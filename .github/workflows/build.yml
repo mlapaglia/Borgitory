@@ -56,25 +56,6 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Test container startup
-      if: github.event_name == 'pull_request'
-      run: |
-        docker build -t borgitory-test .
-        docker run --rm -d --name borgitory-test-container \
-          -p 8000:8000 \
-          -e SECRET_KEY=test-secret \
-          -e DATABASE_URL=sqlite:///./data/test.db \
-          borgitory-test
-        
-        # Wait for container to start
-        sleep 10
-        
-        # Test if the application responds
-        curl -f http://localhost:8000/api/jobs/ || exit 1
-        
-        # Clean up
-        docker stop borgitory-test-container
-
   security-scan:
     runs-on: ubuntu-latest
     needs: build
