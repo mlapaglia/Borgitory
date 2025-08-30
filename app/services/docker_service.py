@@ -5,7 +5,13 @@ from typing import AsyncGenerator, Dict, Optional
 import docker
 from docker.models.containers import Container
 
-from app.config import BORG_DOCKER_IMAGE
+from app.config import (
+    BORG_DOCKER_IMAGE, 
+    BORG_REPOS_HOST_PATH, 
+    BACKUP_SOURCES_HOST_PATH,
+    BORG_REPOS_CONTAINER_PATH,
+    BACKUP_SOURCES_CONTAINER_PATH
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +52,9 @@ class DockerService:
             if volumes is None:
                 volumes = {}
             
-            volumes["/c/code/Borgitory/borg-repos"] = {"bind": "/repos", "mode": "rw"}
-            
-            volumes["/c/code/Borgitory/backup-sources"] = {"bind": "/data", "mode": "ro"}
+            # Use configurable paths instead of hardcoded Windows paths
+            volumes[BORG_REPOS_HOST_PATH] = {"bind": BORG_REPOS_CONTAINER_PATH, "mode": "rw"}
+            volumes[BACKUP_SOURCES_HOST_PATH] = {"bind": BACKUP_SOURCES_CONTAINER_PATH, "mode": "ro"}
             
             env_list = [f"{k}={v}" for k, v in environment.items()]
             logger.info(f"Environment as list: {env_list}")

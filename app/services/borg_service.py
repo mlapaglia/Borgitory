@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.models.database import Repository, Job, get_db
 from app.services.docker_service import docker_service
+from app.utils.security import (
+    build_secure_borg_command, 
+    validate_archive_name, 
+    validate_compression,
+    sanitize_path
+)
 
 
 class BorgService:
@@ -23,17 +29,29 @@ class BorgService:
         
         logger.info(f"Initializing Borg repository at {repository.path}")
         
-        passphrase = repository.get_passphrase()
-        
-        command = [
-            "sh", "-c", 
-            f"BORG_PASSPHRASE='{passphrase}' BORG_RELOCATED_REPO_ACCESS_IS_OK=yes borg init --encryption {encryption} {repository.path}"
-        ]
-        
-        environment = {
-            "BORG_PASSPHRASE": passphrase,
-            "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes"
-        }
+        try:
+            passphrase = repository.get_passphrase()
+            
+            # Validate encryption type
+            valid_encryptions = {"repokey", "keyfile", "repokey-blake2", "keyfile-blake2", "authenticated", "authenticated-blake2", "none"}
+            if encryption not in valid_encryptions:
+                raise ValueError(f"Invalid encryption type: {encryption}")
+            
+            # Build secure command
+            command, environment = build_secure_borg_command(
+                base_command="borg init",
+                repository_path=repository.path,
+                passphrase=passphrase,
+                additional_args=[f"--encryption={encryption}"]
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to build secure command: {e}")
+            return {
+                "success": False,
+                "message": f"Invalid repository configuration: {str(e)}",
+                "output": ""
+            }
         
         try:
             container = await docker_service.run_borg_container(
@@ -96,35 +114,48 @@ class BorgService:
         logger.info(f"Creating backup for repository: {repository.name} at {repository.path}")
         logger.info(f"Source: {source_path}, Compression: {compression}, Dry run: {dry_run}")
         
-        archive_name = f"backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        logger.info(f"Archive name: {archive_name}")
-        
-        logger.info("Setting up environment variables...")
         try:
+            # Validate inputs
+            safe_compression = validate_compression(compression)
+            archive_name = validate_archive_name(f"backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+            safe_source_path = sanitize_path(source_path)
+            
+            logger.info(f"Archive name: {archive_name}")
+            
             passphrase = repository.get_passphrase()
             logger.info("Retrieved repository passphrase successfully")
+            
+            # Build secure command arguments
+            args = ["--stats", "--progress", "--json", f"--compression={safe_compression}"]
+            if dry_run:
+                args.append("--dry-run")
+            
+            # Add archive specification and source path
+            repo_archive = f"{repository.path}::{archive_name}"
+            args.extend([repo_archive, safe_source_path])
+            
+            # Build secure command
+            command, environment = build_secure_borg_command(
+                base_command="borg create",
+                repository_path="",  # Already included in args
+                passphrase=passphrase,
+                additional_args=args[:-2]  # All args except repo_archive and source
+            )
+            
+            # Manually add the final arguments since they need special handling
+            command.extend([repo_archive, safe_source_path])
+            
+            logger.info("Secure command built successfully")
+            
         except Exception as e:
-            logger.error(f"Failed to get repository passphrase: {e}")
-            raise
+            logger.error(f"Failed to build secure backup command: {e}")
+            yield {
+                "type": "error",
+                "message": f"Invalid backup configuration: {str(e)}"
+            }
+            return
         
-        borg_cmd = f"borg create --stats --progress --json --compression={compression}"
-        if dry_run:
-            borg_cmd += " --dry-run"
-        borg_cmd += f" {repository.path}::{archive_name} {source_path}"
-        
-        command = [
-            "sh", "-c",
-            f"BORG_PASSPHRASE='{passphrase}' BORG_RELOCATED_REPO_ACCESS_IS_OK=yes BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=yes {borg_cmd}"
-        ]
-        
-        environment = {
-            "BORG_PASSPHRASE": passphrase,
-            "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes",
-            "BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK": "yes"
-        }
-        logger.info("Environment variables set up successfully")
-        
-        logger.info(f"Using source path: {source_path}")
+        logger.info(f"Using source path: {safe_source_path}")
         volumes = None
         logger.info("Volume mapping handled automatically by docker_service")
         
@@ -154,7 +185,7 @@ class BorgService:
             yield {
                 "type": "completed", 
                 "exit_code": exit_code,
-                "status": "success" if status["exit_code"] in [0, 143] else "failed"
+                "status": "success" if exit_code in [0, 143] else "failed"
             }
             
         except Exception as e:
@@ -169,16 +200,19 @@ class BorgService:
     
     async def list_archives(self, repository: Repository) -> List[Dict]:
         """List all archives in a repository"""
-        passphrase = repository.get_passphrase()
-        command = [
-            "sh", "-c",
-            f"BORG_PASSPHRASE='{passphrase}' BORG_RELOCATED_REPO_ACCESS_IS_OK=yes borg list --json {repository.path}"
-        ]
-        
-        environment = {
-            "BORG_PASSPHRASE": passphrase,
-            "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes"
-        }
+        try:
+            passphrase = repository.get_passphrase()
+            
+            # Build secure command
+            command, environment = build_secure_borg_command(
+                base_command="borg list",
+                repository_path=repository.path,
+                passphrase=passphrase,
+                additional_args=["--json"]
+            )
+            
+        except Exception as e:
+            raise Exception(f"Failed to build secure list command: {str(e)}")
         
         try:
             container = await docker_service.run_borg_container(
@@ -232,16 +266,17 @@ class BorgService:
         import logging
         logger = logging.getLogger(__name__)
         
-        # Build the borg command to test access
-        command = [
-            "sh", "-c",
-            f"BORG_PASSPHRASE='{passphrase}' BORG_RELOCATED_REPO_ACCESS_IS_OK=yes borg list --json {repo_path}"
-        ]
-        
-        environment = {
-            "BORG_PASSPHRASE": passphrase,
-            "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes"
-        }
+        try:
+            # Build secure command
+            command, environment = build_secure_borg_command(
+                base_command="borg list",
+                repository_path=repo_path,
+                passphrase=passphrase,
+                additional_args=["--json"]
+            )
+        except Exception as e:
+            logger.error(f"Failed to build secure verify command: {e}")
+            return False
         
         # TODO: Add keyfile support when keyfile_path is provided
         if keyfile_path:
@@ -265,7 +300,7 @@ class BorgService:
             logger.info(f"Repository verification output: {output[:500]}...")
             
             # Only exit code 0 indicates success for verification
-            if status["exit_code"] == 0:
+            if exit_code == 0:
                 try:
                     # Try to parse as JSON to ensure it's valid
                     json_start = output.find('{')
@@ -293,16 +328,18 @@ class BorgService:
     
     async def get_repo_info(self, repository: Repository) -> Dict:
         """Get repository information"""
-        passphrase = repository.get_passphrase()
-        command = [
-            "sh", "-c",
-            f"BORG_PASSPHRASE='{passphrase}' BORG_RELOCATED_REPO_ACCESS_IS_OK=yes borg info --json {repository.path}"
-        ]
-        
-        environment = {
-            "BORG_PASSPHRASE": passphrase,
-            "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes"
-        }
+        try:
+            passphrase = repository.get_passphrase()
+            
+            # Build secure command
+            command, environment = build_secure_borg_command(
+                base_command="borg info",
+                repository_path=repository.path,
+                passphrase=passphrase,
+                additional_args=["--json"]
+            )
+        except Exception as e:
+            raise Exception(f"Failed to build secure info command: {str(e)}")
         
         try:
             container = await docker_service.run_borg_container(
@@ -357,16 +394,21 @@ class BorgService:
     
     async def list_archive_contents(self, repository: Repository, archive_name: str) -> List[Dict]:
         """List the contents of a specific archive"""
-        passphrase = repository.get_passphrase()
-        command = [
-            "sh", "-c",
-            f"BORG_PASSPHRASE='{passphrase}' BORG_RELOCATED_REPO_ACCESS_IS_OK=yes borg list --json-lines {repository.path}::{archive_name}"
-        ]
-        
-        environment = {
-            "BORG_PASSPHRASE": passphrase,
-            "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes"
-        }
+        try:
+            passphrase = repository.get_passphrase()
+            safe_archive_name = validate_archive_name(archive_name)
+            
+            # Build secure command with archive specification
+            repo_archive = f"{repository.path}::{safe_archive_name}"
+            command, environment = build_secure_borg_command(
+                base_command="borg list",
+                repository_path="",  # Already in repo_archive
+                passphrase=passphrase,
+                additional_args=["--json-lines", repo_archive]
+            )
+            
+        except Exception as e:
+            raise Exception(f"Failed to build secure archive list command: {str(e)}")
         
         try:
             container = await docker_service.run_borg_container(
@@ -407,9 +449,17 @@ class BorgService:
         import logging
         logger = logging.getLogger(__name__)
         
+        try:
+            safe_scan_path = sanitize_path(scan_path)
+        except Exception as e:
+            logger.error(f"Invalid scan path: {e}")
+            return []
+        
+        # Use a safer find command without shell injection
         command = [
-            "sh", "-c",
-            f"find {scan_path} -name 'config' -type f -exec sh -c 'if grep -q \"\\[repository\\]\" \"$1\" 2>/dev/null; then dirname \"$1\"; fi' _ {{}} \\; 2>/dev/null"
+            "find", safe_scan_path, "-name", "config", "-type", "f", "-exec",
+            "sh", "-c", 'if grep -q "\\[repository\\]" "$1" 2>/dev/null; then dirname "$1"; fi',
+            "_", "{}", ";"
         ]
         
         environment = {}
@@ -430,7 +480,7 @@ class BorgService:
             
             logger.info(f"Repository scan completed with exit code {exit_code}, output: {output[:500]}...")
             
-            if status["exit_code"] in [0, 143]:
+            if exit_code in [0, 143]:
                 repo_paths = []
                 for line in output.strip().split('\n'):
                     line = line.strip()
@@ -463,9 +513,10 @@ class BorgService:
         
         try:
             # First, check if it's a valid repository by looking for the config file
+            safe_repo_path = sanitize_path(repo_path)
             config_check_command = [
                 "sh", "-c", 
-                f"if [ -f '{repo_path}/config' ]; then echo 'REPO_EXISTS'; else echo 'NO_REPO'; fi"
+                f'if [ -f "{safe_repo_path}/config" ]; then echo "REPO_EXISTS"; else echo "NO_REPO"; fi'
             ]
             
             container = await docker_service.run_borg_container(
@@ -482,7 +533,7 @@ class BorgService:
             logger.info(f"Container output: {output}")
             
             
-            if status["exit_code"] not in [0, 143] or "REPO_EXISTS" not in output:
+            if exit_code not in [0, 143] or "REPO_EXISTS" not in output:
                 logger.warning(f"Repository not found or invalid at {repo_path}")
                 return None
             
@@ -490,10 +541,10 @@ class BorgService:
             combined_command = [
                 "sh", "-c",
                 f"echo '=== BORG_INFO_START ==='; "
-                f"borg info '{repo_path}' 2>&1 || echo 'INFO_FAILED'; "
+                f'borg info "{safe_repo_path}" 2>&1 || echo "INFO_FAILED"; '
                 f"echo '=== BORG_INFO_END ==='; "
                 f"echo '=== CONFIG_ID_START ==='; "
-                f"grep '^id = ' '{repo_path}/config' 2>/dev/null || echo 'NO_ID'; "
+                f'grep "^id = " "{safe_repo_path}/config" 2>/dev/null || echo "NO_ID"; '
                 f"echo '=== CONFIG_ID_END ==='"
             ]
             
