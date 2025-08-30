@@ -2,21 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including rclone
 RUN apt-get update && apt-get install -y \
-    curl \
-    unzip \
+    rclone \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Rclone
-RUN curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip \
-    && unzip rclone-current-linux-amd64.zip \
-    && cd rclone-*-linux-amd64 \
-    && cp rclone /usr/bin/ \
-    && chown root:root /usr/bin/rclone \
-    && chmod 755 /usr/bin/rclone \
-    && cd .. \
-    && rm -rf rclone-*
 
 # Install Python dependencies
 COPY requirements.txt .
