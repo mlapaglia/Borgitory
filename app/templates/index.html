@@ -135,10 +135,22 @@
     <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Backup Operations</h2>
         
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Manual Backup -->
-            <div class="border rounded-lg p-4">
-                <h3 class="font-medium text-gray-700 mb-3">Create Backup</h3>
+        <!-- Tabs -->
+        <div class="flex mb-6 border-b">
+            <button onclick="switchBackupTab('manual')" id="manual-backup-tab" class="px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
+                Manual Backup
+            </button>
+            <button onclick="switchBackupTab('scheduled')" id="scheduled-backup-tab" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+                Scheduled Backup
+            </button>
+        </div>
+        
+        <!-- Manual Backup Tab -->
+        <div id="manual-backup-form" class="backup-tab">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Manual Backup -->
+                <div class="border rounded-lg p-4">
+                    <h3 class="font-medium text-gray-700 mb-3">Create Backup</h3>
                 <form 
                     hx-post="/api/jobs/backup" 
                     hx-ext="json-enc"
@@ -173,16 +185,100 @@
                         </button>
                     </div>
                 </form>
-                <div id="backup-status" class="mt-4"></div>
-            </div>
+                    <div id="backup-status" class="mt-4"></div>
+                </div>
 
-            <!-- Real-time Progress -->
-            <div class="border rounded-lg p-4">
-                <h3 class="font-medium text-gray-700 mb-3">Current Operations</h3>
-                <div id="current-jobs" hx-get="/api/jobs/" hx-trigger="load, every 5s" hx-swap="innerHTML" hx-on::after-request="formatCurrentJobs(event)">
-                    <div class="text-gray-500 text-sm">No active operations</div>
+                <!-- Real-time Progress -->
+                <div class="border rounded-lg p-4">
+                    <h3 class="font-medium text-gray-700 mb-3">Current Operations</h3>
+                    <div id="current-jobs" hx-get="/api/jobs/" hx-trigger="load, every 5s" hx-swap="innerHTML" hx-on::after-request="formatCurrentJobs(event)">
+                        <div class="text-gray-500 text-sm">No active operations</div>
+                    </div>
                 </div>
             </div>
+        </div>
+        
+        <!-- Scheduled Backup Tab -->
+        <div id="scheduled-backup-form" class="backup-tab hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Create Schedule -->
+                <div class="border rounded-lg p-4">
+                    <h3 class="font-medium text-gray-700 mb-3">Create Schedule</h3>
+                    <form 
+                        hx-post="/api/schedules/" 
+                        hx-ext="json-enc"
+                        hx-target="#schedule-status"
+                        hx-on::after-request="handleScheduleResponse(event)"
+                    >
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Name</label>
+                                <input type="text" name="name" required placeholder="Daily backup" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Repository</label>
+                                <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Select Repository...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Schedule</label>
+                                <select onchange="updateCronExpression()" id="schedule-preset" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Select a preset...</option>
+                                    <option value="0 2 * * *">Daily at 2:00 AM</option>
+                                    <option value="0 2 * * 0">Weekly on Sunday at 2:00 AM</option>
+                                    <option value="0 2 1 * *">Monthly on 1st at 2:00 AM</option>
+                                    <option value="0 2 1,15 * *">Twice monthly (1st and 15th) at 2:00 AM</option>
+                                    <option value="0 2 */2 * *">Every 2 days at 2:00 AM</option>
+                                    <option value="0 2 15-21 * 6">Third Saturday of month at 2:00 AM (approximation)</option>
+                                    <option value="custom">Custom (cron expression)</option>
+                                </select>
+                            </div>
+                            <div id="custom-cron" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700">Custom Cron Expression</label>
+                                <input type="text" id="custom-cron-input" placeholder="0 2 * * *" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                <p class="mt-1 text-sm text-gray-500">Format: minute hour day month weekday</p>
+                            </div>
+                            <input type="hidden" name="cron_expression" id="cron-expression">
+                            <div id="cron-description" class="text-sm text-gray-600 bg-blue-50 p-2 rounded hidden"></div>
+                            <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                                Create Schedule
+                            </button>
+                        </div>
+                    </form>
+                    <div id="schedule-status" class="mt-4"></div>
+                </div>
+
+                <!-- Existing Schedules -->
+                <div class="border rounded-lg p-4">
+                    <h3 class="font-medium text-gray-700 mb-3">Existing Schedules</h3>
+                    <div id="schedules-list" 
+                         hx-get="/api/schedules/html" 
+                         hx-trigger="load, every 30s, scheduleUpdate from:body" 
+                         hx-swap="innerHTML"
+                         hx-indicator=".schedules-loading">
+                        <div class="text-gray-500 text-sm">Loading schedules...</div>
+                    </div>
+                    <div class="schedules-loading htmx-indicator">
+                        <div class="text-blue-500 text-sm">Updating schedules...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Scheduled Backups -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Upcoming Scheduled Backups</h2>
+        <div id="upcoming-backups" 
+             hx-get="/api/schedules/upcoming/html" 
+             hx-trigger="load, every 60s, scheduleUpdate from:body" 
+             hx-swap="innerHTML"
+             hx-indicator=".upcoming-loading">
+            <div class="text-gray-500 text-sm">Loading upcoming backups...</div>
+        </div>
+        <div class="upcoming-loading htmx-indicator">
+            <div class="text-blue-500 text-sm">Updating upcoming backups...</div>
         </div>
     </div>
 
@@ -386,8 +482,8 @@ function borgitoryApp() {
         },
         
         updateRepositorySelect() {
-            const select = document.querySelector('select[name="repository_id"]');
-            if (select) {
+            const selects = document.querySelectorAll('select[name="repository_id"]');
+            selects.forEach(select => {
                 select.innerHTML = '<option value="">Select Repository...</option>';
                 this.repositories.forEach(repo => {
                     const option = document.createElement('option');
@@ -395,7 +491,7 @@ function borgitoryApp() {
                     option.textContent = repo.name;
                     select.appendChild(option);
                 });
-            }
+            });
             
             // Also update the repository list display
             this.updateRepositoryList();
@@ -841,6 +937,188 @@ function formatJobHistory(event) {
         `).join('');
     } catch (e) {
         console.error('Error formatting job history:', e);
+    }
+}
+
+// Backup tab management
+function switchBackupTab(tab) {
+    const manualTab = document.getElementById('manual-backup-tab');
+    const scheduledTab = document.getElementById('scheduled-backup-tab');
+    const manualForm = document.getElementById('manual-backup-form');
+    const scheduledForm = document.getElementById('scheduled-backup-form');
+    
+    if (tab === 'manual') {
+        manualTab.className = 'px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600';
+        scheduledTab.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700';
+        manualForm.classList.remove('hidden');
+        scheduledForm.classList.add('hidden');
+    } else {
+        manualTab.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700';
+        scheduledTab.className = 'px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600';
+        manualForm.classList.add('hidden');
+        scheduledForm.classList.remove('hidden');
+    }
+}
+
+// Schedule management functions
+function updateCronExpression() {
+    const preset = document.getElementById('schedule-preset');
+    const customCron = document.getElementById('custom-cron');
+    const customInput = document.getElementById('custom-cron-input');
+    const cronExpression = document.getElementById('cron-expression');
+    const cronDescription = document.getElementById('cron-description');
+    
+    if (preset.value === 'custom') {
+        customCron.classList.remove('hidden');
+        cronExpression.value = customInput.value;
+    } else if (preset.value) {
+        customCron.classList.add('hidden');
+        cronExpression.value = preset.value;
+        
+        // Show human-readable description
+        const descriptions = {
+            '0 2 * * *': 'Runs daily at 2:00 AM',
+            '0 2 * * 0': 'Runs weekly on Sundays at 2:00 AM',
+            '0 2 1 * *': 'Runs monthly on the 1st at 2:00 AM',
+            '0 2 1,15 * *': 'Runs twice monthly (1st and 15th) at 2:00 AM',
+            '0 2 */2 * *': 'Runs every 2 days at 2:00 AM',
+            '0 2 15-21 * 6': 'Runs on the third Saturday of each month at 2:00 AM (15th-21st, Saturday only)'
+        };
+        
+        if (descriptions[preset.value]) {
+            cronDescription.textContent = descriptions[preset.value];
+            cronDescription.classList.remove('hidden');
+        } else {
+            cronDescription.classList.add('hidden');
+        }
+    } else {
+        customCron.classList.add('hidden');
+        cronExpression.value = '';
+        cronDescription.classList.add('hidden');
+    }
+}
+
+// Handle custom cron input changes
+document.addEventListener('DOMContentLoaded', function() {
+    const customInput = document.getElementById('custom-cron-input');
+    if (customInput) {
+        customInput.addEventListener('input', function() {
+            const cronExpression = document.getElementById('cron-expression');
+            cronExpression.value = this.value;
+        });
+    }
+});
+
+// Handle schedule form response
+function handleScheduleResponse(event) {
+    const xhr = event.detail.xhr;
+    const form = event.target;
+    const statusDiv = document.getElementById('schedule-status');
+    
+    if (xhr.status >= 200 && xhr.status < 300) {
+        // Success
+        showNotification('Schedule created successfully!', 'success');
+        form.reset();
+        document.getElementById('cron-description').classList.add('hidden');
+        statusDiv.innerHTML = `
+            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                <span class="text-green-700 text-sm">Schedule created and activated</span>
+            </div>
+        `;
+        
+        // Trigger custom event to refresh all schedule-related sections
+        document.body.dispatchEvent(new CustomEvent('scheduleUpdate'));
+    } else {
+        // Error
+        let errorMessage = 'Failed to create schedule';
+        try {
+            const errorData = JSON.parse(xhr.response);
+            if (errorData.detail) {
+                errorMessage = Array.isArray(errorData.detail) 
+                    ? errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ')
+                    : errorData.detail;
+            }
+        } catch (e) {
+            errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
+        }
+        showNotification(errorMessage, 'error');
+        statusDiv.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <span class="text-red-700 text-sm">${errorMessage}</span>
+            </div>
+        `;
+    }
+}
+
+// Note: Formatting now handled by backend HTML endpoints
+
+// Helper function to format time until next run
+function formatTimeUntil(milliseconds) {
+    if (milliseconds < 0) return 'Overdue';
+    
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) {
+        const remainingHours = hours % 24;
+        return `${days}d ${remainingHours}h`;
+    } else if (hours > 0) {
+        const remainingMinutes = minutes % 60;
+        return `${hours}h ${remainingMinutes}m`;
+    } else if (minutes > 0) {
+        const remainingSeconds = seconds % 60;
+        return `${minutes}m ${remainingSeconds}s`;
+    } else {
+        return `${seconds}s`;
+    }
+}
+
+// Schedule management actions
+async function toggleSchedule(scheduleId) {
+    try {
+        const response = await fetch(`/api/schedules/${scheduleId}/toggle`, {
+            method: 'PUT'
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            showNotification(data.message, 'success');
+            
+            // Trigger custom event to refresh all schedule-related sections
+            document.body.dispatchEvent(new CustomEvent('scheduleUpdate'));
+        } else {
+            const error = await response.json();
+            showNotification(`Failed to toggle schedule: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Error toggling schedule: ${error.message}`, 'error');
+    }
+}
+
+async function deleteSchedule(scheduleId, scheduleName) {
+    if (!confirm(`Are you sure you want to delete the schedule "${scheduleName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/schedules/${scheduleId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            showNotification(data.message, 'success');
+            
+            // Trigger custom event to refresh all schedule-related sections
+            document.body.dispatchEvent(new CustomEvent('scheduleUpdate'));
+        } else {
+            const error = await response.json();
+            showNotification(`Failed to delete schedule: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Error deleting schedule: ${error.message}`, 'error');
     }
 }
 </script>
