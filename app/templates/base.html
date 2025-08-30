@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Borgitory - BorgBackup Manager{% endblock %}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-semibold text-gray-900">Borgitory</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="logout-btn" class="text-sm text-gray-500 hover:text-gray-700">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div id="notification-area" class="fixed top-4 right-4 z-50"></div>
+
+    <script>
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `px-4 py-2 rounded-lg shadow-lg mb-2 transition-opacity duration-500 ${
+                type === 'error' ? 'bg-red-100 text-red-700 border border-red-300' :
+                type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' :
+                'bg-blue-100 text-blue-700 border border-blue-300'
+            }`;
+            notification.textContent = message;
+            
+            document.getElementById('notification-area').appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 500);
+            }, 5000);
+        }
+
+        // Global HTMX event listeners (only for unhandled errors)
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            // Only show if no specific handler was used
+            if (!evt.target.hasAttribute('hx-on::after-request')) {
+                showNotification('An error occurred: ' + evt.detail.xhr.statusText, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
