@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.database import Repository, Job, get_db
 from app.models.schemas import Job as JobSchema, BackupRequest
@@ -45,46 +45,112 @@ async def create_backup(
         raise HTTPException(status_code=500, detail=f"Failed to start backup: {str(e)}")
 
 
+@router.get("/stream")
+async def stream_all_jobs():
+    """Stream real-time updates for all jobs via Server-Sent Events"""
+    async def event_generator():
+        try:
+            # Send initial job list
+            jobs_data = []
+            for job_id, borg_job in borg_job_manager.jobs.items():
+                jobs_data.append({
+                    "id": job_id,
+                    "type": "job_status",
+                    "status": borg_job.status,
+                    "started_at": borg_job.started_at.isoformat(),
+                    "completed_at": borg_job.completed_at.isoformat() if borg_job.completed_at else None,
+                    "return_code": borg_job.return_code,
+                    "error": borg_job.error,
+                    "progress": borg_job.current_progress,
+                    "command": " ".join(borg_job.command[:3]) + "..." if len(borg_job.command) > 3 else " ".join(borg_job.command)
+                })
+            
+            if jobs_data:
+                yield f"event: jobs_update\ndata: {json.dumps({'type': 'jobs_update', 'jobs': jobs_data})}\n\n"
+            else:
+                yield f"event: jobs_update\ndata: {json.dumps({'type': 'jobs_update', 'jobs': []})}\n\n"
+            
+            # Stream job updates
+            async for event in borg_job_manager.stream_all_job_updates():
+                event_type = event.get('type', 'unknown')
+                yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
+                
+        except Exception as e:
+            logger.error(f"SSE streaming error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+        }
+    )
+
 @router.get("/")
 def list_jobs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """List database job records (legacy jobs) and active JobManager jobs"""
     
-    # Get database jobs (legacy)
-    db_jobs = db.query(Job).order_by(Job.id.desc()).offset(skip).limit(limit).all()
+    # Get database jobs (legacy) with repository relationship loaded
+    db_jobs = db.query(Job).options(joinedload(Job.repository)).order_by(Job.id.desc()).offset(skip).limit(limit).all()
     
     # Convert to dict format and add JobManager jobs
     jobs_list = []
     
     # Add database jobs
     for job in db_jobs:
+        repository_name = "Unknown"
+        if job.repository_id and job.repository:
+            repository_name = job.repository.name
+        
         jobs_list.append({
             "id": job.id,
-            "job_id": job.job_id,
+            "job_id": str(job.id),  # Use primary key as job_id
             "repository_id": job.repository_id,
+            "repository_name": repository_name,
             "type": job.type,
             "status": job.status,
             "started_at": job.started_at.isoformat() if job.started_at else None,
             "finished_at": job.finished_at.isoformat() if job.finished_at else None,
             "error": job.error,
+            "log_output": job.log_output,
             "source": "database"
         })
     
     # Add active JobManager jobs
     for job_id, borg_job in borg_job_manager.jobs.items():
         # Skip if this job is already in database
-        existing_db_job = next((j for j in db_jobs if j.job_id == job_id), None)
+        existing_db_job = next((j for j in db_jobs if str(j.id) == job_id), None)
         if existing_db_job:
             continue
+        
+        # Try to find the repository name from command if possible
+        repository_name = "Unknown"
+        job_type = "unknown"
+        
+        # Try to infer type from command
+        if borg_job.command and len(borg_job.command) > 1:
+            if "create" in borg_job.command:
+                job_type = "backup"
+            elif "list" in borg_job.command:
+                job_type = "list"
+            elif "check" in borg_job.command:
+                job_type = "verify"
         
         jobs_list.append({
             "id": f"jm_{job_id}",  # Prefix to distinguish from DB IDs
             "job_id": job_id,
             "repository_id": None,  # JobManager doesn't track this separately
-            "type": "unknown",  # Could be inferred from command
+            "repository_name": repository_name,
+            "type": job_type,
             "status": borg_job.status,
             "started_at": borg_job.started_at.isoformat(),
             "finished_at": borg_job.completed_at.isoformat() if borg_job.completed_at else None,
             "error": borg_job.error,
+            "log_output": None,  # JobManager output is in-memory only
             "source": "jobmanager"
         })
     
@@ -114,17 +180,23 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     # Try database lookup
     try:
         db_job_id = int(job_id)
-        job = db.query(Job).filter(Job.id == db_job_id).first()
+        job = db.query(Job).options(joinedload(Job.repository)).filter(Job.id == db_job_id).first()
         if job:
+            repository_name = "Unknown"
+            if job.repository_id and job.repository:
+                repository_name = job.repository.name
+                
             return {
                 "id": job.id,
-                "job_id": job.job_id,
+                "job_id": str(job.id),  # Use primary key as job_id
                 "repository_id": job.repository_id,
+                "repository_name": repository_name,
                 "type": job.type,
                 "status": job.status,
                 "started_at": job.started_at.isoformat() if job.started_at else None,
                 "finished_at": job.finished_at.isoformat() if job.finished_at else None,
                 "error": job.error,
+                "log_output": job.log_output,
                 "source": "database"
             }
     except ValueError:
@@ -153,7 +225,6 @@ async def get_job_output(job_id: str, last_n_lines: int = 100):
         raise HTTPException(status_code=404, detail=output['error'])
     
     return output
-
 
 @router.get("/{job_id}/stream")
 async def stream_job_output(job_id: str):
@@ -188,11 +259,11 @@ async def cancel_job(job_id: str, db: Session = Depends(get_db)):
     # Try database job
     try:
         db_job_id = int(job_id)
-        job = db.query(Job).filter(Job.id == db_job_id).first()
+        job = db.query(Job).options(joinedload(Job.repository)).filter(Job.id == db_job_id).first()
         if job:
             # Try to cancel the associated JobManager job
-            if job.job_id:
-                await borg_job_manager.cancel_job(job.job_id)
+            # Note: Database jobs and JobManager jobs are separate systems
+            # Database jobs don't directly map to JobManager UUIDs
             
             # Update database status
             job.status = "cancelled"
@@ -239,3 +310,21 @@ def cleanup_completed_jobs():
         cleaned += 1
     
     return {"message": f"Cleaned up {cleaned} completed jobs"}
+
+
+@router.get("/queue/stats")
+def get_queue_stats():
+    """Get backup queue statistics"""
+    return borg_job_manager.get_queue_stats()
+
+
+@router.post("/migrate")
+def run_database_migration(db: Session = Depends(get_db)):
+    """Manually trigger database migration for jobs table"""
+    try:
+        from app.models.database import migrate_job_table
+        migrate_job_table()
+        return {"message": "Database migration completed successfully"}
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")

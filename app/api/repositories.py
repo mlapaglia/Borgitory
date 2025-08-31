@@ -108,10 +108,10 @@ async def start_repository_scan():
         raise HTTPException(status_code=500, detail=f"Failed to start scan: {str(e)}")
 
 @router.get("/scan-existing/status/{job_id}")
-def check_scan_status(job_id: str):
+async def check_scan_status(job_id: str):
     """Check status of repository scan job"""
     try:
-        status = borg_service.check_scan_status(job_id)
+        status = await borg_service.check_scan_status(job_id)
         return status
     except Exception as e:
         logger.error(f"Error checking scan status: {e}")

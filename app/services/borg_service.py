@@ -226,16 +226,16 @@ class BorgService:
             raise Exception(f"Security validation failed: {str(e)}")
         
         try:
-            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            job_id = await borg_job_manager.start_borg_command(command, env=env, is_backup=True)
             
             # Create job record in database
             db = next(get_db())
             try:
                 job = Job(
                     repository_id=repository.id,
-                    job_id=job_id,
+                    job_uuid=job_id,  # Store the JobManager UUID
                     type="backup",
-                    status="running",
+                    status="queued",  # Will be updated to 'running' when started
                     started_at=datetime.now()
                 )
                 db.add(job)
@@ -266,7 +266,24 @@ class BorgService:
             raise Exception(f"Security validation failed: {str(e)}")
         
         try:
-            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            # Create database job record for tracking
+            db = next(get_db())
+            try:
+                job_id = await borg_job_manager.start_borg_command(command, env=env)
+                
+                # Create database job record
+                db_job = Job(
+                    repository_id=repository.id,
+                    job_uuid=job_id,
+                    type="list",
+                    status="running",
+                    started_at=datetime.utcnow()
+                )
+                db.add(db_job)
+                db.commit()
+                logger.info(f"Created database record for list archives job {job_id}")
+            finally:
+                db.close()
             
             # Wait for completion (list is usually quick)
             max_wait = 30  # 30 seconds max
@@ -277,27 +294,38 @@ class BorgService:
                 if not status:
                     raise Exception("Job not found")
                 
-                if status['completed']:
+                if status['completed'] or status['status'] in ['completed', 'failed']:
+                    # Get the output first
+                    output = await borg_job_manager.get_job_output_stream(job_id)
+                    
                     if status['return_code'] == 0:
-                        # Get the output
-                        output = await borg_job_manager.get_job_output_stream(job_id)
-                        
-                        # Parse JSON output
+                        # Parse JSON output - look for complete JSON structure
+                        json_lines = []
                         for line in output.get('lines', []):
-                            line_text = line['text']
-                            if line_text.startswith('{') and '"archives"' in line_text:
-                                try:
-                                    data = json.loads(line_text)
-                                    return data["archives"]
-                                except json.JSONDecodeError as je:
-                                    logger.error(f"JSON decode error: {je}")
+                            line_text = line['text'].strip()
+                            if line_text:
+                                json_lines.append(line_text)
+                        
+                        # Try to parse the complete JSON output
+                        full_json = '\n'.join(json_lines)
+                        try:
+                            data = json.loads(full_json)
+                            if "archives" in data:
+                                logger.info(f"Successfully parsed {len(data['archives'])} archives from repository")
+                                return data["archives"]
+                        except json.JSONDecodeError as je:
+                            logger.error(f"JSON decode error: {je}")
+                            logger.error(f"Raw output: {full_json[:500]}...")  # Log first 500 chars
                         
                         # Fallback: return empty list if no valid JSON found
+                        logger.warning(f"No valid archives JSON found in output, returning empty list")
                         return []
                     else:
                         error_lines = [line['text'] for line in output.get('lines', [])]
                         error_text = '\n'.join(error_lines)
-                        raise Exception(f"Borg list failed: {error_text}")
+                        raise Exception(f"Borg list failed with return code {status['return_code']}: {error_text}")
+                    
+                    break  # Exit the while loop since job is complete
                 
                 await asyncio.sleep(0.5)
                 wait_time += 0.5
@@ -438,11 +466,20 @@ class BorgService:
             logger.error(f"Failed to start repository scan: {e}")
             raise Exception(f"Failed to start repository scan: {e}")
     
-    def check_scan_status(self, job_id: str) -> Dict[str, any]:
+    async def check_scan_status(self, job_id: str) -> Dict[str, any]:
         """Check status of repository scan job"""
         status = borg_job_manager.get_job_status(job_id)
         if not status:
             return {"running": False, "completed": False, "error": "Job not found"}
+        
+        # Get job output for error debugging
+        output = ""
+        try:
+            job_output = await borg_job_manager.get_job_output_stream(job_id)
+            if 'lines' in job_output:
+                output = "\n".join([line['text'] for line in job_output['lines'][-20:]])  # Last 20 lines
+        except Exception as e:
+            logger.debug(f"Could not get job output for {job_id}: {e}")
         
         return {
             "running": status['running'],
@@ -451,7 +488,8 @@ class BorgService:
             "started_at": status['started_at'],
             "completed_at": status['completed_at'],
             "return_code": status['return_code'],
-            "error": status['error']
+            "error": status['error'],
+            "output": output if output else None
         }
     
     async def get_scan_results(self, job_id: str) -> List[Dict]:
@@ -524,10 +562,11 @@ class BorgService:
             
             while wait_time < max_wait:
                 status = borg_job_manager.get_job_status(job_id)
+                
                 if not status:
                     return False
                 
-                if status['completed']:
+                if status['completed'] or status['status'] == 'failed':
                     success = status['return_code'] == 0
                     # Clean up job
                     borg_job_manager.cleanup_job(job_id)
@@ -552,7 +591,7 @@ class BorgService:
         wait_time = 0
         
         while wait_time < max_wait:
-            status = self.check_scan_status(job_id)
+            status = await self.check_scan_status(job_id)
             if status['completed']:
                 return await self.get_scan_results(job_id)
             

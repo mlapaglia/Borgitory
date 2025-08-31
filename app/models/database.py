@@ -44,6 +44,7 @@ class Job(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    job_uuid = Column(String, nullable=True, index=True)  # Links to JobManager UUID
     type = Column(String, nullable=False)  # backup, restore, list, etc.
     status = Column(String, nullable=False, default="pending")  # pending, running, completed, failed
     started_at = Column(DateTime, nullable=True)
@@ -127,6 +128,7 @@ async def init_db():
         
         # Handle specific migrations for existing tables
         migrate_user_table()
+        migrate_job_table()
         
     except Exception as e:
         print(f"Database initialization error: {e}")
@@ -153,6 +155,27 @@ def migrate_user_table():
     
     except Exception as e:
         print(f"⚠️  Migration error: {e}")
+        print("💡 If you see 'no such column' errors, try deleting the database file and restarting")
+
+
+def migrate_job_table():
+    """Handle migration of jobs table to add new columns"""
+    from sqlalchemy import text
+    
+    try:
+        with engine.begin() as conn:
+            # Check if job_uuid column exists
+            try:
+                conn.execute(text("SELECT job_uuid FROM jobs LIMIT 1"))
+                print("Jobs table schema is up to date")
+            except Exception:
+                # Column doesn't exist, add it
+                print("Migrating jobs table: adding job_uuid column...")
+                conn.execute(text("ALTER TABLE jobs ADD COLUMN job_uuid STRING"))
+                print("✅ Migration completed: jobs.job_uuid column added")
+    
+    except Exception as e:
+        print(f"⚠️  Job table migration error: {e}")
         print("💡 If you see 'no such column' errors, try deleting the database file and restarting")
 
 

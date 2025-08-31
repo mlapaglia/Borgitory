@@ -194,8 +194,8 @@
                 <!-- Real-time Progress -->
                 <div class="border rounded-lg p-4">
                     <h3 class="font-medium text-gray-700 mb-3">Current Operations</h3>
-                    <div id="current-jobs" hx-get="/api/jobs/" hx-trigger="load, every 5s" hx-swap="innerHTML" hx-on::after-request="formatCurrentJobs(event)">
-                        <div class="text-gray-500 text-sm">No active operations</div>
+                    <div id="current-jobs">
+                        <div class="text-gray-500 text-sm">Loading current operations...</div>
                     </div>
                 </div>
             </div>
@@ -288,8 +288,8 @@
     <!-- Job History -->
     <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Job History</h2>
-        <div id="job-history" hx-get="/api/jobs/" hx-trigger="load, every 10s" hx-swap="innerHTML" hx-on::after-request="formatJobHistory(event)">
-            <div class="text-gray-500 text-sm">No job history</div>
+        <div id="job-history">
+            <div class="text-gray-500 text-sm">Loading job history...</div>
         </div>
     </div>
 
@@ -324,12 +324,12 @@ function handleImportResponse(event) {
     const buttonText = document.getElementById('import-button-text');
     const spinner = document.getElementById('import-loading-spinner');
     
-    // Hide loading state
+    // Hide loading state immediately
     spinner.classList.add('hidden');
-    buttonText.textContent = 'Import Repository';
     
     if (xhr.status >= 200 && xhr.status < 300) {
         // Success
+        buttonText.textContent = 'Import Repository';
         showNotification('Repository imported successfully!', 'success');
         form.reset();
         
@@ -347,27 +347,21 @@ function handleImportResponse(event) {
         // Trigger HTMX refresh for repository list
         document.body.dispatchEvent(new CustomEvent('repositoryUpdate'));
     } else {
-        // Error - re-enable button
+        // Error - re-enable button immediately
+        buttonText.textContent = 'Import Repository';
         submitButton.disabled = false;
         submitButton.className = 'w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 flex items-center justify-center';
         
-        // Parse and show error message
+        // Parse and show error message immediately
         let errorMessage = 'Failed to import repository';
         try {
             const errorData = JSON.parse(xhr.response);
             if (errorData.detail) {
-                if (Array.isArray(errorData.detail)) {
-                    // Validation errors
-                    errorMessage = errorData.detail.map(err => 
-                        `${err.loc?.join('.')}: ${err.msg}`
-                    ).join(', ');
-                } else {
-                    // String error message
-                    errorMessage = errorData.detail;
-                }
+                errorMessage = Array.isArray(errorData.detail) 
+                    ? errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ')
+                    : errorData.detail;
             }
         } catch (e) {
-            // Fallback error message
             errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
         }
         showNotification(errorMessage, 'error');
@@ -421,13 +415,16 @@ function handleBackupResponse(event) {
             const response = JSON.parse(xhr.response);
             showNotification('Backup started successfully!', 'success');
             statusDiv.innerHTML = `
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div id="backup-job-${response.job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <div class="flex items-center">
                         <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
                         <span class="text-blue-700 text-sm">Backup job #${response.job_id} started... (This may take a few minutes if Docker images need to be downloaded)</span>
                     </div>
                 </div>
             `;
+            
+            // Store the job ID for status updates
+            statusDiv.setAttribute('data-backup-job-id', response.job_id);
         } catch (e) {
             showNotification('Backup started!', 'success');
         }
@@ -467,6 +464,8 @@ function borgitoryApp() {
         
         init() {
             this.loadRepositories();
+            loadJobHistory(); // Load initial job history
+            initializeSSE(); // Set up single SSE connection
             // Store instance globally for form handler
             window.borgitoryAppInstance = this;
         },
@@ -763,8 +762,18 @@ async function scanForRepositories() {
         
         statusDiv.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Scanning for repositories...';
         
-        // Poll for completion
+        // Poll for completion with timeout
+        let pollCount = 0;
+        const maxPollAttempts = 120; // 2 minutes timeout (120 seconds)
         const pollInterval = setInterval(async () => {
+            pollCount++;
+            
+            if (pollCount > maxPollAttempts) {
+                clearInterval(pollInterval);
+                statusDiv.innerHTML = 'Scan timed out after 2 minutes. The scan may still be running in the background.';
+                return;
+            }
+            
             try {
                 const statusResponse = await fetch(`/api/repositories/scan-existing/status/${currentScanJobId}`);
                 if (!statusResponse.ok) {
@@ -775,6 +784,18 @@ async function scanForRepositories() {
                 
                 if (statusData.completed) {
                     clearInterval(pollInterval);
+                    
+                    // Check if the scan failed
+                    if (statusData.error || (statusData.return_code && statusData.return_code !== 0)) {
+                        const errorMsg = statusData.error || `Scan completed with return code ${statusData.return_code}`;
+                        statusDiv.innerHTML = `<span class="text-red-600">Scan failed: ${errorMsg}</span>`;
+                        
+                        // Show detailed output if available for debugging
+                        if (statusData.output) {
+                            statusDiv.innerHTML += `<div class="mt-2 text-xs bg-gray-100 p-2 rounded max-h-32 overflow-y-auto"><pre>${statusData.output}</pre></div>`;
+                        }
+                        return;
+                    }
                     
                     // Get the results
                     const resultsResponse = await fetch(`/api/repositories/scan-existing/results/${currentScanJobId}`);
@@ -806,16 +827,23 @@ async function scanForRepositories() {
                     }
                 } else if (statusData.error) {
                     clearInterval(pollInterval);
-                    throw new Error(statusData.error);
+                    statusDiv.innerHTML = `<span class="text-red-600">Scan error: ${statusData.error}</span>`;
+                    
+                    // Show detailed output if available for debugging
+                    if (statusData.output) {
+                        statusDiv.innerHTML += `<div class="mt-2 text-xs bg-gray-100 p-2 rounded max-h-32 overflow-y-auto"><pre>${statusData.output}</pre></div>`;
+                    }
                 } else {
                     // Still running, update progress if available
                     if (statusData.progress) {
-                        statusDiv.innerHTML = `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Scanning: ${statusData.progress.message || 'In progress'}...`;
+                        statusDiv.innerHTML = `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Scanning: ${statusData.progress.message || 'In progress'}... (${pollCount}/${maxPollAttempts})`;
+                    } else {
+                        statusDiv.innerHTML = `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Scanning for repositories... (${pollCount}/${maxPollAttempts})`;
                     }
                 }
             } catch (pollError) {
                 clearInterval(pollInterval);
-                statusDiv.innerHTML = `Error checking scan status: ${pollError.message}`;
+                statusDiv.innerHTML = `<span class="text-red-600">Error checking scan status: ${pollError.message}</span>`;
                 console.error('Poll error:', pollError);
             }
         }, 1000); // Poll every second
@@ -896,94 +924,471 @@ function selectDiscoveredRepo() {
     }
 }
 
-// Global functions for HTMX callbacks
-function formatCurrentJobs(event) {
-    const container = document.getElementById('current-jobs');
-    if (!container) return;
+// Initialize single SSE connection for all job updates
+function initializeSSE() {
+    // Prevent multiple connections
+    if (window.jobSSEConnection) {
+        console.log('SSE connection already exists, skipping initialization');
+        return;
+    }
     
-    try {
-        const jobs = JSON.parse(event.detail.xhr.response);
-        const runningJobs = jobs.filter(job => job.status === 'running' || job.status === 'pending');
-        
-        if (runningJobs.length === 0) {
-            container.innerHTML = '<div class="text-gray-500 text-sm">No active operations</div>';
-            return;
+    console.log('Initializing SSE connection...');
+    
+    const eventSource = new EventSource('/api/jobs/stream');
+    
+    eventSource.onopen = function(event) {
+        console.log('SSE connection opened');
+        document.getElementById('current-jobs').innerHTML = '<div class="text-gray-500 text-sm">No active operations</div>';
+    };
+    
+    eventSource.onerror = function(event) {
+        console.error('SSE connection error:', event);
+        document.getElementById('current-jobs').innerHTML = '<div class="text-red-500 text-sm">Connection error - retrying...</div>';
+    };
+    
+    // Handle jobs_update events
+    eventSource.addEventListener('jobs_update', function(event) {
+        console.log('jobs_update event:', event.data);
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'jobs_update') {
+                // Only show running jobs in current operations
+                const runningJobs = data.jobs.filter(job => job.status === 'running' || job.status === 'queued');
+                console.log('SSE filtered running jobs:', runningJobs);
+                renderJobsList(runningJobs);
+            }
+        } catch (e) {
+            console.error('Error parsing jobs_update:', e);
         }
-        
-        container.innerHTML = runningJobs.map(job => `
-            <div class="flex items-center justify-between p-3 border rounded-lg mb-2">
-                <div>
-                    <div class="font-medium">Job #${job.id} - ${job.type}</div>
-                    <div class="text-sm text-gray-500">
-                        <span class="inline-flex px-2 py-1 text-xs rounded-full ${borgitoryAppInstance.getStatusColor(job.status)}">${job.status}</span>
-                        ${job.started_at ? 'Started: ' + new Date(job.started_at).toLocaleString() : ''}
-                    </div>
-                </div>
-                <div class="flex space-x-2">
-                    <button onclick="borgitoryAppInstance.toggleJobDetails(${job.id})" 
-                            class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-                        <span id="job-arrow-${job.id}">▶</span> Details
-                    </button>
-                </div>
-            </div>
-            <div id="job-details-${job.id}" class="hidden bg-gray-50 p-4 rounded-lg mb-2 ml-4">
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div><strong>Container ID:</strong> <code class="text-xs">${job.container_id || 'N/A'}</code></div>
-                    <div><strong>Repository:</strong> ${job.repository_id}</div>
-                    <div><strong>Started:</strong> ${job.started_at ? new Date(job.started_at).toLocaleString() : 'N/A'}</div>
-                    <div><strong>Duration:</strong> ${borgitoryAppInstance.formatDuration(job.started_at, new Date())}</div>
-                </div>
-                ${job.error ? `<div class="mt-2"><strong>Error:</strong><pre class="text-xs bg-red-50 p-2 rounded mt-1">${job.error}</pre></div>` : ''}
-                ${job.log_output ? `<div class="mt-2"><strong>Logs:</strong><pre class="text-xs bg-white p-2 rounded mt-1 max-h-32 overflow-y-auto">${job.log_output}</pre></div>` : ''}
-            </div>
-        `).join('');
+    });
+    
+    // Handle job lifecycle events
+    eventSource.addEventListener('job_started', function(event) {
+        console.log('job_started event:', event.data);
+        try {
+            const data = JSON.parse(event.data);
+            console.log('Parsed job_started data:', data);
+            updateBackupStatus(data);
+            // Refresh current jobs display
+            fetchAndRenderCurrentJobs();
+        } catch (e) {
+            console.error('Error parsing job_started:', e, 'Raw data:', event.data);
+        }
+    });
+    
+    eventSource.addEventListener('job_completed', function(event) {
+        console.log('job_completed event:', event.data);
+        try {
+            const data = JSON.parse(event.data);
+            updateBackupStatus(data);
+            // Refresh current jobs and history
+            fetchAndRenderCurrentJobs();
+            loadJobHistory();
+        } catch (e) {
+            console.error('Error parsing job_completed:', e);
+        }
+    });
+    
+    eventSource.addEventListener('job_failed', function(event) {
+        console.log('job_failed event:', event.data);
+        try {
+            const data = JSON.parse(event.data);
+            updateBackupStatus(data);
+            // Refresh current jobs and history
+            fetchAndRenderCurrentJobs();
+            loadJobHistory();
+        } catch (e) {
+            console.error('Error parsing job_failed:', e);
+        }
+    });
+    
+    eventSource.addEventListener('job_queued', function(event) {
+        console.log('job_queued event:', event.data);
+        try {
+            const data = JSON.parse(event.data);
+            updateBackupStatus(data);
+            fetchAndRenderCurrentJobs();
+            showNotification(`Backup job queued (${data.job_id.substring(0, 8)}...)`, 'info');
+        } catch (e) {
+            console.error('Error parsing job_queued:', e);
+        }
+    });
+    
+    eventSource.addEventListener('job_progress', function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            updateJobProgress(data.job_id, data.progress);
+        } catch (e) {
+            console.error('Error parsing job_progress:', e);
+        }
+    });
+    
+    eventSource.addEventListener('job_output', function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            updateJobOutput(data.job_id, data.line);
+        } catch (e) {
+            console.error('Error parsing job_output:', e);
+        }
+    });
+    
+    // Store globally for cleanup if needed
+    window.jobSSEConnection = eventSource;
+}
+
+// Fetch current jobs without SSE for manual refresh
+async function fetchAndRenderCurrentJobs() {
+    try {
+        const response = await fetch('/api/jobs/');
+        if (response.ok) {
+            const jobs = await response.json();
+            // Only show actually running jobs, not completed ones
+            const runningJobs = jobs.filter(job => (job.status === 'running' || job.status === 'queued') && job.source === 'jobmanager');
+            console.log('Filtered running jobs:', runningJobs);
+            renderJobsList(runningJobs);
+        }
     } catch (e) {
-        console.error('Error formatting current jobs:', e);
+        console.error('Error fetching current jobs:', e);
     }
 }
 
-function formatJobHistory(event) {
+// Global functions for SSE event handling (kept for compatibility)
+function handleJobsUpdate(event) {
+    const container = document.getElementById('current-jobs');
+    if (!container) return;
+    
+    console.log('SSE Event received:', event); // Debug log
+    
+    try {
+        // HTMX SSE events have the data directly accessible
+        let data;
+        if (event.detail && event.detail.data) {
+            data = JSON.parse(event.detail.data);
+        } else if (typeof event.data === 'string') {
+            data = JSON.parse(event.data);
+        } else {
+            console.warn('Unexpected event format:', event);
+            return;
+        }
+        
+        console.log('Parsed SSE data:', data); // Debug log
+        
+        if (data.type === 'jobs_update') {
+            renderJobsList(data.jobs);
+        } else if (data.type === 'job_started' || data.type === 'job_completed' || data.type === 'job_failed') {
+            // Handle individual job updates
+            console.log('Job status update:', data);
+            updateBackupStatus(data);
+        } else if (data.type === 'job_progress') {
+            updateJobProgress(data.job_id, data.progress);
+        } else if (data.type === 'job_output') {
+            updateJobOutput(data.job_id, data.line);
+        }
+    } catch (e) {
+        console.error('Error handling jobs update:', e, event);
+        container.innerHTML = '<div class="text-red-500 text-sm">Error receiving job updates</div>';
+    }
+}
+
+function renderJobsList(jobs) {
+    const container = document.getElementById('current-jobs');
+    if (!container) return;
+    
+    const runningJobs = jobs.filter(job => job.status === 'running' || job.status === 'queued');
+    
+    if (runningJobs.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 text-sm">No active operations</div>';
+        return;
+    }
+    
+    container.innerHTML = runningJobs.map(job => `
+        <div class="flex items-center justify-between p-3 border rounded-lg mb-2" id="job-card-${job.id}">
+            <div>
+                <div class="font-medium">Job ${String(job.id).substring(0, 8)}... - ${job.command || 'Unknown'}</div>
+                <div class="text-sm text-gray-500">
+                    <span class="inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(job.status)}">${job.status}</span>
+                    ${job.started_at ? 'Started: ' + new Date(job.started_at).toLocaleString() : ''}
+                    ${job.progress && job.progress.percent ? `• Progress: ${job.progress.percent}%` : ''}
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <button onclick="toggleJobDetails('${job.id}')" 
+                        class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                    <span id="job-arrow-${job.id}">▶</span> Details
+                </button>
+            </div>
+        </div>
+        <div id="job-details-${job.id}" class="hidden bg-gray-50 p-4 rounded-lg mb-2 ml-4">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div><strong>Job ID:</strong> <code class="text-xs">${String(job.id)}</code></div>
+                <div><strong>Command:</strong> ${job.command || 'N/A'}</div>
+                <div><strong>Started:</strong> ${job.started_at ? new Date(job.started_at).toLocaleString() : 'N/A'}</div>
+                <div><strong>Status:</strong> ${job.status}</div>
+            </div>
+            ${job.progress ? `<div class="mt-2"><strong>Progress:</strong> ${job.progress.percent || 0}% (${job.progress.nfiles || 0} files)</div>` : ''}
+            ${job.error ? `<div class="mt-2"><strong>Error:</strong><pre class="text-xs bg-red-50 p-2 rounded mt-1">${job.error}</pre></div>` : ''}
+            <div class="mt-2"><strong>Output:</strong><pre id="job-output-${job.id}" class="text-xs bg-white p-2 rounded mt-1 max-h-32 overflow-y-auto">Loading...</pre></div>
+        </div>
+    `).join('');
+}
+
+function updateJobProgress(jobId, progress) {
+    // Update progress in the job card
+    const progressText = document.querySelector(`#job-card-${jobId} .text-gray-500`);
+    if (progressText && progress.percent !== undefined) {
+        // Update the progress percentage in the status line
+        const statusHtml = progressText.innerHTML;
+        const updatedHtml = statusHtml.replace(/• Progress: \d+%/, `• Progress: ${progress.percent}%`) || 
+                           statusHtml + ` • Progress: ${progress.percent}%`;
+        progressText.innerHTML = updatedHtml;
+    }
+}
+
+function updateJobOutput(jobId, line) {
+    // Update output in the job details if they're open
+    const outputContainer = document.getElementById(`job-output-${jobId}`);
+    if (outputContainer) {
+        outputContainer.textContent += line + '\n';
+        outputContainer.scrollTop = outputContainer.scrollHeight;
+    }
+}
+
+function toggleJobDetails(jobId) {
+    const details = document.getElementById(`job-details-${jobId}`);
+    const arrow = document.getElementById(`job-arrow-${jobId}`);
+    if (details && arrow) {
+        if (details.classList.contains('hidden')) {
+            details.classList.remove('hidden');
+            arrow.textContent = '▼';
+        } else {
+            details.classList.add('hidden');
+            arrow.textContent = '▶';
+        }
+    }
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'running': 'bg-blue-100 text-blue-700',
+        'completed': 'bg-green-100 text-green-700', 
+        'failed': 'bg-red-100 text-red-700',
+        'pending': 'bg-yellow-100 text-yellow-700',
+        'queued': 'bg-purple-100 text-purple-700'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700';
+}
+
+function updateBackupStatus(jobData) {
+    console.log('updateBackupStatus called with:', jobData);
+    
+    // Check if this is a job we're tracking in the backup status area
+    const backupStatusDiv = document.getElementById('backup-status');
+    if (!backupStatusDiv) {
+        console.log('No backup-status div found');
+        return;
+    }
+    
+    const trackedJobId = backupStatusDiv.getAttribute('data-backup-job-id');
+    console.log('Tracked job ID:', trackedJobId, 'Current job ID:', jobData.job_id);
+    
+    if (!trackedJobId || trackedJobId !== jobData.job_id) {
+        console.log('Job ID mismatch or no tracked job, skipping update');
+        return;
+    }
+    
+    const jobStatusDiv = document.getElementById(`backup-job-${jobData.job_id}`);
+    if (!jobStatusDiv) return;
+    
+    if (jobData.type === 'job_completed') {
+        if (jobData.return_code === 0) {
+            // Success
+            jobStatusDiv.className = 'bg-green-50 border border-green-200 rounded-lg p-3';
+            jobStatusDiv.innerHTML = `
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-green-700 text-sm">Backup job #${jobData.job_id} completed successfully!</span>
+                </div>
+            `;
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                if (jobStatusDiv.parentElement) {
+                    jobStatusDiv.parentElement.innerHTML = '';
+                    backupStatusDiv.removeAttribute('data-backup-job-id');
+                }
+            }, 10000);
+        } else {
+            // Failed
+            jobStatusDiv.className = 'bg-red-50 border border-red-200 rounded-lg p-3';
+            jobStatusDiv.innerHTML = `
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 text-red-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-red-700 text-sm">Backup job #${jobData.job_id} failed (return code: ${jobData.return_code})</span>
+                </div>
+            `;
+        }
+    } else if (jobData.type === 'job_failed') {
+        // Job failed with error
+        jobStatusDiv.className = 'bg-red-50 border border-red-200 rounded-lg p-3';
+        jobStatusDiv.innerHTML = `
+            <div class="flex items-center">
+                <svg class="w-4 h-4 text-red-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-red-700 text-sm">Backup job #${jobData.job_id} failed with error</span>
+            </div>
+        `;
+    }
+}
+
+function handleJobHistoryUpdate(event) {
+    // For job history, we'll load the full history on initial load and updates
+    // This is simpler than trying to update individual items
+    loadJobHistory();
+}
+
+async function loadJobHistory() {
     const container = document.getElementById('job-history');
     if (!container) return;
     
     try {
-        const jobs = JSON.parse(event.detail.xhr.response);
+        const response = await fetch('/api/jobs/');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
         
-        if (jobs.length === 0) {
+        const jobs = await response.json();
+        const completedJobs = jobs.filter(job => job.status === 'completed' || job.status === 'failed')
+                                  .slice(0, 10); // Show last 10 completed jobs
+        
+        if (completedJobs.length === 0) {
             container.innerHTML = '<div class="text-gray-500 text-sm">No job history</div>';
             return;
         }
         
-        container.innerHTML = jobs.map(job => `
+        container.innerHTML = completedJobs.map(job => `
             <div class="flex items-center justify-between p-3 border rounded-lg mb-2">
                 <div>
-                    <div class="font-medium">Job #${job.id} - ${job.type}</div>
+                    <div class="font-medium">Job ${job.job_id ? String(job.job_id).substring(0, 8) + '...' : String(job.id)} - ${job.type || 'Unknown'}</div>
                     <div class="text-sm text-gray-500">
-                        <span class="inline-flex px-2 py-1 text-xs rounded-full ${borgitoryAppInstance.getStatusColor(job.status)}">${job.status}</span>
-                        ${job.started_at ? 'Started: ' + new Date(job.started_at).toLocaleString() : ''}
-                        ${job.finished_at ? ' | Duration: ' + borgitoryAppInstance.formatDuration(job.started_at, job.finished_at) : ''}
+                        <span class="inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(job.status)}">${job.status}</span>
+                        Repository: ${job.repository_name || 'N/A'}
+                        ${job.started_at ? ' | Started: ' + new Date(job.started_at).toLocaleString() : ''}
+                        ${job.finished_at ? ' | Duration: ' + formatDuration(job.started_at, job.finished_at) : ''}
                     </div>
                 </div>
                 <div class="flex space-x-2">
-                    <button onclick="borgitoryAppInstance.toggleJobDetails(${job.id})" 
+                    ${job.log_output || (job.source === 'jobmanager' && job.job_id) ? `
+                        <button onclick="showJobOutput('${job.job_id || job.id}', '${job.source}')" 
+                                class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200">
+                            View Output
+                        </button>
+                    ` : ''}
+                    <button onclick="toggleJobHistoryDetails('${job.job_id || job.id}')" 
                             class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-                        <span id="job-arrow-${job.id}">▶</span> Details
+                        <span id="job-arrow-${job.job_id || job.id}">▶</span> Details
                     </button>
                 </div>
             </div>
-            <div id="job-details-${job.id}" class="hidden bg-gray-50 p-4 rounded-lg mb-2 ml-4">
+            <div id="job-details-${job.job_id || job.id}" class="hidden bg-gray-50 p-4 rounded-lg mb-2 ml-4">
                 <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div><strong>Container ID:</strong> <code class="text-xs">${job.container_id || 'N/A'}</code></div>
-                    <div><strong>Repository:</strong> ${job.repository_id}</div>
+                    <div><strong>Job ID:</strong> <code class="text-xs">${job.job_id || job.id}</code></div>
+                    <div><strong>Repository:</strong> ${job.repository_name || 'N/A'}</div>
                     <div><strong>Started:</strong> ${job.started_at ? new Date(job.started_at).toLocaleString() : 'N/A'}</div>
                     <div><strong>Finished:</strong> ${job.finished_at ? new Date(job.finished_at).toLocaleString() : 'N/A'}</div>
                 </div>
                 ${job.error ? `<div class="mt-2"><strong>Error:</strong><pre class="text-xs bg-red-50 p-2 rounded mt-1">${job.error}</pre></div>` : ''}
-                ${job.log_output ? `<div class="mt-2"><strong>Logs:</strong><pre class="text-xs bg-white p-2 rounded mt-1 max-h-64 overflow-y-auto">${job.log_output}</pre></div>` : ''}
             </div>
         `).join('');
     } catch (e) {
-        console.error('Error formatting job history:', e);
+        console.error('Error loading job history:', e);
+        container.innerHTML = '<div class="text-red-500 text-sm">Error loading job history</div>';
+    }
+}
+
+function toggleJobHistoryDetails(jobId) {
+    const details = document.getElementById(`job-details-${jobId}`);
+    const arrow = document.getElementById(`job-arrow-${jobId}`);
+    if (details && arrow) {
+        if (details.classList.contains('hidden')) {
+            details.classList.remove('hidden');
+            arrow.textContent = '▼';
+        } else {
+            details.classList.add('hidden');
+            arrow.textContent = '▶';
+        }
+    }
+}
+
+function formatDuration(startDate, endDate) {
+    if (!startDate || !endDate) return 'N/A';
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffMs = end - start;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const remainingSecs = diffSecs % 60;
+    
+    if (diffMins > 0) {
+        return `${diffMins}m ${remainingSecs}s`;
+    }
+    return `${diffSecs}s`;
+}
+
+async function showJobOutput(jobId, source) {
+    try {
+        let output;
+        
+        if (source === 'database') {
+            // Get job details from API which includes log_output
+            const response = await fetch(`/api/jobs/${jobId}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const jobData = await response.json();
+            output = jobData.log_output || 'No output available';
+        } else if (source === 'jobmanager') {
+            // Get real-time output from JobManager
+            const response = await fetch(`/api/jobs/${jobId}/output`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const outputData = await response.json();
+            output = outputData.lines ? 
+                outputData.lines.map(line => line.text).join('\n') : 
+                'No output available';
+        } else {
+            output = 'No output available for this job type';
+        }
+        
+        // Create modal overlay
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg w-full max-w-4xl max-h-full flex flex-col" style="height: 90vh;">
+                <div class="flex items-center justify-between p-4 border-b flex-shrink-0">
+                    <h3 class="text-lg font-semibold">Job Output - ${jobId.substring(0, 8)}...</h3>
+                    <button onclick="this.closest('.fixed').remove()" 
+                            class="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+                </div>
+                <div class="flex-1 overflow-auto p-4 min-h-0">
+                    <pre class="text-sm bg-gray-100 p-4 rounded whitespace-pre-wrap font-mono">${output}</pre>
+                </div>
+                <div class="p-4 border-t flex justify-end flex-shrink-0">
+                    <button onclick="this.closest('.fixed').remove()" 
+                            class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Close</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+    } catch (error) {
+        showNotification(`Failed to load job output: ${error.message}`, 'error');
     }
 }
 
