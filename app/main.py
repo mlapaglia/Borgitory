@@ -1,7 +1,7 @@
 import logging
 import sys
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -38,11 +38,36 @@ app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 
 
 @app.get("/")
-async def root():
-    from fastapi import Request
-    from fastapi.responses import HTMLResponse
+async def root(request: Request):
+    from fastapi.responses import HTMLResponse, RedirectResponse
+    from app.api.auth import get_current_user_optional
+    from app.models.database import get_db
     
-    request = Request({"type": "http", "method": "GET", "path": "/", "headers": []})
-    return templates.TemplateResponse("index.html", {"request": request})
+    # Check if user is authenticated
+    db = next(get_db())
+    current_user = get_current_user_optional(request, db)
+    
+    if not current_user:
+        # Redirect to login if not authenticated
+        return RedirectResponse(url="/login", status_code=302)
+    
+    return templates.TemplateResponse("index.html", {"request": request, "current_user": current_user})
+
+
+@app.get("/login")
+async def login_page(request: Request):
+    from fastapi.responses import HTMLResponse, RedirectResponse
+    from app.api.auth import get_current_user_optional
+    from app.models.database import get_db
+    
+    # Check if user is already authenticated
+    db = next(get_db())
+    current_user = get_current_user_optional(request, db)
+    
+    if current_user:
+        # Redirect to main app if already logged in
+        return RedirectResponse(url="/", status_code=302)
+    
+    return templates.TemplateResponse("login.html", {"request": request})
 
 

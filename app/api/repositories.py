@@ -1,16 +1,21 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile, Request
 from sqlalchemy.orm import Session
 
-from app.models.database import Repository, get_db
+from app.models.database import Repository, User, get_db
 from app.models.schemas import Repository as RepositorySchema, RepositoryCreate, RepositoryUpdate
 from app.services.borg_service import borg_service
+from app.api.auth import get_current_user
 
 router = APIRouter()
 
 
 @router.post("/", response_model=RepositorySchema, status_code=status.HTTP_201_CREATED)
-async def create_repository(repo: RepositoryCreate, db: Session = Depends(get_db)):
+async def create_repository(
+    repo: RepositoryCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     try:
         db_repo = db.query(Repository).filter(Repository.name == repo.name).first()
         if db_repo:

@@ -76,8 +76,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
     
     credentials = relationship("Credential", back_populates="user")
+    sessions = relationship("UserSession", back_populates="user")
 
 
 class Credential(Base):
@@ -93,6 +95,22 @@ class Credential(Base):
     user = relationship("User", back_populates="credentials")
 
 
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    session_token = Column(String, unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    remember_me = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_activity = Column(DateTime, default=datetime.utcnow)
+    user_agent = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    
+    user = relationship("User", back_populates="sessions")
+
+
 class Setting(Base):
     __tablename__ = "settings"
 
@@ -102,7 +120,48 @@ class Setting(Base):
 
 
 async def init_db():
+    """Initialize database with schema migration support"""
+    try:
+        # First, try to create all tables (will create new tables only)
+        Base.metadata.create_all(bind=engine)
+        
+        # Handle specific migrations for existing tables
+        migrate_user_table()
+        
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+        print("If you're getting schema errors, you may need to reset the database.")
+        print("You can do this by deleting the database file and restarting the container.")
+        raise
+
+
+def migrate_user_table():
+    """Handle migration of users table to add new columns"""
+    from sqlalchemy import text
+    
+    try:
+        with engine.begin() as conn:
+            # Check if last_login column exists
+            try:
+                conn.execute(text("SELECT last_login FROM users LIMIT 1"))
+                print("Database schema is up to date")
+            except Exception:
+                # Column doesn't exist, add it
+                print("Migrating users table: adding last_login column...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN last_login DATETIME"))
+                print("✅ Migration completed: users.last_login column added")
+    
+    except Exception as e:
+        print(f"⚠️  Migration error: {e}")
+        print("💡 If you see 'no such column' errors, try deleting the database file and restarting")
+
+
+def reset_db():
+    """Reset the entire database - USE WITH CAUTION"""
+    print("🔄 Resetting database...")
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    print("✅ Database reset complete")
 
 
 def get_db():
