@@ -52,8 +52,10 @@ class Job(Base):
     log_output = Column(Text, nullable=True)
     error = Column(Text, nullable=True)
     container_id = Column(String, nullable=True)
+    cloud_backup_config_id = Column(Integer, ForeignKey("cloud_backup_configs.id"), nullable=True)
     
     repository = relationship("Repository", back_populates="jobs")
+    cloud_backup_config = relationship("CloudBackupConfig")
 
 
 class Schedule(Base):
@@ -67,8 +69,10 @@ class Schedule(Base):
     last_run = Column(DateTime, nullable=True)
     next_run = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    cloud_backup_config_id = Column(Integer, ForeignKey("cloud_backup_configs.id"), nullable=True)
     
     repository = relationship("Repository", back_populates="schedules")
+    cloud_backup_config = relationship("CloudBackupConfig")
 
 
 class User(Base):
@@ -120,6 +124,32 @@ class Setting(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class CloudBackupConfig(Base):
+    __tablename__ = "cloud_backup_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False)  # "s3", "azure", "gcp", etc.
+    region = Column(String, nullable=True)
+    bucket_name = Column(String, nullable=False)
+    path_prefix = Column(String, default="", nullable=False)
+    endpoint = Column(String, nullable=True)
+    encrypted_access_key = Column(String, nullable=False)
+    encrypted_secret_key = Column(String, nullable=False)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def set_credentials(self, access_key: str, secret_key: str):
+        self.encrypted_access_key = cipher_suite.encrypt(access_key.encode()).decode()
+        self.encrypted_secret_key = cipher_suite.encrypt(secret_key.encode()).decode()
+    
+    def get_credentials(self) -> tuple[str, str]:
+        access_key = cipher_suite.decrypt(self.encrypted_access_key.encode()).decode()
+        secret_key = cipher_suite.decrypt(self.encrypted_secret_key.encode()).decode()
+        return access_key, secret_key
+
+
 async def init_db():
     """Initialize database with schema migration support"""
     try:
@@ -129,6 +159,7 @@ async def init_db():
         # Handle specific migrations for existing tables
         migrate_user_table()
         migrate_job_table()
+        migrate_cloud_backup_table()
         
     except Exception as e:
         print(f"Database initialization error: {e}")
@@ -177,6 +208,25 @@ def migrate_job_table():
     except Exception as e:
         print(f"⚠️  Job table migration error: {e}")
         print("💡 If you see 'no such column' errors, try deleting the database file and restarting")
+
+
+def migrate_cloud_backup_table():
+    """Handle migration/creation of cloud_backup_configs table"""
+    from sqlalchemy import text
+    
+    try:
+        with engine.begin() as conn:
+            # Check if cloud_backup_configs table exists
+            try:
+                conn.execute(text("SELECT COUNT(*) FROM cloud_backup_configs LIMIT 1"))
+                print("Cloud backup configs table exists")
+            except Exception:
+                # Table doesn't exist, it will be created by Base.metadata.create_all()
+                print("✅ Cloud backup configs table will be created automatically")
+    
+    except Exception as e:
+        print(f"⚠️  Cloud backup table migration check error: {e}")
+        print("💡 The table will be created automatically if it doesn't exist")
 
 
 def reset_db():

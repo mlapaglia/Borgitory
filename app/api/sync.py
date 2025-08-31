@@ -63,13 +63,13 @@ async def test_remote_connection(remote_name: str, bucket_name: str):
 
 async def sync_repository_task(
     repository_id: int,
-    remote_name: str,
+    config_name: str,
     bucket_name: str,
     path_prefix: str,
     job_id: int
 ):
     """Background task to sync repository to S3"""
-    from app.models.database import SessionLocal
+    from app.models.database import SessionLocal, CloudBackupConfig
     
     db = SessionLocal()
     try:
@@ -77,8 +77,16 @@ async def sync_repository_task(
         job = db.query(Job).filter(Job.id == job_id).first()
         repository = db.query(Repository).filter(Repository.id == repository_id).first()
         
-        if not job or not repository:
+        # Get the cloud backup config
+        config = db.query(CloudBackupConfig).filter(
+            CloudBackupConfig.name == config_name
+        ).first()
+        
+        if not job or not repository or not config:
             return
+        
+        # Get credentials
+        access_key, secret_key = config.get_credentials()
         
         job.status = "running"
         job.started_at = datetime.utcnow()
@@ -87,9 +95,12 @@ async def sync_repository_task(
         log_output = []
         async for progress in rclone_service.sync_repository_to_s3(
             repository=repository,
-            remote_name=remote_name,
+            access_key_id=access_key,
+            secret_access_key=secret_key,
             bucket_name=bucket_name,
-            path_prefix=path_prefix
+            region=config.region,
+            path_prefix=path_prefix,
+            endpoint=config.endpoint
         ):
             if progress.get("type") == "log":
                 log_output.append(f"[{progress['stream']}] {progress['message']}")
@@ -156,7 +167,7 @@ async def sync_repository(
     background_tasks.add_task(
         sync_repository_task,
         repository.id,
-        sync_request.remote_name,
+        sync_request.remote_name,  # This is now config name, not remote name
         sync_request.bucket_name,
         sync_request.path_prefix,
         job.id

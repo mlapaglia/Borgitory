@@ -27,7 +27,8 @@ def create_schedule(schedule: ScheduleCreate, db: Session = Depends(get_db)):
         name=schedule.name,
         repository_id=schedule.repository_id,
         cron_expression=schedule.cron_expression,
-        enabled=True
+        enabled=True,
+        cloud_backup_config_id=schedule.cloud_backup_config_id
     )
     
     db.add(db_schedule)

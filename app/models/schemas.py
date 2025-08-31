@@ -55,6 +55,7 @@ class ScheduleBase(BaseModel):
 
 class ScheduleCreate(ScheduleBase):
     repository_id: int
+    cloud_backup_config_id: Optional[int] = None
 
 
 class Schedule(ScheduleBase):
@@ -64,6 +65,7 @@ class Schedule(ScheduleBase):
     last_run: Optional[datetime]
     next_run: Optional[datetime]
     created_at: datetime
+    cloud_backup_config_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -74,6 +76,7 @@ class BackupRequest(BaseModel):
     source_path: Optional[str] = "/data"
     compression: Optional[str] = "zstd"
     dry_run: Optional[Union[bool, str]] = False
+    cloud_backup_config_id: Optional[int] = None
     
     @field_validator('dry_run', mode='before')
     @classmethod
@@ -81,3 +84,42 @@ class BackupRequest(BaseModel):
         if isinstance(v, str):
             return v.lower() in ('true', '1', 'yes', 'on')
         return bool(v)
+
+
+class CloudBackupConfigBase(BaseModel):
+    name: str
+    provider: str = "s3"
+    region: Optional[str] = "us-east-1"
+    bucket_name: str
+    path_prefix: Optional[str] = ""
+    endpoint: Optional[str] = None
+
+
+class CloudBackupConfigCreate(CloudBackupConfigBase):
+    access_key: str
+    secret_key: str
+
+
+class CloudBackupConfigUpdate(BaseModel):
+    name: Optional[str] = None
+    region: Optional[str] = None
+    bucket_name: Optional[str] = None
+    path_prefix: Optional[str] = None
+    endpoint: Optional[str] = None
+    access_key: Optional[str] = None
+    secret_key: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class CloudBackupConfig(CloudBackupConfigBase):
+    id: int
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CloudBackupTestRequest(BaseModel):
+    config_id: int

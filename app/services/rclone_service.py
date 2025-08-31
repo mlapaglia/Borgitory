@@ -11,63 +11,78 @@ from app.models.database import Repository
 
 class RcloneService:
     def __init__(self):
-        self.rclone_config_dir = Path("./data/rclone")
-        self.rclone_config_dir.mkdir(parents=True, exist_ok=True)
-        self.config_file = self.rclone_config_dir / "rclone.conf"
+        pass  # No longer need config file management
     
-    async def configure_s3_remote(
+    def _build_s3_env(
         self,
-        remote_name: str,
         access_key_id: str,
         secret_access_key: str,
         region: str = "us-east-1",
         endpoint: Optional[str] = None
-    ) -> bool:
-        """Configure an S3 remote in Rclone"""
-        try:
-            config_content = f"""
-[{remote_name}]
-type = s3
-provider = AWS
-access_key_id = {access_key_id}
-secret_access_key = {secret_access_key}
-region = {region}
-"""
-            if endpoint:
-                config_content += f"endpoint = {endpoint}\n"
+    ) -> Dict[str, str]:
+        """Build environment variables for S3 configuration"""
+        env = os.environ.copy()
+        
+        # Set S3 credentials via environment variables
+        env["AWS_ACCESS_KEY_ID"] = access_key_id
+        env["AWS_SECRET_ACCESS_KEY"] = secret_access_key
+        env["AWS_DEFAULT_REGION"] = region
+        
+        if endpoint:
+            env["AWS_ENDPOINT_URL"] = endpoint
             
-            # Append to config file
-            with open(self.config_file, "a") as f:
-                f.write(config_content)
+        return env
+    
+    def _build_s3_flags(
+        self,
+        access_key_id: str,
+        secret_access_key: str,
+        region: str = "us-east-1",
+        endpoint: Optional[str] = None
+    ) -> list:
+        """Build S3 configuration flags for rclone command"""
+        flags = [
+            "--s3-access-key-id", access_key_id,
+            "--s3-secret-access-key", secret_access_key,
+            "--s3-region", region,
+            "--s3-provider", "AWS"
+        ]
+        
+        if endpoint:
+            flags.extend(["--s3-endpoint", endpoint])
             
-            return True
-            
-        except Exception as e:
-            print(f"Failed to configure S3 remote: {e}")
-            return False
+        return flags
     
     async def sync_repository_to_s3(
         self,
         repository: Repository,
-        remote_name: str,
+        access_key_id: str,
+        secret_access_key: str,
         bucket_name: str,
-        path_prefix: str = ""
+        region: str = "us-east-1",
+        path_prefix: str = "",
+        endpoint: Optional[str] = None
     ) -> AsyncGenerator[Dict, None]:
-        """Sync a Borg repository to S3 using Rclone"""
+        """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
         
-        remote_path = f"{remote_name}:{bucket_name}"
+        # Build S3 path
+        s3_path = f":s3:{bucket_name}"
         if path_prefix:
-            remote_path = f"{remote_path}/{path_prefix}"
+            s3_path = f"{s3_path}/{path_prefix}"
         
+        # Build rclone command with S3 backend flags
         command = [
             "rclone", "sync",
             repository.path,
-            remote_path,
-            "--config", str(self.config_file),
+            s3_path,
             "--progress",
             "--stats", "1s",
             "--verbose"
         ]
+        
+        # Add S3 configuration flags
+        s3_flags = self._build_s3_flags(access_key_id, secret_access_key, region, endpoint)
+        command.extend(s3_flags)
         
         try:
             process = await asyncio.create_subprocess_exec(
@@ -128,17 +143,28 @@ region = {region}
     
     async def test_s3_connection(
         self,
-        remote_name: str,
-        bucket_name: str
+        access_key_id: str,
+        secret_access_key: str,
+        bucket_name: str,
+        region: str = "us-east-1",
+        endpoint: Optional[str] = None
     ) -> Dict:
-        """Test S3 connection by listing bucket contents"""
+        """Test S3 connection by checking bucket access and verifying region"""
         try:
+            # Test 1: Check if we can list the bucket contents
+            s3_path = f":s3:{bucket_name}"
+            
+            # Build rclone command with S3 backend flags - add region checking
             command = [
                 "rclone", "lsd",
-                f"{remote_name}:{bucket_name}",
-                "--config", str(self.config_file),
-                "--max-depth", "1"
+                s3_path,
+                "--max-depth", "1",
+                "--verbose"  # Add verbose to get more error details
             ]
+            
+            # Add S3 configuration flags
+            s3_flags = self._build_s3_flags(access_key_id, secret_access_key, region, endpoint)
+            command.extend(s3_flags)
             
             process = await asyncio.create_subprocess_exec(
                 *command,
@@ -147,23 +173,147 @@ region = {region}
             )
             
             stdout, stderr = await process.communicate()
+            stdout_text = stdout.decode('utf-8')
+            stderr_text = stderr.decode('utf-8')
             
             if process.returncode == 0:
-                return {
-                    "status": "success",
-                    "message": "Connection successful",
-                    "output": stdout.decode('utf-8')
-                }
+                # Test 2: Try to create and delete a test file to verify write permissions
+                test_result = await self._test_s3_write_permissions(
+                    access_key_id, secret_access_key, bucket_name, region, endpoint
+                )
+                
+                if test_result["status"] == "success":
+                    return {
+                        "status": "success",
+                        "message": f"Connection successful - bucket accessible and writable in region {region}",
+                        "output": stdout_text,
+                        "details": {
+                            "read_test": "passed",
+                            "write_test": "passed",
+                            "region": region
+                        }
+                    }
+                else:
+                    return {
+                        "status": "warning",
+                        "message": f"Bucket is readable but may have write permission issues: {test_result['message']}",
+                        "output": stdout_text,
+                        "details": {
+                            "read_test": "passed",
+                            "write_test": "failed",
+                            "region": region
+                        }
+                    }
             else:
-                return {
-                    "status": "failed",
-                    "message": stderr.decode('utf-8')
-                }
+                # Analyze the error to provide better feedback
+                error_message = stderr_text.lower()
+                if "no such bucket" in error_message or "nosuchbucket" in error_message:
+                    return {
+                        "status": "failed",
+                        "message": f"Bucket '{bucket_name}' does not exist or is not accessible"
+                    }
+                elif "invalid access key" in error_message or "access denied" in error_message:
+                    return {
+                        "status": "failed",
+                        "message": "Access denied - check your AWS credentials"
+                    }
+                elif "region" in error_message or "endpoint" in error_message:
+                    return {
+                        "status": "failed",
+                        "message": f"Region mismatch - bucket may not be in region '{region}'. Error: {stderr_text}"
+                    }
+                else:
+                    return {
+                        "status": "failed",
+                        "message": f"Connection failed: {stderr_text}"
+                    }
                 
         except Exception as e:
             return {
                 "status": "error",
-                "message": str(e)
+                "message": f"Test failed with exception: {str(e)}"
+            }
+    
+    async def _test_s3_write_permissions(
+        self,
+        access_key_id: str,
+        secret_access_key: str,
+        bucket_name: str,
+        region: str,
+        endpoint: Optional[str] = None
+    ) -> Dict:
+        """Test write permissions by creating and deleting a small test file"""
+        try:
+            import tempfile
+            import os
+            from datetime import datetime
+            
+            # Create a small test file
+            test_content = f"borgitory-test-{datetime.now().isoformat()}"
+            test_filename = f"borgitory-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
+            
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_file:
+                temp_file.write(test_content)
+                temp_file_path = temp_file.name
+            
+            try:
+                # Test upload
+                s3_path = f":s3:{bucket_name}/{test_filename}"
+                
+                upload_command = [
+                    "rclone", "copy",
+                    temp_file_path,
+                    s3_path
+                ]
+                
+                s3_flags = self._build_s3_flags(access_key_id, secret_access_key, region, endpoint)
+                upload_command.extend(s3_flags)
+                
+                process = await asyncio.create_subprocess_exec(
+                    *upload_command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                
+                stdout, stderr = await process.communicate()
+                
+                if process.returncode == 0:
+                    # Test cleanup - delete the test file
+                    delete_command = [
+                        "rclone", "delete",
+                        s3_path
+                    ]
+                    delete_command.extend(s3_flags)
+                    
+                    delete_process = await asyncio.create_subprocess_exec(
+                        *delete_command,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    
+                    await delete_process.communicate()
+                    
+                    return {
+                        "status": "success",
+                        "message": "Write permissions verified"
+                    }
+                else:
+                    return {
+                        "status": "failed", 
+                        "message": f"Cannot write to bucket: {stderr.decode('utf-8')}"
+                    }
+                    
+            finally:
+                # Clean up local temp file
+                try:
+                    os.unlink(temp_file_path)
+                except:
+                    pass
+                    
+        except Exception as e:
+            return {
+                "status": "failed",
+                "message": f"Write test failed: {str(e)}"
             }
     
     def parse_rclone_progress(self, line: str) -> Optional[Dict]:
@@ -215,26 +365,10 @@ region = {region}
                 yield item
     
     def get_configured_remotes(self) -> list:
-        """Get list of configured Rclone remotes"""
-        try:
-            if not self.config_file.exists():
-                return []
-            
-            with open(self.config_file, 'r') as f:
-                content = f.read()
-            
-            remotes = []
-            for line in content.split('\n'):
-                line = line.strip()
-                if line.startswith('[') and line.endswith(']'):
-                    remote_name = line[1:-1]
-                    if remote_name:
-                        remotes.append(remote_name)
-            
-            return remotes
-            
-        except Exception:
-            return []
+        """Get list of configured cloud backup configs from database"""
+        # This method is no longer needed since we don't use config files
+        # Cloud backup configurations are now stored in the database
+        return []
 
 
 rclone_service = RcloneService()

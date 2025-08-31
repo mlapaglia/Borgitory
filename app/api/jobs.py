@@ -3,8 +3,9 @@ import json
 import logging
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.database import Repository, Job, get_db
@@ -14,6 +15,7 @@ from app.services.job_manager import borg_job_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+templates = Jinja2Templates(directory="app/templates")
 
 
 @router.post("/backup")
@@ -35,7 +37,8 @@ async def create_backup(
             repository=repository,
             source_path=backup_request.source_path,
             compression=backup_request.compression,
-            dry_run=backup_request.dry_run
+            dry_run=backup_request.dry_run,
+            cloud_backup_config_id=backup_request.cloud_backup_config_id
         )
         
         return {"job_id": borg_job_id, "status": "started"}
@@ -155,6 +158,159 @@ def list_jobs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
         })
     
     return jobs_list
+
+
+@router.get("/html", response_class=HTMLResponse)
+def get_jobs_html(request: Request, db: Session = Depends(get_db)):
+    """Get job history as HTML"""
+    try:
+        # Get recent jobs (last 20)
+        db_jobs = db.query(Job).options(joinedload(Job.repository)).order_by(Job.id.desc()).limit(20).all()
+        
+        html_content = ""
+        
+        if not db_jobs:
+            html_content = '''
+                <div class="text-gray-500 text-center py-8">
+                    <p>No job history available.</p>
+                </div>
+            '''
+        else:
+            html_content = '<div class="space-y-3">'
+            
+            for job in db_jobs:
+                repository_name = job.repository.name if job.repository else "Unknown"
+                
+                # Status styling
+                if job.status == "completed":
+                    status_class = "bg-green-100 text-green-800"
+                    status_icon = "✓"
+                elif job.status == "failed":
+                    status_class = "bg-red-100 text-red-800"
+                    status_icon = "✗"
+                elif job.status == "running":
+                    status_class = "bg-blue-100 text-blue-800"
+                    status_icon = "⟳"
+                else:
+                    status_class = "bg-gray-100 text-gray-800"
+                    status_icon = "◦"
+                
+                # Format dates
+                started_at = job.started_at.strftime("%Y-%m-%d %H:%M") if job.started_at else "N/A"
+                finished_at = job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "N/A"
+                
+                html_content += f'''
+                    <div class="border rounded-lg p-4 bg-white hover:bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-3">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {status_class}">
+                                        {status_icon} {job.status.title()}
+                                    </span>
+                                    <span class="text-sm font-medium text-gray-900">
+                                        {job.type.title()} - {repository_name}
+                                    </span>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-500 space-x-4">
+                                    <span>Started: {started_at}</span>
+                                    {f'<span>Finished: {finished_at}</span>' if job.finished_at else ''}
+                                    {f'<span class="text-red-600">Error: {job.error}</span>' if job.error else ''}
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <span class="text-sm text-gray-500">#{job.id}</span>
+                            </div>
+                        </div>
+                    </div>
+                '''
+            
+            html_content += '</div>'
+        
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        error_html = f'''
+            <div class="text-red-500 text-center py-4">
+                <p>Error loading job history: {str(e)}</p>
+            </div>
+        '''
+        return HTMLResponse(content=error_html)
+
+
+@router.get("/current/html", response_class=HTMLResponse)
+def get_current_jobs_html(request: Request):
+    """Get current running jobs as HTML"""
+    try:
+        current_jobs = []
+        
+        # Get current jobs from JobManager
+        for job_id, borg_job in borg_job_manager.jobs.items():
+            if borg_job.status == 'running':
+                # Determine job type from command
+                job_type = "unknown"
+                if borg_job.command and len(borg_job.command) > 1:
+                    if "create" in borg_job.command:
+                        job_type = "backup"
+                    elif "list" in borg_job.command:
+                        job_type = "list"
+                    elif "check" in borg_job.command:
+                        job_type = "verify"
+                
+                current_jobs.append({
+                    'id': job_id,
+                    'type': job_type,
+                    'status': borg_job.status,
+                    'started_at': borg_job.started_at.strftime("%H:%M:%S"),
+                    'progress': borg_job.current_progress
+                })
+        
+        html_content = ""
+        
+        if not current_jobs:
+            html_content = '''
+                <div class="text-gray-500 text-center py-4">
+                    <p>No operations currently running.</p>
+                </div>
+            '''
+        else:
+            html_content = '<div class="space-y-3">'
+            
+            for job in current_jobs:
+                progress_info = ""
+                if job['progress']:
+                    if 'files' in job['progress']:
+                        progress_info = f"Files: {job['progress']['files']}"
+                    if 'transferred' in job['progress']:
+                        progress_info += f" | {job['progress']['transferred']}"
+                
+                html_content += f'''
+                    <div class="border border-blue-200 rounded-lg p-3 bg-blue-50">
+                        <div class="flex items-center">
+                            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-medium text-blue-900">{job['type'].title()}</span>
+                                    <span class="text-blue-700 text-sm">#{job['id'][:8]}...</span>
+                                </div>
+                                <div class="text-xs text-blue-600 mt-1">
+                                    Started: {job['started_at']} {f'| {progress_info}' if progress_info else ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                '''
+            
+            html_content += '</div>'
+        
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        error_html = f'''
+            <div class="text-red-500 text-center py-4">
+                <p>Error loading current operations: {str(e)}</p>
+            </div>
+        '''
+        return HTMLResponse(content=error_html)
 
 
 @router.get("/{job_id}")

@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: mlapaglia/borgitory
+
+jobs:
+  docker-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Extract version and determine release type
+      id: version
+      run: |
+        VERSION=${{ github.event.release.tag_name }}
+        # Remove 'v' prefix if present
+        VERSION=${VERSION#v}
+        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Extracted version: ${VERSION}"
+        
+        # Check if version contains prerelease indicators OR if GitHub release is marked as prerelease
+        if [[ "$VERSION" =~ (alpha|beta|rc|dev|pre) ]] || [ "${{ github.event.release.prerelease }}" == "true" ]; then
+          echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
+          echo "PRERELEASE_TAG=alpha" >> $GITHUB_OUTPUT
+          echo "This is a prerelease (detected from version string or GitHub flag)"
+        else
+          echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
+          echo "PRERELEASE_TAG=" >> $GITHUB_OUTPUT
+          echo "This is a stable release"
+        fi
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          # For stable releases: tag with version and latest
+          type=raw,value=${{ steps.version.outputs.VERSION }},enable=${{ steps.version.outputs.IS_PRERELEASE == 'false' }}
+          type=raw,value=latest,enable=${{ steps.version.outputs.IS_PRERELEASE == 'false' }}
+          # For prereleases: tag with exact version (already contains alpha/beta/etc) and alpha
+          type=raw,value=${{ steps.version.outputs.VERSION }},enable=${{ steps.version.outputs.IS_PRERELEASE == 'true' }}
+          type=raw,value=alpha,enable=${{ steps.version.outputs.IS_PRERELEASE == 'true' }}
+        labels: |
+          org.opencontainers.image.title=Borgitory
+          org.opencontainers.image.description=Borg Backup Manager with Web UI
+          org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+          org.opencontainers.image.url=https://github.com/mlapaglia/borgitory
+          org.opencontainers.image.source=https://github.com/mlapaglia/borgitory
+          org.opencontainers.image.vendor=mlapaglia
+          org.opencontainers.image.licenses=MIT
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+
+    - name: Create release summary
+      run: |
+        echo "# 🚀 Docker Release Published" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Release Type:** ${{ steps.version.outputs.IS_PRERELEASE == 'true' && 'Pre-release (Alpha)' || 'Stable Release' }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Version:** ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📦 Published Docker Images" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Tag | Command |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|---------|" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.version.outputs.IS_PRERELEASE }}" == "true" ]; then
+          echo "| \`${{ steps.version.outputs.VERSION }}\` | \`docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`alpha\` | \`docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpha\` |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| \`${{ steps.version.outputs.VERSION }}\` | \`docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`latest\` | \`docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` |" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🏗️ Multi-platform Support" >> $GITHUB_STEP_SUMMARY
+        echo "- linux/amd64" >> $GITHUB_STEP_SUMMARY
+        echo "- linux/arm64" >> $GITHUB_STEP_SUMMARY
+
+    - name: Update Docker Hub description
+      uses: peter-evans/dockerhub-description@v4
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        repository: ${{ env.IMAGE_NAME }}
+        readme-filepath: ./README.md

@@ -448,6 +448,13 @@ class BorgJobManager:
                     
                     db.commit()
                     logger.info(f"Updated database job record for {job_id}")
+                    
+                    # Trigger cloud backup if this was a successful backup job
+                    if (job.status == 'completed' and 
+                        db_job.type == 'backup' and 
+                        job.return_code == 0):
+                        asyncio.create_task(self._trigger_cloud_backups(db_job, db))
+                        
                 else:
                     logger.warning(f"No database job found for UUID {job_id}")
             finally:
@@ -455,6 +462,65 @@ class BorgJobManager:
                 
         except Exception as e:
             logger.error(f"Failed to update database job for {job_id}: {e}")
+    
+    async def _trigger_cloud_backups(self, db_job: 'Job', db: 'Session'):
+        """Trigger cloud backups for all enabled configurations after a successful borg backup"""
+        try:
+            from app.models.database import CloudBackupConfig, Repository
+            from app.services.rclone_service import rclone_service
+            from app.api.sync import sync_repository_task
+            
+            # Get all enabled cloud backup configurations
+            cloud_configs = db.query(CloudBackupConfig).filter(
+                CloudBackupConfig.enabled == True
+            ).all()
+            
+            if not cloud_configs:
+                logger.info("No enabled cloud backup configurations found")
+                return
+            
+            # Get the repository that was backed up
+            repository = db.query(Repository).filter(
+                Repository.id == db_job.repository_id
+            ).first()
+            
+            if not repository:
+                logger.error(f"Repository not found for job {db_job.id}")
+                return
+            
+            logger.info(f"Triggering cloud backups for repository '{repository.name}' after successful borg backup")
+            
+            # Create cloud backup jobs for each enabled configuration
+            for config in cloud_configs:
+                try:
+                    # Create a new sync job
+                    from app.models.database import Job as JobModel
+                    
+                    sync_job = JobModel(
+                        repository_id=repository.id,
+                        type="sync",
+                        status="pending"
+                    )
+                    db.add(sync_job)
+                    db.commit()
+                    db.refresh(sync_job)
+                    
+                    logger.info(f"Starting cloud backup to '{config.name}' for repository '{repository.name}'")
+                    
+                    # Start the sync task in the background
+                    asyncio.create_task(sync_repository_task(
+                        repository.id,
+                        config.name,  # config name
+                        config.bucket_name,
+                        config.path_prefix or "",
+                        sync_job.id
+                    ))
+                    
+                except Exception as e:
+                    logger.error(f"Failed to create cloud backup job for config '{config.name}': {e}")
+                    
+        except Exception as e:
+            logger.error(f"Failed to trigger cloud backups: {e}")
 
 # Global job manager instance
 borg_job_manager = BorgJobManager()
