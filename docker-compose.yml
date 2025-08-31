@@ -6,8 +6,6 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Mount Docker socket for container management
-      - /var/run/docker.sock:/var/run/docker.sock
       # Persistent data storage
       - ./data:/app/data
       # Mount your backup sources (adjust as needed)
@@ -18,11 +16,7 @@ services:
       - SECRET_KEY=your-secret-key-change-in-production
       - DATABASE_URL=sqlite:///./data/borgitory.db
       - DATA_DIR=/app/data
-      - BORG_DOCKER_IMAGE=ghcr.io/borgmatic-collective/borgmatic:latest
     restart: unless-stopped
-    
-    # Ensure the borgitory service can access Docker
-    user: root
     
     # Optional: limit resources
     deploy:

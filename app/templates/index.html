@@ -124,7 +124,10 @@
             <!-- Repository List -->
             <div>
                 <h3 class="font-medium text-gray-700 mb-3">Existing Repositories</h3>
-                <div id="repository-list" hx-get="/api/repositories/" hx-trigger="load" hx-swap="innerHTML">
+                <div id="repository-list" 
+                     hx-get="/api/repositories/html" 
+                     hx-trigger="load, repositoryUpdate from:body" 
+                     hx-swap="innerHTML">
                     <div class="animate-pulse bg-gray-200 h-20 rounded"></div>
                 </div>
             </div>
@@ -341,8 +344,8 @@ function handleImportResponse(event) {
         submitButton.className = 'w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center';
         buttonText.textContent = 'Select a repository first';
         
-        // Reload repositories for the dropdown
-        window.borgitoryAppInstance?.loadRepositories();
+        // Trigger HTMX refresh for repository list
+        document.body.dispatchEvent(new CustomEvent('repositoryUpdate'));
     } else {
         // Error - re-enable button
         submitButton.disabled = false;
@@ -380,8 +383,8 @@ function handleRepositoryResponse(event) {
         // Success
         showNotification('Repository added successfully!', 'success');
         form.reset();
-        // Reload repositories for the dropdown
-        window.borgitoryAppInstance?.loadRepositories();
+        // Trigger HTMX refresh for repository list
+        document.body.dispatchEvent(new CustomEvent('repositoryUpdate'));
     } else {
         // Error
         let errorMessage = 'Failed to add repository';
@@ -737,42 +740,86 @@ function switchRepositoryTab(tab) {
 
 // Repository scanning and import
 let discoveredRepositories = [];
+let currentScanJobId = null;
 
 async function scanForRepositories() {
     const statusDiv = document.getElementById('scan-status');
     const discoveredDiv = document.getElementById('discovered-repos');
     const repoSelect = document.getElementById('repo-select');
     
-    statusDiv.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Scanning...';
+    statusDiv.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Starting scan...';
     
     try {
-        const response = await fetch('/api/repositories/scan-existing');
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        // Start the scan job
+        const startResponse = await fetch('/api/repositories/scan-existing/start', {
+            method: 'POST'
+        });
+        if (!startResponse.ok) {
+            throw new Error(`HTTP ${startResponse.status}`);
         }
         
-        const data = await response.json();
-        discoveredRepositories = data.repositories;
+        const startData = await startResponse.json();
+        currentScanJobId = startData.job_id;
         
-        if (discoveredRepositories.length === 0) {
-            statusDiv.innerHTML = 'No new repositories found (all detected repositories are already imported)';
-            discoveredDiv.classList.add('hidden');
-        } else {
-            statusDiv.innerHTML = `Found ${discoveredRepositories.length} new repository${discoveredRepositories.length === 1 ? '' : 's'} available for import`;
-            
-            // Populate select dropdown
-            repoSelect.innerHTML = '<option value="">Select a repository...</option>';
-            discoveredRepositories.forEach((repo, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                const encryptionInfo = repo.encryption_mode ? ` (${repo.encryption_mode})` : '';
-                const idInfo = repo.id ? ` [ID: ${repo.id.substring(0, 8)}...]` : '';
-                option.textContent = `${repo.path}${encryptionInfo}${idInfo}`;
-                repoSelect.appendChild(option);
-            });
-            
-            discoveredDiv.classList.remove('hidden');
-        }
+        statusDiv.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Scanning for repositories...';
+        
+        // Poll for completion
+        const pollInterval = setInterval(async () => {
+            try {
+                const statusResponse = await fetch(`/api/repositories/scan-existing/status/${currentScanJobId}`);
+                if (!statusResponse.ok) {
+                    throw new Error(`HTTP ${statusResponse.status}`);
+                }
+                
+                const statusData = await statusResponse.json();
+                
+                if (statusData.completed) {
+                    clearInterval(pollInterval);
+                    
+                    // Get the results
+                    const resultsResponse = await fetch(`/api/repositories/scan-existing/results/${currentScanJobId}`);
+                    if (!resultsResponse.ok) {
+                        throw new Error(`HTTP ${resultsResponse.status}`);
+                    }
+                    
+                    const resultsData = await resultsResponse.json();
+                    discoveredRepositories = resultsData.repositories;
+                    
+                    if (discoveredRepositories.length === 0) {
+                        statusDiv.innerHTML = 'No new repositories found (all detected repositories are already imported)';
+                        discoveredDiv.classList.add('hidden');
+                    } else {
+                        statusDiv.innerHTML = `Found ${discoveredRepositories.length} new repository${discoveredRepositories.length === 1 ? '' : 's'} available for import`;
+                        
+                        // Populate select dropdown
+                        repoSelect.innerHTML = '<option value="">Select a repository...</option>';
+                        discoveredRepositories.forEach((repo, index) => {
+                            const option = document.createElement('option');
+                            option.value = index;
+                            const encryptionInfo = repo.encryption_mode ? ` (${repo.encryption_mode})` : '';
+                            const idInfo = repo.id ? ` [ID: ${repo.id.substring(0, 8)}...]` : '';
+                            option.textContent = `${repo.path}${encryptionInfo}${idInfo}`;
+                            repoSelect.appendChild(option);
+                        });
+                        
+                        discoveredDiv.classList.remove('hidden');
+                    }
+                } else if (statusData.error) {
+                    clearInterval(pollInterval);
+                    throw new Error(statusData.error);
+                } else {
+                    // Still running, update progress if available
+                    if (statusData.progress) {
+                        statusDiv.innerHTML = `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Scanning: ${statusData.progress.message || 'In progress'}...`;
+                    }
+                }
+            } catch (pollError) {
+                clearInterval(pollInterval);
+                statusDiv.innerHTML = `Error checking scan status: ${pollError.message}`;
+                console.error('Poll error:', pollError);
+            }
+        }, 1000); // Poll every second
+        
     } catch (error) {
         statusDiv.innerHTML = `Error: ${error.message}`;
         console.error('Scan error:', error);

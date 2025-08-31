@@ -1,3 +1,4 @@
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile, Request
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from app.services.borg_service import borg_service
 from app.api.auth import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/", response_model=RepositorySchema, status_code=status.HTTP_201_CREATED)
@@ -37,12 +39,8 @@ async def create_repository(
         try:
             init_result = await borg_service.initialize_repository(db_repo)
             if not init_result["success"]:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Repository '{repo.name}' created in database but Borg initialization failed: {init_result['message']}")
         except Exception as init_error:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Repository '{repo.name}' created in database but Borg initialization error: {init_error}")
         
         return db_repo
@@ -63,9 +61,82 @@ def list_repositories(skip: int = 0, limit: int = 100, db: Session = Depends(get
     return repositories
 
 
+@router.get("/html")
+def list_repositories_html(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Return HTML-rendered repository list for HTMX"""
+    from fastapi.responses import HTMLResponse
+    
+    repositories = db.query(Repository).offset(skip).limit(limit).all()
+    
+    if not repositories:
+        return HTMLResponse('<div class="text-gray-500 p-4">No repositories configured</div>')
+    
+    html_items = []
+    for repo in repositories:
+        created_date = repo.created_at.strftime('%Y-%m-%d') if repo.created_at else 'Unknown'
+        html_items.append(f'''
+            <div class="flex items-center justify-between p-3 border rounded-lg mb-2">
+                <div>
+                    <div class="font-medium">{repo.name}</div>
+                    <div class="text-sm text-gray-500">{repo.path}</div>
+                    <div class="text-xs text-gray-400">Created: {created_date}</div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="borgitoryAppInstance.selectRepository({repo.id})" 
+                            class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200">
+                        View Archives
+                    </button>
+                    <button onclick="borgitoryAppInstance.deleteRepository({repo.id}, '{repo.name}')" 
+                            class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        ''')
+    
+    return HTMLResponse(''.join(html_items))
+
+
+@router.post("/scan-existing/start")
+async def start_repository_scan():
+    """Start scanning for existing Borg repositories in the repos directory"""
+    try:
+        job_id = await borg_service.start_repository_scan("/repos")
+        return {"job_id": job_id, "status": "started"}
+    except Exception as e:
+        logger.error(f"Error starting repository scan: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start scan: {str(e)}")
+
+@router.get("/scan-existing/status/{job_id}")
+def check_scan_status(job_id: str):
+    """Check status of repository scan job"""
+    try:
+        status = borg_service.check_scan_status(job_id)
+        return status
+    except Exception as e:
+        logger.error(f"Error checking scan status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to check status: {str(e)}")
+
+@router.get("/scan-existing/results/{job_id}")
+async def get_scan_results(job_id: str, db: Session = Depends(get_db)):
+    """Get results of completed repository scan"""
+    try:
+        repositories = await borg_service.get_scan_results(job_id)
+        
+        # Filter out already imported repositories
+        imported_repos = db.query(Repository).all()
+        imported_paths = {repo.path for repo in imported_repos}
+        
+        available_repos = [repo for repo in repositories if repo["path"] not in imported_paths]
+        
+        return {"repositories": available_repos}
+    except Exception as e:
+        logger.error(f"Error getting scan results: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get results: {str(e)}")
+
 @router.get("/scan-existing")
 async def scan_existing_repositories(db: Session = Depends(get_db)):
-    """Scan for existing Borg repositories in the repos directory"""
+    """Legacy endpoint - use the new start/status/results endpoints instead"""
     try:
         imported_repos = db.query(Repository).all()
         imported_paths = {repo.path for repo in imported_repos}
@@ -76,8 +147,6 @@ async def scan_existing_repositories(db: Session = Depends(get_db)):
         
         return {"repositories": available_repos}
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Error scanning for repositories: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to scan repositories: {str(e)}")
 
@@ -147,8 +216,6 @@ async def list_archives(repo_id: int, db: Session = Depends(get_db)):
         archives = await borg_service.list_archives(repository)
         return {"archives": archives}
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Error listing archives for repository {repo_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list archives: {str(e)}")
 
@@ -210,8 +277,6 @@ async def import_repository(
                 content = await keyfile.read()
                 f.write(content)
                 
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"Saved keyfile for repository '{name}' at {keyfile_path}")
         
         # Create repository record
@@ -250,12 +315,8 @@ async def import_repository(
         # If verification passed, get archive count for logging
         try:
             archives = await borg_service.list_archives(db_repo)
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"Successfully imported repository '{name}' with {len(archives)} archives")
         except Exception:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"Successfully imported repository '{name}' (could not count archives)")
         
         return db_repo

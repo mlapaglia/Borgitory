@@ -10,6 +10,13 @@ from app.models.database import init_db
 from app.api import repositories, jobs, auth, schedules, sync
 from app.services.scheduler_service import scheduler_service
 
+# Configure logging to show container output
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+
 logger = logging.getLogger(__name__)
 
 

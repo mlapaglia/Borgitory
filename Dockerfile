@@ -5,6 +5,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     rclone \
+    borgbackup \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -19,6 +20,9 @@ COPY app/ ./app/
 
 # Create data directory and set permissions
 RUN mkdir -p /app/data && chown -R borgitory:borgitory /app
+
+# Create directories that will be mounted and ensure proper permissions
+RUN mkdir -p /repos /data && chown -R borgitory:borgitory /repos /data
 
 # Switch to non-root user
 USER borgitory

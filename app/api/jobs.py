@@ -1,113 +1,27 @@
 import asyncio
+import json
+import logging
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sse_starlette.sse import EventSourceResponse
 
 from app.models.database import Repository, Job, get_db
 from app.models.schemas import Job as JobSchema, BackupRequest
 from app.services.borg_service import borg_service
-from app.services.docker_service import docker_service
+from app.services.job_manager import borg_job_manager
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-async def create_backup_task(repository_id: int, backup_request: BackupRequest, job_id: int):
-    """Background task to handle backup creation"""
-    from app.models.database import SessionLocal
-    import logging
-    
-    logger = logging.getLogger(__name__)
-    logger.info(f"Starting backup task for repository_id={repository_id}, job_id={job_id}")
-    
-    db = SessionLocal()
-    try:
-        # Get fresh instances from the new session
-        job = db.query(Job).filter(Job.id == job_id).first()
-        repository = db.query(Repository).filter(Repository.id == repository_id).first()
-        
-        if not job:
-            logger.error(f"Job {job_id} not found in database")
-            return
-        if not repository:
-            logger.error(f"Repository {repository_id} not found in database")
-            job.status = "failed"
-            job.error = f"Repository {repository_id} not found"
-            job.finished_at = datetime.utcnow()
-            db.commit()
-            return
-        
-        logger.info(f"Found job {job.id} and repository {repository.name}")
-        
-        job.status = "running"
-        job.started_at = datetime.utcnow()
-        db.commit()
-        logger.info(f"Job {job.id} status updated to running")
-        
-        logger.info(f"Starting Borg backup with source_path={backup_request.source_path}, compression={backup_request.compression}, dry_run={backup_request.dry_run}")
-        
-        log_output = []
-        try:
-            async for progress in borg_service.create_backup(
-                repository=repository,
-                source_path=backup_request.source_path,
-                compression=backup_request.compression,
-                dry_run=backup_request.dry_run
-            ):
-                logger.info(f"Backup progress: {progress}")
-                if progress.get("type") == "log":
-                    log_output.append(progress["message"])
-                elif progress.get("type") == "error":
-                    job.status = "failed"
-                    job.error = progress["message"]
-                    job.finished_at = datetime.utcnow()
-                    job.log_output = "\n".join(log_output)
-                    db.commit()
-                    return
-                elif progress.get("type") == "started":
-                    job.container_id = progress["container_id"]
-                    db.commit()
-                elif progress.get("type") == "completed":
-                    job.status = "completed" if progress["status"] == "success" else "failed"
-                    job.finished_at = datetime.utcnow()
-                    job.log_output = "\n".join(log_output)
-                    db.commit()
-                    return
-        except Exception as backup_error:
-            logger.error(f"Backup service error: {backup_error}")
-            job.status = "failed"
-            job.error = str(backup_error)
-            job.finished_at = datetime.utcnow()
-            job.log_output = "\n".join(log_output)
-            db.commit()
-            return
-        
-        job.status = "completed"
-        job.finished_at = datetime.utcnow()
-        job.log_output = "\n".join(log_output)
-        db.commit()
-        
-    except Exception as e:
-        try:
-            job = db.query(Job).filter(Job.id == job_id).first()
-            if job:
-                job.status = "failed"
-                job.error = str(e)
-                job.finished_at = datetime.utcnow()
-                db.commit()
-        except:
-            pass
-    finally:
-        db.close()
 
 
 @router.post("/backup")
 async def create_backup(
     backup_request: BackupRequest, 
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
+    """Start a backup job and return job_id for tracking"""
     repository = db.query(Repository).filter(
         Repository.id == backup_request.repository_id
     ).first()
@@ -115,118 +29,213 @@ async def create_backup(
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
     
-    job = Job(
-        repository_id=repository.id,
-        type="backup",
-        status="pending"
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    
-    background_tasks.add_task(create_backup_task, repository.id, backup_request, job.id)
-    
-    return {"job_id": job.id, "status": "started"}
+    try:
+        # Start the backup using the new JobManager system
+        borg_job_id = await borg_service.create_backup(
+            repository=repository,
+            source_path=backup_request.source_path,
+            compression=backup_request.compression,
+            dry_run=backup_request.dry_run
+        )
+        
+        return {"job_id": borg_job_id, "status": "started"}
+        
+    except Exception as e:
+        logger.error(f"Failed to start backup: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start backup: {str(e)}")
 
 
-@router.get("/", response_model=List[JobSchema])
+@router.get("/")
 def list_jobs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    jobs = db.query(Job).order_by(Job.id.desc()).offset(skip).limit(limit).all()
-    return jobs
+    """List database job records (legacy jobs) and active JobManager jobs"""
+    
+    # Get database jobs (legacy)
+    db_jobs = db.query(Job).order_by(Job.id.desc()).offset(skip).limit(limit).all()
+    
+    # Convert to dict format and add JobManager jobs
+    jobs_list = []
+    
+    # Add database jobs
+    for job in db_jobs:
+        jobs_list.append({
+            "id": job.id,
+            "job_id": job.job_id,
+            "repository_id": job.repository_id,
+            "type": job.type,
+            "status": job.status,
+            "started_at": job.started_at.isoformat() if job.started_at else None,
+            "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+            "error": job.error,
+            "source": "database"
+        })
+    
+    # Add active JobManager jobs
+    for job_id, borg_job in borg_job_manager.jobs.items():
+        # Skip if this job is already in database
+        existing_db_job = next((j for j in db_jobs if j.job_id == job_id), None)
+        if existing_db_job:
+            continue
+        
+        jobs_list.append({
+            "id": f"jm_{job_id}",  # Prefix to distinguish from DB IDs
+            "job_id": job_id,
+            "repository_id": None,  # JobManager doesn't track this separately
+            "type": "unknown",  # Could be inferred from command
+            "status": borg_job.status,
+            "started_at": borg_job.started_at.isoformat(),
+            "finished_at": borg_job.completed_at.isoformat() if borg_job.completed_at else None,
+            "error": borg_job.error,
+            "source": "jobmanager"
+        })
+    
+    return jobs_list
 
 
-@router.get("/{job_id}", response_model=JobSchema)
-def get_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return job
+@router.get("/{job_id}")
+def get_job(job_id: str, db: Session = Depends(get_db)):
+    """Get job details - supports both database IDs and JobManager IDs"""
+    
+    # Try to get from JobManager first (if it's a UUID format)
+    if len(job_id) > 10:  # Probably a UUID
+        status = borg_job_manager.get_job_status(job_id)
+        if status:
+            return {
+                "id": f"jm_{job_id}",
+                "job_id": job_id,
+                "repository_id": None,
+                "type": "unknown",
+                "status": status['status'],
+                "started_at": status['started_at'],
+                "finished_at": status['completed_at'],
+                "error": status['error'],
+                "source": "jobmanager"
+            }
+    
+    # Try database lookup
+    try:
+        db_job_id = int(job_id)
+        job = db.query(Job).filter(Job.id == db_job_id).first()
+        if job:
+            return {
+                "id": job.id,
+                "job_id": job.job_id,
+                "repository_id": job.repository_id,
+                "type": job.type,
+                "status": job.status,
+                "started_at": job.started_at.isoformat() if job.started_at else None,
+                "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+                "error": job.error,
+                "source": "database"
+            }
+    except ValueError:
+        pass
+    
+    raise HTTPException(status_code=404, detail="Job not found")
+
+
+@router.get("/{job_id}/status")
+async def get_job_status(job_id: str):
+    """Get current job status and progress"""
+    output = await borg_job_manager.get_job_output_stream(job_id, last_n_lines=50)
+    
+    if 'error' in output:
+        raise HTTPException(status_code=404, detail=output['error'])
+    
+    return output
+
+
+@router.get("/{job_id}/output")
+async def get_job_output(job_id: str, last_n_lines: int = 100):
+    """Get job output lines"""
+    output = await borg_job_manager.get_job_output_stream(job_id, last_n_lines=last_n_lines)
+    
+    if 'error' in output:
+        raise HTTPException(status_code=404, detail=output['error'])
+    
+    return output
 
 
 @router.get("/{job_id}/stream")
-async def stream_job_progress(job_id: int, db: Session = Depends(get_db)):
-    """Stream real-time job progress via Server-Sent Events"""
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
+async def stream_job_output(job_id: str):
+    """Stream real-time job output via Server-Sent Events"""
     async def event_generator():
-        while True:
-            db.refresh(job)
-            yield {
-                "event": "job_update",
-                "data": {
-                    "id": job.id,
-                    "status": job.status,
-                    "started_at": job.started_at.isoformat() if job.started_at else None,
-                    "finished_at": job.finished_at.isoformat() if job.finished_at else None
-                }
-            }
-            
-            if job.status in ["completed", "failed"]:
-                break
-                
-            await asyncio.sleep(1)
+        try:
+            async for event in borg_job_manager.stream_job_output(job_id):
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     
-    return EventSourceResponse(event_generator())
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @router.delete("/{job_id}")
-def cancel_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+async def cancel_job(job_id: str, db: Session = Depends(get_db)):
+    """Cancel a running job"""
     
-    if job.status == "running" and job.container_id:
-        # TODO: Implement container cancellation
+    # Try to cancel in JobManager first
+    if len(job_id) > 10:  # Probably a UUID
+        success = await borg_job_manager.cancel_job(job_id)
+        if success:
+            return {"message": "Job cancelled successfully"}
+    
+    # Try database job
+    try:
+        db_job_id = int(job_id)
+        job = db.query(Job).filter(Job.id == db_job_id).first()
+        if job:
+            # Try to cancel the associated JobManager job
+            if job.job_id:
+                await borg_job_manager.cancel_job(job.job_id)
+            
+            # Update database status
+            job.status = "cancelled"
+            job.finished_at = datetime.utcnow()
+            db.commit()
+            
+            return {"message": "Job cancelled successfully"}
+    except ValueError:
         pass
     
-    job.status = "cancelled"
-    job.finished_at = datetime.utcnow()
-    db.commit()
-    
-    return {"message": "Job cancelled successfully"}
+    raise HTTPException(status_code=404, detail="Job not found")
 
 
-@router.get("/test/docker")
-def test_docker_connectivity():
-    """Test Docker connectivity and image availability"""
-    import logging
-    from app.config import BORG_DOCKER_IMAGE
+@router.get("/manager/stats")
+def get_job_manager_stats():
+    """Get JobManager statistics"""
+    jobs = borg_job_manager.jobs
+    running_jobs = [job for job in jobs.values() if job.status == 'running']
+    completed_jobs = [job for job in jobs.values() if job.status == 'completed']
+    failed_jobs = [job for job in jobs.values() if job.status == 'failed']
     
-    logger = logging.getLogger(__name__)
+    return {
+        "total_jobs": len(jobs),
+        "running_jobs": len(running_jobs),
+        "completed_jobs": len(completed_jobs),
+        "failed_jobs": len(failed_jobs),
+        "active_processes": len(borg_job_manager._processes),
+        "running_job_ids": [job.id for job in running_jobs]
+    }
+
+
+@router.post("/manager/cleanup")
+def cleanup_completed_jobs():
+    """Clean up completed jobs from JobManager memory"""
+    cleaned = 0
+    jobs_to_remove = []
     
-    try:
-        # Test basic Docker connectivity
-        docker_info = docker_service.client.info()
-        logger.info(f"Docker info: {docker_info}")
-        
-        # Test image availability
-        try:
-            image = docker_service.client.images.get(BORG_DOCKER_IMAGE)
-            image_available = True
-            image_id = image.id
-        except Exception as e:
-            image_available = False
-            image_id = None
-            logger.warning(f"Borg image not available: {e}")
-        
-        # Test container list
-        containers = docker_service.client.containers.list()
-        
-        return {
-            "docker_connected": True,
-            "docker_version": docker_info.get("ServerVersion", "unknown"),
-            "borg_image": BORG_DOCKER_IMAGE,
-            "image_available": image_available,
-            "image_id": image_id,
-            "running_containers": len(containers)
-        }
-        
-    except Exception as e:
-        logger.error(f"Docker test failed: {e}")
-        return {
-            "docker_connected": False,
-            "error": str(e),
-            "borg_image": BORG_DOCKER_IMAGE
-        }
+    for job_id, job in borg_job_manager.jobs.items():
+        if job.status in ['completed', 'failed']:
+            jobs_to_remove.append(job_id)
+    
+    for job_id in jobs_to_remove:
+        borg_job_manager.cleanup_job(job_id)
+        cleaned += 1
+    
+    return {"message": f"Cleaned up {cleaned} completed jobs"}
