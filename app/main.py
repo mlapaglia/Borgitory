@@ -34,7 +34,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Borgitory - BorgBackup Web Manager", lifespan=lifespan)
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# Mount static files if directory exists
+import os
+if os.path.exists("app/static"):
+    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+else:
+    logger.warning("Static directory 'app/static' not found - static files will not be served")
 templates = Jinja2Templates(directory="app/templates")
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])

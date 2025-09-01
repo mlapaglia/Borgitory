@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 
+# Ensure static directory exists (even if empty)
+RUN mkdir -p /app/app/static
+
 # Create data directory and set permissions
 RUN mkdir -p /app/data && chown -R borgitory:borgitory /app
 
