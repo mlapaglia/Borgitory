@@ -1,10 +1,9 @@
 import os
-import socket
 import subprocess
 from pathlib import Path
 
 def ensure_certificates():
-    """Generate self-signed certificate that actually works"""
+    """Generate self-signed certificate for the user's IP"""
     cert_dir = Path("/app/ssl")
     cert_path = cert_dir / "cert.pem"
     key_path = cert_dir / "key.pem"
@@ -15,41 +14,21 @@ def ensure_certificates():
     if not cert_path.exists() or not key_path.exists():
         print("🔒 Generating self-signed certificate...")
         
-        # Collect all possible access methods
-        san_entries = [
-            'DNS:localhost',
-            'IP:127.0.0.1',
-            'IP:::1'
-        ]
+        # Get the IP address the user will access the app from
+        server_ip = os.environ.get('SERVER_IP')
+        if not server_ip:
+            print("❌ SERVER_IP environment variable is required!")
+            print("   Example: -e SERVER_IP=192.168.1.100")
+            exit(1)
         
-        # Add hostname
-        hostname = socket.gethostname()
-        san_entries.append(f'DNS:{hostname}')
+        # Generate certificate for localhost and the user's IP
+        san_string = f'DNS:localhost,IP:127.0.0.1,IP:{server_ip}'
         
-        # Add container IP
-        try:
-            container_ip = socket.gethostbyname(hostname)
-            san_entries.append(f'IP:{container_ip}')
-        except:
-            pass
-        
-        # Add user-specified hosts
-        if extra_hosts := os.environ.get('CERT_HOSTS'):
-            for host in extra_hosts.split(','):
-                host = host.strip()
-                if host.replace('.', '').replace(':', '').isdigit():  # IP address
-                    san_entries.append(f'IP:{host}')
-                else:  # hostname
-                    san_entries.append(f'DNS:{host}')
-        
-        san_string = ','.join(san_entries)
-        
-        # Generate the certificate
         subprocess.run([
             'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
             '-keyout', str(key_path), '-out', str(cert_path),
             '-days', '365', '-nodes',
-            '-subj', f'/CN={hostname}',
+            '-subj', f'/CN={server_ip}',
             '-addext', f'subjectAltName={san_string}'
         ], check=True)
         
