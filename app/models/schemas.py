@@ -56,6 +56,15 @@ class ScheduleBase(BaseModel):
 class ScheduleCreate(ScheduleBase):
     repository_id: int
     cloud_backup_config_id: Optional[int] = None
+    
+    @field_validator('cloud_backup_config_id', mode='before')
+    @classmethod
+    def validate_cloud_backup_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
 
 
 class Schedule(ScheduleBase):
@@ -84,6 +93,15 @@ class BackupRequest(BaseModel):
         if isinstance(v, str):
             return v.lower() in ('true', '1', 'yes', 'on')
         return bool(v)
+    
+    @field_validator('cloud_backup_config_id', mode='before')
+    @classmethod
+    def validate_cloud_backup_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
 
 
 class CloudBackupConfigBase(BaseModel):

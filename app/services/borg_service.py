@@ -189,7 +189,7 @@ class BorgService:
             logger.error(f"Failed to initialize repository: {e}")
             return {"success": False, "message": str(e)}
 
-    async def create_backup(self, repository: Repository, source_path: str, compression: str = "zstd", dry_run: bool = False) -> str:
+    async def create_backup(self, repository: Repository, source_path: str, compression: str = "zstd", dry_run: bool = False, cloud_backup_config_id: Optional[int] = None) -> str:
         """Create a backup and return job_id for tracking"""
         logger.info(f"Creating backup for repository: {repository.name} at {repository.path}")
         
@@ -236,7 +236,8 @@ class BorgService:
                     job_uuid=job_id,  # Store the JobManager UUID
                     type="backup",
                     status="queued",  # Will be updated to 'running' when started
-                    started_at=datetime.now()
+                    started_at=datetime.now(),
+                    cloud_backup_config_id=cloud_backup_config_id
                 )
                 db.add(job)
                 db.commit()
