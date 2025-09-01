@@ -12,15 +12,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
+COPY start.sh /app/start.sh
 
-# Generate self-signed SSL certificate
-RUN mkdir -p /app/ssl && \
-    openssl req -x509 -newkey rsa:4096 -keyout /app/ssl/key.pem -out /app/ssl/cert.pem \
-    -days 3650 -nodes -subj "/C=US/ST=State/L=City/O=Borgitory/CN=localhost"
+# Make script executable and create ssl directory
+RUN chmod +x /app/start.sh && \
+    mkdir -p /app/ssl
 
 EXPOSE 8443
 
 ENV SSL_CERT_FILE=/app/ssl/cert.pem
 ENV SSL_KEY_FILE=/app/ssl/key.pem
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8443", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]
+CMD ["/app/start.sh"]

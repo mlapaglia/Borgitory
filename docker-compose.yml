@@ -14,6 +14,8 @@ services:
       - ./borg-repos:/repos:rw
     environment:
       - SECRET_KEY=your-secret-key-change-in-production
+      # Optional: Add additional hostnames/IPs for SSL certificate
+      # - CERT_HOSTS=192.168.1.100,borgitory.local,myserver.home
     restart: unless-stopped
     
     # Optional: limit resources
