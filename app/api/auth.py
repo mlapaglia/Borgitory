@@ -12,12 +12,19 @@ from app.models.database import User, Credential, UserSession, get_db
 
 router = APIRouter()
 
-rp = PublicKeyCredentialRpEntity(
-    name="Borgitory",
-    id="localhost"
-)
+def get_rp_id(request: Request) -> str:
+    """Get the appropriate RP ID based on the request host"""
+    host = request.headers.get("host", "localhost").split(":")[0]
+    # For IP addresses, use the IP as RP ID
+    return host
 
-server = Fido2Server(rp)
+def get_server(request: Request) -> Fido2Server:
+    """Get a Fido2Server with the correct RP ID for the request"""
+    rp = PublicKeyCredentialRpEntity(
+        name="Borgitory",
+        id=get_rp_id(request)
+    )
+    return Fido2Server(rp)
 
 sessions = {}
 
@@ -29,8 +36,8 @@ def check_users_exist(db: Session = Depends(get_db)):
 
 
 @router.post("/register/begin")
-def begin_registration(request: dict, db: Session = Depends(get_db)):
-    username = request.get("username")
+def begin_registration(request_data: dict, http_request: Request, db: Session = Depends(get_db)):
+    username = request_data.get("username")
     if not username:
         raise HTTPException(status_code=400, detail="Username is required")
     
@@ -47,6 +54,7 @@ def begin_registration(request: dict, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
     
+    server = get_server(http_request)
     registration_data, state = server.register_begin(
         {
             "id": str(user.id).encode(),
@@ -71,11 +79,12 @@ def begin_registration(request: dict, db: Session = Depends(get_db)):
 
 @router.post("/register/complete")
 def complete_registration(
-    request: dict,
+    request_data: dict,
+    http_request: Request,
     db: Session = Depends(get_db)
 ):
-    session_id = request.get("session_id")
-    credential = request.get("credential")
+    session_id = request_data.get("session_id")
+    credential = request_data.get("credential")
     
     if not session_id or not credential:
         raise HTTPException(status_code=400, detail="Missing session_id or credential")
@@ -85,6 +94,7 @@ def complete_registration(
         raise HTTPException(status_code=400, detail="Invalid session")
     
     try:
+        server = get_server(http_request)
         auth_data = server.register_complete(
             session_data["state"],
             credential
@@ -109,8 +119,8 @@ def complete_registration(
 
 
 @router.post("/login/begin")
-def begin_authentication(request: dict, db: Session = Depends(get_db)):
-    username = request.get("username")
+def begin_authentication(request_data: dict, http_request: Request, db: Session = Depends(get_db)):
+    username = request_data.get("username")
     if not username:
         raise HTTPException(status_code=400, detail="Username is required")
     
@@ -133,6 +143,7 @@ def begin_authentication(request: dict, db: Session = Depends(get_db)):
         )
         creds.append(credential_data)
     
+    server = get_server(http_request)
     auth_data, state = server.authenticate_begin(creds)
     
     auth_data_json = dict(auth_data)
@@ -183,6 +194,7 @@ def complete_authentication(
             )
             creds.append(credential_data)
         
+        server = get_server(request)
         server.authenticate_complete(
             session_data["state"],
             creds,
