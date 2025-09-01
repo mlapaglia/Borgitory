@@ -109,7 +109,7 @@ jobs:
     - name: Update Docker Hub description
       uses: peter-evans/dockerhub-description@v4
       with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
         repository: ${{ env.IMAGE_NAME }}
         readme-filepath: ./README.md

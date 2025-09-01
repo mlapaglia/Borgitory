@@ -152,20 +152,46 @@ class CloudBackupConfig(Base):
 
 async def init_db():
     """Initialize database with schema migration support"""
+    import os
+    import pathlib
+    
     try:
+        # Ensure the data directory exists and is writable
+        from app.config import DATA_DIR, DATABASE_URL
+        
+        print(f"Initializing database at: {DATABASE_URL}")
+        print(f"Data directory: {DATA_DIR}")
+        
+        # Create data directory if it doesn't exist
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"✅ Data directory created/verified: {DATA_DIR}")
+        
+        # Extract database file path and ensure its directory exists
+        if DATABASE_URL.startswith("sqlite:///"):
+            db_path = DATABASE_URL.replace("sqlite:///", "")
+            if db_path.startswith("./"):
+                # Handle relative paths
+                db_path = os.path.abspath(db_path)
+            db_dir = pathlib.Path(db_path).parent
+            db_dir.mkdir(parents=True, exist_ok=True)
+            print(f"✅ Database directory created/verified: {db_dir}")
+        
         # First, try to create all tables (will create new tables only)
         Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created/verified")
         
         # Handle specific migrations for existing tables
         migrate_user_table()
         migrate_job_table()
         migrate_cloud_backup_table()
         
+        print("✅ Database initialization complete")
+        
     except Exception as e:
-        print(f"Database initialization error: {e}")
+        print(f"❌ Database initialization error: {e}")
         print("If you're getting schema errors, you may need to reset the database.")
         print("You can do this by deleting the database file and restarting the container.")
-        raise
+        raise  # Re-raise the exception so the app doesn't start with a broken database
 
 
 def migrate_user_table():

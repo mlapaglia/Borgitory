@@ -12,4 +12,4 @@ BACKUP_SOURCES_HOST_PATH = os.getenv("BACKUP_SOURCES_HOST_PATH", "./backup-sourc
 BORG_REPOS_CONTAINER_PATH = "/repos"
 BACKUP_SOURCES_CONTAINER_PATH = "/data"
 
-DATA_DIR.mkdir(exist_ok=True)
+# Note: DATA_DIR creation is handled in database.py init_db() to avoid permission issues

@@ -18,24 +18,22 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 
-# Ensure static directory exists (even if empty)
-RUN mkdir -p /app/app/static
-
-# Create data directory and set permissions
-RUN mkdir -p /app/data && chown -R borgitory:borgitory /app
-
-# Create directories that will be mounted and ensure proper permissions
-RUN mkdir -p /repos /data && chown -R borgitory:borgitory /repos /data
+# Create data directory and ensure proper permissions for the borgitory user
+RUN mkdir -p /app/data /repos /data && \
+    chown -R borgitory:borgitory /app /repos /data
 
 # Switch to non-root user
 USER borgitory
+
+# Create the database directory with proper permissions (as the borgitory user)
+RUN mkdir -p /app/data
 
 # Expose port
 EXPOSE 8000
 
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV DATABASE_URL=sqlite:///./data/borgitory.db
+ENV DATABASE_URL=sqlite:////app/data/borgitory.db
 ENV DATA_DIR=/app/data
 
 # Run the application (reload is disabled by default)
