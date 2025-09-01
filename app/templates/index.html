@@ -1344,7 +1344,154 @@ async function deleteSchedule(scheduleId, scheduleName) {
 }
 
 async function viewArchiveContents(repoId, archiveName) {
-    showNotification('Archive content viewing not yet implemented', 'info');
+    try {
+        showNotification('Loading archive contents...', 'info');
+        
+        const response = await fetch(`/api/repositories/${repoId}/archives/${encodeURIComponent(archiveName)}/contents`);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to load archive contents');
+        }
+        
+        const data = await response.json();
+        showArchiveContentsModal(archiveName, data.contents);
+        
+    } catch (error) {
+        showNotification(`Failed to load archive contents: ${error.message}`, 'error');
+        console.error('Archive contents error:', error);
+    }
+}
+
+function showArchiveContentsModal(archiveName, contents) {
+    // Create modal backdrop
+    const backdrop = document.createElement('div');
+    backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    backdrop.onclick = (e) => {
+        if (e.target === backdrop) {
+            document.body.removeChild(backdrop);
+        }
+    };
+    
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.className = 'bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] flex flex-col';
+    
+    // Sort contents: directories first, then files, both alphabetically
+    const sortedContents = contents.sort((a, b) => {
+        const aIsDir = a.type === 'd';
+        const bIsDir = b.type === 'd';
+        
+        if (aIsDir && !bIsDir) return -1;
+        if (!aIsDir && bIsDir) return 1;
+        
+        return a.path.localeCompare(b.path);
+    });
+    
+    // Format file size
+    const formatSize = (size) => {
+        if (!size) return '';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let unitIndex = 0;
+        let fileSize = size;
+        
+        while (fileSize >= 1024 && unitIndex < units.length - 1) {
+            fileSize /= 1024;
+            unitIndex++;
+        }
+        
+        return `${fileSize.toFixed(1)} ${units[unitIndex]}`;
+    };
+    
+    // Generate contents HTML
+    let contentsHtml = '';
+    if (sortedContents.length === 0) {
+        contentsHtml = '<div class="text-center py-8 text-gray-500">This archive is empty</div>';
+    } else {
+        contentsHtml = '<div class="space-y-1">';
+        
+        for (const item of sortedContents) {
+            const isDir = item.type === 'd';
+            const icon = isDir ? '📁' : '📄';
+            const sizeText = isDir ? '' : formatSize(item.size);
+            const modeText = item.mode || '';
+            const timeText = item.mtime ? new Date(item.mtime).toLocaleString() : '';
+            
+            contentsHtml += `
+                <div class="flex items-center py-2 px-3 hover:bg-gray-50 rounded text-sm">
+                    <span class="mr-3">${icon}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-mono text-gray-900 truncate">${item.path}</div>
+                        <div class="text-xs text-gray-500 space-x-4">
+                            ${sizeText ? `<span>${sizeText}</span>` : ''}
+                            ${modeText ? `<span>${modeText}</span>` : ''}
+                            ${timeText ? `<span>${timeText}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        contentsHtml += '</div>';
+    }
+    
+    modal.innerHTML = `
+        <div class="flex items-center justify-between p-6 border-b">
+            <h2 class="text-lg font-semibold text-gray-900">Archive Contents</h2>
+            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="p-6 border-b">
+            <h3 class="font-medium text-gray-900">${archiveName}</h3>
+            <p class="text-sm text-gray-500 mt-1">${contents.length} items</p>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6">
+            ${contentsHtml}
+        </div>
+        <div class="p-6 border-t bg-gray-50 rounded-b-lg">
+            <div class="flex justify-end">
+                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+    
+    // Focus trap for accessibility
+    const closeButton = modal.querySelector('button');
+    if (closeButton) closeButton.focus();
+}
+
+// Job history functions
+function toggleJobDetails(jobId) {
+    const detailsDiv = document.getElementById(`job-details-${jobId}`);
+    const chevron = document.getElementById(`chevron-${jobId}`);
+    
+    if (detailsDiv.classList.contains('hidden')) {
+        detailsDiv.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        detailsDiv.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+    }
+}
+
+function copyJobOutput(jobId) {
+    const outputElement = document.getElementById(`job-output-${jobId}`);
+    if (outputElement) {
+        const text = outputElement.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('Job output copied to clipboard', 'success');
+        }).catch(() => {
+            showNotification('Failed to copy output to clipboard', 'error');
+        });
+    }
 }
 
 // Initialize when page loads

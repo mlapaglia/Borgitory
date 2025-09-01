@@ -199,26 +199,83 @@ def get_jobs_html(request: Request, db: Session = Depends(get_db)):
                 started_at = job.started_at.strftime("%Y-%m-%d %H:%M") if job.started_at else "N/A"
                 finished_at = job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "N/A"
                 
+                # Prepare log output for display
+                has_output = bool(job.log_output and job.log_output.strip())
+                truncated_output = ""
+                if has_output:
+                    lines = job.log_output.strip().split('\n')
+                    if len(lines) > 3:
+                        truncated_output = '\n'.join(lines[:3]) + f'\n... ({len(lines)-3} more lines)'
+                    else:
+                        truncated_output = job.log_output.strip()
+                
                 html_content += f'''
-                    <div class="border rounded-lg p-4 bg-white hover:bg-gray-50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center space-x-3">
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {status_class}">
-                                        {status_icon} {job.status.title()}
-                                    </span>
-                                    <span class="text-sm font-medium text-gray-900">
-                                        {job.type.title()} - {repository_name}
-                                    </span>
+                    <div class="border rounded-lg bg-white">
+                        <div class="p-4 hover:bg-gray-50 cursor-pointer" onclick="toggleJobDetails({job.id})">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-3">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {status_class}">
+                                            {status_icon} {job.status.title()}
+                                        </span>
+                                        <span class="text-sm font-medium text-gray-900">
+                                            {job.type.title()} - {repository_name}
+                                        </span>
+                                    </div>
+                                    <div class="mt-2 text-xs text-gray-500 space-x-4">
+                                        <span>Started: {started_at}</span>
+                                        {f'<span>Finished: {finished_at}</span>' if job.finished_at else ''}
+                                        {f'<span class="text-red-600">Error: {job.error}</span>' if job.error else ''}
+                                    </div>
                                 </div>
-                                <div class="mt-2 text-xs text-gray-500 space-x-4">
-                                    <span>Started: {started_at}</span>
-                                    {f'<span>Finished: {finished_at}</span>' if job.finished_at else ''}
-                                    {f'<span class="text-red-600">Error: {job.error}</span>' if job.error else ''}
+                                <div class="flex-shrink-0 flex items-center space-x-2">
+                                    <span class="text-sm text-gray-500">#{job.id}</span>
+                                    <svg id="chevron-{job.id}" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
                                 </div>
                             </div>
-                            <div class="flex-shrink-0">
-                                <span class="text-sm text-gray-500">#{job.id}</span>
+                        </div>
+                        <div id="job-details-{job.id}" class="hidden border-t bg-gray-50 p-4">
+                            <div class="space-y-3">
+                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span class="font-medium text-gray-700">Type:</span>
+                                        <span class="ml-2 text-gray-900">{job.type}</span>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium text-gray-700">Repository:</span>
+                                        <span class="ml-2 text-gray-900">{repository_name}</span>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium text-gray-700">Started:</span>
+                                        <span class="ml-2 text-gray-900">{started_at}</span>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium text-gray-700">Finished:</span>
+                                        <span class="ml-2 text-gray-900">{finished_at if job.finished_at else "N/A"}</span>
+                                    </div>
+                                </div>
+                '''
+                
+                # Add output section conditionally
+                if has_output:
+                    escaped_output = job.log_output.strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                    html_content += f'''
+                                <div>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="font-medium text-gray-700">Output:</span>
+                                        <button onclick="copyJobOutput({job.id})" class="text-xs text-blue-600 hover:text-blue-800">Copy</button>
+                                    </div>
+                                    <div class="bg-black text-green-400 p-3 rounded font-mono text-xs max-h-64 overflow-y-auto">
+                                        <pre id="job-output-{job.id}">{escaped_output}</pre>
+                                    </div>
+                                </div>
+                    '''
+                else:
+                    html_content += '<div class="text-gray-500 text-sm">No output available</div>'
+                    
+                html_content += '''
                             </div>
                         </div>
                     </div>
