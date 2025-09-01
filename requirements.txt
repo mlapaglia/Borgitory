@@ -8,6 +8,6 @@ aiofiles>=24.1.0
 apscheduler>=3.10.4
 cryptography>=45.0.0
 docker>=7.1.0
-fido2>=2.0.0
+passlib[bcrypt]>=1.7.4
 python-dotenv>=1.0.1
 sse-starlette>=2.1.3

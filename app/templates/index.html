@@ -114,15 +114,15 @@
                                     <div class="space-y-4">
                                         <div>
                                             <label class="block text-sm font-medium text-gray-700">Name</label>
-                                            <input type="text" name="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                            <input type="text" name="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                         </div>
                                         <div>
                                             <label class="block text-sm font-medium text-gray-700">Path</label>
-                                            <input type="text" name="path" required placeholder="/repos/my-new-repo" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                            <input type="text" name="path" required placeholder="/repos/my-new-repo" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                         </div>
                                         <div>
                                             <label class="block text-sm font-medium text-gray-700">Passphrase</label>
-                                            <input type="password" name="passphrase" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                            <input type="password" name="passphrase" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                         </div>
                                         <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
                                             Create Repository
@@ -144,7 +144,7 @@
                                     
                                     <div id="discovered-repos" class="hidden">
                                         <label class="block text-sm font-medium text-gray-700">Found Repositories</label>
-                                        <select id="repo-select" onchange="selectDiscoveredRepo()" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <select id="repo-select" onchange="selectDiscoveredRepo()" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             <option value="">Select a repository...</option>
                                         </select>
                                     </div>
@@ -160,11 +160,11 @@
                                         <div class="space-y-4">
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700">Name (for this app)</label>
-                                                <input type="text" name="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                                <input type="text" name="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             </div>
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700">Repository Path</label>
-                                                <input type="text" name="path" id="import-path" required readonly class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                                                <input type="text" name="path" id="import-path" required readonly class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50 focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             </div>
                                             
                                             <!-- Encryption info display -->
@@ -180,13 +180,13 @@
                                             <!-- Passphrase field -->
                                             <div id="passphrase-field" class="hidden">
                                                 <label class="block text-sm font-medium text-gray-700">Passphrase</label>
-                                                <input type="password" name="passphrase" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                                <input type="password" name="passphrase" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             </div>
                                             
                                             <!-- Keyfile field -->
                                             <div id="keyfile-field" class="hidden">
                                                 <label class="block text-sm font-medium text-gray-700">Keyfile</label>
-                                                <input type="file" name="keyfile" accept=".key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                                <input type="file" name="keyfile" accept=".key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                                 <p class="mt-1 text-sm text-gray-500">Upload the Borg keyfile (usually has .key extension)</p>
                                             </div>
                                             
@@ -235,17 +235,17 @@
                                 <div class="space-y-4">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Repository</label>
-                                        <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             <option value="">Select Repository...</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Source Path</label>
-                                        <input type="text" name="source_path" value="/data" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <input type="text" name="source_path" value="/data" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Compression</label>
-                                        <select name="compression" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <select name="compression" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             <option value="zstd">ZSTD (Recommended)</option>
                                             <option value="lz4">LZ4 (Fast)</option>
                                             <option value="none">None</option>
@@ -253,7 +253,7 @@
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Cloud Backup (Optional)</label>
-                                        <select name="cloud_backup_config_id" id="backup-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <select name="cloud_backup_config_id" id="backup-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             <option value="">No cloud backup</option>
                                         </select>
                                         <p class="mt-1 text-xs text-gray-500">Automatically backup to cloud after Borg backup completes</p>
@@ -299,17 +299,17 @@
                                 <div class="space-y-4">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Name</label>
-                                        <input type="text" name="name" required placeholder="Daily backup" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <input type="text" name="name" required placeholder="Daily backup" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Repository</label>
-                                        <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             <option value="">Select Repository...</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Schedule</label>
-                                        <select onchange="updateCronExpression()" id="schedule-preset" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <select onchange="updateCronExpression()" id="schedule-preset" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             <option value="">Select a preset...</option>
                                             <option value="0 2 * * *">Daily at 2:00 AM</option>
                                             <option value="0 2 * * 0">Weekly on Sunday at 2:00 AM</option>
@@ -321,12 +321,12 @@
                                     </div>
                                     <div id="custom-cron" class="hidden">
                                         <label class="block text-sm font-medium text-gray-700">Custom Cron Expression</label>
-                                        <input type="text" id="custom-cron-input" placeholder="0 2 * * *" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <input type="text" id="custom-cron-input" placeholder="0 2 * * *" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                         <p class="mt-1 text-sm text-gray-500">Format: minute hour day month weekday</p>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Cloud Backup (Optional)</label>
-                                        <select name="cloud_backup_config_id" id="schedule-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <select name="cloud_backup_config_id" id="schedule-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                             <option value="">No cloud backup</option>
                                         </select>
                                         <p class="mt-1 text-xs text-gray-500">Automatically backup to cloud after each scheduled Borg backup</p>
@@ -392,11 +392,11 @@
                             >
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Name</label>
-                                    <input type="text" name="name" required placeholder="My S3 Backup" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="text" name="name" required placeholder="My S3 Backup" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Region</label>
-                                    <select name="region" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <select name="region" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                         <!-- US Regions -->
                                         <option value="us-east-1">us-east-1 - US East (N. Virginia)</option>
                                         <option value="us-east-2">us-east-2 - US East (Ohio)</option>
@@ -445,19 +445,19 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Bucket Name</label>
-                                    <input type="text" name="bucket_name" required placeholder="my-backup-bucket" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="text" name="bucket_name" required placeholder="my-backup-bucket" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Path Prefix (optional)</label>
-                                    <input type="text" name="path_prefix" placeholder="backups/borgitory" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="text" name="path_prefix" placeholder="backups/borgitory" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">AWS Access Key ID</label>
-                                    <input type="text" name="access_key" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="text" name="access_key" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">AWS Secret Access Key</label>
-                                    <input type="password" name="secret_key" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="password" name="secret_key" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                 </div>
                                 <div class="flex space-x-2">
                                     <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">

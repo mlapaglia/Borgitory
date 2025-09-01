@@ -16,10 +16,14 @@ Base = declarative_base()
 
 import base64
 import hashlib
+from passlib.context import CryptContext
 
 # Generate a proper Fernet key from the secret
 fernet_key = base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest())
 cipher_suite = Fernet(fernet_key)
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class Repository(Base):
@@ -82,24 +86,20 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
     
-    credentials = relationship("Credential", back_populates="user")
     sessions = relationship("UserSession", back_populates="user")
-
-
-class Credential(Base):
-    __tablename__ = "credentials"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    credential_id = Column(String, unique=True, nullable=False)
-    public_key = Column(LargeBinary, nullable=False)
-    sign_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
     
-    user = relationship("User", back_populates="credentials")
+    def set_password(self, password: str):
+        """Hash and store the password"""
+        self.password_hash = pwd_context.hash(password)
+    
+    def verify_password(self, password: str) -> bool:
+        """Verify a password against the stored hash"""
+        return pwd_context.verify(password, self.password_hash)
+
 
 
 class UserSession(Base):

@@ -4,7 +4,7 @@ services:
   borgitory:
     build: .
     ports:
-      - "8443:8443"   # HTTPS port
+      - "8000:8000"   # HTTP port
     volumes:
       # Persistent data storage
       - ./data:/app/data
@@ -14,7 +14,6 @@ services:
       - ./borg-repos:/repos:rw
     environment:
       - SECRET_KEY=your-secret-key-change-in-production
-      - SERVER_IP=192.168.1.2  # REQUIRED: IP address you'll access the app from
     restart: unless-stopped
     
     # Optional: limit resources

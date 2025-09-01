@@ -14,7 +14,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 ### Advanced Features
 - **Automated Scheduling**: Set up cron-based backup schedules with APScheduler
 - **Cloud Sync**: Synchronize repositories to S3-compatible storage using Rclone
-- **Passkey Authentication**: Secure access using WebAuthn (passwordless authentication)
+- **User Authentication**: Secure username/password authentication
 - **Docker Integration**: Manage Borg operations through isolated Docker containers
 - **Mobile Responsive**: HTMX + Alpine.js + Tailwind CSS interface
 
@@ -45,7 +45,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 4. **Access the web interface**
    - Open http://localhost:8000 in your browser
-   - Set up passkey authentication on first visit
+   - Create your first admin account on initial setup
 
 ### Development Setup
 
@@ -153,7 +153,7 @@ The application provides a RESTful API with automatic OpenAPI documentation:
 - **SQLite**: Lightweight database for configuration
 - **APScheduler**: Job scheduling and cron support
 - **Docker SDK**: Container management
-- **Fido2**: WebAuthn/passkey authentication
+- **Passlib**: Password hashing and verification
 
 ### Frontend Stack
 - **HTMX**: Dynamic HTML updates
@@ -162,11 +162,11 @@ The application provides a RESTful API with automatic OpenAPI documentation:
 - **Server-Sent Events**: Real-time progress updates
 
 ### Security Features
-- Passkey-only authentication (WebAuthn)
+- Username/password authentication with bcrypt hashing
+- Secure session management
 - Encrypted credential storage (Fernet)
 - Docker container isolation
 - No network access for Borg containers
-- CSRF protection
 
 ## Deployment
 
@@ -230,9 +230,9 @@ server {
    - Verify repository path is accessible from container
    - Check volume mounts in docker-compose.yml
 
-3. **Passkey registration fails**
-   - Ensure HTTPS in production
-   - Check browser WebAuthn support
+3. **Login fails**
+   - Check username and password are correct
+   - Ensure database is properly initialized
 
 ### Logs
 
