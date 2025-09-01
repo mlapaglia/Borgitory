@@ -74,7 +74,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
+        platforms: linux/amd64
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
@@ -82,29 +82,6 @@ jobs:
         cache-to: type=gha,mode=max
         build-args: |
           VERSION=${{ steps.version.outputs.VERSION }}
-
-    - name: Create release summary
-      run: |
-        echo "# 🚀 Docker Release Published" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Release Type:** ${{ steps.version.outputs.IS_PRERELEASE == 'true' && 'Pre-release (Alpha)' || 'Stable Release' }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Version:** ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "## 📦 Published Docker Images" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Tag | Command |" >> $GITHUB_STEP_SUMMARY
-        echo "|-----|---------|" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ steps.version.outputs.IS_PRERELEASE }}" == "true" ]; then
-          echo "| \`${{ steps.version.outputs.VERSION }}\` | \`docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`alpha\` | \`docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpha\` |" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "| \`${{ steps.version.outputs.VERSION }}\` | \`docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`latest\` | \`docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` |" >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "## 🏗️ Multi-platform Support" >> $GITHUB_STEP_SUMMARY
-        echo "- linux/amd64" >> $GITHUB_STEP_SUMMARY
-        echo "- linux/arm64" >> $GITHUB_STEP_SUMMARY
 
     - name: Update Docker Hub description
       uses: peter-evans/dockerhub-description@v4

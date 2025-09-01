@@ -2,39 +2,31 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     rclone \
     borgbackup \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN groupadd -r borgitory && useradd -r -g borgitory -d /app -s /bin/bash borgitory
 
-# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY app/ ./app/
 
-# Create data directory and ensure proper permissions for the borgitory user
-RUN mkdir -p /app/data /repos /data && \
-    chown -R borgitory:borgitory /app /repos /data
+# Generate self-signed SSL certificate
+RUN mkdir -p /app/ssl && \
+    openssl req -x509 -newkey rsa:4096 -keyout /app/ssl/key.pem -out /app/ssl/cert.pem \
+    -days 3650 -nodes -subj "/C=US/ST=State/L=City/O=Borgitory/CN=localhost" && \
+    chown -R borgitory:borgitory /app/ssl
 
-# Switch to non-root user
 USER borgitory
 
-# Create the database directory with proper permissions (as the borgitory user)
-RUN mkdir -p /app/data
+EXPOSE 8443
 
-# Expose port
-EXPOSE 8000
+ENV SSL_CERT_FILE=/app/ssl/cert.pem
+ENV SSL_KEY_FILE=/app/ssl/key.pem
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV DATABASE_URL=sqlite:////app/data/borgitory.db
-ENV DATA_DIR=/app/data
-
-# Run the application (reload is disabled by default)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8443", "--ssl-keyfile", "/app/ssl/key.pem", "--ssl-certfile", "/app/ssl/cert.pem"]

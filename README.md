@@ -76,7 +76,6 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 |----------|---------|-------------|
 | `SECRET_KEY` | *required* | Encryption key for stored credentials |
 | `DATABASE_URL` | `sqlite:///./data/borgitory.db` | SQLite database path |
-| `DATA_DIR` | `./data` | Data directory for app storage |
 | `BORG_DOCKER_IMAGE` | `ghcr.io/borgmatic-collective/borgmatic:latest` | Docker image for Borg/Borgmatic operations |
 
 ### BorgBackup Docker Image

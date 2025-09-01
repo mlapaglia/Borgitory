@@ -4,7 +4,7 @@ services:
   borgitory:
     build: .
     ports:
-      - "8000:8000"
+      - "8443:8443"   # HTTPS port
     volumes:
       # Persistent data storage
       - ./data:/app/data
@@ -14,8 +14,6 @@ services:
       - ./borg-repos:/repos:rw
     environment:
       - SECRET_KEY=your-secret-key-change-in-production
-      - DATABASE_URL=sqlite:///./data/borgitory.db
-      - DATA_DIR=/app/data
     restart: unless-stopped
     
     # Optional: limit resources
