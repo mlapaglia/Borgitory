@@ -82,6 +82,18 @@ class RecoveryService:
             job.completed_at = datetime.now()
             job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {job.started_at})"
             
+            # Also mark any associated tasks as failed
+            from app.models.database import JobTask
+            db_tasks = db.query(JobTask).filter(JobTask.job_id == job.id).all()
+            if db_tasks:
+                logger.info(f"  🔧 Found {len(db_tasks)} tasks to cancel for job {job.id}")
+                for db_task in db_tasks:
+                    if db_task.status in ['pending', 'running', 'in_progress']:
+                        db_task.status = 'failed'
+                        db_task.completed_at = datetime.now()
+                        db_task.error = "Task cancelled on startup - job was interrupted by application shutdown"
+                        logger.info(f"    ✅ Task '{db_task.task_name}' marked as failed")
+            
             db.commit()
             logger.info(f"✅ Job {job.id} cancelled and marked as failed")
             
@@ -166,12 +178,29 @@ class RecoveryService:
                         job_info.status = 'failed'
                         job_info.completed_at = datetime.now()
                         
+                        # Mark all running tasks as failed too
+                        for task in job_info.tasks:
+                            if task.status in ['pending', 'in_progress', 'running']:
+                                task.status = 'failed'
+                                task.completed_at = datetime.now()
+                                task.error = "Task cancelled on startup - job was interrupted by application shutdown"
+                                logger.info(f"  ✅ Task '{task.task_name}' marked as failed")
+                        
                         # Update database record
                         db_job = db.query(Job).filter(Job.id == job_info.db_job_id).first()
                         if db_job:
                             db_job.status = 'failed'
                             db_job.completed_at = datetime.now()
                             db_job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {db_job.started_at})"
+                            
+                            # Also update database task records
+                            from app.models.database import JobTask
+                            db_tasks = db.query(JobTask).filter(JobTask.job_id == db_job.id).all()
+                            for db_task in db_tasks:
+                                if db_task.status in ['pending', 'running', 'in_progress']:
+                                    db_task.status = 'failed'
+                                    db_task.completed_at = datetime.now()
+                                    db_task.error = "Task cancelled on startup - job was interrupted by application shutdown"
                     
                     db.commit()
                     logger.info("✅ All stale composite jobs recovered")
