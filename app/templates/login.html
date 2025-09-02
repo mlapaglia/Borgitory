@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Borgitory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box !important;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            display: table;
+            width: 100%;
+            height: 100%;
+            background-color: #111;
+            color: #f2f2f2;
+            line-height: 1.6;
+            position: relative;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+
+        .lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            margin: auto;
+            width: 90vw;
+            display: flex;
+            justify-content: space-between;
+            z-index: 1;
+        }
+
+        .line {
+            position: relative;
+            width: 1px;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .line::after {
+            content: '';
+            display: block;
+            position: absolute;
+            height: 15vh;
+            width: 100%;
+            top: -50%;
+            left: 0;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #ffffff 75%, #ffffff 100%);
+            animation: drop 7s 0s infinite;
+            animation-fill-mode: forwards;
+            animation-timing-function: cubic-bezier(0.4, 0.26, 0, 0.97);
+        }
+
+        .line:nth-child(1)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #FF4500 75%, #FF4500 100%);
+            animation-delay: 2.3s;
+        }
+
+        .line:nth-child(2)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #32CD32 75%, #32CD32 100%);
+            animation-delay: 4.7s;
+        }
+
+        .line:nth-child(3)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #1E90FF 75%, #1E90FF 100%);
+            animation-delay: 0.8s;
+        }
+
+        .line:nth-child(4)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #FFD700 75%, #FFD700 100%);
+            animation-delay: 6.1s;
+        }
+
+        .line:nth-child(5)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #8A2BE2 75%, #8A2BE2 100%);
+            animation-delay: 1.4s;
+        }
+
+        .line:nth-child(6)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #20B2AA 75%, #20B2AA 100%);
+            animation-delay: 3.9s;
+        }
+
+        .line:nth-child(7)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #DC143C 75%, #DC143C 100%);
+            animation-delay: 0.2s;
+        }
+
+        .line:nth-child(8)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #00FA9A 75%, #00FA9A 100%);
+            animation-delay: 5.3s;
+        }
+
+        .line:nth-child(9)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #FF1493 75%, #FF1493 100%);
+            animation-delay: 2.7s;
+        }
+
+        .line:nth-child(10)::after {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #00BFFF 75%, #00BFFF 100%);
+            animation-delay: 4.2s;
+        }
+
+        @keyframes drop {
+            0% {
+                top: -50%;
+            }
+            100% {
+                top: 110%;
+            }
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .content-wrapper {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: center;
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="lines">
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+    </div>
+    <div class="content-wrapper">
+        <div class="login-container rounded-lg shadow-xl p-8 w-full max-w-md mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Borgitory</h1>
+                <p class="text-gray-600">BorgBackup Web Manager</p>
+            </div>
+
+            <!-- Welcome message for first user -->
+            <div id="welcome-message" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div class="text-blue-700 text-sm">
+                    <strong>Welcome!</strong> No users exist yet. Create the first administrator account to get started.
+                </div>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="hidden" onsubmit="submitLogin(event)">
+                <div class="mb-4">
+                    <label for="username" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        name="username"
+                        placeholder="Enter your username"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                        required
+                    >
+                </div>
+
+                <div class="mb-4">
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password"
+                        placeholder="Enter your password"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                        required
+                    >
+                </div>
+
+                <div class="mb-6">
+                    <label class="flex items-center">
+                        <input 
+                            type="checkbox" 
+                            id="remember-me"
+                            name="remember_me"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        >
+                        <span class="ml-2 text-sm text-gray-700">Remember me (stay logged in)</span>
+                    </label>
+                </div>
+
+                <button 
+                    type="submit"
+                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors"
+                >
+                    Sign In
+                </button>
+            </form>
+
+            <!-- Registration Form -->
+            <form id="register-form" class="hidden" onsubmit="submitRegistration(event)">
+                <div class="mb-4">
+                    <label for="reg-username" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input 
+                        type="text" 
+                        id="reg-username" 
+                        name="username"
+                        placeholder="Choose a username (min 3 characters)"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                        required
+                        minlength="3"
+                    >
+                </div>
+
+                <div class="mb-6">
+                    <label for="reg-password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input 
+                        type="password" 
+                        id="reg-password" 
+                        name="password"
+                        placeholder="Choose a password (min 6 characters)"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                        required
+                        minlength="6"
+                    >
+                </div>
+
+                <button 
+                    type="submit"
+                    class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:ring-4 focus:ring-green-300 transition-colors"
+                >
+                    Create Account
+                </button>
+            </form>
+
+            <!-- Status messages -->
+            <div id="status-message" class="mt-4 hidden">
+                <div id="status-content" class="text-sm text-center"></div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div id="loading" class="hidden mt-4">
+                <div class="flex items-center justify-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span class="ml-3 text-gray-700">Processing...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let hasUsers = false;
+
+        // Check if users exist on page load
+        checkUsersExist();
+
+        async function checkUsersExist() {
+            try {
+                const response = await fetch('/auth/check-users');
+                const data = await response.json();
+                hasUsers = data.has_users;
+                
+                if (!hasUsers) {
+                    // Show welcome message and register form for first user
+                    document.getElementById('welcome-message').classList.remove('hidden');
+                    document.getElementById('register-form').classList.remove('hidden');
+                    document.getElementById('login-form').classList.add('hidden');
+                } else {
+                    // Show login form for existing users
+                    document.getElementById('login-form').classList.remove('hidden');
+                    document.getElementById('register-form').classList.add('hidden');
+                }
+            } catch (error) {
+                showStatus('Error checking system status', 'error');
+                console.error('Error checking users:', error);
+            }
+        }
+
+        async function submitRegistration(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch('/auth/register', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Registration failed');
+                }
+
+                showStatus('Account created successfully! You can now sign in.', 'success');
+                
+                // Switch to login form
+                hasUsers = true;
+                document.getElementById('welcome-message').classList.add('hidden');
+                document.getElementById('register-form').classList.add('hidden');
+                document.getElementById('login-form').classList.remove('hidden');
+
+            } catch (error) {
+                showStatus(`Registration failed: ${error.message}`, 'error');
+                console.error('Registration error:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function submitLogin(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            
+            setLoading(true);
+
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Login failed');
+                }
+
+                showStatus('Login successful! Redirecting...', 'success');
+                
+                // Redirect to main app
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+
+            } catch (error) {
+                showStatus(`Login failed: ${error.message}`, 'error');
+                console.error('Login error:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status-message');
+            const contentDiv = document.getElementById('status-content');
+            
+            statusDiv.classList.remove('hidden');
+            contentDiv.innerHTML = message;
+            
+            // Remove previous type classes
+            contentDiv.className = 'text-sm text-center';
+            
+            // Add type-specific classes
+            if (type === 'error') {
+                contentDiv.classList.add('text-red-600', 'bg-red-50', 'border', 'border-red-200', 'rounded', 'p-2');
+            } else if (type === 'success') {
+                contentDiv.classList.add('text-green-600', 'bg-green-50', 'border', 'border-green-200', 'rounded', 'p-2');
+            } else if (type === 'info') {
+                contentDiv.classList.add('text-blue-600', 'bg-blue-50', 'border', 'border-blue-200', 'rounded', 'p-2');
+            }
+
+            // Auto-hide success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.classList.add('hidden');
+                }, 3000);
+            }
+        }
+
+        function setLoading(loading) {
+            const loadingDiv = document.getElementById('loading');
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            
+            if (loading) {
+                loadingDiv.classList.remove('hidden');
+                loginForm.classList.add('hidden');
+                registerForm.classList.add('hidden');
+            } else {
+                loadingDiv.classList.add('hidden');
+                if (hasUsers) {
+                    loginForm.classList.remove('hidden');
+                } else {
+                    registerForm.classList.remove('hidden');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

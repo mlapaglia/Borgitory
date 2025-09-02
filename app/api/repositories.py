@@ -1,16 +1,26 @@
+import logging
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.models.database import Repository, get_db
+from app.models.database import Repository, User, get_db
 from app.models.schemas import Repository as RepositorySchema, RepositoryCreate, RepositoryUpdate
 from app.services.borg_service import borg_service
+from app.api.auth import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+templates = Jinja2Templates(directory="app/templates")
 
 
 @router.post("/", response_model=RepositorySchema, status_code=status.HTTP_201_CREATED)
-async def create_repository(repo: RepositoryCreate, db: Session = Depends(get_db)):
+async def create_repository(
+    repo: RepositoryCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     try:
         db_repo = db.query(Repository).filter(Repository.name == repo.name).first()
         if db_repo:
@@ -32,12 +42,8 @@ async def create_repository(repo: RepositoryCreate, db: Session = Depends(get_db
         try:
             init_result = await borg_service.initialize_repository(db_repo)
             if not init_result["success"]:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Repository '{repo.name}' created in database but Borg initialization failed: {init_result['message']}")
         except Exception as init_error:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Repository '{repo.name}' created in database but Borg initialization error: {init_error}")
         
         return db_repo
@@ -58,9 +64,48 @@ def list_repositories(skip: int = 0, limit: int = 100, db: Session = Depends(get
     return repositories
 
 
+
+
+@router.post("/scan-existing/start")
+async def start_repository_scan():
+    """Start scanning for existing Borg repositories in the repos directory"""
+    try:
+        job_id = await borg_service.start_repository_scan("/repos")
+        return {"job_id": job_id, "status": "started"}
+    except Exception as e:
+        logger.error(f"Error starting repository scan: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start scan: {str(e)}")
+
+@router.get("/scan-existing/status/{job_id}")
+async def check_scan_status(job_id: str):
+    """Check status of repository scan job"""
+    try:
+        status = await borg_service.check_scan_status(job_id)
+        return status
+    except Exception as e:
+        logger.error(f"Error checking scan status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to check status: {str(e)}")
+
+@router.get("/scan-existing/results/{job_id}")
+async def get_scan_results(job_id: str, db: Session = Depends(get_db)):
+    """Get results of completed repository scan"""
+    try:
+        repositories = await borg_service.get_scan_results(job_id)
+        
+        # Filter out already imported repositories
+        imported_repos = db.query(Repository).all()
+        imported_paths = {repo.path for repo in imported_repos}
+        
+        available_repos = [repo for repo in repositories if repo["path"] not in imported_paths]
+        
+        return {"repositories": available_repos}
+    except Exception as e:
+        logger.error(f"Error getting scan results: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get results: {str(e)}")
+
 @router.get("/scan-existing")
 async def scan_existing_repositories(db: Session = Depends(get_db)):
-    """Scan for existing Borg repositories in the repos directory"""
+    """Legacy endpoint - use the new start/status/results endpoints instead"""
     try:
         imported_repos = db.query(Repository).all()
         imported_paths = {repo.path for repo in imported_repos}
@@ -71,10 +116,73 @@ async def scan_existing_repositories(db: Session = Depends(get_db)):
         
         return {"repositories": available_repos}
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Error scanning for repositories: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to scan repositories: {str(e)}")
+
+
+@router.get("/scan")
+async def scan_repositories():
+    """Scan for existing repositories (alias for scan-existing for frontend compatibility)"""
+    try:
+        available_repos = await borg_service.scan_for_repositories()
+        return {"repositories": available_repos}
+    except Exception as e:
+        logger.error(f"Error scanning for repositories: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to scan repositories: {str(e)}")
+
+
+@router.get("/html", response_class=HTMLResponse)
+def get_repositories_html(request: Request, db: Session = Depends(get_db)):
+    """Get repositories as HTML for frontend display"""
+    try:
+        repositories = db.query(Repository).all()
+        
+        html_content = ""
+        
+        if not repositories:
+            html_content = '''
+                <div class="text-gray-500 text-center py-4">
+                    <p>No repositories configured.</p>
+                    <p class="text-sm mt-1">Create or import a repository to get started.</p>
+                </div>
+            '''
+        else:
+            html_content = '<div class="space-y-3">'
+            
+            for repo in repositories:
+                html_content += f'''
+                    <div class="border rounded-lg p-4 bg-white hover:bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <h4 class="font-medium text-gray-900">{repo.name}</h4>
+                                <p class="text-sm text-gray-500">{repo.path}</p>
+                                <p class="text-xs text-gray-400 mt-1">Created: {repo.created_at.strftime("%Y-%m-%d %H:%M") if repo.created_at else "Unknown"}</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="switchTab('archives'); document.getElementById('archive-repository-select').value = '{repo.id}'; loadArchives();" 
+                                        class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200">
+                                    View Archives
+                                </button>
+                                <button onclick="borgitoryAppInstance.deleteRepository({repo.id}, '{repo.name}')" 
+                                        class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                '''
+            
+            html_content += '</div>'
+        
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        error_html = f'''
+            <div class="text-red-500 text-center py-4">
+                <p>Error loading repositories: {str(e)}</p>
+            </div>
+        '''
+        return HTMLResponse(content=error_html)
 
 
 @router.get("/{repo_id}", response_model=RepositorySchema)
@@ -142,10 +250,144 @@ async def list_archives(repo_id: int, db: Session = Depends(get_db)):
         archives = await borg_service.list_archives(repository)
         return {"archives": archives}
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Error listing archives for repository {repo_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list archives: {str(e)}")
+
+
+@router.get("/{repo_id}/archives/html", response_class=HTMLResponse)
+async def list_archives_html(repo_id: int, request: Request, db: Session = Depends(get_db)):
+    """Get repository archives as HTML"""
+    try:
+        repository = db.query(Repository).filter(Repository.id == repo_id).first()
+        if repository is None:
+            raise HTTPException(status_code=404, detail="Repository not found")
+        
+        try:
+            archives = await borg_service.list_archives(repository)
+            
+            html_content = ""
+            
+            if not archives:
+                html_content = '''
+                    <div class="text-gray-500 text-center py-8">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">No Archives Found</h3>
+                        <p class="text-sm">This repository doesn't contain any backup archives yet.</p>
+                        <p class="text-sm mt-1">Create a backup to see archives here.</p>
+                    </div>
+                '''
+            else:
+                html_content = f'''
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-medium text-gray-900">Archives for {repository.name}</h3>
+                            <span class="text-sm text-gray-500">{len(archives)} archives</span>
+                        </div>
+                    </div>
+                '''
+                
+                if len(archives) > 10:
+                    html_content += '''
+                        <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p class="text-sm text-blue-700">
+                                Showing the most recent 10 archives. Use the Borg command line to view older archives if needed.
+                            </p>
+                        </div>
+                    '''
+                
+                html_content += '<div class="space-y-2">'
+                
+                # Show most recent archives first (limit to 10)
+                recent_archives = archives[-10:] if len(archives) > 10 else archives
+                recent_archives.reverse()  # Most recent first
+                
+                for archive in recent_archives:
+                    # Parse archive information
+                    archive_name = archive.get('name', 'Unknown')
+                    archive_time = archive.get('time', '')
+                    
+                    # Format the timestamp if available
+                    formatted_time = archive_time
+                    if archive_time:
+                        try:
+                            from datetime import datetime
+                            dt = datetime.fromisoformat(archive_time.replace('Z', '+00:00'))
+                            formatted_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                        except:
+                            pass
+                    
+                    # Archive size information
+                    size_info = ""
+                    if 'stats' in archive:
+                        stats = archive['stats']
+                        if 'original_size' in stats:
+                            # Convert bytes to human readable
+                            size_bytes = stats['original_size']
+                            for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                                if size_bytes < 1024.0:
+                                    size_info = f"{size_bytes:.1f} {unit}"
+                                    break
+                                size_bytes /= 1024.0
+                    
+                    html_content += f'''
+                        <div class="border rounded-lg p-4 bg-white hover:bg-gray-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-3">
+                                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                        </svg>
+                                        <div>
+                                            <h4 class="font-medium text-gray-900">{archive_name}</h4>
+                                            <div class="text-sm text-gray-500 space-x-4">
+                                                <span>Created: {formatted_time}</span>
+                                                {f'<span>Size: {size_info}</span>' if size_info else ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex-shrink-0">
+                                    <button 
+                                        onclick="viewArchiveContents('{repo_id}', '{archive_name}')"
+                                        class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        View Contents
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    '''
+                
+                html_content += '</div>'
+            
+            return HTMLResponse(content=html_content)
+            
+        except Exception as e:
+            logger.error(f"Error listing archives for repository {repo_id}: {e}")
+            error_html = f'''
+                <div class="text-red-500 text-center py-8">
+                    <svg class="mx-auto h-12 w-12 text-red-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Error Loading Archives</h3>
+                    <p class="text-sm text-red-600">{str(e)}</p>
+                    <p class="text-sm text-gray-500 mt-2">Please check that the repository is accessible and try again.</p>
+                </div>
+            '''
+            return HTMLResponse(content=error_html)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in list_archives_html: {e}")
+        error_html = '''
+            <div class="text-red-500 text-center py-8">
+                <p>An unexpected error occurred while loading archives.</p>
+            </div>
+        '''
+        return HTMLResponse(content=error_html)
 
 
 @router.get("/{repo_id}/info")
@@ -205,8 +447,6 @@ async def import_repository(
                 content = await keyfile.read()
                 f.write(content)
                 
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"Saved keyfile for repository '{name}' at {keyfile_path}")
         
         # Create repository record
@@ -245,12 +485,8 @@ async def import_repository(
         # If verification passed, get archive count for logging
         try:
             archives = await borg_service.list_archives(db_repo)
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"Successfully imported repository '{name}' with {len(archives)} archives")
         except Exception:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"Successfully imported repository '{name}' (could not count archives)")
         
         return db_repo

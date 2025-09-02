@@ -1,18 +1,22 @@
 import asyncio
 import json
+import logging
 import re
+import os
 from datetime import datetime
 from typing import AsyncGenerator, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.database import Repository, Job, get_db
-from app.services.docker_service import docker_service
+from app.services.job_manager import borg_job_manager
 from app.utils.security import (
     build_secure_borg_command, 
     validate_archive_name, 
     validate_compression,
     sanitize_path
 )
+
+logger = logging.getLogger(__name__)
 
 
 class BorgService:
@@ -22,601 +26,581 @@ class BorgService:
             r'(?P<nfiles>\d+)\s+(?P<path>.*)'
         )
     
-    async def initialize_repository(self, repository: Repository, encryption: str = "repokey") -> Dict:
-        """Initialize a new Borg repository if it doesn't exist"""
-        import logging
-        logger = logging.getLogger(__name__)
+    def _parse_borg_config(self, repo_path: str) -> Dict[str, any]:
+        """Parse a Borg repository config file to determine encryption mode"""
+        config_path = os.path.join(repo_path, "config")
         
+        try:
+            if not os.path.exists(config_path):
+                return {
+                    "mode": "unknown",
+                    "requires_keyfile": False,
+                    "preview": "Config file not found"
+                }
+            
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_content = f.read()
+            
+            # Parse the config file (it's an INI-like format)
+            import configparser
+            config = configparser.ConfigParser()
+            config.read_string(config_content)
+            
+            # Debug: log the actual config content to understand structure
+            logger.info(f"Parsing Borg config at {config_path}")
+            logger.info(f"Sections found: {config.sections()}")
+            
+            # Check if this looks like a Borg repository
+            if not config.has_section('repository'):
+                return {
+                    "mode": "invalid",
+                    "requires_keyfile": False,
+                    "preview": "Not a valid Borg repository (no [repository] section)"
+                }
+            
+            # Log all options in repository section
+            if config.has_section('repository'):
+                repo_options = dict(config.items('repository'))
+                logger.info(f"Repository section options: {repo_options}")
+            
+            # The key insight: Borg stores encryption info differently
+            # Check for a key file in the repository directory
+            key_files = []
+            try:
+                for item in os.listdir(repo_path):
+                    if item.startswith('key.') or 'key' in item.lower():
+                        key_files.append(item)
+            except:
+                pass
+            
+            # Method 1: Check for repokey data in config
+            encryption_mode = "unknown"
+            requires_keyfile = False
+            preview = "Repository detected"
+            
+            # Look for key-related sections
+            key_sections = [s for s in config.sections() if 'key' in s.lower()]
+            logger.info(f"Key-related sections: {key_sections}")
+            
+            # Check repository section for encryption hints
+            repo_section = dict(config.items('repository'))
+            
+            # Check for encryption by looking for the 'key' field in repository section
+            if 'key' in repo_section:
+                # Repository has a key field - this means it's encrypted
+                key_value = repo_section['key']
+                
+                if key_value and len(key_value) > 50:  # Key data is present and substantial
+                    # This is repokey mode - key is embedded in the repository
+                    encryption_mode = "repokey"
+                    requires_keyfile = False
+                    preview = "Encrypted repository (repokey mode) - key embedded in repository"
+                else:
+                    # Key field exists but might be empty/reference - possibly keyfile mode
+                    if key_files:
+                        encryption_mode = "keyfile"
+                        requires_keyfile = True
+                        preview = f"Encrypted repository (keyfile mode) - found key files: {', '.join(key_files)}"
+                    else:
+                        encryption_mode = "encrypted"
+                        requires_keyfile = False
+                        preview = "Encrypted repository (key field present but unclear mode)"
+            elif key_files:
+                # No key in config but key files found - definitely keyfile mode
+                encryption_mode = "keyfile"
+                requires_keyfile = True
+                preview = f"Encrypted repository (keyfile mode) - found key files: {', '.join(key_files)}"
+            else:
+                # No key field and no key files - check for other encryption indicators
+                all_content_lower = config_content.lower()
+                if any(word in all_content_lower for word in ['encrypt', 'cipher', 'algorithm', 'blake2', 'aes']):
+                    encryption_mode = "encrypted"
+                    requires_keyfile = False
+                    preview = "Encrypted repository (encryption detected but mode unclear)"
+                else:
+                    # Likely unencrypted (very rare for Borg)
+                    encryption_mode = "none"
+                    requires_keyfile = False
+                    preview = "Unencrypted repository (no encryption detected)"
+            
+            return {
+                "mode": encryption_mode,
+                "requires_keyfile": requires_keyfile,
+                "preview": preview
+            }
+            
+        except Exception as e:
+            logger.error(f"Error parsing Borg config at {config_path}: {e}")
+            return {
+                "mode": "error",
+                "requires_keyfile": False,
+                "preview": f"Error reading config: {str(e)}"
+            }
+
+    async def initialize_repository(self, repository: Repository) -> Dict[str, any]:
+        """Initialize a new Borg repository"""
         logger.info(f"Initializing Borg repository at {repository.path}")
         
         try:
-            passphrase = repository.get_passphrase()
-            
-            # Validate encryption type
-            valid_encryptions = {"repokey", "keyfile", "repokey-blake2", "keyfile-blake2", "authenticated", "authenticated-blake2", "none"}
-            if encryption not in valid_encryptions:
-                raise ValueError(f"Invalid encryption type: {encryption}")
-            
-            # Build secure command
-            command, environment = build_secure_borg_command(
+            command, env = build_secure_borg_command(
                 base_command="borg init",
                 repository_path=repository.path,
-                passphrase=passphrase,
-                additional_args=[f"--encryption={encryption}"]
+                passphrase=repository.get_passphrase(),
+                additional_args=["--encryption=repokey"]
             )
-            
         except Exception as e:
             logger.error(f"Failed to build secure command: {e}")
-            return {
-                "success": False,
-                "message": f"Invalid repository configuration: {str(e)}",
-                "output": ""
-            }
+            return {"success": False, "message": f"Security validation failed: {str(e)}"}
         
         try:
-            container = await docker_service.run_borg_container(
-                command=command,
-                environment=environment,
-                name=f"borg-init-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
+            job_id = await borg_job_manager.start_borg_command(command, env=env)
             
-            logger.info(f"Repository initialization container started: {container.id}")
+            # Wait for initialization to complete (it's usually quick)
+            max_wait = 60  # 60 seconds max
+            wait_time = 0
             
-            loop = asyncio.get_event_loop()
+            while wait_time < max_wait:
+                status = borg_job_manager.get_job_status(job_id)
+                if not status:
+                    return {"success": False, "message": "Job not found"}
+                
+                if status['completed']:
+                    if status['return_code'] == 0:
+                        return {"success": True, "message": "Repository initialized successfully"}
+                    else:
+                        # Get error output
+                        output = await borg_job_manager.get_job_output_stream(job_id)
+                        error_lines = [line['text'] for line in output.get('lines', [])]
+                        error_text = '\n'.join(error_lines[-10:])  # Last 10 lines
+                        
+                        # Check if it's just because repo already exists
+                        if "already exists" in error_text.lower():
+                            logger.info("Repository already exists, which is fine")
+                            return {"success": True, "message": "Repository already exists"}
+                        
+                        return {"success": False, "message": f"Initialization failed: {error_text}"}
+                
+                await asyncio.sleep(1)
+                wait_time += 1
             
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
+            return {"success": False, "message": "Initialization timed out"}
             
-            output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {output}")
-            
-            logger.info(f"Init container finished with exit code: {exit_code}")
-            
-            if exit_code == 0 or exit_code == 143:
-                return {
-                    "success": True,
-                    "message": "Repository initialized successfully",
-                    "output": output
-                }
-            else:
-                if "already exists" in output.lower():
-                    logger.info("Repository already exists, which is fine")
-                    return {
-                        "success": True,
-                        "message": "Repository already exists",
-                        "output": output
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"Repository initialization failed (exit code {exit_code})",
-                        "output": output
-                    }
-                    
         except Exception as e:
             logger.error(f"Failed to initialize repository: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to initialize repository: {str(e)}",
-                "output": ""
-            }
-    
-    async def create_backup(
-        self, 
-        repository: Repository, 
-        source_path: str = "/data",
-        compression: str = "zstd",
-        dry_run: bool = False
-    ) -> AsyncGenerator[Dict, None]:
-        """Create a backup and yield progress updates"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
+            return {"success": False, "message": str(e)}
+
+    async def create_backup(self, repository: Repository, source_path: str, compression: str = "zstd", dry_run: bool = False, cloud_backup_config_id: Optional[int] = None) -> str:
+        """Create a backup and return job_id for tracking"""
         logger.info(f"Creating backup for repository: {repository.name} at {repository.path}")
-        logger.info(f"Source: {source_path}, Compression: {compression}, Dry run: {dry_run}")
         
         try:
-            # Validate inputs
-            safe_compression = validate_compression(compression)
-            archive_name = validate_archive_name(f"backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
-            safe_source_path = sanitize_path(source_path)
-            
-            logger.info(f"Archive name: {archive_name}")
-            
-            passphrase = repository.get_passphrase()
-            logger.info("Retrieved repository passphrase successfully")
-            
-            # Build secure command arguments
-            args = ["--stats", "--progress", "--json", f"--compression={safe_compression}"]
-            if dry_run:
-                args.append("--dry-run")
-            
-            # Add archive specification and source path
-            repo_archive = f"{repository.path}::{archive_name}"
-            args.extend([repo_archive, safe_source_path])
-            
-            # Build secure command
-            command, environment = build_secure_borg_command(
+            validate_compression(compression)
+            archive_name = f"backup-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+            validate_archive_name(archive_name)
+        except Exception as e:
+            raise Exception(f"Validation failed: {str(e)}")
+        
+        # Build additional arguments
+        additional_args = []
+        
+        if dry_run:
+            additional_args.append("--dry-run")
+        
+        additional_args.extend([
+            "--compression", compression,
+            "--stats",
+            "--progress",
+            "--json",  # Enable JSON output for progress parsing
+            f"{repository.path}::{archive_name}",
+            source_path
+        ])
+        
+        try:
+            command, env = build_secure_borg_command(
                 base_command="borg create",
-                repository_path="",  # Already included in args
-                passphrase=passphrase,
-                additional_args=args[:-2]  # All args except repo_archive and source
+                repository_path="",  # Path is included in additional_args
+                passphrase=repository.get_passphrase(),
+                additional_args=additional_args
             )
-            
-            # Manually add the final arguments since they need special handling
-            command.extend([repo_archive, safe_source_path])
-            
-            logger.info("Secure command built successfully")
-            
         except Exception as e:
-            logger.error(f"Failed to build secure backup command: {e}")
-            yield {
-                "type": "error",
-                "message": f"Invalid backup configuration: {str(e)}"
-            }
-            return
-        
-        logger.info(f"Using source path: {safe_source_path}")
-        volumes = None
-        logger.info("Volume mapping handled automatically by docker_service")
+            raise Exception(f"Security validation failed: {str(e)}")
         
         try:
-            logger.info(f"Starting Borg container with command: {' '.join(command)}")
-            container = await docker_service.run_borg_container(
-                command=command,
-                environment=environment,
-                volumes=volumes,
-                name=f"borg-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
-            logger.info(f"Container started successfully: {container.id}")
+            job_id = await borg_job_manager.start_borg_command(command, env=env, is_backup=True)
             
-            yield {
-                "type": "started",
-                "container_id": container.id,
-                "archive_name": archive_name
-            }
+            # Create job record in database
+            db = next(get_db())
+            try:
+                job = Job(
+                    repository_id=repository.id,
+                    job_uuid=job_id,  # Store the JobManager UUID
+                    type="backup",
+                    status="queued",  # Will be updated to 'running' when started
+                    started_at=datetime.now(),
+                    cloud_backup_config_id=cloud_backup_config_id
+                )
+                db.add(job)
+                db.commit()
+                db.refresh(job)
+                logger.info(f"Created job record {job.id} for backup job {job_id}")
+            except Exception as e:
+                logger.error(f"Failed to create job record: {e}")
+            finally:
+                db.close()
             
-            loop = asyncio.get_event_loop()
-            
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
-            
-            output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {output}")
-            
-            yield {
-                "type": "completed", 
-                "exit_code": exit_code,
-                "status": "success" if exit_code in [0, 143] else "failed"
-            }
+            return job_id
             
         except Exception as e:
-            logger.error(f"Exception in create_backup: {type(e).__name__}: {str(e)}")
-            logger.error(f"Exception details: {e.__class__.__module__}.{e.__class__.__name__}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            yield {
-                "type": "error",
-                "message": f"{type(e).__name__}: {str(e)}"
-            }
-    
-    async def list_archives(self, repository: Repository) -> List[Dict]:
+            logger.error(f"Failed to start backup: {e}")
+            raise Exception(f"Failed to start backup: {str(e)}")
+
+    async def list_archives(self, repository: Repository) -> List[Dict[str, any]]:
         """List all archives in a repository"""
         try:
-            passphrase = repository.get_passphrase()
-            
-            # Build secure command
-            command, environment = build_secure_borg_command(
+            command, env = build_secure_borg_command(
                 base_command="borg list",
                 repository_path=repository.path,
-                passphrase=passphrase,
+                passphrase=repository.get_passphrase(),
                 additional_args=["--json"]
             )
-            
         except Exception as e:
-            raise Exception(f"Failed to build secure list command: {str(e)}")
+            raise Exception(f"Security validation failed: {str(e)}")
         
         try:
-            container = await docker_service.run_borg_container(
-                command=command,
-                environment=environment,
-                name=f"borg-list-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
+            # Create database job record for tracking
+            db = next(get_db())
+            try:
+                job_id = await borg_job_manager.start_borg_command(command, env=env)
+                
+                # Create database job record
+                db_job = Job(
+                    repository_id=repository.id,
+                    job_uuid=job_id,
+                    type="list",
+                    status="running",
+                    started_at=datetime.utcnow()
+                )
+                db.add(db_job)
+                db.commit()
+                logger.info(f"Created database record for list archives job {job_id}")
+            finally:
+                db.close()
             
-            loop = asyncio.get_event_loop()
+            # Wait for completion (list is usually quick)
+            max_wait = 30  # 30 seconds max
+            wait_time = 0
             
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
-            
-            output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {output}")
-            
-            if exit_code in [0, 143]:
-                try:
-                    import logging
-                    logger = logging.getLogger(__name__)
+            while wait_time < max_wait:
+                status = borg_job_manager.get_job_status(job_id)
+                if not status:
+                    raise Exception("Job not found")
+                
+                if status['completed'] or status['status'] in ['completed', 'failed']:
+                    # Get the output first
+                    output = await borg_job_manager.get_job_output_stream(job_id)
                     
-                    # Extract the JSON part from the output
-                    # Look for the start of JSON (first '{') and end of JSON (last '}')
-                    json_start = output.find('{')
-                    json_end = output.rfind('}')
-                    
-                    if json_start != -1 and json_end != -1 and json_end > json_start:
-                        json_content = output[json_start:json_end+1]
+                    if status['return_code'] == 0:
+                        # Parse JSON output - look for complete JSON structure
+                        json_lines = []
+                        for line in output.get('lines', []):
+                            line_text = line['text'].strip()
+                            if line_text:
+                                json_lines.append(line_text)
                         
+                        # Try to parse the complete JSON output
+                        full_json = '\n'.join(json_lines)
                         try:
-                            data = json.loads(json_content)
+                            data = json.loads(full_json)
                             if "archives" in data:
+                                logger.info(f"Successfully parsed {len(data['archives'])} archives from repository")
                                 return data["archives"]
                         except json.JSONDecodeError as je:
                             logger.error(f"JSON decode error: {je}")
+                            logger.error(f"Raw output: {full_json[:500]}...")  # Log first 500 chars
+                        
+                        # Fallback: return empty list if no valid JSON found
+                        logger.warning(f"No valid archives JSON found in output, returning empty list")
+                        return []
+                    else:
+                        error_lines = [line['text'] for line in output.get('lines', [])]
+                        error_text = '\n'.join(error_lines)
+                        raise Exception(f"Borg list failed with return code {status['return_code']}: {error_text}")
                     
-                    # Fallback: return empty list if no valid JSON found
-                    return []
-                except Exception as e:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Error parsing archive list output: {e}")
-                    return []
-            else:
-                raise Exception(f"Borg list failed with exit code {exit_code}")
+                    break  # Exit the while loop since job is complete
                 
+                await asyncio.sleep(0.5)
+                wait_time += 0.5
+            
+            raise Exception("List archives timed out")
+            
         except Exception as e:
             raise Exception(f"Failed to list archives: {str(e)}")
-    
-    async def verify_repository_access(self, repo_path: str, passphrase: str, keyfile_path: str = None) -> bool:
-        """Verify that we can access a repository with the given credentials"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        try:
-            # Build secure command
-            command, environment = build_secure_borg_command(
-                base_command="borg list",
-                repository_path=repo_path,
-                passphrase=passphrase,
-                additional_args=["--json"]
-            )
-        except Exception as e:
-            logger.error(f"Failed to build secure verify command: {e}")
-            return False
-        
-        # TODO: Add keyfile support when keyfile_path is provided
-        if keyfile_path:
-            logger.warning("Keyfile verification not yet implemented")
-        
-        try:
-            container = await docker_service.run_borg_container(
-                command=command,
-                environment=environment,
-                name=f"borg-verify-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
-            
-            loop = asyncio.get_event_loop()
-            
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
-            
-            output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {output}")
-            
-            logger.info(f"Repository verification for {repo_path}: exit_code={exit_code}")
-            logger.info(f"Repository verification output: {output[:500]}...")
-            
-            # Only exit code 0 indicates success for verification
-            if exit_code == 0:
-                try:
-                    # Try to parse as JSON to ensure it's valid
-                    json_start = output.find('{')
-                    json_end = output.rfind('}')
-                    
-                    if json_start != -1 and json_end != -1 and json_end > json_start:
-                        json_content = output[json_start:json_end+1]
-                        import json
-                        data = json.loads(json_content)
-                        logger.info(f"Repository verification successful for {repo_path}")
-                        return True
-                    else:
-                        logger.warning(f"No valid JSON found in output, verification failed")
-                        return False
-                except Exception as parse_error:
-                    logger.warning(f"Could not parse borg output: {parse_error}")
-                    return False
-            else:
-                logger.warning(f"Repository verification failed for {repo_path} with exit code {exit_code}: {output}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Repository verification error for {repo_path}: {e}")
-            return False
-    
-    async def get_repo_info(self, repository: Repository) -> Dict:
+
+    async def get_repo_info(self, repository: Repository) -> Dict[str, any]:
         """Get repository information"""
         try:
-            passphrase = repository.get_passphrase()
-            
-            # Build secure command
-            command, environment = build_secure_borg_command(
+            command, env = build_secure_borg_command(
                 base_command="borg info",
                 repository_path=repository.path,
-                passphrase=passphrase,
+                passphrase=repository.get_passphrase(),
                 additional_args=["--json"]
             )
         except Exception as e:
-            raise Exception(f"Failed to build secure info command: {str(e)}")
+            raise Exception(f"Security validation failed: {str(e)}")
         
         try:
-            container = await docker_service.run_borg_container(
-                command=command,
-                environment=environment,
-                name=f"borg-info-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
+            job_id = await borg_job_manager.start_borg_command(command, env=env)
             
-            loop = asyncio.get_event_loop()
+            # Wait for completion
+            max_wait = 30
+            wait_time = 0
             
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
-            
-            output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {output}")
-            
-            if exit_code == 0:
-                try:
-                    return json.loads(output)
-                except json.JSONDecodeError:
-                    return {}
-            else:
-                raise Exception(f"Borg info failed with exit code {exit_code}")
+            while wait_time < max_wait:
+                status = borg_job_manager.get_job_status(job_id)
+                if not status:
+                    raise Exception("Job not found")
                 
-        except Exception as e:
-            raise Exception(f"Failed to get repo info: {str(e)}")
-    
-    def parse_progress_line(self, line: str) -> Optional[Dict]:
-        """Parse Borg progress output"""
-        if "Original size:" in line:
-            # Parse final statistics
-            parts = line.split()
-            try:
-                return {
-                    "original_size": parts[2],
-                    "compressed_size": parts[5],
-                    "deduplicated_size": parts[8]
-                }
-            except (IndexError, ValueError):
-                pass
-        
-        match = self.progress_pattern.search(line)
-        if match:
-            return {
-                "original_size": int(match.group("original_size")),
-                "compressed_size": int(match.group("compressed_size")),
-                "deduplicated_size": int(match.group("deduplicated_size")),
-                "nfiles": int(match.group("nfiles")),
-                "current_path": match.group("path")
-            }
-        
-        return None
-    
-    async def list_archive_contents(self, repository: Repository, archive_name: str) -> List[Dict]:
-        """List the contents of a specific archive"""
-        try:
-            passphrase = repository.get_passphrase()
-            safe_archive_name = validate_archive_name(archive_name)
+                if status['completed']:
+                    if status['return_code'] == 0:
+                        output = await borg_job_manager.get_job_output_stream(job_id)
+                        
+                        # Parse JSON output
+                        for line in output.get('lines', []):
+                            line_text = line['text']
+                            if line_text.startswith('{'):
+                                try:
+                                    return json.loads(line_text)
+                                except json.JSONDecodeError:
+                                    continue
+                        
+                        raise Exception("No valid JSON output found")
+                    else:
+                        error_lines = [line['text'] for line in output.get('lines', [])]
+                        error_text = '\n'.join(error_lines)
+                        raise Exception(f"Borg info failed: {error_text}")
+                
+                await asyncio.sleep(0.5)
+                wait_time += 0.5
             
-            # Build secure command with archive specification
-            repo_archive = f"{repository.path}::{safe_archive_name}"
-            command, environment = build_secure_borg_command(
+            raise Exception("Get repo info timed out")
+            
+        except Exception as e:
+            raise Exception(f"Failed to get repository info: {str(e)}")
+
+    async def list_archive_contents(self, repository: Repository, archive_name: str) -> List[Dict[str, any]]:
+        """List contents of a specific archive"""
+        try:
+            validate_archive_name(archive_name)
+            command, env = build_secure_borg_command(
                 base_command="borg list",
-                repository_path="",  # Already in repo_archive
-                passphrase=passphrase,
-                additional_args=["--json-lines", repo_archive]
+                repository_path="",  # Path is in archive specification
+                passphrase=repository.get_passphrase(),
+                additional_args=["--json-lines", f"{repository.path}::{archive_name}"]
             )
-            
         except Exception as e:
-            raise Exception(f"Failed to build secure archive list command: {str(e)}")
+            raise Exception(f"Validation failed: {str(e)}")
         
         try:
-            container = await docker_service.run_borg_container(
-                command=command,
-                environment=environment,
-                name=f"borg-list-contents-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
+            job_id = await borg_job_manager.start_borg_command(command, env=env)
             
-            loop = asyncio.get_event_loop()
+            # Wait for completion
+            max_wait = 60
+            wait_time = 0
             
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
-            
-            output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {output}")
-            
-            if exit_code in [0, 143]:
-                try:
-                    # Parse JSON lines output
-                    files = []
-                    for line in output.strip().split('\n'):
-                        if line.strip():
-                            try:
-                                file_info = json.loads(line)
-                                files.append(file_info)
-                            except json.JSONDecodeError:
-                                continue
-                    return files
-                except Exception as e:
-                    raise Exception(f"Failed to parse archive contents: {str(e)}")
-            else:
-                raise Exception(f"Borg list failed with exit code {exit_code}")
+            while wait_time < max_wait:
+                status = borg_job_manager.get_job_status(job_id)
+                if not status:
+                    raise Exception("Job not found")
                 
+                if status['completed']:
+                    if status['return_code'] == 0:
+                        output = await borg_job_manager.get_job_output_stream(job_id)
+                        
+                        contents = []
+                        for line in output.get('lines', []):
+                            line_text = line['text']
+                            if line_text.startswith('{'):
+                                try:
+                                    item = json.loads(line_text)
+                                    contents.append(item)
+                                except json.JSONDecodeError:
+                                    continue
+                        
+                        return contents
+                    else:
+                        error_lines = [line['text'] for line in output.get('lines', [])]
+                        error_text = '\n'.join(error_lines)
+                        raise Exception(f"Borg list failed: {error_text}")
+                
+                await asyncio.sleep(0.5)
+                wait_time += 0.5
+            
+            raise Exception("List archive contents timed out")
+            
         except Exception as e:
             raise Exception(f"Failed to list archive contents: {str(e)}")
-    
-    async def scan_for_repositories(self, scan_path: str = "/repos") -> List[Dict]:
-        """Scan a directory for existing Borg repositories"""
-        import logging
-        logger = logging.getLogger(__name__)
+
+    async def start_repository_scan(self, scan_path: str = "/repos") -> str:
+        """Start repository scan and return job_id for tracking"""
+        logger.info(f"Starting repository scan in {scan_path}")
         
         try:
             safe_scan_path = sanitize_path(scan_path)
         except Exception as e:
             logger.error(f"Invalid scan path: {e}")
-            return []
+            raise Exception(f"Invalid scan path: {e}")
         
-        # Use a safer find command without shell injection
+        # Use find command to scan for Borg repositories
         command = [
-            "find", safe_scan_path, "-name", "config", "-type", "f", "-exec",
-            "sh", "-c", 'if grep -q "\\[repository\\]" "$1" 2>/dev/null; then dirname "$1"; fi',
-            "_", "{}", ";"
+            'find', safe_scan_path, '-name', 'config', '-type', 'f',
+            '-exec', 'sh', '-c',
+            'if grep -q "\\[repository\\]" "$1" 2>/dev/null; then dirname "$1"; fi',
+            '_', '{}', ';'
         ]
         
-        environment = {}
-        
         try:
-            container = await docker_service.run_borg_container(
-                command=command,
-                environment=environment,
-                name=f"borg-scan-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
+            job_id = await borg_job_manager.start_borg_command(command, env={})
+            logger.info(f"Repository scan job {job_id} started")
+            return job_id
             
-            loop = asyncio.get_event_loop()
-            
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
-            
-            output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {output}")
-            
-            logger.info(f"Repository scan completed with exit code {exit_code}, output: {output[:500]}...")
-            
-            if exit_code in [0, 143]:
-                repo_paths = []
-                for line in output.strip().split('\n'):
-                    line = line.strip()
-                    if (line and 
-                        line.startswith('/') and  # Must be an absolute path
-                        not line.startswith('[') and  # Ignore Docker/container messages
-                        'exit code' not in line.lower() and  # Ignore exit code messages
-                        'exception' not in line.lower() and  # Ignore exception messages
-                        len(line) > 1):  # Must be more than just '/'
-                        
-                        logger.info(f"Found potential repository path: {line}")
-                        repo_info = await self._get_repository_basic_info(line)
-                        if repo_info:
-                            repo_paths.append(repo_info)
-                
-                logger.info(f"Successfully identified {len(repo_paths)} repositories")
-                return repo_paths
-            else:
-                logger.error(f"Repository scan failed with exit code {exit_code}")
-                return []
-                
         except Exception as e:
-            logger.error(f"Failed to scan for repositories: {e}")
-            return []
+            logger.error(f"Failed to start repository scan: {e}")
+            raise Exception(f"Failed to start repository scan: {e}")
     
-    async def _get_repository_basic_info(self, repo_path: str) -> Optional[Dict]:
-        """Get basic info about a repository without requiring passphrase"""
-        import logging
-        logger = logging.getLogger(__name__)
+    async def check_scan_status(self, job_id: str) -> Dict[str, any]:
+        """Check status of repository scan job"""
+        status = borg_job_manager.get_job_status(job_id)
+        if not status:
+            return {"running": False, "completed": False, "error": "Job not found"}
         
+        # Get job output for error debugging
+        output = ""
         try:
-            # First, check if it's a valid repository by looking for the config file
-            safe_repo_path = sanitize_path(repo_path)
-            config_check_command = [
-                "sh", "-c", 
-                f'if [ -f "{safe_repo_path}/config" ]; then echo "REPO_EXISTS"; else echo "NO_REPO"; fi'
-            ]
+            job_output = await borg_job_manager.get_job_output_stream(job_id)
+            if 'lines' in job_output:
+                output = "\n".join([line['text'] for line in job_output['lines'][-20:]])  # Last 20 lines
+        except Exception as e:
+            logger.debug(f"Could not get job output for {job_id}: {e}")
+        
+        return {
+            "running": status['running'],
+            "completed": status['completed'],
+            "status": status['status'],
+            "started_at": status['started_at'],
+            "completed_at": status['completed_at'],
+            "return_code": status['return_code'],
+            "error": status['error'],
+            "output": output if output else None
+        }
+    
+    async def get_scan_results(self, job_id: str) -> List[Dict]:
+        """Get results of completed repository scan"""
+        try:
+            status = borg_job_manager.get_job_status(job_id)
+            if not status or not status['completed']:
+                return []
             
-            container = await docker_service.run_borg_container(
-                command=config_check_command,
-                environment={},
-                name=f"borg-check-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
+            if status['return_code'] != 0:
+                logger.error(f"Scan job {job_id} failed with return code {status['return_code']}")
+                return []
             
-            loop = asyncio.get_event_loop()
+            # Get the output
+            output = await borg_job_manager.get_job_output_stream(job_id)
             
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
+            repo_paths = []
+            for line in output.get('lines', []):
+                line_text = line['text'].strip()
+                if (line_text and 
+                    line_text.startswith('/') and  # Must be an absolute path
+                    os.path.isdir(line_text)):  # Must be a valid directory
+                    
+                    # Parse the Borg config file to get encryption info
+                    encryption_info = self._parse_borg_config(line_text)
+                    
+                    repo_paths.append({
+                        "path": line_text,
+                        "id": f"repo_{hash(line_text)}",
+                        "encryption_mode": encryption_info["mode"],
+                        "requires_keyfile": encryption_info["requires_keyfile"],
+                        "detected": True,
+                        "config_preview": encryption_info["preview"]
+                    })
             
-            output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {output}")
+            # Clean up job after getting results
+            borg_job_manager.cleanup_job(job_id)
             
-            
-            if exit_code not in [0, 143] or "REPO_EXISTS" not in output:
-                logger.warning(f"Repository not found or invalid at {repo_path}")
-                return None
-            
-            # Run both borg info and config parsing in a single container
-            combined_command = [
-                "sh", "-c",
-                f"echo '=== BORG_INFO_START ==='; "
-                f'borg info "{safe_repo_path}" 2>&1 || echo "INFO_FAILED"; '
-                f"echo '=== BORG_INFO_END ==='; "
-                f"echo '=== CONFIG_ID_START ==='; "
-                f'grep "^id = " "{safe_repo_path}/config" 2>/dev/null || echo "NO_ID"; '
-                f"echo '=== CONFIG_ID_END ==='"
-            ]
-            
-            container = await docker_service.run_borg_container(
-                command=combined_command,
-                environment={},
-                name=f"borg-info-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
-            
-            loop = asyncio.get_event_loop()
-            
-            exit_code = await loop.run_in_executor(None, lambda: container.wait()['StatusCode'])
-            
-            combined_output = await loop.run_in_executor(None, lambda: container.logs().decode('utf-8'))
-            logger.info(f"Container output: {combined_output}")
-            
-            # Parse borg info output for encryption information
-            info_start = combined_output.find("=== BORG_INFO_START ===")
-            info_end = combined_output.find("=== BORG_INFO_END ===")
-            info_output = ""
-            if info_start != -1 and info_end != -1:
-                info_output = combined_output[info_start:info_end]
-            
-            # Parse config ID output
-            id_start = combined_output.find("=== CONFIG_ID_START ===")
-            id_end = combined_output.find("=== CONFIG_ID_END ===")
-            id_output = ""
-            if id_start != -1 and id_end != -1:
-                id_output = combined_output[id_start:id_end]
-            
-            # Extract encryption information from the error messages or output
-            encryption_mode = 'unknown'
-            requires_keyfile = False
-            repo_id = None
-            
-            # Look for encryption indicators in the borg info output
-            if 'passphrase' in info_output.lower() and 'keyfile' not in info_output.lower():
-                encryption_mode = 'repokey'
-                requires_keyfile = False
-            elif 'keyfile' in info_output.lower():
-                encryption_mode = 'keyfile'  
-                requires_keyfile = True
-            elif 'unencrypted' in info_output.lower():
-                encryption_mode = 'none'
-                requires_keyfile = False
-            else:
-                # If we can't determine from borg info, assume repokey (most common default)
-                # for repositories that exist and have valid config files
-                encryption_mode = 'repokey'
-                requires_keyfile = False
-                logger.info(f"Could not determine encryption from borg output, defaulting to repokey for {repo_path}")
-            
-            # Extract repository ID from config output
-            for line in id_output.split('\n'):
-                if 'id = ' in line:
-                    repo_id = line.split('=', 1)[1].strip()
-                    break
-            
-            logger.info(f"Repository {repo_path}: encryption_mode={encryption_mode}, requires_keyfile={requires_keyfile}, id={repo_id[:8] if repo_id else 'unknown'}...")
-            
-            return {
-                "path": repo_path,
-                "id": repo_id,
-                "encryption_mode": encryption_mode,
-                "requires_keyfile": requires_keyfile,
-                "detected": True,
-                "config_preview": f"Repository detected with {encryption_mode} encryption"
-            }
+            return repo_paths
             
         except Exception as e:
-            logger.error(f"Error getting repository info for {repo_path}: {e}")
-            return None
+            logger.error(f"Error getting scan results: {e}")
+            return []
+
+    async def verify_repository_access(self, repo_path: str, passphrase: str, keyfile_path: str = None) -> bool:
+        """Verify we can access a repository with given credentials"""
+        try:
+            # Build environment overrides for keyfile if needed
+            env_overrides = {}
+            if keyfile_path:
+                env_overrides['BORG_KEY_FILE'] = keyfile_path
+            
+            command, env = build_secure_borg_command(
+                base_command="borg info",
+                repository_path=repo_path,
+                passphrase=passphrase,
+                additional_args=["--json"],
+                environment_overrides=env_overrides
+            )
+        except Exception as e:
+            logger.error(f"Security validation failed: {e}")
+            return False
+        
+        try:
+            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            
+            # Wait for completion
+            max_wait = 30
+            wait_time = 0
+            
+            while wait_time < max_wait:
+                status = borg_job_manager.get_job_status(job_id)
+                
+                if not status:
+                    return False
+                
+                if status['completed'] or status['status'] == 'failed':
+                    success = status['return_code'] == 0
+                    # Clean up job
+                    borg_job_manager.cleanup_job(job_id)
+                    return success
+                
+                await asyncio.sleep(0.5)
+                wait_time += 0.5
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Failed to verify repository access: {e}")
+            return False
+
+    # Legacy method for compatibility - calls the new async scan
+    async def scan_for_repositories(self, scan_path: str = "/repos") -> List[Dict]:
+        """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
+        job_id = await self.start_repository_scan(scan_path)
+        
+        # Wait for completion
+        max_wait = 60
+        wait_time = 0
+        
+        while wait_time < max_wait:
+            status = await self.check_scan_status(job_id)
+            if status['completed']:
+                return await self.get_scan_results(job_id)
+            
+            await asyncio.sleep(1)
+            wait_time += 1
+        
+        logger.error(f"Legacy scan timed out for job {job_id}")
+        return []
 
 
 borg_service = BorgService()

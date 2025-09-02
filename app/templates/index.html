@@ -1,209 +1,713 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div x-data="borgitoryApp()" x-init="init()" class="space-y-8">
-    <!-- Repository Selection -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Repository Management</h2>
+<div x-data="borgitoryApp()" x-init="init()" class="flex h-screen bg-gray-100">
+    <!-- Left Navigation Panel -->
+    <div class="w-64 bg-white shadow-lg flex-shrink-0">
+        <div class="p-4 border-b">
+            <h1 class="text-xl font-bold text-gray-800">Borgitory</h1>
+            <p class="text-sm text-gray-600">Borg Backup Manager</p>
+        </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Repository Forms -->
-            <div class="border rounded-lg p-4">
-                <!-- Tabs -->
-                <div class="flex mb-4 border-b">
-                    <button onclick="switchRepositoryTab('create')" id="create-tab" class="px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
-                        Create New
-                    </button>
-                    <button onclick="switchRepositoryTab('import')" id="import-tab" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
-                        Import Existing
-                    </button>
-                </div>
+        <nav class="mt-4">
+            <div class="px-4 space-y-2">
+                <button 
+                    onclick="switchTab('repositories')"
+                    id="nav-repositories"
+                    class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2V7z"></path>
+                    </svg>
+                    <span>Repositories</span>
+                </button>
                 
-                <!-- Create New Repository Form -->
-                <div id="create-form" class="repository-form">
-                    <h3 class="font-medium text-gray-700 mb-3">Create New Repository</h3>
-                    <form 
-                        hx-post="/api/repositories/" 
-                        hx-ext="json-enc"
-                        hx-target="#repository-list" 
-                        hx-swap="beforeend"
-                        hx-on::after-request="handleRepositoryResponse(event)"
-                    >
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Name</label>
-                                <input type="text" name="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Path</label>
-                                <input type="text" name="path" required placeholder="/repos/my-new-repo" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Passphrase</label>
-                                <input type="password" name="passphrase" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                                Create Repository
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                <button 
+                    onclick="switchTab('backups')"
+                    id="nav-backups"
+                    class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                    </svg>
+                    <span>Backups</span>
+                </button>
                 
-                <!-- Import Existing Repository Form -->
-                <div id="import-form" class="repository-form hidden">
-                    <h3 class="font-medium text-gray-700 mb-3">Import Existing Repository</h3>
-                    <div class="space-y-4">
-                        <div class="flex space-x-2">
-                            <button onclick="scanForRepositories()" class="bg-gray-600 text-white px-3 py-2 rounded-md hover:bg-gray-700 text-sm">
-                                Scan for Repositories
-                            </button>
-                            <div id="scan-status" class="flex items-center text-sm text-gray-500"></div>
-                        </div>
-                        
-                        <div id="discovered-repos" class="hidden">
-                            <label class="block text-sm font-medium text-gray-700">Found Repositories</label>
-                            <select id="repo-select" onchange="selectDiscoveredRepo()" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                <option value="">Select a repository...</option>
-                            </select>
-                        </div>
-                        
-                        <form 
-                            hx-post="/api/repositories/import" 
-                            hx-encoding="multipart/form-data"
-                            hx-target="#repository-list" 
-                            hx-swap="beforeend"
-                            hx-on::before-request="handleImportStart(event)"
-                            hx-on::after-request="handleImportResponse(event)"
-                        >
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Name (for this app)</label>
-                                    <input type="text" name="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Repository Path</label>
-                                    <input type="text" name="path" id="import-path" required readonly class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
-                                </div>
-                                
-                                <!-- Encryption info display -->
-                                <div id="encryption-info" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <div class="flex items-center">
-                                        <svg class="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        <span id="encryption-text" class="text-sm text-blue-700"></span>
-                                    </div>
-                                </div>
-                                
-                                <!-- Passphrase field (always shown when repo selected) -->
-                                <div id="passphrase-field" class="hidden">
-                                    <label class="block text-sm font-medium text-gray-700">Passphrase</label>
-                                    <input type="password" name="passphrase" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                </div>
-                                
-                                <!-- Keyfile field (shown only for keyfile mode) -->
-                                <div id="keyfile-field" class="hidden">
-                                    <label class="block text-sm font-medium text-gray-700">Keyfile</label>
-                                    <input type="file" name="keyfile" accept=".key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                    <p class="mt-1 text-sm text-gray-500">Upload the Borg keyfile (usually has .key extension)</p>
-                                </div>
-                                
-                                <button type="submit" id="import-submit" disabled class="w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center">
-                                    <span id="import-button-text">Select a repository first</span>
-                                    <svg id="import-loading-spinner" class="hidden animate-spin ml-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
+                <button 
+                    onclick="switchTab('schedules')"
+                    id="nav-schedules"
+                    class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Schedules</span>
+                </button>
+                
+                <button 
+                    onclick="switchTab('cloud-backup')"
+                    id="nav-cloud-backup"
+                    class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                    </svg>
+                    <span>Cloud Backup</span>
+                </button>
+                
+                <button 
+                    onclick="switchTab('archives')"
+                    id="nav-archives"
+                    class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                    <span>Archives</span>
+                </button>
+                
+                <button 
+                    onclick="switchTab('jobs')"
+                    id="nav-jobs"
+                    class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <span>Job History</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 overflow-hidden">
+        <div class="h-full overflow-y-auto p-6">
+            <!-- Repositories Tab -->
+            <div id="tab-repositories" class="tab-content">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Repository Management</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Repository Forms -->
+                        <div class="border rounded-lg p-4">
+                            <!-- Tabs -->
+                            <div class="flex mb-4 border-b">
+                                <button onclick="switchRepositoryTab('create')" id="create-tab" class="px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
+                                    Create New
+                                </button>
+                                <button onclick="switchRepositoryTab('import')" id="import-tab" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+                                    Import Existing
                                 </button>
                             </div>
-                        </form>
+                            
+                            <!-- Create New Repository Form -->
+                            <div id="create-form" class="repository-form">
+                                <h3 class="font-medium text-gray-700 mb-3">Create New Repository</h3>
+                                <form 
+                                    hx-post="/api/repositories/" 
+                                    hx-ext="json-enc"
+                                    hx-target="#repository-list" 
+                                    hx-swap="beforeend"
+                                    hx-on::after-request="handleRepositoryResponse(event)"
+                                >
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Name</label>
+                                            <input type="text" name="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Path</label>
+                                            <input type="text" name="path" required placeholder="/repos/my-new-repo" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Passphrase</label>
+                                            <input type="password" name="passphrase" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                        </div>
+                                        <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                                            Create Repository
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <!-- Import Existing Repository Form -->
+                            <div id="import-form" class="repository-form hidden">
+                                <h3 class="font-medium text-gray-700 mb-3">Import Existing Repository</h3>
+                                <div class="space-y-4">
+                                    <div class="flex space-x-2">
+                                        <button onclick="scanForRepositories()" class="bg-gray-600 text-white px-3 py-2 rounded-md hover:bg-gray-700 text-sm">
+                                            Scan for Repositories
+                                        </button>
+                                        <div id="scan-status" class="flex items-center text-sm text-gray-500"></div>
+                                    </div>
+                                    
+                                    <div id="discovered-repos" class="hidden">
+                                        <label class="block text-sm font-medium text-gray-700">Found Repositories</label>
+                                        <select id="repo-select" onchange="selectDiscoveredRepo()" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            <option value="">Select a repository...</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <form 
+                                        hx-post="/api/repositories/import" 
+                                        hx-encoding="multipart/form-data"
+                                        hx-target="#repository-list" 
+                                        hx-swap="beforeend"
+                                        hx-on::before-request="handleImportStart(event)"
+                                        hx-on::after-request="handleImportResponse(event)"
+                                    >
+                                        <div class="space-y-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Name (for this app)</label>
+                                                <input type="text" name="name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Repository Path</label>
+                                                <input type="text" name="path" id="import-path" required readonly class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50 focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            </div>
+                                            
+                                            <!-- Encryption info display -->
+                                            <div id="encryption-info" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                                <div class="flex items-center">
+                                                    <svg class="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                                    </svg>
+                                                    <span id="encryption-text" class="text-sm text-blue-700"></span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Passphrase field -->
+                                            <div id="passphrase-field" class="hidden">
+                                                <label class="block text-sm font-medium text-gray-700">Passphrase</label>
+                                                <input type="password" name="passphrase" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            </div>
+                                            
+                                            <!-- Keyfile field -->
+                                            <div id="keyfile-field" class="hidden">
+                                                <label class="block text-sm font-medium text-gray-700">Keyfile</label>
+                                                <input type="file" name="keyfile" accept=".key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                                <p class="mt-1 text-sm text-gray-500">Upload the Borg keyfile (usually has .key extension)</p>
+                                            </div>
+                                            
+                                            <button type="submit" id="import-submit" disabled class="w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center">
+                                                <span id="import-button-text">Select a repository first</span>
+                                                <svg id="import-loading-spinner" class="hidden animate-spin ml-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Repository List -->
+                        <div>
+                            <h3 class="font-medium text-gray-700 mb-3">Existing Repositories</h3>
+                            <div id="repository-list" 
+                                 hx-get="/api/repositories/html" 
+                                 hx-trigger="load, repositoryUpdate from:body" 
+                                 hx-swap="innerHTML">
+                                <div class="animate-pulse bg-gray-200 h-20 rounded"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Repository List -->
-            <div>
-                <h3 class="font-medium text-gray-700 mb-3">Existing Repositories</h3>
-                <div id="repository-list" hx-get="/api/repositories/" hx-trigger="load" hx-swap="innerHTML">
-                    <div class="animate-pulse bg-gray-200 h-20 rounded"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+            <!-- Backups Tab -->
+            <div id="tab-backups" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Backup Operations</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Manual Backup -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium text-gray-700 mb-3">Create Backup</h3>
+                            <form 
+                                hx-post="/api/jobs/backup" 
+                                hx-ext="json-enc"
+                                hx-target="#backup-status"
+                                hx-on::after-request="handleBackupResponse(event)"
+                            >
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Repository</label>
+                                        <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            <option value="">Select Repository...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Source Path</label>
+                                        <input type="text" name="source_path" value="/data" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Compression</label>
+                                        <select name="compression" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            <option value="zstd">ZSTD (Recommended)</option>
+                                            <option value="lz4">LZ4 (Fast)</option>
+                                            <option value="none">None</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Cloud Backup (Optional)</label>
+                                        <select name="cloud_backup_config_id" id="backup-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            <option value="">No cloud backup</option>
+                                        </select>
+                                        <p class="mt-1 text-xs text-gray-500">Automatically backup to cloud after Borg backup completes</p>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" name="dry_run" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label class="ml-2 block text-sm text-gray-700">Dry Run</label>
+                                    </div>
+                                    <button type="submit" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                                        Start Backup
+                                    </button>
+                                </div>
+                            </form>
+                            <div id="backup-status" class="mt-4"></div>
+                        </div>
 
-    <!-- Backup Operations -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Backup Operations</h2>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Manual Backup -->
-            <div class="border rounded-lg p-4">
-                <h3 class="font-medium text-gray-700 mb-3">Create Backup</h3>
-                <form 
-                    hx-post="/api/jobs/backup" 
-                    hx-ext="json-enc"
-                    hx-target="#backup-status"
-                    hx-on::after-request="handleBackupResponse(event)"
-                >
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Repository</label>
-                            <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                <option value="">Select Repository...</option>
-                            </select>
+                        <!-- Current Operations -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium text-gray-700 mb-3">Current Operations</h3>
+                            <div id="current-jobs">
+                                <div class="text-gray-500 text-sm">Loading current operations...</div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Source Path</label>
-                            <input type="text" name="source_path" value="/data" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Compression</label>
-                            <select name="compression" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                <option value="zstd">ZSTD (Recommended)</option>
-                                <option value="lz4">LZ4 (Fast)</option>
-                                <option value="none">None</option>
-                            </select>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" name="dry_run" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label class="ml-2 block text-sm text-gray-700">Dry Run</label>
-                        </div>
-                        <button type="submit" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
-                            Start Backup
-                        </button>
                     </div>
-                </form>
-                <div id="backup-status" class="mt-4"></div>
-            </div>
-
-            <!-- Real-time Progress -->
-            <div class="border rounded-lg p-4">
-                <h3 class="font-medium text-gray-700 mb-3">Current Operations</h3>
-                <div id="current-jobs" hx-get="/api/jobs/" hx-trigger="load, every 5s" hx-swap="innerHTML" hx-on::after-request="formatCurrentJobs(event)">
-                    <div class="text-gray-500 text-sm">No active operations</div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Job History -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Job History</h2>
-        <div id="job-history" hx-get="/api/jobs/" hx-trigger="load, every 10s" hx-swap="innerHTML" hx-on::after-request="formatJobHistory(event)">
-            <div class="text-gray-500 text-sm">No job history</div>
-        </div>
-    </div>
+            <!-- Schedules Tab -->
+            <div id="tab-schedules" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Scheduled Backups</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Create Schedule -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium text-gray-700 mb-3">Create Schedule</h3>
+                            <form 
+                                hx-post="/api/schedules/" 
+                                hx-ext="json-enc"
+                                hx-target="#schedule-status"
+                                hx-on::before-request="prepareScheduleSubmission(event)"
+                                hx-on::after-request="handleScheduleResponse(event)"
+                            >
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Name</label>
+                                        <input type="text" name="name" required placeholder="Daily backup" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Repository</label>
+                                        <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            <option value="">Select Repository...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Schedule</label>
+                                        <select onchange="updateCronExpression()" id="schedule-preset" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            <option value="">Select a preset...</option>
+                                            <option value="0 2 * * *">Daily at 2:00 AM</option>
+                                            <option value="0 2 * * 0">Weekly on Sunday at 2:00 AM</option>
+                                            <option value="0 2 1 * *">Monthly on 1st at 2:00 AM</option>
+                                            <option value="0 2 1,15 * *">Twice monthly (1st and 15th) at 2:00 AM</option>
+                                            <option value="0 2 */2 * *">Every 2 days at 2:00 AM</option>
+                                            <option value="custom">Custom (cron expression)</option>
+                                        </select>
+                                    </div>
+                                    <div id="custom-cron" class="hidden">
+                                        <label class="block text-sm font-medium text-gray-700">Custom Cron Expression</label>
+                                        <input type="text" id="custom-cron-input" placeholder="0 2 * * *" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                        <p class="mt-1 text-sm text-gray-500">Format: minute hour day month weekday</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Cloud Backup (Optional)</label>
+                                        <select name="cloud_backup_config_id" id="schedule-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            <option value="">No cloud backup</option>
+                                        </select>
+                                        <p class="mt-1 text-xs text-gray-500">Automatically backup to cloud after each scheduled Borg backup</p>
+                                    </div>
+                                    <input type="hidden" name="cron_expression" id="cron-expression">
+                                    <div id="cron-description" class="text-sm text-gray-600 bg-blue-50 p-2 rounded hidden"></div>
+                                    <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                                        Create Schedule
+                                    </button>
+                                </div>
+                            </form>
+                            <div id="schedule-status" class="mt-4"></div>
+                        </div>
 
-    <!-- Archives -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Archives</h2>
-        <div id="archives-list" class="overflow-x-auto">
-            <div class="text-gray-500">Select a repository to view archives</div>
+                        <!-- Existing Schedules -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium text-gray-700 mb-3">Existing Schedules</h3>
+                            <div id="schedules-list" 
+                                 hx-get="/api/schedules/html" 
+                                 hx-trigger="load, every 30s, scheduleUpdate from:body" 
+                                 hx-swap="innerHTML"
+                                 hx-indicator=".schedules-loading">
+                                <div class="text-gray-500 text-sm">Loading schedules...</div>
+                            </div>
+                            <div class="schedules-loading htmx-indicator" style="display: none;">
+                                <div class="text-blue-500 text-sm">Updating schedules...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Upcoming Scheduled Backups -->
+                    <div class="mt-6 bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-medium text-gray-700 mb-3">Upcoming Scheduled Backups</h3>
+                        <div id="upcoming-backups" 
+                             hx-get="/api/schedules/upcoming/html" 
+                             hx-trigger="load, every 60s, scheduleUpdate from:body" 
+                             hx-swap="innerHTML"
+                             hx-on::htmx:before-request="showUpcomingLoading()"
+                             hx-on::htmx:after-request="hideUpcomingLoading()">
+                            <div class="text-gray-500 text-sm">Loading upcoming backups...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cloud Backup Tab -->
+            <div id="tab-cloud-backup" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Cloud Backup Configuration</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Add New Cloud Backup -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium text-gray-700 mb-3">Add Cloud Backup Location</h3>
+                            <form 
+                                hx-post="/api/cloud-backup/" 
+                                hx-ext="json-enc"
+                                hx-target="#cloud-backup-status"
+                                hx-on::after-request="handleCloudBackupResponse(event)"
+                                class="space-y-4"
+                                id="cloud-backup-form"
+                            >
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                                    <input type="text" name="name" required placeholder="My Backup Location" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Provider Type</label>
+                                    <select name="provider" id="provider-select" onchange="toggleProviderFields()" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                        <option value="s3">AWS S3</option>
+                                        <option value="sftp">SFTP (SSH)</option>
+                                    </select>
+                                </div>
+
+                                <!-- S3 Fields -->
+                                <div id="s3-fields">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Region</label>
+                                        <select name="region" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            <!-- US Regions -->
+                                            <option value="us-east-1">us-east-1 - US East (N. Virginia)</option>
+                                            <option value="us-east-2">us-east-2 - US East (Ohio)</option>
+                                            <option value="us-west-1">us-west-1 - US West (N. California)</option>
+                                            <option value="us-west-2">us-west-2 - US West (Oregon)</option>
+                                            
+                                            <!-- Canada -->
+                                            <option value="ca-central-1">ca-central-1 - Canada (Central)</option>
+                                            <option value="ca-west-1">ca-west-1 - Canada (West)</option>
+                                            
+                                            <!-- Europe -->
+                                            <option value="eu-north-1">eu-north-1 - Europe (Stockholm)</option>
+                                            <option value="eu-west-1">eu-west-1 - Europe (Ireland)</option>
+                                            <option value="eu-west-2">eu-west-2 - Europe (London)</option>
+                                            <option value="eu-west-3">eu-west-3 - Europe (Paris)</option>
+                                            <option value="eu-central-1">eu-central-1 - Europe (Frankfurt)</option>
+                                            <option value="eu-central-2">eu-central-2 - Europe (Zurich)</option>
+                                            <option value="eu-south-1">eu-south-1 - Europe (Milan)</option>
+                                            <option value="eu-south-2">eu-south-2 - Europe (Spain)</option>
+                                            
+                                            <!-- Asia Pacific -->
+                                            <option value="ap-northeast-1">ap-northeast-1 - Asia Pacific (Tokyo)</option>
+                                            <option value="ap-northeast-2">ap-northeast-2 - Asia Pacific (Seoul)</option>
+                                            <option value="ap-northeast-3">ap-northeast-3 - Asia Pacific (Osaka)</option>
+                                            <option value="ap-southeast-1">ap-southeast-1 - Asia Pacific (Singapore)</option>
+                                            <option value="ap-southeast-2">ap-southeast-2 - Asia Pacific (Sydney)</option>
+                                            <option value="ap-southeast-3">ap-southeast-3 - Asia Pacific (Jakarta)</option>
+                                            <option value="ap-southeast-4">ap-southeast-4 - Asia Pacific (Melbourne)</option>
+                                            <option value="ap-south-1">ap-south-1 - Asia Pacific (Mumbai)</option>
+                                            <option value="ap-south-2">ap-south-2 - Asia Pacific (Hyderabad)</option>
+                                            <option value="ap-east-1">ap-east-1 - Asia Pacific (Hong Kong)</option>
+                                            
+                                            <!-- Middle East -->
+                                            <option value="me-south-1">me-south-1 - Middle East (Bahrain)</option>
+                                            <option value="me-central-1">me-central-1 - Middle East (UAE)</option>
+                                            
+                                            <!-- Africa -->
+                                            <option value="af-south-1">af-south-1 - Africa (Cape Town)</option>
+                                            
+                                            <!-- South America -->
+                                            <option value="sa-east-1">sa-east-1 - South America (São Paulo)</option>
+                                            
+                                            <!-- Israel -->
+                                            <option value="il-central-1">il-central-1 - Israel (Tel Aviv)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Bucket Name</label>
+                                        <input type="text" name="bucket_name" placeholder="my-backup-bucket" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Endpoint (optional)</label>
+                                        <input type="text" name="endpoint" placeholder="https://s3.amazonaws.com" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">AWS Access Key ID</label>
+                                        <input type="text" name="access_key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">AWS Secret Access Key</label>
+                                        <input type="password" name="secret_key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                </div>
+
+                                <!-- SFTP Fields -->
+                                <div id="sftp-fields" style="display: none;">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Host</label>
+                                        <input type="text" name="host" placeholder="sftp.example.com" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Port</label>
+                                        <input type="number" name="port" value="22" placeholder="22" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Username</label>
+                                        <input type="text" name="username" placeholder="backup-user" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Remote Path</label>
+                                        <input type="text" name="remote_path" placeholder="/backups" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Password (optional if using private key)</label>
+                                        <input type="password" name="password" placeholder="Leave empty if using private key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Private Key (optional if using password)</label>
+                                        <textarea name="private_key" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" rows="6" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"></textarea>
+                                        <p class="mt-1 text-sm text-gray-500">Paste your SSH private key here. This will be securely encrypted when stored.</p>
+                                    </div>
+                                </div>
+
+                                <!-- Common Fields -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Path Prefix (optional)</label>
+                                    <input type="text" name="path_prefix" placeholder="backups/borgitory" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                </div>
+
+                                <div class="flex space-x-2">
+                                    <button type="submit" id="submit-button" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                                        Add S3 Location
+                                    </button>
+                                </div>
+                            </form>
+                            <div id="cloud-backup-status" class="mt-4"></div>
+                        </div>
+
+                        <!-- Existing Cloud Backups -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium text-gray-700 mb-3">Configured Backup Locations</h3>
+                            <div id="cloud-backup-list" 
+                                 hx-get="/api/cloud-backup/html" 
+                                 hx-trigger="load, cloudBackupUpdate from:body" 
+                                 hx-swap="innerHTML">
+                                <div class="text-gray-500 text-sm">Loading cloud backup configurations...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Archives Tab -->
+            <div id="tab-archives" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Archive Browser</h2>
+                    
+                    <div class="mb-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Select Repository</label>
+                                <select id="archive-repository-select" onchange="loadArchives()" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Select a repository to view archives...</option>
+                                </select>
+                            </div>
+                            <div class="flex-shrink-0 pt-6">
+                                <button 
+                                    onclick="refreshArchives()" 
+                                    id="refresh-archives-btn"
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                    disabled
+                                >
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="archives-list" class="overflow-x-auto">
+                        <div class="text-gray-500 text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                            <p>Select a repository above to view its archives</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Job History Tab -->
+            <div id="tab-jobs" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Job History</h2>
+                    <div id="job-history">
+                        <div class="text-gray-500 text-sm">Loading job history...</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
+<style>
+.nav-item.active {
+    @apply bg-blue-100 text-blue-700 border-r-2 border-blue-600;
+}
+
+.tab-content {
+    min-height: 500px;
+}
+</style>
+
 <script>
+// Tab Navigation
+function switchTab(tabName) {
+    // Hide all tab content
+    const tabs = document.querySelectorAll('.tab-content');
+    tabs.forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    
+    // Remove active class from all nav items
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+    
+    // Add active class to selected nav item
+    document.getElementById(`nav-${tabName}`).classList.add('active');
+    
+    // Handle tab-specific initialization
+    if (tabName === 'archives') {
+        populateArchiveRepositorySelect();
+    }
+}
+
+// Initialize the first tab as active
+function initializeTabs() {
+    switchTab('repositories');
+}
+
+// Archives functionality
+function populateArchiveRepositorySelect() {
+    const select = document.getElementById('archive-repository-select');
+    if (!window.borgitoryAppInstance || !window.borgitoryAppInstance.repositories) {
+        return;
+    }
+    
+    // Clear existing options except the first one
+    select.innerHTML = '<option value="">Select a repository to view archives...</option>';
+    
+    // Add repository options
+    window.borgitoryAppInstance.repositories.forEach(repo => {
+        const option = document.createElement('option');
+        option.value = repo.id;
+        option.textContent = repo.name;
+        select.appendChild(option);
+    });
+}
+
+function loadArchives() {
+    const select = document.getElementById('archive-repository-select');
+    const refreshBtn = document.getElementById('refresh-archives-btn');
+    const archivesList = document.getElementById('archives-list');
+    
+    const repositoryId = select.value;
+    
+    if (!repositoryId) {
+        refreshBtn.disabled = true;
+        archivesList.innerHTML = `
+            <div class="text-gray-500 text-center py-8">
+                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <p>Select a repository above to view its archives</p>
+            </div>
+        `;
+        return;
+    }
+    
+    refreshBtn.disabled = false;
+    
+    // Show loading state
+    archivesList.innerHTML = `
+        <div class="text-center py-8">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p class="text-gray-500">Loading archives...</p>
+        </div>
+    `;
+    
+    // Load archives via HTMX
+    htmx.ajax('GET', `/api/repositories/${repositoryId}/archives/html`, {
+        target: '#archives-list',
+        swap: 'innerHTML'
+    });
+}
+
+function refreshArchives() {
+    loadArchives();
+}
+
+// Repository Tab Functions  
+function switchRepositoryTab(tab) {
+    const createTab = document.getElementById('create-tab');
+    const importTab = document.getElementById('import-tab');
+    const createForm = document.getElementById('create-form');
+    const importForm = document.getElementById('import-form');
+    
+    if (tab === 'create') {
+        createTab.classList.add('text-blue-600', 'border-blue-600');
+        createTab.classList.remove('text-gray-500');
+        importTab.classList.add('text-gray-500');
+        importTab.classList.remove('text-blue-600', 'border-blue-600');
+        
+        createForm.classList.remove('hidden');
+        importForm.classList.add('hidden');
+    } else {
+        importTab.classList.add('text-blue-600', 'border-blue-600');
+        importTab.classList.remove('text-gray-500');
+        createTab.classList.add('text-gray-500');
+        createTab.classList.remove('text-blue-600', 'border-blue-600');
+        
+        importForm.classList.remove('hidden');
+        createForm.classList.add('hidden');
+    }
+}
+
 // Handle import repository start (loading state)
 function handleImportStart(event) {
     const submitButton = document.getElementById('import-submit');
@@ -225,12 +729,12 @@ function handleImportResponse(event) {
     const buttonText = document.getElementById('import-button-text');
     const spinner = document.getElementById('import-loading-spinner');
     
-    // Hide loading state
+    // Hide loading state immediately
     spinner.classList.add('hidden');
-    buttonText.textContent = 'Import Repository';
     
     if (xhr.status >= 200 && xhr.status < 300) {
         // Success
+        buttonText.textContent = 'Import Repository';
         showNotification('Repository imported successfully!', 'success');
         form.reset();
         
@@ -245,30 +749,24 @@ function handleImportResponse(event) {
         submitButton.className = 'w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center';
         buttonText.textContent = 'Select a repository first';
         
-        // Reload repositories for the dropdown
-        window.borgitoryAppInstance?.loadRepositories();
+        // Trigger HTMX refresh for repository list
+        document.body.dispatchEvent(new CustomEvent('repositoryUpdate'));
     } else {
-        // Error - re-enable button
+        // Error - re-enable button immediately
+        buttonText.textContent = 'Import Repository';
         submitButton.disabled = false;
         submitButton.className = 'w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 flex items-center justify-center';
         
-        // Parse and show error message
+        // Parse and show error message immediately
         let errorMessage = 'Failed to import repository';
         try {
             const errorData = JSON.parse(xhr.response);
             if (errorData.detail) {
-                if (Array.isArray(errorData.detail)) {
-                    // Validation errors
-                    errorMessage = errorData.detail.map(err => 
-                        `${err.loc?.join('.')}: ${err.msg}`
-                    ).join(', ');
-                } else {
-                    // String error message
-                    errorMessage = errorData.detail;
-                }
+                errorMessage = Array.isArray(errorData.detail) 
+                    ? errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ')
+                    : errorData.detail;
             }
         } catch (e) {
-            // Fallback error message
             errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
         }
         showNotification(errorMessage, 'error');
@@ -284,8 +782,8 @@ function handleRepositoryResponse(event) {
         // Success
         showNotification('Repository added successfully!', 'success');
         form.reset();
-        // Reload repositories for the dropdown
-        window.borgitoryAppInstance?.loadRepositories();
+        // Trigger HTMX refresh for repository list
+        document.body.dispatchEvent(new CustomEvent('repositoryUpdate'));
     } else {
         // Error
         let errorMessage = 'Failed to add repository';
@@ -310,6 +808,143 @@ function handleRepositoryResponse(event) {
     }
 }
 
+// Handle cloud backup form response
+function handleCloudBackupResponse(event) {
+    const xhr = event.detail.xhr;
+    const form = event.target;
+    const statusDiv = document.getElementById('cloud-backup-status');
+    
+    if (xhr.status >= 200 && xhr.status < 300) {
+        // Success
+        showNotification('Cloud backup location added successfully!', 'success');
+        form.reset();
+        // Reset provider selection to S3 and update fields
+        document.getElementById('provider-select').value = 's3';
+        toggleProviderFields();
+        statusDiv.innerHTML = `
+            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                <span class="text-green-700 text-sm">Cloud backup location configured successfully!</span>
+            </div>
+        `;
+        
+        // Trigger HTMX refresh for cloud backup list
+        document.body.dispatchEvent(new CustomEvent('cloudBackupUpdate'));
+    } else {
+        // Error
+        let errorMessage = 'Failed to add cloud backup location';
+        try {
+            const errorData = JSON.parse(xhr.response);
+            if (errorData.detail) {
+                errorMessage = Array.isArray(errorData.detail) 
+                    ? errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ')
+                    : errorData.detail;
+            }
+        } catch (e) {
+            errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
+        }
+        showNotification(errorMessage, 'error');
+        statusDiv.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <span class="text-red-700 text-sm">${errorMessage}</span>
+            </div>
+        `;
+    }
+}
+
+// Test cloud backup connection
+async function testCloudBackupConnection(configId, buttonElement) {
+    const originalText = buttonElement.textContent;
+    buttonElement.disabled = true;
+    buttonElement.textContent = 'Testing...';
+    
+    try {
+        const response = await fetch(`/api/cloud-backup/${configId}/test`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                let message = 'Connection test successful!';
+                if (result.details) {
+                    message += ` (Read: ${result.details.read_test}, Write: ${result.details.write_test}, Region: ${result.details.region})`;
+                }
+                showNotification(message, 'success');
+            } else if (result.status === 'warning') {
+                showNotification(`Connection test warning: ${result.message}`, 'warning');
+            } else {
+                showNotification(`Connection test failed: ${result.message}`, 'error');
+            }
+        } else {
+            const error = await response.json();
+            showNotification(`Connection test failed: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Connection test failed: ${error.message}`, 'error');
+    } finally {
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
+    }
+}
+
+// Toggle cloud backup configuration
+async function toggleCloudBackupConfig(configId, enabled, buttonElement) {
+    const action = enabled ? 'disable' : 'enable';
+    const originalText = buttonElement.textContent;
+    buttonElement.disabled = true;
+    buttonElement.textContent = enabled ? 'Disabling...' : 'Enabling...';
+    
+    try {
+        const response = await fetch(`/api/cloud-backup/${configId}/${action}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showNotification(`Cloud backup ${action}d successfully!`, 'success');
+            document.body.dispatchEvent(new CustomEvent('cloudBackupUpdate'));
+        } else {
+            const error = await response.json();
+            showNotification(`Failed to ${action} cloud backup: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Failed to ${action} cloud backup: ${error.message}`, 'error');
+    } finally {
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
+    }
+}
+
+// Delete cloud backup configuration
+async function deleteCloudBackupConfig(configId, configName, buttonElement) {
+    if (!confirm(`Are you sure you want to delete the cloud backup configuration "${configName}"?`)) {
+        return;
+    }
+    
+    const originalText = buttonElement.textContent;
+    buttonElement.disabled = true;
+    buttonElement.textContent = 'Deleting...';
+    
+    try {
+        const response = await fetch(`/api/cloud-backup/${configId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification('Cloud backup configuration deleted successfully!', 'success');
+            document.body.dispatchEvent(new CustomEvent('cloudBackupUpdate'));
+        } else {
+            const error = await response.json();
+            showNotification(`Failed to delete cloud backup configuration: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Failed to delete cloud backup configuration: ${error.message}`, 'error');
+    } finally {
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
+    }
+}
+
 // Handle backup form response
 function handleBackupResponse(event) {
     const xhr = event.detail.xhr;
@@ -322,13 +957,16 @@ function handleBackupResponse(event) {
             const response = JSON.parse(xhr.response);
             showNotification('Backup started successfully!', 'success');
             statusDiv.innerHTML = `
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div id="backup-job-${response.job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <div class="flex items-center">
                         <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
                         <span class="text-blue-700 text-sm">Backup job #${response.job_id} started... (This may take a few minutes if Docker images need to be downloaded)</span>
                     </div>
                 </div>
             `;
+            
+            // Store the job ID for status updates
+            statusDiv.setAttribute('data-backup-job-id', response.job_id);
         } catch (e) {
             showNotification('Backup started!', 'success');
         }
@@ -361,13 +999,64 @@ function handleBackupResponse(event) {
     }
 }
 
+// Handle schedule form response
+function handleScheduleResponse(event) {
+    const xhr = event.detail.xhr;
+    const form = event.target;
+    const statusDiv = document.getElementById('schedule-status');
+    
+    if (xhr.status >= 200 && xhr.status < 300) {
+        // Success
+        showNotification('Schedule created successfully!', 'success');
+        form.reset();
+        statusDiv.innerHTML = `
+            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                <span class="text-green-700 text-sm">Schedule created successfully!</span>
+            </div>
+        `;
+        
+        // Clear form fields
+        document.getElementById('schedule-preset').value = '';
+        document.getElementById('cron-expression').value = '';
+        document.getElementById('custom-cron').classList.add('hidden');
+        document.getElementById('cron-description').classList.add('hidden');
+        
+        // Trigger HTMX refresh for schedule list
+        document.body.dispatchEvent(new CustomEvent('scheduleUpdate'));
+    } else {
+        // Error
+        let errorMessage = 'Failed to create schedule';
+        try {
+            const errorData = JSON.parse(xhr.response);
+            if (errorData.detail) {
+                errorMessage = Array.isArray(errorData.detail) 
+                    ? errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ')
+                    : errorData.detail;
+            }
+        } catch (e) {
+            errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
+        }
+        showNotification(errorMessage, 'error');
+        statusDiv.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <span class="text-red-700 text-sm">${errorMessage}</span>
+            </div>
+        `;
+    }
+}
+
 function borgitoryApp() {
     return {
         selectedRepository: null,
         repositories: [],
+        cloudBackupConfigs: [],
         
         init() {
             this.loadRepositories();
+            this.loadCloudBackupConfigs();
+            loadJobHistory(); // Load initial job history
+            initializeSSE(); // Set up single SSE connection
+            initializeTabs(); // Initialize tabs
             // Store instance globally for form handler
             window.borgitoryAppInstance = this;
         },
@@ -384,10 +1073,23 @@ function borgitoryApp() {
                 showNotification('Failed to load repositories: ' + error.message, 'error');
             }
         },
+
+        async loadCloudBackupConfigs() {
+            try {
+                const response = await fetch('/api/cloud-backup/');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                this.cloudBackupConfigs = await response.json();
+                this.updateCloudBackupSelects();
+            } catch (error) {
+                console.error('Failed to load cloud backup configs:', error);
+            }
+        },
         
         updateRepositorySelect() {
-            const select = document.querySelector('select[name="repository_id"]');
-            if (select) {
+            const selects = document.querySelectorAll('select[name="repository_id"]');
+            selects.forEach(select => {
                 select.innerHTML = '<option value="">Select Repository...</option>';
                 this.repositories.forEach(repo => {
                     const option = document.createElement('option');
@@ -395,453 +1097,593 @@ function borgitoryApp() {
                     option.textContent = repo.name;
                     select.appendChild(option);
                 });
-            }
+            });
+            
+            // Update archive repository select if on archives tab
+            populateArchiveRepositorySelect();
             
             // Also update the repository list display
             this.updateRepositoryList();
         },
         
         updateRepositoryList() {
-            const container = document.getElementById('repository-list');
-            if (!container) return;
-            
-            if (this.repositories.length === 0) {
-                container.innerHTML = '<div class="text-gray-500 p-4">No repositories configured</div>';
-                return;
-            }
-            
-            container.innerHTML = this.repositories.map(repo => `
-                <div class="flex items-center justify-between p-3 border rounded-lg mb-2">
-                    <div>
-                        <div class="font-medium">${repo.name}</div>
-                        <div class="text-sm text-gray-500">${repo.path}</div>
-                        <div class="text-xs text-gray-400">Created: ${new Date(repo.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button onclick="borgitoryAppInstance.selectRepository(${repo.id})" 
-                                class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200">
-                            View Archives
-                        </button>
-                        <button onclick="borgitoryAppInstance.deleteRepository(${repo.id}, '${repo.name}')" 
-                                class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+            // This will be handled by HTMX
         },
-        
-        async deleteRepository(id, name) {
-            if (!confirm(`Are you sure you want to delete repository "${name}"? This will remove it from the database but not delete the actual Borg repository files.`)) {
+
+        updateCloudBackupSelects() {
+            const selects = document.querySelectorAll('#backup-cloud-select, #schedule-cloud-select');
+            selects.forEach(select => {
+                // Keep the "No cloud backup" option
+                const defaultOption = select.querySelector('option[value=""]');
+                select.innerHTML = '';
+                select.appendChild(defaultOption);
+                
+                // Add cloud backup config options
+                this.cloudBackupConfigs.forEach(config => {
+                    if (config.enabled) { // Only show enabled configs
+                        const option = document.createElement('option');
+                        option.value = config.id;
+                        option.textContent = `${config.name} (${config.bucket_name})`;
+                        select.appendChild(option);
+                    }
+                });
+            });
+        },
+
+        async deleteRepository(repoId, repoName) {
+            if (!confirm(`Are you sure you want to delete the repository "${repoName}"? This action cannot be undone.`)) {
                 return;
             }
             
             try {
-                const response = await fetch(`/api/repositories/${id}`, {
+                const response = await fetch(`/api/repositories/${repoId}`, {
                     method: 'DELETE'
                 });
                 
                 if (response.ok) {
-                    showNotification(`Repository "${name}" deleted successfully`, 'success');
-                    await this.loadRepositories(); // Reload the list
+                    showNotification(`Repository "${repoName}" deleted successfully!`, 'success');
+                    // Reload repositories
+                    await this.loadRepositories();
+                    // Trigger HTMX refresh for repository list
+                    document.body.dispatchEvent(new CustomEvent('repositoryUpdate'));
                 } else {
                     const error = await response.json();
                     showNotification(`Failed to delete repository: ${error.detail}`, 'error');
                 }
             } catch (error) {
-                showNotification(`Error deleting repository: ${error.message}`, 'error');
+                showNotification(`Failed to delete repository: ${error.message}`, 'error');
             }
-        },
-        
-        selectRepository(id) {
-            this.selectedRepository = id;
-            this.loadArchives(id);
-        },
-        
-        async loadArchives(repoId) {
-            try {
-                const response = await fetch(`/api/repositories/${repoId}/archives`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                const data = await response.json();
-                this.displayArchives(data.archives);
-            } catch (error) {
-                showNotification('Failed to load archives: ' + error.message, 'error');
-            }
-        },
-        
-        displayArchives(archives) {
-            const container = document.getElementById('archives-list');
-            if (!container) return;
-            
-            if (archives.length === 0) {
-                container.innerHTML = '<div class="text-gray-500">No archives found</div>';
-                return;
-            }
-            
-            const table = document.createElement('table');
-            table.className = 'min-w-full divide-y divide-gray-200';
-            table.innerHTML = `
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    ${archives.map(archive => `
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${archive.name}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(archive.time).toLocaleString()}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${this.formatBytes(archive.stats?.original_size || 0)}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <button onclick="borgitoryAppInstance.browseArchive(${this.selectedRepository}, '${archive.name}')" 
-                                        class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-                                    Browse Contents
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            `;
-            container.innerHTML = '';
-            container.appendChild(table);
-        },
-        
-        formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        },
-        
-        async browseArchive(repoId, archiveName) {
-            try {
-                const response = await fetch(`/api/repositories/${repoId}/archives/${encodeURIComponent(archiveName)}/contents`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                const data = await response.json();
-                this.displayArchiveContents(archiveName, data.contents);
-            } catch (error) {
-                showNotification(`Failed to load archive contents: ${error.message}`, 'error');
-            }
-        },
-        
-        displayArchiveContents(archiveName, contents) {
-            const container = document.getElementById('archives-list');
-            if (!container) return;
-            
-            if (contents.length === 0) {
-                container.innerHTML = '<div class="text-gray-500">Archive is empty</div>';
-                return;
-            }
-            
-            const table = document.createElement('table');
-            table.className = 'min-w-full divide-y divide-gray-200';
-            table.innerHTML = `
-                <div class="mb-4">
-                    <button onclick="borgitoryAppInstance.loadArchives(${this.selectedRepository})" 
-                            class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 mb-2">
-                        ← Back to Archives
-                    </button>
-                    <h3 class="text-lg font-medium text-gray-900">Contents of "${archiveName}"</h3>
-                </div>
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Path</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modified</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    ${contents.map(item => `
-                        <tr>
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900 break-all">${item.path}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.type || 'file'}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${this.formatBytes(item.size || 0)}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.mtime ? new Date(item.mtime).toLocaleString() : 'N/A'}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            `;
-            container.innerHTML = '';
-            container.appendChild(table);
-        },
-        
-        formatDuration(startDate, endDate) {
-            if (!startDate || !endDate) return 'N/A';
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            const diffMs = end - start;
-            const diffSecs = Math.floor(diffMs / 1000);
-            const diffMins = Math.floor(diffSecs / 60);
-            const remainingSecs = diffSecs % 60;
-            
-            if (diffMins > 0) {
-                return `${diffMins}m ${remainingSecs}s`;
-            }
-            return `${diffSecs}s`;
-        },
-        
-        getStatusColor(status) {
-            const colors = {
-                'running': 'bg-blue-100 text-blue-700',
-                'completed': 'bg-green-100 text-green-700', 
-                'failed': 'bg-red-100 text-red-700',
-                'pending': 'bg-yellow-100 text-yellow-700'
-            };
-            return colors[status] || 'bg-gray-100 text-gray-700';
-        },
-        
-        toggleJobDetails(jobId) {
-            const details = document.getElementById(`job-details-${jobId}`);
-            const arrow = document.getElementById(`job-arrow-${jobId}`);
-            if (details.classList.contains('hidden')) {
-                details.classList.remove('hidden');
-                arrow.textContent = '▼';
-            } else {
-                details.classList.add('hidden');
-                arrow.textContent = '▶';
-            }
-        },
-        
-        formatJsonValue(value) {
-            if (value === null || value === undefined) return 'null';
-            if (typeof value === 'string') return value;
-            return JSON.stringify(value, null, 2);
+        }
+    };
+}
+
+// Schedule helper functions
+function updateCronExpression() {
+    const preset = document.getElementById('schedule-preset');
+    const customCron = document.getElementById('custom-cron');
+    const cronExpression = document.getElementById('cron-expression');
+    const cronDescription = document.getElementById('cron-description');
+    
+    if (preset.value === 'custom') {
+        customCron.classList.remove('hidden');
+        // Copy current custom input value to hidden field
+        const customInput = document.getElementById('custom-cron-input');
+        cronExpression.value = customInput.value.trim();
+        cronDescription.classList.add('hidden');
+    } else if (preset.value) {
+        customCron.classList.add('hidden');
+        cronExpression.value = preset.value;
+        cronDescription.textContent = preset.options[preset.selectedIndex].text;
+        cronDescription.classList.remove('hidden');
+    } else {
+        customCron.classList.add('hidden');
+        cronExpression.value = '';
+        cronDescription.classList.add('hidden');
+    }
+}
+
+function updateCustomCronExpression() {
+    const preset = document.getElementById('schedule-preset');
+    const customInput = document.getElementById('custom-cron-input');
+    const cronExpression = document.getElementById('cron-expression');
+    
+    // Only update if custom is selected
+    if (preset.value === 'custom') {
+        cronExpression.value = customInput.value.trim();
+    }
+}
+
+function prepareScheduleSubmission(event) {
+    // Ensure custom cron expression is copied to hidden field before submission
+    const preset = document.getElementById('schedule-preset');
+    const customInput = document.getElementById('custom-cron-input');
+    const cronExpression = document.getElementById('cron-expression');
+    
+    if (preset.value === 'custom' && customInput) {
+        const customValue = customInput.value.trim();
+        if (!customValue) {
+            event.preventDefault();
+            showNotification('Please enter a custom cron expression', 'error');
+            return false;
+        }
+        cronExpression.value = customValue;
+    }
+    
+    // Validate that we have a cron expression
+    if (!cronExpression.value.trim()) {
+        event.preventDefault();
+        showNotification('Please select a schedule or enter a custom cron expression', 'error');
+        return false;
+    }
+    
+    return true;
+}
+
+// Upcoming backups loading functions
+function showUpcomingLoading() {
+    const upcomingDiv = document.getElementById('upcoming-backups');
+    if (upcomingDiv && !upcomingDiv.querySelector('.loading-indicator')) {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'loading-indicator text-blue-500 text-sm flex items-center';
+        loadingDiv.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>Updating upcoming backups...';
+        upcomingDiv.appendChild(loadingDiv);
+    }
+}
+
+function hideUpcomingLoading() {
+    const upcomingDiv = document.getElementById('upcoming-backups');
+    if (upcomingDiv) {
+        const loadingIndicator = upcomingDiv.querySelector('.loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.remove();
         }
     }
 }
 
-// Repository tab management
-function switchRepositoryTab(tab) {
-    const createTab = document.getElementById('create-tab');
-    const importTab = document.getElementById('import-tab');
-    const createForm = document.getElementById('create-form');
-    const importForm = document.getElementById('import-form');
-    
-    if (tab === 'create') {
-        createTab.className = 'px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600';
-        importTab.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700';
-        createForm.classList.remove('hidden');
-        importForm.classList.add('hidden');
-    } else {
-        createTab.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700';
-        importTab.className = 'px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600';
-        createForm.classList.add('hidden');
-        importForm.classList.remove('hidden');
-    }
-}
-
-// Repository scanning and import
-let discoveredRepositories = [];
-
+// Repository scanning functions
 async function scanForRepositories() {
     const statusDiv = document.getElementById('scan-status');
-    const discoveredDiv = document.getElementById('discovered-repos');
     const repoSelect = document.getElementById('repo-select');
+    const discoveredRepos = document.getElementById('discovered-repos');
     
-    statusDiv.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>Scanning...';
+    statusDiv.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div> Scanning...';
     
     try {
-        const response = await fetch('/api/repositories/scan-existing');
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
+        const response = await fetch('/api/repositories/scan');
         const data = await response.json();
-        discoveredRepositories = data.repositories;
         
-        if (discoveredRepositories.length === 0) {
-            statusDiv.innerHTML = 'No new repositories found (all detected repositories are already imported)';
-            discoveredDiv.classList.add('hidden');
-        } else {
-            statusDiv.innerHTML = `Found ${discoveredRepositories.length} new repository${discoveredRepositories.length === 1 ? '' : 's'} available for import`;
-            
-            // Populate select dropdown
+        if (data.repositories && data.repositories.length > 0) {
+            // Clear and populate select
             repoSelect.innerHTML = '<option value="">Select a repository...</option>';
-            discoveredRepositories.forEach((repo, index) => {
+            data.repositories.forEach(repo => {
                 const option = document.createElement('option');
-                option.value = index;
-                const encryptionInfo = repo.encryption_mode ? ` (${repo.encryption_mode})` : '';
-                const idInfo = repo.id ? ` [ID: ${repo.id.substring(0, 8)}...]` : '';
-                option.textContent = `${repo.path}${encryptionInfo}${idInfo}`;
+                option.value = JSON.stringify(repo);
+                option.textContent = `${repo.path} (${repo.encryption_mode})`;
                 repoSelect.appendChild(option);
             });
             
-            discoveredDiv.classList.remove('hidden');
+            discoveredRepos.classList.remove('hidden');
+            statusDiv.innerHTML = `Found ${data.repositories.length} repositories`;
+        } else {
+            statusDiv.innerHTML = 'No repositories found';
         }
     } catch (error) {
         statusDiv.innerHTML = `Error: ${error.message}`;
-        console.error('Scan error:', error);
     }
 }
 
 function selectDiscoveredRepo() {
     const repoSelect = document.getElementById('repo-select');
-    const pathInput = document.getElementById('import-path');
+    const importPath = document.getElementById('import-path');
+    const submitButton = document.getElementById('import-submit');
+    const buttonText = document.getElementById('import-button-text');
     const encryptionInfo = document.getElementById('encryption-info');
     const encryptionText = document.getElementById('encryption-text');
     const passphraseField = document.getElementById('passphrase-field');
     const keyfileField = document.getElementById('keyfile-field');
-    const submitButton = document.getElementById('import-submit');
-    const passphraseInput = document.querySelector('#import-form input[name="passphrase"]');
-    const keyfileInput = document.querySelector('#import-form input[name="keyfile"]');
     
-    const selectedIndex = repoSelect.value;
-    if (selectedIndex !== '') {
-        const repo = discoveredRepositories[parseInt(selectedIndex)];
-        pathInput.value = repo.path;
+    if (!repoSelect.value) {
+        importPath.value = '';
+        submitButton.disabled = true;
+        submitButton.className = 'w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center';
+        buttonText.textContent = 'Select a repository first';
+        encryptionInfo.classList.add('hidden');
+        passphraseField.classList.add('hidden');
+        keyfileField.classList.add('hidden');
+        return;
+    }
+    
+    try {
+        const repo = JSON.parse(repoSelect.value);
+        importPath.value = repo.path;
         
-        // Auto-suggest a name based on the path
-        const nameInput = document.querySelector('#import-form input[name="name"]');
-        if (!nameInput.value) {
-            const pathParts = repo.path.split('/');
-            const suggestedName = pathParts[pathParts.length - 1] || 'imported-repo';
-            nameInput.value = suggestedName;
-        }
-        
-        // Show encryption information
-        const encryptionMode = repo.encryption_mode || 'unknown';
-        const requiresKeyfile = repo.requires_keyfile || false;
-        
+        // Show encryption info
+        encryptionText.textContent = repo.preview || `Encryption: ${repo.encryption_mode}`;
         encryptionInfo.classList.remove('hidden');
-        if (requiresKeyfile) {
-            encryptionText.textContent = `This repository uses keyfile encryption. You'll need both the passphrase and the keyfile to access it.`;
-        } else if (encryptionMode === 'repokey') {
-            encryptionText.textContent = `This repository uses repokey encryption. Only the passphrase is required.`;
-        } else {
-            encryptionText.textContent = `This repository uses ${encryptionMode} encryption.`;
-        }
         
-        // Always show passphrase field
-        passphraseField.classList.remove('hidden');
-        passphraseInput.required = true;
-        
-        // Show keyfile field only if required
-        if (requiresKeyfile) {
+        // Show appropriate auth fields based on encryption mode
+        if (repo.requires_keyfile) {
             keyfileField.classList.remove('hidden');
-            keyfileInput.required = true;
-        } else {
+            passphraseField.classList.remove('hidden'); // Most repos also need passphrase
+        } else if (repo.encryption_mode !== 'none') {
+            passphraseField.classList.remove('hidden');
             keyfileField.classList.add('hidden');
-            keyfileInput.required = false;
+        } else {
+            passphraseField.classList.add('hidden');
+            keyfileField.classList.add('hidden');
         }
         
         // Enable submit button
         submitButton.disabled = false;
-        document.getElementById('import-button-text').textContent = 'Import Repository';
         submitButton.className = 'w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 flex items-center justify-center';
+        buttonText.textContent = 'Import Repository';
+    } catch (error) {
+        console.error('Error parsing repository data:', error);
+    }
+}
+
+// Notification system
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 transition-opacity duration-300 ${
+        type === 'success' ? 'bg-green-100 border border-green-400 text-green-800' :
+        type === 'error' ? 'bg-red-100 border border-red-400 text-red-800' :
+        type === 'warning' ? 'bg-yellow-100 border border-yellow-400 text-yellow-800' :
+        'bg-blue-100 border border-blue-400 text-blue-800'
+    }`;
+    
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <span class="mr-2">${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-current hover:bg-black hover:bg-opacity-10 rounded p-1">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 300);
+    }, 5000);
+}
+
+// Job history and SSE functions (simplified versions - full implementations would be in base.html)
+function loadJobHistory() {
+    // Load job history via HTMX
+    htmx.ajax('GET', '/api/jobs/html', {
+        target: '#job-history',
+        swap: 'innerHTML'
+    });
+    
+    // Also load current jobs
+    htmx.ajax('GET', '/api/jobs/current/html', {
+        target: '#current-jobs',  
+        swap: 'innerHTML'
+    });
+}
+
+function initializeSSE() {
+    // This would normally set up Server-Sent Events for real-time updates
+    // For now, we'll use periodic refresh
+    setInterval(() => {
+        if (document.getElementById('current-jobs')) {
+            htmx.ajax('GET', '/api/jobs/current/html', {
+                target: '#current-jobs',
+                swap: 'innerHTML'
+            });
+        }
+    }, 5000);
+}
+
+// Delete repository function
+async function deleteRepository(repoId, repoName) {
+    if (!confirm(`Are you sure you want to delete the repository "${repoName}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/repositories/${repoId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification(`Repository "${repoName}" deleted successfully!`, 'success');
+            // Trigger HTMX refresh for repository list
+            document.body.dispatchEvent(new CustomEvent('repositoryUpdate'));
+            // Update repository selects
+            if (window.borgitoryAppInstance) {
+                window.borgitoryAppInstance.loadRepositories();
+            }
+        } else {
+            const error = await response.json();
+            showNotification(`Failed to delete repository: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Failed to delete repository: ${error.message}`, 'error');
+    }
+}
+
+// Schedule functions
+async function toggleSchedule(scheduleId) {
+    try {
+        const response = await fetch(`/api/schedules/${scheduleId}/toggle`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message, 'success');
+            document.body.dispatchEvent(new CustomEvent('scheduleUpdate'));
+        } else {
+            const error = await response.json();
+            showNotification(`Failed to toggle schedule: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Failed to toggle schedule: ${error.message}`, 'error');
+    }
+}
+
+async function deleteSchedule(scheduleId, scheduleName) {
+    if (!confirm(`Are you sure you want to delete the schedule "${scheduleName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/schedules/${scheduleId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showNotification(`Schedule "${scheduleName}" deleted successfully!`, 'success');
+            document.body.dispatchEvent(new CustomEvent('scheduleUpdate'));
+        } else {
+            const error = await response.json();
+            showNotification(`Failed to delete schedule: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Failed to delete schedule: ${error.message}`, 'error');
+    }
+}
+
+async function viewArchiveContents(repoId, archiveName) {
+    try {
+        showNotification('Loading archive contents...', 'info');
+        
+        const response = await fetch(`/api/repositories/${repoId}/archives/${encodeURIComponent(archiveName)}/contents`);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to load archive contents');
+        }
+        
+        const data = await response.json();
+        showArchiveContentsModal(archiveName, data.contents);
+        
+    } catch (error) {
+        showNotification(`Failed to load archive contents: ${error.message}`, 'error');
+        console.error('Archive contents error:', error);
+    }
+}
+
+function showArchiveContentsModal(archiveName, contents) {
+    // Create modal backdrop
+    const backdrop = document.createElement('div');
+    backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    backdrop.onclick = (e) => {
+        if (e.target === backdrop) {
+            document.body.removeChild(backdrop);
+        }
+    };
+    
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.className = 'bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] flex flex-col';
+    
+    // Sort contents: directories first, then files, both alphabetically
+    const sortedContents = contents.sort((a, b) => {
+        const aIsDir = a.type === 'd';
+        const bIsDir = b.type === 'd';
+        
+        if (aIsDir && !bIsDir) return -1;
+        if (!aIsDir && bIsDir) return 1;
+        
+        return a.path.localeCompare(b.path);
+    });
+    
+    // Format file size
+    const formatSize = (size) => {
+        if (!size) return '';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let unitIndex = 0;
+        let fileSize = size;
+        
+        while (fileSize >= 1024 && unitIndex < units.length - 1) {
+            fileSize /= 1024;
+            unitIndex++;
+        }
+        
+        return `${fileSize.toFixed(1)} ${units[unitIndex]}`;
+    };
+    
+    // Generate contents HTML
+    let contentsHtml = '';
+    if (sortedContents.length === 0) {
+        contentsHtml = '<div class="text-center py-8 text-gray-500">This archive is empty</div>';
     } else {
-        // Hide all fields and disable submit
-        pathInput.value = '';
-        encryptionInfo.classList.add('hidden');
-        passphraseField.classList.add('hidden');
-        keyfileField.classList.add('hidden');
+        contentsHtml = '<div class="space-y-1">';
         
-        passphraseInput.required = false;
-        keyfileInput.required = false;
+        for (const item of sortedContents) {
+            const isDir = item.type === 'd';
+            const icon = isDir ? '📁' : '📄';
+            const sizeText = isDir ? '' : formatSize(item.size);
+            const modeText = item.mode || '';
+            const timeText = item.mtime ? new Date(item.mtime).toLocaleString() : '';
+            
+            contentsHtml += `
+                <div class="flex items-center py-2 px-3 hover:bg-gray-50 rounded text-sm">
+                    <span class="mr-3">${icon}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-mono text-gray-900 truncate">${item.path}</div>
+                        <div class="text-xs text-gray-500 space-x-4">
+                            ${sizeText ? `<span>${sizeText}</span>` : ''}
+                            ${modeText ? `<span>${modeText}</span>` : ''}
+                            ${timeText ? `<span>${timeText}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
         
-        submitButton.disabled = true;
-        document.getElementById('import-button-text').textContent = 'Select a repository first';
-        submitButton.className = 'w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center';
+        contentsHtml += '</div>';
+    }
+    
+    modal.innerHTML = `
+        <div class="flex items-center justify-between p-6 border-b">
+            <h2 class="text-lg font-semibold text-gray-900">Archive Contents</h2>
+            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="p-6 border-b">
+            <h3 class="font-medium text-gray-900">${archiveName}</h3>
+            <p class="text-sm text-gray-500 mt-1">${contents.length} items</p>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6">
+            ${contentsHtml}
+        </div>
+        <div class="p-6 border-t bg-gray-50 rounded-b-lg">
+            <div class="flex justify-end">
+                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+    
+    // Focus trap for accessibility
+    const closeButton = modal.querySelector('button');
+    if (closeButton) closeButton.focus();
+}
+
+// Job history functions
+function toggleJobDetails(jobId) {
+    const detailsDiv = document.getElementById(`job-details-${jobId}`);
+    const chevron = document.getElementById(`chevron-${jobId}`);
+    
+    if (detailsDiv.classList.contains('hidden')) {
+        detailsDiv.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        detailsDiv.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
     }
 }
 
-// Global functions for HTMX callbacks
-function formatCurrentJobs(event) {
-    const container = document.getElementById('current-jobs');
-    if (!container) return;
-    
-    try {
-        const jobs = JSON.parse(event.detail.xhr.response);
-        const runningJobs = jobs.filter(job => job.status === 'running' || job.status === 'pending');
-        
-        if (runningJobs.length === 0) {
-            container.innerHTML = '<div class="text-gray-500 text-sm">No active operations</div>';
-            return;
-        }
-        
-        container.innerHTML = runningJobs.map(job => `
-            <div class="flex items-center justify-between p-3 border rounded-lg mb-2">
-                <div>
-                    <div class="font-medium">Job #${job.id} - ${job.type}</div>
-                    <div class="text-sm text-gray-500">
-                        <span class="inline-flex px-2 py-1 text-xs rounded-full ${borgitoryAppInstance.getStatusColor(job.status)}">${job.status}</span>
-                        ${job.started_at ? 'Started: ' + new Date(job.started_at).toLocaleString() : ''}
-                    </div>
-                </div>
-                <div class="flex space-x-2">
-                    <button onclick="borgitoryAppInstance.toggleJobDetails(${job.id})" 
-                            class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-                        <span id="job-arrow-${job.id}">▶</span> Details
-                    </button>
-                </div>
-            </div>
-            <div id="job-details-${job.id}" class="hidden bg-gray-50 p-4 rounded-lg mb-2 ml-4">
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div><strong>Container ID:</strong> <code class="text-xs">${job.container_id || 'N/A'}</code></div>
-                    <div><strong>Repository:</strong> ${job.repository_id}</div>
-                    <div><strong>Started:</strong> ${job.started_at ? new Date(job.started_at).toLocaleString() : 'N/A'}</div>
-                    <div><strong>Duration:</strong> ${borgitoryAppInstance.formatDuration(job.started_at, new Date())}</div>
-                </div>
-                ${job.error ? `<div class="mt-2"><strong>Error:</strong><pre class="text-xs bg-red-50 p-2 rounded mt-1">${job.error}</pre></div>` : ''}
-                ${job.log_output ? `<div class="mt-2"><strong>Logs:</strong><pre class="text-xs bg-white p-2 rounded mt-1 max-h-32 overflow-y-auto">${job.log_output}</pre></div>` : ''}
-            </div>
-        `).join('');
-    } catch (e) {
-        console.error('Error formatting current jobs:', e);
+function copyJobOutput(jobId) {
+    const outputElement = document.getElementById(`job-output-${jobId}`);
+    if (outputElement) {
+        const text = outputElement.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('Job output copied to clipboard', 'success');
+        }).catch(() => {
+            showNotification('Failed to copy output to clipboard', 'error');
+        });
     }
 }
 
-function formatJobHistory(event) {
-    const container = document.getElementById('job-history');
-    if (!container) return;
+// Task-level functions for composite jobs
+function toggleTaskDetails(jobId, taskOrder) {
+    const detailsDiv = document.getElementById(`task-details-${jobId}-${taskOrder}`);
+    const chevron = document.getElementById(`task-chevron-${jobId}-${taskOrder}`);
     
-    try {
-        const jobs = JSON.parse(event.detail.xhr.response);
-        
-        if (jobs.length === 0) {
-            container.innerHTML = '<div class="text-gray-500 text-sm">No job history</div>';
-            return;
-        }
-        
-        container.innerHTML = jobs.map(job => `
-            <div class="flex items-center justify-between p-3 border rounded-lg mb-2">
-                <div>
-                    <div class="font-medium">Job #${job.id} - ${job.type}</div>
-                    <div class="text-sm text-gray-500">
-                        <span class="inline-flex px-2 py-1 text-xs rounded-full ${borgitoryAppInstance.getStatusColor(job.status)}">${job.status}</span>
-                        ${job.started_at ? 'Started: ' + new Date(job.started_at).toLocaleString() : ''}
-                        ${job.finished_at ? ' | Duration: ' + borgitoryAppInstance.formatDuration(job.started_at, job.finished_at) : ''}
-                    </div>
-                </div>
-                <div class="flex space-x-2">
-                    <button onclick="borgitoryAppInstance.toggleJobDetails(${job.id})" 
-                            class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-                        <span id="job-arrow-${job.id}">▶</span> Details
-                    </button>
-                </div>
-            </div>
-            <div id="job-details-${job.id}" class="hidden bg-gray-50 p-4 rounded-lg mb-2 ml-4">
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div><strong>Container ID:</strong> <code class="text-xs">${job.container_id || 'N/A'}</code></div>
-                    <div><strong>Repository:</strong> ${job.repository_id}</div>
-                    <div><strong>Started:</strong> ${job.started_at ? new Date(job.started_at).toLocaleString() : 'N/A'}</div>
-                    <div><strong>Finished:</strong> ${job.finished_at ? new Date(job.finished_at).toLocaleString() : 'N/A'}</div>
-                </div>
-                ${job.error ? `<div class="mt-2"><strong>Error:</strong><pre class="text-xs bg-red-50 p-2 rounded mt-1">${job.error}</pre></div>` : ''}
-                ${job.log_output ? `<div class="mt-2"><strong>Logs:</strong><pre class="text-xs bg-white p-2 rounded mt-1 max-h-64 overflow-y-auto">${job.log_output}</pre></div>` : ''}
-            </div>
-        `).join('');
-    } catch (e) {
-        console.error('Error formatting job history:', e);
+    if (detailsDiv.classList.contains('hidden')) {
+        detailsDiv.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        detailsDiv.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
     }
 }
+
+function copyTaskOutput(jobId, taskOrder) {
+    const outputElement = document.getElementById(`task-output-${jobId}-${taskOrder}`);
+    if (outputElement) {
+        const text = outputElement.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('Task output copied to clipboard', 'success');
+        }).catch(() => {
+            showNotification('Failed to copy task output to clipboard', 'error');
+        });
+    }
+}
+
+// Cloud Backup Provider Toggle
+function toggleProviderFields() {
+    const providerSelect = document.getElementById('provider-select');
+    const s3Fields = document.getElementById('s3-fields');
+    const sftpFields = document.getElementById('sftp-fields');
+    const submitButton = document.getElementById('submit-button');
+    
+    if (providerSelect.value === 's3') {
+        s3Fields.style.display = 'block';
+        sftpFields.style.display = 'none';
+        submitButton.textContent = 'Add S3 Location';
+        
+        // Set required fields for S3
+        document.querySelector('input[name="bucket_name"]').required = true;
+        document.querySelector('input[name="access_key"]').required = true;
+        document.querySelector('input[name="secret_key"]').required = true;
+        
+        // Remove required from SFTP fields
+        document.querySelector('input[name="host"]').required = false;
+        document.querySelector('input[name="username"]').required = false;
+        document.querySelector('input[name="remote_path"]').required = false;
+        
+    } else if (providerSelect.value === 'sftp') {
+        s3Fields.style.display = 'none';
+        sftpFields.style.display = 'block';
+        submitButton.textContent = 'Add SFTP Location';
+        
+        // Remove required from S3 fields
+        document.querySelector('input[name="bucket_name"]').required = false;
+        document.querySelector('input[name="access_key"]').required = false;
+        document.querySelector('input[name="secret_key"]').required = false;
+        
+        // Set required fields for SFTP
+        document.querySelector('input[name="host"]').required = true;
+        document.querySelector('input[name="username"]').required = true;
+        document.querySelector('input[name="remote_path"]').required = true;
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initializeTabs();
+    
+    // Add event listener to custom cron input
+    const customCronInput = document.getElementById('custom-cron-input');
+    if (customCronInput) {
+        customCronInput.addEventListener('input', updateCustomCronExpression);
+        customCronInput.addEventListener('blur', updateCustomCronExpression);
+    }
+    
+    // Initialize provider fields visibility
+    toggleProviderFields();
+});
 </script>
+
 {% endblock %}
