@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 @router.post("/", response_model=ScheduleSchema, status_code=status.HTTP_201_CREATED)
-def create_schedule(schedule: ScheduleCreate, db: Session = Depends(get_db)):
+async def create_schedule(schedule: ScheduleCreate, db: Session = Depends(get_db)):
     repository = db.query(Repository).filter(Repository.id == schedule.repository_id).first()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -37,7 +37,7 @@ def create_schedule(schedule: ScheduleCreate, db: Session = Depends(get_db)):
     
     # Add to scheduler
     try:
-        scheduler_service.add_schedule(db_schedule.id, db_schedule.name, db_schedule.cron_expression)
+        await scheduler_service.add_schedule(db_schedule.id, db_schedule.name, db_schedule.cron_expression)
     except Exception as e:
         # Rollback database changes if scheduler fails
         db.delete(db_schedule)
@@ -98,10 +98,10 @@ def get_schedules_html(skip: int = 0, limit: int = 100, db: Session = Depends(ge
 
 
 @router.get("/upcoming/html", response_class=HTMLResponse)
-def get_upcoming_backups_html():
+async def get_upcoming_backups_html():
     """Get upcoming scheduled backups as formatted HTML"""
     try:
-        jobs = scheduler_service.get_scheduled_jobs()
+        jobs = await scheduler_service.get_scheduled_jobs()
         
         if not jobs:
             return '<div class="text-gray-500 text-sm">No upcoming scheduled backups</div>'
@@ -189,7 +189,7 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{schedule_id}/toggle")
-def toggle_schedule(schedule_id: int, db: Session = Depends(get_db)):
+async def toggle_schedule(schedule_id: int, db: Session = Depends(get_db)):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -199,7 +199,7 @@ def toggle_schedule(schedule_id: int, db: Session = Depends(get_db)):
     
     # Update scheduler
     try:
-        scheduler_service.update_schedule(schedule.id, schedule.name, schedule.cron_expression, schedule.enabled)
+        await scheduler_service.update_schedule(schedule.id, schedule.name, schedule.cron_expression, schedule.enabled)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update schedule: {str(e)}")
     
@@ -207,13 +207,13 @@ def toggle_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{schedule_id}")
-def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
+async def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
     
     # Remove from scheduler
-    scheduler_service.remove_schedule(schedule_id)
+    await scheduler_service.remove_schedule(schedule_id)
     
     # Delete from database
     db.delete(schedule)
@@ -223,9 +223,9 @@ def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/jobs/active")
-def get_active_scheduled_jobs():
+async def get_active_scheduled_jobs():
     """Get all active scheduled jobs"""
-    return {"jobs": scheduler_service.get_scheduled_jobs()}
+    return {"jobs": await scheduler_service.get_scheduled_jobs()}
 
 
 def format_cron_trigger(trigger_str: str) -> str:

@@ -294,6 +294,7 @@
                                 hx-post="/api/schedules/" 
                                 hx-ext="json-enc"
                                 hx-target="#schedule-status"
+                                hx-on::before-request="prepareScheduleSubmission(event)"
                                 hx-on::after-request="handleScheduleResponse(event)"
                             >
                                 <div class="space-y-4">
@@ -364,11 +365,9 @@
                              hx-get="/api/schedules/upcoming/html" 
                              hx-trigger="load, every 60s, scheduleUpdate from:body" 
                              hx-swap="innerHTML"
-                             hx-indicator=".upcoming-loading">
+                             hx-on::htmx:before-request="showUpcomingLoading()"
+                             hx-on::htmx:after-request="hideUpcomingLoading()">
                             <div class="text-gray-500 text-sm">Loading upcoming backups...</div>
-                        </div>
-                        <div class="upcoming-loading htmx-indicator">
-                            <div class="text-blue-500 text-sm">Updating upcoming backups...</div>
                         </div>
                     </div>
                 </div>
@@ -1115,7 +1114,9 @@ function updateCronExpression() {
     
     if (preset.value === 'custom') {
         customCron.classList.remove('hidden');
-        cronExpression.value = '';
+        // Copy current custom input value to hidden field
+        const customInput = document.getElementById('custom-cron-input');
+        cronExpression.value = customInput.value.trim();
         cronDescription.classList.add('hidden');
     } else if (preset.value) {
         customCron.classList.add('hidden');
@@ -1126,6 +1127,64 @@ function updateCronExpression() {
         customCron.classList.add('hidden');
         cronExpression.value = '';
         cronDescription.classList.add('hidden');
+    }
+}
+
+function updateCustomCronExpression() {
+    const preset = document.getElementById('schedule-preset');
+    const customInput = document.getElementById('custom-cron-input');
+    const cronExpression = document.getElementById('cron-expression');
+    
+    // Only update if custom is selected
+    if (preset.value === 'custom') {
+        cronExpression.value = customInput.value.trim();
+    }
+}
+
+function prepareScheduleSubmission(event) {
+    // Ensure custom cron expression is copied to hidden field before submission
+    const preset = document.getElementById('schedule-preset');
+    const customInput = document.getElementById('custom-cron-input');
+    const cronExpression = document.getElementById('cron-expression');
+    
+    if (preset.value === 'custom' && customInput) {
+        const customValue = customInput.value.trim();
+        if (!customValue) {
+            event.preventDefault();
+            showNotification('Please enter a custom cron expression', 'error');
+            return false;
+        }
+        cronExpression.value = customValue;
+    }
+    
+    // Validate that we have a cron expression
+    if (!cronExpression.value.trim()) {
+        event.preventDefault();
+        showNotification('Please select a schedule or enter a custom cron expression', 'error');
+        return false;
+    }
+    
+    return true;
+}
+
+// Upcoming backups loading functions
+function showUpcomingLoading() {
+    const upcomingDiv = document.getElementById('upcoming-backups');
+    if (upcomingDiv && !upcomingDiv.querySelector('.loading-indicator')) {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'loading-indicator text-blue-500 text-sm flex items-center';
+        loadingDiv.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>Updating upcoming backups...';
+        upcomingDiv.appendChild(loadingDiv);
+    }
+}
+
+function hideUpcomingLoading() {
+    const upcomingDiv = document.getElementById('upcoming-backups');
+    if (upcomingDiv) {
+        const loadingIndicator = upcomingDiv.querySelector('.loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.remove();
+        }
     }
 }
 
@@ -1494,9 +1553,42 @@ function copyJobOutput(jobId) {
     }
 }
 
+// Task-level functions for composite jobs
+function toggleTaskDetails(jobId, taskOrder) {
+    const detailsDiv = document.getElementById(`task-details-${jobId}-${taskOrder}`);
+    const chevron = document.getElementById(`task-chevron-${jobId}-${taskOrder}`);
+    
+    if (detailsDiv.classList.contains('hidden')) {
+        detailsDiv.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        detailsDiv.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+    }
+}
+
+function copyTaskOutput(jobId, taskOrder) {
+    const outputElement = document.getElementById(`task-output-${jobId}-${taskOrder}`);
+    if (outputElement) {
+        const text = outputElement.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('Task output copied to clipboard', 'success');
+        }).catch(() => {
+            showNotification('Failed to copy task output to clipboard', 'error');
+        });
+    }
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     initializeTabs();
+    
+    // Add event listener to custom cron input
+    const customCronInput = document.getElementById('custom-cron-input');
+    if (customCronInput) {
+        customCronInput.addEventListener('input', updateCustomCronExpression);
+        customCronInput.addEventListener('blur', updateCustomCronExpression);
+    }
 });
 </script>
 

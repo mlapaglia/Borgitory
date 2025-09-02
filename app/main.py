@@ -25,11 +25,11 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Borgitory application...")
     await init_db()
     logger.info("Database initialized")
-    scheduler_service.start()
+    await scheduler_service.start()
     logger.info("Scheduler started")
     yield
     logger.info("Shutting down...")
-    scheduler_service.stop()
+    await scheduler_service.stop()
 
 
 app = FastAPI(title="Borgitory - BorgBackup Web Manager", lifespan=lifespan)

@@ -69,11 +69,23 @@ async def sync_repository_task(
     job_id: int
 ):
     """Background task to sync repository to S3"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"☁️ sync_repository_task STARTED")
+    logger.info(f"📊 Parameters:")
+    logger.info(f"  - repository_id: {repository_id}")
+    logger.info(f"  - config_name: {config_name}")
+    logger.info(f"  - bucket_name: {bucket_name}")
+    logger.info(f"  - path_prefix: {path_prefix}")
+    logger.info(f"  - job_id: {job_id}")
+    
     from app.models.database import SessionLocal, CloudBackupConfig
     
     db = SessionLocal()
     try:
         # Get fresh instances from the new session
+        logger.info(f"🔍 Looking up database records...")
         job = db.query(Job).filter(Job.id == job_id).first()
         repository = db.query(Repository).filter(Repository.id == repository_id).first()
         
@@ -82,16 +94,27 @@ async def sync_repository_task(
             CloudBackupConfig.name == config_name
         ).first()
         
+        logger.info(f"📊 Database lookup results:")
+        logger.info(f"  - job: {'Found' if job else 'NOT FOUND'}")
+        logger.info(f"  - repository: {'Found' if repository else 'NOT FOUND'}")
+        logger.info(f"  - config: {'Found' if config else 'NOT FOUND'}")
+        
         if not job or not repository or not config:
+            logger.error(f"❌ Missing required database records - aborting sync task")
             return
         
         # Get credentials
+        logger.info(f"🔐 Getting credentials for config '{config.name}'...")
         access_key, secret_key = config.get_credentials()
+        logger.info(f"✅ Got credentials (access_key: {'***' + access_key[-4:] if access_key else 'None'})")
         
+        logger.info(f"📝 Updating job {job_id} status to running...")
         job.status = "running"
         job.started_at = datetime.utcnow()
         db.commit()
+        logger.info(f"✅ Job status updated")
         
+        logger.info(f"🚀 Starting rclone sync to {bucket_name}...")
         log_output = []
         async for progress in rclone_service.sync_repository_to_s3(
             repository=repository,

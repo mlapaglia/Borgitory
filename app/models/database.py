@@ -60,8 +60,32 @@ class Job(Base):
     container_id = Column(String, nullable=True)
     cloud_backup_config_id = Column(Integer, ForeignKey("cloud_backup_configs.id"), nullable=True)
     
+    # New composite job fields
+    job_type = Column(String, nullable=False, default="simple")  # 'simple', 'composite'
+    total_tasks = Column(Integer, default=1)
+    completed_tasks = Column(Integer, default=0)
+    
     repository = relationship("Repository", back_populates="jobs")
     cloud_backup_config = relationship("CloudBackupConfig")
+    tasks = relationship("JobTask", back_populates="job", cascade="all, delete-orphan")
+
+
+class JobTask(Base):
+    __tablename__ = "job_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
+    task_type = Column(String, nullable=False)  # 'backup', 'cloud_sync', 'verify', etc.
+    task_name = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="pending")  # 'pending', 'running', 'completed', 'failed', 'skipped'
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    output = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    return_code = Column(Integer, nullable=True)
+    task_order = Column(Integer, nullable=False)  # Order of execution within the job
+    
+    job = relationship("Job", back_populates="tasks")
 
 
 class Schedule(Base):
