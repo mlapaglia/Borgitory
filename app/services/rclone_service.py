@@ -13,44 +13,19 @@ class RcloneService:
     def __init__(self):
         pass  # No longer need config file management
     
-    def _build_s3_env(
-        self,
-        access_key_id: str,
-        secret_access_key: str,
-        region: str = "us-east-1",
-        endpoint: Optional[str] = None
-    ) -> Dict[str, str]:
-        """Build environment variables for S3 configuration"""
-        env = os.environ.copy()
-        
-        # Set S3 credentials via environment variables
-        env["AWS_ACCESS_KEY_ID"] = access_key_id
-        env["AWS_SECRET_ACCESS_KEY"] = secret_access_key
-        env["AWS_DEFAULT_REGION"] = region
-        
-        if endpoint:
-            env["AWS_ENDPOINT_URL"] = endpoint
-            
-        return env
     
     def _build_s3_flags(
         self,
         access_key_id: str,
-        secret_access_key: str,
-        region: str = "us-east-1",
-        endpoint: Optional[str] = None
+        secret_access_key: str
     ) -> list:
         """Build S3 configuration flags for rclone command"""
         flags = [
             "--s3-access-key-id", access_key_id,
             "--s3-secret-access-key", secret_access_key,
-            "--s3-region", region,
             "--s3-provider", "AWS"
         ]
         
-        if endpoint:
-            flags.extend(["--s3-endpoint", endpoint])
-            
         return flags
     
     async def sync_repository_to_s3(
@@ -81,7 +56,7 @@ class RcloneService:
         ]
         
         # Add S3 configuration flags
-        s3_flags = self._build_s3_flags(access_key_id, secret_access_key, region, endpoint)
+        s3_flags = self._build_s3_flags(access_key_id, secret_access_key)
         command.extend(s3_flags)
         
         try:
@@ -163,7 +138,7 @@ class RcloneService:
             ]
             
             # Add S3 configuration flags
-            s3_flags = self._build_s3_flags(access_key_id, secret_access_key, region, endpoint)
+            s3_flags = self._build_s3_flags(access_key_id, secret_access_key)
             command.extend(s3_flags)
             
             process = await asyncio.create_subprocess_exec(
@@ -266,7 +241,7 @@ class RcloneService:
                     s3_path
                 ]
                 
-                s3_flags = self._build_s3_flags(access_key_id, secret_access_key, region, endpoint)
+                s3_flags = self._build_s3_flags(access_key_id, secret_access_key)
                 upload_command.extend(s3_flags)
                 
                 process = await asyncio.create_subprocess_exec(

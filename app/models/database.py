@@ -159,9 +159,7 @@ class CloudBackupConfig(Base):
     provider = Column(String, nullable=False)  # "s3", "sftp", "azure", "gcp", etc.
     
     # S3-specific fields
-    region = Column(String, nullable=True)
     bucket_name = Column(String, nullable=True)  # Made nullable for non-S3 providers
-    endpoint = Column(String, nullable=True)
     encrypted_access_key = Column(String, nullable=True)  # Made nullable for non-S3 providers
     encrypted_secret_key = Column(String, nullable=True)  # Made nullable for non-S3 providers
     

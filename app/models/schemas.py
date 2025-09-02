@@ -112,9 +112,7 @@ class CloudBackupConfigBase(BaseModel):
     path_prefix: Optional[str] = ""
     
     # S3-specific fields
-    region: Optional[str] = None
     bucket_name: Optional[str] = None
-    endpoint: Optional[str] = None
     
     # SFTP-specific fields
     host: Optional[str] = None
@@ -139,9 +137,7 @@ class CloudBackupConfigUpdate(BaseModel):
     path_prefix: Optional[str] = None
     
     # S3 fields
-    region: Optional[str] = None
     bucket_name: Optional[str] = None
-    endpoint: Optional[str] = None
     access_key: Optional[str] = None
     secret_key: Optional[str] = None
     
