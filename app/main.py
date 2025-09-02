@@ -24,32 +24,22 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        print("🔥 LIFESPAN: Starting Borgitory application...")
-        logger.info("🔥 STARTING Borgitory application...")
+        logger.info("Starting Borgitory application...")
         await init_db()
-        print("🔥 LIFESPAN: Database initialized")
-        logger.info("🔥 Database initialized")
+        logger.info("Database initialized")
         
         # Recover any interrupted backup jobs from previous shutdown/crash
-        print("🔥 LIFESPAN: About to start recovery...")
-        logger.info("🔥 About to start recovery...")
         await recovery_service.recover_stale_jobs()
-        print("🔥 LIFESPAN: Recovery completed")
-        logger.info("🔥 Recovery completed")
         
         await scheduler_service.start()
-        print("🔥 LIFESPAN: Scheduler started")
-        logger.info("🔥 Scheduler started")
+        logger.info("Scheduler started")
         yield
-        print("🔥 LIFESPAN: Shutting down...")
-        logger.info("🔥 Shutting down...")
+        logger.info("Shutting down...")
         await scheduler_service.stop()
     except Exception as e:
-        print(f"🔥 LIFESPAN ERROR: {e}")
-        logger.error(f"🔥 LIFESPAN ERROR: {e}")
+        logger.error(f"Lifespan error: {e}")
         import traceback
-        print(f"🔥 TRACEBACK: {traceback.format_exc()}")
-        logger.error(f"🔥 TRACEBACK: {traceback.format_exc()}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
 

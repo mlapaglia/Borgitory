@@ -15,8 +15,7 @@ from app.models.database import Repository, Job, Schedule, get_db
 from app.services.borg_service import borg_service
 from app.services.composite_job_manager import composite_job_manager
 
-# Configure logging
-logging.basicConfig()
+# Configure APScheduler logging only (don't override main basicConfig)
 logging.getLogger('apscheduler').setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 

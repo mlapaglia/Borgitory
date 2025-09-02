@@ -44,7 +44,6 @@ class RecoveryService:
         but database records still show 'running' status.
         """
         try:
-            print("🔥 RECOVERY: Checking database for interrupted job records...")
             logger.info("🔧 Checking database for interrupted job records...")
             
             db = next(get_db())
@@ -53,18 +52,14 @@ class RecoveryService:
                 
                 # Find all jobs in database marked as running
                 running_jobs = db.query(Job).filter(Job.status == 'running').all()
-                print(f"🔥 RECOVERY: Found {len(running_jobs)} running jobs in database")
                 
                 if not running_jobs:
-                    print("🔥 RECOVERY: No interrupted database job records found")
                     logger.info("✅ No interrupted database job records found")
                     return
                 
-                print(f"🔥 RECOVERY: Processing {len(running_jobs)} interrupted database job records")
                 logger.info(f"🔍 Found {len(running_jobs)} interrupted database job records")
                 
                 for job in running_jobs:
-                    print(f"🔥 RECOVERY: Processing job {job.id} ({job.job_type}) - repository_id: {job.repository_id}")
                     logger.info(f"🔧 Cancelling database job record {job.id} ({job.job_type}) - was running since {job.started_at}")
                     
                     # Mark job as failed
@@ -86,16 +81,14 @@ class RecoveryService:
                     
                     # Release repository lock if this was a backup job (including composite jobs)
                     if job.job_type in ['manual_backup', 'scheduled_backup', 'backup', 'composite'] and job.repository_id:
-                        print(f"🔥 RECOVERY: Looking up repository {job.repository_id} for job {job.id}")
                         repository = db.query(Repository).filter(Repository.id == job.repository_id).first()
                         if repository:
-                            print(f"🔥 RECOVERY: Found repository {repository.name}, releasing lock...")
                             logger.info(f"🔓 Releasing repository lock for: {repository.name}")
                             await self._release_repository_lock(repository)
                         else:
-                            print(f"🔥 RECOVERY: Repository {job.repository_id} not found in database!")
+                            logger.warning(f"Repository {job.repository_id} not found in database for job {job.id}")
                     else:
-                        print(f"🔥 RECOVERY: Job {job.id} is not a backup job or has no repository_id")
+                        logger.debug(f"Job {job.id} is not a backup job or has no repository_id - skipping lock release")
                 
                 db.commit()
                 logger.info("✅ All interrupted database job records cancelled")
@@ -110,8 +103,6 @@ class RecoveryService:
     async def _release_repository_lock(self, repository: Repository):
         """Use borg break-lock to release any stale locks on a repository"""
         try:
-            print(f"🔥 RECOVERY: Attempting to release lock on repository: {repository.name}")
-            print(f"🔥 RECOVERY: Repository path: {repository.path}")
             logger.info(f"🔓 Attempting to release lock on repository: {repository.name}")
             
             # Build borg break-lock command
@@ -121,8 +112,6 @@ class RecoveryService:
                 passphrase=repository.get_passphrase(),
                 additional_args=[]
             )
-            
-            print(f"🔥 RECOVERY: Break-lock command: {' '.join(command)}")
             
             # Execute the break-lock command with a timeout
             process = await asyncio.create_subprocess_exec(
@@ -135,28 +124,18 @@ class RecoveryService:
             try:
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
                 
-                stdout_text = stdout.decode() if stdout else "No stdout"
-                stderr_text = stderr.decode() if stderr else "No stderr"
-                
-                print(f"🔥 RECOVERY: Break-lock return code: {process.returncode}")
-                print(f"🔥 RECOVERY: Break-lock stdout: {stdout_text}")
-                print(f"🔥 RECOVERY: Break-lock stderr: {stderr_text}")
-                
                 if process.returncode == 0:
-                    print(f"🔥 RECOVERY: Successfully released lock on repository: {repository.name}")
                     logger.info(f"✅ Successfully released lock on repository: {repository.name}")
                 else:
                     # Log the error but don't fail - lock might not exist
-                    print(f"🔥 RECOVERY: Break-lock returned {process.returncode} for {repository.name}: {stderr_text}")
+                    stderr_text = stderr.decode() if stderr else "No error details"
                     logger.warning(f"⚠️  Break-lock returned {process.returncode} for {repository.name}: {stderr_text}")
                     
             except asyncio.TimeoutError:
-                print(f"🔥 RECOVERY: Break-lock timed out for repository: {repository.name}")
                 logger.warning(f"⚠️  Break-lock timed out for repository: {repository.name}")
                 process.kill()
                 
         except Exception as e:
-            print(f"🔥 RECOVERY: Error releasing lock for repository {repository.name}: {e}")
             logger.error(f"❌ Error releasing lock for repository {repository.name}: {e}")
     
 
