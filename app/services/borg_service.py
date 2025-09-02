@@ -450,15 +450,21 @@ class BorgService:
             logger.error(f"Invalid scan path: {e}")
             raise Exception(f"Invalid scan path: {e}")
         
-        # Use find command to scan for Borg repositories
+        # Use find command to scan for Borg repositories - only check top-level subdirectories
+        # This scans /backups/repo-1/, /backups/repo-2/ but not deeper like /backups/repo-1/sub/deep/
         command = [
-            'find', safe_scan_path, '-name', 'config', '-type', 'f',
-            '-exec', 'sh', '-c',
-            'if grep -q "\\[repository\\]" "$1" 2>/dev/null; then dirname "$1"; fi',
+            'find', safe_scan_path, 
+            '-mindepth', '2',  # Start looking 2 levels deep (scan_path/repo_name/config)
+            '-maxdepth', '2',  # Don't go deeper than 2 levels
+            '-name', 'config', 
+            '-type', 'f',
+            '-exec', 'sh', '-c', 
+            'if head -20 "$1" 2>/dev/null | grep -q "\\[repository\\]"; then echo "$(dirname "$1")"; fi',
             '_', '{}', ';'
         ]
         
         try:
+            logger.info(f"Executing scan command: {' '.join(command)}")
             job_id = await borg_job_manager.start_borg_command(command, env={})
             logger.info(f"Repository scan job {job_id} started")
             return job_id
@@ -587,19 +593,48 @@ class BorgService:
         """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
         job_id = await self.start_repository_scan(scan_path)
         
-        # Wait for completion
-        max_wait = 60
+        # Wait for completion - increased timeout for large filesystem scans
+        max_wait = 300  # 5 minutes instead of 1 minute
         wait_time = 0
         
+        logger.info(f"Waiting for scan completion (max {max_wait}s)...")
         while wait_time < max_wait:
             status = await self.check_scan_status(job_id)
+            
+            # Log progress every 10 seconds
+            if wait_time % 10 == 0:
+                logger.info(f"Scan progress: {wait_time}s elapsed, status: {status.get('status', 'unknown')}")
+                if status.get('output'):
+                    logger.debug(f"Current output: {status['output'][-200:]}")  # Last 200 chars
+            
             if status['completed']:
+                logger.info(f"Scan completed after {wait_time}s")
                 return await self.get_scan_results(job_id)
+            
+            if status.get('error'):
+                logger.error(f"Scan error: {status['error']}")
+                break
             
             await asyncio.sleep(1)
             wait_time += 1
         
-        logger.error(f"Legacy scan timed out for job {job_id}")
+        # Get final status and output for debugging
+        final_status = await self.check_scan_status(job_id)
+        logger.error(f"Legacy scan timed out for job {job_id} after {max_wait}s")
+        logger.error(f"Final status: {final_status.get('status', 'unknown')}")
+        if final_status.get('output'):
+            logger.error(f"Final output: {final_status['output'][-500:]}")  # Last 500 chars
+        if final_status.get('error'):
+            logger.error(f"Job error: {final_status['error']}")
+        
+        # Try to clean up the hung job
+        try:
+            # The job manager should handle cleanup, but log that it's still running
+            if final_status.get('running'):
+                logger.warning(f"Job {job_id} is still running after timeout - it may continue in background")
+        except Exception as cleanup_error:
+            logger.error(f"Error during cleanup: {cleanup_error}")
+        
         return []
 
 

@@ -109,6 +109,7 @@
                                     hx-ext="json-enc"
                                     hx-target="#repository-list" 
                                     hx-swap="beforeend"
+                                    hx-on::before-request="handleCreateRepositoryStart(event)"
                                     hx-on::after-request="handleRepositoryResponse(event)"
                                 >
                                     <div class="space-y-4">
@@ -124,8 +125,12 @@
                                             <label class="block text-sm font-medium text-gray-700">Passphrase</label>
                                             <input type="password" name="passphrase" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                                         </div>
-                                        <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                                            Create Repository
+                                        <button type="submit" id="create-repo-button" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
+                                            <span id="create-repo-text">Create Repository</span>
+                                            <svg id="create-repo-spinner" class="hidden animate-spin ml-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
                                         </button>
                                     </div>
                                 </form>
@@ -773,19 +778,46 @@ function handleImportResponse(event) {
     }
 }
 
+// Handle repository form start (for create form loading state)
+function handleCreateRepositoryStart(event) {
+    const submitButton = document.getElementById('create-repo-button');
+    const buttonText = document.getElementById('create-repo-text');
+    const spinner = document.getElementById('create-repo-spinner');
+    
+    // Show loading state
+    submitButton.disabled = true;
+    submitButton.className = 'w-full bg-blue-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center';
+    buttonText.textContent = 'Creating...';
+    spinner.classList.remove('hidden');
+}
+
 // Handle repository form response (for create form)
 function handleRepositoryResponse(event) {
     const xhr = event.detail.xhr;
     const form = event.target;
+    const submitButton = document.getElementById('create-repo-button');
+    const buttonText = document.getElementById('create-repo-text');
+    const spinner = document.getElementById('create-repo-spinner');
+    
+    // Always hide loading state first
+    spinner.classList.add('hidden');
     
     if (xhr.status >= 200 && xhr.status < 300) {
         // Success
+        submitButton.disabled = false;
+        submitButton.className = 'w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center';
+        buttonText.textContent = 'Create Repository';
+        
         showNotification('Repository added successfully!', 'success');
         form.reset();
         // Trigger HTMX refresh for repository list
         document.body.dispatchEvent(new CustomEvent('repositoryUpdate'));
     } else {
-        // Error
+        // Error - re-enable button
+        submitButton.disabled = false;
+        submitButton.className = 'w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center';
+        buttonText.textContent = 'Create Repository';
+        
         let errorMessage = 'Failed to add repository';
         try {
             const errorData = JSON.parse(xhr.response);
