@@ -44,6 +44,7 @@ class RecoveryService:
         but database records still show 'running' status.
         """
         try:
+            print("🔥 RECOVERY: Checking database for interrupted job records...")
             logger.info("🔧 Checking database for interrupted job records...")
             
             db = next(get_db())
@@ -52,8 +53,10 @@ class RecoveryService:
                 
                 # Find all jobs in database marked as running
                 running_jobs = db.query(Job).filter(Job.status == 'running').all()
+                print(f"🔥 RECOVERY: Found {len(running_jobs)} running jobs in database")
                 
                 if not running_jobs:
+                    print("🔥 RECOVERY: No interrupted database job records found")
                     logger.info("✅ No interrupted database job records found")
                     return
                 
