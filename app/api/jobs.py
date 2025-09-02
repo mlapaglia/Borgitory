@@ -366,11 +366,31 @@ def render_job_html(job):
                                 </div>
                 '''
             else:
-                html += f'''
+                # Check if this task is currently running and show streaming output
+                if task.status == "running":
+                    html += f'''
+                                <div id="task-details-{job.id}-{task.task_order}" class="hidden mt-3 pt-3 border-t">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <h5 class="text-xs font-medium text-gray-700">Live Output:</h5>
+                                        <div class="flex items-center">
+                                            <div class="animate-pulse w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                                            <span class="text-xs text-green-600">Streaming</span>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto" 
+                                         id="task-output-{job.id}-{task.task_order}"
+                                         data-job-uuid="{job.job_uuid}"
+                                         data-task-index="{task.task_order}">
+                                        <div class="text-gray-500">Connecting to live output...</div>
+                                    </div>
+                                </div>
+                    '''
+                else:
+                    html += f'''
                                 <div id="task-details-{job.id}-{task.task_order}" class="hidden mt-3 pt-3 border-t">
                                     <div class="text-xs text-gray-500">No output available</div>
                                 </div>
-                '''
+                    '''
             
             html += '''
                             </div>
@@ -541,22 +561,81 @@ async def get_job_status(job_id: str):
 
 
 @router.get("/{job_id}/output")
-async def get_job_output(job_id: str, last_n_lines: int = 100):
+async def get_job_output(job_id: str, last_n_lines: int = 100, db: Session = Depends(get_db)):
     """Get job output lines"""
-    output = await borg_job_manager.get_job_output_stream(job_id, last_n_lines=last_n_lines)
-    
-    if 'error' in output:
-        raise HTTPException(status_code=404, detail=output['error'])
-    
-    return output
+    # Check if this is a composite job first
+    db_job = db.query(Job).filter(Job.job_uuid == job_id).first()
+    if db_job and db_job.job_type == "composite":
+        # Get composite job output
+        from app.services.composite_job_manager import composite_job_manager
+        composite_job = composite_job_manager.jobs.get(job_id)
+        if not composite_job:
+            raise HTTPException(status_code=404, detail="Composite job not found")
+        
+        # Get current task output if job is running
+        current_task_output = []
+        if composite_job.status == "running" and composite_job.current_task_index < len(composite_job.tasks):
+            current_task = composite_job.tasks[composite_job.current_task_index]
+            lines = list(current_task.output_lines)
+            if last_n_lines:
+                lines = lines[-last_n_lines:]
+            current_task_output = lines
+        
+        return {
+            'job_id': job_id,
+            'job_type': 'composite',
+            'status': composite_job.status,
+            'current_task_index': composite_job.current_task_index,
+            'total_tasks': len(composite_job.tasks),
+            'current_task_output': current_task_output,
+            'started_at': composite_job.started_at.isoformat(),
+            'completed_at': composite_job.completed_at.isoformat() if composite_job.completed_at else None
+        }
+    else:
+        # Get regular borg job output
+        output = await borg_job_manager.get_job_output_stream(job_id, last_n_lines=last_n_lines)
+        
+        if 'error' in output:
+            raise HTTPException(status_code=404, detail=output['error'])
+        
+        return output
 
 @router.get("/{job_id}/stream")
-async def stream_job_output(job_id: str):
+async def stream_job_output(job_id: str, db: Session = Depends(get_db)):
     """Stream real-time job output via Server-Sent Events"""
     async def event_generator():
         try:
-            async for event in borg_job_manager.stream_job_output(job_id):
-                yield f"data: {json.dumps(event)}\n\n"
+            # Check if this is a composite job first
+            db_job = db.query(Job).filter(Job.job_uuid == job_id).first()
+            if db_job and db_job.job_type == "composite":
+                # Stream composite job output
+                from app.services.composite_job_manager import composite_job_manager
+                event_queue = composite_job_manager.subscribe_to_events()
+                
+                try:
+                    # Send initial state
+                    composite_job = composite_job_manager.jobs.get(job_id)
+                    if composite_job:
+                        yield f"data: {json.dumps({'type': 'initial_state', 'job_id': job_id, 'status': composite_job.status})}\n\n"
+                    
+                    # Stream events
+                    while True:
+                        try:
+                            event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
+                            # Only send events for this job
+                            if event.get('job_id') == job_id:
+                                yield f"data: {json.dumps(event)}\n\n"
+                        except asyncio.TimeoutError:
+                            yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+                        except Exception as e:
+                            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+                            break
+                finally:
+                    composite_job_manager.unsubscribe_from_events(event_queue)
+            else:
+                # Stream regular borg job output
+                async for event in borg_job_manager.stream_job_output(job_id):
+                    yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     

@@ -213,6 +213,12 @@ class CompositeJobManager:
         try:
             logger.info(f"🔄 Starting borg backup for repository {job.repository.name}")
             
+            # DEBUG: Enable test mode for slow fake backup
+            TEST_MODE = False  # Set to False for real borg backups
+            
+            if TEST_MODE:
+                return await self._execute_fake_backup_task(job, task, task_index)
+            
             # Use the existing borg service to create backup
             # But we'll stream the output to our task instead of creating a separate job
             from app.utils.security import build_secure_borg_command
@@ -227,10 +233,12 @@ class CompositeJobManager:
             validate_archive_name(archive_name)
             
             additional_args = [
-                "--compression", compression,
+                "--compression", "none",  # No compression = slower processing
                 "--stats",
-                "--progress",
+                "--progress", 
                 "--json",
+                "--verbose",  # More verbose output
+                "--list",     # List files being processed
                 f"{job.repository.path}::{archive_name}",
                 "/data"
             ]
@@ -260,6 +268,9 @@ class CompositeJobManager:
                 
                 # Broadcast output
                 self._broadcast_task_output(job.id, task_index, decoded_line)
+                
+                # DEBUG: Add artificial delay for testing streaming
+                await asyncio.sleep(0.5)  # Half second delay per line
             
             await process.wait()
             
@@ -273,6 +284,88 @@ class CompositeJobManager:
                 
         except Exception as e:
             logger.error(f"❌ Exception in backup task: {str(e)}")
+            task.error = str(e)
+            return False
+    
+    async def _execute_fake_backup_task(self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int) -> bool:
+        """Execute a fake slow backup for testing streaming output"""
+        try:
+            logger.info(f"🧪 Starting FAKE backup for testing (repository: {job.repository.name})")
+            
+            # Simulate borg backup output with realistic messages
+            fake_output_lines = [
+                "Repository lock acquired",
+                "------------------------------------------------------------------------------",
+                "Archive name: backup-2024-01-15_14-30-25", 
+                "Archive fingerprint: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+                "Time (start): Mon, 2024-01-15 14:30:25",
+                "Time (end):   Mon, 2024-01-15 14:35:42",
+                "Duration: 5 minutes 17.23 seconds",
+                "Number of files: 1247",
+                "Utilization of max. archive size: 0%",
+                "------------------------------------------------------------------------------",
+                "",
+                "Scanning files...",
+                "Processing: /data/documents/file1.txt",
+                "Processing: /data/documents/file2.pdf", 
+                "Processing: /data/images/photo1.jpg",
+                "Processing: /data/images/photo2.png",
+                "Processing: /data/videos/video1.mp4",
+                "Processing: /data/config/settings.json",
+                "Processing: /data/logs/application.log",
+                "Processing: /data/backups/old_backup.tar.gz",
+                "",
+                "A /data/documents/file1.txt",
+                "A /data/documents/file2.pdf", 
+                "A /data/images/photo1.jpg",
+                "A /data/images/photo2.png",
+                "M /data/videos/video1.mp4",
+                "A /data/config/settings.json",
+                "M /data/logs/application.log",
+                "U /data/backups/old_backup.tar.gz",
+                "",
+                '{"original_size": 52428800, "compressed_size": 41943040, "deduplicated_size": 20971520}',
+                "",
+                "------------------------------------------------------------------------------",
+                "Original size      Compressed size    Deduplicated size",
+                "This archive:        50.00 MB            40.00 MB            20.00 MB", 
+                "All archives:       500.00 MB           400.00 MB           200.00 MB",
+                "",
+                "                       Unique chunks         Total chunks",
+                "Chunk index:                    1532                 3847",
+                "------------------------------------------------------------------------------",
+                "",
+                "Archive successfully created"
+            ]
+            
+            # Stream each line with a delay
+            for i, line in enumerate(fake_output_lines):
+                # Add timestamp and store
+                task.output_lines.append({
+                    'timestamp': datetime.now().isoformat(),
+                    'text': line
+                })
+                
+                # Broadcast output
+                self._broadcast_task_output(job.id, task_index, line)
+                
+                # Variable delay based on content (faster for empty lines, slower for file processing)
+                if line.startswith("Processing:") or line.startswith("A ") or line.startswith("M "):
+                    await asyncio.sleep(0.8)  # Slow for file operations
+                elif line.strip() == "":
+                    await asyncio.sleep(0.2)  # Fast for empty lines
+                elif "scanning" in line.lower() or "repository" in line.lower():
+                    await asyncio.sleep(1.5)  # Very slow for major operations
+                else:
+                    await asyncio.sleep(0.4)  # Medium for other lines
+                
+                logger.info(f"🧪 Fake backup output [{i+1}/{len(fake_output_lines)}]: {line}")
+            
+            logger.info(f"✅ Fake backup task completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Exception in fake backup task: {str(e)}")
             task.error = str(e)
             return False
     

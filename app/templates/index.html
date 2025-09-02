@@ -1613,9 +1613,18 @@ function toggleTaskDetails(jobId, taskOrder) {
     if (detailsDiv.classList.contains('hidden')) {
         detailsDiv.classList.remove('hidden');
         chevron.style.transform = 'rotate(180deg)';
+        
+        // Start streaming if this is a running task with live output
+        const outputDiv = document.getElementById(`task-output-${jobId}-${taskOrder}`);
+        if (outputDiv && outputDiv.dataset.jobUuid) {
+            startTaskStreaming(outputDiv.dataset.jobUuid, taskOrder, outputDiv);
+        }
     } else {
         detailsDiv.classList.add('hidden');
         chevron.style.transform = 'rotate(0deg)';
+        
+        // Stop streaming when collapsed
+        stopTaskStreaming(jobId, taskOrder);
     }
 }
 
@@ -1669,6 +1678,101 @@ function toggleProviderFields() {
         document.querySelector('input[name="remote_path"]').required = true;
     }
 }
+
+// Task streaming management
+let taskStreams = new Map(); // Track active streams by jobId-taskOrder
+
+function startTaskStreaming(jobUuid, taskOrder, outputDiv) {
+    const streamKey = `${jobUuid}-${taskOrder}`;
+    
+    // Don't start duplicate streams
+    if (taskStreams.has(streamKey)) {
+        return;
+    }
+    
+    console.log(`Starting task streaming for job ${jobUuid}, task ${taskOrder}`);
+    
+    const eventSource = new EventSource(`/api/jobs/${jobUuid}/stream`);
+    taskStreams.set(streamKey, eventSource);
+    
+    eventSource.onopen = function() {
+        outputDiv.innerHTML = '<div class="text-green-400">🔗 Connected to live output stream</div>';
+    };
+    
+    eventSource.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'task_output' && data.task_index == taskOrder) {
+                // Append new output line
+                const lineDiv = document.createElement('div');
+                lineDiv.textContent = data.line;
+                outputDiv.appendChild(lineDiv);
+                
+                // Auto-scroll to bottom
+                outputDiv.scrollTop = outputDiv.scrollHeight;
+                
+                // Limit lines to prevent memory issues (keep last 500 lines)
+                while (outputDiv.children.length > 500) {
+                    outputDiv.removeChild(outputDiv.firstChild);
+                }
+            }
+            else if (data.type === 'initial_state') {
+                outputDiv.innerHTML = '<div class="text-green-400">📡 Streaming live output...</div>';
+                
+                // Load any existing output
+                fetch(`/api/jobs/${jobUuid}/output?last_n_lines=100`)
+                    .then(response => response.json())
+                    .then(outputData => {
+                        if (outputData.job_type === 'composite' && outputData.current_task_output) {
+                            outputDiv.innerHTML = '';
+                            outputData.current_task_output.forEach(line => {
+                                const lineDiv = document.createElement('div');
+                                lineDiv.textContent = line.text;
+                                outputDiv.appendChild(lineDiv);
+                            });
+                            outputDiv.scrollTop = outputDiv.scrollHeight;
+                        }
+                    })
+                    .catch(err => console.warn('Failed to load existing output:', err));
+            }
+            else if (data.type === 'keepalive') {
+                // Just keep the connection alive
+            }
+            else if (data.type === 'error') {
+                outputDiv.innerHTML = `<div class="text-red-400">❌ Streaming error: ${data.message}</div>`;
+                stopTaskStreaming(jobUuid, taskOrder);
+            }
+        } catch (e) {
+            console.error('Error parsing SSE data:', e);
+        }
+    };
+    
+    eventSource.onerror = function(event) {
+        console.error('SSE error:', event);
+        outputDiv.innerHTML = '<div class="text-red-400">❌ Connection lost. Refresh page to reconnect.</div>';
+        stopTaskStreaming(jobUuid, taskOrder);
+    };
+}
+
+function stopTaskStreaming(jobId, taskOrder) {
+    const streamKey = `${jobId}-${taskOrder}`;
+    const eventSource = taskStreams.get(streamKey);
+    
+    if (eventSource) {
+        console.log(`Stopping task streaming for job ${jobId}, task ${taskOrder}`);
+        eventSource.close();
+        taskStreams.delete(streamKey);
+    }
+}
+
+// Stop all streams when page unloads
+window.addEventListener('beforeunload', function() {
+    taskStreams.forEach(eventSource => {
+        eventSource.close();
+    });
+    taskStreams.clear();
+});
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
