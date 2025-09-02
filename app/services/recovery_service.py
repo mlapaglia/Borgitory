@@ -60,9 +60,11 @@ class RecoveryService:
                     logger.info("✅ No interrupted database job records found")
                     return
                 
+                print(f"🔥 RECOVERY: Processing {len(running_jobs)} interrupted database job records")
                 logger.info(f"🔍 Found {len(running_jobs)} interrupted database job records")
                 
                 for job in running_jobs:
+                    print(f"🔥 RECOVERY: Processing job {job.id} ({job.job_type}) - repository_id: {job.repository_id}")
                     logger.info(f"🔧 Cancelling database job record {job.id} ({job.job_type}) - was running since {job.started_at}")
                     
                     # Mark job as failed
@@ -84,10 +86,16 @@ class RecoveryService:
                     
                     # Release repository lock if this was a backup job
                     if job.job_type in ['manual_backup', 'scheduled_backup', 'backup'] and job.repository_id:
+                        print(f"🔥 RECOVERY: Looking up repository {job.repository_id} for job {job.id}")
                         repository = db.query(Repository).filter(Repository.id == job.repository_id).first()
                         if repository:
+                            print(f"🔥 RECOVERY: Found repository {repository.name}, releasing lock...")
                             logger.info(f"🔓 Releasing repository lock for: {repository.name}")
                             await self._release_repository_lock(repository)
+                        else:
+                            print(f"🔥 RECOVERY: Repository {job.repository_id} not found in database!")
+                    else:
+                        print(f"🔥 RECOVERY: Job {job.id} is not a backup job or has no repository_id")
                 
                 db.commit()
                 logger.info("✅ All interrupted database job records cancelled")
