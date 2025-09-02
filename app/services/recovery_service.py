@@ -102,6 +102,8 @@ class RecoveryService:
     async def _release_repository_lock(self, repository: Repository):
         """Use borg break-lock to release any stale locks on a repository"""
         try:
+            print(f"🔥 RECOVERY: Attempting to release lock on repository: {repository.name}")
+            print(f"🔥 RECOVERY: Repository path: {repository.path}")
             logger.info(f"🔓 Attempting to release lock on repository: {repository.name}")
             
             # Build borg break-lock command
@@ -111,6 +113,8 @@ class RecoveryService:
                 passphrase=repository.get_passphrase(),
                 additional_args=[]
             )
+            
+            print(f"🔥 RECOVERY: Break-lock command: {' '.join(command)}")
             
             # Execute the break-lock command with a timeout
             process = await asyncio.create_subprocess_exec(
@@ -123,18 +127,28 @@ class RecoveryService:
             try:
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
                 
+                stdout_text = stdout.decode() if stdout else "No stdout"
+                stderr_text = stderr.decode() if stderr else "No stderr"
+                
+                print(f"🔥 RECOVERY: Break-lock return code: {process.returncode}")
+                print(f"🔥 RECOVERY: Break-lock stdout: {stdout_text}")
+                print(f"🔥 RECOVERY: Break-lock stderr: {stderr_text}")
+                
                 if process.returncode == 0:
+                    print(f"🔥 RECOVERY: Successfully released lock on repository: {repository.name}")
                     logger.info(f"✅ Successfully released lock on repository: {repository.name}")
                 else:
                     # Log the error but don't fail - lock might not exist
-                    stderr_text = stderr.decode() if stderr else "No error details"
+                    print(f"🔥 RECOVERY: Break-lock returned {process.returncode} for {repository.name}: {stderr_text}")
                     logger.warning(f"⚠️  Break-lock returned {process.returncode} for {repository.name}: {stderr_text}")
                     
             except asyncio.TimeoutError:
+                print(f"🔥 RECOVERY: Break-lock timed out for repository: {repository.name}")
                 logger.warning(f"⚠️  Break-lock timed out for repository: {repository.name}")
                 process.kill()
                 
         except Exception as e:
+            print(f"🔥 RECOVERY: Error releasing lock for repository {repository.name}: {e}")
             logger.error(f"❌ Error releasing lock for repository {repository.name}: {e}")
     
 
