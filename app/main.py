@@ -9,6 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.models.database import init_db
 from app.api import repositories, jobs, auth, schedules, sync, cloud_backup
 from app.services.scheduler_service import scheduler_service
+from app.services.recovery_service import recovery_service
 
 # Configure logging to show container output
 logging.basicConfig(
@@ -25,6 +26,11 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Borgitory application...")
     await init_db()
     logger.info("Database initialized")
+    
+    # Recover any stale jobs from previous shutdown/crash
+    await recovery_service.recover_stale_jobs()
+    await recovery_service.recover_composite_jobs()
+    
     await scheduler_service.start()
     logger.info("Scheduler started")
     yield
