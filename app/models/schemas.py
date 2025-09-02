@@ -106,26 +106,51 @@ class BackupRequest(BaseModel):
 
 class CloudBackupConfigBase(BaseModel):
     name: str
-    provider: str = "s3"
-    region: Optional[str] = "us-east-1"
-    bucket_name: str
+    provider: str = "s3"  # "s3" or "sftp"
     path_prefix: Optional[str] = ""
+    
+    # S3-specific fields
+    region: Optional[str] = None
+    bucket_name: Optional[str] = None
     endpoint: Optional[str] = None
+    
+    # SFTP-specific fields
+    host: Optional[str] = None
+    port: Optional[int] = 22
+    username: Optional[str] = None
+    remote_path: Optional[str] = None
 
 
 class CloudBackupConfigCreate(CloudBackupConfigBase):
-    access_key: str
-    secret_key: str
+    # S3 credentials
+    access_key: Optional[str] = None
+    secret_key: Optional[str] = None
+    
+    # SFTP credentials
+    password: Optional[str] = None
+    private_key: Optional[str] = None
 
 
 class CloudBackupConfigUpdate(BaseModel):
     name: Optional[str] = None
+    provider: Optional[str] = None
+    path_prefix: Optional[str] = None
+    
+    # S3 fields
     region: Optional[str] = None
     bucket_name: Optional[str] = None
-    path_prefix: Optional[str] = None
     endpoint: Optional[str] = None
     access_key: Optional[str] = None
     secret_key: Optional[str] = None
+    
+    # SFTP fields
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    remote_path: Optional[str] = None
+    password: Optional[str] = None
+    private_key: Optional[str] = None
+    
     enabled: Optional[bool] = None
 
 

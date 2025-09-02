@@ -172,7 +172,6 @@ class CompositeJobManager:
                         
                 except Exception as e:
                     logger.error(f"❌ Exception in task {task.task_name}: {str(e)}")
-                    print(f"❌ COMPOSITE TASK: Exception in {task.task_name}: {str(e)}")
                     task.status = 'failed'
                     task.completed_at = datetime.now()
                     task.return_code = 1
@@ -183,7 +182,6 @@ class CompositeJobManager:
                     job.status = 'failed'
                     job.completed_at = datetime.now()
                     self._update_job_status(job_id, 'failed')
-                    print(f"❌ COMPOSITE JOB: Job {job_id} failed due to exception")
                     return
             
             # All tasks completed successfully
@@ -192,11 +190,9 @@ class CompositeJobManager:
             self._update_job_status(job_id, 'completed')
             
             logger.info(f"🎉 Composite job {job_id} completed successfully")
-            print(f"🎉 COMPOSITE JOB: Job {job_id} completed successfully with {len(job.tasks)} tasks")
             
         except Exception as e:
             logger.error(f"❌ Fatal error in composite job {job_id}: {str(e)}")
-            print(f"❌ COMPOSITE JOB: Fatal error in job {job_id}: {str(e)}")
             job.status = 'failed'
             job.completed_at = datetime.now()
             self._update_job_status(job_id, 'failed')
@@ -303,21 +299,49 @@ class CompositeJobManager:
                     task.status = 'skipped'
                     return True
                 
-                # Get credentials
-                access_key, secret_key = config.get_credentials()
+                # Handle different provider types
+                if config.provider == "s3":
+                    # Get S3 credentials
+                    access_key, secret_key = config.get_credentials()
+                    
+                    logger.info(f"☁️ Syncing to {config.name} (S3: {config.bucket_name})")
+                    
+                    # Use rclone service to sync to S3
+                    progress_generator = rclone_service.sync_repository_to_s3(
+                        repository=job.repository,
+                        access_key_id=access_key,
+                        secret_access_key=secret_key,
+                        bucket_name=config.bucket_name,
+                        region=config.region,
+                        path_prefix=config.path_prefix or "",
+                        endpoint=config.endpoint
+                    )
+                    
+                elif config.provider == "sftp":
+                    # Get SFTP credentials
+                    password, private_key = config.get_sftp_credentials()
+                    
+                    logger.info(f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})")
+                    
+                    # Use rclone service to sync to SFTP
+                    progress_generator = rclone_service.sync_repository_to_sftp(
+                        repository=job.repository,
+                        host=config.host,
+                        username=config.username,
+                        remote_path=config.remote_path,
+                        port=config.port or 22,
+                        password=password if password else None,
+                        private_key=private_key if private_key else None,
+                        path_prefix=config.path_prefix or ""
+                    )
+                    
+                else:
+                    logger.error(f"❌ Unsupported cloud backup provider: {config.provider}")
+                    task.error = f"Unsupported provider: {config.provider}"
+                    return False
                 
-                logger.info(f"☁️ Syncing to {config.name} ({config.bucket_name})")
-                
-                # Use rclone service to sync
-                async for progress in rclone_service.sync_repository_to_s3(
-                    repository=job.repository,
-                    access_key_id=access_key,
-                    secret_access_key=secret_key,
-                    bucket_name=config.bucket_name,
-                    region=config.region,
-                    path_prefix=config.path_prefix or "",
-                    endpoint=config.endpoint
-                ):
+                # Process progress from either S3 or SFTP sync
+                async for progress in progress_generator:
                     if progress.get("type") == "log":
                         log_line = f"[{progress['stream']}] {progress['message']}"
                         task.output_lines.append({

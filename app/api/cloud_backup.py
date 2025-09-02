@@ -35,18 +35,58 @@ async def create_cloud_backup_config(
             detail=f"Cloud backup configuration with name '{config.name}' already exists"
         )
     
-    # Create new config
+    # Create new config based on provider type
     db_config = CloudBackupConfig(
         name=config.name,
         provider=config.provider,
-        region=config.region,
-        bucket_name=config.bucket_name,
-        path_prefix=config.path_prefix or "",
-        endpoint=config.endpoint
+        path_prefix=config.path_prefix or ""
     )
     
-    # Set encrypted credentials
-    db_config.set_credentials(config.access_key, config.secret_key)
+    if config.provider == "s3":
+        # Set S3-specific fields
+        db_config.region = config.region
+        db_config.bucket_name = config.bucket_name
+        db_config.endpoint = config.endpoint
+        
+        # Validate S3 credentials are provided
+        if not config.access_key or not config.secret_key:
+            raise HTTPException(
+                status_code=400,
+                detail="S3 configurations require access_key and secret_key"
+            )
+        
+        # Set encrypted S3 credentials
+        db_config.set_credentials(config.access_key, config.secret_key)
+        
+    elif config.provider == "sftp":
+        # Set SFTP-specific fields
+        db_config.host = config.host
+        db_config.port = config.port or 22
+        db_config.username = config.username
+        db_config.remote_path = config.remote_path
+        
+        # Validate SFTP required fields
+        if not config.host or not config.username or not config.remote_path:
+            raise HTTPException(
+                status_code=400,
+                detail="SFTP configurations require host, username, and remote_path"
+            )
+        
+        # Validate at least password or private key is provided
+        if not config.password and not config.private_key:
+            raise HTTPException(
+                status_code=400,
+                detail="SFTP configurations require either password or private_key"
+            )
+        
+        # Set encrypted SFTP credentials
+        db_config.set_sftp_credentials(config.password, config.private_key)
+        
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported provider: {config.provider}. Supported providers: s3, sftp"
+        )
     
     db.add(db_config)
     db.commit()
@@ -79,7 +119,25 @@ def get_cloud_backup_configs_html(request: Request, db: Session = Depends(get_db
                 toggle_text = "Disable" if config.enabled else "Enable"
                 
                 path_prefix_html = f'<div><strong>Path Prefix:</strong> {config.path_prefix}</div>' if config.path_prefix else ''
-                endpoint_html = f'<div><strong>Endpoint:</strong> {config.endpoint}</div>' if config.endpoint else ''
+                
+                # Generate provider-specific details
+                if config.provider == "s3":
+                    provider_name = "AWS S3"
+                    provider_details = f'''
+                        <div><strong>Region:</strong> {config.region or "N/A"}</div>
+                        <div><strong>Bucket:</strong> {config.bucket_name}</div>
+                        {f'<div><strong>Endpoint:</strong> {config.endpoint}</div>' if config.endpoint else ''}
+                    '''
+                elif config.provider == "sftp":
+                    provider_name = "SFTP"
+                    provider_details = f'''
+                        <div><strong>Host:</strong> {config.host}:{config.port}</div>
+                        <div><strong>Username:</strong> {config.username}</div>
+                        <div><strong>Remote Path:</strong> {config.remote_path}</div>
+                    '''
+                else:
+                    provider_name = config.provider.upper()
+                    provider_details = '<div><strong>Configuration:</strong> Unknown provider</div>'
                 
                 html_content += f'''
                     <div class="border rounded-lg p-4 mb-3 bg-gray-50">
@@ -92,11 +150,9 @@ def get_cloud_backup_configs_html(request: Request, db: Session = Depends(get_db
                                     </span>
                                 </div>
                                 <div class="text-sm text-gray-600 space-y-1">
-                                    <div><strong>Provider:</strong> AWS S3</div>
-                                    <div><strong>Region:</strong> {config.region or "N/A"}</div>
-                                    <div><strong>Bucket:</strong> {config.bucket_name}</div>
+                                    <div><strong>Provider:</strong> {provider_name}</div>
+                                    {provider_details}
                                     {path_prefix_html}
-                                    {endpoint_html}
                                     <div class="text-xs text-gray-500">Created: {config.created_at.strftime("%Y-%m-%d %H:%M")}</div>
                                 </div>
                             </div>
@@ -186,13 +242,19 @@ async def update_cloud_backup_config(
     
     # Update fields
     for field, value in config_update.model_dump(exclude_unset=True).items():
-        if field in ["access_key", "secret_key"]:
+        if field in ["access_key", "secret_key", "password", "private_key"]:
             continue  # Handle credentials separately
         setattr(config, field, value)
     
-    # Update credentials if provided
-    if config_update.access_key and config_update.secret_key:
-        config.set_credentials(config_update.access_key, config_update.secret_key)
+    # Update credentials based on provider type
+    if config.provider == "s3":
+        # Update S3 credentials if provided
+        if config_update.access_key and config_update.secret_key:
+            config.set_credentials(config_update.access_key, config_update.secret_key)
+    elif config.provider == "sftp":
+        # Update SFTP credentials if provided
+        if config_update.password or config_update.private_key:
+            config.set_sftp_credentials(config_update.password, config_update.private_key)
     
     config.updated_at = datetime.utcnow()
     db.commit()
@@ -227,17 +289,37 @@ async def test_cloud_backup_config(config_id: int, db: Session = Depends(get_db)
     if not config:
         raise HTTPException(status_code=404, detail="Cloud backup configuration not found")
     
-    # Get credentials
-    access_key, secret_key = config.get_credentials()
-    
-    # Test the connection
-    result = await rclone_service.test_s3_connection(
-        access_key_id=access_key,
-        secret_access_key=secret_key,
-        bucket_name=config.bucket_name,
-        region=config.region,
-        endpoint=config.endpoint
-    )
+    # Test the connection based on provider type
+    if config.provider == "s3":
+        # Get S3 credentials
+        access_key, secret_key = config.get_credentials()
+        
+        result = await rclone_service.test_s3_connection(
+            access_key_id=access_key,
+            secret_access_key=secret_key,
+            bucket_name=config.bucket_name,
+            region=config.region,
+            endpoint=config.endpoint
+        )
+        
+    elif config.provider == "sftp":
+        # Get SFTP credentials
+        password, private_key = config.get_sftp_credentials()
+        
+        result = await rclone_service.test_sftp_connection(
+            host=config.host,
+            username=config.username,
+            remote_path=config.remote_path,
+            port=config.port or 22,
+            password=password if password else None,
+            private_key=private_key if private_key else None
+        )
+        
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported provider for testing: {config.provider}"
+        )
     
     if result["status"] == "success":
         return {

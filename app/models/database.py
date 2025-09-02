@@ -155,25 +155,58 @@ class CloudBackupConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
-    provider = Column(String, nullable=False)  # "s3", "azure", "gcp", etc.
+    provider = Column(String, nullable=False)  # "s3", "sftp", "azure", "gcp", etc.
+    
+    # S3-specific fields
     region = Column(String, nullable=True)
-    bucket_name = Column(String, nullable=False)
-    path_prefix = Column(String, default="", nullable=False)
+    bucket_name = Column(String, nullable=True)  # Made nullable for non-S3 providers
     endpoint = Column(String, nullable=True)
-    encrypted_access_key = Column(String, nullable=False)
-    encrypted_secret_key = Column(String, nullable=False)
+    encrypted_access_key = Column(String, nullable=True)  # Made nullable for non-S3 providers
+    encrypted_secret_key = Column(String, nullable=True)  # Made nullable for non-S3 providers
+    
+    # SFTP-specific fields
+    host = Column(String, nullable=True)
+    port = Column(Integer, nullable=True, default=22)
+    username = Column(String, nullable=True)
+    encrypted_password = Column(String, nullable=True)
+    encrypted_private_key = Column(Text, nullable=True)  # SSH private key
+    remote_path = Column(String, nullable=True)  # Remote directory path
+    
+    # Common fields
+    path_prefix = Column(String, default="", nullable=False)
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     def set_credentials(self, access_key: str, secret_key: str):
+        """For S3 providers"""
         self.encrypted_access_key = cipher_suite.encrypt(access_key.encode()).decode()
         self.encrypted_secret_key = cipher_suite.encrypt(secret_key.encode()).decode()
     
     def get_credentials(self) -> tuple[str, str]:
+        """For S3 providers"""
         access_key = cipher_suite.decrypt(self.encrypted_access_key.encode()).decode()
         secret_key = cipher_suite.decrypt(self.encrypted_secret_key.encode()).decode()
         return access_key, secret_key
+    
+    def set_sftp_credentials(self, password: str = None, private_key: str = None):
+        """For SFTP providers"""
+        if password:
+            self.encrypted_password = cipher_suite.encrypt(password.encode()).decode()
+        if private_key:
+            self.encrypted_private_key = cipher_suite.encrypt(private_key.encode()).decode()
+    
+    def get_sftp_credentials(self) -> tuple[str, str]:
+        """For SFTP providers - returns (password, private_key)"""
+        password = ""
+        private_key = ""
+        
+        if self.encrypted_password:
+            password = cipher_suite.decrypt(self.encrypted_password.encode()).decode()
+        if self.encrypted_private_key:
+            private_key = cipher_suite.decrypt(self.encrypted_private_key.encode()).decode()
+            
+        return password, private_key
 
 
 async def init_db():
