@@ -22,84 +22,19 @@ class RecoveryService:
     
     async def recover_stale_jobs(self):
         """
-        Find jobs that were running when the app was shut down and clean them up.
+        Find composite jobs that were running when the app was shut down and clean them up.
         This should be called on application startup.
+        
+        Note: We only handle composite jobs since all backup operations now use the composite job system.
+        Legacy jobs (repository operations like scan, init) are not critical and will be cleaned up naturally.
         """
-        logger.info("🔧 Starting recovery: checking for jobs interrupted by shutdown...")
+        logger.info("🔧 Starting recovery: checking for composite jobs interrupted by shutdown...")
         
-        db = next(get_db())
-        try:
-            # Find jobs that are still marked as running
-            stale_jobs = self._find_stale_jobs(db)
-            
-            if not stale_jobs:
-                logger.info("✅ No interrupted jobs found - recovery complete")
-                return
-            
-            logger.info(f"🔍 Found {len(stale_jobs)} interrupted jobs - cancelling and releasing locks")
-            
-            # Process each stale job - cancel them and release repository locks
-            for job in stale_jobs:
-                await self._recover_job(job, db)
-            
-            logger.info("✅ All interrupted jobs cancelled and repository locks released")
-            
-        except Exception as e:
-            logger.error(f"❌ Error during recovery process: {e}")
-        finally:
-            db.close()
+        # Only recover composite jobs - they handle actual backup operations
+        await self.recover_composite_jobs()
+        
+        logger.info("✅ Recovery complete - all interrupted backup jobs cancelled and locks released")
     
-    def _find_stale_jobs(self, db: Session) -> List[Job]:
-        """Find jobs that are marked as running but likely stale"""
-        
-        # Consider jobs stale if they've been running for more than this duration
-        # without any updates (assuming app was restarted)
-        stale_threshold = datetime.now() - timedelta(minutes=5)
-        
-        stale_jobs = db.query(Job).filter(
-            Job.status == 'running',
-            Job.started_at < stale_threshold  # Been running for a while
-        ).all()
-        
-        logger.info(f"🔍 Checking for jobs running longer than {stale_threshold}")
-        
-        return stale_jobs
-    
-    async def _recover_job(self, job: Job, db: Session):
-        """Recover a single stale job - release locks and mark as failed"""
-        try:
-            logger.info(f"🔧 Cancelling stale job {job.id} ({job.job_type}) - was running since {job.started_at}")
-            
-            # If this was a backup job, try to release any repository locks
-            if job.job_type in ['backup', 'manual_backup', 'scheduled_backup']:
-                repository = db.query(Repository).filter(Repository.id == job.repository_id).first()
-                if repository:
-                    logger.info(f"🔓 Releasing repository lock for: {repository.name}")
-                    await self._release_repository_lock(repository)
-            
-            # Mark the job as failed (cancelled due to app restart)
-            job.status = 'failed'
-            job.completed_at = datetime.now()
-            job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {job.started_at})"
-            
-            # Also mark any associated tasks as failed
-            from app.models.database import JobTask
-            db_tasks = db.query(JobTask).filter(JobTask.job_id == job.id).all()
-            if db_tasks:
-                logger.info(f"  🔧 Found {len(db_tasks)} tasks to cancel for job {job.id}")
-                for db_task in db_tasks:
-                    if db_task.status in ['pending', 'running', 'in_progress']:
-                        db_task.status = 'failed'
-                        db_task.completed_at = datetime.now()
-                        db_task.error = "Task cancelled on startup - job was interrupted by application shutdown"
-                        logger.info(f"    ✅ Task '{db_task.task_name}' marked as failed")
-            
-            db.commit()
-            logger.info(f"✅ Job {job.id} cancelled and marked as failed")
-            
-        except Exception as e:
-            logger.error(f"❌ Error recovering job {job.id}: {e}")
-            db.rollback()
     
     async def _release_repository_lock(self, repository: Repository):
         """Use borg break-lock to release any stale locks on a repository"""
@@ -152,14 +87,11 @@ class RecoveryService:
             
             # Get all jobs from the composite job manager
             stale_composite_jobs = []
-            current_time = datetime.now()
             
             for job_id, job_info in composite_job_manager.jobs.items():
                 if job_info.status == 'running':
-                    # Check if job has been running for more than reasonable time without progress
-                    time_running = current_time - job_info.started_at
-                    if time_running > timedelta(minutes=5):  # Adjust threshold as needed
-                        stale_composite_jobs.append((job_id, job_info))
+                    # Any running job is stale after app restart since all processes were killed
+                    stale_composite_jobs.append((job_id, job_info))
             
             if stale_composite_jobs:
                 logger.info(f"🔍 Found {len(stale_composite_jobs)} stale composite jobs")

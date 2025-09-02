@@ -27,9 +27,8 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
     
-    # Recover any stale jobs from previous shutdown/crash
+    # Recover any interrupted backup jobs from previous shutdown/crash
     await recovery_service.recover_stale_jobs()
-    await recovery_service.recover_composite_jobs()
     
     await scheduler_service.start()
     logger.info("Scheduler started")
