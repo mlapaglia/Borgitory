@@ -55,6 +55,7 @@ class ScheduleBase(BaseModel):
 
 class ScheduleCreate(ScheduleBase):
     repository_id: int
+    source_path: Optional[str] = "/data"
     cloud_backup_config_id: Optional[int] = None
     
     @field_validator('cloud_backup_config_id', mode='before')
@@ -70,6 +71,7 @@ class ScheduleCreate(ScheduleBase):
 class Schedule(ScheduleBase):
     id: int
     repository_id: int
+    source_path: str = "/data"
     enabled: bool
     last_run: Optional[datetime]
     next_run: Optional[datetime]

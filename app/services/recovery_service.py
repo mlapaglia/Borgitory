@@ -25,7 +25,7 @@ class RecoveryService:
         Find jobs that were running when the app was shut down and clean them up.
         This should be called on application startup.
         """
-        logger.info("🔧 Starting recovery process for stale backup jobs...")
+        logger.info("🔧 Starting recovery: checking for jobs interrupted by shutdown...")
         
         db = next(get_db())
         try:
@@ -33,16 +33,16 @@ class RecoveryService:
             stale_jobs = self._find_stale_jobs(db)
             
             if not stale_jobs:
-                logger.info("✅ No stale jobs found - recovery complete")
+                logger.info("✅ No interrupted jobs found - recovery complete")
                 return
             
-            logger.info(f"🔍 Found {len(stale_jobs)} stale jobs to recover")
+            logger.info(f"🔍 Found {len(stale_jobs)} interrupted jobs - cancelling and releasing locks")
             
-            # Process each stale job
+            # Process each stale job - cancel them and release repository locks
             for job in stale_jobs:
                 await self._recover_job(job, db)
             
-            logger.info("✅ Recovery process completed")
+            logger.info("✅ All interrupted jobs cancelled and repository locks released")
             
         except Exception as e:
             logger.error(f"❌ Error during recovery process: {e}")
@@ -66,23 +66,24 @@ class RecoveryService:
         return stale_jobs
     
     async def _recover_job(self, job: Job, db: Session):
-        """Recover a single stale job"""
+        """Recover a single stale job - release locks and mark as failed"""
         try:
-            logger.info(f"🔧 Recovering job {job.id}: {job.job_type}")
+            logger.info(f"🔧 Cancelling stale job {job.id} ({job.job_type}) - was running since {job.started_at}")
             
             # If this was a backup job, try to release any repository locks
             if job.job_type in ['backup', 'manual_backup', 'scheduled_backup']:
                 repository = db.query(Repository).filter(Repository.id == job.repository_id).first()
                 if repository:
+                    logger.info(f"🔓 Releasing repository lock for: {repository.name}")
                     await self._release_repository_lock(repository)
             
-            # Mark the job as failed with recovery information
+            # Mark the job as failed (cancelled due to app restart)
             job.status = 'failed'
             job.completed_at = datetime.now()
-            job.error = f"Job recovered on startup - was running when application shut down (started: {job.started_at})"
+            job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {job.started_at})"
             
             db.commit()
-            logger.info(f"✅ Job {job.id} marked as failed and recovered")
+            logger.info(f"✅ Job {job.id} cancelled and marked as failed")
             
         except Exception as e:
             logger.error(f"❌ Error recovering job {job.id}: {e}")
@@ -154,13 +155,14 @@ class RecoveryService:
                 db = next(get_db())
                 try:
                     for job_id, job_info in stale_composite_jobs:
-                        logger.info(f"🔧 Recovering composite job {job_id}")
+                        logger.info(f"🔧 Cancelling stale composite job {job_id} - was running since {job_info.started_at}")
                         
                         # Release repository lock if it was a backup job
                         if job_info.repository:
+                            logger.info(f"🔓 Releasing repository lock for: {job_info.repository.name}")
                             await self._release_repository_lock(job_info.repository)
                         
-                        # Mark composite job as failed
+                        # Mark composite job as failed (cancelled due to app restart)
                         job_info.status = 'failed'
                         job_info.completed_at = datetime.now()
                         
@@ -169,7 +171,7 @@ class RecoveryService:
                         if db_job:
                             db_job.status = 'failed'
                             db_job.completed_at = datetime.now()
-                            db_job.error = f"Composite job recovered on startup - was running when application shut down"
+                            db_job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {db_job.started_at})"
                     
                     db.commit()
                     logger.info("✅ All stale composite jobs recovered")

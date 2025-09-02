@@ -53,11 +53,18 @@ async def execute_scheduled_backup(schedule_id: int):
             logger.info(f"🚀 SCHEDULER: Creating composite job for scheduled backup")
             logger.info(f"  - repository: {repository.name}")
             logger.info(f"  - schedule: {schedule.name}")
+            logger.info(f"  - source_path: {schedule.source_path}")
             logger.info(f"  - cloud_backup_config_id: {schedule.cloud_backup_config_id}")
             
             # Define the tasks for this composite job
             task_definitions = [
-                {'type': 'backup', 'name': f'Backup {repository.name}'}
+                {
+                    'type': 'backup', 
+                    'name': f'Backup {repository.name}',
+                    'source_path': schedule.source_path,
+                    'compression': 'zstd',  # Default compression for scheduled backups
+                    'dry_run': False
+                }
             ]
             
             # Add cloud sync task if cloud backup is configured

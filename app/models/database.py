@@ -95,6 +95,7 @@ class Schedule(Base):
     repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
     name = Column(String, nullable=False)
     cron_expression = Column(String, nullable=False)
+    source_path = Column(String, nullable=False, default="/data")
     enabled = Column(Boolean, default=True)
     last_run = Column(DateTime, nullable=True)
     next_run = Column(DateTime, nullable=True)
@@ -218,6 +219,14 @@ async def init_db():
         # Create all tables (will create new tables only)
         Base.metadata.create_all(bind=engine)
         print("✅ Database tables created/verified")
+        
+        # Run migrations for schema updates
+        try:
+            from app.utils.migration_add_source_path import migrate_add_source_path
+            migrate_add_source_path()
+        except Exception as migration_error:
+            print(f"⚠️  Migration warning: {migration_error}")
+            # Don't fail startup for migration issues
 
     except Exception as e:
         print(f"❌ Database initialization error: {e}")
