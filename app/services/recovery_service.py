@@ -84,8 +84,8 @@ class RecoveryService:
                         task.error = "Task cancelled on startup - job was interrupted by application shutdown"
                         logger.info(f"  ✅ Task '{task.task_name}' marked as failed")
                     
-                    # Release repository lock if this was a backup job
-                    if job.job_type in ['manual_backup', 'scheduled_backup', 'backup'] and job.repository_id:
+                    # Release repository lock if this was a backup job (including composite jobs)
+                    if job.job_type in ['manual_backup', 'scheduled_backup', 'backup', 'composite'] and job.repository_id:
                         print(f"🔥 RECOVERY: Looking up repository {job.repository_id} for job {job.id}")
                         repository = db.query(Repository).filter(Repository.id == job.repository_id).first()
                         if repository:
