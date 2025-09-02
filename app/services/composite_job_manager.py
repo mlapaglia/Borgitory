@@ -24,6 +24,10 @@ class CompositeJobTaskInfo:
     output_lines: deque = field(default_factory=lambda: deque(maxlen=1000))
     error: Optional[str] = None
     return_code: Optional[int] = None
+    # Backup-specific parameters
+    source_path: Optional[str] = None
+    compression: Optional[str] = None
+    dry_run: Optional[bool] = None
 
 @dataclass
 class CompositeJobInfo:
@@ -107,7 +111,10 @@ class CompositeJobManager:
         for task_def in task_definitions:
             task_info = CompositeJobTaskInfo(
                 task_type=task_def['type'],
-                task_name=task_def['name']
+                task_name=task_def['name'],
+                source_path=task_def.get('source_path'),
+                compression=task_def.get('compression'),
+                dry_run=task_def.get('dry_run')
             )
             composite_job.tasks.append(task_info)
         
@@ -232,16 +239,26 @@ class CompositeJobManager:
             validate_compression(compression)
             validate_archive_name(archive_name)
             
+            # Get source path from task or default to /data
+            source_path = task.source_path or "/data"
+            compression_setting = task.compression or "zstd"
+            
+            logger.info(f"🔄 Backup settings - Source: {source_path}, Compression: {compression_setting}, Dry run: {task.dry_run}")
+            
             additional_args = [
-                "--compression", "none",  # No compression = slower processing
+                "--compression", compression_setting,
                 "--stats",
                 "--progress", 
                 "--json",
                 "--verbose",  # More verbose output
                 "--list",     # List files being processed
                 f"{job.repository.path}::{archive_name}",
-                "/data"
+                source_path
             ]
+            
+            # Add dry run flag if requested
+            if task.dry_run:
+                additional_args.insert(0, "--dry-run")
             
             command, env = build_secure_borg_command(
                 base_command="borg create",

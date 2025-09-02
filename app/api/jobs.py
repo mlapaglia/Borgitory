@@ -37,7 +37,13 @@ async def create_backup(
         
         # Define the tasks for this manual backup job
         task_definitions = [
-            {'type': 'backup', 'name': f'Backup {repository.name}'}
+            {
+                'type': 'backup', 
+                'name': f'Backup {repository.name}',
+                'source_path': backup_request.source_path,
+                'compression': backup_request.compression,
+                'dry_run': backup_request.dry_run
+            }
         ]
         
         # Add cloud sync task if cloud backup is configured
