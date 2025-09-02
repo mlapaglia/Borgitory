@@ -211,6 +211,14 @@ class CompositeJobManager:
             return await self._execute_backup_task(job, task, task_index)
         elif task.task_type == 'cloud_sync':
             return await self._execute_cloud_sync_task(job, task, task_index)
+        elif task.task_type == 'repo_scan':
+            return await self._execute_repo_scan_task(job, task, task_index)
+        elif task.task_type == 'repo_init':
+            return await self._execute_repo_init_task(job, task, task_index)
+        elif task.task_type == 'repo_list':
+            return await self._execute_repo_list_task(job, task, task_index)
+        elif task.task_type == 'repo_info':
+            return await self._execute_repo_info_task(job, task, task_index)
         else:
             logger.error(f"Unknown task type: {task.task_type}")
             return False

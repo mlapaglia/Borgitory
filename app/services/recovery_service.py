@@ -22,18 +22,78 @@ class RecoveryService:
     
     async def recover_stale_jobs(self):
         """
-        Find composite jobs that were running when the app was shut down and clean them up.
+        Find backup jobs that were running when the app was shut down and clean them up.
         This should be called on application startup.
         
-        Note: We only handle composite jobs since all backup operations now use the composite job system.
-        Legacy jobs (repository operations like scan, init) are not critical and will be cleaned up naturally.
+        All backup operations (manual and scheduled) use the composite job system.
+        Legacy jobs are only used for utility operations (scan, list archives, etc.) 
+        which don't need recovery - they can simply be re-run if needed.
         """
-        logger.info("🔧 Starting recovery: checking for composite jobs interrupted by shutdown...")
+        logger.info("🔧 Starting recovery: checking for interrupted jobs...")
         
-        # Only recover composite jobs - they handle actual backup operations
-        await self.recover_composite_jobs()
+        # Only need to check database Job records - in-memory composite jobs 
+        # are always empty on startup since they don't persist across restarts
+        await self.recover_database_job_records()
         
         logger.info("✅ Recovery complete - all interrupted backup jobs cancelled and locks released")
+    
+    async def recover_database_job_records(self):
+        """
+        Find database Job records that are marked as 'running' and mark them as failed.
+        This handles the case where the app restarted and composite jobs are cleared from memory,
+        but database records still show 'running' status.
+        """
+        try:
+            logger.info("🔧 Checking database for interrupted job records...")
+            
+            db = next(get_db())
+            try:
+                from app.models.database import Job, JobTask
+                
+                # Find all jobs in database marked as running
+                running_jobs = db.query(Job).filter(Job.status == 'running').all()
+                
+                if not running_jobs:
+                    logger.info("✅ No interrupted database job records found")
+                    return
+                
+                logger.info(f"🔍 Found {len(running_jobs)} interrupted database job records")
+                
+                for job in running_jobs:
+                    logger.info(f"🔧 Cancelling database job record {job.id} ({job.job_type}) - was running since {job.started_at}")
+                    
+                    # Mark job as failed
+                    job.status = 'failed'
+                    job.completed_at = datetime.now()
+                    job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {job.started_at})"
+                    
+                    # Mark all running tasks as failed
+                    running_tasks = db.query(JobTask).filter(
+                        JobTask.job_id == job.id,
+                        JobTask.status.in_(['pending', 'running', 'in_progress'])
+                    ).all()
+                    
+                    for task in running_tasks:
+                        task.status = 'failed'
+                        task.completed_at = datetime.now()
+                        task.error = "Task cancelled on startup - job was interrupted by application shutdown"
+                        logger.info(f"  ✅ Task '{task.task_name}' marked as failed")
+                    
+                    # Release repository lock if this was a backup job
+                    if job.job_type in ['manual_backup', 'scheduled_backup', 'backup'] and job.repository_id:
+                        repository = db.query(Repository).filter(Repository.id == job.repository_id).first()
+                        if repository:
+                            logger.info(f"🔓 Releasing repository lock for: {repository.name}")
+                            await self._release_repository_lock(repository)
+                
+                db.commit()
+                logger.info("✅ All interrupted database job records cancelled")
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"❌ Error recovering database job records: {e}")
     
     
     async def _release_repository_lock(self, repository: Repository):
@@ -74,76 +134,6 @@ class RecoveryService:
         except Exception as e:
             logger.error(f"❌ Error releasing lock for repository {repository.name}: {e}")
     
-    async def recover_composite_jobs(self):
-        """
-        Recover composite jobs that may be stuck in running state.
-        This handles the new composite job system.
-        """
-        try:
-            # Import here to avoid circular imports
-            from app.services.composite_job_manager import composite_job_manager
-            
-            logger.info("🔧 Checking for stale composite jobs...")
-            
-            # Get all jobs from the composite job manager
-            stale_composite_jobs = []
-            
-            for job_id, job_info in composite_job_manager.jobs.items():
-                if job_info.status == 'running':
-                    # Any running job is stale after app restart since all processes were killed
-                    stale_composite_jobs.append((job_id, job_info))
-            
-            if stale_composite_jobs:
-                logger.info(f"🔍 Found {len(stale_composite_jobs)} stale composite jobs")
-                
-                db = next(get_db())
-                try:
-                    for job_id, job_info in stale_composite_jobs:
-                        logger.info(f"🔧 Cancelling stale composite job {job_id} - was running since {job_info.started_at}")
-                        
-                        # Release repository lock if it was a backup job
-                        if job_info.repository:
-                            logger.info(f"🔓 Releasing repository lock for: {job_info.repository.name}")
-                            await self._release_repository_lock(job_info.repository)
-                        
-                        # Mark composite job as failed (cancelled due to app restart)
-                        job_info.status = 'failed'
-                        job_info.completed_at = datetime.now()
-                        
-                        # Mark all running tasks as failed too
-                        for task in job_info.tasks:
-                            if task.status in ['pending', 'in_progress', 'running']:
-                                task.status = 'failed'
-                                task.completed_at = datetime.now()
-                                task.error = "Task cancelled on startup - job was interrupted by application shutdown"
-                                logger.info(f"  ✅ Task '{task.task_name}' marked as failed")
-                        
-                        # Update database record
-                        db_job = db.query(Job).filter(Job.id == job_info.db_job_id).first()
-                        if db_job:
-                            db_job.status = 'failed'
-                            db_job.completed_at = datetime.now()
-                            db_job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {db_job.started_at})"
-                            
-                            # Also update database task records
-                            from app.models.database import JobTask
-                            db_tasks = db.query(JobTask).filter(JobTask.job_id == db_job.id).all()
-                            for db_task in db_tasks:
-                                if db_task.status in ['pending', 'running', 'in_progress']:
-                                    db_task.status = 'failed'
-                                    db_task.completed_at = datetime.now()
-                                    db_task.error = "Task cancelled on startup - job was interrupted by application shutdown"
-                    
-                    db.commit()
-                    logger.info("✅ All stale composite jobs recovered")
-                    
-                finally:
-                    db.close()
-            else:
-                logger.info("✅ No stale composite jobs found")
-                
-        except Exception as e:
-            logger.error(f"❌ Error recovering composite jobs: {e}")
 
 
 # Global instance
