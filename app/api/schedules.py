@@ -29,7 +29,7 @@ async def create_schedule(schedule: ScheduleCreate, db: Session = Depends(get_db
         cron_expression=schedule.cron_expression,
         source_path=schedule.source_path,
         enabled=True,
-        cloud_backup_config_id=schedule.cloud_backup_config_id,
+        cloud_sync_config_id=schedule.cloud_sync_config_id,
         cleanup_config_id=schedule.cleanup_config_id,
         notification_config_id=schedule.notification_config_id
     )

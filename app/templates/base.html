@@ -47,10 +47,14 @@
     <script src="/static/js/components/repositories.js"></script>
     <script src="/static/js/components/backups.js"></script>
     <script src="/static/js/components/schedules.js"></script>
-    <script src="/static/js/components/cloud-backup.js"></script>
+    <script src="/static/js/components/cloud-sync.js"></script>
     <script src="/static/js/components/archives.js"></script>
     <script src="/static/js/components/notifications.js"></script>
     <script src="/static/js/components/cleanup.js"></script>
+    <script src="/static/js/components/jobs.js"></script>
+    <script src="/static/js/components/path-autocomplete.js"></script>
+    <script src="/static/js/components/archive-browser.js"></script>
+    <script src="/static/js/components/debug.js"></script>
 
     <script>
         // Logout function (specific to base template)
@@ -83,5 +87,8 @@
             }
         });
     </script>
+
+    <!-- Archive Contents Modal -->
+    {% include 'partials/archives/contents_modal.html' %}
 </body>
 </html>

@@ -5,12 +5,12 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
-from app.models.database import CloudBackupConfig, get_db
+from app.models.database import CloudSyncConfig, get_db
 from app.models.schemas import (
-    CloudBackupConfigCreate,
-    CloudBackupConfigUpdate,
-    CloudBackupConfig as CloudBackupConfigSchema,
-    CloudBackupTestRequest
+    CloudSyncConfigCreate,
+    CloudSyncConfigUpdate,
+    CloudSyncConfig as CloudSyncConfigSchema,
+    CloudSyncTestRequest
 )
 from app.services.rclone_service import rclone_service
 
@@ -18,25 +18,25 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.post("/", response_model=CloudBackupConfigSchema)
-async def create_cloud_backup_config(
-    config: CloudBackupConfigCreate,
+@router.post("/", response_model=CloudSyncConfigSchema)
+async def create_cloud_sync_config(
+    config: CloudSyncConfigCreate,
     db: Session = Depends(get_db)
 ):
-    """Create a new cloud backup configuration"""
+    """Create a new cloud sync configuration"""
     # Check if name already exists
-    existing = db.query(CloudBackupConfig).filter(
-        CloudBackupConfig.name == config.name
+    existing = db.query(CloudSyncConfig).filter(
+        CloudSyncConfig.name == config.name
     ).first()
     
     if existing:
         raise HTTPException(
             status_code=400, 
-            detail=f"Cloud backup configuration with name '{config.name}' already exists"
+            detail=f"Cloud sync configuration with name '{config.name}' already exists"
         )
     
     # Create new config based on provider type
-    db_config = CloudBackupConfig(
+    db_config = CloudSyncConfig(
         name=config.name,
         provider=config.provider,
         path_prefix=config.path_prefix or ""
@@ -96,18 +96,18 @@ async def create_cloud_backup_config(
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_cloud_backup_configs_html(request: Request, db: Session = Depends(get_db)):
-    """Get cloud backup configurations as HTML"""
+def get_cloud_sync_configs_html(request: Request, db: Session = Depends(get_db)):
+    """Get cloud sync configurations as HTML"""
     try:
-        configs = db.query(CloudBackupConfig).order_by(CloudBackupConfig.created_at.desc()).all()
+        configs = db.query(CloudSyncConfig).order_by(CloudSyncConfig.created_at.desc()).all()
         
         html_content = ""
         
         if not configs:
             html_content = '''
                 <div class="text-gray-500 text-sm py-4 text-center">
-                    <p>No cloud backup locations configured.</p>
-                    <p class="mt-1">Add one using the form above to automatically backup your repositories to the cloud after each Borg backup.</p>
+                    <p>No cloud sync locations configured.</p>
+                    <p class="mt-1">Add one using the form above to automatically sync your repositories to the cloud after each backup.</p>
                 </div>
             '''
         else:
@@ -154,19 +154,19 @@ def get_cloud_backup_configs_html(request: Request, db: Session = Depends(get_db
                             </div>
                             <div class="flex flex-col space-y-2 ml-4">
                                 <button 
-                                    onclick="testCloudBackupConnection({config.id}, this)"
+                                    onclick="testCloudSyncConnection({config.id}, this)"
                                     class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
                                 >
                                     Test
                                 </button>
                                 <button 
-                                    onclick="toggleCloudBackupConfig({config.id}, {str(config.enabled).lower()}, this)"
+                                    onclick="toggleCloudSyncConfig({config.id}, {str(config.enabled).lower()}, this)"
                                     class="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 focus:ring-2 focus:ring-gray-500"
                                 >
                                     {toggle_text}
                                 </button>
                                 <button 
-                                    onclick="deleteCloudBackupConfig({config.id}, '{config.name}', this)"
+                                    onclick="deleteCloudSyncConfig({config.id}, '{config.name}', this)"
                                     class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500"
                                 >
                                     Delete
@@ -182,58 +182,58 @@ def get_cloud_backup_configs_html(request: Request, db: Session = Depends(get_db
         # If there's a database error (like table doesn't exist), return a helpful message
         error_html = '''
             <div class="text-gray-500 text-sm py-4 text-center">
-                <p>Cloud backup feature is initializing...</p>
+                <p>Cloud sync feature is initializing...</p>
                 <p class="mt-1 text-xs">If this persists, try restarting the application.</p>
             </div>
         '''
         return HTMLResponse(content=error_html)
 
 
-@router.get("/", response_model=List[CloudBackupConfigSchema])
-def list_cloud_backup_configs(db: Session = Depends(get_db)):
-    """List all cloud backup configurations"""
-    configs = db.query(CloudBackupConfig).all()
+@router.get("/", response_model=List[CloudSyncConfigSchema])
+def list_cloud_sync_configs(db: Session = Depends(get_db)):
+    """List all cloud sync configurations"""
+    configs = db.query(CloudSyncConfig).all()
     return configs
 
 
-@router.get("/{config_id}", response_model=CloudBackupConfigSchema)
-def get_cloud_backup_config(config_id: int, db: Session = Depends(get_db)):
-    """Get a specific cloud backup configuration"""
-    config = db.query(CloudBackupConfig).filter(
-        CloudBackupConfig.id == config_id
+@router.get("/{config_id}", response_model=CloudSyncConfigSchema)
+def get_cloud_sync_config(config_id: int, db: Session = Depends(get_db)):
+    """Get a specific cloud sync configuration"""
+    config = db.query(CloudSyncConfig).filter(
+        CloudSyncConfig.id == config_id
     ).first()
     
     if not config:
-        raise HTTPException(status_code=404, detail="Cloud backup configuration not found")
+        raise HTTPException(status_code=404, detail="Cloud sync configuration not found")
     
     return config
 
 
-@router.put("/{config_id}", response_model=CloudBackupConfigSchema)
-async def update_cloud_backup_config(
+@router.put("/{config_id}", response_model=CloudSyncConfigSchema)
+async def update_cloud_sync_config(
     config_id: int,
-    config_update: CloudBackupConfigUpdate,
+    config_update: CloudSyncConfigUpdate,
     db: Session = Depends(get_db)
 ):
-    """Update a cloud backup configuration"""
-    config = db.query(CloudBackupConfig).filter(
-        CloudBackupConfig.id == config_id
+    """Update a cloud sync configuration"""
+    config = db.query(CloudSyncConfig).filter(
+        CloudSyncConfig.id == config_id
     ).first()
     
     if not config:
-        raise HTTPException(status_code=404, detail="Cloud backup configuration not found")
+        raise HTTPException(status_code=404, detail="Cloud sync configuration not found")
     
     # Check if name is being changed and if it conflicts
     if config_update.name and config_update.name != config.name:
-        existing = db.query(CloudBackupConfig).filter(
-            CloudBackupConfig.name == config_update.name,
-            CloudBackupConfig.id != config_id
+        existing = db.query(CloudSyncConfig).filter(
+            CloudSyncConfig.name == config_update.name,
+            CloudSyncConfig.id != config_id
         ).first()
         
         if existing:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Cloud backup configuration with name '{config_update.name}' already exists"
+                detail=f"Cloud sync configuration with name '{config_update.name}' already exists"
             )
     
     # Update fields
@@ -260,30 +260,30 @@ async def update_cloud_backup_config(
 
 
 @router.delete("/{config_id}")
-def delete_cloud_backup_config(config_id: int, db: Session = Depends(get_db)):
-    """Delete a cloud backup configuration"""
-    config = db.query(CloudBackupConfig).filter(
-        CloudBackupConfig.id == config_id
+def delete_cloud_sync_config(config_id: int, db: Session = Depends(get_db)):
+    """Delete a cloud sync configuration"""
+    config = db.query(CloudSyncConfig).filter(
+        CloudSyncConfig.id == config_id
     ).first()
     
     if not config:
-        raise HTTPException(status_code=404, detail="Cloud backup configuration not found")
+        raise HTTPException(status_code=404, detail="Cloud sync configuration not found")
     
     db.delete(config)
     db.commit()
     
-    return {"message": f"Cloud backup configuration '{config.name}' deleted successfully"}
+    return {"message": f"Cloud sync configuration '{config.name}' deleted successfully"}
 
 
 @router.post("/{config_id}/test")
-async def test_cloud_backup_config(config_id: int, db: Session = Depends(get_db)):
-    """Test a cloud backup configuration"""
-    config = db.query(CloudBackupConfig).filter(
-        CloudBackupConfig.id == config_id
+async def test_cloud_sync_config(config_id: int, db: Session = Depends(get_db)):
+    """Test a cloud sync configuration"""
+    config = db.query(CloudSyncConfig).filter(
+        CloudSyncConfig.id == config_id
     ).first()
     
     if not config:
-        raise HTTPException(status_code=404, detail="Cloud backup configuration not found")
+        raise HTTPException(status_code=404, detail="Cloud sync configuration not found")
     
     # Test the connection based on provider type
     if config.provider == "s3":
@@ -337,34 +337,34 @@ async def test_cloud_backup_config(config_id: int, db: Session = Depends(get_db)
 
 
 @router.post("/{config_id}/enable")
-def enable_cloud_backup_config(config_id: int, db: Session = Depends(get_db)):
-    """Enable a cloud backup configuration"""
-    config = db.query(CloudBackupConfig).filter(
-        CloudBackupConfig.id == config_id
+def enable_cloud_sync_config(config_id: int, db: Session = Depends(get_db)):
+    """Enable a cloud sync configuration"""
+    config = db.query(CloudSyncConfig).filter(
+        CloudSyncConfig.id == config_id
     ).first()
     
     if not config:
-        raise HTTPException(status_code=404, detail="Cloud backup configuration not found")
+        raise HTTPException(status_code=404, detail="Cloud sync configuration not found")
     
     config.enabled = True
     config.updated_at = datetime.utcnow()
     db.commit()
     
-    return {"message": f"Cloud backup configuration '{config.name}' enabled"}
+    return {"message": f"Cloud sync configuration '{config.name}' enabled"}
 
 
 @router.post("/{config_id}/disable")
-def disable_cloud_backup_config(config_id: int, db: Session = Depends(get_db)):
-    """Disable a cloud backup configuration"""
-    config = db.query(CloudBackupConfig).filter(
-        CloudBackupConfig.id == config_id
+def disable_cloud_sync_config(config_id: int, db: Session = Depends(get_db)):
+    """Disable a cloud sync configuration"""
+    config = db.query(CloudSyncConfig).filter(
+        CloudSyncConfig.id == config_id
     ).first()
     
     if not config:
-        raise HTTPException(status_code=404, detail="Cloud backup configuration not found")
+        raise HTTPException(status_code=404, detail="Cloud sync configuration not found")
     
     config.enabled = False
     config.updated_at = datetime.utcnow()
     db.commit()
     
-    return {"message": f"Cloud backup configuration '{config.name}' disabled"}
+    return {"message": f"Cloud sync configuration '{config.name}' disabled"}

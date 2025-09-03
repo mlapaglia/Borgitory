@@ -1,4 +1,4 @@
-// Cloud Backup Provider Field Toggle
+// Cloud Sync Provider Field Toggle
 function toggleProviderFields() {
     const provider = document.getElementById('provider-select').value;
     const s3Fields = document.getElementById('s3-fields');
@@ -16,30 +16,30 @@ function toggleProviderFields() {
     }
 }
 
-// Handle cloud backup form response
-function handleCloudBackupResponse(event) {
+// Handle cloud sync form response
+function handleCloudSyncResponse(event) {
     const xhr = event.detail.xhr;
     const form = event.target;
-    const statusDiv = document.getElementById('cloud-backup-status');
+    const statusDiv = document.getElementById('cloud-sync-status');
     
     if (xhr.status >= 200 && xhr.status < 300) {
         // Success
-        showNotification('Cloud backup location added successfully!', 'success');
+        showNotification('Cloud sync location added successfully!', 'success');
         form.reset();
         // Reset provider selection to S3 and update fields
         document.getElementById('provider-select').value = 's3';
         toggleProviderFields();
         statusDiv.innerHTML = `
             <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-                <span class="text-green-700 text-sm">Cloud backup location configured successfully!</span>
+                <span class="text-green-700 text-sm">Cloud sync location configured successfully!</span>
             </div>
         `;
         
-        // Trigger HTMX refresh for cloud backup list
-        document.body.dispatchEvent(new CustomEvent('cloudBackupUpdate'));
+        // Trigger HTMX refresh for cloud sync list
+        document.body.dispatchEvent(new CustomEvent('cloudSyncUpdate'));
     } else {
         // Error
-        let errorMessage = 'Failed to add cloud backup location';
+        let errorMessage = 'Failed to add cloud sync location';
         try {
             const errorData = JSON.parse(xhr.response);
             if (errorData.detail) {
@@ -59,14 +59,14 @@ function handleCloudBackupResponse(event) {
     }
 }
 
-// Test cloud backup connection
-async function testCloudBackupConnection(configId, buttonElement) {
+// Test cloud sync connection
+async function testCloudSyncConnection(configId, buttonElement) {
     const originalText = buttonElement.textContent;
     buttonElement.disabled = true;
     buttonElement.textContent = 'Testing...';
     
     try {
-        const response = await fetch(`/api/cloud-backup/${configId}/test`, {
+        const response = await fetch(`/api/cloud-sync/${configId}/test`, {
             method: 'POST'
         });
         
@@ -96,36 +96,36 @@ async function testCloudBackupConnection(configId, buttonElement) {
     }
 }
 
-// Toggle cloud backup configuration
-async function toggleCloudBackupConfig(configId, enabled, buttonElement) {
+// Toggle cloud sync configuration
+async function toggleCloudSyncConfig(configId, enabled, buttonElement) {
     const action = enabled ? 'disable' : 'enable';
     const originalText = buttonElement.textContent;
     buttonElement.disabled = true;
     buttonElement.textContent = enabled ? 'Disabling...' : 'Enabling...';
     
     try {
-        const response = await fetch(`/api/cloud-backup/${configId}/${action}`, {
+        const response = await fetch(`/api/cloud-sync/${configId}/${action}`, {
             method: 'POST'
         });
         
         if (response.ok) {
-            showNotification(`Cloud backup ${action}d successfully!`, 'success');
-            document.body.dispatchEvent(new CustomEvent('cloudBackupUpdate'));
+            showNotification(`Cloud sync ${action}d successfully!`, 'success');
+            document.body.dispatchEvent(new CustomEvent('cloudSyncUpdate'));
         } else {
             const error = await response.json();
-            showNotification(`Failed to ${action} cloud backup: ${error.detail}`, 'error');
+            showNotification(`Failed to ${action} cloud sync: ${error.detail}`, 'error');
         }
     } catch (error) {
-        showNotification(`Failed to ${action} cloud backup: ${error.message}`, 'error');
+        showNotification(`Failed to ${action} cloud sync: ${error.message}`, 'error');
     } finally {
         buttonElement.disabled = false;
         buttonElement.textContent = originalText;
     }
 }
 
-// Delete cloud backup configuration
-async function deleteCloudBackupConfig(configId, configName, buttonElement) {
-    if (!confirm(`Are you sure you want to delete the cloud backup configuration "${configName}"?`)) {
+// Delete cloud sync configuration
+async function deleteCloudSyncConfig(configId, configName, buttonElement) {
+    if (!confirm(`Are you sure you want to delete the cloud sync configuration "${configName}"?`)) {
         return;
     }
     
@@ -134,19 +134,19 @@ async function deleteCloudBackupConfig(configId, configName, buttonElement) {
     buttonElement.textContent = 'Deleting...';
     
     try {
-        const response = await fetch(`/api/cloud-backup/${configId}`, {
+        const response = await fetch(`/api/cloud-sync/${configId}`, {
             method: 'DELETE'
         });
         
         if (response.ok) {
-            showNotification('Cloud backup configuration deleted successfully!', 'success');
-            document.body.dispatchEvent(new CustomEvent('cloudBackupUpdate'));
+            showNotification('Cloud sync configuration deleted successfully!', 'success');
+            document.body.dispatchEvent(new CustomEvent('cloudSyncUpdate'));
         } else {
             const error = await response.json();
-            showNotification(`Failed to delete cloud backup configuration: ${error.detail}`, 'error');
+            showNotification(`Failed to delete cloud sync configuration: ${error.detail}`, 'error');
         }
     } catch (error) {
-        showNotification(`Failed to delete cloud backup configuration: ${error.message}`, 'error');
+        showNotification(`Failed to delete cloud sync configuration: ${error.message}`, 'error');
     } finally {
         buttonElement.disabled = false;
         buttonElement.textContent = originalText;

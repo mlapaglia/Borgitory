@@ -21,6 +21,8 @@ function switchTab(tabName) {
     // Handle tab-specific initialization
     if (tabName === 'archives') {
         populateArchiveRepositorySelect();
+    } else if (tabName === 'debug') {
+        loadDebugInfo();
     }
 }
 

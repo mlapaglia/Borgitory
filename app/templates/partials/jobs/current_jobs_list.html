@@ -1,0 +1,10 @@
+{# Template for current jobs list #}
+{% if current_jobs %}
+    <div class="space-y-3">
+        {% for job in current_jobs %}
+            {% include 'partials/jobs/current_job_item.html' %}
+        {% endfor %}
+    </div>
+{% else %}
+    {% include 'partials/jobs/empty_state.html' %}
+{% endif %}

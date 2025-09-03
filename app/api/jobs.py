@@ -80,7 +80,7 @@ async def create_backup(
                 task_definitions.append(prune_task)
         
         # Add cloud sync task if cloud backup is configured
-        if backup_request.cloud_backup_config_id:
+        if backup_request.cloud_sync_config_id:
             task_definitions.append({
                 'type': 'cloud_sync', 
                 'name': f'Sync to Cloud'
@@ -92,7 +92,7 @@ async def create_backup(
             task_definitions=task_definitions,
             repository=repository,
             schedule=None,  # No schedule for manual backups
-            cloud_backup_config_id=backup_request.cloud_backup_config_id
+            cloud_sync_config_id=backup_request.cloud_sync_config_id
         )
         
         return {"job_id": job_id, "status": "started"}
@@ -285,11 +285,10 @@ def get_jobs_html(request: Request, expand: str = None, db: Session = Depends(ge
         html_content = ""
         
         if not db_jobs:
-            html_content = '''
-                <div class="text-gray-500 text-center py-8">
-                    <p>No job history available.</p>
-                </div>
-            '''
+            html_content = templates.get_template("partials/jobs/empty_state.html").render(
+                message="No job history available.",
+                padding="8"
+            )
         else:
             html_content = '<div class="space-y-3">'
             
@@ -303,7 +302,10 @@ def get_jobs_html(request: Request, expand: str = None, db: Session = Depends(ge
         
     except Exception as e:
         logger.error(f"Error generating jobs HTML: {e}")
-        return f'<div class="text-red-500">Error loading jobs: {str(e)}</div>'
+        return templates.get_template("partials/jobs/error_state.html").render(
+            message=f"Error loading jobs: {str(e)}",
+            padding="4"
+        )
 
 
 def render_job_html(job, expand_details=False):
@@ -337,190 +339,22 @@ def render_job_html(job, expand_details=False):
         progress_text = f"({job.completed_tasks}/{job.total_tasks} tasks)"
         job_title += f" {progress_text}"
     
-    html = f'''
-        <div class="border rounded-lg bg-white">
-            <div class="p-4 hover:bg-gray-50 cursor-pointer" onclick="toggleJobDetails({job.id})">
-                <div class="flex items-center justify-between">
-                    <div class="flex-1">
-                        <div class="flex items-center space-x-3">
-                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {status_class}">
-                                {status_icon} {job.status.title()}
-                            </span>
-                            <span class="text-sm font-medium text-gray-900">
-                                {job_title}
-                            </span>
-                        </div>
-                        <div class="mt-2 text-xs text-gray-500 space-x-4">
-                            <span>Started: {started_at}</span>
-                            {f'<span>Finished: {finished_at}</span>' if job.finished_at else ''}
-                            {f'<span class="text-red-600">Error: {job.error}</span>' if job.error else ''}
-                        </div>
-                    </div>
-                    <div class="flex-shrink-0 flex items-center space-x-2">
-                        <span class="text-sm text-gray-500">#{job.id}</span>
-                        <svg id="chevron-{job.id}" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="{'transform: rotate(180deg);' if expand_details else ''}">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            <div id="job-details-{job.id}" class="{'border-t bg-gray-50 p-4' if expand_details else 'hidden border-t bg-gray-50 p-4'}">
-                <div class="space-y-3">
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <span class="font-medium text-gray-700">Type:</span>
-                            <span class="ml-2 text-gray-900">{job.type}</span>
-                        </div>
-                        <div>
-                            <span class="font-medium text-gray-700">Repository:</span>
-                            <span class="ml-2 text-gray-900">{repository_name}</span>
-                        </div>
-                        <div>
-                            <span class="font-medium text-gray-700">Started:</span>
-                            <span class="ml-2 text-gray-900">{started_at}</span>
-                        </div>
-                        <div>
-                            <span class="font-medium text-gray-700">Finished:</span>
-                            <span class="ml-2 text-gray-900">{finished_at if job.finished_at else "N/A"}</span>
-                        </div>
-                    </div>
-    '''
+    # Sort tasks by order if composite
+    sorted_tasks = sorted(job.tasks, key=lambda t: t.task_order) if is_composite else []
     
-    if is_composite:
-        # Render composite job with tasks
-        html += f'''
-                    <div class="mt-4">
-                        <h4 class="text-sm font-medium text-gray-900 mb-3">Tasks:</h4>
-                        <div class="space-y-2">
-        '''
-        
-        # Sort tasks by order
-        sorted_tasks = sorted(job.tasks, key=lambda t: t.task_order)
-        
-        for task in sorted_tasks:
-            # Task status styling
-            if task.status == "completed":
-                task_status_class = "bg-green-100 text-green-800"
-                task_status_icon = "✓"
-            elif task.status == "failed":
-                task_status_class = "bg-red-100 text-red-800"
-                task_status_icon = "✗"
-            elif task.status == "running":
-                task_status_class = "bg-blue-100 text-blue-800"
-                task_status_icon = "⟳"
-            elif task.status == "skipped":
-                task_status_class = "bg-yellow-100 text-yellow-800"
-                task_status_icon = "⤴"
-            else:
-                task_status_class = "bg-gray-100 text-gray-800"
-                task_status_icon = "◦"
-            
-            # Task timing
-            task_started = task.started_at.strftime("%H:%M:%S") if task.started_at else "N/A"
-            task_finished = task.completed_at.strftime("%H:%M:%S") if task.completed_at else "N/A"
-            
-            # Task duration
-            task_duration = ""
-            if task.started_at and task.completed_at:
-                duration = task.completed_at - task.started_at
-                task_duration = f"({duration.total_seconds():.1f}s)"
-            
-            html += f'''
-                            <div class="border rounded p-3 bg-white">
-                                <div class="flex items-center justify-between cursor-pointer" onclick="toggleTaskDetails({job.id}, {task.task_order})">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {task_status_class}">
-                                            {task_status_icon} {task.status.title()}
-                                        </span>
-                                        <span class="text-sm font-medium text-gray-900">{task.task_name}</span>
-                                        <span class="text-xs text-gray-500">{task_duration}</span>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-xs text-gray-500">{task_started} - {task_finished}</span>
-                                        <svg id="task-chevron-{job.id}-{task.task_order}" class="w-3 h-3 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                        </svg>
-                                    </div>
-                                </div>
-            '''
-            
-            # Task output section
-            if task.output and task.output.strip():
-                escaped_output = task.output.strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                html += f'''
-                                <div id="task-details-{job.id}-{task.task_order}" class="hidden mt-3 pt-3 border-t">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <h5 class="text-xs font-medium text-gray-700">Output:</h5>
-                                        <button onclick="copyTaskOutput({job.id}, {task.task_order})" class="text-xs text-blue-600 hover:text-blue-800">Copy</button>
-                                    </div>
-                                    <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto" id="task-output-{job.id}-{task.task_order}">{escaped_output}</div>
-                                    {f'<div class="mt-2 text-xs text-red-600">Error: {task.error}</div>' if task.error else ''}
-                                </div>
-                '''
-            elif task.error:
-                html += f'''
-                                <div id="task-details-{job.id}-{task.task_order}" class="hidden mt-3 pt-3 border-t">
-                                    <div class="text-xs text-red-600">Error: {task.error}</div>
-                                </div>
-                '''
-            else:
-                # Check if this task is currently running and show streaming output
-                if task.status == "running":
-                    html += f'''
-                                <div id="task-details-{job.id}-{task.task_order}" class="hidden mt-3 pt-3 border-t">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <h5 class="text-xs font-medium text-gray-700">Live Output:</h5>
-                                        <div class="flex items-center">
-                                            <div class="animate-pulse w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                                            <span class="text-xs text-green-600">Streaming</span>
-                                        </div>
-                                    </div>
-                                    <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto" 
-                                         id="task-output-{job.id}-{task.task_order}"
-                                         data-job-uuid="{job.job_uuid}"
-                                         data-task-index="{task.task_order}">
-                                        <div class="text-gray-500">Connecting to live output...</div>
-                                    </div>
-                                </div>
-                    '''
-                else:
-                    html += f'''
-                                <div id="task-details-{job.id}-{task.task_order}" class="hidden mt-3 pt-3 border-t">
-                                    <div class="text-xs text-gray-500">No output available</div>
-                                </div>
-                    '''
-            
-            html += '''
-                            </div>
-            '''
-        
-        html += '''
-                        </div>
-                    </div>
-        '''
-    
-    else:
-        # Render simple job with single output
-        has_output = bool(job.log_output and job.log_output.strip())
-        if has_output:
-            escaped_output = job.log_output.strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            html += f'''
-                    <div class="mt-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <h4 class="text-sm font-medium text-gray-900">Output:</h4>
-                            <button onclick="copyJobOutput({job.id})" class="text-sm text-blue-600 hover:text-blue-800">Copy</button>
-                        </div>
-                        <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto" id="job-output-{job.id}">{escaped_output}</div>
-                    </div>
-            '''
-    
-    html += '''
-                </div>
-            </div>
-        </div>
-    '''
-    
-    return html
+    # Render the template with context
+    return templates.get_template("partials/jobs/job_item.html").render(
+        job=job,
+        repository_name=repository_name,
+        status_class=status_class,
+        status_icon=status_icon,
+        started_at=started_at,
+        finished_at=finished_at,
+        job_title=job_title,
+        is_composite=is_composite,
+        sorted_tasks=sorted_tasks,
+        expand_details=expand_details
+    )
 
 
 @router.get("/current/html", response_class=HTMLResponse)
@@ -542,12 +376,21 @@ def get_current_jobs_html(request: Request):
                     elif "check" in borg_job.command:
                         job_type = "verify"
                 
+                # Calculate progress info
+                progress_info = ""
+                if borg_job.current_progress:
+                    if 'files' in borg_job.current_progress:
+                        progress_info = f"Files: {borg_job.current_progress['files']}"
+                    if 'transferred' in borg_job.current_progress:
+                        progress_info += f" | {borg_job.current_progress['transferred']}"
+                
                 current_jobs.append({
                     'id': job_id,
                     'type': job_type,
                     'status': borg_job.status,
                     'started_at': borg_job.started_at.strftime("%H:%M:%S"),
-                    'progress': borg_job.current_progress
+                    'progress': borg_job.current_progress,
+                    'progress_info': progress_info
                 })
         
         # Get current composite jobs from CompositeJobManager
@@ -559,6 +402,8 @@ def get_current_jobs_html(request: Request):
                 if composite_job.current_task_index < len(composite_job.tasks):
                     current_task = composite_job.tasks[composite_job.current_task_index]
                 
+                progress_info = f"Task: {current_task.task_name if current_task else 'Unknown'} ({composite_job.current_task_index + 1}/{len(composite_job.tasks)})"
+                
                 current_jobs.append({
                     'id': job_id,
                     'type': composite_job.job_type,
@@ -567,61 +412,24 @@ def get_current_jobs_html(request: Request):
                     'progress': {
                         'current_task': current_task.task_name if current_task else "Unknown",
                         'task_progress': f"{composite_job.current_task_index + 1}/{len(composite_job.tasks)}"
-                    }
+                    },
+                    'progress_info': progress_info
                 })
         
-        html_content = ""
-        
-        if not current_jobs:
-            html_content = '''
-                <div class="text-gray-500 text-center py-4">
-                    <p>No operations currently running.</p>
-                </div>
-            '''
-        else:
-            html_content = '<div class="space-y-3">'
-            
-            for job in current_jobs:
-                progress_info = ""
-                if job['progress']:
-                    if 'files' in job['progress']:
-                        progress_info = f"Files: {job['progress']['files']}"
-                    if 'transferred' in job['progress']:
-                        progress_info += f" | {job['progress']['transferred']}"
-                    if 'current_task' in job['progress']:
-                        progress_info = f"Task: {job['progress']['current_task']} ({job['progress']['task_progress']})"
-                
-                html_content += f'''
-                    <div class="border border-blue-200 rounded-lg p-3 bg-blue-50 hover:bg-blue-100 cursor-pointer transition-colors" 
-                         onclick="viewRunningJobDetails('{job['id']}')">
-                        <div class="flex items-center">
-                            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
-                            <div class="flex-1">
-                                <div class="flex items-center space-x-2">
-                                    <span class="font-medium text-blue-900">{job['type'].title()}</span>
-                                    <span class="text-blue-700 text-sm">#{job['id'][:8]}...</span>
-                                </div>
-                                <div class="text-xs text-blue-600 mt-1">
-                                    Started: {job['started_at']} {f'| {progress_info}' if progress_info else ''}
-                                </div>
-                                <div class="text-xs text-blue-500 mt-1 opacity-75">
-                                    Click to view details
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                '''
-            
-            html_content += '</div>'
+        # Render using template
+        html_content = templates.get_template("partials/jobs/current_jobs_list.html").render(
+            current_jobs=current_jobs,
+            message="No operations currently running.",
+            padding="4"
+        )
         
         return HTMLResponse(content=html_content)
         
     except Exception as e:
-        error_html = f'''
-            <div class="text-red-500 text-center py-4">
-                <p>Error loading current operations: {str(e)}</p>
-            </div>
-        '''
+        error_html = templates.get_template("partials/jobs/error_state.html").render(
+            message=f"Error loading current operations: {str(e)}",
+            padding="4"
+        )
         return HTMLResponse(content=error_html)
 
 

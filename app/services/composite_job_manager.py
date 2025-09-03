@@ -63,7 +63,7 @@ class CompositeJobManager:
         task_definitions: List[Dict], 
         repository: Repository,
         schedule: Optional[Schedule] = None,
-        cloud_backup_config_id: Optional[int] = None
+        cloud_sync_config_id: Optional[int] = None
     ) -> str:
         """Create a new composite job with multiple tasks"""
         
@@ -80,7 +80,7 @@ class CompositeJobManager:
                 job_type="composite",
                 total_tasks=len(task_definitions),
                 completed_tasks=0,
-                cloud_backup_config_id=cloud_backup_config_id,
+                cloud_sync_config_id=cloud_sync_config_id,
                 started_at=datetime.now()
             )
             db.add(db_job)
@@ -508,7 +508,7 @@ class CompositeJobManager:
     async def _execute_cloud_sync_task(self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int) -> bool:
         """Execute a cloud sync task"""
         try:
-            if not job.schedule or not job.schedule.cloud_backup_config_id:
+            if not job.schedule or not job.schedule.cloud_sync_config_id:
                 logger.info("📋 No cloud backup configuration - skipping cloud sync")
                 task.status = 'skipped'
                 return True
@@ -518,9 +518,9 @@ class CompositeJobManager:
             # Get cloud backup configuration
             db = next(get_db())
             try:
-                from app.models.database import CloudBackupConfig
-                config = db.query(CloudBackupConfig).filter(
-                    CloudBackupConfig.id == job.schedule.cloud_backup_config_id
+                from app.models.database import CloudSyncConfig
+                config = db.query(CloudSyncConfig).filter(
+                    CloudSyncConfig.id == job.schedule.cloud_sync_config_id
                 ).first()
                 
                 if not config or not config.enabled:

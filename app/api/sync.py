@@ -76,7 +76,7 @@ async def sync_repository_task(
     logger.info(f"  - path_prefix: {path_prefix}")
     logger.info(f"  - job_id: {job_id}")
     
-    from app.models.database import SessionLocal, CloudBackupConfig
+    from app.models.database import SessionLocal, CloudSyncConfig
     
     db = SessionLocal()
     try:
@@ -86,8 +86,8 @@ async def sync_repository_task(
         repository = db.query(Repository).filter(Repository.id == repository_id).first()
         
         # Get the cloud backup config
-        config = db.query(CloudBackupConfig).filter(
-            CloudBackupConfig.name == config_name
+        config = db.query(CloudSyncConfig).filter(
+            CloudSyncConfig.name == config_name
         ).first()
         
         logger.info(f"📊 Database lookup results:")

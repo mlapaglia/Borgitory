@@ -21,7 +21,13 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Source Path</label>
-                <input type="text" name="source_path" value="/data" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <div class="relative">
+                    <input type="text" name="source_path" id="schedule-source-path" value="/data" 
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                           autocomplete="off">
+                    <div id="schedule-source-path-dropdown" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden">
+                    </div>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Schedule</label>
@@ -49,7 +55,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Cloud Backup (Optional)</label>
-                <select name="cloud_backup_config_id" id="schedule-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <select name="cloud_sync_config_id" id="schedule-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                     <option value="">No cloud backup</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Automatically backup to cloud after each scheduled Borg backup</p>

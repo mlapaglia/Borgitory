@@ -441,7 +441,7 @@ class BorgJobManager:
                 db_job = db.query(Job).filter(Job.job_uuid == job_id).first()
                 if db_job:
                     logger.info(f"🔍 Found database job {db_job.id} for JobManager job {job_id}")
-                    logger.info(f"📊 Job details - Type: {db_job.type}, Status: {job.status}, Return Code: {job.return_code}, Cloud Config ID: {db_job.cloud_backup_config_id}")
+                    logger.info(f"📊 Job details - Type: {db_job.type}, Status: {job.status}, Return Code: {job.return_code}, Cloud Sync Config ID: {db_job.cloud_sync_config_id}")
                     
                     db_job.status = 'completed' if job.status == 'completed' else 'failed'
                     db_job.finished_at = job.completed_at
@@ -457,7 +457,7 @@ class BorgJobManager:
                     logger.info(f"  - job.status == 'completed': {job.status == 'completed'}")
                     logger.info(f"  - db_job.type in ['backup', 'scheduled_backup']: {db_job.type in ['backup', 'scheduled_backup']} (actual: {db_job.type})")
                     logger.info(f"  - job.return_code == 0: {job.return_code == 0}")
-                    logger.info(f"  - db_job.cloud_backup_config_id: {db_job.cloud_backup_config_id}")
+                    logger.info(f"  - db_job.cloud_sync_config_id: {db_job.cloud_sync_config_id}")
                     
                     if (job.status == 'completed' and 
                         db_job.type in ['backup', 'scheduled_backup'] and 
@@ -480,25 +480,25 @@ class BorgJobManager:
         logger.info(f"☁️ _trigger_cloud_backups called for job {db_job.id}")
         
         try:
-            from app.models.database import CloudBackupConfig, Repository
+            from app.models.database import CloudSyncConfig, Repository
             from app.services.rclone_service import rclone_service
             from app.api.sync import sync_repository_task
             
             # Only trigger cloud backup if a specific configuration was selected for this job
-            if not db_job.cloud_backup_config_id:
-                logger.info(f"🔍 No cloud backup configuration selected for job {db_job.id}")
+            if not db_job.cloud_sync_config_id:
+                logger.info(f"🔍 No cloud sync configuration selected for job {db_job.id}")
                 return
             
-            logger.info(f"🔍 Looking for cloud backup configuration {db_job.cloud_backup_config_id}")
+            logger.info(f"🔍 Looking for cloud sync configuration {db_job.cloud_sync_config_id}")
             
-            # Get the specific cloud backup configuration
-            cloud_config = db.query(CloudBackupConfig).filter(
-                CloudBackupConfig.id == db_job.cloud_backup_config_id,
-                CloudBackupConfig.enabled == True
+            # Get the specific cloud sync configuration
+            cloud_config = db.query(CloudSyncConfig).filter(
+                CloudSyncConfig.id == db_job.cloud_sync_config_id,
+                CloudSyncConfig.enabled == True
             ).first()
             
             if not cloud_config:
-                logger.warning(f"⚠️ Cloud backup configuration {db_job.cloud_backup_config_id} not found or disabled for job {db_job.id}")
+                logger.warning(f"⚠️ Cloud sync configuration {db_job.cloud_sync_config_id} not found or disabled for job {db_job.id}")
                 return
             
             logger.info(f"✅ Found cloud backup configuration: {cloud_config.name} (enabled: {cloud_config.enabled})")

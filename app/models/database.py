@@ -58,7 +58,7 @@ class Job(Base):
     log_output = Column(Text, nullable=True)
     error = Column(Text, nullable=True)
     container_id = Column(String, nullable=True)
-    cloud_backup_config_id = Column(Integer, ForeignKey("cloud_backup_configs.id"), nullable=True)
+    cloud_sync_config_id = Column(Integer, ForeignKey("cloud_sync_configs.id"), nullable=True)
     cleanup_config_id = Column(Integer, ForeignKey("cleanup_configs.id"), nullable=True)
     notification_config_id = Column(Integer, ForeignKey("notification_configs.id"), nullable=True)
     
@@ -68,7 +68,7 @@ class Job(Base):
     completed_tasks = Column(Integer, default=0)
     
     repository = relationship("Repository", back_populates="jobs")
-    cloud_backup_config = relationship("CloudBackupConfig")
+    cloud_backup_config = relationship("CloudSyncConfig")
     tasks = relationship("JobTask", back_populates="job", cascade="all, delete-orphan")
 
 
@@ -102,12 +102,12 @@ class Schedule(Base):
     last_run = Column(DateTime, nullable=True)
     next_run = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    cloud_backup_config_id = Column(Integer, ForeignKey("cloud_backup_configs.id"), nullable=True)
+    cloud_sync_config_id = Column(Integer, ForeignKey("cloud_sync_configs.id"), nullable=True)
     cleanup_config_id = Column(Integer, ForeignKey("cleanup_configs.id"), nullable=True)
     notification_config_id = Column(Integer, ForeignKey("notification_configs.id"), nullable=True)
     
     repository = relationship("Repository", back_populates="schedules")
-    cloud_backup_config = relationship("CloudBackupConfig")
+    cloud_sync_config = relationship("CloudSyncConfig")
     cleanup_config = relationship("CleanupConfig")
     notification_config = relationship("NotificationConfig")
 
@@ -212,8 +212,8 @@ class NotificationConfig(Base):
         app_token = cipher_suite.decrypt(self.encrypted_app_token.encode()).decode()
         return user_key, app_token
 
-class CloudBackupConfig(Base):
-    __tablename__ = "cloud_backup_configs"
+class CloudSyncConfig(Base):
+    __tablename__ = "cloud_sync_configs"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)

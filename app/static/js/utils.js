@@ -103,23 +103,21 @@ async function deleteSchedule(scheduleId, scheduleName) {
 }
 
 // Archive Management Functions
+// Note: archiveBrowser is declared in archive-browser.js, but we reference it here
 async function viewArchiveContents(repoId, archiveName) {
-    try {
-        showNotification('Loading archive contents...', 'info');
+    // Show the archive contents modal
+    const archiveModal = document.getElementById('archive-contents-modal');
+    if (archiveModal) {
+        archiveModal.classList.remove('hidden');
         
-        const response = await fetch(`/api/repositories/${repoId}/archives/${encodeURIComponent(archiveName)}/contents`);
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to load archive contents');
-        }
-        
-        const data = await response.json();
-        showArchiveContentsModal(archiveName, data.contents);
-        
-    } catch (error) {
-        showNotification(`Failed to load archive contents: ${error.message}`, 'error');
-        console.error('Archive contents error:', error);
+        // Initialize the directory browser
+        archiveBrowser = new ArchiveDirectoryBrowser(
+            'archive-browser-container',
+            repoId,
+            archiveName
+        );
+    } else {
+        showNotification('Archive contents modal not found', 'error');
     }
 }
 

@@ -31,7 +31,13 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Repository Path</label>
-                    <input type="text" name="path" id="import-path" required readonly class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50 focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                    <div class="relative">
+                        <input type="text" name="path" id="import-path" required 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                               placeholder="/repos/" autocomplete="off">
+                        <div id="import-path-dropdown" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden">
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Encryption info display -->

@@ -41,14 +41,14 @@
             </button>
             
             <button 
-                onclick="switchTab('cloud-backup')"
-                id="nav-cloud-backup"
+                onclick="switchTab('cloud-sync')"
+                id="nav-cloud-sync"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
                 </svg>
-                <span>Cloud Backup</span>
+                <span>Cloud Sync</span>
             </button>
             
             <button 
@@ -93,6 +93,17 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                 </svg>
                 <span>Job History</span>
+            </button>
+            
+            <button 
+                onclick="switchTab('debug')"
+                id="nav-debug"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                </svg>
+                <span>Debug Info</span>
             </button>
         </div>
     </nav>

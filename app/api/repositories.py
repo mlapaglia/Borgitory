@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile, Request
 from fastapi.responses import HTMLResponse
@@ -22,11 +23,20 @@ async def create_repository(
     current_user: User = Depends(get_current_user)
 ):
     try:
+        # Check for duplicate name
         db_repo = db.query(Repository).filter(Repository.name == repo.name).first()
         if db_repo:
             raise HTTPException(
                 status_code=400, 
                 detail="Repository with this name already exists"
+            )
+        
+        # Check for duplicate path
+        db_repo_path = db.query(Repository).filter(Repository.path == repo.path).first()
+        if db_repo_path:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Repository with path '{repo.path}' already exists with name '{db_repo_path.name}'"
             )
         
         db_repo = Repository(
@@ -183,6 +193,58 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
             </div>
         '''
         return HTMLResponse(content=error_html)
+
+
+@router.get("/directories")
+async def list_directories(path: str = "/repos"):
+    """List directories at the given path for autocomplete functionality"""
+    try:
+        # Security: Only allow root directory or paths under /repos for safety
+        if path != "/" and not path.startswith("/repos"):
+            raise HTTPException(status_code=400, detail="Path must be root directory or under /repos directory")
+        
+        # Normalize path
+        path = os.path.normpath(path)
+        
+        # Check if path exists and is a directory
+        if not os.path.exists(path):
+            return {"directories": []}
+        
+        if not os.path.isdir(path):
+            return {"directories": []}
+        
+        directories = []
+        try:
+            for item in os.listdir(path):
+                item_path = os.path.join(path, item)
+                if os.path.isdir(item_path):
+                    # For root directory, filter out system directories
+                    if path == "/":
+                        # Hardcoded list of root directories to ignore
+                        ignored_dirs = {"opt", "home", "usr", "var", "bin", "sbin", "lib", "lib64", "etc", "proc", "sys", "dev", "run", "tmp", "boot", "mnt", "media", "srv", "root"}
+                        
+                        if item not in ignored_dirs:
+                            directories.append({
+                                "name": item,
+                                "path": item_path
+                            })
+                    else:
+                        directories.append({
+                            "name": item,
+                            "path": item_path
+                        })
+        except PermissionError:
+            logger.warning(f"Permission denied accessing directory: {path}")
+            return {"directories": []}
+        
+        # Sort directories alphabetically
+        directories.sort(key=lambda x: x["name"].lower())
+        
+        return {"directories": directories}
+        
+    except Exception as e:
+        logger.error(f"Error listing directories at {path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list directories: {str(e)}")
 
 
 @router.get("/{repo_id}", response_model=RepositorySchema)
@@ -431,14 +493,42 @@ async def get_repository_info(repo_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{repo_id}/archives/{archive_name}/contents")
-async def get_archive_contents(repo_id: int, archive_name: str, db: Session = Depends(get_db)):
+async def get_archive_contents(
+    repo_id: int, 
+    archive_name: str, 
+    path: str = "",
+    db: Session = Depends(get_db)
+):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
     
     try:
-        contents = await borg_service.list_archive_contents(repository, archive_name)
-        return {"archive": archive_name, "contents": contents}
+        contents = await borg_service.list_archive_directory_contents(
+            repository, archive_name, path
+        )
+        return {
+            "archive": archive_name,
+            "path": path,
+            "items": contents
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{repo_id}/archives/{archive_name}/extract")
+async def extract_file(
+    repo_id: int,
+    archive_name: str,
+    file: str,
+    db: Session = Depends(get_db)
+):
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if repository is None:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    
+    try:
+        return await borg_service.extract_file_stream(repository, archive_name, file)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -453,11 +543,20 @@ async def import_repository(
 ):
     """Import an existing Borg repository"""
     try:
+        # Check for duplicate name
         db_repo = db.query(Repository).filter(Repository.name == name).first()
         if db_repo:
             raise HTTPException(
                 status_code=400, 
                 detail="Repository with this name already exists"
+            )
+        
+        # Check for duplicate path
+        db_repo_path = db.query(Repository).filter(Repository.path == path).first()
+        if db_repo_path:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Repository with path '{path}' already exists with name '{db_repo_path.name}'"
             )
         
         # Handle keyfile if provided

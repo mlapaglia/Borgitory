@@ -11,5 +11,3 @@ BORG_REPOS_HOST_PATH = "./borg-repos"
 BACKUP_SOURCES_HOST_PATH = "./backup-sources"
 BORG_REPOS_CONTAINER_PATH = "/repos"
 BACKUP_SOURCES_CONTAINER_PATH = "/data"
-
-# Note: DATA_DIR creation is handled in database.py init_db() to avoid permission issues

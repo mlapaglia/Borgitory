@@ -34,7 +34,7 @@ async def execute_scheduled_backup(schedule_id: int):
             return
         
         logger.info(f"✅ SCHEDULER: Found schedule '{schedule.name}' for repository_id {schedule.repository_id}")
-        logger.info(f"📊 SCHEDULER: Schedule details - cloud_backup_config_id: {schedule.cloud_backup_config_id}")
+        logger.info(f"📊 SCHEDULER: Schedule details - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
         
         repository = schedule.repository
         if not repository:
@@ -53,7 +53,7 @@ async def execute_scheduled_backup(schedule_id: int):
             logger.info(f"  - repository: {repository.name}")
             logger.info(f"  - schedule: {schedule.name}")
             logger.info(f"  - source_path: {schedule.source_path}")
-            logger.info(f"  - cloud_backup_config_id: {schedule.cloud_backup_config_id}")
+            logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
             
             # Define the tasks for this composite job
             task_definitions = [
@@ -101,7 +101,7 @@ async def execute_scheduled_backup(schedule_id: int):
                     logger.info(f"📋 SCHEDULER: Added cleanup task to composite job")
             
             # Add cloud sync task if cloud backup is configured
-            if schedule.cloud_backup_config_id:
+            if schedule.cloud_sync_config_id:
                 task_definitions.append({
                     'type': 'cloud_sync', 
                     'name': f'Sync to Cloud'
@@ -116,7 +116,7 @@ async def execute_scheduled_backup(schedule_id: int):
                 task_definitions=task_definitions,
                 repository=repository,
                 schedule=schedule,
-                cloud_backup_config_id=schedule.cloud_backup_config_id
+                cloud_sync_config_id=schedule.cloud_sync_config_id
             )
             
             logger.info(f"✅ SCHEDULER: Created composite job {job_id} with {len(task_definitions)} tasks")

@@ -113,12 +113,28 @@ def build_secure_borg_command(
     command_parts = base_command.split()
     
     if additional_args:
-        for arg in additional_args:
+        for i, arg in enumerate(additional_args):
             if not isinstance(arg, str):
                 raise ValueError("All arguments must be strings")
-            # Validate that arguments don't contain shell metacharacters
-            if re.search(r'[;<>|&`$\n\r]', arg):
-                raise ValueError(f"Argument contains dangerous characters: {arg}")
+            
+            # Special handling for Borg pattern arguments
+            is_pattern_arg = (
+                i > 0 and additional_args[i-1] == "--pattern"
+            ) or arg == "--pattern"
+            
+            if is_pattern_arg:
+                # For pattern arguments, allow regex metacharacters but block shell injection
+                # Only check for actual shell injection characters, not regex characters
+                if re.search(r'[;<>&`\n\r]', arg):
+                    raise ValueError(f"Argument contains dangerous characters: {arg}")
+                # Also block command substitution patterns
+                if '$(' in arg or '${' in arg:
+                    raise ValueError(f"Argument contains dangerous characters: {arg}")
+            else:
+                # For regular arguments, use stricter validation
+                if re.search(r'[;<>|&`$\n\r]', arg):
+                    raise ValueError(f"Argument contains dangerous characters: {arg}")
+                    
             command_parts.append(arg)
     
     # Add repository path as final argument (only if provided)

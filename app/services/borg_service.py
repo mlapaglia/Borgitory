@@ -189,7 +189,7 @@ class BorgService:
             logger.error(f"Failed to initialize repository: {e}")
             return {"success": False, "message": str(e)}
 
-    async def create_backup(self, repository: Repository, source_path: str, compression: str = "zstd", dry_run: bool = False, cloud_backup_config_id: Optional[int] = None) -> str:
+    async def create_backup(self, repository: Repository, source_path: str, compression: str = "zstd", dry_run: bool = False, cloud_sync_config_id: Optional[int] = None) -> str:
         """Create a backup and return job_id for tracking"""
         logger.info(f"Creating backup for repository: {repository.name} at {repository.path}")
         
@@ -237,7 +237,7 @@ class BorgService:
                     type="backup",
                     status="queued",  # Will be updated to 'running' when started
                     started_at=datetime.now(),
-                    cloud_backup_config_id=cloud_backup_config_id
+                    cloud_sync_config_id=cloud_sync_config_id
                 )
                 db.add(job)
                 db.commit()
@@ -439,6 +439,255 @@ class BorgService:
             
         except Exception as e:
             raise Exception(f"Failed to list archive contents: {str(e)}")
+
+    async def list_archive_directory_contents(self, repository: Repository, archive_name: str, path: str = "") -> List[Dict[str, any]]:
+        """List contents of a specific directory within an archive, loading only what's needed"""
+        try:
+            validate_archive_name(archive_name)
+            
+            # Normalize path
+            path = path.strip().strip('/')
+            
+            # Build borg list command with pattern filtering for efficiency
+            borg_args = ["--json-lines"]
+            
+            # Use regex patterns based on working example
+            if path:
+                # For subdirectories like "data", show immediate children only
+                # Pattern matches: path/immediate_child with optional trailing slash
+                borg_args.extend([
+                    "--pattern", f"+ re:^{re.escape(path)}/[^/]+/?$",  # Include immediate children only
+                    "--pattern", "- *"                                  # Exclude everything else
+                ])
+            else:
+                # For root level, match items without path separators  
+                borg_args.extend([
+                    "--pattern", "+ re:^[^/]+/?$",        # Include root-level items only
+                    "--pattern", "- *"                    # Exclude everything else
+                ])
+            
+            borg_args.append(f"{repository.path}::{archive_name}")
+            
+            command, env = build_secure_borg_command(
+                base_command="borg list",
+                repository_path="",
+                passphrase=repository.get_passphrase(),
+                additional_args=borg_args
+            )
+            
+            logger.info(f"Running borg command for directory listing: {' '.join(command)}")
+        except Exception as e:
+            raise Exception(f"Validation failed: {str(e)}")
+        
+        try:
+            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            
+            # Wait for completion
+            max_wait = 60
+            wait_time = 0
+            
+            while wait_time < max_wait:
+                status = borg_job_manager.get_job_status(job_id)
+                if not status:
+                    raise Exception("Job not found")
+                
+                if status['completed']:
+                    if status['return_code'] == 0:
+                        output = await borg_job_manager.get_job_output_stream(job_id)
+                        
+                        # Parse all entries
+                        all_entries = []
+                        for line in output.get('lines', []):
+                            line_text = line['text']
+                            if line_text.startswith('{'):
+                                try:
+                                    item = json.loads(line_text)
+                                    all_entries.append(item)
+                                except json.JSONDecodeError:
+                                    continue
+                        
+                        logger.info(f"Borg returned {len(all_entries)} entries for path '{path}'")
+                        
+                        # Debug: Show first few actual paths to understand structure
+                        if all_entries and len(all_entries) > 0:
+                            sample_paths = [entry.get('path', 'NO_PATH') for entry in all_entries[:5]]
+                            logger.info(f"Sample paths from Borg: {sample_paths}")
+                        
+                        # Filter entries to show only immediate children of the specified path
+                        return self._filter_directory_contents(all_entries, path)
+                    else:
+                        error_lines = [line['text'] for line in output.get('lines', [])]
+                        error_text = '\n'.join(error_lines)
+                        raise Exception(f"Borg list failed: {error_text}")
+                
+                await asyncio.sleep(0.5)
+                wait_time += 0.5
+            
+            raise Exception("List archive contents timed out")
+            
+        except Exception as e:
+            raise Exception(f"Failed to list directory contents: {str(e)}")
+
+    def _filter_directory_contents(self, all_entries: List[Dict], target_path: str = "") -> List[Dict]:
+        """Filter entries to show only immediate children of target_path"""
+        target_path = target_path.strip().strip('/')
+        
+        logger.info(f"Filtering {len(all_entries)} entries for target_path: '{target_path}'")
+        
+        # Group entries by their immediate parent under target_path
+        children = {}
+        
+        for entry in all_entries:
+            entry_path = entry.get('path', '').lstrip('/')
+            
+            logger.debug(f"Processing entry path: '{entry_path}'")
+            
+            # Determine if this entry is a direct child of target_path
+            if target_path:
+                # For subdirectory like "data", we want entries like:
+                # "data/file.txt" -> include as "file.txt" 
+                # "data/subdir/file.txt" -> include as "subdir" (directory)
+                if not entry_path.startswith(target_path + '/'):
+                    continue
+                    
+                # Remove the target path prefix
+                relative_path = entry_path[len(target_path) + 1:]
+                
+            else:
+                # For root directory, we want entries like:
+                # "file.txt" -> include as "file.txt"
+                # "data/file.txt" -> include as "data" (directory) 
+                relative_path = entry_path
+            
+            if not relative_path:
+                continue
+                
+            # Get the first component (immediate child)
+            path_parts = relative_path.split('/')
+            immediate_child = path_parts[0]
+            
+            # Build full path for this item
+            full_path = f"{target_path}/{immediate_child}" if target_path else immediate_child
+            
+            if immediate_child not in children:
+                # Determine if this is a directory or file
+                # Use the actual Borg entry type - 'd' means directory
+                is_directory = entry.get('type') == 'd' or len(path_parts) > 1
+                
+                children[immediate_child] = {
+                    'name': immediate_child,
+                    'path': full_path,
+                    'is_directory': is_directory,
+                    'size': entry.get('size') if not is_directory else None,
+                    'modified': entry.get('mtime'),
+                    'mode': entry.get('mode'),
+                    'user': entry.get('user'),
+                    'group': entry.get('group')
+                }
+                
+                logger.debug(f"Added item: {immediate_child} (is_directory: {is_directory})")
+            else:
+                # If we already have this item and this entry suggests it's a directory, update it
+                if len(path_parts) > 1:
+                    children[immediate_child]['is_directory'] = True
+                    children[immediate_child]['size'] = None
+                elif not children[immediate_child]['is_directory']:
+                    # Update file info if this is the actual file entry
+                    children[immediate_child]['size'] = entry.get('size')
+                    children[immediate_child]['modified'] = entry.get('mtime')
+        
+        # Sort results: directories first, then files, both alphabetically
+        result = list(children.values())
+        result.sort(key=lambda x: (not x['is_directory'], x['name'].lower()))
+        
+        logger.info(f"Filtered to {len(result)} items: {[item['name'] for item in result[:5]]}{'...' if len(result) > 5 else ''}")
+        
+        return result
+
+    async def extract_file_stream(self, repository: Repository, archive_name: str, file_path: str):
+        """Extract a single file from an archive and stream it to the client"""
+        try:
+            validate_archive_name(archive_name)
+            
+            # Sanitize the file path
+            if not file_path or not isinstance(file_path, str):
+                raise Exception("File path is required")
+            
+            # Build borg extract command with --stdout
+            borg_args = [
+                "--stdout",
+                f"{repository.path}::{archive_name}",
+                file_path
+            ]
+            
+            command, env = build_secure_borg_command(
+                base_command="borg extract",
+                repository_path="",
+                passphrase=repository.get_passphrase(),
+                additional_args=borg_args
+            )
+            
+            logger.info(f"Extracting file {file_path} from archive {archive_name}")
+            
+            # Import required classes for streaming response
+            from fastapi import Response
+            from fastapi.responses import StreamingResponse
+            import asyncio
+            import os
+            
+            # Start the borg process
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            async def generate_stream():
+                """Generator function to stream the file content with automatic backpressure"""
+                try:
+                    while True:
+                        # Read chunk from Borg process - this already yields control to event loop
+                        chunk = await process.stdout.read(65536)  # 64KB chunks for efficiency
+                        if not chunk:
+                            break
+                        
+                        # Yield chunk to client - FastAPI/Starlette handles backpressure automatically
+                        yield chunk
+                    
+                finally:
+                    # Ensure process cleanup happens regardless of early client disconnect
+                    if process.returncode is None:
+                        # Process still running - terminate it
+                        process.terminate()
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=5.0)
+                        except asyncio.TimeoutError:
+                            process.kill()
+                            await process.wait()
+                    
+                    # Check for errors if process completed normally
+                    if process.returncode != 0:
+                        stderr = await process.stderr.read()
+                        error_msg = stderr.decode('utf-8') if stderr else 'Unknown error'
+                        logger.error(f"Borg extract process failed: {error_msg}")
+                        raise Exception(f"Borg extract failed: {error_msg}")
+            
+            # Get filename for download header
+            filename = os.path.basename(file_path)
+            
+            # Return streaming response
+            return StreamingResponse(
+                generate_stream(),
+                media_type='application/octet-stream',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{filename}"'
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to extract file {file_path}: {str(e)}")
+            raise Exception(f"Failed to extract file: {str(e)}")
 
     async def start_repository_scan(self, scan_path: str = "/repos") -> str:
         """Start repository scan and return job_id for tracking"""

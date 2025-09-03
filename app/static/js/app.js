@@ -3,13 +3,13 @@ function borgitoryApp() {
     return {
         selectedRepository: null,
         repositories: [],
-        cloudBackupConfigs: [],
+        cloudSyncConfigs: [],
         notificationConfigs: [],
         cleanupConfigs: [],
         
         init() {
             this.loadRepositories();
-            this.loadCloudBackupConfigs();
+            this.loadCloudSyncConfigs();
             this.loadNotificationConfigs();
             this.loadCleanupConfigs();
             loadJobHistory(); // Load initial job history
@@ -32,16 +32,16 @@ function borgitoryApp() {
             }
         },
 
-        async loadCloudBackupConfigs() {
+        async loadCloudSyncConfigs() {
             try {
-                const response = await fetch('/api/cloud-backup/');
+                const response = await fetch('/api/cloud-sync/');
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
-                this.cloudBackupConfigs = await response.json();
-                this.updateCloudBackupSelects();
+                this.cloudSyncConfigs = await response.json();
+                this.updateCloudSyncSelects();
             } catch (error) {
-                console.error('Failed to load cloud backup configs:', error);
+                console.error('Failed to load cloud sync configs:', error);
             }
         },
 
@@ -94,20 +94,20 @@ function borgitoryApp() {
             // This will be handled by HTMX
         },
 
-        updateCloudBackupSelects() {
+        updateCloudSyncSelects() {
             const selects = document.querySelectorAll('#backup-cloud-select, #schedule-cloud-select');
             selects.forEach(select => {
-                // Keep the "No cloud backup" option
+                // Keep the "No cloud sync" option
                 const defaultOption = select.querySelector('option[value=""]');
                 select.innerHTML = '';
                 select.appendChild(defaultOption);
                 
-                // Add cloud backup config options
-                this.cloudBackupConfigs.forEach(config => {
+                // Add cloud sync config options
+                this.cloudSyncConfigs.forEach(config => {
                     if (config.enabled) { // Only show enabled configs
                         const option = document.createElement('option');
                         option.value = config.id;
-                        option.textContent = `${config.name} (${config.bucket_name})`;
+                        option.textContent = `${config.name} (${config.bucket_name || config.host || config.provider})`;
                         select.appendChild(option);
                     }
                 });
