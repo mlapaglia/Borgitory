@@ -35,6 +35,9 @@ class RepositoryStatsService:
             # Sort archives by date
             archive_stats.sort(key=lambda x: x.get('start', ''))
             
+            # Get file type statistics
+            file_type_stats = await self._get_file_type_stats(repository, archives)
+            
             # Build statistics
             stats = {
                 "repository_path": repository.path,
@@ -42,6 +45,7 @@ class RepositoryStatsService:
                 "archive_stats": archive_stats,
                 "size_over_time": self._build_size_timeline(archive_stats),
                 "dedup_compression_stats": self._build_dedup_compression_stats(archive_stats),
+                "file_type_stats": file_type_stats,
                 "summary": self._build_summary_stats(archive_stats)
             }
             
@@ -210,6 +214,140 @@ class RepositoryStatsService:
         
         return dedup_data
     
+    async def _get_file_type_stats(self, repository: Repository, archives: List[str]) -> Dict[str, Any]:
+        """Get file type statistics over time"""
+        file_type_timeline = {
+            "labels": [],
+            "count_data": {},
+            "size_data": {}
+        }
+        
+        # Limit to recent archives for performance (last 10)
+        recent_archives = archives[-10:] if len(archives) > 10 else archives
+        
+        for archive_name in recent_archives:
+            try:
+                # Get file listing with sizes
+                command, env = build_secure_borg_command(
+                    base_command="borg list",
+                    repository_path="",
+                    passphrase=repository.get_passphrase(),
+                    additional_args=[f"{repository.path}::{archive_name}", "--format={size} {path}{NL}"]
+                )
+                
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env
+                )
+                
+                stdout, stderr = await process.communicate()
+                
+                if process.returncode == 0:
+                    # Parse file types and sizes
+                    ext_count = {}
+                    ext_size = {}
+                    
+                    for line in stdout.decode().strip().split('\n'):
+                        if not line.strip():
+                            continue
+                        parts = line.strip().split(' ', 1)
+                        if len(parts) == 2:
+                            try:
+                                size = int(parts[0])
+                                path = parts[1]
+                                
+                                # Extract file extension
+                                if '.' in path and not path.endswith('/'):
+                                    ext = path.split('.')[-1].lower()
+                                    if ext and len(ext) <= 10:  # Reasonable extension length
+                                        ext_count[ext] = ext_count.get(ext, 0) + 1
+                                        ext_size[ext] = ext_size.get(ext, 0) + size
+                            except (ValueError, IndexError):
+                                continue
+                    
+                    # Add to timeline
+                    archive_date = archive_name.split('backup-')[-1][:10] if 'backup-' in archive_name else archive_name[:10]
+                    file_type_timeline["labels"].append(archive_date)
+                    
+                    # Store data for each extension
+                    for ext in ext_count:
+                        if ext not in file_type_timeline["count_data"]:
+                            file_type_timeline["count_data"][ext] = []
+                            file_type_timeline["size_data"][ext] = []
+                        file_type_timeline["count_data"][ext].append(ext_count[ext])
+                        file_type_timeline["size_data"][ext].append(round(ext_size[ext] / (1024*1024), 2))  # Convert to MB
+                    
+                    # Fill missing data points for consistency
+                    for ext in file_type_timeline["count_data"]:
+                        while len(file_type_timeline["count_data"][ext]) < len(file_type_timeline["labels"]):
+                            file_type_timeline["count_data"][ext].insert(-1, 0)
+                            file_type_timeline["size_data"][ext].insert(-1, 0)
+                            
+            except Exception as e:
+                logger.error(f"Error analyzing file types for archive {archive_name}: {str(e)}")
+                continue
+        
+        return self._build_file_type_chart_data(file_type_timeline)
+    
+    def _build_file_type_chart_data(self, timeline_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Build chart data for file types"""
+        # Color palette for different file types
+        colors = [
+            'rgb(59, 130, 246)',   # Blue
+            'rgb(16, 185, 129)',   # Green  
+            'rgb(245, 101, 101)',  # Red
+            'rgb(139, 92, 246)',   # Purple
+            'rgb(245, 158, 11)',   # Yellow
+            'rgb(236, 72, 153)',   # Pink
+            'rgb(14, 165, 233)',   # Light Blue
+            'rgb(34, 197, 94)',    # Light Green
+            'rgb(168, 85, 247)',   # Violet
+            'rgb(251, 146, 60)'    # Orange
+        ]
+        
+        # Get top 10 extensions by average size
+        avg_sizes = {}
+        for ext, sizes in timeline_data["size_data"].items():
+            if sizes:
+                avg_sizes[ext] = sum(sizes) / len(sizes)
+        
+        top_extensions = sorted(avg_sizes.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        count_datasets = []
+        size_datasets = []
+        
+        for i, (ext, _) in enumerate(top_extensions):
+            color = colors[i % len(colors)]
+            
+            count_datasets.append({
+                "label": f".{ext} files",
+                "data": timeline_data["count_data"][ext],
+                "borderColor": color,
+                "backgroundColor": color.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+                "fill": False
+            })
+            
+            size_datasets.append({
+                "label": f".{ext} size (MB)",
+                "data": timeline_data["size_data"][ext],
+                "borderColor": color,
+                "backgroundColor": color.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+                "fill": False
+            })
+        
+        return {
+            "count_chart": {
+                "labels": timeline_data["labels"],
+                "datasets": count_datasets
+            },
+            "size_chart": {
+                "labels": timeline_data["labels"],
+                "datasets": size_datasets
+            }
+        }
+
     def _build_summary_stats(self, archive_stats: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Build overall summary statistics"""
         if not archive_stats:

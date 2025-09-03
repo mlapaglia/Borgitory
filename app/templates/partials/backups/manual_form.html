@@ -10,7 +10,7 @@
         <div class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700">Repository</label>
-                <select name="repository_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <select name="repository_id" required class="select-modern w-full">
                     <option value="">Select Repository...</option>
                 </select>
             </div>
@@ -26,7 +26,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Compression</label>
-                <select name="compression" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <select name="compression" class="select-modern w-full">
                     <option value="zstd">ZSTD (Recommended)</option>
                     <option value="lz4">LZ4 (Fast)</option>
                     <option value="none">None</option>
@@ -34,21 +34,21 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Archive Cleanup (Optional)</label>
-                <select name="cleanup_config_id" id="backup-cleanup-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <select name="cleanup_config_id" id="backup-cleanup-select" class="select-modern w-full">
                     <option value="">No cleanup</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Automatically prune old archives after backup completes</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Cloud Backup (Optional)</label>
-                <select name="cloud_sync_config_id" id="backup-cloud-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <select name="cloud_sync_config_id" id="backup-cloud-select" class="select-modern w-full">
                     <option value="">No cloud backup</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Automatically backup to cloud after Borg backup completes</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Notifications (Optional)</label>
-                <select name="notification_config_id" id="backup-notification-select" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <select name="notification_config_id" id="backup-notification-select" class="select-modern w-full">
                     <option value="">No notifications</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Get notified when backup completes or fails</p>

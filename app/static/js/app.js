@@ -201,6 +201,8 @@ function borgitoryApp() {
 // Chart instances (global scope for updates)
 let sizeChart = null;
 let ratioChart = null;
+let fileTypeCountChart = null;
+let fileTypeSizeChart = null;
 
 // Clean HTMX Chart.js Integration
 document.body.addEventListener('htmx:afterSwap', function(e) {
@@ -212,14 +214,18 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
             try {
                 const sizeDataRaw = chartDataEl.getAttribute('data-size-chart');
                 const ratioDataRaw = chartDataEl.getAttribute('data-ratio-chart');
+                const fileTypeCountDataRaw = chartDataEl.getAttribute('data-file-type-count-chart');
+                const fileTypeSizeDataRaw = chartDataEl.getAttribute('data-file-type-size-chart');
                 
                 const sizeData = JSON.parse(sizeDataRaw);
                 const ratioData = JSON.parse(ratioDataRaw);
+                const fileTypeCountData = JSON.parse(fileTypeCountDataRaw);
+                const fileTypeSizeData = JSON.parse(fileTypeSizeDataRaw);
                 
-                if (sizeChart && ratioChart) {
-                    updateCharts(sizeData, ratioData);
+                if (sizeChart && ratioChart && fileTypeCountChart && fileTypeSizeChart) {
+                    updateCharts(sizeData, ratioData, fileTypeCountData, fileTypeSizeData);
                 } else {
-                    createCharts(sizeData, ratioData);
+                    createCharts(sizeData, ratioData, fileTypeCountData, fileTypeSizeData);
                 }
             } catch (error) {
                 console.error('Error processing chart data:', error);
@@ -228,9 +234,11 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
     }
 });
 
-function createCharts(sizeData, ratioData) {
+function createCharts(sizeData, ratioData, fileTypeCountData, fileTypeSizeData) {
     const sizeCtx = document.getElementById('sizeChart');
     const ratioCtx = document.getElementById('ratioChart');
+    const fileTypeCountCtx = document.getElementById('fileTypeCountChart');
+    const fileTypeSizeCtx = document.getElementById('fileTypeSizeChart');
     
     if (sizeCtx && ratioCtx) {
         // Create Size Chart
@@ -318,10 +326,76 @@ function createCharts(sizeData, ratioData) {
                 }
             }
         });
+        
+        // Create File Type Count Chart
+        if (fileTypeCountCtx && fileTypeCountData) {
+            fileTypeCountChart = new Chart(fileTypeCountCtx, {
+                type: 'line',
+                data: fileTypeCountData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'File Count'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Archive Date'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Create File Type Size Chart
+        if (fileTypeSizeCtx && fileTypeSizeData) {
+            fileTypeSizeChart = new Chart(fileTypeSizeCtx, {
+                type: 'line',
+                data: fileTypeSizeData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Size (MB)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Archive Date'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
     }
 }
 
-function updateCharts(sizeData, ratioData) {
+function updateCharts(sizeData, ratioData, fileTypeCountData, fileTypeSizeData) {
     if (sizeChart) {
         sizeChart.data = sizeData;
         sizeChart.update('none'); // No animation for smooth updates
@@ -330,5 +404,15 @@ function updateCharts(sizeData, ratioData) {
     if (ratioChart) {
         ratioChart.data = ratioData;
         ratioChart.update('none');
+    }
+    
+    if (fileTypeCountChart && fileTypeCountData) {
+        fileTypeCountChart.data = fileTypeCountData;
+        fileTypeCountChart.update('none');
+    }
+    
+    if (fileTypeSizeChart && fileTypeSizeData) {
+        fileTypeSizeChart.data = fileTypeSizeData;
+        fileTypeSizeChart.update('none');
     }
 }

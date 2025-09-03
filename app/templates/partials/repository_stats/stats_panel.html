@@ -78,6 +78,22 @@
                 <canvas id="ratioChart"></canvas>
             </div>
         </div>
+
+        <!-- File Types by Count Over Time -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">File Types by Count Over Time</h3>
+            <div class="relative h-64">
+                <canvas id="fileTypeCountChart"></canvas>
+            </div>
+        </div>
+
+        <!-- File Types by Size Over Time -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">File Types by Size Over Time</h3>
+            <div class="relative h-64">
+                <canvas id="fileTypeSizeChart"></canvas>
+            </div>
+        </div>
     </div>
 
     <!-- Detailed Statistics Table -->
@@ -111,6 +127,8 @@
     <div id="chart-data" 
          data-size-chart='{{ stats.size_over_time | tojson }}'
          data-ratio-chart='{{ stats.dedup_compression_stats | tojson }}'
+         data-file-type-count-chart='{{ stats.file_type_stats.count_chart | tojson }}'
+         data-file-type-size-chart='{{ stats.file_type_stats.size_chart | tojson }}'
          style="display: none;">
     </div>
 {% endif %}
