@@ -38,6 +38,15 @@ class CompositeJobTaskInfo:
     show_list: Optional[bool] = None
     save_space: Optional[bool] = None
     force_prune: Optional[bool] = None
+    # Check-specific parameters
+    check_type: Optional[str] = None
+    verify_data: Optional[bool] = None
+    repair_mode: Optional[bool] = None
+    max_duration: Optional[int] = None
+    archive_prefix: Optional[str] = None
+    archive_glob: Optional[str] = None
+    first_n_archives: Optional[int] = None
+    last_n_archives: Optional[int] = None
 
 @dataclass
 class CompositeJobInfo:
@@ -239,6 +248,8 @@ class CompositeJobManager:
             return await self._execute_cloud_sync_task(job, task, task_index)
         elif task.task_type == 'prune':
             return await self._execute_prune_task(job, task, task_index)
+        elif task.task_type == 'check':
+            return await self._execute_check_task(job, task, task_index)
         elif task.task_type == 'repo_scan':
             return await self._execute_repo_scan_task(job, task, task_index)
         elif task.task_type == 'repo_init':
@@ -255,12 +266,6 @@ class CompositeJobManager:
         """Execute a borg backup task"""
         try:
             logger.info(f"🔄 Starting borg backup for repository {job.repository.name}")
-            
-            # DEBUG: Enable test mode for slow fake backup
-            TEST_MODE = False  # Set to False for real borg backups
-            
-            if TEST_MODE:
-                return await self._execute_fake_backup_task(job, task, task_index)
             
             # Use the existing borg service to create backup
             # But we'll stream the output to our task instead of creating a separate job
@@ -321,9 +326,6 @@ class CompositeJobManager:
                 
                 # Broadcast output
                 self._broadcast_task_output(job.id, task_index, decoded_line)
-                
-                # DEBUG: Add artificial delay for testing streaming
-                await asyncio.sleep(0.5)  # Half second delay per line
             
             await process.wait()
             
@@ -423,85 +425,97 @@ class CompositeJobManager:
             task.error = str(e)
             return False
     
-    async def _execute_fake_backup_task(self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int) -> bool:
-        """Execute a fake slow backup for testing streaming output"""
+    async def _execute_check_task(self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int) -> bool:
+        """Execute a borg check task to verify repository integrity"""
         try:
-            logger.info(f"🧪 Starting FAKE backup for testing (repository: {job.repository.name})")
+            logger.info(f"🔍 Starting borg check for repository {job.repository.name}")
             
-            # Simulate borg backup output with realistic messages
-            fake_output_lines = [
-                "Repository lock acquired",
-                "------------------------------------------------------------------------------",
-                "Archive name: backup-2024-01-15_14-30-25", 
-                "Archive fingerprint: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
-                "Time (start): Mon, 2024-01-15 14:30:25",
-                "Time (end):   Mon, 2024-01-15 14:35:42",
-                "Duration: 5 minutes 17.23 seconds",
-                "Number of files: 1247",
-                "Utilization of max. archive size: 0%",
-                "------------------------------------------------------------------------------",
-                "",
-                "Scanning files...",
-                "Processing: /data/documents/file1.txt",
-                "Processing: /data/documents/file2.pdf", 
-                "Processing: /data/images/photo1.jpg",
-                "Processing: /data/images/photo2.png",
-                "Processing: /data/videos/video1.mp4",
-                "Processing: /data/config/settings.json",
-                "Processing: /data/logs/application.log",
-                "Processing: /data/backups/old_backup.tar.gz",
-                "",
-                "A /data/documents/file1.txt",
-                "A /data/documents/file2.pdf", 
-                "A /data/images/photo1.jpg",
-                "A /data/images/photo2.png",
-                "M /data/videos/video1.mp4",
-                "A /data/config/settings.json",
-                "M /data/logs/application.log",
-                "U /data/backups/old_backup.tar.gz",
-                "",
-                '{"original_size": 52428800, "compressed_size": 41943040, "deduplicated_size": 20971520}',
-                "",
-                "------------------------------------------------------------------------------",
-                "Original size      Compressed size    Deduplicated size",
-                "This archive:        50.00 MB            40.00 MB            20.00 MB", 
-                "All archives:       500.00 MB           400.00 MB           200.00 MB",
-                "",
-                "                       Unique chunks         Total chunks",
-                "Chunk index:                    1532                 3847",
-                "------------------------------------------------------------------------------",
-                "",
-                "Archive successfully created"
+            from app.utils.security import build_secure_borg_command
+            
+            # Build check command arguments based on task configuration
+            additional_args = [
+                "--verbose",     # Enable verbose output
+                "--progress",    # Show progress information
+                "--show-rc"      # Show return code information
             ]
             
-            # Stream each line with a delay
-            for i, line in enumerate(fake_output_lines):
-                # Add timestamp and store
+            # Determine base command based on check type
+            if task.check_type == "repository_only":
+                additional_args.append("--repository-only")
+            elif task.check_type == "archives_only":
+                additional_args.append("--archives-only")
+            # For "full", we don't add any flags (default behavior)
+            
+            # Add verification options
+            if task.verify_data and task.check_type != "repository_only":
+                additional_args.append("--verify-data")
+            
+            if task.repair_mode:
+                additional_args.append("--repair")
+                
+            if task.save_space:
+                additional_args.append("--save-space")
+                
+            # Add time limit for repository-only checks
+            if task.max_duration and task.check_type == "repository_only":
+                additional_args.extend(["--max-duration", str(task.max_duration)])
+            
+            # Add archive filters (only for archive checks)
+            if task.check_type != "repository_only":
+                if task.archive_prefix:
+                    additional_args.extend(["--prefix", task.archive_prefix])
+                    
+                if task.archive_glob:
+                    additional_args.extend(["--glob-archives", task.archive_glob])
+                    
+                if task.first_n_archives:
+                    additional_args.extend(["--first", str(task.first_n_archives)])
+                elif task.last_n_archives:
+                    additional_args.extend(["--last", str(task.last_n_archives)])
+            
+            # Repository path as positional argument
+            additional_args.append(job.repository.path)
+            
+            logger.info(f"🔍 Check settings - Type: {task.check_type}, Repository: {job.repository.path}")
+            
+            command, env = build_secure_borg_command(
+                base_command="borg check",
+                repository_path="",  # Path is in additional_args
+                passphrase=job.repository.get_passphrase(),
+                additional_args=additional_args
+            )
+            
+            # Execute the command and capture output
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env
+            )
+            
+            # Stream output to task
+            async for line in process.stdout:
+                decoded_line = line.decode('utf-8', errors='replace').rstrip()
                 task.output_lines.append({
                     'timestamp': datetime.now().isoformat(),
-                    'text': line
+                    'text': decoded_line
                 })
                 
                 # Broadcast output
-                self._broadcast_task_output(job.id, task_index, line)
-                
-                # Variable delay based on content (faster for empty lines, slower for file processing)
-                if line.startswith("Processing:") or line.startswith("A ") or line.startswith("M "):
-                    await asyncio.sleep(0.8)  # Slow for file operations
-                elif line.strip() == "":
-                    await asyncio.sleep(0.2)  # Fast for empty lines
-                elif "scanning" in line.lower() or "repository" in line.lower():
-                    await asyncio.sleep(1.5)  # Very slow for major operations
-                else:
-                    await asyncio.sleep(0.4)  # Medium for other lines
-                
-                logger.info(f"🧪 Fake backup output [{i+1}/{len(fake_output_lines)}]: {line}")
+                self._broadcast_task_output(job.id, task_index, decoded_line)
             
-            logger.info(f"✅ Fake backup task completed successfully")
-            return True
+            await process.wait()
             
+            if process.returncode == 0:
+                logger.info(f"✅ Check task completed successfully")
+                return True
+            else:
+                logger.error(f"❌ Check task failed with return code {process.returncode}")
+                task.error = f"Check failed with return code {process.returncode}"
+                return False
+                
         except Exception as e:
-            logger.error(f"❌ Exception in fake backup task: {str(e)}")
+            logger.error(f"❌ Exception in check task: {str(e)}")
             task.error = str(e)
             return False
     

@@ -6,12 +6,14 @@ function borgitoryApp() {
         cloudSyncConfigs: [],
         notificationConfigs: [],
         cleanupConfigs: [],
+        checkConfigs: [],
         
         init() {
             this.loadRepositories();
             this.loadCloudSyncConfigs();
             this.loadNotificationConfigs();
             this.loadCleanupConfigs();
+            this.loadCheckConfigs();
             loadJobHistory(); // Load initial job history
             initializeSSE(); // Set up single SSE connection
             initializeTabs(); // Initialize tabs
@@ -68,6 +70,19 @@ function borgitoryApp() {
                 this.updateCleanupSelects();
             } catch (error) {
                 console.error('Failed to load cleanup configs:', error);
+            }
+        },
+
+        async loadCheckConfigs() {
+            try {
+                const response = await fetch('/api/repository-check-configs/');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                this.checkConfigs = await response.json();
+                this.updateCheckSelects();
+            } catch (error) {
+                console.error('Failed to load check configs:', error);
             }
         },
         
@@ -161,6 +176,43 @@ function borgitoryApp() {
                             if (config.keep_yearly) parts.push(`${config.keep_yearly}y`);
                             if (parts.length > 0) description += ` (${parts.join(',')})`;
                         }
+                        option.textContent = description;
+                        select.appendChild(option);
+                    }
+                });
+            });
+        },
+
+        updateCheckSelects() {
+            const selects = document.querySelectorAll('#backup-check-select, #schedule-check-select');
+            selects.forEach(select => {
+                // Keep the "No check" option
+                const defaultOption = select.querySelector('option[value=""]');
+                select.innerHTML = '';
+                select.appendChild(defaultOption);
+                
+                // Add check config options
+                this.checkConfigs.forEach(config => {
+                    if (config.enabled) { // Only show enabled configs
+                        const option = document.createElement('option');
+                        option.value = config.id;
+                        let description = config.name;
+                        
+                        // Add check type information
+                        if (config.check_type === 'full') {
+                            description += ' (Full)';
+                        } else if (config.check_type === 'repository_only') {
+                            description += ' (Repo Only)';
+                        } else if (config.check_type === 'archives_only') {
+                            description += ' (Archives)';
+                        }
+                        
+                        // Add verification indicators
+                        const indicators = [];
+                        if (config.verify_data) indicators.push('Data Verify');
+                        if (config.repair_mode) indicators.push('Repair');
+                        if (indicators.length > 0) description += ` [${indicators.join(', ')}]`;
+                        
                         option.textContent = description;
                         select.appendChild(option);
                     }

@@ -20,6 +20,7 @@ class JobType(str, Enum):
     LIST = "list"
     SYNC = "sync"
     SCHEDULED_BACKUP = "scheduled_backup"
+    CHECK = "check"
 
 
 class ProviderType(str, Enum):
@@ -32,6 +33,12 @@ class ProviderType(str, Enum):
 class CleanupStrategy(str, Enum):
     SIMPLE = "simple"
     ADVANCED = "advanced"
+
+
+class CheckType(str, Enum):
+    FULL = "full"
+    REPOSITORY_ONLY = "repository_only"
+    ARCHIVES_ONLY = "archives_only"
 
 
 class CompressionType(str, Enum):
@@ -157,6 +164,7 @@ class ScheduleCreate(ScheduleBase):
     source_path: Optional[str] = "/data"
     cloud_sync_config_id: Optional[int] = None
     cleanup_config_id: Optional[int] = None
+    check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
     
     @field_validator('cloud_sync_config_id', mode='before')
@@ -171,6 +179,24 @@ class ScheduleCreate(ScheduleBase):
     @field_validator('cleanup_config_id', mode='before')
     @classmethod
     def validate_cleanup_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
+    
+    @field_validator('check_config_id', mode='before')
+    @classmethod
+    def validate_check_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
+    
+    @field_validator('notification_config_id', mode='before')
+    @classmethod
+    def validate_notification_config_id(cls, v):
         if v == "" or v == "none":
             return None
         if v is None:
@@ -288,6 +314,7 @@ class BackupRequest(BaseModel):
     dry_run: bool = False
     cloud_sync_config_id: Optional[int] = Field(None, gt=0)
     cleanup_config_id: Optional[int] = Field(None, gt=0)
+    check_config_id: Optional[int] = Field(None, gt=0)
     notification_config_id: Optional[int] = Field(None, gt=0)
     
     @field_validator('dry_run', mode='before')
@@ -309,6 +336,15 @@ class BackupRequest(BaseModel):
     @field_validator('cleanup_config_id', mode='before')
     @classmethod
     def validate_cleanup_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
+    
+    @field_validator('check_config_id', mode='before')
+    @classmethod
+    def validate_check_config_id(cls, v):
         if v == "" or v == "none":
             return None
         if v is None:
@@ -530,6 +566,104 @@ class CloudSyncConfig(CloudSyncConfigBase):
     }
 
 
+class RepositoryCheckConfigBase(BaseModel):
+    name: str = Field(
+        min_length=1,
+        max_length=128,
+        description="Repository check configuration name"
+    )
+    description: Optional[str] = Field(None, max_length=500)
+    check_type: CheckType = CheckType.FULL
+    verify_data: bool = False
+    repair_mode: bool = False
+    save_space: bool = False
+    max_duration: Optional[int] = Field(None, gt=0, description="Max duration in seconds")
+    archive_prefix: Optional[str] = Field(None, max_length=255)
+    archive_glob: Optional[str] = Field(None, max_length=255)
+    first_n_archives: Optional[int] = Field(None, gt=0)
+    last_n_archives: Optional[int] = Field(None, gt=0)
+
+    @field_validator('max_duration', mode='before')
+    @classmethod
+    def validate_max_duration(cls, v):
+        if v == "" or v is None:
+            return None
+        return int(v)
+    
+    @field_validator('first_n_archives', mode='before')
+    @classmethod
+    def validate_first_n_archives(cls, v):
+        if v == "" or v is None:
+            return None
+        return int(v)
+    
+    @field_validator('last_n_archives', mode='before')
+    @classmethod
+    def validate_last_n_archives(cls, v):
+        if v == "" or v is None:
+            return None
+        return int(v)
+
+    @model_validator(mode='after')
+    def validate_check_constraints(self):
+        """Validate check configuration constraints"""
+        # Can't use verify_data with repository_only
+        if self.check_type == CheckType.REPOSITORY_ONLY and self.verify_data:
+            raise ValueError("Cannot use verify_data with repository_only checks")
+        
+        # Can't use repair mode with max_duration (partial checks)
+        if self.max_duration is not None and self.repair_mode:
+            raise ValueError("Cannot use repair mode with partial checks (max_duration)")
+        
+        # Max duration requires repository_only
+        if self.max_duration is not None and self.check_type != CheckType.REPOSITORY_ONLY:
+            raise ValueError("max_duration can only be used with repository_only checks")
+        
+        # Archive filters only make sense with archive checks
+        if self.check_type == CheckType.REPOSITORY_ONLY:
+            if self.archive_prefix or self.archive_glob or self.first_n_archives or self.last_n_archives:
+                raise ValueError("Archive filters cannot be used with repository_only checks")
+        
+        # Can't specify both first_n and last_n
+        if self.first_n_archives is not None and self.last_n_archives is not None:
+            raise ValueError("Cannot specify both first_n_archives and last_n_archives")
+        
+        return self
+
+
+class RepositoryCheckConfigCreate(RepositoryCheckConfigBase):
+    pass
+
+
+class RepositoryCheckConfigUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=128)
+    description: Optional[str] = Field(None, max_length=500)
+    check_type: Optional[CheckType] = None
+    verify_data: Optional[bool] = None
+    repair_mode: Optional[bool] = None
+    save_space: Optional[bool] = None
+    max_duration: Optional[int] = Field(None, gt=0)
+    archive_prefix: Optional[str] = Field(None, max_length=255)
+    archive_glob: Optional[str] = Field(None, max_length=255)
+    first_n_archives: Optional[int] = Field(None, gt=0)
+    last_n_archives: Optional[int] = Field(None, gt=0)
+    enabled: Optional[bool] = None
+
+
+class RepositoryCheckConfig(RepositoryCheckConfigBase):
+    id: int = Field(gt=0)
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {
+        "from_attributes": True,
+        "str_strip_whitespace": True,
+        "validate_assignment": True,
+        "extra": "forbid"
+    }
+
+
 class PruneRequest(BaseModel):
     repository_id: int = Field(gt=0)
     strategy: CleanupStrategy = CleanupStrategy.SIMPLE
@@ -556,3 +690,72 @@ class PruneRequest(BaseModel):
 
 class CloudSyncTestRequest(BaseModel):
     config_id: int = Field(gt=0, description="Cloud sync configuration ID to test")
+
+
+class CheckRequest(BaseModel):
+    repository_id: int = Field(gt=0)
+    check_config_id: Optional[int] = Field(None, gt=0, description="Use existing check policy, or None for custom check")
+    
+    # Custom check parameters (used when check_config_id is None)
+    check_type: Optional[CheckType] = CheckType.FULL
+    verify_data: bool = False
+    repair_mode: bool = False
+    save_space: bool = False
+    max_duration: Optional[int] = Field(None, gt=0, description="Max duration in seconds")
+    archive_prefix: Optional[str] = Field(None, max_length=255)
+    archive_glob: Optional[str] = Field(None, max_length=255)
+    first_n_archives: Optional[int] = Field(None, gt=0)
+    last_n_archives: Optional[int] = Field(None, gt=0)
+    
+    @field_validator('check_config_id', mode='before')
+    @classmethod
+    def validate_check_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
+    
+    @model_validator(mode='after')
+    def validate_check_request(self):
+        """Validate check request constraints"""
+        # If using a policy, don't allow custom parameters
+        if self.check_config_id is not None:
+            custom_params = [
+                self.check_type != CheckType.FULL,
+                self.verify_data,
+                self.repair_mode,
+                self.save_space,
+                self.max_duration is not None,
+                self.archive_prefix is not None,
+                self.archive_glob is not None,
+                self.first_n_archives is not None,
+                self.last_n_archives is not None
+            ]
+            if any(custom_params):
+                raise ValueError("Cannot specify custom check parameters when using a check policy")
+        
+        # Validate custom parameters when not using a policy
+        if self.check_config_id is None:
+            # Can't use verify_data with repository_only
+            if self.check_type == CheckType.REPOSITORY_ONLY and self.verify_data:
+                raise ValueError("Cannot use verify_data with repository_only checks")
+            
+            # Can't use repair mode with max_duration (partial checks)
+            if self.max_duration is not None and self.repair_mode:
+                raise ValueError("Cannot use repair mode with partial checks (max_duration)")
+            
+            # Max duration requires repository_only
+            if self.max_duration is not None and self.check_type != CheckType.REPOSITORY_ONLY:
+                raise ValueError("max_duration can only be used with repository_only checks")
+            
+            # Archive filters only make sense with archive checks
+            if self.check_type == CheckType.REPOSITORY_ONLY:
+                if self.archive_prefix or self.archive_glob or self.first_n_archives or self.last_n_archives:
+                    raise ValueError("Archive filters cannot be used with repository_only checks")
+            
+            # Can't specify both first_n and last_n
+            if self.first_n_archives is not None and self.last_n_archives is not None:
+                raise ValueError("Cannot specify both first_n_archives and last_n_archives")
+        
+        return self

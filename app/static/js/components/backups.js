@@ -13,7 +13,7 @@ function handleBackupResponse(event) {
                 <div id="backup-job-${response.job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <div class="flex items-center">
                         <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                        <span class="text-blue-700 text-sm">Backup job #${response.job_id} started... (This may take a few minutes if Docker images need to be downloaded)</span>
+                        <span class="text-blue-700 text-sm">Backup job #${response.job_id} started...</span>
                     </div>
                 </div>
             `;

@@ -61,6 +61,13 @@
                 <p class="mt-1 text-xs text-gray-500">Automatically backup to cloud after each scheduled Borg backup</p>
             </div>
             <div>
+                <label class="block text-sm font-medium text-gray-700">Repository Check (Optional)</label>
+                <select name="check_config_id" id="schedule-check-select" class="select-modern w-full">
+                    <option value="">No check</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">Verify repository integrity after each scheduled backup</p>
+            </div>
+            <div>
                 <label class="block text-sm font-medium text-gray-700">Notifications (Optional)</label>
                 <select name="notification_config_id" id="schedule-notification-select" class="select-modern w-full">
                     <option value="">No notifications</option>

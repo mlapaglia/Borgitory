@@ -60,6 +60,7 @@ class Job(Base):
     container_id = Column(String, nullable=True)
     cloud_sync_config_id = Column(Integer, ForeignKey("cloud_sync_configs.id"), nullable=True)
     cleanup_config_id = Column(Integer, ForeignKey("cleanup_configs.id"), nullable=True)
+    check_config_id = Column(Integer, ForeignKey("repository_check_configs.id"), nullable=True)
     notification_config_id = Column(Integer, ForeignKey("notification_configs.id"), nullable=True)
     
     # New composite job fields
@@ -69,6 +70,7 @@ class Job(Base):
     
     repository = relationship("Repository", back_populates="jobs")
     cloud_backup_config = relationship("CloudSyncConfig")
+    check_config = relationship("RepositoryCheckConfig")
     tasks = relationship("JobTask", back_populates="job", cascade="all, delete-orphan")
 
 
@@ -104,11 +106,13 @@ class Schedule(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     cloud_sync_config_id = Column(Integer, ForeignKey("cloud_sync_configs.id"), nullable=True)
     cleanup_config_id = Column(Integer, ForeignKey("cleanup_configs.id"), nullable=True)
+    check_config_id = Column(Integer, ForeignKey("repository_check_configs.id"), nullable=True)
     notification_config_id = Column(Integer, ForeignKey("notification_configs.id"), nullable=True)
     
     repository = relationship("Repository", back_populates="schedules")
     cloud_sync_config = relationship("CloudSyncConfig")
     cleanup_config = relationship("CleanupConfig")
+    check_config = relationship("RepositoryCheckConfig")
     notification_config = relationship("NotificationConfig")
 
 
@@ -267,6 +271,34 @@ class CloudSyncConfig(Base):
             private_key = cipher_suite.decrypt(self.encrypted_private_key.encode()).decode()
             
         return password, private_key
+
+
+class RepositoryCheckConfig(Base):
+    __tablename__ = "repository_check_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    description = Column(String, nullable=True)
+    
+    # Check Type
+    check_type = Column(String, nullable=False, default="full")  # "full", "repository_only", "archives_only"
+    
+    # Verification Options
+    verify_data = Column(Boolean, default=False)
+    repair_mode = Column(Boolean, default=False) 
+    save_space = Column(Boolean, default=False)
+    
+    # Advanced Options
+    max_duration = Column(Integer, nullable=True)  # seconds
+    archive_prefix = Column(String, nullable=True)
+    archive_glob = Column(String, nullable=True)
+    first_n_archives = Column(Integer, nullable=True)
+    last_n_archives = Column(Integer, nullable=True)
+    
+    # Metadata
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 async def init_db():

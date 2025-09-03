@@ -25,6 +25,8 @@ function switchTab(tabName) {
         loadDebugInfo();
     } else if (tabName === 'statistics') {
         populateStatisticsRepositories();
+    } else if (tabName === 'repository-check') {
+        initRepositoryCheck();
     }
 }
 

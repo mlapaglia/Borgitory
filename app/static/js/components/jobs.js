@@ -1,6 +1,7 @@
 // Job History UI Functions
 
-function toggleJobDetails(jobId) {
+// Make functions globally available
+window.toggleJobDetails = function(jobId) {
     const detailsDiv = document.getElementById(`job-details-${jobId}`);
     const chevronIcon = document.getElementById(`chevron-${jobId}`);
     
@@ -15,7 +16,7 @@ function toggleJobDetails(jobId) {
     }
 }
 
-function toggleTaskDetails(jobId, taskOrder) {
+window.toggleTaskDetails = function(jobId, taskOrder) {
     const detailsDiv = document.getElementById(`task-details-${jobId}-${taskOrder}`);
     const chevronIcon = document.getElementById(`task-chevron-${jobId}-${taskOrder}`);
     
@@ -23,14 +24,27 @@ function toggleTaskDetails(jobId, taskOrder) {
         if (detailsDiv.classList.contains('hidden')) {
             detailsDiv.classList.remove('hidden');
             chevronIcon.style.transform = 'rotate(180deg)';
+            
+            // Initialize live output streaming for running tasks
+            const outputDiv = document.getElementById(`task-output-${jobId}-${taskOrder}`);
+            if (outputDiv && outputDiv.dataset.jobUuid) {
+                initializeTaskLiveOutput(outputDiv.dataset.jobUuid, taskOrder, outputDiv);
+            }
         } else {
             detailsDiv.classList.add('hidden');
             chevronIcon.style.transform = 'rotate(0deg)';
+            
+            // Clean up SSE connection when collapsing
+            const outputDiv = document.getElementById(`task-output-${jobId}-${taskOrder}`);
+            if (outputDiv && outputDiv.liveOutputSource) {
+                outputDiv.liveOutputSource.close();
+                outputDiv.liveOutputSource = null;
+            }
         }
     }
 }
 
-function copyJobOutput(jobId) {
+window.copyJobOutput = function(jobId) {
     const outputDiv = document.getElementById(`job-output-${jobId}`);
     if (outputDiv) {
         const text = outputDiv.textContent || outputDiv.innerText;
@@ -43,7 +57,7 @@ function copyJobOutput(jobId) {
     }
 }
 
-function copyTaskOutput(jobId, taskOrder) {
+window.copyTaskOutput = function(jobId, taskOrder) {
     const outputDiv = document.getElementById(`task-output-${jobId}-${taskOrder}`);
     if (outputDiv) {
         const text = outputDiv.textContent || outputDiv.innerText;
@@ -56,7 +70,7 @@ function copyTaskOutput(jobId, taskOrder) {
     }
 }
 
-function viewRunningJobDetails(jobId) {
+window.viewRunningJobDetails = function(jobId) {
     // Navigate to job details view or open a modal
     // For now, just show an alert with the job ID
     console.log(`Viewing details for running job: ${jobId}`);
@@ -66,6 +80,60 @@ function viewRunningJobDetails(jobId) {
     // - Navigate to a dedicated job details page  
     // - Show more detailed progress information
     showNotification(`Viewing job ${jobId.substring(0, 8)}...`, 'info');
+}
+
+// Initialize live output streaming for individual task
+function initializeTaskLiveOutput(jobUuid, taskIndex, outputElement) {
+    if (!jobUuid || outputElement.liveOutputSource) {
+        return; // Already connected or no job UUID
+    }
+    
+    // Connect to the individual job stream endpoint
+    const eventSource = new EventSource(`/api/jobs/${jobUuid}/stream`);
+    outputElement.liveOutputSource = eventSource;
+    
+    eventSource.onopen = function(event) {
+        outputElement.innerHTML = '<div class="text-gray-500">Connected to live output...</div>';
+    };
+    
+    eventSource.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'task_output' && data.task_index === parseInt(taskIndex)) {
+                // Clear the "Connecting..." message on first real output
+                if (outputElement.innerHTML.includes('Connected to live output')) {
+                    outputElement.innerHTML = '';
+                }
+                
+                // Add the new line
+                const lineElement = document.createElement('div');
+                lineElement.textContent = data.line;
+                outputElement.appendChild(lineElement);
+                
+                // Auto-scroll to bottom
+                outputElement.scrollTop = outputElement.scrollHeight;
+            } else if (data.type === 'task_completed' && data.task_index === parseInt(taskIndex)) {
+                // Task completed, close connection
+                eventSource.close();
+                outputElement.liveOutputSource = null;
+                
+                // Add completion indicator
+                const completionElement = document.createElement('div');
+                completionElement.className = 'text-blue-400 mt-2';
+                completionElement.textContent = `--- Task completed (${data.status}) ---`;
+                outputElement.appendChild(completionElement);
+            }
+        } catch (error) {
+            // Silently handle parsing errors
+        }
+    };
+    
+    eventSource.onerror = function(event) {
+        outputElement.innerHTML = '<div class="text-red-400">Connection error - refresh to retry</div>';
+        eventSource.close();
+        outputElement.liveOutputSource = null;
+    };
 }
 
 // Helper function for showing notifications (assumes it exists in utils.js)

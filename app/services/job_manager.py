@@ -316,20 +316,23 @@ class BorgJobManager:
     
     def _broadcast_job_event(self, event: Dict):
         """Broadcast job event to all SSE clients"""
-        # Remove empty queues (disconnected clients)
-        self._event_queues = [q for q in self._event_queues if not q.empty() or q.qsize() == 0]
-        
         # Send event to all active queues
-        for queue in self._event_queues[:]:  # Create copy to avoid modification during iteration
+        failed_queues = []
+        for queue in self._event_queues:
             try:
                 if not queue.full():
                     queue.put_nowait(event)
-            except:
-                # Remove failed queues
-                try:
-                    self._event_queues.remove(queue)
-                except ValueError:
-                    pass
+            except Exception as e:
+                # Mark queue for removal (likely disconnected client)
+                logger.debug(f"Failed to send event to queue: {e}")
+                failed_queues.append(queue)
+        
+        # Remove failed queues
+        for queue in failed_queues:
+            try:
+                self._event_queues.remove(queue)
+            except ValueError:
+                pass
     
     def get_queue_stats(self) -> Dict:
         """Get queue and concurrency statistics"""

@@ -1,5 +1,5 @@
 <!-- Left Navigation Panel -->
-<div class="w-64 bg-white shadow-lg flex-shrink-0">
+<div id="sidebar" class="w-64 bg-white shadow-lg flex-shrink-0 lg:block fixed lg:static inset-y-0 left-0 z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
     <div class="p-4 border-b">
         <h1 class="text-xl font-bold text-gray-800">Borgitory</h1>
         <p class="text-sm text-gray-600">Borg Backup Manager</p>
@@ -8,7 +8,7 @@
     <nav class="mt-4">
         <div class="px-4 space-y-2">
             <button 
-                onclick="switchTab('repositories')"
+                onclick="switchTab('repositories'); closeMobileSidebar();"
                 id="nav-repositories"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -19,7 +19,7 @@
             </button>
             
             <button 
-                onclick="switchTab('backups')"
+                onclick="switchTab('backups'); closeMobileSidebar();"
                 id="nav-backups"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -30,7 +30,7 @@
             </button>
             
             <button 
-                onclick="switchTab('schedules')"
+                onclick="switchTab('schedules'); closeMobileSidebar();"
                 id="nav-schedules"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -41,7 +41,7 @@
             </button>
             
             <button 
-                onclick="switchTab('cloud-sync')"
+                onclick="switchTab('cloud-sync'); closeMobileSidebar();"
                 id="nav-cloud-sync"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -52,7 +52,7 @@
             </button>
             
             <button 
-                onclick="switchTab('archives')"
+                onclick="switchTab('archives'); closeMobileSidebar();"
                 id="nav-archives"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -63,7 +63,7 @@
             </button>
             
             <button 
-                onclick="switchTab('statistics')"
+                onclick="switchTab('statistics'); closeMobileSidebar();"
                 id="nav-statistics"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -74,7 +74,7 @@
             </button>
             
             <button 
-                onclick="switchTab('cleanup')"
+                onclick="switchTab('cleanup'); closeMobileSidebar();"
                 id="nav-cleanup"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -85,7 +85,7 @@
             </button>
             
             <button 
-                onclick="switchTab('notifications')"
+                onclick="switchTab('notifications'); closeMobileSidebar();"
                 id="nav-notifications"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -96,7 +96,7 @@
             </button>
             
             <button 
-                onclick="switchTab('jobs')"
+                onclick="switchTab('jobs'); closeMobileSidebar();"
                 id="nav-jobs"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >
@@ -107,7 +107,18 @@
             </button>
             
             <button 
-                onclick="switchTab('debug')"
+                onclick="switchTab('repository-check'); closeMobileSidebar();"
+                id="nav-repository-check"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Repository Check</span>
+            </button>
+            
+            <button 
+                onclick="switchTab('debug'); closeMobileSidebar();"
                 id="nav-debug"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
             >

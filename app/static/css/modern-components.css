@@ -117,3 +117,63 @@
         color: #ffffff;
     }
 }
+
+/* Mobile Sidebar Responsiveness */
+@media (max-width: 1023px) {
+    /* Hide sidebar by default on mobile */
+    #sidebar {
+        transform: translateX(-100%);
+    }
+    
+    /* Show sidebar when mobile menu is open */
+    #sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    /* Ensure main content takes full width on mobile */
+    .flex-1 {
+        width: 100%;
+        margin-left: 0 !important;
+    }
+    
+    /* Adjust sidebar height for mobile navbar */
+    #sidebar {
+        top: 64px; /* Account for navbar height */
+        height: calc(100vh - 64px);
+    }
+}
+
+/* Desktop styles - ensure sidebar is always visible */
+@media (min-width: 1024px) {
+    #sidebar {
+        transform: translateX(0) !important;
+        position: static !important;
+    }
+    
+    #sidebar-overlay {
+        display: none !important;
+    }
+    
+    #mobile-menu-button {
+        display: none !important;
+    }
+}
+
+/* Smooth transitions for sidebar */
+#sidebar {
+    transition: transform 0.3s ease-in-out;
+}
+
+/* Overlay transition */
+#sidebar-overlay {
+    transition: opacity 0.3s ease-in-out;
+}
+
+#sidebar-overlay.show {
+    opacity: 1;
+}
+
+/* Prevent body scroll when mobile sidebar is open */
+body.mobile-sidebar-open {
+    overflow: hidden;
+}

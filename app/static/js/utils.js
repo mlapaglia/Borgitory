@@ -48,16 +48,130 @@ function loadJobHistory() {
 }
 
 function initializeSSE() {
-    // This would normally set up Server-Sent Events for real-time updates
-    // For now, we'll use periodic refresh
-    setInterval(() => {
-        if (document.getElementById('current-jobs')) {
-            htmx.ajax('GET', '/api/jobs/current/html', {
-                target: '#current-jobs',
-                swap: 'innerHTML'
-            });
+    console.log('initializeSSE() called');
+    // Set up Server-Sent Events for real-time job updates
+    if (typeof EventSource !== 'undefined') {
+        console.log('EventSource supported, creating connection to /api/jobs/stream');
+        const eventSource = new EventSource('/api/jobs/stream');
+        
+        eventSource.onopen = function(event) {
+            console.log('SSE connection opened successfully');
+        };
+        
+        eventSource.addEventListener('jobs_update', function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.jobs && document.getElementById('current-jobs')) {
+                    // Update current jobs display
+                    htmx.ajax('GET', '/api/jobs/current/html', {
+                        target: '#current-jobs',
+                        swap: 'innerHTML'
+                    });
+                }
+            } catch (error) {
+                console.error('Error processing jobs_update event:', error);
+            }
+        });
+        
+        eventSource.addEventListener('job_progress', function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Job progress:', data);
+                // Update specific job progress if visible
+                updateJobProgress(data);
+            } catch (error) {
+                console.error('Error processing job_progress event:', error);
+            }
+        });
+        
+        eventSource.addEventListener('task_output', function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                updateTaskOutput(data);
+            } catch (error) {
+                // Silently handle task output parsing errors
+            }
+        });
+        
+        eventSource.onerror = function(event) {
+            console.error('SSE connection error:', event);
+        };
+        
+        // Store reference for cleanup
+        window.jobsEventSource = eventSource;
+    } else {
+        console.log('EventSource not supported, falling back to polling');
+        // Fallback to periodic refresh
+        setInterval(() => {
+            if (document.getElementById('current-jobs')) {
+                htmx.ajax('GET', '/api/jobs/current/html', {
+                    target: '#current-jobs',
+                    swap: 'innerHTML'
+                });
+            }
+        }, 5000);
+    }
+}
+
+function updateJobProgress(data) {
+    // Update progress for specific job
+    const jobElement = document.getElementById(`backup-job-${data.job_id}`);
+    if (jobElement && data.progress) {
+        // Update progress display
+        const progressElement = jobElement.querySelector('.progress-text');
+        if (progressElement) {
+            progressElement.textContent = data.progress;
         }
-    }, 5000);
+    }
+}
+
+function updateTaskOutput(data) {
+    // Update live output for composite jobs (including check jobs)
+    // Look for job elements with various possible ID patterns
+    const jobElement = document.getElementById(`backup-job-${data.job_id}`) || 
+                      document.getElementById(`check-job-${data.job_id}`) ||
+                      document.getElementById(`job-${data.job_id}`);
+    
+    if (jobElement) {
+        // Find or create live output container
+        let outputContainer = jobElement.querySelector('.live-output');
+        if (!outputContainer) {
+            // Create live output container if it doesn't exist
+            outputContainer = document.createElement('div');
+            outputContainer.className = 'live-output mt-2 p-2 bg-gray-900 text-green-400 rounded text-xs font-mono max-h-40 overflow-y-auto';
+            jobElement.appendChild(outputContainer);
+        }
+        
+        // Add the new line to the output
+        const lineElement = document.createElement('div');
+        lineElement.textContent = data.line;
+        outputContainer.appendChild(lineElement);
+        
+        // Auto-scroll to bottom
+        outputContainer.scrollTop = outputContainer.scrollHeight;
+        
+        // Update any progress text element
+        const progressElement = jobElement.querySelector('.progress-text');
+        if (progressElement) {
+            progressElement.textContent = data.line || 'Processing...';
+        }
+    } else {
+        // If we can't find a specific job element, try to find a general live output area
+        const liveOutputElement = document.querySelector('#live-output-content') || 
+                                 document.querySelector('.live-output') ||
+                                 document.querySelector('#backup-status') ||
+                                 document.querySelector('#check-status');
+        
+        if (liveOutputElement) {
+            const lineElement = document.createElement('div');
+            lineElement.className = 'text-xs font-mono text-green-400';
+            lineElement.textContent = `[${data.job_id.substring(0, 8)}] ${data.line}`;
+            liveOutputElement.appendChild(lineElement);
+            
+            // Auto-scroll to bottom
+            liveOutputElement.scrollTop = liveOutputElement.scrollHeight;
+        }
+    }
 }
 
 // Schedule Management Functions

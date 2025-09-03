@@ -100,6 +100,33 @@ async def execute_scheduled_backup(schedule_id: int):
                     task_definitions.append(prune_task)
                     logger.info(f"📋 SCHEDULER: Added cleanup task to composite job")
             
+            # Add check task if repository check is configured
+            if schedule.check_config_id:
+                from app.models.database import RepositoryCheckConfig
+                check_config = db.query(RepositoryCheckConfig).filter(
+                    RepositoryCheckConfig.id == schedule.check_config_id,
+                    RepositoryCheckConfig.enabled == True
+                ).first()
+                
+                if check_config:
+                    check_task = {
+                        'type': 'check',
+                        'name': f'Check {repository.name} ({check_config.name})',
+                        'check_type': check_config.check_type,
+                        'verify_data': check_config.verify_data,
+                        'repair_mode': check_config.repair_mode,
+                        'save_space': check_config.save_space,
+                        'max_duration': check_config.max_duration,
+                        'archive_prefix': check_config.archive_prefix,
+                        'archive_glob': check_config.archive_glob,
+                        'first_n_archives': check_config.first_n_archives,
+                        'last_n_archives': check_config.last_n_archives
+                    }
+                    task_definitions.append(check_task)
+                    logger.info(f"📋 SCHEDULER: Added check task to composite job")
+            else:
+                logger.info(f"📋 SCHEDULER: No repository check configured")
+            
             # Add cloud sync task if cloud backup is configured
             if schedule.cloud_sync_config_id:
                 task_definitions.append({

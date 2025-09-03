@@ -20,6 +20,24 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
+                    <!-- Hamburger Menu Button (Mobile Only) -->
+                    <button 
+                        id="mobile-menu-button" 
+                        onclick="toggleMobileSidebar()"
+                        class="lg:hidden mr-3 p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                        aria-expanded="false"
+                        aria-controls="mobile-sidebar"
+                    >
+                        <span class="sr-only">Open sidebar</span>
+                        <!-- Hamburger Icon -->
+                        <svg id="hamburger-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                        <!-- Close Icon (hidden by default) -->
+                        <svg id="close-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                     <h1 class="text-xl font-semibold text-gray-900">Borgitory</h1>
                 </div>
                 <div class="flex items-center space-x-4">
@@ -56,6 +74,7 @@
     <script src="/static/js/components/jobs.js"></script>
     <script src="/static/js/components/path-autocomplete.js"></script>
     <script src="/static/js/components/archive-browser.js"></script>
+    <script src="/static/js/components/repository-check.js"></script>
     <script src="/static/js/components/debug.js"></script>
 
     <script>
@@ -86,6 +105,87 @@
             // Only show if no specific handler was used
             if (!evt.target.hasAttribute('hx-on::after-request')) {
                 showNotification('An error occurred: ' + evt.detail.xhr.statusText, 'error');
+            }
+        });
+
+        // Mobile Sidebar Functionality (Global functions)
+        window.toggleMobileSidebar = function() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const hamburgerIcon = document.getElementById('hamburger-icon');
+            const closeIcon = document.getElementById('close-icon');
+            const button = document.getElementById('mobile-menu-button');
+            const body = document.body;
+            
+            const isOpen = sidebar.classList.contains('mobile-open');
+            
+            if (isOpen) {
+                closeMobileSidebar();
+            } else {
+                openMobileSidebar();
+            }
+        }
+        
+        window.openMobileSidebar = function() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const hamburgerIcon = document.getElementById('hamburger-icon');
+            const closeIcon = document.getElementById('close-icon');
+            const button = document.getElementById('mobile-menu-button');
+            const body = document.body;
+            
+            sidebar.classList.add('mobile-open');
+            overlay.classList.remove('hidden');
+            overlay.classList.add('show');
+            hamburgerIcon.classList.add('hidden');
+            closeIcon.classList.remove('hidden');
+            button.setAttribute('aria-expanded', 'true');
+            body.classList.add('mobile-sidebar-open');
+        }
+        
+        window.closeMobileSidebar = function() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const hamburgerIcon = document.getElementById('hamburger-icon');
+            const closeIcon = document.getElementById('close-icon');
+            const button = document.getElementById('mobile-menu-button');
+            const body = document.body;
+            
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('show');
+            hamburgerIcon.classList.remove('hidden');
+            closeIcon.classList.add('hidden');
+            button.setAttribute('aria-expanded', 'false');
+            body.classList.remove('mobile-sidebar-open');
+        }
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('sidebar');
+            const button = document.getElementById('mobile-menu-button');
+            const isClickInsideSidebar = sidebar && sidebar.contains(event.target);
+            const isClickOnButton = button && button.contains(event.target);
+            const isMobile = window.innerWidth < 1024;
+            
+            if (isMobile && !isClickInsideSidebar && !isClickOnButton && sidebar.classList.contains('mobile-open')) {
+                closeMobileSidebar();
+            }
+        });
+        
+        // Close sidebar on window resize to desktop
+        window.addEventListener('resize', function() {
+            const sidebar = document.getElementById('sidebar');
+            if (window.innerWidth >= 1024 && sidebar.classList.contains('mobile-open')) {
+                closeMobileSidebar();
+            }
+        });
+        
+        // Handle escape key to close sidebar
+        document.addEventListener('keydown', function(event) {
+            const sidebar = document.getElementById('sidebar');
+            if (event.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
+                closeMobileSidebar();
             }
         });
     </script>

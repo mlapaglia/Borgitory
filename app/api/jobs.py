@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.database import Repository, Job, JobTask, get_db
-from app.models.schemas import Job as JobSchema, BackupRequest, PruneRequest
+from app.models.schemas import Job as JobSchema, BackupRequest, PruneRequest, CheckRequest
 from app.services.borg_service import borg_service
 from app.services.job_manager import borg_job_manager
 
@@ -86,6 +86,30 @@ async def create_backup(
                 'name': f'Sync to Cloud'
             })
         
+        # Add check task if repository check is configured
+        if backup_request.check_config_id:
+            from app.models.database import RepositoryCheckConfig
+            check_config = db.query(RepositoryCheckConfig).filter(
+                RepositoryCheckConfig.id == backup_request.check_config_id,
+                RepositoryCheckConfig.enabled == True
+            ).first()
+            
+            if check_config:
+                check_task = {
+                    'type': 'check',
+                    'name': f'Check {repository.name} ({check_config.name})',
+                    'check_type': check_config.check_type,
+                    'verify_data': check_config.verify_data,
+                    'repair_mode': check_config.repair_mode,
+                    'save_space': check_config.save_space,
+                    'max_duration': check_config.max_duration,
+                    'archive_prefix': check_config.archive_prefix,
+                    'archive_glob': check_config.archive_glob,
+                    'first_n_archives': check_config.first_n_archives,
+                    'last_n_archives': check_config.last_n_archives
+                }
+                task_definitions.append(check_task)
+        
         # Create composite job
         job_id = await composite_job_manager.create_composite_job(
             job_type="manual_backup",
@@ -160,13 +184,97 @@ async def create_prune_job(
         raise HTTPException(status_code=500, detail=f"Failed to start prune job: {str(e)}")
 
 
+@router.post("/check")
+async def create_check_job(
+    check_request: CheckRequest, 
+    db: Session = Depends(get_db)
+):
+    """Start a repository check job and return job_id for tracking"""
+    repository = db.query(Repository).filter(
+        Repository.id == check_request.repository_id
+    ).first()
+    
+    if repository is None:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    
+    # Import here to avoid circular imports
+    from app.models.database import RepositoryCheckConfig
+    
+    try:
+        # Import composite job manager
+        from app.services.composite_job_manager import composite_job_manager
+        
+        # Determine check parameters - either from policy or custom
+        if check_request.check_config_id:
+            # Use existing check policy
+            check_config = db.query(RepositoryCheckConfig).filter(
+                RepositoryCheckConfig.id == check_request.check_config_id
+            ).first()
+            
+            if not check_config:
+                raise HTTPException(status_code=404, detail="Check policy not found")
+            
+            if not check_config.enabled:
+                raise HTTPException(status_code=400, detail="Check policy is disabled")
+                
+            # Use policy parameters
+            task_def = {
+                'type': 'check',
+                'name': f'Check {repository.name} ({check_config.name})',
+                'check_type': check_config.check_type,
+                'verify_data': check_config.verify_data,
+                'repair_mode': check_config.repair_mode,
+                'save_space': check_config.save_space,
+                'max_duration': check_config.max_duration,
+                'archive_prefix': check_config.archive_prefix,
+                'archive_glob': check_config.archive_glob,
+                'first_n_archives': check_config.first_n_archives,
+                'last_n_archives': check_config.last_n_archives
+            }
+        else:
+            # Use custom parameters
+            task_def = {
+                'type': 'check',
+                'name': f'Check {repository.name}',
+                'check_type': check_request.check_type,
+                'verify_data': check_request.verify_data,
+                'repair_mode': check_request.repair_mode,
+                'save_space': check_request.save_space,
+                'max_duration': check_request.max_duration,
+                'archive_prefix': check_request.archive_prefix,
+                'archive_glob': check_request.archive_glob,
+                'first_n_archives': check_request.first_n_archives,
+                'last_n_archives': check_request.last_n_archives
+            }
+        
+        task_definitions = [task_def]
+        
+        # Start the composite job
+        job_id = await composite_job_manager.create_composite_job(
+            job_type="check",
+            task_definitions=task_definitions,
+            repository=repository,
+            schedule=None
+        )
+        
+        return {"job_id": job_id, "status": "started"}
+        
+    except Exception as e:
+        logger.error(f"Failed to start check job: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start check job: {str(e)}")
+
+
 @router.get("/stream")
 async def stream_all_jobs():
     """Stream real-time updates for all jobs via Server-Sent Events"""
     async def event_generator():
         try:
-            # Send initial job list
+            from app.services.composite_job_manager import composite_job_manager
+            
+            # Send initial job list (both regular and composite jobs)
             jobs_data = []
+            
+            # Add regular borg jobs
             for job_id, borg_job in borg_job_manager.jobs.items():
                 jobs_data.append({
                     "id": job_id,
@@ -180,12 +288,26 @@ async def stream_all_jobs():
                     "command": " ".join(borg_job.command[:3]) + "..." if len(borg_job.command) > 3 else " ".join(borg_job.command)
                 })
             
+            # Add composite jobs
+            for job_id, composite_job in composite_job_manager.jobs.items():
+                jobs_data.append({
+                    "id": job_id,
+                    "type": "composite_job_status",
+                    "status": composite_job.status,
+                    "started_at": composite_job.started_at.isoformat(),
+                    "completed_at": composite_job.completed_at.isoformat() if composite_job.completed_at else None,
+                    "current_task_index": composite_job.current_task_index,
+                    "total_tasks": len(composite_job.tasks),
+                    "job_type": composite_job.job_type
+                })
+            
             if jobs_data:
                 yield f"event: jobs_update\ndata: {json.dumps({'type': 'jobs_update', 'jobs': jobs_data})}\n\n"
             else:
                 yield f"event: jobs_update\ndata: {json.dumps({'type': 'jobs_update', 'jobs': []})}\n\n"
             
-            # Stream job updates
+            # Stream job updates from borg job manager only
+            # Individual task output should come from /api/jobs/{job_id}/stream
             async for event in borg_job_manager.stream_all_job_updates():
                 event_type = event.get('type', 'unknown')
                 yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
@@ -206,11 +328,17 @@ async def stream_all_jobs():
     )
 
 @router.get("/")
-def list_jobs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def list_jobs(skip: int = 0, limit: int = 100, type: str = None, db: Session = Depends(get_db)):
     """List database job records (legacy jobs) and active JobManager jobs"""
     
     # Get database jobs (legacy) with repository relationship loaded
-    db_jobs = db.query(Job).options(joinedload(Job.repository)).order_by(Job.id.desc()).offset(skip).limit(limit).all()
+    query = db.query(Job).options(joinedload(Job.repository))
+    
+    # Filter by type if provided
+    if type:
+        query = query.filter(Job.type == type)
+        
+    db_jobs = query.order_by(Job.id.desc()).offset(skip).limit(limit).all()
     
     # Convert to dict format and add JobManager jobs
     jobs_list = []
