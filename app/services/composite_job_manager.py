@@ -28,6 +28,16 @@ class CompositeJobTaskInfo:
     source_path: Optional[str] = None
     compression: Optional[str] = None
     dry_run: Optional[bool] = None
+    # Prune-specific parameters
+    keep_within: Optional[str] = None
+    keep_daily: Optional[int] = None
+    keep_weekly: Optional[int] = None
+    keep_monthly: Optional[int] = None
+    keep_yearly: Optional[int] = None
+    show_stats: Optional[bool] = None
+    show_list: Optional[bool] = None
+    save_space: Optional[bool] = None
+    force_prune: Optional[bool] = None
 
 @dataclass
 class CompositeJobInfo:
@@ -114,7 +124,17 @@ class CompositeJobManager:
                 task_name=task_def['name'],
                 source_path=task_def.get('source_path'),
                 compression=task_def.get('compression'),
-                dry_run=task_def.get('dry_run')
+                dry_run=task_def.get('dry_run'),
+                # Prune parameters
+                keep_within=task_def.get('keep_within'),
+                keep_daily=task_def.get('keep_daily'),
+                keep_weekly=task_def.get('keep_weekly'),
+                keep_monthly=task_def.get('keep_monthly'),
+                keep_yearly=task_def.get('keep_yearly'),
+                show_stats=task_def.get('show_stats'),
+                show_list=task_def.get('show_list'),
+                save_space=task_def.get('save_space'),
+                force_prune=task_def.get('force_prune')
             )
             composite_job.tasks.append(task_info)
         
@@ -171,6 +191,9 @@ class CompositeJobManager:
                         
                         logger.error(f"❌ Task {i+1}/{len(job.tasks)} failed: {task.task_name}")
                         
+                        # Mark all remaining tasks as skipped
+                        self._mark_remaining_tasks_as_skipped(job, i + 1)
+                        
                         # Fail the entire job if a task fails
                         job.status = 'failed'
                         job.completed_at = datetime.now()
@@ -184,6 +207,9 @@ class CompositeJobManager:
                     task.return_code = 1
                     task.error = str(e)
                     self._update_task_status(job_id, i, 'failed', error=str(e), return_code=1)
+                    
+                    # Mark all remaining tasks as skipped
+                    self._mark_remaining_tasks_as_skipped(job, i + 1)
                     
                     # Fail the entire job
                     job.status = 'failed'
@@ -211,6 +237,8 @@ class CompositeJobManager:
             return await self._execute_backup_task(job, task, task_index)
         elif task.task_type == 'cloud_sync':
             return await self._execute_cloud_sync_task(job, task, task_index)
+        elif task.task_type == 'prune':
+            return await self._execute_prune_task(job, task, task_index)
         elif task.task_type == 'repo_scan':
             return await self._execute_repo_scan_task(job, task, task_index)
         elif task.task_type == 'repo_init':
@@ -309,6 +337,89 @@ class CompositeJobManager:
                 
         except Exception as e:
             logger.error(f"❌ Exception in backup task: {str(e)}")
+            task.error = str(e)
+            return False
+    
+    async def _execute_prune_task(self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int) -> bool:
+        """Execute a borg prune task to clean up old archives"""
+        try:
+            logger.info(f"🗑️ Starting borg prune for repository {job.repository.name}")
+            
+            from app.utils.security import build_secure_borg_command
+            
+            # Build prune command arguments based on task configuration
+            additional_args = []
+            
+            # Add retention policy arguments
+            if hasattr(task, 'keep_within') and task.keep_within:
+                additional_args.extend(["--keep-within", task.keep_within])
+            
+            if hasattr(task, 'keep_daily') and task.keep_daily:
+                additional_args.extend(["--keep-daily", str(task.keep_daily)])
+            if hasattr(task, 'keep_weekly') and task.keep_weekly:
+                additional_args.extend(["--keep-weekly", str(task.keep_weekly)])
+            if hasattr(task, 'keep_monthly') and task.keep_monthly:
+                additional_args.extend(["--keep-monthly", str(task.keep_monthly)])
+            if hasattr(task, 'keep_yearly') and task.keep_yearly:
+                additional_args.extend(["--keep-yearly", str(task.keep_yearly)])
+            
+            # Add common options
+            if hasattr(task, 'show_stats') and task.show_stats:
+                additional_args.append("--stats")
+            if hasattr(task, 'show_list') and task.show_list:
+                additional_args.append("--list")
+            if hasattr(task, 'save_space') and task.save_space:
+                additional_args.append("--save-space")
+            if hasattr(task, 'force_prune') and task.force_prune:
+                additional_args.append("--force")
+            
+            # Add dry run flag if requested
+            if task.dry_run:
+                additional_args.append("--dry-run")
+            
+            # Repository path as positional argument
+            additional_args.append(job.repository.path)
+            
+            logger.info(f"🗑️ Prune settings - Repository: {job.repository.path}, Dry run: {task.dry_run}")
+            
+            command, env = build_secure_borg_command(
+                base_command="borg prune",
+                repository_path="",  # Path is in additional_args
+                passphrase=job.repository.get_passphrase(),
+                additional_args=additional_args
+            )
+            
+            # Execute the command and capture output
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env
+            )
+            
+            # Stream output to task
+            async for line in process.stdout:
+                decoded_line = line.decode('utf-8', errors='replace').rstrip()
+                task.output_lines.append({
+                    'timestamp': datetime.now().isoformat(),
+                    'text': decoded_line
+                })
+                
+                # Broadcast output
+                self._broadcast_task_output(job.id, task_index, decoded_line)
+            
+            await process.wait()
+            
+            if process.returncode == 0:
+                logger.info(f"✅ Prune task completed successfully")
+                return True
+            else:
+                logger.error(f"❌ Prune task failed with return code {process.returncode}")
+                task.error = f"Prune failed with return code {process.returncode}"
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Exception in prune task: {str(e)}")
             task.error = str(e)
             return False
     
@@ -430,9 +541,7 @@ class CompositeJobManager:
                         access_key_id=access_key,
                         secret_access_key=secret_key,
                         bucket_name=config.bucket_name,
-                        region=config.region,
-                        path_prefix=config.path_prefix or "",
-                        endpoint=config.endpoint
+                        path_prefix=config.path_prefix or ""
                     )
                     
                 elif config.provider == "sftp":
@@ -598,6 +707,16 @@ class CompositeJobManager:
         """Unsubscribe from job events"""
         if queue in self._event_queues:
             self._event_queues.remove(queue)
+    
+    def _mark_remaining_tasks_as_skipped(self, job: CompositeJobInfo, start_index: int):
+        """Mark all remaining tasks as skipped when a job fails"""
+        for i in range(start_index, len(job.tasks)):
+            task = job.tasks[i]
+            if task.status == 'pending':
+                task.status = 'skipped'
+                task.completed_at = datetime.now()
+                self._update_task_status(job.id, i, 'skipped')
+                logger.info(f"⏭️ Task {i+1}/{len(job.tasks)} skipped: {task.task_name}")
 
 # Global composite job manager instance
 composite_job_manager = CompositeJobManager()

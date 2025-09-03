@@ -34,9 +34,7 @@ class RcloneService:
         access_key_id: str,
         secret_access_key: str,
         bucket_name: str,
-        region: str = "us-east-1",
-        path_prefix: str = "",
-        endpoint: Optional[str] = None
+        path_prefix: str = ""
     ) -> AsyncGenerator[Dict, None]:
         """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
         
@@ -121,15 +119,13 @@ class RcloneService:
         access_key_id: str,
         secret_access_key: str,
         bucket_name: str,
-        region: str = "us-east-1",
-        endpoint: Optional[str] = None
     ) -> Dict:
-        """Test S3 connection by checking bucket access and verifying region"""
+        """Test S3 connection by checking bucket access"""
         try:
             # Test 1: Check if we can list the bucket contents
             s3_path = f":s3:{bucket_name}"
             
-            # Build rclone command with S3 backend flags - add region checking
+            # Build rclone command with S3 backend flags
             command = [
                 "rclone", "lsd",
                 s3_path,
@@ -154,18 +150,17 @@ class RcloneService:
             if process.returncode == 0:
                 # Test 2: Try to create and delete a test file to verify write permissions
                 test_result = await self._test_s3_write_permissions(
-                    access_key_id, secret_access_key, bucket_name, region, endpoint
+                    access_key_id, secret_access_key, bucket_name
                 )
                 
                 if test_result["status"] == "success":
                     return {
                         "status": "success",
-                        "message": f"Connection successful - bucket accessible and writable in region {region}",
+                        "message": f"Connection successful - bucket accessible and writable",
                         "output": stdout_text,
                         "details": {
                             "read_test": "passed",
-                            "write_test": "passed",
-                            "region": region
+                            "write_test": "passed"
                         }
                     }
                 else:
@@ -175,8 +170,7 @@ class RcloneService:
                         "output": stdout_text,
                         "details": {
                             "read_test": "passed",
-                            "write_test": "failed",
-                            "region": region
+                            "write_test": "failed"
                         }
                     }
             else:
@@ -191,11 +185,6 @@ class RcloneService:
                     return {
                         "status": "failed",
                         "message": "Access denied - check your AWS credentials"
-                    }
-                elif "region" in error_message or "endpoint" in error_message:
-                    return {
-                        "status": "failed",
-                        "message": f"Region mismatch - bucket may not be in region '{region}'. Error: {stderr_text}"
                     }
                 else:
                     return {
@@ -213,9 +202,7 @@ class RcloneService:
         self,
         access_key_id: str,
         secret_access_key: str,
-        bucket_name: str,
-        region: str,
-        endpoint: Optional[str] = None
+        bucket_name: str
     ) -> Dict:
         """Test write permissions by creating and deleting a small test file"""
         try:

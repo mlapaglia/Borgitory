@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.database import Repository, Job, JobTask, get_db
-from app.models.schemas import Job as JobSchema, BackupRequest
+from app.models.schemas import Job as JobSchema, BackupRequest, PruneRequest
 from app.services.borg_service import borg_service
 from app.services.job_manager import borg_job_manager
 
@@ -46,6 +46,39 @@ async def create_backup(
             }
         ]
         
+        # Add prune task if cleanup is configured
+        if backup_request.cleanup_config_id:
+            from app.models.database import CleanupConfig
+            cleanup_config = db.query(CleanupConfig).filter(
+                CleanupConfig.id == backup_request.cleanup_config_id,
+                CleanupConfig.enabled == True
+            ).first()
+            
+            if cleanup_config:
+                prune_task = {
+                    'type': 'prune', 
+                    'name': f'Clean up {repository.name}',
+                    'dry_run': False,  # Don't dry run when chained after backup
+                    'show_list': cleanup_config.show_list,
+                    'show_stats': cleanup_config.show_stats,
+                    'save_space': cleanup_config.save_space
+                }
+                
+                # Add retention parameters based on strategy
+                if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
+                    prune_task['keep_within'] = f"{cleanup_config.keep_within_days}d"
+                elif cleanup_config.strategy == "advanced":
+                    if cleanup_config.keep_daily:
+                        prune_task['keep_daily'] = cleanup_config.keep_daily
+                    if cleanup_config.keep_weekly:
+                        prune_task['keep_weekly'] = cleanup_config.keep_weekly
+                    if cleanup_config.keep_monthly:
+                        prune_task['keep_monthly'] = cleanup_config.keep_monthly
+                    if cleanup_config.keep_yearly:
+                        prune_task['keep_yearly'] = cleanup_config.keep_yearly
+                
+                task_definitions.append(prune_task)
+        
         # Add cloud sync task if cloud backup is configured
         if backup_request.cloud_backup_config_id:
             task_definitions.append({
@@ -67,6 +100,64 @@ async def create_backup(
     except Exception as e:
         logger.error(f"Failed to start backup: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start backup: {str(e)}")
+
+
+@router.post("/prune")
+async def create_prune_job(
+    prune_request: PruneRequest, 
+    db: Session = Depends(get_db)
+):
+    """Start an archive pruning job and return job_id for tracking"""
+    repository = db.query(Repository).filter(
+        Repository.id == prune_request.repository_id
+    ).first()
+    
+    if repository is None:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    
+    try:
+        # Import composite job manager
+        from app.services.composite_job_manager import composite_job_manager
+        
+        # Build task definition based on strategy
+        task_def = {
+            'type': 'prune', 
+            'name': f'Prune {repository.name}',
+            'dry_run': prune_request.dry_run,
+            'show_list': prune_request.show_list,
+            'show_stats': prune_request.show_stats,
+            'save_space': prune_request.save_space,
+            'force_prune': prune_request.force_prune
+        }
+        
+        # Add retention parameters based on strategy
+        if prune_request.strategy == "simple" and prune_request.keep_within_days:
+            task_def['keep_within'] = f"{prune_request.keep_within_days}d"
+        elif prune_request.strategy == "advanced":
+            if prune_request.keep_daily:
+                task_def['keep_daily'] = prune_request.keep_daily
+            if prune_request.keep_weekly:
+                task_def['keep_weekly'] = prune_request.keep_weekly
+            if prune_request.keep_monthly:
+                task_def['keep_monthly'] = prune_request.keep_monthly
+            if prune_request.keep_yearly:
+                task_def['keep_yearly'] = prune_request.keep_yearly
+        
+        task_definitions = [task_def]
+        
+        # Create composite job
+        job_id = await composite_job_manager.create_composite_job(
+            job_type="prune",
+            task_definitions=task_definitions,
+            repository=repository,
+            schedule=None
+        )
+        
+        return {"job_id": job_id, "status": "started"}
+        
+    except Exception as e:
+        logger.error(f"Failed to start prune job: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start prune job: {str(e)}")
 
 
 @router.get("/stream")
@@ -182,7 +273,7 @@ def list_jobs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_jobs_html(request: Request, db: Session = Depends(get_db)):
+def get_jobs_html(request: Request, expand: str = None, db: Session = Depends(get_db)):
     """Get job history as HTML"""
     try:
         # Get recent jobs (last 20) with their tasks
@@ -203,7 +294,8 @@ def get_jobs_html(request: Request, db: Session = Depends(get_db)):
             html_content = '<div class="space-y-3">'
             
             for job in db_jobs:
-                html_content += render_job_html(job)
+                should_expand = (expand and (str(job.id) == expand or (job.job_uuid and job.job_uuid.startswith(expand[:8]))))
+                html_content += render_job_html(job, expand_details=should_expand)
             
             html_content += '</div>'
         
@@ -214,7 +306,7 @@ def get_jobs_html(request: Request, db: Session = Depends(get_db)):
         return f'<div class="text-red-500">Error loading jobs: {str(e)}</div>'
 
 
-def render_job_html(job):
+def render_job_html(job, expand_details=False):
     """Render HTML for a single job (simple or composite)"""
     repository_name = job.repository.name if job.repository else "Unknown"
     
@@ -266,13 +358,13 @@ def render_job_html(job):
                     </div>
                     <div class="flex-shrink-0 flex items-center space-x-2">
                         <span class="text-sm text-gray-500">#{job.id}</span>
-                        <svg id="chevron-{job.id}" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg id="chevron-{job.id}" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="{'transform: rotate(180deg);' if expand_details else ''}">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </div>
                 </div>
             </div>
-            <div id="job-details-{job.id}" class="hidden border-t bg-gray-50 p-4">
+            <div id="job-details-{job.id}" class="{'border-t bg-gray-50 p-4' if expand_details else 'hidden border-t bg-gray-50 p-4'}">
                 <div class="space-y-3">
                     <div class="grid grid-cols-2 gap-4 text-sm">
                         <div>
@@ -437,7 +529,7 @@ def get_current_jobs_html(request: Request):
     try:
         current_jobs = []
         
-        # Get current jobs from JobManager
+        # Get current jobs from JobManager (simple borg jobs)
         for job_id, borg_job in borg_job_manager.jobs.items():
             if borg_job.status == 'running':
                 # Determine job type from command
@@ -458,6 +550,26 @@ def get_current_jobs_html(request: Request):
                     'progress': borg_job.current_progress
                 })
         
+        # Get current composite jobs from CompositeJobManager
+        from app.services.composite_job_manager import composite_job_manager
+        for job_id, composite_job in composite_job_manager.jobs.items():
+            if composite_job.status == 'running':
+                # Get current task info
+                current_task = None
+                if composite_job.current_task_index < len(composite_job.tasks):
+                    current_task = composite_job.tasks[composite_job.current_task_index]
+                
+                current_jobs.append({
+                    'id': job_id,
+                    'type': composite_job.job_type,
+                    'status': composite_job.status,
+                    'started_at': composite_job.started_at.strftime("%H:%M:%S"),
+                    'progress': {
+                        'current_task': current_task.task_name if current_task else "Unknown",
+                        'task_progress': f"{composite_job.current_task_index + 1}/{len(composite_job.tasks)}"
+                    }
+                })
+        
         html_content = ""
         
         if not current_jobs:
@@ -476,9 +588,12 @@ def get_current_jobs_html(request: Request):
                         progress_info = f"Files: {job['progress']['files']}"
                     if 'transferred' in job['progress']:
                         progress_info += f" | {job['progress']['transferred']}"
+                    if 'current_task' in job['progress']:
+                        progress_info = f"Task: {job['progress']['current_task']} ({job['progress']['task_progress']})"
                 
                 html_content += f'''
-                    <div class="border border-blue-200 rounded-lg p-3 bg-blue-50">
+                    <div class="border border-blue-200 rounded-lg p-3 bg-blue-50 hover:bg-blue-100 cursor-pointer transition-colors" 
+                         onclick="viewRunningJobDetails('{job['id']}')">
                         <div class="flex items-center">
                             <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
                             <div class="flex-1">
@@ -488,6 +603,9 @@ def get_current_jobs_html(request: Request):
                                 </div>
                                 <div class="text-xs text-blue-600 mt-1">
                                     Started: {job['started_at']} {f'| {progress_info}' if progress_info else ''}
+                                </div>
+                                <div class="text-xs text-blue-500 mt-1 opacity-75">
+                                    Click to view details
                                 </div>
                             </div>
                         </div>

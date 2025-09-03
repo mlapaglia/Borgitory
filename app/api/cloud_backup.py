@@ -44,9 +44,7 @@ async def create_cloud_backup_config(
     
     if config.provider == "s3":
         # Set S3-specific fields
-        db_config.region = config.region
         db_config.bucket_name = config.bucket_name
-        db_config.endpoint = config.endpoint
         
         # Validate S3 credentials are provided
         if not config.access_key or not config.secret_key:
@@ -124,9 +122,7 @@ def get_cloud_backup_configs_html(request: Request, db: Session = Depends(get_db
                 if config.provider == "s3":
                     provider_name = "AWS S3"
                     provider_details = f'''
-                        <div><strong>Region:</strong> {config.region or "N/A"}</div>
                         <div><strong>Bucket:</strong> {config.bucket_name}</div>
-                        {f'<div><strong>Endpoint:</strong> {config.endpoint}</div>' if config.endpoint else ''}
                     '''
                 elif config.provider == "sftp":
                     provider_name = "SFTP"
@@ -297,9 +293,7 @@ async def test_cloud_backup_config(config_id: int, db: Session = Depends(get_db)
         result = await rclone_service.test_s3_connection(
             access_key_id=access_key,
             secret_access_key=secret_key,
-            bucket_name=config.bucket_name,
-            region=config.region,
-            endpoint=config.endpoint
+            bucket_name=config.bucket_name
         )
         
     elif config.provider == "sftp":

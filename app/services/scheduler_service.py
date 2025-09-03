@@ -66,6 +66,40 @@ async def execute_scheduled_backup(schedule_id: int):
                 }
             ]
             
+            # Add prune task if cleanup is configured
+            if schedule.cleanup_config_id:
+                from app.models.database import CleanupConfig
+                cleanup_config = db.query(CleanupConfig).filter(
+                    CleanupConfig.id == schedule.cleanup_config_id,
+                    CleanupConfig.enabled == True
+                ).first()
+                
+                if cleanup_config:
+                    prune_task = {
+                        'type': 'prune', 
+                        'name': f'Clean up {repository.name}',
+                        'dry_run': False,  # Don't dry run when chained after backup
+                        'show_list': cleanup_config.show_list,
+                        'show_stats': cleanup_config.show_stats,
+                        'save_space': cleanup_config.save_space
+                    }
+                    
+                    # Add retention parameters based on strategy
+                    if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
+                        prune_task['keep_within'] = f"{cleanup_config.keep_within_days}d"
+                    elif cleanup_config.strategy == "advanced":
+                        if cleanup_config.keep_daily:
+                            prune_task['keep_daily'] = cleanup_config.keep_daily
+                        if cleanup_config.keep_weekly:
+                            prune_task['keep_weekly'] = cleanup_config.keep_weekly
+                        if cleanup_config.keep_monthly:
+                            prune_task['keep_monthly'] = cleanup_config.keep_monthly
+                        if cleanup_config.keep_yearly:
+                            prune_task['keep_yearly'] = cleanup_config.keep_yearly
+                    
+                    task_definitions.append(prune_task)
+                    logger.info(f"📋 SCHEDULER: Added cleanup task to composite job")
+            
             # Add cloud sync task if cloud backup is configured
             if schedule.cloud_backup_config_id:
                 task_definitions.append({
@@ -74,7 +108,7 @@ async def execute_scheduled_backup(schedule_id: int):
                 })
                 logger.info(f"📋 SCHEDULER: Added cloud sync task to composite job")
             else:
-                logger.info(f"📋 SCHEDULER: No cloud backup configured - backup only")
+                logger.info(f"📋 SCHEDULER: No cloud backup configured")
             
             # Create composite job
             job_id = await composite_job_manager.create_composite_job(

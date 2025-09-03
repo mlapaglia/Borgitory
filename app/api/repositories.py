@@ -213,19 +213,45 @@ def update_repository(repo_id: int, repo_update: RepositoryUpdate, db: Session =
 
 
 @router.delete("/{repo_id}")
-def delete_repository(repo_id: int, delete_borg_repo: bool = False, db: Session = Depends(get_db)):
+async def delete_repository(repo_id: int, delete_borg_repo: bool = False, db: Session = Depends(get_db)):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
     
     repo_name = repository.name
     
-    from app.models.database import Job
-    jobs_deleted = db.query(Job).filter(Job.repository_id == repo_id).delete()
+    # Check for active jobs before allowing deletion
+    from app.models.database import Job, JobTask, Schedule
+    active_jobs = db.query(Job).filter(
+        Job.repository_id == repo_id,
+        Job.status.in_(["running", "pending", "queued"])
+    ).all()
     
-    from app.models.database import Schedule
-    schedules_deleted = db.query(Schedule).filter(Schedule.repository_id == repo_id).delete()
+    if active_jobs:
+        active_job_types = [job.type for job in active_jobs]
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete repository '{repo_name}' - {len(active_jobs)} active job(s) running: {', '.join(active_job_types)}. Please wait for jobs to complete or cancel them first."
+        )
     
+    # Count entities that will be deleted for reporting
+    jobs_count = db.query(Job).filter(Job.repository_id == repo_id).count()
+    tasks_count = db.query(JobTask).join(Job).filter(Job.repository_id == repo_id).count()
+    schedules_to_delete = db.query(Schedule).filter(Schedule.repository_id == repo_id).all()
+    schedules_count = len(schedules_to_delete)
+    
+    # Remove scheduled jobs from APScheduler before deleting from database
+    from app.services.scheduler_service import scheduler_service
+    for schedule in schedules_to_delete:
+        try:
+            await scheduler_service.remove_schedule(schedule.id)
+            logger.info(f"Removed scheduled job for schedule ID {schedule.id}")
+        except Exception as e:
+            logger.warning(f"Could not remove scheduled job for schedule ID {schedule.id}: {e}")
+    
+    # Delete the repository - this will cascade to jobs and schedules due to the 
+    # cascade="all, delete-orphan" relationships defined in the Repository model.
+    # Jobs will then cascade to JobTask records as well.
     db.delete(repository)
     db.commit()
     
@@ -234,8 +260,9 @@ def delete_repository(repo_id: int, delete_borg_repo: bool = False, db: Session 
     
     return {
         "message": f"Repository '{repo_name}' deleted successfully from database",
-        "jobs_deleted": jobs_deleted,
-        "schedules_deleted": schedules_deleted,
+        "jobs_deleted": jobs_count,
+        "tasks_deleted": tasks_count,
+        "schedules_deleted": schedules_count,
         "note": "Actual Borg repository files were not deleted" if not delete_borg_repo else None
     }
 

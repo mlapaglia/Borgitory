@@ -127,7 +127,6 @@ volumes:
 
 1. Configure S3 remote:
    - Access Key ID and Secret
-   - Region and optional endpoint
 2. Test connection
 3. Set up automatic sync after backups or manual sync
 

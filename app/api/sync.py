@@ -15,8 +15,6 @@ class S3RemoteConfig(BaseModel):
     remote_name: str
     access_key_id: str
     secret_access_key: str
-    region: str = "us-east-1"
-    endpoint: str = None
 
 
 class SyncRequest(BaseModel):
@@ -32,9 +30,7 @@ async def configure_s3_remote(config: S3RemoteConfig):
     success = await rclone_service.configure_s3_remote(
         remote_name=config.remote_name,
         access_key_id=config.access_key_id,
-        secret_access_key=config.secret_access_key,
-        region=config.region,
-        endpoint=config.endpoint
+        secret_access_key=config.secret_access_key
     )
     
     if success:
@@ -121,9 +117,7 @@ async def sync_repository_task(
             access_key_id=access_key,
             secret_access_key=secret_key,
             bucket_name=bucket_name,
-            region=config.region,
-            path_prefix=path_prefix,
-            endpoint=config.endpoint
+            path_prefix=path_prefix
         ):
             if progress.get("type") == "log":
                 log_output.append(f"[{progress['stream']}] {progress['message']}")

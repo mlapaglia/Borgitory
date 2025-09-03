@@ -59,6 +59,8 @@ class Job(Base):
     error = Column(Text, nullable=True)
     container_id = Column(String, nullable=True)
     cloud_backup_config_id = Column(Integer, ForeignKey("cloud_backup_configs.id"), nullable=True)
+    cleanup_config_id = Column(Integer, ForeignKey("cleanup_configs.id"), nullable=True)
+    notification_config_id = Column(Integer, ForeignKey("notification_configs.id"), nullable=True)
     
     # New composite job fields
     job_type = Column(String, nullable=False, default="simple")  # 'simple', 'composite'
@@ -101,9 +103,13 @@ class Schedule(Base):
     next_run = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     cloud_backup_config_id = Column(Integer, ForeignKey("cloud_backup_configs.id"), nullable=True)
+    cleanup_config_id = Column(Integer, ForeignKey("cleanup_configs.id"), nullable=True)
+    notification_config_id = Column(Integer, ForeignKey("notification_configs.id"), nullable=True)
     
     repository = relationship("Repository", back_populates="schedules")
     cloud_backup_config = relationship("CloudBackupConfig")
+    cleanup_config = relationship("CleanupConfig")
+    notification_config = relationship("NotificationConfig")
 
 
 class User(Base):
@@ -150,6 +156,61 @@ class Setting(Base):
     value = Column(String, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
+class CleanupConfig(Base):
+    __tablename__ = "cleanup_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    strategy = Column(String, nullable=False)  # "simple" or "advanced"
+    
+    # Simple strategy
+    keep_within_days = Column(Integer, nullable=True)
+    
+    # Advanced strategy
+    keep_daily = Column(Integer, nullable=True)
+    keep_weekly = Column(Integer, nullable=True)
+    keep_monthly = Column(Integer, nullable=True)
+    keep_yearly = Column(Integer, nullable=True)
+    
+    # Options
+    show_list = Column(Boolean, default=True)
+    show_stats = Column(Boolean, default=True)
+    save_space = Column(Boolean, default=False)
+    
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class NotificationConfig(Base):
+    __tablename__ = "notification_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False)  # "pushover"
+    
+    # Pushover-specific fields
+    encrypted_user_key = Column(String, nullable=True)
+    encrypted_app_token = Column(String, nullable=True)
+    
+    # Notification settings
+    notify_on_success = Column(Boolean, default=True)
+    notify_on_failure = Column(Boolean, default=True)
+    
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def set_pushover_credentials(self, user_key: str, app_token: str):
+        """Encrypt and store Pushover credentials"""
+        self.encrypted_user_key = cipher_suite.encrypt(user_key.encode()).decode()
+        self.encrypted_app_token = cipher_suite.encrypt(app_token.encode()).decode()
+    
+    def get_pushover_credentials(self) -> tuple[str, str]:
+        """Decrypt and return Pushover credentials"""
+        user_key = cipher_suite.decrypt(self.encrypted_user_key.encode()).decode()
+        app_token = cipher_suite.decrypt(self.encrypted_app_token.encode()).decode()
+        return user_key, app_token
 
 class CloudBackupConfig(Base):
     __tablename__ = "cloud_backup_configs"
