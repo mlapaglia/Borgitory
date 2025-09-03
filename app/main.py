@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.models.database import init_db
-from app.api import repositories, jobs, auth, schedules, sync, cloud_sync, cleanup, notifications, debug
+from app.api import repositories, jobs, auth, schedules, sync, cloud_sync, cleanup, notifications, debug, repository_stats
 from app.services.scheduler_service import scheduler_service
 from app.services.recovery_service import recovery_service
 
@@ -55,6 +55,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(repositories.router, prefix="/api/repositories", tags=["repositories"])
+app.include_router(repository_stats.router, prefix="/api/repositories", tags=["repository-stats"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(schedules.router, prefix="/api/schedules", tags=["schedules"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])

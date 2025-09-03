@@ -23,6 +23,8 @@ function switchTab(tabName) {
         populateArchiveRepositorySelect();
     } else if (tabName === 'debug') {
         loadDebugInfo();
+    } else if (tabName === 'statistics') {
+        populateStatisticsRepositories();
     }
 }
 
