@@ -34,9 +34,12 @@ def get_cipher_suite():
     global _cipher_suite
     if _cipher_suite is None:
         secret_key = get_secret_key()
-        fernet_key = base64.urlsafe_b64encode(hashlib.sha256(secret_key.encode()).digest())
+        fernet_key = base64.urlsafe_b64encode(
+            hashlib.sha256(secret_key.encode()).digest()
+        )
         _cipher_suite = Fernet(fernet_key)
     return _cipher_suite
+
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -59,7 +62,9 @@ class Repository(Base):
     )
 
     def set_passphrase(self, passphrase: str):
-        self.encrypted_passphrase = get_cipher_suite().encrypt(passphrase.encode()).decode()
+        self.encrypted_passphrase = (
+            get_cipher_suite().encrypt(passphrase.encode()).decode()
+        )
 
     def get_passphrase(self) -> str:
         return get_cipher_suite().decrypt(self.encrypted_passphrase.encode()).decode()
@@ -244,12 +249,16 @@ class NotificationConfig(Base):
     def set_pushover_credentials(self, user_key: str, app_token: str):
         """Encrypt and store Pushover credentials"""
         self.encrypted_user_key = get_cipher_suite().encrypt(user_key.encode()).decode()
-        self.encrypted_app_token = get_cipher_suite().encrypt(app_token.encode()).decode()
+        self.encrypted_app_token = (
+            get_cipher_suite().encrypt(app_token.encode()).decode()
+        )
 
     def get_pushover_credentials(self) -> tuple[str, str]:
         """Decrypt and return Pushover credentials"""
         user_key = get_cipher_suite().decrypt(self.encrypted_user_key.encode()).decode()
-        app_token = get_cipher_suite().decrypt(self.encrypted_app_token.encode()).decode()
+        app_token = (
+            get_cipher_suite().decrypt(self.encrypted_app_token.encode()).decode()
+        )
         return user_key, app_token
 
 
@@ -285,23 +294,33 @@ class CloudSyncConfig(Base):
 
     def set_credentials(self, access_key: str, secret_key: str):
         """For S3 providers"""
-        self.encrypted_access_key = get_cipher_suite().encrypt(access_key.encode()).decode()
-        self.encrypted_secret_key = get_cipher_suite().encrypt(secret_key.encode()).decode()
+        self.encrypted_access_key = (
+            get_cipher_suite().encrypt(access_key.encode()).decode()
+        )
+        self.encrypted_secret_key = (
+            get_cipher_suite().encrypt(secret_key.encode()).decode()
+        )
 
     def get_credentials(self) -> tuple[str, str]:
         """For S3 providers"""
-        access_key = get_cipher_suite().decrypt(self.encrypted_access_key.encode()).decode()
-        secret_key = get_cipher_suite().decrypt(self.encrypted_secret_key.encode()).decode()
+        access_key = (
+            get_cipher_suite().decrypt(self.encrypted_access_key.encode()).decode()
+        )
+        secret_key = (
+            get_cipher_suite().decrypt(self.encrypted_secret_key.encode()).decode()
+        )
         return access_key, secret_key
 
     def set_sftp_credentials(self, password: str = None, private_key: str = None):
         """For SFTP providers"""
         if password:
-            self.encrypted_password = get_cipher_suite().encrypt(password.encode()).decode()
+            self.encrypted_password = (
+                get_cipher_suite().encrypt(password.encode()).decode()
+            )
         if private_key:
-            self.encrypted_private_key = get_cipher_suite().encrypt(
-                private_key.encode()
-            ).decode()
+            self.encrypted_private_key = (
+                get_cipher_suite().encrypt(private_key.encode()).decode()
+            )
 
     def get_sftp_credentials(self) -> tuple[str, str]:
         """For SFTP providers - returns (password, private_key)"""
@@ -309,11 +328,13 @@ class CloudSyncConfig(Base):
         private_key = ""
 
         if self.encrypted_password:
-            password = get_cipher_suite().decrypt(self.encrypted_password.encode()).decode()
+            password = (
+                get_cipher_suite().decrypt(self.encrypted_password.encode()).decode()
+            )
         if self.encrypted_private_key:
-            private_key = get_cipher_suite().decrypt(
-                self.encrypted_private_key.encode()
-            ).decode()
+            private_key = (
+                get_cipher_suite().decrypt(self.encrypted_private_key.encode()).decode()
+            )
 
         return password, private_key
 

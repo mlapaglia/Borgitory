@@ -12,6 +12,8 @@ def get_secret_key():
             "SECRET_KEY not available. This should be set during application startup."
         )
     return secret_key
+
+
 BORG_DOCKER_IMAGE = os.getenv(
     "BORG_DOCKER_IMAGE", "ghcr.io/borgmatic-collective/borgmatic:latest"
 )
