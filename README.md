@@ -78,19 +78,9 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SECRET_KEY` | *required* | Encryption key for stored credentials |
 | `DATABASE_URL` | `sqlite:///./data/borgitory.db` | SQLite database path |
-| `BORG_DOCKER_IMAGE` | `ghcr.io/borgmatic-collective/borgmatic:latest` | Docker image for Borg/Borgmatic operations |
 
-### BorgBackup Docker Image
-
-The application uses the official **borgmatic-collective** Docker image which includes:
-- **BorgBackup** - The core backup functionality
-- **Borgmatic** - Configuration management and automation wrapper
-- **Well-maintained** - Active community support and regular updates
-- **Comprehensive** - Includes all necessary dependencies and tools
-
-Alternative images can be configured via the `BORG_DOCKER_IMAGE` environment variable.
+**Note**: The SECRET_KEY is automatically generated and persisted on first startup - no manual configuration required.
 
 ### Docker Volumes
 

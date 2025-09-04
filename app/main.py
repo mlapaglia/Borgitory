@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from app.utils.security import get_or_generate_secret_key
 from app.models.database import init_db
 from app.api import (
     repositories,
@@ -37,6 +38,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     try:
         logger.info("Starting Borgitory application...")
+        
+        # Initialize SECRET_KEY before anything else that might need it
+        from app.config import DATA_DIR
+        if not os.getenv("SECRET_KEY"):
+            secret_key = get_or_generate_secret_key(DATA_DIR)
+            os.environ["SECRET_KEY"] = secret_key
+            logger.info("SECRET_KEY initialized")
+        
         await init_db()
         logger.info("Database initialized")
 

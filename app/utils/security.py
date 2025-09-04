@@ -1,4 +1,5 @@
 import re
+import secrets
 from pathlib import Path
 from typing import List, Dict
 import logging
@@ -208,3 +209,42 @@ def validate_compression(compression: str) -> str:
         )
 
     return compression
+
+
+def get_or_generate_secret_key(data_dir: str) -> str:
+    """
+    Get existing secret key or generate a new one and save it.
+    
+    Args:
+        data_dir: Directory where the secret key file should be stored
+        
+    Returns:
+        The secret key string
+        
+    Raises:
+        Exception: If unable to create data directory or write secret key file
+    """
+    # Ensure data directory exists
+    data_path = Path(data_dir)
+    data_path.mkdir(parents=True, exist_ok=True)
+    
+    secret_file = data_path / "secret_key"
+    
+    # Try to read existing secret key
+    if secret_file.exists():
+        try:
+            return secret_file.read_text().strip()
+        except Exception as e:
+            raise Exception(f"Failed to read secret key from {secret_file}: {e}")
+    
+    # Generate new secret key
+    secret_key = secrets.token_urlsafe(32)
+    
+    # Save the secret key
+    try:
+        secret_file.write_text(secret_key)
+        # Set restrictive permissions (readable only by owner)
+        secret_file.chmod(0o600)
+        return secret_key
+    except Exception as e:
+        raise Exception(f"Failed to save secret key to {secret_file}: {e}")

@@ -1,8 +1,12 @@
 import os
 
 DATABASE_URL = "sqlite:////app/data/borgitory.db"
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 DATA_DIR = "/app/data"
+
+# SECRET_KEY will be set during application startup
+SECRET_KEY = os.getenv("SECRET_KEY")
+if SECRET_KEY is None:
+    raise RuntimeError("SECRET_KEY not available. This should be set during application startup.")
 BORG_DOCKER_IMAGE = os.getenv(
     "BORG_DOCKER_IMAGE", "ghcr.io/borgmatic-collective/borgmatic:latest"
 )
