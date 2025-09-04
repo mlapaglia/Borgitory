@@ -21,14 +21,20 @@ logger = logging.getLogger(__name__)
 
 class CloudSyncService:
     """Service class for cloud sync configuration operations."""
-    
+
     def __init__(self, db: Session):
         self.db = db
-    
-    def create_cloud_sync_config(self, config: CloudSyncConfigCreate) -> CloudSyncConfig:
+
+    def create_cloud_sync_config(
+        self, config: CloudSyncConfigCreate
+    ) -> CloudSyncConfig:
         """Create a new cloud sync configuration."""
         # Check if name already exists
-        existing = self.db.query(CloudSyncConfig).filter(CloudSyncConfig.name == config.name).first()
+        existing = (
+            self.db.query(CloudSyncConfig)
+            .filter(CloudSyncConfig.name == config.name)
+            .first()
+        )
         if existing:
             raise HTTPException(
                 status_code=400,
@@ -36,7 +42,9 @@ class CloudSyncService:
             )
 
         db_config = CloudSyncConfig(
-            name=config.name, provider=config.provider, path_prefix=config.path_prefix or ""
+            name=config.name,
+            provider=config.provider,
+            path_prefix=config.path_prefix or "",
         )
 
         if config.provider == "s3":
@@ -81,21 +89,27 @@ class CloudSyncService:
         self.db.refresh(db_config)
 
         return db_config
-    
+
     def get_cloud_sync_configs(self) -> List[CloudSyncConfig]:
         """Get all cloud sync configurations."""
         return self.db.query(CloudSyncConfig).all()
-    
+
     def get_cloud_sync_config_by_id(self, config_id: int) -> CloudSyncConfig:
         """Get cloud sync configuration by ID."""
-        config = self.db.query(CloudSyncConfig).filter(CloudSyncConfig.id == config_id).first()
+        config = (
+            self.db.query(CloudSyncConfig)
+            .filter(CloudSyncConfig.id == config_id)
+            .first()
+        )
         if not config:
             raise HTTPException(
                 status_code=404, detail="Cloud sync configuration not found"
             )
         return config
-    
-    def update_cloud_sync_config(self, config_id: int, config_update: CloudSyncConfigUpdate) -> CloudSyncConfig:
+
+    def update_cloud_sync_config(
+        self, config_id: int, config_update: CloudSyncConfigUpdate
+    ) -> CloudSyncConfig:
         """Update a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
@@ -126,7 +140,9 @@ class CloudSyncService:
         if config.provider == "s3":
             # Update S3 credentials if provided
             if config_update.access_key and config_update.secret_key:
-                config.set_credentials(config_update.access_key, config_update.secret_key)
+                config.set_credentials(
+                    config_update.access_key, config_update.secret_key
+                )
         elif config.provider == "sftp":
             # Update SFTP credentials if provided
             if config_update.password or config_update.private_key:
@@ -139,13 +155,13 @@ class CloudSyncService:
         self.db.refresh(config)
 
         return config
-    
+
     def delete_cloud_sync_config(self, config_id: int) -> None:
         """Delete a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
         self.db.delete(config)
         self.db.commit()
-    
+
     def enable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
         """Enable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
@@ -153,7 +169,7 @@ class CloudSyncService:
         config.updated_at = datetime.utcnow()
         self.db.commit()
         return config
-    
+
     def disable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
         """Disable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
@@ -161,8 +177,10 @@ class CloudSyncService:
         config.updated_at = datetime.utcnow()
         self.db.commit()
         return config
-    
-    async def test_cloud_sync_config(self, config_id: int, rclone: RcloneService) -> dict:
+
+    async def test_cloud_sync_config(
+        self, config_id: int, rclone: RcloneService
+    ) -> dict:
         """Test a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
@@ -206,8 +224,8 @@ def get_cloud_sync_service(db: Session = Depends(get_db)) -> CloudSyncService:
 
 @router.post("/", response_model=CloudSyncConfigSchema)
 async def create_cloud_sync_config(
-    config: CloudSyncConfigCreate, 
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service)
+    config: CloudSyncConfigCreate,
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
 ):
     """Create a new cloud sync configuration"""
     return cloud_sync_service.create_cloud_sync_config(config)
@@ -215,8 +233,8 @@ async def create_cloud_sync_config(
 
 @router.get("/html", response_class=HTMLResponse)
 def get_cloud_sync_configs_html(
-    request: Request, 
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service)
+    request: Request,
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
 ):
     """Get cloud sync configurations as HTML"""
     try:
@@ -263,15 +281,17 @@ def get_cloud_sync_configs_html(
 
 
 @router.get("/", response_model=List[CloudSyncConfigSchema])
-def list_cloud_sync_configs(cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service)):
+def list_cloud_sync_configs(
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+):
     """List all cloud sync configurations"""
     return cloud_sync_service.get_cloud_sync_configs()
 
 
 @router.get("/{config_id}", response_model=CloudSyncConfigSchema)
 def get_cloud_sync_config(
-    config_id: int, 
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service)
+    config_id: int,
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
 ):
     """Get a specific cloud sync configuration"""
     return cloud_sync_service.get_cloud_sync_config_by_id(config_id)
@@ -279,9 +299,9 @@ def get_cloud_sync_config(
 
 @router.put("/{config_id}", response_model=CloudSyncConfigSchema)
 async def update_cloud_sync_config(
-    config_id: int, 
-    config_update: CloudSyncConfigUpdate, 
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service)
+    config_id: int,
+    config_update: CloudSyncConfigUpdate,
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
 ):
     """Update a cloud sync configuration"""
     return cloud_sync_service.update_cloud_sync_config(config_id, config_update)
@@ -289,8 +309,8 @@ async def update_cloud_sync_config(
 
 @router.delete("/{config_id}")
 def delete_cloud_sync_config(
-    config_id: int, 
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service)
+    config_id: int,
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
 ):
     """Delete a cloud sync configuration"""
     config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
@@ -301,9 +321,9 @@ def delete_cloud_sync_config(
 
 @router.post("/{config_id}/test")
 async def test_cloud_sync_config(
-    config_id: int, 
+    config_id: int,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
-    rclone: RcloneService = Depends(lambda: rclone_service)
+    rclone: RcloneService = Depends(lambda: rclone_service),
 ):
     """Test a cloud sync configuration"""
     result = await cloud_sync_service.test_cloud_sync_config(config_id, rclone)
@@ -331,8 +351,8 @@ async def test_cloud_sync_config(
 
 @router.post("/{config_id}/enable")
 def enable_cloud_sync_config(
-    config_id: int, 
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service)
+    config_id: int,
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
 ):
     """Enable a cloud sync configuration"""
     config = cloud_sync_service.enable_cloud_sync_config(config_id)
@@ -341,8 +361,8 @@ def enable_cloud_sync_config(
 
 @router.post("/{config_id}/disable")
 def disable_cloud_sync_config(
-    config_id: int, 
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service)
+    config_id: int,
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
 ):
     """Disable a cloud sync configuration"""
     config = cloud_sync_service.disable_cloud_sync_config(config_id)
