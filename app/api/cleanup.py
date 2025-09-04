@@ -18,14 +18,16 @@ logger = logging.getLogger(__name__)
 
 class CleanupService:
     """Service class for cleanup configuration operations."""
-    
+
     def __init__(self, db: Session):
         self.db = db
-    
-    def create_cleanup_config(self, cleanup_config: CleanupConfigCreate) -> CleanupConfig:
+
+    def create_cleanup_config(
+        self, cleanup_config: CleanupConfigCreate
+    ) -> CleanupConfig:
         """Create a new cleanup configuration."""
         self._validate_cleanup_config(cleanup_config)
-        
+
         db_cleanup_config = CleanupConfig(
             name=cleanup_config.name,
             strategy=cleanup_config.strategy,
@@ -39,44 +41,50 @@ class CleanupService:
             save_space=cleanup_config.save_space,
             enabled=True,
         )
-        
+
         self.db.add(db_cleanup_config)
         self.db.commit()
         self.db.refresh(db_cleanup_config)
-        
+
         return db_cleanup_config
-    
-    def get_cleanup_configs(self, skip: int = 0, limit: int = 100) -> List[CleanupConfig]:
+
+    def get_cleanup_configs(
+        self, skip: int = 0, limit: int = 100
+    ) -> List[CleanupConfig]:
         """Get all cleanup configurations with pagination."""
         return self.db.query(CleanupConfig).offset(skip).limit(limit).all()
-    
+
     def get_cleanup_config_by_id(self, config_id: int) -> CleanupConfig:
         """Get cleanup configuration by ID."""
-        cleanup_config = self.db.query(CleanupConfig).filter(CleanupConfig.id == config_id).first()
+        cleanup_config = (
+            self.db.query(CleanupConfig).filter(CleanupConfig.id == config_id).first()
+        )
         if not cleanup_config:
-            raise HTTPException(status_code=404, detail="Cleanup configuration not found")
+            raise HTTPException(
+                status_code=404, detail="Cleanup configuration not found"
+            )
         return cleanup_config
-    
+
     def enable_cleanup_config(self, config_id: int) -> CleanupConfig:
         """Enable a cleanup configuration."""
         cleanup_config = self.get_cleanup_config_by_id(config_id)
         cleanup_config.enabled = True
         self.db.commit()
         return cleanup_config
-    
+
     def disable_cleanup_config(self, config_id: int) -> CleanupConfig:
         """Disable a cleanup configuration."""
         cleanup_config = self.get_cleanup_config_by_id(config_id)
         cleanup_config.enabled = False
         self.db.commit()
         return cleanup_config
-    
+
     def delete_cleanup_config(self, config_id: int) -> None:
         """Delete a cleanup configuration."""
         cleanup_config = self.get_cleanup_config_by_id(config_id)
         self.db.delete(cleanup_config)
         self.db.commit()
-    
+
     def _validate_cleanup_config(self, cleanup_config: CleanupConfigCreate) -> None:
         """Validate cleanup configuration parameters."""
         if cleanup_config.strategy == "simple" and not cleanup_config.keep_within_days:
@@ -84,12 +92,14 @@ class CleanupService:
                 status_code=400, detail="Simple strategy requires keep_within_days"
             )
         elif cleanup_config.strategy == "advanced":
-            if not any([
-                cleanup_config.keep_daily,
-                cleanup_config.keep_weekly,
-                cleanup_config.keep_monthly,
-                cleanup_config.keep_yearly,
-            ]):
+            if not any(
+                [
+                    cleanup_config.keep_daily,
+                    cleanup_config.keep_weekly,
+                    cleanup_config.keep_monthly,
+                    cleanup_config.keep_yearly,
+                ]
+            ):
                 raise HTTPException(
                     status_code=400,
                     detail="Advanced strategy requires at least one keep_* parameter",
@@ -105,8 +115,8 @@ def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
     "/", response_model=CleanupConfigSchema, status_code=status.HTTP_201_CREATED
 )
 async def create_cleanup_config(
-    cleanup_config: CleanupConfigCreate, 
-    cleanup_service: CleanupService = Depends(get_cleanup_service)
+    cleanup_config: CleanupConfigCreate,
+    cleanup_service: CleanupService = Depends(get_cleanup_service),
 ):
     """Create a new cleanup configuration"""
     return cleanup_service.create_cleanup_config(cleanup_config)
@@ -114,16 +124,18 @@ async def create_cleanup_config(
 
 @router.get("/", response_model=List[CleanupConfigSchema])
 def list_cleanup_configs(
-    skip: int = 0, 
-    limit: int = 100, 
-    cleanup_service: CleanupService = Depends(get_cleanup_service)
+    skip: int = 0,
+    limit: int = 100,
+    cleanup_service: CleanupService = Depends(get_cleanup_service),
 ):
     """List all cleanup configurations"""
     return cleanup_service.get_cleanup_configs(skip, limit)
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_cleanup_configs_html(cleanup_service: CleanupService = Depends(get_cleanup_service)):
+def get_cleanup_configs_html(
+    cleanup_service: CleanupService = Depends(get_cleanup_service),
+):
     """Get cleanup configurations as formatted HTML"""
     cleanup_configs = cleanup_service.get_cleanup_configs()
 
@@ -182,8 +194,7 @@ def get_cleanup_configs_html(cleanup_service: CleanupService = Depends(get_clean
 
 @router.post("/{config_id}/enable")
 async def enable_cleanup_config(
-    config_id: int, 
-    cleanup_service: CleanupService = Depends(get_cleanup_service)
+    config_id: int, cleanup_service: CleanupService = Depends(get_cleanup_service)
 ):
     """Enable a cleanup configuration"""
     cleanup_service.enable_cleanup_config(config_id)
@@ -192,8 +203,7 @@ async def enable_cleanup_config(
 
 @router.post("/{config_id}/disable")
 async def disable_cleanup_config(
-    config_id: int, 
-    cleanup_service: CleanupService = Depends(get_cleanup_service)
+    config_id: int, cleanup_service: CleanupService = Depends(get_cleanup_service)
 ):
     """Disable a cleanup configuration"""
     cleanup_service.disable_cleanup_config(config_id)
@@ -202,8 +212,7 @@ async def disable_cleanup_config(
 
 @router.delete("/{config_id}")
 async def delete_cleanup_config(
-    config_id: int, 
-    cleanup_service: CleanupService = Depends(get_cleanup_service)
+    config_id: int, cleanup_service: CleanupService = Depends(get_cleanup_service)
 ):
     """Delete a cleanup configuration"""
     cleanup_service.delete_cleanup_config(config_id)
