@@ -28,7 +28,7 @@ async def get_debug_html(request: Request, db: Session = Depends(get_db)):
         debug_info = await debug_service.get_debug_info(db)
         return templates.TemplateResponse(
             "partials/debug/debug_panel.html",
-            {"request": request, "debug_info": debug_info}
+            {"request": request, "debug_info": debug_info},
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

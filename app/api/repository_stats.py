@@ -16,18 +16,20 @@ async def get_repository_statistics(repository_id: int, db: Session = Depends(ge
         raise HTTPException(status_code=404, detail="Repository not found")
 
     stats = await repository_stats_service.get_repository_statistics(repository, db)
-    
+
     if "error" in stats:
         raise HTTPException(status_code=500, detail=stats["error"])
-    
+
     return stats
 
 
 @router.get("/{repository_id}/stats/html")
-async def get_repository_statistics_html(repository_id: int, request: Request, db: Session = Depends(get_db)):
+async def get_repository_statistics_html(
+    repository_id: int, request: Request, db: Session = Depends(get_db)
+):
     """Get repository statistics as HTML partial"""
     from fastapi.templating import Jinja2Templates
-    
+
     templates = Jinja2Templates(directory="app/templates")
 
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
@@ -35,8 +37,8 @@ async def get_repository_statistics_html(repository_id: int, request: Request, d
         raise HTTPException(status_code=404, detail="Repository not found")
 
     stats = await repository_stats_service.get_repository_statistics(repository, db)
-    
+
     return templates.TemplateResponse(
         "partials/repository_stats/stats_panel.html",
-        {"request": request, "repository": repository, "stats": stats}
+        {"request": request, "repository": repository, "stats": stats},
     )

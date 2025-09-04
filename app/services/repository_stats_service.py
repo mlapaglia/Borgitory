@@ -12,48 +12,52 @@ logger = logging.getLogger(__name__)
 
 class RepositoryStatsService:
     """Service to gather repository statistics from Borg commands"""
-    
-    async def get_repository_statistics(self, repository: Repository, db: Session) -> Dict[str, Any]:
+
+    async def get_repository_statistics(
+        self, repository: Repository, db: Session
+    ) -> Dict[str, Any]:
         """Gather comprehensive repository statistics"""
         try:
             # Get list of all archives
             archives = await self._get_archive_list(repository)
             if not archives:
                 return {"error": "No archives found in repository"}
-            
+
             # Get detailed info for each archive
             archive_stats = []
             for archive in archives:
                 archive_info = await self._get_archive_info(repository, archive)
                 if archive_info:
                     archive_stats.append(archive_info)
-            
+
             if not archive_stats:
                 return {"error": "Could not retrieve archive information"}
-            
+
             # Sort archives by date
-            archive_stats.sort(key=lambda x: x.get('start', ''))
-            
+            archive_stats.sort(key=lambda x: x.get("start", ""))
+
             # Get file type statistics
             file_type_stats = await self._get_file_type_stats(repository, archives)
-            
+
             # Build statistics
             stats = {
                 "repository_path": repository.path,
                 "total_archives": len(archive_stats),
                 "archive_stats": archive_stats,
                 "size_over_time": self._build_size_timeline(archive_stats),
-                "dedup_compression_stats": self._build_dedup_compression_stats(archive_stats),
+                "dedup_compression_stats": self._build_dedup_compression_stats(
+                    archive_stats
+                ),
                 "file_type_stats": file_type_stats,
-                "summary": self._build_summary_stats(archive_stats)
+                "summary": self._build_summary_stats(archive_stats),
             }
-            
+
             return stats
-            
+
         except Exception as e:
             logger.error(f"Error getting repository statistics: {str(e)}")
             return {"error": str(e)}
-    
+
     async def _get_archive_list(self, repository: Repository) -> List[str]:
         """Get list of all archives in repository"""
         try:
@@ -61,78 +65,94 @@ class RepositoryStatsService:
                 base_command="borg list",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                additional_args=["--short"]
+                additional_args=["--short"],
             )
-            
+
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=env
+                env=env,
             )
-            
+
             stdout, stderr = await process.communicate()
-            
+
             if process.returncode == 0:
-                archives = [line.strip() for line in stdout.decode().strip().split('\n') if line.strip()]
+                archives = [
+                    line.strip()
+                    for line in stdout.decode().strip().split("\n")
+                    if line.strip()
+                ]
                 return archives
             else:
                 logger.error(f"Borg list failed: {stderr.decode()}")
                 return []
-                
+
         except Exception as e:
             logger.error(f"Error listing archives: {str(e)}")
             return []
-    
-    async def _get_archive_info(self, repository: Repository, archive_name: str) -> Dict[str, Any]:
+
+    async def _get_archive_info(
+        self, repository: Repository, archive_name: str
+    ) -> Dict[str, Any]:
         """Get detailed information for a specific archive"""
         try:
             command, env = build_secure_borg_command(
                 base_command="borg info",
                 repository_path="",
                 passphrase=repository.get_passphrase(),
-                additional_args=["--json", f"{repository.path}::{archive_name}"]
+                additional_args=["--json", f"{repository.path}::{archive_name}"],
             )
-            
+
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=env
+                env=env,
             )
-            
+
             stdout, stderr = await process.communicate()
-            
+
             if process.returncode == 0:
                 info_data = json.loads(stdout.decode())
-                
+
                 # Extract relevant statistics
-                archive_info = info_data.get('archives', [{}])[0]
-                cache_info = info_data.get('cache', {})
-                
+                archive_info = info_data.get("archives", [{}])[0]
+                cache_info = info_data.get("cache", {})
+
                 return {
                     "name": archive_name,
-                    "start": archive_info.get('start', ''),
-                    "end": archive_info.get('end', ''),
-                    "duration": archive_info.get('duration', 0),
-                    "original_size": archive_info.get('stats', {}).get('original_size', 0),
-                    "compressed_size": archive_info.get('stats', {}).get('compressed_size', 0),
-                    "deduplicated_size": archive_info.get('stats', {}).get('deduplicated_size', 0),
-                    "nfiles": archive_info.get('stats', {}).get('nfiles', 0),
-                    "unique_chunks": cache_info.get('stats', {}).get('unique_chunks', 0),
-                    "total_chunks": cache_info.get('stats', {}).get('total_chunks', 0),
-                    "unique_size": cache_info.get('stats', {}).get('unique_size', 0),
-                    "total_size": cache_info.get('stats', {}).get('total_size', 0)
+                    "start": archive_info.get("start", ""),
+                    "end": archive_info.get("end", ""),
+                    "duration": archive_info.get("duration", 0),
+                    "original_size": archive_info.get("stats", {}).get(
+                        "original_size", 0
+                    ),
+                    "compressed_size": archive_info.get("stats", {}).get(
+                        "compressed_size", 0
+                    ),
+                    "deduplicated_size": archive_info.get("stats", {}).get(
+                        "deduplicated_size", 0
+                    ),
+                    "nfiles": archive_info.get("stats", {}).get("nfiles", 0),
+                    "unique_chunks": cache_info.get("stats", {}).get(
+                        "unique_chunks", 0
+                    ),
+                    "total_chunks": cache_info.get("stats", {}).get("total_chunks", 0),
+                    "unique_size": cache_info.get("stats", {}).get("unique_size", 0),
+                    "total_size": cache_info.get("stats", {}).get("total_size", 0),
                 }
             else:
                 logger.error(f"Borg info failed for {archive_name}: {stderr.decode()}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error getting archive info for {archive_name}: {str(e)}")
             return None
-    
-    def _build_size_timeline(self, archive_stats: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+    def _build_size_timeline(
+        self, archive_stats: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Build size over time data for charting"""
         timeline_data = {
             "labels": [],
@@ -142,38 +162,48 @@ class RepositoryStatsService:
                     "data": [],
                     "borderColor": "rgb(59, 130, 246)",
                     "backgroundColor": "rgba(59, 130, 246, 0.1)",
-                    "fill": False
+                    "fill": False,
                 },
                 {
-                    "label": "Compressed Size", 
+                    "label": "Compressed Size",
                     "data": [],
                     "borderColor": "rgb(16, 185, 129)",
                     "backgroundColor": "rgba(16, 185, 129, 0.1)",
-                    "fill": False
+                    "fill": False,
                 },
                 {
                     "label": "Deduplicated Size",
                     "data": [],
                     "borderColor": "rgb(245, 101, 101)",
                     "backgroundColor": "rgba(245, 101, 101, 0.1)",
-                    "fill": False
-                }
-            ]
+                    "fill": False,
+                },
+            ],
         }
-        
+
         for archive in archive_stats:
             # Use archive name or start time as label
-            label = archive.get('start', archive.get('name', ''))[:10]  # First 10 chars for date
+            label = archive.get("start", archive.get("name", ""))[
+                :10
+            ]  # First 10 chars for date
             timeline_data["labels"].append(label)
-            
+
             # Convert bytes to MB for better readability
-            timeline_data["datasets"][0]["data"].append(archive.get('original_size', 0) / (1024*1024))
-            timeline_data["datasets"][1]["data"].append(archive.get('compressed_size', 0) / (1024*1024))
-            timeline_data["datasets"][2]["data"].append(archive.get('deduplicated_size', 0) / (1024*1024))
-        
+            timeline_data["datasets"][0]["data"].append(
+                archive.get("original_size", 0) / (1024 * 1024)
+            )
+            timeline_data["datasets"][1]["data"].append(
+                archive.get("compressed_size", 0) / (1024 * 1024)
+            )
+            timeline_data["datasets"][2]["data"].append(
+                archive.get("deduplicated_size", 0) / (1024 * 1024)
+            )
+
         return timeline_data
-    
-    def _build_dedup_compression_stats(self, archive_stats: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+    def _build_dedup_compression_stats(
+        self, archive_stats: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Build deduplication and compression statistics"""
         dedup_data = {
             "labels": [],
@@ -183,47 +213,51 @@ class RepositoryStatsService:
                     "data": [],
                     "borderColor": "rgb(139, 92, 246)",
                     "backgroundColor": "rgba(139, 92, 246, 0.1)",
-                    "yAxisID": "y"
+                    "yAxisID": "y",
                 },
                 {
                     "label": "Deduplication Ratio %",
                     "data": [],
                     "borderColor": "rgb(245, 158, 11)",
                     "backgroundColor": "rgba(245, 158, 11, 0.1)",
-                    "yAxisID": "y1"
-                }
-            ]
+                    "yAxisID": "y1",
+                },
+            ],
         }
-        
+
         for archive in archive_stats:
-            label = archive.get('start', archive.get('name', ''))[:10]
+            label = archive.get("start", archive.get("name", ""))[:10]
             dedup_data["labels"].append(label)
-            
+
             # Calculate compression ratio
-            original = archive.get('original_size', 0)
-            compressed = archive.get('compressed_size', 0)
-            compression_ratio = ((original - compressed) / original * 100) if original > 0 else 0
-            
+            original = archive.get("original_size", 0)
+            compressed = archive.get("compressed_size", 0)
+            compression_ratio = (
+                ((original - compressed) / original * 100) if original > 0 else 0
+            )
+
             # Calculate deduplication ratio
-            deduplicated = archive.get('deduplicated_size', 0)
-            dedup_ratio = ((compressed - deduplicated) / compressed * 100) if compressed > 0 else 0
-            
+            deduplicated = archive.get("deduplicated_size", 0)
+            dedup_ratio = (
+                ((compressed - deduplicated) / compressed * 100)
+                if compressed > 0
+                else 0
+            )
+
             dedup_data["datasets"][0]["data"].append(round(compression_ratio, 2))
             dedup_data["datasets"][1]["data"].append(round(dedup_ratio, 2))
-        
+
         return dedup_data
-    
-    async def _get_file_type_stats(self, repository: Repository, archives: List[str]) -> Dict[str, Any]:
+
+    async def _get_file_type_stats(
+        self, repository: Repository, archives: List[str]
+    ) -> Dict[str, Any]:
         """Get file type statistics over time"""
-        file_type_timeline = {
-            "labels": [],
-            "count_data": {},
-            "size_data": {}
-        }
-        
+        file_type_timeline = {"labels": [], "count_data": {}, "size_data": {}}
+
         # Limit to recent archives for performance (last 10)
         recent_archives = archives[-10:] if len(archives) > 10 else archives
-        
+
         for archive_name in recent_archives:
             try:
                 # Get file listing with sizes
@@ -231,142 +265,191 @@ class RepositoryStatsService:
                     base_command="borg list",
                     repository_path="",
                     passphrase=repository.get_passphrase(),
-                    additional_args=[f"{repository.path}::{archive_name}", "--format={size} {path}{NL}"]
+                    additional_args=[
+                        f"{repository.path}::{archive_name}",
+                        "--format={size} {path}{NL}",
+                    ],
                 )
-                
+
                 process = await asyncio.create_subprocess_exec(
                     *command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    env=env
+                    env=env,
                 )
-                
+
                 stdout, stderr = await process.communicate()
-                
+
                 if process.returncode == 0:
                     # Parse file types and sizes
                     ext_count = {}
                     ext_size = {}
-                    
-                    for line in stdout.decode().strip().split('\n'):
+
+                    for line in stdout.decode().strip().split("\n"):
                         if not line.strip():
                             continue
-                        parts = line.strip().split(' ', 1)
+                        parts = line.strip().split(" ", 1)
                         if len(parts) == 2:
                             try:
                                 size = int(parts[0])
                                 path = parts[1]
-                                
+
                                 # Extract file extension
-                                if '.' in path and not path.endswith('/'):
-                                    ext = path.split('.')[-1].lower()
-                                    if ext and len(ext) <= 10:  # Reasonable extension length
+                                if "." in path and not path.endswith("/"):
+                                    ext = path.split(".")[-1].lower()
+                                    if (
+                                        ext and len(ext) <= 10
+                                    ):  # Reasonable extension length
                                         ext_count[ext] = ext_count.get(ext, 0) + 1
                                         ext_size[ext] = ext_size.get(ext, 0) + size
                             except (ValueError, IndexError):
                                 continue
-                    
+
                     # Add to timeline
-                    archive_date = archive_name.split('backup-')[-1][:10] if 'backup-' in archive_name else archive_name[:10]
+                    archive_date = (
+                        archive_name.split("backup-")[-1][:10]
+                        if "backup-" in archive_name
+                        else archive_name[:10]
+                    )
                     file_type_timeline["labels"].append(archive_date)
-                    
+
                     # Store data for each extension
                     for ext in ext_count:
                         if ext not in file_type_timeline["count_data"]:
                             file_type_timeline["count_data"][ext] = []
                             file_type_timeline["size_data"][ext] = []
                         file_type_timeline["count_data"][ext].append(ext_count[ext])
-                        file_type_timeline["size_data"][ext].append(round(ext_size[ext] / (1024*1024), 2))  # Convert to MB
-                    
+                        file_type_timeline["size_data"][ext].append(
+                            round(ext_size[ext] / (1024 * 1024), 2)
+                        )  # Convert to MB
+
                     # Fill missing data points for consistency
                     for ext in file_type_timeline["count_data"]:
-                        while len(file_type_timeline["count_data"][ext]) < len(file_type_timeline["labels"]):
+                        while len(file_type_timeline["count_data"][ext]) < len(
+                            file_type_timeline["labels"]
+                        ):
                             file_type_timeline["count_data"][ext].insert(-1, 0)
                             file_type_timeline["size_data"][ext].insert(-1, 0)
-                            
+
             except Exception as e:
-                logger.error(f"Error analyzing file types for archive {archive_name}: {str(e)}")
+                logger.error(
+                    f"Error analyzing file types for archive {archive_name}: {str(e)}"
+                )
                 continue
-        
+
         return self._build_file_type_chart_data(file_type_timeline)
-    
-    def _build_file_type_chart_data(self, timeline_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _build_file_type_chart_data(
+        self, timeline_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Build chart data for file types"""
         # Color palette for different file types
         colors = [
-            'rgb(59, 130, 246)',   # Blue
-            'rgb(16, 185, 129)',   # Green  
-            'rgb(245, 101, 101)',  # Red
-            'rgb(139, 92, 246)',   # Purple
-            'rgb(245, 158, 11)',   # Yellow
-            'rgb(236, 72, 153)',   # Pink
-            'rgb(14, 165, 233)',   # Light Blue
-            'rgb(34, 197, 94)',    # Light Green
-            'rgb(168, 85, 247)',   # Violet
-            'rgb(251, 146, 60)'    # Orange
+            "rgb(59, 130, 246)",  # Blue
+            "rgb(16, 185, 129)",  # Green
+            "rgb(245, 101, 101)",  # Red
+            "rgb(139, 92, 246)",  # Purple
+            "rgb(245, 158, 11)",  # Yellow
+            "rgb(236, 72, 153)",  # Pink
+            "rgb(14, 165, 233)",  # Light Blue
+            "rgb(34, 197, 94)",  # Light Green
+            "rgb(168, 85, 247)",  # Violet
+            "rgb(251, 146, 60)",  # Orange
         ]
-        
+
         # Get top 10 extensions by average size
         avg_sizes = {}
         for ext, sizes in timeline_data["size_data"].items():
             if sizes:
                 avg_sizes[ext] = sum(sizes) / len(sizes)
-        
-        top_extensions = sorted(avg_sizes.items(), key=lambda x: x[1], reverse=True)[:10]
-        
+
+        top_extensions = sorted(avg_sizes.items(), key=lambda x: x[1], reverse=True)[
+            :10
+        ]
+
         count_datasets = []
         size_datasets = []
-        
+
         for i, (ext, _) in enumerate(top_extensions):
             color = colors[i % len(colors)]
-            
-            count_datasets.append({
-                "label": f".{ext} files",
-                "data": timeline_data["count_data"][ext],
-                "borderColor": color,
-                "backgroundColor": color.replace('rgb', 'rgba').replace(')', ', 0.1)'),
-                "fill": False
-            })
-            
-            size_datasets.append({
-                "label": f".{ext} size (MB)",
-                "data": timeline_data["size_data"][ext],
-                "borderColor": color,
-                "backgroundColor": color.replace('rgb', 'rgba').replace(')', ', 0.1)'),
-                "fill": False
-            })
-        
+
+            count_datasets.append(
+                {
+                    "label": f".{ext} files",
+                    "data": timeline_data["count_data"][ext],
+                    "borderColor": color,
+                    "backgroundColor": color.replace("rgb", "rgba").replace(
+                        ")", ", 0.1)"
+                    ),
+                    "fill": False,
+                }
+            )
+
+            size_datasets.append(
+                {
+                    "label": f".{ext} size (MB)",
+                    "data": timeline_data["size_data"][ext],
+                    "borderColor": color,
+                    "backgroundColor": color.replace("rgb", "rgba").replace(
+                        ")", ", 0.1)"
+                    ),
+                    "fill": False,
+                }
+            )
+
         return {
             "count_chart": {
                 "labels": timeline_data["labels"],
-                "datasets": count_datasets
+                "datasets": count_datasets,
             },
             "size_chart": {
                 "labels": timeline_data["labels"],
-                "datasets": size_datasets
-            }
+                "datasets": size_datasets,
+            },
         }
 
-    def _build_summary_stats(self, archive_stats: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _build_summary_stats(
+        self, archive_stats: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Build overall summary statistics"""
         if not archive_stats:
             return {}
-        
+
         latest_archive = archive_stats[-1]
-        total_original = sum(archive.get('original_size', 0) for archive in archive_stats)
-        total_compressed = sum(archive.get('compressed_size', 0) for archive in archive_stats)
-        total_deduplicated = sum(archive.get('deduplicated_size', 0) for archive in archive_stats)
-        
+        total_original = sum(
+            archive.get("original_size", 0) for archive in archive_stats
+        )
+        total_compressed = sum(
+            archive.get("compressed_size", 0) for archive in archive_stats
+        )
+        total_deduplicated = sum(
+            archive.get("deduplicated_size", 0) for archive in archive_stats
+        )
+
         return {
             "total_archives": len(archive_stats),
-            "latest_archive_date": latest_archive.get('start', ''),
+            "latest_archive_date": latest_archive.get("start", ""),
             "total_original_size_gb": round(total_original / (1024**3), 2),
             "total_compressed_size_gb": round(total_compressed / (1024**3), 2),
             "total_deduplicated_size_gb": round(total_deduplicated / (1024**3), 2),
-            "overall_compression_ratio": round(((total_original - total_compressed) / total_original * 100), 2) if total_original > 0 else 0,
-            "overall_deduplication_ratio": round(((total_compressed - total_deduplicated) / total_compressed * 100), 2) if total_compressed > 0 else 0,
-            "space_saved_gb": round((total_original - total_deduplicated) / (1024**3), 2),
-            "average_archive_size_gb": round((total_original / len(archive_stats)) / (1024**3), 2) if archive_stats else 0
+            "overall_compression_ratio": round(
+                ((total_original - total_compressed) / total_original * 100), 2
+            )
+            if total_original > 0
+            else 0,
+            "overall_deduplication_ratio": round(
+                ((total_compressed - total_deduplicated) / total_compressed * 100), 2
+            )
+            if total_compressed > 0
+            else 0,
+            "space_saved_gb": round(
+                (total_original - total_deduplicated) / (1024**3), 2
+            ),
+            "average_archive_size_gb": round(
+                (total_original / len(archive_stats)) / (1024**3), 2
+            )
+            if archive_stats
+            else 0,
         }
 
 
