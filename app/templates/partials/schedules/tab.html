@@ -1,0 +1,13 @@
+<!-- Schedules Tab -->
+<div id="tab-schedules" class="tab-content hidden">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Scheduled Backups</h2>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {% include "partials/schedules/create_form.html" %}
+            {% include "partials/schedules/list.html" %}
+        </div>
+        
+        {% include "partials/schedules/upcoming.html" %}
+    </div>
+</div>

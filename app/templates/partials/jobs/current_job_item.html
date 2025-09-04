@@ -1,0 +1,19 @@
+{# Template for a current running job item #}
+<div class="border border-blue-200 rounded-lg p-3 bg-blue-50 hover:bg-blue-100 cursor-pointer transition-colors" 
+     onclick="viewRunningJobDetails('{{ job.id }}')">
+    <div class="flex items-center">
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+        <div class="flex-1">
+            <div class="flex items-center space-x-2">
+                <span class="font-medium text-blue-900">{{ job.type.title() }}</span>
+                <span class="text-blue-700 text-sm">#{{ job.id[:8] }}...</span>
+            </div>
+            <div class="text-xs text-blue-600 mt-1">
+                Started: {{ job.started_at }}{% if progress_info %} | {{ progress_info }}{% endif %}
+            </div>
+            <div class="text-xs text-blue-500 mt-1 opacity-75">
+                Click to view details
+            </div>
+        </div>
+    </div>
+</div>

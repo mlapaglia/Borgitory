@@ -1,0 +1,14 @@
+<!-- Existing Schedules -->
+<div class="border rounded-lg p-4">
+    <h3 class="font-medium text-gray-700 mb-3">Existing Schedules</h3>
+    <div id="schedules-list" 
+         hx-get="/api/schedules/html" 
+         hx-trigger="load, every 30s, scheduleUpdate from:body" 
+         hx-swap="innerHTML"
+         hx-indicator=".schedules-loading">
+        <div class="text-gray-500 text-sm">Loading schedules...</div>
+    </div>
+    <div class="schedules-loading htmx-indicator" style="display: none;">
+        <div class="text-blue-500 text-sm">Updating schedules...</div>
+    </div>
+</div>

@@ -1,0 +1,179 @@
+/* Modern Select Dropdown Styling */
+.select-modern {
+    appearance: none;
+    background-color: #4b5563;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    padding: 8px 32px 8px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.select-modern:hover {
+    background-color: #374151;
+    border-color: #374151;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.select-modern:focus {
+    outline: none;
+    background-color: #374151;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.select-modern:disabled {
+    background-color: #6b7280;
+    border-color: #6b7280;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
+/* Modern Select with Icon */
+.select-modern-with-icon {
+    padding-left: 44px;
+}
+
+.select-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.select-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    color: #6b7280;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Compact modern select for smaller spaces */
+.select-modern-compact {
+    appearance: none;
+    background-color: #4b5563;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-position: right 10px center;
+    background-repeat: no-repeat;
+    background-size: 14px;
+    border: 1px solid #4b5563;
+    border-radius: 4px;
+    padding: 6px 28px 6px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #ffffff;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.select-modern-compact:hover {
+    background-color: #374151;
+    border-color: #374151;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.select-modern-compact:focus {
+    outline: none;
+    background-color: #374151;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Dark mode support - dropdowns maintain consistent appearance */
+@media (prefers-color-scheme: dark) {
+    .select-modern,
+    .select-modern-compact {
+        /* Keep same gray appearance in dark mode for consistency */
+        background-color: #4b5563;
+        border-color: #4b5563;
+        color: #ffffff;
+    }
+    
+    .select-modern:hover,
+    .select-modern-compact:hover {
+        background-color: #374151;
+        border-color: #374151;
+    }
+    
+    .select-modern:focus,
+    .select-modern-compact:focus {
+        background-color: #374151;
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+    }
+    
+    .select-icon {
+        color: #ffffff;
+    }
+}
+
+/* Mobile Sidebar Responsiveness */
+@media (max-width: 1023px) {
+    /* Hide sidebar by default on mobile */
+    #sidebar {
+        transform: translateX(-100%);
+    }
+    
+    /* Show sidebar when mobile menu is open */
+    #sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    /* Ensure main content takes full width on mobile */
+    .flex-1 {
+        width: 100%;
+        margin-left: 0 !important;
+    }
+    
+    /* Adjust sidebar height for mobile navbar */
+    #sidebar {
+        top: 64px; /* Account for navbar height */
+        height: calc(100vh - 64px);
+    }
+}
+
+/* Desktop styles - ensure sidebar is always visible */
+@media (min-width: 1024px) {
+    #sidebar {
+        transform: translateX(0) !important;
+        position: static !important;
+    }
+    
+    #sidebar-overlay {
+        display: none !important;
+    }
+    
+    #mobile-menu-button {
+        display: none !important;
+    }
+}
+
+/* Smooth transitions for sidebar */
+#sidebar {
+    transition: transform 0.3s ease-in-out;
+}
+
+/* Overlay transition */
+#sidebar-overlay {
+    transition: opacity 0.3s ease-in-out;
+}
+
+#sidebar-overlay.show {
+    opacity: 1;
+}
+
+/* Prevent body scroll when mobile sidebar is open */
+body.mobile-sidebar-open {
+    overflow: hidden;
+}

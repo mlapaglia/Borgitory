@@ -1,0 +1,10 @@
+<!-- Repository List -->
+<div>
+    <h3 class="font-medium text-gray-700 mb-3">Existing Repositories</h3>
+    <div id="repository-list" 
+         hx-get="/api/repositories/html" 
+         hx-trigger="load, repositoryUpdate from:body" 
+         hx-swap="innerHTML">
+        <div class="animate-pulse bg-gray-200 h-20 rounded"></div>
+    </div>
+</div>

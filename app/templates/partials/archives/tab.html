@@ -1,0 +1,36 @@
+<!-- Archives Tab -->
+<div id="tab-archives" class="tab-content hidden">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Archive Browser</h2>
+        
+        <div class="mb-4">
+            <div class="flex items-center space-x-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Repository</label>
+                    <select id="archive-repository-select" onchange="loadArchives()" class="select-modern w-full">
+                        <option value="">Select a repository to view archives...</option>
+                    </select>
+                </div>
+                <div class="flex-shrink-0 pt-6">
+                    <button 
+                        onclick="refreshArchives()" 
+                        id="refresh-archives-btn"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        disabled
+                    >
+                        Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="archives-list" class="overflow-x-auto">
+            <div class="text-gray-500 text-center py-8">
+                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <p>Select a repository above to view its archives</p>
+            </div>
+        </div>
+    </div>
+</div>

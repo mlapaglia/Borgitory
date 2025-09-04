@@ -8,14 +8,18 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 - **Repository Management**: Add, configure, and manage multiple Borg repositories
 - **Manual Backups**: Create backups on-demand with configurable compression and source paths
 - **Real-time Progress**: Monitor backup progress with live updates via Server-Sent Events
-- **Archive Browser**: List and explore backup archives with size and date information
-- **Job History**: Track all backup operations with detailed logs and status
+- **Archive Browser**: Interactive directory-based archive exploration with file downloads
+- **Job History**: Track all backup operations with detailed logs and expandable task views
 
 ### Advanced Features
-- **Automated Scheduling**: Set up cron-based backup schedules with APScheduler
+- **Composite Jobs**: Multi-step operations combining backup, pruning, and cloud sync tasks
+- **Automated Scheduling**: Set up cron-based backup schedules with integrated cleanup and notifications
+- **Archive Cleanup**: Configure automated pruning policies with simple or advanced retention strategies
 - **Cloud Sync**: Synchronize repositories to S3-compatible storage using Rclone
+- **Push Notifications**: Pushover integration for job completion alerts
 - **User Authentication**: Secure username/password authentication
 - **Docker Integration**: Manage Borg operations through isolated Docker containers
+- **Template System**: Modern Jinja2-based UI with reusable components
 - **Mobile Responsive**: HTMX + Alpine.js + Tailwind CSS interface
 
 ## Quick Start
@@ -123,13 +127,44 @@ volumes:
 2. Create new schedule with cron expression
 3. Enable/disable schedules as needed
 
-### 3. Cloud Sync
+### 3. Archive Cleanup (Pruning)
+
+1. Create cleanup policies:
+   - **Simple Strategy**: Keep archives within X days
+   - **Advanced Strategy**: Granular retention (daily/weekly/monthly/yearly)
+2. Configure options:
+   - Show detailed prune lists
+   - Display space savings statistics
+   - Force prune execution
+3. Attach policies to schedules or manual backups
+
+### 4. Archive Browsing
+
+**Exploring Archives:**
+1. Click "View Contents" on any archive to open the browser
+2. Navigate through directories by clicking folder names
+3. View file details including size and modification dates
+
+**Downloading Files:**
+1. Click the download button (⬇) next to any file
+2. Files stream directly from the archive without temporary storage
+3. Works efficiently with large files and slow connections
+4. Multiple downloads can run simultaneously
+
+### 5. Cloud Sync
 
 1. Configure S3 remote:
    - Access Key ID and Secret
-   - Region and optional endpoint
 2. Test connection
 3. Set up automatic sync after backups or manual sync
+
+### 6. Push Notifications
+
+1. Configure Pushover notifications:
+   - User Key and API Token
+2. Choose notification triggers:
+   - Success, failure, or both
+3. Attach to schedules for automated alerts
 
 ## API Documentation
 
@@ -140,26 +175,49 @@ The application provides a RESTful API with automatic OpenAPI documentation:
 
 ### Key Endpoints
 
+**Repositories & Jobs:**
 - `POST /api/repositories/` - Create repository
-- `POST /api/jobs/backup` - Start backup
+- `POST /api/jobs/backup` - Start backup job
+- `POST /api/jobs/prune` - Start pruning job
 - `GET /api/jobs/{id}/stream` - Stream job progress (SSE)
+- `GET /api/jobs/html` - Get job history as HTML
+- `GET /api/jobs/current/html` - Get current running jobs as HTML
+
+**Scheduling & Configuration:**
 - `POST /api/schedules/` - Create backup schedule
+- `POST /api/cleanup/` - Create cleanup policy
+- `POST /api/notifications/` - Create notification config
+- `POST /api/cloud-backup/` - Create cloud backup config
+
+**Cloud & Utilities:**
 - `POST /api/sync/` - Sync to cloud storage
+- `POST /api/jobs/migrate` - Run database migrations
 
 ## Architecture
 
 ### Backend Stack
-- **FastAPI**: Modern Python web framework
-- **SQLite**: Lightweight database for configuration
-- **APScheduler**: Job scheduling and cron support
-- **Docker SDK**: Container management
-- **Passlib**: Password hashing and verification
+- **FastAPI**: Modern Python web framework with automatic OpenAPI docs
+- **SQLite**: Lightweight database for configuration and job history
+- **APScheduler**: Advanced job scheduling and cron support
+- **Docker SDK**: Container orchestration and management
+- **Jinja2**: Powerful template engine for dynamic HTML generation
+- **Passlib**: Secure password hashing and verification
+- **Pushover**: Push notification service integration
 
 ### Frontend Stack
-- **HTMX**: Dynamic HTML updates
+- **HTMX**: Dynamic HTML updates without JavaScript frameworks
 - **Alpine.js**: Lightweight JavaScript reactivity
-- **Tailwind CSS**: Utility-first styling
-- **Server-Sent Events**: Real-time progress updates
+- **Tailwind CSS**: Utility-first styling with responsive design
+- **Server-Sent Events**: Real-time progress updates and live job monitoring
+- **Component Architecture**: Modular JavaScript and template organization
+
+### Job Management System
+- **Composite Jobs**: Multi-task operations with backup, pruning, and cloud sync stages
+- **Real-time Monitoring**: Live job output streaming with expandable task details
+- **Progress Tracking**: Detailed progress indicators for each job stage
+- **Job History**: Persistent storage of job results with searchable history
+- **Task Management**: Individual task tracking within composite jobs
+- **Recovery Service**: Automatic job state recovery after application restarts
 
 ### Security Features
 - Username/password authentication with bcrypt hashing

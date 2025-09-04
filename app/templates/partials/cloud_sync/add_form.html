@@ -1,0 +1,83 @@
+<!-- Add New Cloud Sync -->
+<div class="border rounded-lg p-4">
+    <h3 class="font-medium text-gray-700 mb-3">Add Cloud Sync Location</h3>
+    <form 
+        hx-post="/api/cloud-sync/" 
+        hx-ext="json-enc"
+        hx-target="#cloud-sync-status"
+        hx-on::after-request="handleCloudSyncResponse(event)"
+        class="space-y-4"
+        id="cloud-sync-form"
+    >
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Name</label>
+            <input type="text" name="name" required placeholder="My Sync Location" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Provider Type</label>
+            <select name="provider" id="provider-select" onchange="toggleProviderFields()" class="select-modern w-full">
+                <option value="s3">AWS S3</option>
+                <option value="sftp">SFTP (SSH)</option>
+            </select>
+        </div>
+
+        <!-- S3 Fields -->
+        <div id="s3-fields">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Bucket Name</label>
+                <input type="text" name="bucket_name" placeholder="my-backup-bucket" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">AWS Access Key ID</label>
+                <input type="text" name="access_key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">AWS Secret Access Key</label>
+                <input type="password" name="secret_key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+        </div>
+
+        <!-- SFTP Fields -->
+        <div id="sftp-fields" style="display: none;">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Host</label>
+                <input type="text" name="host" placeholder="sftp.example.com" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Port</label>
+                <input type="number" name="port" value="22" placeholder="22" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Username</label>
+                <input type="text" name="username" placeholder="backup-user" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Remote Path</label>
+                <input type="text" name="remote_path" placeholder="/backups" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Password (optional if using private key)</label>
+                <input type="password" name="password" placeholder="Leave empty if using private key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Private Key (optional if using password)</label>
+                <textarea name="private_key" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" rows="6" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"></textarea>
+                <p class="mt-1 text-sm text-gray-500">Paste your SSH private key here. This will be securely encrypted when stored.</p>
+            </div>
+        </div>
+
+        <!-- Common Fields -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Path Prefix (optional)</label>
+            <input type="text" name="path_prefix" placeholder="backups/borgitory" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        </div>
+
+        <div class="flex space-x-2">
+            <button type="submit" id="submit-button" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                Add Sync Location
+            </button>
+        </div>
+    </form>
+    <div id="cloud-sync-status" class="mt-4"></div>
+</div>

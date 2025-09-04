@@ -1,0 +1,108 @@
+<!-- Statistics Tab -->
+<div id="tab-statistics" class="tab-content hidden">
+    <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Repository Statistics</h2>
+        <p class="mt-1 text-sm text-gray-600">Analyze repository size, compression, and deduplication metrics</p>
+    </div>
+
+    <!-- Repository Selector -->
+    <div class="mb-6">
+        <div>
+            <label for="stats-repository-select" class="block text-sm font-medium text-gray-700">Repository</label>
+            <select 
+                id="stats-repository-select" 
+                class="select-modern w-64"
+                onchange="loadRepositoryStatistics()"
+            >
+                <option value="">Select a repository...</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Statistics Content -->
+    <div id="statistics-content" class="min-h-96">
+        <div class="flex items-center justify-center h-64">
+            <div class="text-center">
+                <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Select Repository</h3>
+                <p class="text-gray-600">Choose a repository to view detailed statistics and analytics</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Statistics functionality
+async function loadRepositoryStatistics() {
+    const select = document.getElementById('stats-repository-select');
+    const repositoryId = select.value;
+    const content = document.getElementById('statistics-content');
+    
+    if (!repositoryId) {
+        content.innerHTML = `
+            <div class="flex items-center justify-center h-64">
+                <div class="text-center">
+                    <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Select Repository</h3>
+                    <p class="text-gray-600">Choose a repository to view detailed statistics and analytics</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Show loading state
+    content.innerHTML = `
+        <div class="flex items-center justify-center h-64">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                <p class="text-gray-600">Loading repository statistics...</p>
+                <p class="text-sm text-gray-500 mt-2">This may take a moment while we analyze all archives</p>
+            </div>
+        </div>
+    `;
+    
+    // Use HTMX to load content so it triggers proper events
+    htmx.ajax('GET', `/api/repositories/${repositoryId}/stats/html`, {
+        target: '#statistics-content',
+        swap: 'innerHTML'
+    }).catch(error => {
+        console.error('Error loading repository statistics:', error);
+        content.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="text-red-700 font-semibold">Error loading statistics</span>
+                </div>
+                <p class="text-red-600 mt-1">Failed to load repository statistics</p>
+                <button onclick="loadRepositoryStatistics()" class="mt-3 text-sm text-red-600 hover:text-red-800 underline">
+                    Try again
+                </button>
+            </div>
+        `;
+    });
+}
+
+// Populate repository selector when statistics tab is activated
+function populateStatisticsRepositories() {
+    const select = document.getElementById('stats-repository-select');
+    if (!select) return;
+    
+    // Get repositories from the global app instance
+    if (window.borgitoryAppInstance && window.borgitoryAppInstance.repositories && window.borgitoryAppInstance.repositories.length > 0) {
+        select.innerHTML = '<option value="">Select a repository...</option>';
+        window.borgitoryAppInstance.repositories.forEach(repo => {
+            const option = document.createElement('option');
+            option.value = repo.id;
+            option.textContent = repo.name;
+            select.appendChild(option);
+        });
+    }
+}
+</script>
