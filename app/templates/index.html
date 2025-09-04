@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div x-data="borgitoryApp()" x-init="init()" class="flex h-screen bg-gray-100">
+<div x-data="borgitoryApp()" x-init="initApp()" class="flex h-screen bg-gray-100">
     <!-- Mobile sidebar overlay -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden hidden" onclick="closeMobileSidebar()"></div>
     

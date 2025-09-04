@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from collections import deque
 
 from app.models.database import Repository, Job, JobTask, get_db, Schedule
+from app.models.enums import JobType
 from app.services.rclone_service import rclone_service
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ class CompositeJobManager:
 
     async def create_composite_job(
         self,
-        job_type: str,
+        job_type: JobType,
         task_definitions: List[Dict],
         repository: Repository,
         schedule: Optional[Schedule] = None,
@@ -84,7 +85,7 @@ class CompositeJobManager:
             db_job = Job(
                 repository_id=repository.id,
                 job_uuid=job_id,
-                type=job_type,
+                type=str(job_type),
                 status="pending",
                 job_type="composite",
                 total_tasks=len(task_definitions),
@@ -123,7 +124,7 @@ class CompositeJobManager:
         composite_job = CompositeJobInfo(
             id=job_id,
             db_job_id=db_job.id,
-            job_type=job_type,
+            job_type=str(job_type),
             repository=repository,
             schedule=schedule,
         )

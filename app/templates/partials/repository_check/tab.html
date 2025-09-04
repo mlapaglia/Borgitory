@@ -7,62 +7,19 @@
             <!-- Run Repository Check -->
             <div class="border rounded-lg p-4">
                 <h3 class="font-medium text-gray-700 mb-3">Run Repository Check</h3>
-                <form 
-                    hx-post="/api/jobs/check" 
-                    hx-ext="json-enc"
-                    hx-target="#check-status"
-                    hx-on::after-request="handleCheckResponse(event)"
-                    id="manual-check-form"
-                    class="space-y-4"
-                >
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Repository</label>
-                        <select name="repository_id" required class="select-modern w-full" id="check-repository-select">
-                            <option value="">Select Repository...</option>
-                        </select>
+                
+                <div hx-get="/api/repository-check-configs/form" hx-trigger="load" hx-swap="innerHTML">
+                    <div class="[&.htmx-request]:flex hidden justify-center items-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                        <span class="text-gray-600">Loading form...</span>
                     </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Check Policy</label>
-                        <select name="check_config_id" class="select-modern w-full" id="check-policy-select" onchange="toggleCustomCheckOptions()">
-                            <option value="">Custom Check...</option>
-                        </select>
-                        <p class="text-xs text-gray-500 mt-1">Select a policy or choose "Custom Check" for manual configuration</p>
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
+                        <div class="h-10 bg-gray-200 rounded mb-4"></div>
+                        <div class="h-32 bg-gray-200 rounded"></div>
                     </div>
-
-                    <!-- Custom Check Options (shown when no policy selected) -->
-                    <div id="custom-check-options">
-                        <div class="p-4 bg-gray-50 rounded-md space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Check Type</label>
-                                <select name="check_type" class="select-modern w-full">
-                                    <option value="full">Full Check</option>
-                                    <option value="repository_only">Repository Only</option>
-                                    <option value="archives_only">Archives Only</option>
-                                </select>
-                            </div>
-                            <div class="space-y-2">
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="verify_data" class="mr-2">
-                                    <span class="text-sm">Verify Data Integrity</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="repair_mode" class="mr-2">
-                                    <span class="text-sm">Repair Mode ⚠️</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="save_space" class="mr-2">
-                                    <span class="text-sm">Save Space</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 font-medium">
-                        Start Repository Check
-                    </button>
-                </form>
-
+                </div>
+                
                 <div id="check-status" class="mt-4"></div>
             </div>
 
@@ -75,7 +32,6 @@
                     hx-post="/api/repository-check-configs/" 
                     hx-ext="json-enc"
                     hx-target="#check-policy-status"
-                    hx-on::after-request="handleCheckPolicyResponse(event)"
                     id="check-policy-form"
                     class="space-y-3 mb-4 pb-4 border-b"
                 >
@@ -94,82 +50,102 @@
                         <label class="block text-sm font-medium text-gray-700 mb-2">Check Type</label>
                         <div class="space-y-2">
                             <label class="flex items-center">
-                                <input type="radio" name="check_type" value="full" class="mr-2" checked onchange="updateCheckOptions()">
+                                <input type="radio" name="check_type" value="full" class="mr-2" checked
+                                       hx-get="/api/repository-check-configs/update-options" 
+                                       hx-target="#dynamic-check-options" 
+                                       hx-include="closest form"
+                                       hx-swap="innerHTML">
                                 <span class="text-sm">Full Check (Repository + Archives)</span>
                             </label>
                             <label class="flex items-center">
-                                <input type="radio" name="check_type" value="repository_only" class="mr-2" onchange="updateCheckOptions()">
+                                <input type="radio" name="check_type" value="repository_only" class="mr-2"
+                                       hx-get="/api/repository-check-configs/update-options" 
+                                       hx-target="#dynamic-check-options" 
+                                       hx-include="closest form"
+                                       hx-swap="innerHTML">
                                 <span class="text-sm">Repository Only (Faster)</span>
                             </label>
                             <label class="flex items-center">
-                                <input type="radio" name="check_type" value="archives_only" class="mr-2" onchange="updateCheckOptions()">
+                                <input type="radio" name="check_type" value="archives_only" class="mr-2"
+                                       hx-get="/api/repository-check-configs/update-options" 
+                                       hx-target="#dynamic-check-options" 
+                                       hx-include="closest form"
+                                       hx-swap="innerHTML">
                                 <span class="text-sm">Archives Only</span>
                             </label>
                         </div>
                     </div>
 
-                    <!-- Verification Options -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
-                        <div class="space-y-2">
-                            <label class="flex items-center" id="verify-data-option">
-                                <input type="checkbox" name="verify_data" class="mr-2">
-                                <span class="text-sm">Verify Data Integrity</span>
-                                <span class="text-xs text-gray-500 ml-2">(Very slow but thorough)</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="checkbox" name="repair_mode" class="mr-2" id="repair-mode-checkbox">
-                                <span class="text-sm">Repair Mode</span>
-                                <span class="text-xs text-red-600 ml-2">⚠️ DANGEROUS - Backup first!</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="checkbox" name="save_space" class="mr-2">
-                                <span class="text-sm">Save Space</span>
-                                <span class="text-xs text-gray-500 ml-2">(Slower but uses less memory)</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Advanced Options (Collapsible) -->
-                    <div>
-                        <button type="button" onclick="toggleAdvancedOptions()" class="flex items-center text-sm text-blue-600 hover:text-blue-800">
-                            <svg id="advanced-chevron" class="w-4 h-4 mr-1 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                            </svg>
-                            Advanced Options
-                        </button>
-                        
-                        <div id="advanced-options" class="hidden mt-3 p-4 bg-gray-50 rounded-md space-y-4">
-                            <!-- Time Limit (Repository Only) -->
-                            <div id="time-limit-section">
-                                <label class="block text-sm font-medium text-gray-700">Time Limit (seconds)</label>
-                                <input type="number" name="max_duration" min="1" placeholder="3600" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                                <p class="text-xs text-gray-500 mt-1">For partial repository checks only. Leave empty for full check.</p>
+                    <!-- Dynamic Check Options (controlled by HTMX) -->
+                    <div id="dynamic-check-options" 
+                         hx-get="/api/repository-check-configs/update-options" 
+                         hx-trigger="load"
+                         hx-include="input[name='check_type']:checked, input[name='max_duration'], input[name='repair_mode']"
+                         hx-swap="innerHTML">
+                        <!-- Default options for full check -->
+                        <!-- Verification Options -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center" id="verify-data-option">
+                                    <input type="checkbox" name="verify_data" class="mr-2">
+                                    <span class="text-sm">Verify Data Integrity</span>
+                                    <span class="text-xs text-gray-500 ml-2">(Very slow but thorough)</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="repair_mode" class="mr-2" id="repair-mode-checkbox">
+                                    <span class="text-sm">Repair Mode</span>
+                                    <span class="text-xs text-red-600 ml-2">⚠️ DANGEROUS - Backup first!</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="save_space" class="mr-2">
+                                    <span class="text-sm">Save Space</span>
+                                    <span class="text-xs text-gray-500 ml-2">(Slower but uses less memory)</span>
+                                </label>
                             </div>
+                        </div>
 
-                            <!-- Archive Filters -->
-                            <div id="archive-filters-section">
-                                <div class="grid grid-cols-1 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700">Archive Prefix</label>
-                                        <input type="text" name="archive_prefix" placeholder="backup-2024" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700">Archive Glob Pattern</label>
-                                        <input type="text" name="archive_glob" placeholder="*2024*" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700">First N Archives</label>
-                                            <input type="number" name="first_n_archives" min="1" placeholder="10" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700">Last N Archives</label>
-                                            <input type="number" name="last_n_archives" min="1" placeholder="10" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                                        </div>
-                                    </div>
+                        <!-- Advanced Options (Collapsible) -->
+                        <div>
+                            <button type="button" onclick="document.getElementById('advanced-options').classList.toggle('hidden'); document.getElementById('advanced-chevron').classList.toggle('rotate-90')" class="flex items-center text-sm text-blue-600 hover:text-blue-800">
+                                <svg id="advanced-chevron" class="w-4 h-4 mr-1 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                                Advanced Options
+                            </button>
+                            
+                            <div id="advanced-options" class="hidden mt-3 p-4 bg-gray-50 rounded-md space-y-4">
+                                <!-- Time Limit (Hidden for full check) -->
+                                <div id="time-limit-section" style="display: none;">
+                                    <label class="block text-sm font-medium text-gray-700">Time Limit (seconds)</label>
+                                    <input type="number" name="max_duration" min="1" placeholder="3600" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                    <p class="text-xs text-gray-500 mt-1">For partial repository checks only. Leave empty for full check.</p>
                                 </div>
-                                <p class="text-xs text-gray-500 mt-2">Archive filters are only used with Full Check or Archives Only.</p>
+
+                                <!-- Archive Filters (Shown for full check) -->
+                                <div id="archive-filters-section">
+                                    <div class="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Archive Prefix</label>
+                                            <input type="text" name="archive_prefix" placeholder="backup-2024" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Archive Glob Pattern</label>
+                                            <input type="text" name="archive_glob" placeholder="*2024*" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">First N Archives</label>
+                                                <input type="number" name="first_n_archives" min="1" placeholder="10" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Last N Archives</label>
+                                                <input type="number" name="last_n_archives" min="1" placeholder="10" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2">Archive filters are only used with Full Check or Archives Only.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -181,7 +157,10 @@
                 <div id="check-policy-status" class="mb-4"></div>
                 
                 <!-- Existing Check Policies -->
-                <div id="check-policies-list">
+                <div id="check-policies-list" 
+                     hx-get="/api/repository-check-configs/html" 
+                     hx-trigger="load, checkConfigUpdate from:body" 
+                     hx-swap="innerHTML">
                     <div class="text-gray-500 text-sm">Loading check policies...</div>
                 </div>
             </div>

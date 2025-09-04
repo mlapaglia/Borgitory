@@ -29,27 +29,39 @@ logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.post("/", response_model=RepositorySchema, status_code=status.HTTP_201_CREATED)
+@router.post("/")
 async def create_repository(
+    request: Request,
     repo: RepositoryCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    is_htmx_request = "hx-request" in request.headers
+    
     try:
         # Check for duplicate name
         db_repo = db.query(Repository).filter(Repository.name == repo.name).first()
         if db_repo:
-            raise HTTPException(
-                status_code=400, detail="Repository with this name already exists"
-            )
+            error_msg = "Repository with this name already exists"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    "partials/repositories/form_create_error.html",
+                    {"request": request, "error_message": error_msg},
+                    status_code=400
+                )
+            raise HTTPException(status_code=400, detail=error_msg)
 
         # Check for duplicate path
         db_repo_path = db.query(Repository).filter(Repository.path == repo.path).first()
         if db_repo_path:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Repository with path '{repo.path}' already exists with name '{db_repo_path.name}'",
-            )
+            error_msg = f"Repository with path '{repo.path}' already exists with name '{db_repo_path.name}'"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    "partials/repositories/form_create_error.html",
+                    {"request": request, "error_message": error_msg},
+                    status_code=400
+                )
+            raise HTTPException(status_code=400, detail=error_msg)
 
         db_repo = Repository(name=repo.name, path=repo.path)
         db_repo.set_passphrase(repo.passphrase)
@@ -69,15 +81,37 @@ async def create_repository(
                 f"Repository '{repo.name}' created in database but Borg initialization error: {init_error}"
             )
 
-        return db_repo
+        # Success response
+        if is_htmx_request:
+            # Trigger repository list update and return fresh form
+            response = templates.TemplateResponse(
+                "partials/repositories/form_create_success.html",
+                {"request": request, "repository_name": repo.name}
+            )
+            response.headers["HX-Trigger"] = "repositoryUpdate"
+            return response
+        else:
+            # Return JSON for non-HTMX requests
+            return db_repo
 
-    except HTTPException:
+    except HTTPException as e:
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                "partials/repositories/form_create_error.html",
+                {"request": request, "error_message": str(e.detail)},
+                status_code=e.status_code
+            )
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create repository: {str(e)}"
-        )
+        error_msg = f"Failed to create repository: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                "partials/repositories/form_create_error.html",
+                {"request": request, "error_message": error_msg},
+                status_code=500
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.get("/", response_model=List[RepositorySchema])
@@ -87,16 +121,32 @@ def list_repositories(skip: int = 0, limit: int = 100, db: Session = Depends(get
 
 
 @router.get("/scan")
-async def scan_repositories():
-    """Scan for existing repositories (alias for scan-existing for frontend compatibility)"""
+async def scan_repositories(request: Request):
+    """Scan for existing repositories and return HTML for HTMX"""
     try:
         available_repos = await borg_service.scan_for_repositories()
-        return {"repositories": available_repos}
+        
+        # Check if request wants JSON (for backward compatibility)
+        accept_header = request.headers.get("Accept", "")
+        if "application/json" in accept_header or "hx-request" not in request.headers:
+            return {"repositories": available_repos}
+        
+        # Return HTML for HTMX
+        return templates.TemplateResponse(
+            "partials/repositories/scan_results.html",
+            {"request": request, "repositories": available_repos}
+        )
     except Exception as e:
         logger.error(f"Error scanning for repositories: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to scan repositories: {str(e)}"
-        )
+        
+        # Check if this is an HTMX request
+        if "hx-request" in request.headers:
+            error_html = f'<div class="text-sm text-red-600">Error: {str(e)}</div>'
+            return HTMLResponse(content=error_html)
+        else:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to scan repositories: {str(e)}"
+            )
 
 
 @router.get("/html", response_class=HTMLResponse)
@@ -131,7 +181,10 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
                                         class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200">
                                     View Archives
                                 </button>
-                                <button onclick="borgitoryAppInstance.deleteRepository({repo.id}, '{repo.name}')" 
+                                <button hx-delete="/api/repositories/{repo.id}"
+                                        hx-confirm="Are you sure you want to delete the repository '{repo.name}'? This action cannot be undone."
+                                        hx-target="#repository-list"
+                                        hx-swap="innerHTML"
                                         class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
                                     Delete
                                 </button>
@@ -157,12 +210,10 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
 async def list_directories(path: str = "/repos"):
     """List directories at the given path for autocomplete functionality"""
     try:
-        # Get list of allowed paths from mounted volumes
         from app.services.volume_service import volume_service
 
         mounted_volumes = await volume_service.get_mounted_volumes()
 
-        # Security: Only allow root directory or paths under mounted volumes
         allowed = path == "/"
         if not allowed:
             for volume in mounted_volumes:
@@ -265,9 +316,9 @@ def update_repository(
     return repository
 
 
-@router.delete("/{repo_id}")
+@router.delete("/{repo_id}", response_class=HTMLResponse)
 async def delete_repository(
-    repo_id: int, delete_borg_repo: bool = False, db: Session = Depends(get_db)
+    repo_id: int, request: Request, delete_borg_repo: bool = False, db: Session = Depends(get_db)
 ):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
@@ -325,15 +376,8 @@ async def delete_repository(
     # TODO: If delete_borg_repo is True, we could also delete the actual Borg repository
     # This would require careful implementation to avoid data loss
 
-    return {
-        "message": f"Repository '{repo_name}' deleted successfully from database",
-        "jobs_deleted": jobs_count,
-        "tasks_deleted": tasks_count,
-        "schedules_deleted": schedules_count,
-        "note": "Actual Borg repository files were not deleted"
-        if not delete_borg_repo
-        else None,
-    }
+    # Return updated repository list HTML (HTMX way)
+    return get_repositories_html(request, db)
 
 
 @router.get("/{repo_id}/archives")
@@ -493,6 +537,30 @@ async def list_archives_html(
         return HTMLResponse(content=error_html)
 
 
+@router.get("/archives/selector")
+async def get_archives_repository_selector(request: Request, db: Session = Depends(get_db)):
+    """Get repository selector for archives with repositories populated"""
+    repositories = db.query(Repository).all()
+    
+    return templates.TemplateResponse(
+        "partials/archives/repository_selector.html",
+        {"request": request, "repositories": repositories}
+    )
+
+
+@router.get("/archives/list")
+async def get_archives_list(request: Request, repository_id: int = None, db: Session = Depends(get_db)):
+    """Get archives list or empty state"""
+    if not repository_id:
+        return templates.TemplateResponse(
+            "partials/archives/empty_state.html",
+            {"request": request}
+        )
+    
+    # Redirect to the existing archives HTML endpoint
+    return await list_archives_html(repository_id, request, db)
+
+
 @router.get("/{repo_id}/info")
 async def get_repository_info(repo_id: int, db: Session = Depends(get_db)):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
@@ -537,10 +605,127 @@ async def extract_file(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post(
-    "/import", response_model=RepositorySchema, status_code=status.HTTP_201_CREATED
-)
+@router.get("/import-form-update", response_class=HTMLResponse)
+def update_import_form(request: Request, repo_select: str = ""):
+    """Update import form fields based on selected repository"""
+    
+    if not repo_select:
+        # No repository selected - show disabled state
+        form_html = '''
+        <div id="import-form-dynamic">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Repository Path</label>
+                <div class="relative">
+                    <input type="text" name="path" id="import-path" required 
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                           placeholder="/repos/" autocomplete="off">
+                    <div id="import-path-dropdown" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Encryption info display (hidden by default) -->
+            <div id="encryption-info" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span id="encryption-text" class="text-sm text-blue-700"></span>
+                </div>
+            </div>
+            
+            <!-- Passphrase field (hidden by default) -->
+            <div id="passphrase-field" class="hidden">
+                <label class="block text-sm font-medium text-gray-700">Passphrase</label>
+                <input type="password" name="passphrase" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            
+            <!-- Keyfile field (hidden by default) -->
+            <div id="keyfile-field" class="hidden">
+                <label class="block text-sm font-medium text-gray-700">Keyfile</label>
+                <input type="file" name="keyfile" accept=".key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <p class="mt-1 text-sm text-gray-500">Upload the Borg keyfile (usually has .key extension)</p>
+            </div>
+            
+            <button type="submit" id="import-submit" disabled class="w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center">
+                <span id="import-button-text">Select a repository first</span>
+            </button>
+        </div>
+        '''
+        return HTMLResponse(content=form_html)
+    
+    try:
+        import json
+        repo_data = json.loads(repo_select)
+        
+        path = repo_data.get('path', '')
+        encryption_mode = repo_data.get('encryption_mode', 'unknown')
+        requires_keyfile = repo_data.get('requires_keyfile', False)
+        preview = repo_data.get('preview', f'Encryption: {encryption_mode}')
+        
+        # Determine which fields to show
+        show_passphrase = encryption_mode != 'none'
+        show_keyfile = requires_keyfile
+        show_encryption_info = True
+        
+        # Build the dynamic form HTML
+        passphrase_style = '' if show_passphrase else ' style="display: none;"'
+        keyfile_style = '' if show_keyfile else ' style="display: none;"'
+        encryption_style = '' if show_encryption_info else ' style="display: none;"'
+        
+        form_html = f'''
+        <div id="import-form-dynamic">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Repository Path</label>
+                <div class="relative">
+                    <input type="text" name="path" id="import-path" required value="{path}"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                           placeholder="/repos/" autocomplete="off">
+                    <div id="import-path-dropdown" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Encryption info display -->
+            <div id="encryption-info" class="p-3 bg-blue-50 border border-blue-200 rounded-lg"{encryption_style}>
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span id="encryption-text" class="text-sm text-blue-700">{preview}</span>
+                </div>
+            </div>
+            
+            <!-- Passphrase field -->
+            <div id="passphrase-field" class="space-y-1"{passphrase_style}>
+                <label class="block text-sm font-medium text-gray-700">Passphrase</label>
+                <input type="password" name="passphrase" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            </div>
+            
+            <!-- Keyfile field -->
+            <div id="keyfile-field" class="space-y-1"{keyfile_style}>
+                <label class="block text-sm font-medium text-gray-700">Keyfile</label>
+                <input type="file" name="keyfile" accept=".key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                <p class="mt-1 text-sm text-gray-500">Upload the Borg keyfile (usually has .key extension)</p>
+            </div>
+            
+            <button type="submit" id="import-submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 flex items-center justify-center">
+                <span id="import-button-text">Import Repository</span>
+            </button>
+        </div>
+        '''
+        
+        return HTMLResponse(content=form_html)
+        
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error parsing repository selection: {e}")
+        # Return disabled state on error
+        return update_import_form(request, "")
+
+
+@router.post("/import")
 async def import_repository(
+    request: Request,
     name: str = Form(...),
     path: str = Form(...),
     passphrase: str = Form(...),
@@ -548,21 +733,32 @@ async def import_repository(
     db: Session = Depends(get_db),
 ):
     """Import an existing Borg repository"""
+    is_htmx_request = "hx-request" in request.headers
+    
     try:
         # Check for duplicate name
         db_repo = db.query(Repository).filter(Repository.name == name).first()
         if db_repo:
-            raise HTTPException(
-                status_code=400, detail="Repository with this name already exists"
-            )
+            error_msg = "Repository with this name already exists"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    "partials/repositories/form_import_error.html",
+                    {"request": request, "error_message": error_msg},
+                    status_code=200
+                )
+            raise HTTPException(status_code=400, detail=error_msg)
 
         # Check for duplicate path
         db_repo_path = db.query(Repository).filter(Repository.path == path).first()
         if db_repo_path:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Repository with path '{path}' already exists with name '{db_repo_path.name}'",
-            )
+            error_msg = f"Repository with path '{path}' already exists with name '{db_repo_path.name}'"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    "partials/repositories/form_import_error.html",
+                    {"request": request, "error_message": error_msg},
+                    status_code=200
+                )
+            raise HTTPException(status_code=400, detail=error_msg)
 
         # Handle keyfile if provided
         keyfile_path = None
@@ -620,12 +816,34 @@ async def import_repository(
                 f"Successfully imported repository '{name}' (could not count archives)"
             )
 
-        return db_repo
+        # Success response
+        if is_htmx_request:
+            # Trigger repository list update and return fresh form
+            response = templates.TemplateResponse(
+                "partials/repositories/form_import_success.html",
+                {"request": request, "repository_name": name}
+            )
+            response.headers["HX-Trigger"] = "repositoryUpdate"
+            return response
+        else:
+            # Return JSON for non-HTMX requests
+            return db_repo
 
-    except HTTPException:
+    except HTTPException as e:
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                "partials/repositories/form_import_error.html",
+                {"request": request, "error_message": str(e.detail)},
+                status_code=200
+            )
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Failed to import repository: {str(e)}"
-        )
+        error_msg = f"Failed to import repository: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                "partials/repositories/form_import_error.html",
+                {"request": request, "error_message": error_msg},
+                status_code=200
+            )
+        raise HTTPException(status_code=500, detail=error_msg)

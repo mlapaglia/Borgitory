@@ -71,15 +71,23 @@ window.copyTaskOutput = function(jobId, taskOrder) {
 }
 
 window.viewRunningJobDetails = function(jobId) {
-    // Navigate to job details view or open a modal
-    // For now, just show an alert with the job ID
-    console.log(`Viewing details for running job: ${jobId}`);
+    console.log(`Switching to jobs tab for job: ${jobId}`);
     
-    // You could expand this to:
-    // - Open a modal with live job output
-    // - Navigate to a dedicated job details page  
-    // - Show more detailed progress information
-    showNotification(`Viewing job ${jobId.substring(0, 8)}...`, 'info');
+    // Switch to the jobs tab
+    if (typeof switchTab === 'function') {
+        switchTab('jobs');
+    } else {
+        console.error('switchTab function not found');
+    }
+    
+    // Load job history with auto-expansion for this job
+    htmx.ajax('GET', `/api/jobs/html?expand=${jobId}`, {
+        target: '#job-history',
+        swap: 'innerHTML'
+    });
+    
+    // Show notification
+    showNotification(`Showing details for job ${jobId.substring(0, 8)}`, 'info');
 }
 
 // Initialize live output streaming for individual task

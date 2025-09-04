@@ -1,7 +1,19 @@
-<!-- Create New Repository Form -->
+<!-- Create New Repository Form - Error State -->
 <div id="create-form-container" class="repository-form">
     <div id="create-form">
         <h3 class="font-medium text-gray-700 mb-3">Create New Repository</h3>
+        
+        <!-- Error Message -->
+        <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-red-700">{{ error_message }}</span>
+            </div>
+        </div>
+        
+        <!-- Form with Previous Values (HTMX preserves form data on error) -->
         <form 
             hx-post="/api/repositories/" 
             hx-ext="json-enc"

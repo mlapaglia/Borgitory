@@ -1,5 +1,7 @@
 {% if not schedules %}
-<div class="text-gray-500 text-sm">No schedules configured</div>
+<div class="text-gray-500 text-center py-4">
+    <p>No schedules configured</p>
+</div>
 {% else %}
 {% for schedule in schedules %}
 <div class="flex items-center justify-between p-3 border rounded-lg mb-2 {{ 'bg-gray-50' if not schedule.enabled }}">

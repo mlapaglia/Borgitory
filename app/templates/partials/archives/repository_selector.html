@@ -1,0 +1,31 @@
+<!-- Archive Repository Selector -->
+<div class="flex items-center space-x-4">
+    <div class="flex-1">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Select Repository</label>
+        <select id="archive-repository-select" 
+                hx-get="/api/repositories/archives/list"
+                hx-target="#archives-list"
+                hx-swap="innerHTML"
+                hx-trigger="change"
+                hx-vals='js:{"repository_id": event.target.value}'
+                class="select-modern w-full">
+            <option value="">Select a repository to view archives...</option>
+            {% for repo in repositories %}
+            <option value="{{ repo.id }}">{{ repo.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="flex-shrink-0 pt-6">
+        <button 
+            hx-get="/api/repositories/archives/list"
+            hx-target="#archives-list"
+            hx-swap="innerHTML"
+            hx-vals='js:{"repository_id": document.getElementById("archive-repository-select").value}'
+            hx-trigger="click"
+            id="refresh-archives-btn"
+            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        >
+            Refresh
+        </button>
+    </div>
+</div>

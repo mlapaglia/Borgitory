@@ -3,21 +3,19 @@
     <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Archive Browser</h2>
         
-        <div class="mb-4">
+        <div class="mb-4" 
+             hx-get="/api/repositories/archives/selector" 
+             hx-trigger="load" 
+             hx-swap="innerHTML">
             <div class="flex items-center space-x-4">
                 <div class="flex-1">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Select Repository</label>
-                    <select id="archive-repository-select" onchange="loadArchives()" class="select-modern w-full">
-                        <option value="">Select a repository to view archives...</option>
+                    <select class="select-modern w-full">
+                        <option value="">Loading repositories...</option>
                     </select>
                 </div>
                 <div class="flex-shrink-0 pt-6">
-                    <button 
-                        onclick="refreshArchives()" 
-                        id="refresh-archives-btn"
-                        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        disabled
-                    >
+                    <button class="bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed">
                         Refresh
                     </button>
                 </div>

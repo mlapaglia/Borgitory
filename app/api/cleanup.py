@@ -5,15 +5,17 @@ API endpoints for managing cleanup configurations (archive pruning policies)
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.models.database import CleanupConfig, get_db
+from app.models.database import CleanupConfig, Repository, get_db
 from app.models.schemas import CleanupConfig as CleanupConfigSchema, CleanupConfigCreate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+templates = Jinja2Templates(directory="app/templates")
 
 
 class CleanupService:
@@ -109,6 +111,17 @@ class CleanupService:
 def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
     """Dependency to get cleanup service instance."""
     return CleanupService(db)
+
+
+@router.get("/form")
+async def get_cleanup_form(request: Request, db: Session = Depends(get_db)):
+    """Get cleanup form with repositories populated"""
+    repositories = db.query(Repository).all()
+    
+    return templates.TemplateResponse(
+        "partials/cleanup/config_form.html",
+        {"request": request, "repositories": repositories}
+    )
 
 
 @router.post(

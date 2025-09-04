@@ -32,31 +32,12 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// Job History and SSE Functions
-function loadJobHistory() {
-    // Load job history via HTMX
-    htmx.ajax('GET', '/api/jobs/html', {
-        target: '#job-history',
-        swap: 'innerHTML'
-    });
-    
-    // Also load current jobs
-    htmx.ajax('GET', '/api/jobs/current/html', {
-        target: '#current-jobs',  
-        swap: 'innerHTML'
-    });
-}
+// SSE Functions
 
-function initializeSSE() {
-    console.log('initializeSSE() called');
+function initializeSSE() {    
     // Set up Server-Sent Events for real-time job updates
     if (typeof EventSource !== 'undefined') {
-        console.log('EventSource supported, creating connection to /api/jobs/stream');
         const eventSource = new EventSource('/api/jobs/stream');
-        
-        eventSource.onopen = function(event) {
-            console.log('SSE connection opened successfully');
-        };
         
         eventSource.addEventListener('jobs_update', function(event) {
             try {
@@ -69,18 +50,15 @@ function initializeSSE() {
                     });
                 }
             } catch (error) {
-                console.error('Error processing jobs_update event:', error);
             }
         });
         
         eventSource.addEventListener('job_progress', function(event) {
             try {
                 const data = JSON.parse(event.data);
-                console.log('Job progress:', data);
                 // Update specific job progress if visible
                 updateJobProgress(data);
             } catch (error) {
-                console.error('Error processing job_progress event:', error);
             }
         });
         
@@ -93,15 +71,25 @@ function initializeSSE() {
             }
         });
         
-        eventSource.onerror = function(event) {
-            console.error('SSE connection error:', event);
+        eventSource.onerror = function(event) {            
+            // Don't create a new connection immediately on error
+            // Let the existing connection attempt to reconnect automatically
+            if (eventSource.readyState === EventSource.CLOSED) {
+                window.jobsEventSource = null;
+            }
         };
         
         // Store reference for cleanup
         window.jobsEventSource = eventSource;
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', function() {
+            if (window.jobsEventSource) {
+                window.jobsEventSource.close();
+                window.jobsEventSource = null;
+            }
+        });
     } else {
-        console.log('EventSource not supported, falling back to polling');
-        // Fallback to periodic refresh
         setInterval(() => {
             if (document.getElementById('current-jobs')) {
                 htmx.ajax('GET', '/api/jobs/current/html', {

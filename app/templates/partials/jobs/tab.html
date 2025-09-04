@@ -2,7 +2,10 @@
 <div id="tab-jobs" class="tab-content hidden">
     <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Job History</h2>
-        <div id="job-history">
+        <div id="job-history"
+             hx-get="/api/jobs/html"
+             hx-trigger="load"
+             hx-swap="innerHTML">
             <div class="text-gray-500 text-sm">Loading job history...</div>
         </div>
     </div>

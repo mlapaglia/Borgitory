@@ -5,13 +5,16 @@
         hx-post="/api/jobs/backup" 
         hx-ext="json-enc"
         hx-target="#backup-status"
-        hx-on::after-request="handleBackupResponse(event)"
+        hx-swap="innerHTML"
     >
         <div class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700">Repository</label>
                 <select name="repository_id" required class="select-modern w-full">
                     <option value="">Select Repository...</option>
+                    {% for repo in repositories %}
+                    <option value="{{ repo.id }}">{{ repo.name }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <div>
@@ -36,6 +39,9 @@
                 <label class="block text-sm font-medium text-gray-700">Archive Cleanup (Optional)</label>
                 <select name="cleanup_config_id" id="backup-cleanup-select" class="select-modern w-full">
                     <option value="">No cleanup</option>
+                    {% for config in cleanup_configs %}
+                    <option value="{{ config.id }}">{{ config.name }}</option>
+                    {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Automatically prune old archives after backup completes</p>
             </div>
@@ -43,6 +49,9 @@
                 <label class="block text-sm font-medium text-gray-700">Cloud Backup (Optional)</label>
                 <select name="cloud_sync_config_id" id="backup-cloud-select" class="select-modern w-full">
                     <option value="">No cloud backup</option>
+                    {% for config in cloud_sync_configs %}
+                    <option value="{{ config.id }}">{{ config.name }}</option>
+                    {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Automatically backup to cloud after Borg backup completes</p>
             </div>
@@ -50,6 +59,9 @@
                 <label class="block text-sm font-medium text-gray-700">Repository Check (Optional)</label>
                 <select name="check_config_id" id="backup-check-select" class="select-modern w-full">
                     <option value="">No check</option>
+                    {% for config in check_configs %}
+                    <option value="{{ config.id }}">{{ config.name }}</option>
+                    {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Verify repository integrity after backup completes</p>
             </div>
@@ -57,6 +69,9 @@
                 <label class="block text-sm font-medium text-gray-700">Notifications (Optional)</label>
                 <select name="notification_config_id" id="backup-notification-select" class="select-modern w-full">
                     <option value="">No notifications</option>
+                    {% for config in notification_configs %}
+                    <option value="{{ config.id }}">{{ config.name }}</option>
+                    {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Get notified when backup completes or fails</p>
             </div>
@@ -71,3 +86,10 @@
     </form>
     <div id="backup-status" class="mt-4"></div>
 </div>
+
+<script>
+// Initialize path autocomplete for dynamically loaded form
+if (typeof PathAutocomplete !== 'undefined') {
+    new PathAutocomplete('backup-source-path', 'backup-source-path-dropdown');
+}
+</script>
