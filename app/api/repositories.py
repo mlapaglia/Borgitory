@@ -157,11 +157,23 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
 async def list_directories(path: str = "/repos"):
     """List directories at the given path for autocomplete functionality"""
     try:
-        # Security: Only allow root directory or paths under /repos for safety
-        if path != "/" and not path.startswith("/repos"):
+        # Get list of allowed paths from mounted volumes
+        from app.services.volume_service import volume_service
+
+        mounted_volumes = await volume_service.get_mounted_volumes()
+
+        # Security: Only allow root directory or paths under mounted volumes
+        allowed = path == "/"
+        if not allowed:
+            for volume in mounted_volumes:
+                if path.startswith(volume):
+                    allowed = True
+                    break
+
+        if not allowed:
             raise HTTPException(
                 status_code=400,
-                detail="Path must be root directory or under /repos directory",
+                detail=f"Path must be root directory or under one of the mounted volumes: {', '.join(mounted_volumes)}",
             )
 
         # Normalize path

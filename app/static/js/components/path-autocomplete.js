@@ -98,12 +98,6 @@ class PathAutocomplete {
             searchTerm = value;
         }
         
-        // Security: ensure we only search under /repos or root
-        if (dirPath !== '/' && !dirPath.startsWith('/repos')) {
-            this.hideDropdown();
-            return;
-        }
-        
         try {
             const url = `/api/repositories/directories?path=${encodeURIComponent(dirPath)}`;
             const response = await fetch(url);

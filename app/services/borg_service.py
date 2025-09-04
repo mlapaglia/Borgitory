@@ -760,37 +760,75 @@ class BorgService:
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
             raise Exception(f"Failed to extract file: {str(e)}")
 
-    async def start_repository_scan(self, scan_path: str = "/repos") -> str:
+    async def start_repository_scan(self, scan_path: str = None) -> str:
         """Start repository scan and return job_id for tracking"""
-        logger.info(f"Starting repository scan in {scan_path}")
 
-        try:
-            safe_scan_path = sanitize_path(scan_path)
-        except Exception as e:
-            logger.error(f"Invalid scan path: {e}")
-            raise Exception(f"Invalid scan path: {e}")
+        # If no specific path provided, scan all mounted volumes
+        if scan_path is None:
+            from app.services.volume_service import volume_service
 
+            mounted_volumes = await volume_service.get_mounted_volumes()
+
+            if not mounted_volumes:
+                logger.warning("No mounted volumes found, falling back to /repos")
+                scan_paths = ["/repos"]
+            else:
+                scan_paths = mounted_volumes
+
+            logger.info(
+                f"Starting repository scan across {len(scan_paths)} mounted volumes: {scan_paths}"
+            )
+        else:
+            scan_paths = [scan_path]
+            logger.info(f"Starting repository scan in specific path: {scan_path}")
+
+        # Build command to scan multiple paths
         # Use find command to scan for Borg repositories - only check top-level subdirectories
         # This scans /backups/repo-1/, /backups/repo-2/ but not deeper like /backups/repo-1/sub/deep/
-        command = [
-            "find",
-            safe_scan_path,
-            "-mindepth",
-            "2",  # Start looking 2 levels deep (scan_path/repo_name/config)
-            "-maxdepth",
-            "2",  # Don't go deeper than 2 levels
-            "-name",
-            "config",
-            "-type",
-            "f",
-            "-exec",
-            "sh",
-            "-c",
-            'if head -20 "$1" 2>/dev/null | grep -q "\\[repository\\]"; then echo "$(dirname "$1")"; fi',
-            "_",
-            "{}",
-            ";",
-        ]
+
+        # Start with base find command structure
+        command_parts = ["find"]
+
+        # Add all scan paths
+        for path in scan_paths:
+            try:
+                safe_scan_path = sanitize_path(path)
+                # Check if path exists before adding it
+                import os
+
+                if os.path.exists(safe_scan_path) and os.path.isdir(safe_scan_path):
+                    command_parts.append(safe_scan_path)
+            except Exception as e:
+                logger.warning(f"Skipping invalid scan path {path}: {e}")
+                continue
+
+        # If no valid paths found, use /repos as fallback
+        if len(command_parts) == 1:  # Only "find" command
+            logger.warning("No valid scan paths found, using /repos as fallback")
+            command_parts.append("/repos")
+
+        # Add find parameters
+        command_parts.extend(
+            [
+                "-mindepth",
+                "2",  # Start looking 2 levels deep (scan_path/repo_name/config)
+                "-maxdepth",
+                "2",  # Don't go deeper than 2 levels
+                "-name",
+                "config",
+                "-type",
+                "f",
+                "-exec",
+                "sh",
+                "-c",
+                'if head -20 "$1" 2>/dev/null | grep -q "\\[repository\\]"; then echo "$(dirname "$1")"; fi',
+                "_",
+                "{}",
+                ";",
+            ]
+        )
+
+        command = command_parts
 
         try:
             logger.info(f"Executing scan command: {' '.join(command)}")
@@ -926,7 +964,7 @@ class BorgService:
             logger.error(f"Failed to verify repository access: {e}")
             return False
 
-    async def scan_for_repositories(self, scan_path: str = "/repos") -> List[Dict]:
+    async def scan_for_repositories(self, scan_path: str = None) -> List[Dict]:
         """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
         job_id = await self.start_repository_scan(scan_path)
 
