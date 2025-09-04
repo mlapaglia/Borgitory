@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, List
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -50,7 +50,7 @@ async def execute_scheduled_backup(schedule_id: int):
 
         # Update schedule last run
         logger.info("📝 SCHEDULER: Updating schedule last run time")
-        schedule.last_run = datetime.utcnow()
+        schedule.last_run = datetime.now(UTC)
         db.commit()
 
         try:

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -129,7 +129,7 @@ async def sync_repository_task(
 
         logger.info(f"Updating job {job_id} status to running...")
         job.status = "running"
-        job.started_at = datetime.utcnow()
+        job.started_at = datetime.now(UTC)
         db.commit()
         logger.info("Job status updated")
 
@@ -147,7 +147,7 @@ async def sync_repository_task(
             elif progress.get("type") == "error":
                 job.status = "failed"
                 job.error = progress["message"]
-                job.finished_at = datetime.utcnow()
+                job.finished_at = datetime.now(UTC)
                 job.log_output = "\n".join(log_output)
                 db.commit()
                 return
@@ -155,13 +155,13 @@ async def sync_repository_task(
                 job.status = (
                     "completed" if progress["status"] == "success" else "failed"
                 )
-                job.finished_at = datetime.utcnow()
+                job.finished_at = datetime.now(UTC)
                 job.log_output = "\n".join(log_output)
                 db.commit()
                 return
 
         job.status = "completed"
-        job.finished_at = datetime.utcnow()
+        job.finished_at = datetime.now(UTC)
         job.log_output = "\n".join(log_output)
         db.commit()
 
@@ -171,7 +171,7 @@ async def sync_repository_task(
             if job:
                 job.status = "failed"
                 job.error = str(e)
-                job.finished_at = datetime.utcnow()
+                job.finished_at = datetime.now(UTC)
                 db.commit()
         except Exception:
             pass

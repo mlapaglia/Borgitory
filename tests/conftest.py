@@ -14,6 +14,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+# Set SECRET_KEY before importing the app to avoid RuntimeError
+if not os.getenv("SECRET_KEY"):
+    os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
+
 from app.main import app
 from app.models.database import Base, get_db
 from app.services.rclone_service import RcloneService

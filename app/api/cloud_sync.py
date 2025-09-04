@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
@@ -150,7 +150,7 @@ class CloudSyncService:
                     config_update.password, config_update.private_key
                 )
 
-        config.updated_at = datetime.utcnow()
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         self.db.refresh(config)
 
@@ -166,7 +166,7 @@ class CloudSyncService:
         """Enable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
         config.enabled = True
-        config.updated_at = datetime.utcnow()
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         return config
 
@@ -174,7 +174,7 @@ class CloudSyncService:
         """Disable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
         config.enabled = False
-        config.updated_at = datetime.utcnow()
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         return config
 
