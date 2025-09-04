@@ -38,14 +38,15 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     try:
         logger.info("Starting Borgitory application...")
-        
+
         # Initialize SECRET_KEY before anything else that might need it
         from app.config import DATA_DIR
+
         if not os.getenv("SECRET_KEY"):
             secret_key = get_or_generate_secret_key(DATA_DIR)
             os.environ["SECRET_KEY"] = secret_key
             logger.info("SECRET_KEY initialized")
-        
+
         await init_db()
         logger.info("Database initialized")
 
