@@ -149,6 +149,7 @@ class DebugService:
         try:
             # Use the shared volume service for volume discovery
             from app.services.volume_service import volume_service
+
             volume_info = await volume_service.get_volume_info()
             mounted_volumes = volume_info.get("mounted_volumes", [])
 

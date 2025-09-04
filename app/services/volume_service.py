@@ -33,32 +33,49 @@ class VolumeService:
 
             # Filter out system directories and include commonly used backup paths
             filtered_volumes = []
-            
+
             # Always include /repos if it exists (default backup location)
             import os
+
             if os.path.exists("/repos") and os.path.isdir("/repos"):
                 filtered_volumes.append("/repos")
-            
+
             # Add discovered volumes, filtering out system paths
             system_paths = {
-                "/", "/boot", "/dev", "/etc", "/home", "/lib", "/lib64", 
-                "/media", "/mnt", "/opt", "/proc", "/root", "/run", 
-                "/sbin", "/srv", "/sys", "/tmp", "/usr", "/var"
+                "/",
+                "/boot",
+                "/dev",
+                "/etc",
+                "/home",
+                "/lib",
+                "/lib64",
+                "/media",
+                "/mnt",
+                "/opt",
+                "/proc",
+                "/root",
+                "/run",
+                "/sbin",
+                "/srv",
+                "/sys",
+                "/tmp",
+                "/usr",
+                "/var",
             }
-            
+
             for volume in mounted_volumes:
                 # Skip system directories
                 if volume in system_paths:
                     continue
-                    
+
                 # Skip paths that are clearly system-related
                 if any(volume.startswith(f"{sys_path}/") for sys_path in system_paths):
                     continue
-                    
+
                 # Skip if path doesn't exist or isn't a directory
                 if not os.path.exists(volume) or not os.path.isdir(volume):
                     continue
-                    
+
                 filtered_volumes.append(volume)
 
             # Remove duplicates while preserving order
@@ -69,13 +86,16 @@ class VolumeService:
                     seen.add(volume)
                     unique_volumes.append(volume)
 
-            logger.info(f"Discovered {len(unique_volumes)} mounted volumes: {unique_volumes}")
+            logger.info(
+                f"Discovered {len(unique_volumes)} mounted volumes: {unique_volumes}"
+            )
             return unique_volumes
 
         except Exception as e:
             logger.error(f"Error getting mounted volumes: {e}")
             # Fallback to just /repos if volume discovery fails
             import os
+
             if os.path.exists("/repos"):
                 return ["/repos"]
             return []
@@ -84,22 +104,22 @@ class VolumeService:
         """Get detailed information about mounted volumes"""
         try:
             mounted_volumes = await self.get_mounted_volumes()
-            
+
             volume_info = {
                 "mounted_volumes": mounted_volumes,
                 "total_mounted_volumes": len(mounted_volumes),
-                "accessible": True
+                "accessible": True,
             }
-            
+
             return volume_info
-            
+
         except Exception as e:
             logger.error(f"Error getting volume info: {e}")
             return {
                 "error": str(e),
                 "mounted_volumes": [],
                 "total_mounted_volumes": 0,
-                "accessible": False
+                "accessible": False,
             }
 
 

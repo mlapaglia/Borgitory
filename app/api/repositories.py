@@ -159,8 +159,9 @@ async def list_directories(path: str = "/repos"):
     try:
         # Get list of allowed paths from mounted volumes
         from app.services.volume_service import volume_service
+
         mounted_volumes = await volume_service.get_mounted_volumes()
-        
+
         # Security: Only allow root directory or paths under mounted volumes
         allowed = path == "/"
         if not allowed:
@@ -168,7 +169,7 @@ async def list_directories(path: str = "/repos"):
                 if path.startswith(volume):
                     allowed = True
                     break
-                    
+
         if not allowed:
             raise HTTPException(
                 status_code=400,
