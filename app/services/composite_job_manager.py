@@ -1,15 +1,12 @@
 import asyncio
-import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Optional, List, AsyncGenerator
+from typing import Dict, Optional, List
 from dataclasses import dataclass, field
 from collections import deque
 
-from sqlalchemy.orm import Session
 from app.models.database import Repository, Job, JobTask, get_db, Schedule
-from app.services.borg_service import borg_service
 from app.services.rclone_service import rclone_service
 
 logger = logging.getLogger(__name__)
@@ -330,7 +327,7 @@ class CompositeJobManager:
             await process.wait()
             
             if process.returncode == 0:
-                logger.info(f"✅ Backup task completed successfully")
+                logger.info("✅ Backup task completed successfully")
                 return True
             else:
                 logger.error(f"❌ Backup task failed with return code {process.returncode}")
@@ -413,7 +410,7 @@ class CompositeJobManager:
             await process.wait()
             
             if process.returncode == 0:
-                logger.info(f"✅ Prune task completed successfully")
+                logger.info("✅ Prune task completed successfully")
                 return True
             else:
                 logger.error(f"❌ Prune task failed with return code {process.returncode}")
@@ -507,7 +504,7 @@ class CompositeJobManager:
             await process.wait()
             
             if process.returncode == 0:
-                logger.info(f"✅ Check task completed successfully")
+                logger.info("✅ Check task completed successfully")
                 return True
             else:
                 logger.error(f"❌ Check task failed with return code {process.returncode}")
@@ -598,14 +595,14 @@ class CompositeJobManager:
                         
                     elif progress.get("type") == "completed":
                         if progress["status"] == "success":
-                            logger.info(f"✅ Cloud sync completed successfully")
+                            logger.info("✅ Cloud sync completed successfully")
                             return True
                         else:
-                            logger.error(f"❌ Cloud sync failed")
+                            logger.error("❌ Cloud sync failed")
                             return False
                 
                 # If we get here, sync completed without explicit success/failure
-                logger.info(f"✅ Cloud sync completed")
+                logger.info("✅ Cloud sync completed")
                 return True
                 
             finally:

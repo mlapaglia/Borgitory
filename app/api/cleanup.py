@@ -11,8 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.database import CleanupConfig, get_db
 from app.models.schemas import (
     CleanupConfig as CleanupConfigSchema, 
-    CleanupConfigCreate, 
-    CleanupConfigUpdate
+    CleanupConfigCreate
 )
 
 router = APIRouter()
@@ -74,10 +73,14 @@ def get_cleanup_configs_html(db: Session = Depends(get_db)):
             description = f"Keep archives within {config.keep_within_days} days"
         else:
             parts = []
-            if config.keep_daily: parts.append(f"{config.keep_daily} daily")
-            if config.keep_weekly: parts.append(f"{config.keep_weekly} weekly")
-            if config.keep_monthly: parts.append(f"{config.keep_monthly} monthly")
-            if config.keep_yearly: parts.append(f"{config.keep_yearly} yearly")
+            if config.keep_daily:
+                parts.append(f"{config.keep_daily} daily")
+            if config.keep_weekly:
+                parts.append(f"{config.keep_weekly} weekly")
+            if config.keep_monthly:
+                parts.append(f"{config.keep_monthly} monthly")
+            if config.keep_yearly:
+                parts.append(f"{config.keep_yearly} yearly")
             description = ", ".join(parts) if parts else "No retention rules"
         
         status_class = "bg-green-100 text-green-800" if config.enabled else "bg-gray-100 text-gray-600"

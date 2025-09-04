@@ -4,8 +4,7 @@ import logging
 import re
 import os
 from datetime import datetime
-from typing import AsyncGenerator, Dict, List, Optional
-from sqlalchemy.orm import Session
+from typing import Dict, List, Optional
 
 from app.models.database import Repository, Job, get_db
 from app.services.job_manager import borg_job_manager
@@ -319,7 +318,7 @@ class BorgService:
                             logger.error(f"Raw output: {full_json[:500]}...")  # Log first 500 chars
                         
                         # Fallback: return empty list if no valid JSON found
-                        logger.warning(f"No valid archives JSON found in output, returning empty list")
+                        logger.warning("No valid archives JSON found in output, returning empty list")
                         return []
                     else:
                         error_lines = [line['text'] for line in output.get('lines', [])]
@@ -630,7 +629,6 @@ class BorgService:
             logger.info(f"Extracting file {file_path} from archive {archive_name}")
             
             # Import required classes for streaming response
-            from fastapi import Response
             from fastapi.responses import StreamingResponse
             import asyncio
             import os
@@ -837,20 +835,17 @@ class BorgService:
             logger.error(f"Failed to verify repository access: {e}")
             return False
 
-    # Legacy method for compatibility - calls the new async scan
     async def scan_for_repositories(self, scan_path: str = "/repos") -> List[Dict]:
         """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
         job_id = await self.start_repository_scan(scan_path)
-        
-        # Wait for completion - increased timeout for large filesystem scans
-        max_wait = 300  # 5 minutes instead of 1 minute
+
+        max_wait = 300
         wait_time = 0
         
         logger.info(f"Waiting for scan completion (max {max_wait}s)...")
         while wait_time < max_wait:
             status = await self.check_scan_status(job_id)
-            
-            # Log progress every 10 seconds
+
             if wait_time % 10 == 0:
                 logger.info(f"Scan progress: {wait_time}s elapsed, status: {status.get('status', 'unknown')}")
                 if status.get('output'):
@@ -866,8 +861,7 @@ class BorgService:
             
             await asyncio.sleep(1)
             wait_time += 1
-        
-        # Get final status and output for debugging
+
         final_status = await self.check_scan_status(job_id)
         logger.error(f"Legacy scan timed out for job {job_id} after {max_wait}s")
         logger.error(f"Final status: {final_status.get('status', 'unknown')}")
@@ -875,10 +869,8 @@ class BorgService:
             logger.error(f"Final output: {final_status['output'][-500:]}")  # Last 500 chars
         if final_status.get('error'):
             logger.error(f"Job error: {final_status['error']}")
-        
-        # Try to clean up the hung job
+
         try:
-            # The job manager should handle cleanup, but log that it's still running
             if final_status.get('running'):
                 logger.warning(f"Job {job_id} is still running after timeout - it may continue in background")
         except Exception as cleanup_error:

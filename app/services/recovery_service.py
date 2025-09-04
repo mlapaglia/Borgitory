@@ -6,11 +6,9 @@ shut down or crashed while backup jobs were running.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import List
-from sqlalchemy.orm import Session
+from datetime import datetime
 
-from app.models.database import get_db, Job, Repository
+from app.models.database import get_db, Repository
 from app.utils.security import build_secure_borg_command
 import asyncio
 

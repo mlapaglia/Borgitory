@@ -1,0 +1,49 @@
+{% if not configs %}
+<div class="text-gray-500 text-sm py-4 text-center">
+    <p>No cloud sync locations configured.</p>
+    <p class="mt-1">Add one using the form above to automatically sync your repositories to the cloud after each backup.</p>
+</div>
+{% else %}
+{% for config in configs %}
+<div class="border rounded-lg p-4 mb-3 bg-gray-50">
+    <div class="flex justify-between items-start">
+        <div class="flex-1">
+            <div class="flex items-center mb-2">
+                <h4 class="font-medium text-gray-900">{{ config.name }}</h4>
+                <span class="ml-2 px-2 py-1 text-xs rounded-full {{ 'bg-green-100 text-green-800' if config.enabled else 'bg-red-100 text-red-800' }}">
+                    {{ 'Enabled' if config.enabled else 'Disabled' }}
+                </span>
+            </div>
+            <div class="text-sm text-gray-600 space-y-1">
+                <div><strong>Provider:</strong> {{ config.provider_name }}</div>
+                {{ config.provider_details | safe }}
+                {% if config.path_prefix %}
+                <div><strong>Path Prefix:</strong> {{ config.path_prefix }}</div>
+                {% endif %}
+                <div class="text-xs text-gray-500">Created: {{ config.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+            </div>
+        </div>
+        <div class="flex flex-col space-y-2 ml-4">
+            <button 
+                onclick="testCloudSyncConnection({{ config.id }}, this)"
+                class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+            >
+                Test
+            </button>
+            <button 
+                onclick="toggleCloudSyncConfig({{ config.id }}, {{ 'true' if config.enabled else 'false' }}, this)"
+                class="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 focus:ring-2 focus:ring-gray-500"
+            >
+                {{ 'Disable' if config.enabled else 'Enable' }}
+            </button>
+            <button 
+                onclick="deleteCloudSyncConfig({{ config.id }}, '{{ config.name }}', this)"
+                class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500"
+            >
+                Delete
+            </button>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}

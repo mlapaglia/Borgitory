@@ -1,9 +1,8 @@
 import os
-from pathlib import Path
 
-DATABASE_URL = "sqlite:////app/data/borgitory.db";
+DATABASE_URL = "sqlite:////app/data/borgitory.db"
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
-DATA_DIR = "/app/data";
+DATA_DIR = "/app/data"
 BORG_DOCKER_IMAGE = os.getenv("BORG_DOCKER_IMAGE", "ghcr.io/borgmatic-collective/borgmatic:latest")
 
 # Docker volume mount paths (configurable via environment)

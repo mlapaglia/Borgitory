@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
@@ -9,8 +9,7 @@ from app.models.database import CloudSyncConfig, get_db
 from app.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
-    CloudSyncConfig as CloudSyncConfigSchema,
-    CloudSyncTestRequest
+    CloudSyncConfig as CloudSyncConfigSchema
 )
 from app.services.rclone_service import rclone_service
 
@@ -35,7 +34,6 @@ async def create_cloud_sync_config(
             detail=f"Cloud sync configuration with name '{config.name}' already exists"
         )
     
-    # Create new config based on provider type
     db_config = CloudSyncConfig(
         name=config.name,
         provider=config.provider,
@@ -43,41 +41,34 @@ async def create_cloud_sync_config(
     )
     
     if config.provider == "s3":
-        # Set S3-specific fields
         db_config.bucket_name = config.bucket_name
-        
-        # Validate S3 credentials are provided
+
         if not config.access_key or not config.secret_key:
             raise HTTPException(
                 status_code=400,
                 detail="S3 configurations require access_key and secret_key"
             )
-        
-        # Set encrypted S3 credentials
+
         db_config.set_credentials(config.access_key, config.secret_key)
         
     elif config.provider == "sftp":
-        # Set SFTP-specific fields
         db_config.host = config.host
         db_config.port = config.port or 22
         db_config.username = config.username
         db_config.remote_path = config.remote_path
-        
-        # Validate SFTP required fields
+
         if not config.host or not config.username or not config.remote_path:
             raise HTTPException(
                 status_code=400,
                 detail="SFTP configurations require host, username, and remote_path"
             )
-        
-        # Validate at least password or private key is provided
+
         if not config.password and not config.private_key:
             raise HTTPException(
                 status_code=400,
                 detail="SFTP configurations require either password or private_key"
             )
-        
-        # Set encrypted SFTP credentials
+
         db_config.set_sftp_credentials(config.password, config.private_key)
         
     else:
@@ -89,9 +80,7 @@ async def create_cloud_sync_config(
     db.add(db_config)
     db.commit()
     db.refresh(db_config)
-    
-    # No longer need to configure rclone remote - we use direct S3 backend
-    
+
     return db_config
 
 
@@ -99,94 +88,42 @@ async def create_cloud_sync_config(
 def get_cloud_sync_configs_html(request: Request, db: Session = Depends(get_db)):
     """Get cloud sync configurations as HTML"""
     try:
-        configs = db.query(CloudSyncConfig).order_by(CloudSyncConfig.created_at.desc()).all()
+        configs_raw = db.query(CloudSyncConfig).order_by(CloudSyncConfig.created_at.desc()).all()
         
-        html_content = ""
-        
-        if not configs:
-            html_content = '''
-                <div class="text-gray-500 text-sm py-4 text-center">
-                    <p>No cloud sync locations configured.</p>
-                    <p class="mt-1">Add one using the form above to automatically sync your repositories to the cloud after each backup.</p>
-                </div>
-            '''
-        else:
-            for config in configs:
-                status_color = "green" if config.enabled else "red"
-                status_text = "Enabled" if config.enabled else "Disabled"
-                toggle_text = "Disable" if config.enabled else "Enable"
-                
-                path_prefix_html = f'<div><strong>Path Prefix:</strong> {config.path_prefix}</div>' if config.path_prefix else ''
-                
-                # Generate provider-specific details
-                if config.provider == "s3":
-                    provider_name = "AWS S3"
-                    provider_details = f'''
-                        <div><strong>Bucket:</strong> {config.bucket_name}</div>
-                    '''
-                elif config.provider == "sftp":
-                    provider_name = "SFTP"
-                    provider_details = f'''
-                        <div><strong>Host:</strong> {config.host}:{config.port}</div>
-                        <div><strong>Username:</strong> {config.username}</div>
-                        <div><strong>Remote Path:</strong> {config.remote_path}</div>
-                    '''
-                else:
-                    provider_name = config.provider.upper()
-                    provider_details = '<div><strong>Configuration:</strong> Unknown provider</div>'
-                
-                html_content += f'''
-                    <div class="border rounded-lg p-4 mb-3 bg-gray-50">
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1">
-                                <div class="flex items-center mb-2">
-                                    <h4 class="font-medium text-gray-900">{config.name}</h4>
-                                    <span class="ml-2 px-2 py-1 text-xs rounded-full bg-{status_color}-100 text-{status_color}-800">
-                                        {status_text}
-                                    </span>
-                                </div>
-                                <div class="text-sm text-gray-600 space-y-1">
-                                    <div><strong>Provider:</strong> {provider_name}</div>
-                                    {provider_details}
-                                    {path_prefix_html}
-                                    <div class="text-xs text-gray-500">Created: {config.created_at.strftime("%Y-%m-%d %H:%M")}</div>
-                                </div>
-                            </div>
-                            <div class="flex flex-col space-y-2 ml-4">
-                                <button 
-                                    onclick="testCloudSyncConnection({config.id}, this)"
-                                    class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
-                                >
-                                    Test
-                                </button>
-                                <button 
-                                    onclick="toggleCloudSyncConfig({config.id}, {str(config.enabled).lower()}, this)"
-                                    class="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 focus:ring-2 focus:ring-gray-500"
-                                >
-                                    {toggle_text}
-                                </button>
-                                <button 
-                                    onclick="deleteCloudSyncConfig({config.id}, '{config.name}', this)"
-                                    class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500"
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+        # Process configs to add computed fields for template
+        processed_configs = []
+        for config in configs_raw:
+            # Generate provider-specific details
+            if config.provider == "s3":
+                provider_name = "AWS S3"
+                provider_details = f'<div><strong>Bucket:</strong> {config.bucket_name}</div>'
+            elif config.provider == "sftp":
+                provider_name = "SFTP"
+                provider_details = f'''
+                    <div><strong>Host:</strong> {config.host}:{config.port}</div>
+                    <div><strong>Username:</strong> {config.username}</div>
+                    <div><strong>Remote Path:</strong> {config.remote_path}</div>
                 '''
+            else:
+                provider_name = config.provider.upper()
+                provider_details = '<div><strong>Configuration:</strong> Unknown provider</div>'
+            
+            # Create processed config object for template
+            processed_config = config.__dict__.copy()
+            processed_config['provider_name'] = provider_name
+            processed_config['provider_details'] = provider_details
+            processed_configs.append(type('Config', (), processed_config)())
         
-        return HTMLResponse(content=html_content)
+        return templates.get_template("partials/cloud_sync/config_list_content.html").render(
+            configs=processed_configs
+        )
         
-    except Exception as e:
+    except Exception:
         # If there's a database error (like table doesn't exist), return a helpful message
-        error_html = '''
-            <div class="text-gray-500 text-sm py-4 text-center">
-                <p>Cloud sync feature is initializing...</p>
-                <p class="mt-1 text-xs">If this persists, try restarting the application.</p>
-            </div>
-        '''
-        return HTMLResponse(content=error_html)
+        return templates.get_template("partials/jobs/error_state.html").render(
+            message="Cloud sync feature is initializing... If this persists, try restarting the application.",
+            padding="4"
+        )
 
 
 @router.get("/", response_model=List[CloudSyncConfigSchema])

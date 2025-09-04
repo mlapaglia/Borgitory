@@ -1,0 +1,31 @@
+{% if not schedules %}
+<div class="text-gray-500 text-sm">No schedules configured</div>
+{% else %}
+{% for schedule in schedules %}
+<div class="flex items-center justify-between p-3 border rounded-lg mb-2 {{ 'bg-gray-50' if not schedule.enabled }}">
+    <div>
+        <div class="font-medium {{ 'text-gray-500' if not schedule.enabled }}">{{ schedule.name }}</div>
+        <div class="text-sm text-gray-500">
+            <span class="inline-flex px-2 py-1 text-xs rounded-full {{ 'bg-green-100 text-green-700' if schedule.enabled else 'bg-gray-100 text-gray-700' }}">
+                {{ 'Active' if schedule.enabled else 'Disabled' }}
+            </span>
+            Last: {{ schedule.last_run.strftime('%m/%d/%Y, %I:%M:%S %p') if schedule.last_run else 'Never run' }}
+            {% if schedule.next_run %}
+            | Next: {{ schedule.next_run.strftime('%m/%d/%Y, %I:%M:%S %p') }}
+            {% endif %}
+        </div>
+        <div class="text-xs text-gray-400">{{ schedule.cron_expression }}</div>
+    </div>
+    <div class="flex space-x-2">
+        <button onclick="toggleSchedule({{ schedule.id }})" 
+                class="px-3 py-1 text-sm {{ 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' if schedule.enabled else 'bg-green-100 text-green-700 hover:bg-green-200' }} rounded">
+            {{ 'Disable' if schedule.enabled else 'Enable' }}
+        </button>
+        <button onclick="deleteSchedule({{ schedule.id }}, '{{ schedule.name }}')" 
+                class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
+            Delete
+        </button>
+    </div>
+</div>
+{% endfor %}
+{% endif %}

@@ -2,15 +2,13 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.database import Repository, Job, JobTask, get_db
-from app.models.schemas import Job as JobSchema, BackupRequest, PruneRequest, CheckRequest
-from app.services.borg_service import borg_service
+from app.models.database import Repository, Job, get_db
+from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.services.job_manager import borg_job_manager
 
 logger = logging.getLogger(__name__)
@@ -32,8 +30,8 @@ async def create_backup(
         raise HTTPException(status_code=404, detail="Repository not found")
     
     try:
-        # Import composite job manager
-        from app.services.composite_job_manager import composite_job_manager
+        # Use unified job manager instead of composite job manager
+        from app.services.job_manager import borg_job_manager
         
         # Define the tasks for this manual backup job
         task_definitions = [
@@ -51,7 +49,7 @@ async def create_backup(
             from app.models.database import CleanupConfig
             cleanup_config = db.query(CleanupConfig).filter(
                 CleanupConfig.id == backup_request.cleanup_config_id,
-                CleanupConfig.enabled == True
+                CleanupConfig.enabled
             ).first()
             
             if cleanup_config:
@@ -83,7 +81,7 @@ async def create_backup(
         if backup_request.cloud_sync_config_id:
             task_definitions.append({
                 'type': 'cloud_sync', 
-                'name': f'Sync to Cloud'
+                'name': 'Sync to Cloud'
             })
         
         # Add check task if repository check is configured
@@ -91,7 +89,7 @@ async def create_backup(
             from app.models.database import RepositoryCheckConfig
             check_config = db.query(RepositoryCheckConfig).filter(
                 RepositoryCheckConfig.id == backup_request.check_config_id,
-                RepositoryCheckConfig.enabled == True
+                RepositoryCheckConfig.enabled
             ).first()
             
             if check_config:
@@ -110,8 +108,8 @@ async def create_backup(
                 }
                 task_definitions.append(check_task)
         
-        # Create composite job
-        job_id = await composite_job_manager.create_composite_job(
+        # Create composite job using unified manager
+        job_id = await borg_job_manager.create_composite_job(
             job_type="manual_backup",
             task_definitions=task_definitions,
             repository=repository,
@@ -269,37 +267,40 @@ async def stream_all_jobs():
     """Stream real-time updates for all jobs via Server-Sent Events"""
     async def event_generator():
         try:
-            from app.services.composite_job_manager import composite_job_manager
-            
-            # Send initial job list (both regular and composite jobs)
+            # Send initial job list (both simple and composite jobs from unified manager)
             jobs_data = []
             
-            # Add regular borg jobs
-            for job_id, borg_job in borg_job_manager.jobs.items():
-                jobs_data.append({
-                    "id": job_id,
-                    "type": "job_status",
-                    "status": borg_job.status,
-                    "started_at": borg_job.started_at.isoformat(),
-                    "completed_at": borg_job.completed_at.isoformat() if borg_job.completed_at else None,
-                    "return_code": borg_job.return_code,
-                    "error": borg_job.error,
-                    "progress": borg_job.current_progress,
-                    "command": " ".join(borg_job.command[:3]) + "..." if len(borg_job.command) > 3 else " ".join(borg_job.command)
-                })
-            
-            # Add composite jobs
-            for job_id, composite_job in composite_job_manager.jobs.items():
-                jobs_data.append({
-                    "id": job_id,
-                    "type": "composite_job_status",
-                    "status": composite_job.status,
-                    "started_at": composite_job.started_at.isoformat(),
-                    "completed_at": composite_job.completed_at.isoformat() if composite_job.completed_at else None,
-                    "current_task_index": composite_job.current_task_index,
-                    "total_tasks": len(composite_job.tasks),
-                    "job_type": composite_job.job_type
-                })
+            # Add all jobs from unified manager
+            for job_id, job in borg_job_manager.jobs.items():
+                if job.is_composite():
+                    # Composite job
+                    jobs_data.append({
+                        "id": job_id,
+                        "type": "composite_job_status",
+                        "status": job.status,
+                        "started_at": job.started_at.isoformat(),
+                        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                        "current_task_index": job.current_task_index,
+                        "total_tasks": len(job.tasks),
+                        "job_type": job.job_type if hasattr(job, 'job_type') else 'composite'
+                    })
+                else:
+                    # Simple job 
+                    command_display = ""
+                    if job.command:
+                        command_display = " ".join(job.command[:3]) + "..." if len(job.command) > 3 else " ".join(job.command)
+                    
+                    jobs_data.append({
+                        "id": job_id,
+                        "type": "job_status", 
+                        "status": job.status,
+                        "started_at": job.started_at.isoformat(),
+                        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                        "return_code": job.return_code,
+                        "error": job.error,
+                        "progress": job.current_progress,
+                        "command": command_display
+                    })
             
             if jobs_data:
                 yield f"event: jobs_update\ndata: {json.dumps({'type': 'jobs_update', 'jobs': jobs_data})}\n\n"
@@ -521,25 +522,22 @@ def get_current_jobs_html(request: Request):
                     'progress_info': progress_info
                 })
         
-        # Get current composite jobs from CompositeJobManager
-        from app.services.composite_job_manager import composite_job_manager
-        for job_id, composite_job in composite_job_manager.jobs.items():
-            if composite_job.status == 'running':
+        # Get current composite jobs from unified manager
+        for job_id, job in borg_job_manager.jobs.items():
+            if job.is_composite() and job.status == 'running':
                 # Get current task info
-                current_task = None
-                if composite_job.current_task_index < len(composite_job.tasks):
-                    current_task = composite_job.tasks[composite_job.current_task_index]
+                current_task = job.get_current_task()
                 
-                progress_info = f"Task: {current_task.task_name if current_task else 'Unknown'} ({composite_job.current_task_index + 1}/{len(composite_job.tasks)})"
+                progress_info = f"Task: {current_task.task_name if current_task else 'Unknown'} ({job.current_task_index + 1}/{len(job.tasks)})"
                 
                 current_jobs.append({
                     'id': job_id,
-                    'type': composite_job.job_type,
-                    'status': composite_job.status,
-                    'started_at': composite_job.started_at.strftime("%H:%M:%S"),
+                    'type': getattr(job, 'job_type', 'composite'),
+                    'status': job.status,
+                    'started_at': job.started_at.strftime("%H:%M:%S"),
                     'progress': {
                         'current_task': current_task.task_name if current_task else "Unknown",
-                        'task_progress': f"{composite_job.current_task_index + 1}/{len(composite_job.tasks)}"
+                        'task_progress': f"{job.current_task_index + 1}/{len(job.tasks)}"
                     },
                     'progress_info': progress_info
                 })
@@ -623,33 +621,28 @@ async def get_job_status(job_id: str):
 @router.get("/{job_id}/output")
 async def get_job_output(job_id: str, last_n_lines: int = 100, db: Session = Depends(get_db)):
     """Get job output lines"""
-    # Check if this is a composite job first
-    db_job = db.query(Job).filter(Job.job_uuid == job_id).first()
-    if db_job and db_job.job_type == "composite":
-        # Get composite job output
-        from app.services.composite_job_manager import composite_job_manager
-        composite_job = composite_job_manager.jobs.get(job_id)
-        if not composite_job:
-            raise HTTPException(status_code=404, detail="Composite job not found")
-        
+    # Check if this is a composite job first - look in unified manager
+    job = borg_job_manager.jobs.get(job_id)
+    if job and job.is_composite():
         # Get current task output if job is running
         current_task_output = []
-        if composite_job.status == "running" and composite_job.current_task_index < len(composite_job.tasks):
-            current_task = composite_job.tasks[composite_job.current_task_index]
-            lines = list(current_task.output_lines)
-            if last_n_lines:
-                lines = lines[-last_n_lines:]
-            current_task_output = lines
+        if job.status == "running":
+            current_task = job.get_current_task()
+            if current_task:
+                lines = list(current_task.output_lines)
+                if last_n_lines:
+                    lines = lines[-last_n_lines:]
+                current_task_output = lines
         
         return {
             'job_id': job_id,
             'job_type': 'composite',
-            'status': composite_job.status,
-            'current_task_index': composite_job.current_task_index,
-            'total_tasks': len(composite_job.tasks),
+            'status': job.status,
+            'current_task_index': job.current_task_index,
+            'total_tasks': len(job.tasks),
             'current_task_output': current_task_output,
-            'started_at': composite_job.started_at.isoformat(),
-            'completed_at': composite_job.completed_at.isoformat() if composite_job.completed_at else None
+            'started_at': job.started_at.isoformat(),
+            'completed_at': job.completed_at.isoformat() if job.completed_at else None
         }
     else:
         # Get regular borg job output
@@ -665,18 +658,15 @@ async def stream_job_output(job_id: str, db: Session = Depends(get_db)):
     """Stream real-time job output via Server-Sent Events"""
     async def event_generator():
         try:
-            # Check if this is a composite job first
-            db_job = db.query(Job).filter(Job.job_uuid == job_id).first()
-            if db_job and db_job.job_type == "composite":
-                # Stream composite job output
-                from app.services.composite_job_manager import composite_job_manager
-                event_queue = composite_job_manager.subscribe_to_events()
+            # Check if this is a composite job first - look in unified manager
+            job = borg_job_manager.jobs.get(job_id)
+            if job and job.is_composite():
+                # Stream composite job output from unified manager
+                event_queue = borg_job_manager.subscribe_to_events()
                 
                 try:
                     # Send initial state
-                    composite_job = composite_job_manager.jobs.get(job_id)
-                    if composite_job:
-                        yield f"data: {json.dumps({'type': 'initial_state', 'job_id': job_id, 'status': composite_job.status})}\n\n"
+                    yield f"data: {json.dumps({'type': 'initial_state', 'job_id': job_id, 'status': job.status})}\n\n"
                     
                     # Stream events
                     while True:
@@ -691,7 +681,7 @@ async def stream_job_output(job_id: str, db: Session = Depends(get_db)):
                             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
                             break
                 finally:
-                    composite_job_manager.unsubscribe_from_events(event_queue)
+                    borg_job_manager.unsubscribe_from_events(event_queue)
             else:
                 # Stream regular borg job output
                 async for event in borg_job_manager.stream_job_output(job_id):

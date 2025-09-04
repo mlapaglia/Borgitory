@@ -1,7 +1,6 @@
 """
 Pushover notification service for sending backup status notifications
 """
-import asyncio
 import logging
 from typing import Optional
 import aiohttp

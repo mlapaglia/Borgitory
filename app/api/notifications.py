@@ -11,8 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.database import NotificationConfig, get_db
 from app.models.schemas import (
     NotificationConfig as NotificationConfigSchema, 
-    NotificationConfigCreate, 
-    NotificationConfigUpdate
+    NotificationConfigCreate
 )
 from app.services.pushover_service import pushover_service
 

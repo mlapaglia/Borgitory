@@ -1,12 +1,11 @@
 import asyncio
-import json
-import os
+import logging
 import subprocess
-from datetime import datetime
 from typing import AsyncGenerator, Dict, Optional
-from pathlib import Path
 
 from app.models.database import Repository
+
+logger = logging.getLogger(__name__)
 
 
 class RcloneService:
@@ -156,7 +155,7 @@ class RcloneService:
                 if test_result["status"] == "success":
                     return {
                         "status": "success",
-                        "message": f"Connection successful - bucket accessible and writable",
+                        "message": "Connection successful - bucket accessible and writable",
                         "output": stdout_text,
                         "details": {
                             "read_test": "passed",
@@ -335,7 +334,6 @@ class RcloneService:
             # For private key auth, we need to write the key to a temporary file
             # and use --sftp-key-file
             import tempfile
-            import os
             
             # Create temp file for private key
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pem') as key_file:
@@ -348,8 +346,6 @@ class RcloneService:
     
     def _obscure_password(self, password: str) -> str:
         """Obscure password using rclone's method"""
-        import subprocess
-        import tempfile
         
         try:
             # Use rclone obscure command to properly encode the password
@@ -527,7 +523,7 @@ class RcloneService:
                 if test_result["status"] == "success":
                     return {
                         "status": "success",
-                        "message": f"SFTP connection successful - remote directory accessible and writable",
+                        "message": "SFTP connection successful - remote directory accessible and writable",
                         "output": stdout_text,
                         "details": {
                             "read_test": "passed",

@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.models.database import init_db
 from app.api import repositories, jobs, auth, schedules, sync, cloud_sync, cleanup, notifications, debug, repository_stats, repository_check_configs
@@ -68,7 +67,7 @@ app.include_router(debug.router)
 
 @app.get("/")
 async def root(request: Request):
-    from fastapi.responses import HTMLResponse, RedirectResponse
+    from fastapi.responses import RedirectResponse
     from app.api.auth import get_current_user_optional
     from app.models.database import get_db
     
@@ -85,7 +84,7 @@ async def root(request: Request):
 
 @app.get("/login")
 async def login_page(request: Request):
-    from fastapi.responses import HTMLResponse, RedirectResponse
+    from fastapi.responses import RedirectResponse
     from app.api.auth import get_current_user_optional
     from app.models.database import get_db
     

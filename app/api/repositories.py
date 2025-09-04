@@ -73,63 +73,6 @@ def list_repositories(skip: int = 0, limit: int = 100, db: Session = Depends(get
     repositories = db.query(Repository).offset(skip).limit(limit).all()
     return repositories
 
-
-
-
-@router.post("/scan-existing/start")
-async def start_repository_scan():
-    """Start scanning for existing Borg repositories in the repos directory"""
-    try:
-        job_id = await borg_service.start_repository_scan("/repos")
-        return {"job_id": job_id, "status": "started"}
-    except Exception as e:
-        logger.error(f"Error starting repository scan: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to start scan: {str(e)}")
-
-@router.get("/scan-existing/status/{job_id}")
-async def check_scan_status(job_id: str):
-    """Check status of repository scan job"""
-    try:
-        status = await borg_service.check_scan_status(job_id)
-        return status
-    except Exception as e:
-        logger.error(f"Error checking scan status: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to check status: {str(e)}")
-
-@router.get("/scan-existing/results/{job_id}")
-async def get_scan_results(job_id: str, db: Session = Depends(get_db)):
-    """Get results of completed repository scan"""
-    try:
-        repositories = await borg_service.get_scan_results(job_id)
-        
-        # Filter out already imported repositories
-        imported_repos = db.query(Repository).all()
-        imported_paths = {repo.path for repo in imported_repos}
-        
-        available_repos = [repo for repo in repositories if repo["path"] not in imported_paths]
-        
-        return {"repositories": available_repos}
-    except Exception as e:
-        logger.error(f"Error getting scan results: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get results: {str(e)}")
-
-@router.get("/scan-existing")
-async def scan_existing_repositories(db: Session = Depends(get_db)):
-    """Legacy endpoint - use the new start/status/results endpoints instead"""
-    try:
-        imported_repos = db.query(Repository).all()
-        imported_paths = {repo.path for repo in imported_repos}
-        
-        repositories = await borg_service.scan_for_repositories("/repos")
-        
-        available_repos = [repo for repo in repositories if repo["path"] not in imported_paths]
-        
-        return {"repositories": available_repos}
-    except Exception as e:
-        logger.error(f"Error scanning for repositories: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to scan repositories: {str(e)}")
-
-
 @router.get("/scan")
 async def scan_repositories():
     """Scan for existing repositories (alias for scan-existing for frontend compatibility)"""
@@ -605,7 +548,7 @@ async def import_repository(
             db.commit()
             raise HTTPException(
                 status_code=400,
-                detail=f"Failed to verify repository access. Please check the path, passphrase, and keyfile (if required)."
+                detail="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required)."
             )
         
         # If verification passed, get archive count for logging

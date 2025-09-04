@@ -7,9 +7,8 @@ from datetime import datetime
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 
-from app.models.database import get_db, Repository, Job
+from app.models.database import Repository, Job
 from app.services.job_manager import borg_job_manager
-from app.utils.security import build_secure_borg_command
 
 logger = logging.getLogger(__name__)
 

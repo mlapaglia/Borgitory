@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, List
@@ -9,10 +8,8 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
-from sqlalchemy.orm import Session
 from app.config import DATABASE_URL
-from app.models.database import Repository, Job, Schedule, get_db
-from app.services.borg_service import borg_service
+from app.models.database import Schedule, get_db
 from app.services.composite_job_manager import composite_job_manager
 
 # Configure APScheduler logging only (don't override main basicConfig)
@@ -44,12 +41,12 @@ async def execute_scheduled_backup(schedule_id: int):
         logger.info(f"✅ SCHEDULER: Found repository '{repository.name}'")
         
         # Update schedule last run
-        logger.info(f"📝 SCHEDULER: Updating schedule last run time")
+        logger.info("📝 SCHEDULER: Updating schedule last run time")
         schedule.last_run = datetime.utcnow()
         db.commit()
         
         try:
-            logger.info(f"🚀 SCHEDULER: Creating composite job for scheduled backup")
+            logger.info("🚀 SCHEDULER: Creating composite job for scheduled backup")
             logger.info(f"  - repository: {repository.name}")
             logger.info(f"  - schedule: {schedule.name}")
             logger.info(f"  - source_path: {schedule.source_path}")
@@ -71,7 +68,7 @@ async def execute_scheduled_backup(schedule_id: int):
                 from app.models.database import CleanupConfig
                 cleanup_config = db.query(CleanupConfig).filter(
                     CleanupConfig.id == schedule.cleanup_config_id,
-                    CleanupConfig.enabled == True
+                    CleanupConfig.enabled
                 ).first()
                 
                 if cleanup_config:
@@ -98,14 +95,14 @@ async def execute_scheduled_backup(schedule_id: int):
                             prune_task['keep_yearly'] = cleanup_config.keep_yearly
                     
                     task_definitions.append(prune_task)
-                    logger.info(f"📋 SCHEDULER: Added cleanup task to composite job")
+                    logger.info("📋 SCHEDULER: Added cleanup task to composite job")
             
             # Add check task if repository check is configured
             if schedule.check_config_id:
                 from app.models.database import RepositoryCheckConfig
                 check_config = db.query(RepositoryCheckConfig).filter(
                     RepositoryCheckConfig.id == schedule.check_config_id,
-                    RepositoryCheckConfig.enabled == True
+                    RepositoryCheckConfig.enabled
                 ).first()
                 
                 if check_config:
@@ -123,19 +120,19 @@ async def execute_scheduled_backup(schedule_id: int):
                         'last_n_archives': check_config.last_n_archives
                     }
                     task_definitions.append(check_task)
-                    logger.info(f"📋 SCHEDULER: Added check task to composite job")
+                    logger.info("📋 SCHEDULER: Added check task to composite job")
             else:
-                logger.info(f"📋 SCHEDULER: No repository check configured")
+                logger.info("📋 SCHEDULER: No repository check configured")
             
             # Add cloud sync task if cloud backup is configured
             if schedule.cloud_sync_config_id:
                 task_definitions.append({
                     'type': 'cloud_sync', 
-                    'name': f'Sync to Cloud'
+                    'name': 'Sync to Cloud'
                 })
-                logger.info(f"📋 SCHEDULER: Added cloud sync task to composite job")
+                logger.info("📋 SCHEDULER: Added cloud sync task to composite job")
             else:
-                logger.info(f"📋 SCHEDULER: No cloud backup configured")
+                logger.info("📋 SCHEDULER: No cloud backup configured")
             
             # Create composite job
             job_id = await composite_job_manager.create_composite_job(
@@ -221,7 +218,7 @@ class SchedulerService:
         """Reload all schedules from database"""
         db = next(get_db())
         try:
-            schedules = db.query(Schedule).filter(Schedule.enabled == True).all()
+            schedules = db.query(Schedule).filter(Schedule.enabled).all()
             for schedule in schedules:
                 await self._add_schedule_internal(
                     schedule.id, schedule.name, schedule.cron_expression, persist=False

@@ -10,13 +10,11 @@ router = APIRouter()
 @router.get("/{repository_id}/stats")
 async def get_repository_statistics(repository_id: int, db: Session = Depends(get_db)):
     """Get comprehensive repository statistics"""
-    
-    # Get repository
+
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
-    
-    # Get statistics
+
     stats = await repository_stats_service.get_repository_statistics(repository, db)
     
     if "error" in stats:
@@ -31,13 +29,11 @@ async def get_repository_statistics_html(repository_id: int, request: Request, d
     from fastapi.templating import Jinja2Templates
     
     templates = Jinja2Templates(directory="app/templates")
-    
-    # Get repository
+
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
-    
-    # Get statistics
+
     stats = await repository_stats_service.get_repository_statistics(repository, db)
     
     return templates.TemplateResponse(
