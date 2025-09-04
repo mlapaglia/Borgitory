@@ -8,13 +8,21 @@ from typing import AsyncGenerator, Generator
 from unittest.mock import Mock
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.main import app
 from app.models.database import Base, get_db
 from app.services.rclone_service import RcloneService
+
+# Import all models to ensure they're registered with Base
+from app.models.database import (
+    Repository, Job, Schedule, CloudSyncConfig, CleanupConfig,
+    RepositoryCheckConfig, User
+)
 
 
 @pytest.fixture(scope="session")
@@ -30,32 +38,41 @@ def event_loop() -> Generator:
 
 @pytest.fixture
 def test_db():
-    """Create a test database."""
+    """Create a test database with proper isolation."""
     # Use in-memory SQLite for testing
     SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
     
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL, 
-        connect_args={"check_same_thread": False}
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
     )
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     
-    # Create tables
+    # Create ALL tables at once
     Base.metadata.create_all(bind=engine)
+    
+    # Create a session for the test
+    db_session = TestingSessionLocal()
     
     def override_get_db():
         try:
-            db = TestingSessionLocal()
-            yield db
+            # Use the same session for the entire test
+            yield db_session
         finally:
-            db.close()
+            # Don't close during the test
+            pass
     
+    # Set up the dependency override
     app.dependency_overrides[get_db] = override_get_db
     
-    yield TestingSessionLocal()
-    
-    # Clean up
-    app.dependency_overrides.clear()
+    try:
+        yield db_session
+    finally:
+        # Clean up after test
+        db_session.rollback()  # Roll back any uncommitted changes
+        db_session.close()
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -81,13 +98,14 @@ def mock_rclone_service():
     return mock
 
 
-@pytest.fixture
-def async_client(test_db) -> AsyncClient:
-    """Create an async test client.""" 
-    return AsyncClient(
+@pytest_asyncio.fixture
+async def async_client(test_db) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client with proper resource management.""" 
+    async with AsyncClient(
         transport=ASGITransport(app=app), 
         base_url="http://testserver"
-    )
+    ) as client:
+        yield client
 
 
 @pytest.fixture
