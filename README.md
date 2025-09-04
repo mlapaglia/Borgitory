@@ -1,4 +1,4 @@
-# Borgitory
+# Borgitory [![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
 
 A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities.
 
