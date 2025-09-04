@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -790,7 +790,7 @@ async def cancel_job(job_id: str, db: Session = Depends(get_db)):
 
             # Update database status
             job.status = "cancelled"
-            job.finished_at = datetime.utcnow()
+            job.finished_at = datetime.now(UTC)
             db.commit()
 
             return {"message": "Job cancelled successfully"}

@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, List, Optional
 
 from app.models.database import Repository, Job, get_db
@@ -313,7 +313,7 @@ class BorgService:
                     job_uuid=job_id,
                     type="list",
                     status="running",
-                    started_at=datetime.utcnow(),
+                    started_at=datetime.now(UTC),
                 )
                 db.add(db_job)
                 db.commit()

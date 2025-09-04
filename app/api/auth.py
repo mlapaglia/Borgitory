@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, Response, Form
 from sqlalchemy.orm import Session
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional
 
 from app.models.database import User, UserSession, get_db
@@ -69,15 +69,15 @@ def login_user(
     auth_token = secrets.token_urlsafe(32)
 
     if remember_me:
-        expires_at = datetime.utcnow() + timedelta(days=365)
+        expires_at = datetime.now(UTC) + timedelta(days=365)
         max_age = 365 * 24 * 60 * 60
     else:
-        expires_at = datetime.utcnow() + timedelta(minutes=30)
+        expires_at = datetime.now(UTC) + timedelta(minutes=30)
         max_age = 30 * 60
 
     # Clean up expired sessions
     db.query(UserSession).filter(
-        UserSession.user_id == user.id, UserSession.expires_at < datetime.utcnow()
+        UserSession.user_id == user.id, UserSession.expires_at < datetime.now(UTC)
     ).delete()
 
     # Create new session
@@ -91,12 +91,12 @@ def login_user(
         remember_me=remember_me,
         user_agent=user_agent,
         ip_address=client_ip,
-        last_activity=datetime.utcnow(),
+        last_activity=datetime.now(UTC),
     )
     db.add(db_session)
 
     # Update user's last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(UTC)
     db.commit()
 
     # Set cookie
@@ -134,7 +134,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         db.query(UserSession)
         .filter(
             UserSession.session_token == auth_token,
-            UserSession.expires_at > datetime.utcnow(),
+            UserSession.expires_at > datetime.now(UTC),
         )
         .first()
     )
@@ -144,8 +144,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
     # Update session activity for non-remember sessions
     if not session.remember_me:
-        session.expires_at = datetime.utcnow() + timedelta(minutes=30)
-        session.last_activity = datetime.utcnow()
+        session.expires_at = datetime.now(UTC) + timedelta(minutes=30)
+        session.last_activity = datetime.now(UTC)
         db.commit()
 
     user = db.query(User).filter(User.id == session.user_id).first()
