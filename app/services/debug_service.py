@@ -81,12 +81,10 @@ class DebugService:
 
     async def _get_application_info(self) -> Dict[str, Any]:
         """Get application information"""
-        from app.config import BORG_DOCKER_IMAGE
 
         return {
             "borgitory_version": "1.0.0",  # You can make this dynamic
             "debug_mode": os.getenv("DEBUG", "false").lower() == "true",
-            "borg_docker_image": BORG_DOCKER_IMAGE,
             "startup_time": datetime.now().isoformat(),
             "working_directory": os.getcwd(),
         }
@@ -258,7 +256,6 @@ class DebugService:
             "VIRTUAL_ENV",
             "CONDA_DEFAULT_ENV",
             "DATABASE_URL",
-            "BORG_DOCKER_IMAGE",
             "DEBUG",
         ]
 
