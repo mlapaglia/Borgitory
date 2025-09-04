@@ -76,6 +76,12 @@ A comprehensive web-based management interface for BorgBackup repositories with 
    python run.py
    ```
 
+4. **Run tests**
+
+   ```bash
+   pytest
+   ```
+
 ### Docker Volumes
 
 The application requires these volume mounts:
