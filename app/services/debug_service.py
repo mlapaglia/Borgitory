@@ -147,25 +147,10 @@ class DebugService:
     async def _get_docker_info(self) -> Dict[str, Any]:
         """Get Docker and volume mount information"""
         try:
-            # Get mounted volumes using the provided command
-            process = await asyncio.create_subprocess_shell(
-                'mount | grep -v "^overlay\\|^proc\\|^tmpfs\\|^sysfs\\|^cgroup\\|^mqueue\\|^shm\\|^devpts" | grep " on /" | grep -v "/etc/\\|/proc\\|/sys\\|on / type" | awk \'{print $3}\'',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            stdout, stderr = await process.communicate()
-
-            mounted_volumes = []
-            if process.returncode == 0 and stdout:
-                # Parse the output to get mounted volumes
-                volumes_output = stdout.decode().strip()
-                if volumes_output:
-                    mounted_volumes = [
-                        line.strip()
-                        for line in volumes_output.split("\n")
-                        if line.strip()
-                    ]
+            # Use the shared volume service for volume discovery
+            from app.services.volume_service import volume_service
+            volume_info = await volume_service.get_volume_info()
+            mounted_volumes = volume_info.get("mounted_volumes", [])
 
             # Try to get basic Docker info if available
             docker_info = {"accessible": False}
