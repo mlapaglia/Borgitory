@@ -268,7 +268,7 @@ class RcloneService:
                 # Clean up local temp file
                 try:
                     os.unlink(temp_file_path)
-                except:
+                except OSError:
                     pass
                     
         except Exception as e:
@@ -306,7 +306,7 @@ class RcloneService:
                 return {
                     "eta": eta_part
                 }
-            except:
+            except (ValueError, KeyError):
                 pass
         
         return None
@@ -469,7 +469,7 @@ class RcloneService:
                 try:
                     import os
                     os.unlink(key_file_path)
-                except:
+                except OSError:
                     pass
     
     async def test_sftp_connection(
@@ -579,7 +579,7 @@ class RcloneService:
                 try:
                     import os
                     os.unlink(key_file_path)
-                except:
+                except OSError:
                     pass
     
     async def _test_sftp_write_permissions(
@@ -666,7 +666,7 @@ class RcloneService:
                 if temp_file_path:
                     try:
                         os.unlink(temp_file_path)
-                    except:
+                    except OSError:
                         pass
                     
         except Exception as e:
@@ -680,7 +680,7 @@ class RcloneService:
                 try:
                     import os
                     os.unlink(key_file_path)
-                except:
+                except OSError:
                     pass
     
     async def _merge_async_generators(self, *async_generators):

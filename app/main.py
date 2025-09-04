@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -45,7 +46,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Borgitory - BorgBackup Web Manager", lifespan=lifespan)
 
 # Mount static files if directory exists
-import os
 if os.path.exists("app/static"):
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
 else:

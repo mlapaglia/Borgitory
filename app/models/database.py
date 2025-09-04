@@ -1,8 +1,12 @@
+import base64
+import hashlib
 from datetime import datetime
+
+from cryptography.fernet import Fernet
+from passlib.context import CryptContext
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from cryptography.fernet import Fernet
 
 from app.config import DATABASE_URL, SECRET_KEY, DATA_DIR
 
@@ -11,10 +15,6 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
-
-import base64
-import hashlib
-from passlib.context import CryptContext
 
 # Generate a proper Fernet key from the secret
 fernet_key = base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest())

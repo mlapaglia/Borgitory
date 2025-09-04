@@ -166,7 +166,7 @@ async def sync_repository_task(
                 job.error = str(e)
                 job.finished_at = datetime.utcnow()
                 db.commit()
-        except:
+        except Exception:
             pass
     finally:
         if should_close_db:

@@ -852,7 +852,7 @@ class BorgJobManager:
             # Get the specific cloud sync configuration
             cloud_config = db.query(CloudSyncConfig).filter(
                 CloudSyncConfig.id == db_job.cloud_sync_config_id,
-                CloudSyncConfig.enabled == True
+                CloudSyncConfig.enabled
             ).first()
             
             if not cloud_config:
@@ -898,7 +898,7 @@ class BorgJobManager:
                 logger.info(f"  - sync_job_id: {sync_job.id}")
                 
                 # Start the sync task in the background
-                task = asyncio.create_task(sync_repository_task(
+                asyncio.create_task(sync_repository_task(
                     repository.id,
                     cloud_config.name,  # config name
                     cloud_config.bucket_name,

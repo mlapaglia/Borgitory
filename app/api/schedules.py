@@ -82,10 +82,10 @@ async def get_upcoming_backups_html():
                     # Try different datetime formats
                     try:
                         next_run = datetime.fromisoformat(next_run_raw.replace('Z', '+00:00'))
-                    except:
+                    except (ValueError, TypeError):
                         try:
                             next_run = datetime.fromisoformat(next_run_raw)
-                        except:
+                        except (ValueError, TypeError):
                             # Skip if we can't parse the datetime
                             continue
                 else:
@@ -227,7 +227,7 @@ def format_cron_trigger(trigger_str: str) -> str:
             return f"Third {day_name} of month at {format_hour(hour)}"
         else:
             return f"{minute} {hour} {day} {month} {day_of_week}"
-    except:
+    except (ValueError, KeyError, AttributeError):
         return trigger_str
 
 
@@ -243,7 +243,7 @@ def format_hour(hour_str: str) -> str:
             return "12:00 PM"
         else:
             return f"{h - 12}:00 PM"
-    except:
+    except (ValueError, TypeError):
         return hour_str
 
 
@@ -252,7 +252,7 @@ def get_day_name(day_of_week: str) -> str:
     days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     try:
         return days[int(day_of_week)]
-    except:
+    except (ValueError, IndexError, TypeError):
         return 'Unknown'
 
 

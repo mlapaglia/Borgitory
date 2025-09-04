@@ -15,7 +15,7 @@ def migrate_add_source_path():
         with engine.connect() as conn:
             # Check if column already exists
             try:
-                result = conn.execute(text("SELECT source_path FROM schedules LIMIT 1"))
+                conn.execute(text("SELECT source_path FROM schedules LIMIT 1"))
                 logger.info("✅ source_path column already exists in schedules table")
                 return
             except Exception:

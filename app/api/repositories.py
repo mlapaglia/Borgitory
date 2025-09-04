@@ -347,7 +347,7 @@ async def list_archives_html(repo_id: int, request: Request, db: Session = Depen
                             from datetime import datetime
                             dt = datetime.fromisoformat(archive_time.replace('Z', '+00:00'))
                             formatted_time = dt.strftime('%Y-%m-%d %H:%M:%S')
-                        except:
+                        except (ValueError, TypeError):
                             pass
                     
                     # Archive size information

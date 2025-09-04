@@ -69,7 +69,7 @@ class BorgService:
                 for item in os.listdir(repo_path):
                     if item.startswith('key.') or 'key' in item.lower():
                         key_files.append(item)
-            except:
+            except (OSError, ValueError):
                 pass
             
             # Method 1: Check for repokey data in config

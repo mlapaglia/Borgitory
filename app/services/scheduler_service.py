@@ -250,7 +250,7 @@ class SchedulerService:
             try:
                 self.scheduler.remove_job(job_id)
                 logger.info(f"Removed existing job {job_id}")
-            except:
+            except Exception:
                 pass  # Job doesn't exist, which is fine
             
             # Add the job
@@ -305,7 +305,7 @@ class SchedulerService:
         try:
             self.scheduler.remove_job(job_id)
             logger.info(f"Removed scheduled job {job_id}")
-        except:
+        except Exception:
             logger.warning(f"Job {job_id} not found when trying to remove")
     
     async def update_schedule(self, schedule_id: int, schedule_name: str, cron_expression: str, enabled: bool):
