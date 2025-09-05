@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BorgJobManagerConfig:
     """Configuration for BorgJobManager"""
+
     max_concurrent_backups: int = 5
     auto_cleanup_delay: int = 30
     max_output_lines: int = 1000
@@ -64,7 +65,9 @@ class BorgJob:
     current_task_index: int = 0
 
     # Repository and schedule context (for composite jobs)
-    repository_id: Optional[int] = None  # Store ID instead of object to avoid session issues
+    repository_id: Optional[int] = (
+        None  # Store ID instead of object to avoid session issues
+    )
     schedule: Optional["Schedule"] = None
 
     # Streaming output storage (for simple jobs - maxlen set during initialization)
@@ -102,32 +105,36 @@ class BorgJobManager:
         """Get repository data from database using a fresh session"""
         from app.models.database import Repository
         from app.utils.db_session import get_db_session
-        
+
         with get_db_session() as db:
             repo = db.query(Repository).filter(Repository.id == repository_id).first()
             if not repo:
                 return None
-            
+
             # Extract all needed data while session is active
             return {
-                'id': repo.id,
-                'name': repo.name,
-                'path': repo.path,
-                'passphrase': repo.get_passphrase()
+                "id": repo.id,
+                "name": repo.name,
+                "path": repo.path,
+                "passphrase": repo.get_passphrase(),
             }
 
     async def initialize(self):
         """Initialize async resources"""
         if not self._backup_queue:
             self._backup_queue = asyncio.Queue()
-            self._backup_semaphore = asyncio.Semaphore(self.config.max_concurrent_backups)
-            logger.info(f"Job manager initialized with max concurrent backups: {self.config.max_concurrent_backups}")
+            self._backup_semaphore = asyncio.Semaphore(
+                self.config.max_concurrent_backups
+            )
+            logger.info(
+                f"Job manager initialized with max concurrent backups: {self.config.max_concurrent_backups}"
+            )
 
     async def shutdown(self):
         """Graceful shutdown of all jobs and background tasks"""
         logger.info("Shutting down BorgJobManager...")
         self._shutdown_requested = True
-        
+
         # Cancel running processes
         for job_id, process in self._processes.items():
             try:
@@ -139,22 +146,18 @@ class BorgJobManager:
                     logger.warning(f"Force killed job {job_id}")
             except Exception as e:
                 logger.error(f"Error terminating job {job_id}: {e}")
-        
+
         # Clear resources
         self.jobs.clear()
         self._processes.clear()
         self._event_queues.clear()
         self._queue_processor_started = False
-        
+
         logger.info("BorgJobManager shutdown complete")
 
     def _create_job_task(self, task_type: str, task_name: str, **kwargs) -> BorgJobTask:
         """Create a BorgJobTask with proper configuration"""
-        task = BorgJobTask(
-            task_type=task_type,
-            task_name=task_name,
-            **kwargs
-        )
+        task = BorgJobTask(task_type=task_type, task_name=task_name, **kwargs)
         # Set proper maxlen for output storage
         task.output_lines = deque(maxlen=self.config.max_output_lines)
         return task
@@ -172,7 +175,7 @@ class BorgJobManager:
         """Start a Borg command and track its output (backward compatibility)"""
         # Ensure job manager is initialized
         await self.initialize()
-        
+
         job_id = str(uuid.uuid4())
 
         job = self._create_job(
@@ -243,9 +246,9 @@ class BorgJobManager:
         """Create a composite job with multiple tasks"""
         # Ensure job manager is initialized
         await self.initialize()
-        
+
         job_id = str(uuid.uuid4())
-        
+
         # Extract repository ID to avoid session issues
         repository_id = repository.id
 
@@ -1208,7 +1211,7 @@ class BorgJobManager:
             if not repo_data:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
-                
+
             logger.info(f"🔄 Starting borg backup for repository {repo_data['name']}")
 
             from app.utils.security import (
@@ -1253,7 +1256,7 @@ class BorgJobManager:
             command, env = build_secure_borg_command(
                 base_command="borg create",
                 repository_path="",
-                passphrase=repo_data['passphrase'],
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -1277,7 +1280,7 @@ class BorgJobManager:
             if not repo_data:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
-                
+
             logger.info(f"🗑️ Starting borg prune for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
@@ -1310,12 +1313,12 @@ class BorgJobManager:
                 additional_args.append("--dry-run")
 
             # Add repository path
-            additional_args.append(repo_data['path'])
+            additional_args.append(repo_data["path"])
 
             command, env = build_secure_borg_command(
                 base_command="borg prune",
                 repository_path="",
-                passphrase=repo_data['passphrase'],
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -1338,7 +1341,7 @@ class BorgJobManager:
             if not repo_data:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
-                
+
             logger.info(f"🔍 Starting borg check for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
@@ -1364,12 +1367,12 @@ class BorgJobManager:
                 additional_args.append("--save-space")
 
             # Add repository path
-            additional_args.append(repo_data['path'])
+            additional_args.append(repo_data["path"])
 
             command, env = build_secure_borg_command(
                 base_command="borg check",
                 repository_path="",
-                passphrase=repo_data['passphrase'],
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -1392,12 +1395,10 @@ class BorgJobManager:
             if not repository:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
-                
+
             # For now, just log that cloud sync would happen
             # This can be expanded to use rclone service like the composite job manager
-            logger.info(
-                f"☁️ Cloud sync task - would sync repository {repository.name}"
-            )
+            logger.info(f"☁️ Cloud sync task - would sync repository {repository.name}")
 
             # Add a small delay to simulate work
             await asyncio.sleep(1)
@@ -1481,13 +1482,18 @@ def get_job_manager(config: Optional[BorgJobManagerConfig] = None) -> BorgJobMan
         if config is None:
             # Use environment variables or defaults
             import os
+
             config = BorgJobManagerConfig(
-                max_concurrent_backups=int(os.getenv('BORG_MAX_CONCURRENT_BACKUPS', '5')),
-                auto_cleanup_delay=int(os.getenv('BORG_AUTO_CLEANUP_DELAY', '30')),
-                max_output_lines=int(os.getenv('BORG_MAX_OUTPUT_LINES', '1000')),
+                max_concurrent_backups=int(
+                    os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")
+                ),
+                auto_cleanup_delay=int(os.getenv("BORG_AUTO_CLEANUP_DELAY", "30")),
+                max_output_lines=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
             )
         _job_manager_instance = BorgJobManager(config)
-        logger.info(f"Created new job manager instance with config: max_concurrent={config.max_concurrent_backups}")
+        logger.info(
+            f"Created new job manager instance with config: max_concurrent={config.max_concurrent_backups}"
+        )
     return _job_manager_instance
 
 

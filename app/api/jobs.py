@@ -245,7 +245,9 @@ async def cancel_job(
 
 
 @router.get("/manager/stats")
-def get_job_manager_stats(job_manager: BorgJobManager = Depends(get_job_manager_dependency)):
+def get_job_manager_stats(
+    job_manager: BorgJobManager = Depends(get_job_manager_dependency),
+):
     """Get JobManager statistics"""
     jobs = job_manager.jobs
     running_jobs = [job for job in jobs.values() if job.status == "running"]
@@ -263,7 +265,9 @@ def get_job_manager_stats(job_manager: BorgJobManager = Depends(get_job_manager_
 
 
 @router.post("/manager/cleanup")
-def cleanup_completed_jobs(job_manager: BorgJobManager = Depends(get_job_manager_dependency)):
+def cleanup_completed_jobs(
+    job_manager: BorgJobManager = Depends(get_job_manager_dependency),
+):
     """Clean up completed jobs from JobManager memory"""
     cleaned = 0
     jobs_to_remove = []

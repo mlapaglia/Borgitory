@@ -268,8 +268,8 @@ async def update_import_form(request: Request, path: str = "", loading: str = ""
                 "preview": "",
             },
         )
-    
-    # If loading=true, return loading template immediately 
+
+    # If loading=true, return loading template immediately
     if loading == "true":
         return templates.TemplateResponse(
             "partials/repositories/import_form_loading.html",
@@ -283,12 +283,12 @@ async def update_import_form(request: Request, path: str = "", loading: str = ""
         # Look up repository details by path
         available_repos = await borg_service.scan_for_repositories()
         selected_repo = None
-        
+
         for repo in available_repos:
             if repo.get("path") == path:
                 selected_repo = repo
                 break
-        
+
         if not selected_repo:
             logger.warning(f"Repository not found for path: {path}")
             return templates.TemplateResponse(
@@ -311,7 +311,6 @@ async def update_import_form(request: Request, path: str = "", loading: str = ""
         # Determine which fields to show
         show_passphrase = encryption_mode != "none"
         show_keyfile = requires_keyfile
-        show_encryption_info = True
 
         return templates.TemplateResponse(
             "partials/repositories/import_form_simple.html",

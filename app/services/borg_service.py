@@ -303,7 +303,7 @@ class BorgService:
             # Start the borg list command
             job_manager = get_job_manager()
             job_id = await job_manager.start_borg_command(command, env=env)
-            
+
             # Create database job record for tracking
             with get_db_session() as db:
                 db_job = Job(

@@ -59,7 +59,9 @@ class CompositeJobInfo:
     completed_at: Optional[datetime] = None
     tasks: List[CompositeJobTaskInfo] = field(default_factory=list)
     current_task_index: int = 0
-    repository_id: Optional[int] = None  # Store ID instead of object to avoid session issues
+    repository_id: Optional[int] = (
+        None  # Store ID instead of object to avoid session issues
+    )
     schedule: Optional["Schedule"] = None
 
 
@@ -74,13 +76,13 @@ class CompositeJobManager:
             repo = db.query(Repository).filter(Repository.id == repository_id).first()
             if not repo:
                 return None
-            
+
             # Extract all needed data while session is active
             return {
-                'id': repo.id,
-                'name': repo.name,
-                'path': repo.path,
-                'passphrase': repo.get_passphrase()
+                "id": repo.id,
+                "name": repo.name,
+                "path": repo.path,
+                "passphrase": repo.get_passphrase(),
             }
 
     async def create_composite_job(
@@ -94,7 +96,7 @@ class CompositeJobManager:
         """Create a new composite job with multiple tasks"""
 
         job_id = str(uuid.uuid4())
-        
+
         # Extract repository ID to avoid session issues
         repository_id = repository.id
 
@@ -300,7 +302,7 @@ class CompositeJobManager:
             if not repo_data:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
-                
+
             logger.info(f"🔄 Starting borg backup for repository {repo_data['name']}")
 
             # Use the existing borg service to create backup
@@ -343,7 +345,7 @@ class CompositeJobManager:
             command, env = build_secure_borg_command(
                 base_command="borg create",
                 repository_path="",
-                passphrase=repo_data['passphrase'],
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -392,7 +394,7 @@ class CompositeJobManager:
             if not repo_data:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
-                
+
             logger.info(f"🗑️ Starting borg prune for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
@@ -428,7 +430,7 @@ class CompositeJobManager:
                 additional_args.append("--dry-run")
 
             # Repository path as positional argument
-            additional_args.append(repo_data['path'])
+            additional_args.append(repo_data["path"])
 
             logger.info(
                 f"🗑️ Prune settings - Repository: {repo_data['path']}, Dry run: {task.dry_run}"
@@ -437,7 +439,7 @@ class CompositeJobManager:
             command, env = build_secure_borg_command(
                 base_command="borg prune",
                 repository_path="",  # Path is in additional_args
-                passphrase=repo_data['passphrase'],
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -486,7 +488,7 @@ class CompositeJobManager:
             if not repo_data:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
-                
+
             logger.info(f"🔍 Starting borg check for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
@@ -533,7 +535,7 @@ class CompositeJobManager:
                     additional_args.extend(["--last", str(task.last_n_archives)])
 
             # Repository path as positional argument
-            additional_args.append(repo_data['path'])
+            additional_args.append(repo_data["path"])
 
             logger.info(
                 f"🔍 Check settings - Type: {task.check_type}, Repository: {repo_data['path']}"
@@ -542,7 +544,7 @@ class CompositeJobManager:
             command, env = build_secure_borg_command(
                 base_command="borg check",
                 repository_path="",  # Path is in additional_args
-                passphrase=repo_data['passphrase'],
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -591,7 +593,7 @@ class CompositeJobManager:
             if not repo_data:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
-                
+
             if not job.schedule or not job.schedule.cloud_sync_config_id:
                 logger.info("📋 No cloud backup configuration - skipping cloud sync")
                 task.status = "skipped"
@@ -627,8 +629,9 @@ class CompositeJobManager:
 
                     # Create a simple repository object for rclone service
                     from types import SimpleNamespace
-                    repo_obj = SimpleNamespace(path=repo_data['path'])
-                    
+
+                    repo_obj = SimpleNamespace(path=repo_data["path"])
+
                     # Use rclone service to sync to S3
                     progress_generator = rclone_service.sync_repository_to_s3(
                         repository=repo_obj,
@@ -648,8 +651,9 @@ class CompositeJobManager:
 
                     # Create a simple repository object for rclone service
                     from types import SimpleNamespace
-                    repo_obj = SimpleNamespace(path=repo_data['path'])
-                    
+
+                    repo_obj = SimpleNamespace(path=repo_data["path"])
+
                     # Use rclone service to sync to SFTP
                     progress_generator = rclone_service.sync_repository_to_sftp(
                         repository=repo_obj,
