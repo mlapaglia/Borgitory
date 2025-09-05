@@ -92,9 +92,7 @@ async def get_repository_check_form(request: Request, db: Session = Depends(get_
 
     repositories = db.query(Repository).all()
     check_configs = (
-        db.query(RepositoryCheckConfig)
-        .filter(RepositoryCheckConfig.enabled)
-        .all()
+        db.query(RepositoryCheckConfig).filter(RepositoryCheckConfig.enabled).all()
     )
 
     return templates.TemplateResponse(

@@ -24,19 +24,13 @@ async def get_schedules_form(request: Request, db: Session = Depends(get_db)):
     )
 
     repositories = db.query(Repository).all()
-    cleanup_configs = (
-        db.query(CleanupConfig).filter(CleanupConfig.enabled).all()
-    )
-    cloud_sync_configs = (
-        db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled).all()
-    )
+    cleanup_configs = db.query(CleanupConfig).filter(CleanupConfig.enabled).all()
+    cloud_sync_configs = db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled).all()
     notification_configs = (
         db.query(NotificationConfig).filter(NotificationConfig.enabled).all()
     )
     check_configs = (
-        db.query(RepositoryCheckConfig)
-        .filter(RepositoryCheckConfig.enabled)
-        .all()
+        db.query(RepositoryCheckConfig).filter(RepositoryCheckConfig.enabled).all()
     )
 
     return templates.TemplateResponse(
