@@ -1,6 +1,4 @@
 import logging
-from typing import List, Dict, Any
-from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
 from fastapi.templating import Jinja2Templates
 
@@ -62,11 +60,11 @@ class JobRenderService:
             for job_id, job in self.job_manager.jobs.items():
                 if job.status == "running":
                     # Check if this is a composite job
-                    if hasattr(job, 'is_composite') and job.is_composite():
+                    if hasattr(job, "is_composite") and job.is_composite():
                         # Handle composite job (like Manual Backup)
                         current_task = job.get_current_task()
                         progress_info = f"Task: {current_task.task_name if current_task else 'Unknown'} ({job.current_task_index + 1}/{len(job.tasks)})"
-                        
+
                         # Get display name from JobType enum
                         display_type = JobType.from_job_type_string(str(job.job_type))
 
@@ -77,7 +75,9 @@ class JobRenderService:
                                 "status": job.status,
                                 "started_at": job.started_at.strftime("%H:%M:%S"),
                                 "progress": {
-                                    "current_task": current_task.task_name if current_task else "Unknown",
+                                    "current_task": current_task.task_name
+                                    if current_task
+                                    else "Unknown",
                                     "task_progress": f"{job.current_task_index + 1}/{len(job.tasks)}",
                                 },
                                 "progress_info": progress_info,
@@ -87,15 +87,24 @@ class JobRenderService:
                         # Handle simple borg job (only show if not part of a composite job)
                         # Skip jobs that are likely created by composite jobs
                         if not self._is_child_of_composite_job(job_id, job):
-                            job_type = JobType.from_command(getattr(job, 'command', []))
-                            
+                            job_type = JobType.from_command(getattr(job, "command", []))
+
                             # Calculate progress info
                             progress_info = ""
-                            if hasattr(job, 'current_progress') and job.current_progress:
+                            if (
+                                hasattr(job, "current_progress")
+                                and job.current_progress
+                            ):
                                 if "files" in job.current_progress:
-                                    progress_info = f"Files: {job.current_progress['files']}"
+                                    progress_info = (
+                                        f"Files: {job.current_progress['files']}"
+                                    )
                                 if "transferred" in job.current_progress:
-                                    progress_info += f" | {job.current_progress['transferred']}" if progress_info else job.current_progress['transferred']
+                                    progress_info += (
+                                        f" | {job.current_progress['transferred']}"
+                                        if progress_info
+                                        else job.current_progress["transferred"]
+                                    )
 
                             current_jobs.append(
                                 {
@@ -103,7 +112,7 @@ class JobRenderService:
                                     "type": job_type,
                                     "status": job.status,
                                     "started_at": job.started_at.strftime("%H:%M:%S"),
-                                    "progress": getattr(job, 'current_progress', None),
+                                    "progress": getattr(job, "current_progress", None),
                                     "progress_info": progress_info,
                                 }
                             )
@@ -122,16 +131,18 @@ class JobRenderService:
             return self.templates.get_template("partials/jobs/error_state.html").render(
                 message=f"Error loading current operations: {str(e)}", padding="4"
             )
-    
+
     def _is_child_of_composite_job(self, job_id: str, job) -> bool:
         """Check if a job is a child task of a composite job"""
-        # Simple heuristic: if there are composite jobs running, 
+        # Simple heuristic: if there are composite jobs running,
         # assume simple borg jobs are their children
         for other_job_id, other_job in self.job_manager.jobs.items():
-            if (hasattr(other_job, 'is_composite') and 
-                other_job.is_composite() and 
-                other_job.status == "running" and
-                other_job_id != job_id):
+            if (
+                hasattr(other_job, "is_composite")
+                and other_job.is_composite()
+                and other_job.status == "running"
+                and other_job_id != job_id
+            ):
                 return True
         return False
 
@@ -154,7 +165,9 @@ class JobRenderService:
             status_icon = "◦"
 
         # Format dates
-        started_at = job.started_at.strftime("%Y-%m-%d %H:%M") if job.started_at else "N/A"
+        started_at = (
+            job.started_at.strftime("%Y-%m-%d %H:%M") if job.started_at else "N/A"
+        )
         finished_at = (
             job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "N/A"
         )
@@ -169,7 +182,9 @@ class JobRenderService:
             job_title += f" {progress_text}"
 
         # Sort tasks by order if composite
-        sorted_tasks = sorted(job.tasks, key=lambda t: t.task_order) if is_composite else []
+        sorted_tasks = (
+            sorted(job.tasks, key=lambda t: t.task_order) if is_composite else []
+        )
 
         # Render the template with context
         return self.templates.get_template("partials/jobs/job_item.html").render(

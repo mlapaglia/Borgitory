@@ -48,7 +48,9 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">Retention Strategy</label>
                 <div class="space-y-3">
                     <div class="flex items-center">
-                        <input type="radio" name="strategy" value="simple" id="strategy-simple" onchange="toggleRetentionStrategy()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300" checked>
+                        <input type="radio" name="strategy" value="simple" id="strategy-simple" hx-get="/api/cleanup/strategy-fields"
+                               hx-target="#strategy-fields-container"
+                               hx-include="this" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300" checked>
                         <label for="strategy-simple" class="ml-2 block text-sm text-gray-700">Simple: Keep archives within time period</label>
                     </div>
                     <div id="simple-strategy" class="ml-6 flex items-center space-x-2">
@@ -58,7 +60,9 @@
                     </div>
                     
                     <div class="flex items-center">
-                        <input type="radio" name="strategy" value="advanced" id="strategy-advanced" onchange="toggleRetentionStrategy()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                        <input type="radio" name="strategy" value="advanced" id="strategy-advanced" hx-get="/api/cleanup/strategy-fields"
+                               hx-target="#strategy-fields-container"
+                               hx-include="this" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
                         <label for="strategy-advanced" class="ml-2 block text-sm text-gray-700">Advanced: Granular retention schedule</label>
                     </div>
                     <div id="advanced-strategy" class="ml-6 space-y-2 hidden">

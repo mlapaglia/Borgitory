@@ -3,24 +3,25 @@ from enum import StrEnum
 
 class JobType(StrEnum):
     """Job type enumeration with display-friendly names"""
+
     MANUAL_BACKUP = "Manual Backup"
-    SCHEDULED_BACKUP = "Scheduled Backup" 
+    SCHEDULED_BACKUP = "Scheduled Backup"
     PRUNE = "Prune"
     CHECK = "Check"
     BACKUP = "Backup"
     LIST = "List"
     VERIFY = "Verify"
     UNKNOWN = "Unknown"
-    
+
     # Composite job types (for internal use)
     COMPOSITE = "Composite"
-    
+
     @classmethod
-    def from_command(cls, command: list) -> 'JobType':
+    def from_command(cls, command: list) -> "JobType":
         """Infer job type from borg command"""
         if not command or len(command) < 2:
             return cls.UNKNOWN
-            
+
         if "create" in command:
             return cls.BACKUP
         elif "list" in command:
@@ -31,9 +32,9 @@ class JobType(StrEnum):
             return cls.PRUNE
         else:
             return cls.UNKNOWN
-    
+
     @classmethod
-    def from_job_type_string(cls, job_type: str) -> 'JobType':
+    def from_job_type_string(cls, job_type: str) -> "JobType":
         """Convert internal job type strings to enum values"""
         type_mapping = {
             "manual_backup": cls.MANUAL_BACKUP,

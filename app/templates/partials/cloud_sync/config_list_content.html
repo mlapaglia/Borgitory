@@ -25,22 +25,35 @@
         </div>
         <div class="flex flex-col space-y-2 ml-4">
             <button 
-                onclick="testCloudSyncConnection({{ config.id }}, this)"
-                class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+                hx-post="/api/cloud-sync/{{ config.id }}/test"
+                hx-target="body"
+                hx-swap="beforeend"
+                hx-indicator="this"
+                class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 [&.htmx-request]:opacity-50"
             >
-                Test
+                <span class="[.htmx-request_&]:hidden">Test</span>
+                <span class="hidden [.htmx-request_&]:inline">Testing...</span>
             </button>
             <button 
-                onclick="toggleCloudSyncConfig({{ config.id }}, {{ 'true' if config.enabled else 'false' }}, this)"
-                class="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 focus:ring-2 focus:ring-gray-500"
+                hx-post="/api/cloud-sync/{{ config.id }}/{{ 'disable' if config.enabled else 'enable' }}"
+                hx-target="body"
+                hx-swap="beforeend"
+                hx-indicator="this"
+                class="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 [&.htmx-request]:opacity-50"
             >
-                {{ 'Disable' if config.enabled else 'Enable' }}
+                <span class="[.htmx-request_&]:hidden">{{ 'Disable' if config.enabled else 'Enable' }}</span>
+                <span class="hidden [.htmx-request_&]:inline">{{ 'Disabling...' if config.enabled else 'Enabling...' }}</span>
             </button>
             <button 
-                onclick="deleteCloudSyncConfig({{ config.id }}, '{{ config.name }}', this)"
-                class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500"
+                hx-delete="/api/cloud-sync/{{ config.id }}"
+                hx-target="body"
+                hx-swap="beforeend"
+                hx-indicator="this"
+                hx-confirm="Are you sure you want to delete the cloud sync configuration '{{ config.name }}'?"
+                class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500 [&.htmx-request]:opacity-50"
             >
-                Delete
+                <span class="[.htmx-request_&]:hidden">Delete</span>
+                <span class="hidden [.htmx-request_&]:inline">Deleting...</span>
             </button>
         </div>
     </div>

@@ -80,8 +80,9 @@ class CompositeJobManager:
         job_id = str(uuid.uuid4())
 
         # Create database job record
-        db = next(get_db())
-        try:
+        from app.utils.db_session import get_db_session
+        
+        with get_db_session() as db:
             db_job = Job(
                 repository_id=repository.id,
                 job_uuid=job_id,
@@ -108,17 +109,9 @@ class CompositeJobManager:
                 )
                 db.add(task)
 
-            db.commit()
-
             logger.info(
                 f"📝 Created composite job {job_id} (db_id: {db_job.id}) with {len(task_definitions)} tasks"
             )
-
-        except Exception as e:
-            logger.error(f"Failed to create database job: {e}")
-            raise
-        finally:
-            db.close()
 
         # Create in-memory job info
         composite_job = CompositeJobInfo(
@@ -561,8 +554,7 @@ class CompositeJobManager:
             logger.info(f"☁️ Starting cloud sync for repository {job.repository.name}")
 
             # Get cloud backup configuration
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 from app.models.database import CloudSyncConfig
 
                 config = (
@@ -649,9 +641,6 @@ class CompositeJobManager:
                 logger.info("✅ Cloud sync completed")
                 return True
 
-            finally:
-                db.close()
-
         except Exception as e:
             logger.error(f"❌ Exception in cloud sync task: {str(e)}")
             task.error = str(e)
@@ -664,16 +653,12 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
                 if db_job:
                     db_job.status = status
                     if status == "completed" or status == "failed":
                         db_job.finished_at = datetime.now()
-                    db.commit()
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update job status: {e}")
@@ -685,14 +670,10 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
                 if db_job:
                     db_job.completed_tasks = job.completed_tasks
-                    db.commit()
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update job progress: {e}")
@@ -711,8 +692,7 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 task = (
                     db.query(JobTask)
                     .filter(
@@ -742,9 +722,6 @@ class CompositeJobManager:
                     if return_code is not None:
                         task.return_code = return_code
 
-                    db.commit()
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update task status: {e}")

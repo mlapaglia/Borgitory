@@ -161,10 +161,10 @@ class BorgJobManager:
         job_id = str(uuid.uuid4())
 
         # Create database job record
-        from app.models.database import Job, JobTask, get_db
+        from app.models.database import Job, JobTask
+        from app.utils.db_session import get_db_session
 
-        db = next(get_db())
-        try:
+        with get_db_session() as db:
             db_job = Job(
                 repository_id=repository.id,
                 job_uuid=job_id,
@@ -191,16 +191,9 @@ class BorgJobManager:
                 )
                 db.add(task)
 
-            db.commit()
             logger.info(
                 f"📝 Created composite job {job_id} (db_id: {db_job.id}) with {len(task_definitions)} tasks"
             )
-
-        except Exception as e:
-            logger.error(f"Failed to create database job: {e}")
-            raise
-        finally:
-            db.close()
 
         # Create in-memory job with tasks
         tasks = []
@@ -880,8 +873,7 @@ class BorgJobManager:
             output_text = "\n".join([line["text"] for line in job.output_lines])
 
             # Update database job
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 db_job = db.query(Job).filter(Job.job_uuid == job_id).first()
                 if db_job:
                     logger.info(
@@ -899,7 +891,6 @@ class BorgJobManager:
                     if job.error:
                         db_job.error = job.error
 
-                    db.commit()
                     logger.info(f"✅ Updated database job record for {job_id}")
 
                     # Trigger cloud backup if this was a successful backup job
@@ -931,8 +922,6 @@ class BorgJobManager:
 
                 else:
                     logger.warning(f"No database job found for UUID {job_id}")
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update database job for {job_id}: {e}")
@@ -1047,21 +1036,18 @@ class BorgJobManager:
             if not job or not job.is_composite():
                 return
 
-            from app.models.database import Job, get_db
+            from app.models.database import Job
+            from app.utils.db_session import get_db_session
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
                 if db_job:
                     db_job.status = status
                     if status == "completed" or status == "failed":
                         db_job.finished_at = datetime.now()
-                    db.commit()
                     logger.info(
                         f"📝 Updated database job {db_job.id} status to {status}"
                     )
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update composite job status: {e}")
@@ -1080,10 +1066,10 @@ class BorgJobManager:
             if not job or not job.is_composite():
                 return
 
-            from app.models.database import JobTask, get_db
+            from app.models.database import JobTask
+            from app.utils.db_session import get_db_session
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 task = (
                     db.query(JobTask)
                     .filter(
@@ -1113,12 +1099,9 @@ class BorgJobManager:
                     if return_code is not None:
                         task.return_code = return_code
 
-                    db.commit()
                     logger.info(
                         f"📝 Updated database task {task.id} status to {status}"
                     )
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update composite task status: {e}")

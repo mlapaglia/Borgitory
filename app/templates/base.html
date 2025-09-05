@@ -9,14 +9,47 @@
     <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
+    
+    <!-- Dark Mode Functions - Available Immediately -->
+    <script>
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark');
+            
+            if (isDark) {
+                html.classList.remove('dark');
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('darkMode', 'true');
+            }
+        }
+
+        function initializeDarkMode() {
+            const savedMode = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            if (savedMode === 'true' || (savedMode === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        }
+
+        // Initialize dark mode immediately
+        initializeDarkMode();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/static/css/modern-components.css">
     <style>
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <nav class="bg-white shadow-sm border-b">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
@@ -24,7 +57,7 @@
                     <button 
                         id="mobile-menu-button" 
                         onclick="toggleMobileSidebar()"
-                        class="lg:hidden mr-3 p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                        class="lg:hidden mr-3 p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
                         aria-expanded="false"
                         aria-controls="mobile-sidebar"
                     >
@@ -38,11 +71,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </button>
-                    <h1 class="text-xl font-semibold text-gray-900">Borgitory</h1>
+                    <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Borgitory</h1>
                 </div>
                 <div class="flex items-center space-x-4">
                     {% if current_user %}
-                        <span class="text-sm text-gray-700">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">
                             Welcome, <span class="font-medium">{{ current_user.username }}</span>
                         </span>
                         <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors">
@@ -64,15 +97,9 @@
     <script src="/static/js/utils.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/components/navigation.js"></script>
-    <script src="/static/js/components/repositories.js"></script>
-    <script src="/static/js/components/schedules.js"></script>
-    <script src="/static/js/components/cloud-sync.js"></script>
-    <script src="/static/js/components/notifications.js"></script>
-    <script src="/static/js/components/cleanup.js"></script>
     <script src="/static/js/components/jobs.js"></script>
     <script src="/static/js/components/path-autocomplete.js"></script>
     <script src="/static/js/components/archive-browser.js"></script>
-    <script src="/static/js/components/debug.js"></script>
 
     <script>
         // Logout function (specific to base template)

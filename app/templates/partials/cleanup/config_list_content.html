@@ -1,0 +1,42 @@
+{% if not configs %}
+<div class="text-gray-500 dark:text-gray-400 text-sm py-4 text-center">
+    <p>No cleanup policies configured.</p>
+    <p class="mt-1">Create one using the form above to automatically prune old archives.</p>
+</div>
+{% else %}
+{% for config in configs %}
+<div class="border dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700 mb-3">
+    <div class="flex justify-between items-start mb-2">
+        <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ config.name }}</h4>
+        <span class="px-2 py-1 text-xs rounded {{ 'bg-green-100 text-green-800' if config.enabled else 'bg-gray-100 text-gray-600' }}">
+            {{ 'Enabled' if config.enabled else 'Disabled' }}
+        </span>
+    </div>
+    <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">{{ config.description }}</p>
+    <div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+        <span>Created: {{ config.created_at.strftime("%Y-%m-%d") }}</span>
+        <div class="space-x-2">
+            <button 
+                hx-post="/api/cleanup/{{ config.id }}/{{ 'disable' if config.enabled else 'enable' }}"
+                hx-target="body"
+                hx-swap="beforeend"
+                hx-indicator="this"
+                class="text-blue-600 hover:text-blue-800 [&.htmx-request]:opacity-50">
+                <span class="[.htmx-request_&]:hidden">{{ 'Disable' if config.enabled else 'Enable' }}</span>
+                <span class="hidden [.htmx-request_&]:inline">{{ 'Disabling...' if config.enabled else 'Enabling...' }}</span>
+            </button>
+            <button 
+                hx-delete="/api/cleanup/{{ config.id }}"
+                hx-target="body"
+                hx-swap="beforeend"
+                hx-indicator="this"
+                hx-confirm="Are you sure you want to delete the cleanup policy '{{ config.name }}'?"
+                class="text-red-600 hover:text-red-800 [&.htmx-request]:opacity-50">
+                <span class="[.htmx-request_&]:hidden">Delete</span>
+                <span class="hidden [.htmx-request_&]:inline">Deleting...</span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}

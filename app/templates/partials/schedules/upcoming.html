@@ -5,8 +5,11 @@
          hx-get="/api/schedules/upcoming/html" 
          hx-trigger="load, every 60s, scheduleUpdate from:body" 
          hx-swap="innerHTML"
-         hx-on::htmx:before-request="showUpcomingLoading()"
-         hx-on::htmx:after-request="hideUpcomingLoading()">
+         hx-indicator="#upcoming-loading">
         <div class="text-gray-500 text-sm">Loading upcoming backups...</div>
+    </div>
+    <div id="upcoming-loading" class="[&.htmx-request]:block hidden flex items-center text-sm text-gray-500">
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+        Updating upcoming backups...
     </div>
 </div>

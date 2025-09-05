@@ -6,8 +6,9 @@ import os
 from datetime import datetime, UTC
 from typing import Dict, List, Optional
 
-from app.models.database import Repository, Job, get_db
+from app.models.database import Repository, Job
 from app.services.job_manager import borg_job_manager
+from app.utils.db_session import get_db_session
 from app.utils.security import (
     build_secure_borg_command,
     validate_archive_name,
@@ -264,8 +265,9 @@ class BorgService:
             )
 
             # Create job record in database
-            db = next(get_db())
-            try:
+            from app.utils.db_session import get_db_session
+
+            with get_db_session() as db:
                 job = Job(
                     repository_id=repository.id,
                     job_uuid=job_id,  # Store the JobManager UUID
@@ -275,13 +277,8 @@ class BorgService:
                     cloud_sync_config_id=cloud_sync_config_id,
                 )
                 db.add(job)
-                db.commit()
                 db.refresh(job)
                 logger.info(f"Created job record {job.id} for backup job {job_id}")
-            except Exception as e:
-                logger.error(f"Failed to create job record: {e}")
-            finally:
-                db.close()
 
             return job_id
 
@@ -303,8 +300,7 @@ class BorgService:
 
         try:
             # Create database job record for tracking
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 job_id = await borg_job_manager.start_borg_command(command, env=env)
 
                 # Create database job record
@@ -316,10 +312,7 @@ class BorgService:
                     started_at=datetime.now(UTC),
                 )
                 db.add(db_job)
-                db.commit()
                 logger.info(f"Created database record for list archives job {job_id}")
-            finally:
-                db.close()
 
             # Wait for completion (list is usually quick)
             max_wait = 30  # 30 seconds max

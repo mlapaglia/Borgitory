@@ -17,16 +17,16 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.post("/backup", response_class=HTMLResponse)
 async def create_backup(
-    backup_request: BackupRequest, 
+    backup_request: BackupRequest,
     request: Request,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service)
+    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Start a backup job and return HTML status"""
     try:
         result = await job_svc.create_backup_job(backup_request, db)
         job_id = result["job_id"]
-        
+
         # Return HTML showing the backup started
         return f"""
             <div id="backup-job-{job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -56,21 +56,21 @@ async def create_backup(
 @router.post("/prune")
 async def create_prune_job(
     request: Request,
-    prune_request: PruneRequest, 
+    prune_request: PruneRequest,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service)
+    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Start an archive pruning job and return job_id for tracking"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         result = await job_svc.create_prune_job(prune_request, db)
-        
+
         if is_htmx_request:
             repositories = db.query(Repository).all()
             return templates.TemplateResponse(
                 "partials/cleanup/config_form_success.html",
-                {"request": request, "repositories": repositories}
+                {"request": request, "repositories": repositories},
             )
         else:
             return result
@@ -80,8 +80,12 @@ async def create_prune_job(
             repositories = db.query(Repository).all()
             return templates.TemplateResponse(
                 "partials/cleanup/config_form_error.html",
-                {"request": request, "error_message": error_msg, "repositories": repositories},
-                status_code=200
+                {
+                    "request": request,
+                    "error_message": error_msg,
+                    "repositories": repositories,
+                },
+                status_code=200,
             )
         raise HTTPException(status_code=404, detail=error_msg)
     except Exception as e:
@@ -91,17 +95,21 @@ async def create_prune_job(
             repositories = db.query(Repository).all()
             return templates.TemplateResponse(
                 "partials/cleanup/config_form_error.html",
-                {"request": request, "error_message": error_msg, "repositories": repositories},
-                status_code=200
+                {
+                    "request": request,
+                    "error_message": error_msg,
+                    "repositories": repositories,
+                },
+                status_code=200,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.post("/check")
 async def create_check_job(
-    check_request: CheckRequest, 
+    check_request: CheckRequest,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service)
+    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Start a repository check job and return job_id for tracking"""
     try:
@@ -122,18 +130,20 @@ async def create_check_job(
 
 
 @router.get("/stream")
-async def stream_all_jobs(stream_svc: JobStreamService = Depends(lambda: job_stream_service)):
+async def stream_all_jobs(
+    stream_svc: JobStreamService = Depends(lambda: job_stream_service),
+):
     """Stream real-time updates for all jobs via Server-Sent Events"""
     return await stream_svc.stream_all_jobs()
 
 
 @router.get("/")
 def list_jobs(
-    skip: int = 0, 
-    limit: int = 100, 
-    type: str = None, 
+    skip: int = 0,
+    limit: int = 100,
+    type: str = None,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service)
+    job_svc: JobService = Depends(lambda: job_service),
 ):
     """List database job records (legacy jobs) and active JobManager jobs"""
     return job_svc.list_jobs(skip, limit, type, db)
@@ -141,21 +151,18 @@ def list_jobs(
 
 @router.get("/html", response_class=HTMLResponse)
 def get_jobs_html(
-    request: Request, 
-    expand: str = None, 
+    request: Request,
+    expand: str = None,
     db: Session = Depends(get_db),
-    render_svc: JobRenderService = Depends(lambda: job_render_service)
+    render_svc: JobRenderService = Depends(lambda: job_render_service),
 ):
     """Get job history as HTML"""
     return render_svc.render_jobs_html(db, expand)
 
 
-
-
 @router.get("/current/html", response_class=HTMLResponse)
 def get_current_jobs_html(
-    request: Request,
-    render_svc: JobRenderService = Depends(lambda: job_render_service)
+    request: Request, render_svc: JobRenderService = Depends(lambda: job_render_service)
 ):
     """Get current running jobs as HTML"""
     html_content = render_svc.render_current_jobs_html()
@@ -164,9 +171,9 @@ def get_current_jobs_html(
 
 @router.get("/{job_id}")
 def get_job(
-    job_id: str, 
+    job_id: str,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service)
+    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Get job details - supports both database IDs and JobManager IDs"""
     job = job_svc.get_job(job_id, db)
@@ -177,8 +184,7 @@ def get_job(
 
 @router.get("/{job_id}/status")
 async def get_job_status(
-    job_id: str,
-    job_svc: JobService = Depends(lambda: job_service)
+    job_id: str, job_svc: JobService = Depends(lambda: job_service)
 ):
     """Get current job status and progress"""
     try:
@@ -193,10 +199,10 @@ async def get_job_status(
 
 @router.get("/{job_id}/output")
 async def get_job_output(
-    job_id: str, 
-    last_n_lines: int = 100, 
+    job_id: str,
+    last_n_lines: int = 100,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service)
+    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Get job output lines"""
     try:
@@ -211,9 +217,9 @@ async def get_job_output(
 
 @router.get("/{job_id}/stream")
 async def stream_job_output(
-    job_id: str, 
+    job_id: str,
     db: Session = Depends(get_db),
-    stream_svc: JobStreamService = Depends(lambda: job_stream_service)
+    stream_svc: JobStreamService = Depends(lambda: job_stream_service),
 ):
     """Stream real-time job output via Server-Sent Events"""
     return await stream_svc.stream_job_output(job_id)
@@ -221,9 +227,9 @@ async def stream_job_output(
 
 @router.delete("/{job_id}")
 async def cancel_job(
-    job_id: str, 
+    job_id: str,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service)
+    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Cancel a running job"""
     success = await job_svc.cancel_job(job_id, db)

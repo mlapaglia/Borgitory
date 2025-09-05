@@ -19,9 +19,7 @@ window.switchTab = function switchTab(tabName) {
     document.getElementById(`nav-${tabName}`).classList.add('active');
     
     // Handle tab-specific initialization
-    if (tabName === 'debug') {
-        loadDebugInfo();
-    }
+    // Debug tab now auto-loads via HTMX
 }
 
 // Initialize the first tab as active

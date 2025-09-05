@@ -5,7 +5,6 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
     Form,
     File,
     UploadFile,
@@ -37,7 +36,7 @@ async def create_repository(
     current_user: User = Depends(get_current_user),
 ):
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         # Check for duplicate name
         db_repo = db.query(Repository).filter(Repository.name == repo.name).first()
@@ -47,7 +46,7 @@ async def create_repository(
                 return templates.TemplateResponse(
                     "partials/repositories/form_create_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=400
+                    status_code=400,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
@@ -59,7 +58,7 @@ async def create_repository(
                 return templates.TemplateResponse(
                     "partials/repositories/form_create_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=400
+                    status_code=400,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
@@ -86,7 +85,7 @@ async def create_repository(
             # Trigger repository list update and return fresh form
             response = templates.TemplateResponse(
                 "partials/repositories/form_create_success.html",
-                {"request": request, "repository_name": repo.name}
+                {"request": request, "repository_name": repo.name},
             )
             response.headers["HX-Trigger"] = "repositoryUpdate"
             return response
@@ -99,7 +98,7 @@ async def create_repository(
             return templates.TemplateResponse(
                 "partials/repositories/form_create_error.html",
                 {"request": request, "error_message": str(e.detail)},
-                status_code=e.status_code
+                status_code=e.status_code,
             )
         raise
     except Exception as e:
@@ -109,7 +108,7 @@ async def create_repository(
             return templates.TemplateResponse(
                 "partials/repositories/form_create_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
@@ -125,24 +124,26 @@ async def scan_repositories(request: Request):
     """Scan for existing repositories and return HTML for HTMX"""
     try:
         available_repos = await borg_service.scan_for_repositories()
-        
+
         # Check if request wants JSON (for backward compatibility)
         accept_header = request.headers.get("Accept", "")
         if "application/json" in accept_header or "hx-request" not in request.headers:
             return {"repositories": available_repos}
-        
+
         # Return HTML for HTMX
         return templates.TemplateResponse(
             "partials/repositories/scan_results.html",
-            {"request": request, "repositories": available_repos}
+            {"request": request, "repositories": available_repos},
         )
     except Exception as e:
         logger.error(f"Error scanning for repositories: {e}")
-        
+
         # Check if this is an HTMX request
         if "hx-request" in request.headers:
-            error_html = f'<div class="text-sm text-red-600">Error: {str(e)}</div>'
-            return HTMLResponse(content=error_html)
+            return templates.TemplateResponse(
+                "partials/common/error_message.html",
+                {"request": request, "error_message": f"Error: {str(e)}"}
+            )
         else:
             raise HTTPException(
                 status_code=500, detail=f"Failed to scan repositories: {str(e)}"
@@ -154,56 +155,15 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
     """Get repositories as HTML for frontend display"""
     try:
         repositories = db.query(Repository).all()
-
-        html_content = ""
-
-        if not repositories:
-            html_content = """
-                <div class="text-gray-500 text-center py-4">
-                    <p>No repositories configured.</p>
-                    <p class="text-sm mt-1">Create or import a repository to get started.</p>
-                </div>
-            """
-        else:
-            html_content = '<div class="space-y-3">'
-
-            for repo in repositories:
-                html_content += f"""
-                    <div class="border rounded-lg p-4 bg-white hover:bg-gray-50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex-1">
-                                <h4 class="font-medium text-gray-900">{repo.name}</h4>
-                                <p class="text-sm text-gray-500">{repo.path}</p>
-                                <p class="text-xs text-gray-400 mt-1">Created: {repo.created_at.strftime("%Y-%m-%d %H:%M") if repo.created_at else "Unknown"}</p>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button onclick="switchTab('archives'); document.getElementById('archive-repository-select').value = '{repo.id}'; loadArchives();" 
-                                        class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200">
-                                    View Archives
-                                </button>
-                                <button hx-delete="/api/repositories/{repo.id}"
-                                        hx-confirm="Are you sure you want to delete the repository '{repo.name}'? This action cannot be undone."
-                                        hx-target="#repository-list"
-                                        hx-swap="innerHTML"
-                                        class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                """
-
-            html_content += "</div>"
-
-        return HTMLResponse(content=html_content)
-
+        return templates.TemplateResponse(
+            "partials/repositories/list_content.html",
+            {"request": request, "repositories": repositories}
+        )
     except Exception as e:
-        error_html = f"""
-            <div class="text-red-500 text-center py-4">
-                <p>Error loading repositories: {str(e)}</p>
-            </div>
-        """
-        return HTMLResponse(content=error_html)
+        return templates.TemplateResponse(
+            "partials/common/error_message.html",
+            {"request": request, "error_message": f"Error loading repositories: {str(e)}"}
+        )
 
 
 @router.get("/directories")
@@ -318,7 +278,10 @@ def update_repository(
 
 @router.delete("/{repo_id}", response_class=HTMLResponse)
 async def delete_repository(
-    repo_id: int, request: Request, delete_borg_repo: bool = False, db: Session = Depends(get_db)
+    repo_id: int,
+    request: Request,
+    delete_borg_repo: bool = False,
+    db: Session = Depends(get_db),
 ):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
@@ -409,40 +372,10 @@ async def list_archives_html(
         try:
             archives = await borg_service.list_archives(repository)
 
-            html_content = ""
-
-            if not archives:
-                html_content = """
-                    <div class="text-gray-500 text-center py-8">
-                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                        </svg>
-                        <h3 class="text-lg font-medium text-gray-900 mb-2">No Archives Found</h3>
-                        <p class="text-sm">This repository doesn't contain any backup archives yet.</p>
-                        <p class="text-sm mt-1">Create a backup to see archives here.</p>
-                    </div>
-                """
-            else:
-                html_content = f"""
-                    <div class="mb-4">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-medium text-gray-900">Archives for {repository.name}</h3>
-                            <span class="text-sm text-gray-500">{len(archives)} archives</span>
-                        </div>
-                    </div>
-                """
-
-                if len(archives) > 10:
-                    html_content += """
-                        <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                            <p class="text-sm text-blue-700">
-                                Showing the most recent 10 archives. Use the Borg command line to view older archives if needed.
-                            </p>
-                        </div>
-                    """
-
-                html_content += '<div class="space-y-2">'
-
+            # Process archives data for template
+            processed_archives = []
+            
+            if archives:
                 # Show most recent archives first (limit to 10)
                 recent_archives = archives[-10:] if len(archives) > 10 else archives
                 recent_archives.reverse()  # Most recent first
@@ -478,85 +411,70 @@ async def list_archives_html(
                                     break
                                 size_bytes /= 1024.0
 
-                    html_content += f"""
-                        <div class="border rounded-lg p-4 bg-white hover:bg-gray-50">
-                            <div class="flex items-center justify-between">
-                                <div class="flex-1">
-                                    <div class="flex items-center space-x-3">
-                                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                        </svg>
-                                        <div>
-                                            <h4 class="font-medium text-gray-900">{archive_name}</h4>
-                                            <div class="text-sm text-gray-500 space-x-4">
-                                                <span>Created: {formatted_time}</span>
-                                                {f"<span>Size: {size_info}</span>" if size_info else ""}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex-shrink-0">
-                                    <button 
-                                        onclick="viewArchiveContents('{repo_id}', '{archive_name}')"
-                                        class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        View Contents
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    """
+                    processed_archives.append({
+                        "name": archive_name,
+                        "formatted_time": formatted_time,
+                        "size_info": size_info,
+                    })
 
-                html_content += "</div>"
-
-            return HTMLResponse(content=html_content)
+            return templates.TemplateResponse(
+                "partials/archives/list_content.html",
+                {
+                    "request": request,
+                    "repository": repository,
+                    "archives": archives,
+                    "recent_archives": processed_archives,
+                }
+            )
 
         except Exception as e:
             logger.error(f"Error listing archives for repository {repo_id}: {e}")
-            error_html = f"""
-                <div class="text-red-500 text-center py-8">
-                    <svg class="mx-auto h-12 w-12 text-red-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">Error Loading Archives</h3>
-                    <p class="text-sm text-red-600">{str(e)}</p>
-                    <p class="text-sm text-gray-500 mt-2">Please check that the repository is accessible and try again.</p>
-                </div>
-            """
-            return HTMLResponse(content=error_html)
+            return templates.TemplateResponse(
+                "partials/archives/error_message.html",
+                {
+                    "request": request,
+                    "error_message": str(e),
+                    "show_help": True,
+                }
+            )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Unexpected error in list_archives_html: {e}")
-        error_html = """
-            <div class="text-red-500 text-center py-8">
-                <p>An unexpected error occurred while loading archives.</p>
-            </div>
-        """
-        return HTMLResponse(content=error_html)
+        return templates.TemplateResponse(
+            "partials/archives/error_message.html",
+            {
+                "request": request,
+                "error_message": "An unexpected error occurred while loading archives.",
+                "show_help": False,
+            }
+        )
 
 
 @router.get("/archives/selector")
-async def get_archives_repository_selector(request: Request, db: Session = Depends(get_db)):
+async def get_archives_repository_selector(
+    request: Request, db: Session = Depends(get_db)
+):
     """Get repository selector for archives with repositories populated"""
     repositories = db.query(Repository).all()
-    
+
     return templates.TemplateResponse(
         "partials/archives/repository_selector.html",
-        {"request": request, "repositories": repositories}
+        {"request": request, "repositories": repositories},
     )
 
 
 @router.get("/archives/list")
-async def get_archives_list(request: Request, repository_id: int = None, db: Session = Depends(get_db)):
+async def get_archives_list(
+    request: Request, repository_id: int = None, db: Session = Depends(get_db)
+):
     """Get archives list or empty state"""
     if not repository_id:
         return templates.TemplateResponse(
-            "partials/archives/empty_state.html",
-            {"request": request}
+            "partials/archives/empty_state.html", {"request": request}
         )
-    
+
     # Redirect to the existing archives HTML endpoint
     return await list_archives_html(repository_id, request, db)
 
@@ -608,115 +526,50 @@ async def extract_file(
 @router.get("/import-form-update", response_class=HTMLResponse)
 def update_import_form(request: Request, repo_select: str = ""):
     """Update import form fields based on selected repository"""
-    
+
     if not repo_select:
         # No repository selected - show disabled state
-        form_html = '''
-        <div id="import-form-dynamic">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Repository Path</label>
-                <div class="relative">
-                    <input type="text" name="path" id="import-path" required 
-                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                           placeholder="/repos/" autocomplete="off">
-                    <div id="import-path-dropdown" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Encryption info display (hidden by default) -->
-            <div id="encryption-info" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div class="flex items-center">
-                    <svg class="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                    </svg>
-                    <span id="encryption-text" class="text-sm text-blue-700"></span>
-                </div>
-            </div>
-            
-            <!-- Passphrase field (hidden by default) -->
-            <div id="passphrase-field" class="hidden">
-                <label class="block text-sm font-medium text-gray-700">Passphrase</label>
-                <input type="password" name="passphrase" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-            </div>
-            
-            <!-- Keyfile field (hidden by default) -->
-            <div id="keyfile-field" class="hidden">
-                <label class="block text-sm font-medium text-gray-700">Keyfile</label>
-                <input type="file" name="keyfile" accept=".key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                <p class="mt-1 text-sm text-gray-500">Upload the Borg keyfile (usually has .key extension)</p>
-            </div>
-            
-            <button type="submit" id="import-submit" disabled class="w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center">
-                <span id="import-button-text">Select a repository first</span>
-            </button>
-        </div>
-        '''
-        return HTMLResponse(content=form_html)
-    
+        return templates.TemplateResponse(
+            "partials/repositories/import_form_dynamic.html",
+            {
+                "request": request,
+                "path": "",
+                "show_encryption_info": False,
+                "show_passphrase": False,
+                "show_keyfile": False,
+                "enable_submit": False,
+                "preview": "",
+            }
+        )
+
     try:
         import json
+
         repo_data = json.loads(repo_select)
-        
-        path = repo_data.get('path', '')
-        encryption_mode = repo_data.get('encryption_mode', 'unknown')
-        requires_keyfile = repo_data.get('requires_keyfile', False)
-        preview = repo_data.get('preview', f'Encryption: {encryption_mode}')
-        
+
+        path = repo_data.get("path", "")
+        encryption_mode = repo_data.get("encryption_mode", "unknown")
+        requires_keyfile = repo_data.get("requires_keyfile", False)
+        preview = repo_data.get("preview", f"Encryption: {encryption_mode}")
+
         # Determine which fields to show
-        show_passphrase = encryption_mode != 'none'
+        show_passphrase = encryption_mode != "none"
         show_keyfile = requires_keyfile
         show_encryption_info = True
-        
-        # Build the dynamic form HTML
-        passphrase_style = '' if show_passphrase else ' style="display: none;"'
-        keyfile_style = '' if show_keyfile else ' style="display: none;"'
-        encryption_style = '' if show_encryption_info else ' style="display: none;"'
-        
-        form_html = f'''
-        <div id="import-form-dynamic">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Repository Path</label>
-                <div class="relative">
-                    <input type="text" name="path" id="import-path" required value="{path}"
-                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                           placeholder="/repos/" autocomplete="off">
-                    <div id="import-path-dropdown" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 hidden">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Encryption info display -->
-            <div id="encryption-info" class="p-3 bg-blue-50 border border-blue-200 rounded-lg"{encryption_style}>
-                <div class="flex items-center">
-                    <svg class="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                    </svg>
-                    <span id="encryption-text" class="text-sm text-blue-700">{preview}</span>
-                </div>
-            </div>
-            
-            <!-- Passphrase field -->
-            <div id="passphrase-field" class="space-y-1"{passphrase_style}>
-                <label class="block text-sm font-medium text-gray-700">Passphrase</label>
-                <input type="password" name="passphrase" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-            </div>
-            
-            <!-- Keyfile field -->
-            <div id="keyfile-field" class="space-y-1"{keyfile_style}>
-                <label class="block text-sm font-medium text-gray-700">Keyfile</label>
-                <input type="file" name="keyfile" accept=".key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                <p class="mt-1 text-sm text-gray-500">Upload the Borg keyfile (usually has .key extension)</p>
-            </div>
-            
-            <button type="submit" id="import-submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 flex items-center justify-center">
-                <span id="import-button-text">Import Repository</span>
-            </button>
-        </div>
-        '''
-        
-        return HTMLResponse(content=form_html)
-        
+
+        return templates.TemplateResponse(
+            "partials/repositories/import_form_dynamic.html",
+            {
+                "request": request,
+                "path": path,
+                "show_encryption_info": show_encryption_info,
+                "show_passphrase": show_passphrase,
+                "show_keyfile": show_keyfile,
+                "enable_submit": True,
+                "preview": preview,
+            }
+        )
+
     except (json.JSONDecodeError, KeyError) as e:
         logger.error(f"Error parsing repository selection: {e}")
         # Return disabled state on error
@@ -734,7 +587,7 @@ async def import_repository(
 ):
     """Import an existing Borg repository"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         # Check for duplicate name
         db_repo = db.query(Repository).filter(Repository.name == name).first()
@@ -744,7 +597,7 @@ async def import_repository(
                 return templates.TemplateResponse(
                     "partials/repositories/form_import_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=200
+                    status_code=200,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
@@ -756,7 +609,7 @@ async def import_repository(
                 return templates.TemplateResponse(
                     "partials/repositories/form_import_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=200
+                    status_code=200,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
@@ -821,7 +674,7 @@ async def import_repository(
             # Trigger repository list update and return fresh form
             response = templates.TemplateResponse(
                 "partials/repositories/form_import_success.html",
-                {"request": request, "repository_name": name}
+                {"request": request, "repository_name": name},
             )
             response.headers["HX-Trigger"] = "repositoryUpdate"
             return response
@@ -834,7 +687,7 @@ async def import_repository(
             return templates.TemplateResponse(
                 "partials/repositories/form_import_error.html",
                 {"request": request, "error_message": str(e.detail)},
-                status_code=200
+                status_code=200,
             )
         raise
     except Exception as e:
@@ -844,6 +697,6 @@ async def import_repository(
             return templates.TemplateResponse(
                 "partials/repositories/form_import_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=200
+                status_code=200,
             )
         raise HTTPException(status_code=500, detail=error_msg)

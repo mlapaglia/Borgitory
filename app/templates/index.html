@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div x-data="borgitoryApp()" x-init="initApp()" class="flex h-screen bg-gray-100">
+<div x-data="borgitoryApp()" x-init="initApp()" class="flex h-screen bg-gray-100 dark:bg-gray-900">
     <!-- Mobile sidebar overlay -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden hidden" onclick="closeMobileSidebar()"></div>
     
@@ -27,7 +27,7 @@
 
 <style>
 .nav-item.active {
-    @apply bg-blue-100 text-blue-700 border-r-2 border-blue-600;
+    @apply bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600 dark:border-blue-400;
 }
 
 .tab-content {

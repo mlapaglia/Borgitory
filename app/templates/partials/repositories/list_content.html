@@ -1,0 +1,36 @@
+<!-- Repository List Content Template -->
+{% if repositories %}
+<div class="space-y-3">
+    {% for repo in repositories %}
+    <div class="border rounded-lg p-4 bg-white hover:bg-gray-50">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <h4 class="font-medium text-gray-900">{{ repo.name }}</h4>
+                <p class="text-sm text-gray-500">{{ repo.path }}</p>
+                <p class="text-xs text-gray-400 mt-1">
+                    Created: {{ repo.created_at.strftime("%Y-%m-%d %H:%M") if repo.created_at else "Unknown" }}
+                </p>
+            </div>
+            <div class="flex space-x-2">
+                <button onclick="switchTab('archives'); document.getElementById('archive-repository-select').value = '{{ repo.id }}'; loadArchives();" 
+                        class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200">
+                    View Archives
+                </button>
+                <button hx-delete="/api/repositories/{{ repo.id }}"
+                        hx-confirm="Are you sure you want to delete the repository '{{ repo.name }}'? This action cannot be undone."
+                        hx-target="#repository-list"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-gray-500 text-center py-4">
+    <p>No repositories configured.</p>
+    <p class="text-sm mt-1">Create or import a repository to get started.</p>
+</div>
+{% endif %}

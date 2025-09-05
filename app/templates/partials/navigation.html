@@ -1,8 +1,28 @@
 <!-- Left Navigation Panel -->
-<div id="sidebar" class="w-64 bg-white shadow-lg flex-shrink-0 lg:block fixed lg:static inset-y-0 left-0 z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
-    <div class="p-4 border-b">
-        <h1 class="text-xl font-bold text-gray-800">Borgitory</h1>
-        <p class="text-sm text-gray-600">Borg Backup Manager</p>
+<div id="sidebar" class="w-64 bg-white dark:bg-gray-800 shadow-lg flex-shrink-0 lg:block fixed lg:static inset-y-0 left-0 z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+    <div class="p-4 border-b dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">Borgitory</h1>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Borg Backup Manager</p>
+            </div>
+            <!-- Dark Mode Toggle -->
+            <button 
+                onclick="toggleDarkMode()" 
+                id="dark-mode-toggle"
+                class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title="Toggle dark mode"
+            >
+                <!-- Sun icon (shown in dark mode) -->
+                <svg id="sun-icon" class="w-5 h-5 text-yellow-500 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <!-- Moon icon (shown in light mode) -->
+                <svg id="moon-icon" class="w-5 h-5 text-gray-600 dark:text-gray-400 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                </svg>
+            </button>
+        </div>
     </div>
     
     <nav class="mt-4">
@@ -10,7 +30,7 @@
             <button 
                 onclick="switchTab('repositories'); closeMobileSidebar();"
                 id="nav-repositories"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2V7z"></path>
@@ -21,7 +41,7 @@
             <button 
                 onclick="switchTab('backups'); closeMobileSidebar();"
                 id="nav-backups"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
@@ -32,7 +52,7 @@
             <button 
                 onclick="switchTab('schedules'); closeMobileSidebar();"
                 id="nav-schedules"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -43,7 +63,7 @@
             <button 
                 onclick="switchTab('cloud-sync'); closeMobileSidebar();"
                 id="nav-cloud-sync"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
@@ -54,7 +74,7 @@
             <button 
                 onclick="switchTab('archives'); closeMobileSidebar();"
                 id="nav-archives"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -65,7 +85,7 @@
             <button 
                 onclick="switchTab('statistics'); closeMobileSidebar();"
                 id="nav-statistics"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -76,7 +96,7 @@
             <button 
                 onclick="switchTab('cleanup'); closeMobileSidebar();"
                 id="nav-cleanup"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -87,7 +107,7 @@
             <button 
                 onclick="switchTab('notifications'); closeMobileSidebar();"
                 id="nav-notifications"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9v4l-2 2v1h18v-1l-2-2V9c0-3.87-3.13-7-7-7zm0 18c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2z"></path>
@@ -98,7 +118,7 @@
             <button 
                 onclick="switchTab('jobs'); closeMobileSidebar();"
                 id="nav-jobs"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
@@ -109,7 +129,7 @@
             <button 
                 onclick="switchTab('repository-check'); closeMobileSidebar();"
                 id="nav-repository-check"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -120,7 +140,7 @@
             <button 
                 onclick="switchTab('debug'); closeMobileSidebar();"
                 id="nav-debug"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center space-x-3"
+                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1.5-2s-1.5.62-1.5 2a2.5 2.5 0 002.5 2.5zM12 14.5c1-.5 2.5-1.5 2.5-3.5 0-2-2.5-3-2.5-3s-2.5 1-2.5 3c0 2 1.5 3 2.5 3.5zm0 0c0 1.5 1.5 2.5 3.5 2.5s3.5-1 3.5-2.5-1.5-2.5-3.5-2.5-3.5 1-3.5 2.5zM8.5 9.5C7 9 5.5 8 5.5 6S8 3 8 3s2.5 1 2.5 3-1.5 3-3 3.5z"></path>

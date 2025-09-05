@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any, Optional
+from typing import AsyncGenerator, Dict, Any
 from fastapi.responses import StreamingResponse
 
 from app.services.job_manager import borg_job_manager
@@ -106,7 +106,9 @@ class JobStreamService:
             logger.error(f"SSE streaming error: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\\n\\n"
 
-    async def _job_output_event_generator(self, job_id: str) -> AsyncGenerator[str, None]:
+    async def _job_output_event_generator(
+        self, job_id: str
+    ) -> AsyncGenerator[str, None]:
         """Generate Server-Sent Events for a specific job's output"""
         try:
             # Check if this is a composite job first - look in unified manager

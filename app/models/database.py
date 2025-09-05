@@ -370,31 +370,40 @@ class RepositoryCheckConfig(Base):
 
 
 async def init_db():
-    """Initialize database with schema migration support"""
+    """Initialize database - assumes migrations have already been run"""
+    import logging
+    import os
+    logger = logging.getLogger(__name__)
+    
     try:
-        print(f"Initializing database at: {DATABASE_URL}")
-        print(f"Data directory: {DATA_DIR}")
+        logger.info(f"Initializing database at: {DATABASE_URL}")
+        logger.info(f"Data directory: {DATA_DIR}")
 
-        # Create all tables (will create new tables only)
-        Base.metadata.create_all(bind=engine)
-        print("✅ Database tables created/verified")
+        # Ensure data directory exists
+        os.makedirs(DATA_DIR, exist_ok=True)
+        logger.info("Data directory ensured")
 
-        # Run migrations for schema updates
+        # Simple database connection test
+        from sqlalchemy import text
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT 1"))
+            result.fetchone()
+            logger.info("Database connection test successful")
+
+        # Optional: Log current migration status (non-blocking)
         try:
-            from app.utils.migration_add_source_path import migrate_add_source_path
+            from app.utils.migrations import get_current_revision
+            current_revision = get_current_revision()
+            logger.info(f"Current database revision: {current_revision}")
+        except Exception as e:
+            logger.warning(f"Could not check migration status: {e}")
 
-            migrate_add_source_path()
-        except Exception as migration_error:
-            print(f"⚠️  Migration warning: {migration_error}")
-            # Don't fail startup for migration issues
+        logger.info("Database initialization completed successfully")
 
     except Exception as e:
-        print(f"❌ Database initialization error: {e}")
-        print("If you're getting schema errors, you may need to reset the database.")
-        print(
-            "You can do this by deleting the database file and restarting the container."
-        )
-        raise  # Re-raise the exception so the app doesn't start with a broken database
+        logger.error(f"Database initialization error: {e}")
+        logger.error("Make sure migrations have been run with: alembic upgrade head")
+        raise
 
 
 def reset_db():

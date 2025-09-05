@@ -7,17 +7,20 @@ from app.services.repository_stats_service import repository_stats_service
 router = APIRouter()
 
 from fastapi.templating import Jinja2Templates
+
 templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/stats/selector")
-async def get_stats_repository_selector(request: Request, db: Session = Depends(get_db)):
+async def get_stats_repository_selector(
+    request: Request, db: Session = Depends(get_db)
+):
     """Get repository selector with repositories populated for statistics"""
     repositories = db.query(Repository).all()
-    
+
     return templates.TemplateResponse(
         "partials/statistics/repository_selector.html",
-        {"request": request, "repositories": repositories}
+        {"request": request, "repositories": repositories},
     )
 
 
@@ -25,20 +28,20 @@ async def get_stats_repository_selector(request: Request, db: Session = Depends(
 async def get_stats_loading(request: Request):
     """Get loading state for statistics"""
     return templates.TemplateResponse(
-        "partials/statistics/loading_state.html",
-        {"request": request}
+        "partials/statistics/loading_state.html", {"request": request}
     )
 
 
 @router.get("/stats/content")
-async def get_stats_content(request: Request, repository_id: int = None, db: Session = Depends(get_db)):
+async def get_stats_content(
+    request: Request, repository_id: int = None, db: Session = Depends(get_db)
+):
     """Get statistics content based on repository selection"""
     if not repository_id:
         return templates.TemplateResponse(
-            "partials/statistics/empty_state.html",
-            {"request": request}
+            "partials/statistics/empty_state.html", {"request": request}
         )
-    
+
     # Redirect to the existing stats HTML endpoint
     return await get_repository_statistics_html(repository_id, request, db)
 

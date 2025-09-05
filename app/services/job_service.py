@@ -17,7 +17,9 @@ class JobService:
     def __init__(self, job_manager=None):
         self.job_manager = job_manager or borg_job_manager
 
-    async def create_backup_job(self, backup_request: BackupRequest, db: Session) -> Dict[str, Any]:
+    async def create_backup_job(
+        self, backup_request: BackupRequest, db: Session
+    ) -> Dict[str, Any]:
         """Create a backup job with optional cleanup and check tasks"""
         repository = (
             db.query(Repository)
@@ -70,7 +72,9 @@ class JobService:
 
         return {"job_id": job_id, "status": "started"}
 
-    async def create_prune_job(self, prune_request: PruneRequest, db: Session) -> Dict[str, Any]:
+    async def create_prune_job(
+        self, prune_request: PruneRequest, db: Session
+    ) -> Dict[str, Any]:
         """Create a standalone prune job"""
         repository = (
             db.query(Repository)
@@ -120,7 +124,9 @@ class JobService:
 
         return {"job_id": job_id, "status": "started"}
 
-    async def create_check_job(self, check_request: CheckRequest, db: Session) -> Dict[str, Any]:
+    async def create_check_job(
+        self, check_request: CheckRequest, db: Session
+    ) -> Dict[str, Any]:
         """Create a repository check job"""
         repository = (
             db.query(Repository)
@@ -167,7 +173,9 @@ class JobService:
 
         return {"job_id": job_id, "status": "started"}
 
-    def list_jobs(self, skip: int = 0, limit: int = 100, job_type: str = None, db: Session = None) -> List[Dict[str, Any]]:
+    def list_jobs(
+        self, skip: int = 0, limit: int = 100, job_type: str = None, db: Session = None
+    ) -> List[Dict[str, Any]]:
         """List database job records and active JobManager jobs"""
         # Get database jobs (legacy) with repository relationship loaded
         query = db.query(Job).options(joinedload(Job.repository))
@@ -195,8 +203,12 @@ class JobService:
                     "repository_name": repository_name,
                     "type": job.type,
                     "status": job.status,
-                    "started_at": job.started_at.isoformat() if job.started_at else None,
-                    "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+                    "started_at": job.started_at.isoformat()
+                    if job.started_at
+                    else None,
+                    "finished_at": job.finished_at.isoformat()
+                    if job.finished_at
+                    else None,
                     "error": job.error,
                     "log_output": job.log_output,
                     "source": "database",
@@ -212,7 +224,7 @@ class JobService:
 
             # Try to find the repository name from command if possible
             repository_name = "Unknown"
-            
+
             # Try to infer type from command
             job_type_inferred = JobType.from_command(borg_job.command)
 
@@ -275,8 +287,12 @@ class JobService:
                     "repository_name": repository_name,
                     "type": job.type,
                     "status": job.status,
-                    "started_at": job.started_at.isoformat() if job.started_at else None,
-                    "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+                    "started_at": job.started_at.isoformat()
+                    if job.started_at
+                    else None,
+                    "finished_at": job.finished_at.isoformat()
+                    if job.finished_at
+                    else None,
                     "error": job.error,
                     "log_output": job.log_output,
                     "source": "database",
@@ -291,7 +307,9 @@ class JobService:
         output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
         return output
 
-    async def get_job_output(self, job_id: str, last_n_lines: int = 100) -> Dict[str, Any]:
+    async def get_job_output(
+        self, job_id: str, last_n_lines: int = 100
+    ) -> Dict[str, Any]:
         """Get job output lines"""
         # Check if this is a composite job first - look in unified manager
         job = self.job_manager.jobs.get(job_id)
@@ -314,7 +332,9 @@ class JobService:
                 "total_tasks": len(job.tasks),
                 "current_task_output": current_task_output,
                 "started_at": job.started_at.isoformat(),
-                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                "completed_at": job.completed_at.isoformat()
+                if job.completed_at
+                else None,
             }
         else:
             # Get regular borg job output
@@ -412,10 +432,7 @@ class JobService:
         }
 
         # Add retention parameters based on strategy
-        if (
-            cleanup_config.strategy == "simple"
-            and cleanup_config.keep_within_days
-        ):
+        if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
             prune_task["keep_within"] = f"{cleanup_config.keep_within_days}d"
         elif cleanup_config.strategy == "advanced":
             if cleanup_config.keep_daily:
