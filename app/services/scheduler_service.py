@@ -40,9 +40,7 @@ async def execute_scheduled_backup(schedule_id: int):
 
         repository = schedule.repository
         if not repository:
-            logger.error(
-                f"SCHEDULER: Repository not found for schedule {schedule_id}"
-            )
+            logger.error(f"SCHEDULER: Repository not found for schedule {schedule_id}")
             return
 
         logger.info(f"SCHEDULER: Found repository '{repository.name}'")
@@ -232,7 +230,10 @@ class SchedulerService:
                 schedules = db.query(Schedule).filter(Schedule.enabled).all()
                 for schedule in schedules:
                     await self._add_schedule_internal(
-                        schedule.id, schedule.name, schedule.cron_expression, persist=False
+                        schedule.id,
+                        schedule.name,
+                        schedule.cron_expression,
+                        persist=False,
                     )
             except Exception as e:
                 logger.error(f"Error reloading schedules: {str(e)}")
@@ -305,7 +306,9 @@ class SchedulerService:
                 with get_db_session() as db:
                     try:
                         schedule = (
-                            db.query(Schedule).filter(Schedule.id == schedule_id).first()
+                            db.query(Schedule)
+                            .filter(Schedule.id == schedule_id)
+                            .first()
                         )
                         if schedule:
                             schedule.next_run = job.next_run_time

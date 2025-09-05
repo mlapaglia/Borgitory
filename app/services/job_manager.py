@@ -7,6 +7,8 @@ from typing import Dict, Optional, List, AsyncGenerator, TYPE_CHECKING
 from dataclasses import dataclass, field
 from collections import deque
 
+from app.utils.db_session import get_db_session
+
 if TYPE_CHECKING:
     from app.models.database import Repository, Schedule, Job
     from sqlalchemy.orm import Session
@@ -863,7 +865,7 @@ class BorgJobManager:
     async def _update_database_job(self, job_id: str):
         """Update database job record with completion results"""
         try:
-            from app.models.database import Job, get_db
+            from app.models.database import Job
 
             job = self.jobs.get(job_id)
             if not job:

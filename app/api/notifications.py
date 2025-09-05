@@ -27,12 +27,12 @@ logger = logging.getLogger(__name__)
 )
 async def create_notification_config(
     request: Request,
-    notification_config: NotificationConfigCreate, 
-    db: Session = Depends(get_db)
+    notification_config: NotificationConfigCreate,
+    db: Session = Depends(get_db),
 ):
     """Create a new notification configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         db_notification_config = NotificationConfig(
             name=notification_config.name,
@@ -50,24 +50,24 @@ async def create_notification_config(
         db.add(db_notification_config)
         db.commit()
         db.refresh(db_notification_config)
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 "partials/notifications/create_success.html",
-                {"request": request, "config_name": notification_config.name}
+                {"request": request, "config_name": notification_config.name},
             )
             response.headers["HX-Trigger"] = "notificationUpdate"
             return response
         else:
             return db_notification_config
-            
+
     except Exception as e:
         error_msg = f"Failed to create notification configuration: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
                 "partials/notifications/create_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
@@ -86,7 +86,7 @@ def get_notification_configs_html(request: Request, db: Session = Depends(get_db
     """Get notification configurations as formatted HTML"""
     try:
         notification_configs_raw = db.query(NotificationConfig).all()
-        
+
         # Process configs to add computed fields for template
         processed_configs = []
         for config in notification_configs_raw:
@@ -118,16 +118,16 @@ def get_notification_configs_html(request: Request, db: Session = Depends(get_db
 
 @router.post("/{config_id}/test")
 async def test_notification_config(
-    request: Request, 
-    config_id: int, 
-    db: Session = Depends(get_db)
+    request: Request, config_id: int, db: Session = Depends(get_db)
 ):
     """Test a notification configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         notification_config = (
-            db.query(NotificationConfig).filter(NotificationConfig.id == config_id).first()
+            db.query(NotificationConfig)
+            .filter(NotificationConfig.id == config_id)
+            .first()
         )
         if not notification_config:
             error_msg = "Notification configuration not found"
@@ -135,25 +135,33 @@ async def test_notification_config(
                 return templates.TemplateResponse(
                     "partials/notifications/test_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=404
+                    status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
 
         if notification_config.provider == "pushover":
             user_key, app_token = notification_config.get_pushover_credentials()
-            result = await pushover_service.test_pushover_connection(user_key, app_token)
-            
+            result = await pushover_service.test_pushover_connection(
+                user_key, app_token
+            )
+
             if is_htmx_request:
                 if result.get("status") == "success":
                     return templates.TemplateResponse(
                         "partials/notifications/test_success.html",
-                        {"request": request, "message": result.get("message", "Test successful")}
+                        {
+                            "request": request,
+                            "message": result.get("message", "Test successful"),
+                        },
                     )
                 else:
                     return templates.TemplateResponse(
                         "partials/notifications/test_error.html",
-                        {"request": request, "error_message": result.get("message", "Test failed")},
-                        status_code=400
+                        {
+                            "request": request,
+                            "error_message": result.get("message", "Test failed"),
+                        },
+                        status_code=400,
                     )
             else:
                 return result
@@ -163,33 +171,33 @@ async def test_notification_config(
                 return templates.TemplateResponse(
                     "partials/notifications/test_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=400
+                    status_code=400,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
-            
+
     except Exception as e:
         error_msg = f"Test failed: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
                 "partials/notifications/test_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.post("/{config_id}/enable")
 async def enable_notification_config(
-    request: Request,
-    config_id: int, 
-    db: Session = Depends(get_db)
+    request: Request, config_id: int, db: Session = Depends(get_db)
 ):
     """Enable a notification configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         notification_config = (
-            db.query(NotificationConfig).filter(NotificationConfig.id == config_id).first()
+            db.query(NotificationConfig)
+            .filter(NotificationConfig.id == config_id)
+            .first()
         )
         if not notification_config:
             error_msg = "Notification configuration not found"
@@ -197,48 +205,48 @@ async def enable_notification_config(
                 return templates.TemplateResponse(
                     "partials/notifications/action_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=404
+                    status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
 
         notification_config.enabled = True
         db.commit()
-        
+
         message = f"Notification '{notification_config.name}' enabled successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 "partials/notifications/action_success.html",
-                {"request": request, "message": message}
+                {"request": request, "message": message},
             )
             response.headers["HX-Trigger"] = "notificationUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_msg = f"Failed to enable notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
                 "partials/notifications/action_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.post("/{config_id}/disable")
 async def disable_notification_config(
-    request: Request,
-    config_id: int, 
-    db: Session = Depends(get_db)
+    request: Request, config_id: int, db: Session = Depends(get_db)
 ):
     """Disable a notification configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         notification_config = (
-            db.query(NotificationConfig).filter(NotificationConfig.id == config_id).first()
+            db.query(NotificationConfig)
+            .filter(NotificationConfig.id == config_id)
+            .first()
         )
         if not notification_config:
             error_msg = "Notification configuration not found"
@@ -246,48 +254,48 @@ async def disable_notification_config(
                 return templates.TemplateResponse(
                     "partials/notifications/action_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=404
+                    status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
 
         notification_config.enabled = False
         db.commit()
-        
+
         message = f"Notification '{notification_config.name}' disabled successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 "partials/notifications/action_success.html",
-                {"request": request, "message": message}
+                {"request": request, "message": message},
             )
             response.headers["HX-Trigger"] = "notificationUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_msg = f"Failed to disable notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
                 "partials/notifications/action_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.delete("/{config_id}")
 async def delete_notification_config(
-    request: Request,
-    config_id: int, 
-    db: Session = Depends(get_db)
+    request: Request, config_id: int, db: Session = Depends(get_db)
 ):
     """Delete a notification configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         notification_config = (
-            db.query(NotificationConfig).filter(NotificationConfig.id == config_id).first()
+            db.query(NotificationConfig)
+            .filter(NotificationConfig.id == config_id)
+            .first()
         )
         if not notification_config:
             error_msg = "Notification configuration not found"
@@ -295,32 +303,32 @@ async def delete_notification_config(
                 return templates.TemplateResponse(
                     "partials/notifications/action_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=404
+                    status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
 
         config_name = notification_config.name
         db.delete(notification_config)
         db.commit()
-        
+
         message = f"Notification configuration '{config_name}' deleted successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 "partials/notifications/action_success.html",
-                {"request": request, "message": message}
+                {"request": request, "message": message},
             )
             response.headers["HX-Trigger"] = "notificationUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_msg = f"Failed to delete notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
                 "partials/notifications/action_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)

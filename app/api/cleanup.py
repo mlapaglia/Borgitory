@@ -114,7 +114,9 @@ def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
 
 
 @router.get("/form", response_class=HTMLResponse)
-async def get_cleanup_form(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+async def get_cleanup_form(
+    request: Request, db: Session = Depends(get_db)
+) -> HTMLResponse:
     """Get cleanup form with repositories populated"""
     repositories = db.query(Repository).all()
 
@@ -126,12 +128,14 @@ async def get_cleanup_form(request: Request, db: Session = Depends(get_db)) -> H
 
 
 @router.get("/strategy-fields", response_class=HTMLResponse)
-async def get_strategy_fields(request: Request, strategy: str = "simple") -> HTMLResponse:
+async def get_strategy_fields(
+    request: Request, strategy: str = "simple"
+) -> HTMLResponse:
     """Get dynamic strategy fields based on selection"""
     return templates.TemplateResponse(
         request=request,
         name="partials/cleanup/strategy_fields.html",
-        context={"strategy": strategy}
+        context={"strategy": strategy},
     )
 
 
@@ -145,28 +149,28 @@ async def create_cleanup_config(
 ):
     """Create a new cleanup configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         result = cleanup_service.create_cleanup_config(cleanup_config)
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request=request,
                 name="partials/cleanup/create_success.html",
-                context={"config_name": cleanup_config.name}
+                context={"config_name": cleanup_config.name},
             )
             response.headers["HX-Trigger"] = "cleanupConfigUpdate"
             return response
         else:
             return result
-            
+
     except HTTPException as e:
         if is_htmx_request:
             return templates.TemplateResponse(
                 request=request,
                 name="partials/cleanup/create_error.html",
                 context={"error_message": str(e.detail)},
-                status_code=e.status_code
+                status_code=e.status_code,
             )
         raise
     except Exception as e:
@@ -176,7 +180,7 @@ async def create_cleanup_config(
                 request=request,
                 name="partials/cleanup/create_error.html",
                 context={"error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
@@ -199,7 +203,7 @@ def get_cleanup_configs_html(
     """Get cleanup configurations as formatted HTML"""
     try:
         cleanup_configs_raw = cleanup_service.get_cleanup_configs()
-        
+
         # Process configs to add computed fields for template
         processed_configs = []
         for config in cleanup_configs_raw:
@@ -236,27 +240,27 @@ def get_cleanup_configs_html(
 @router.post("/{config_id}/enable", response_model=None)
 async def enable_cleanup_config(
     request: Request,
-    config_id: int, 
-    cleanup_service: CleanupService = Depends(get_cleanup_service)
+    config_id: int,
+    cleanup_service: CleanupService = Depends(get_cleanup_service),
 ):
     """Enable a cleanup configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         config = cleanup_service.enable_cleanup_config(config_id)
         message = f"Cleanup policy '{config.name}' enabled successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request=request,
                 name="partials/cleanup/action_success.html",
-                context={"message": message}
+                context={"message": message},
             )
             response.headers["HX-Trigger"] = "cleanupConfigUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_message = f"Failed to enable cleanup configuration: {str(e)}"
         if is_htmx_request:
@@ -264,7 +268,7 @@ async def enable_cleanup_config(
                 request=request,
                 name="partials/cleanup/action_error.html",
                 context={"error_message": error_message},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_message)
 
@@ -272,27 +276,27 @@ async def enable_cleanup_config(
 @router.post("/{config_id}/disable", response_model=None)
 async def disable_cleanup_config(
     request: Request,
-    config_id: int, 
-    cleanup_service: CleanupService = Depends(get_cleanup_service)
+    config_id: int,
+    cleanup_service: CleanupService = Depends(get_cleanup_service),
 ):
     """Disable a cleanup configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         config = cleanup_service.disable_cleanup_config(config_id)
         message = f"Cleanup policy '{config.name}' disabled successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request=request,
                 name="partials/cleanup/action_success.html",
-                context={"message": message}
+                context={"message": message},
             )
             response.headers["HX-Trigger"] = "cleanupConfigUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_message = f"Failed to disable cleanup configuration: {str(e)}"
         if is_htmx_request:
@@ -300,7 +304,7 @@ async def disable_cleanup_config(
                 request=request,
                 name="partials/cleanup/action_error.html",
                 context={"error_message": error_message},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_message)
 
@@ -308,29 +312,29 @@ async def disable_cleanup_config(
 @router.delete("/{config_id}", response_model=None)
 async def delete_cleanup_config(
     request: Request,
-    config_id: int, 
-    cleanup_service: CleanupService = Depends(get_cleanup_service)
+    config_id: int,
+    cleanup_service: CleanupService = Depends(get_cleanup_service),
 ):
     """Delete a cleanup configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         config = cleanup_service.get_cleanup_config_by_id(config_id)
         config_name = config.name
         cleanup_service.delete_cleanup_config(config_id)
         message = f"Cleanup policy '{config_name}' deleted successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request=request,
                 name="partials/cleanup/action_success.html",
-                context={"message": message}
+                context={"message": message},
             )
             response.headers["HX-Trigger"] = "cleanupConfigUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_message = f"Failed to delete cleanup configuration: {str(e)}"
         if is_htmx_request:
@@ -338,6 +342,6 @@ async def delete_cleanup_config(
                 request=request,
                 name="partials/cleanup/action_error.html",
                 context={"error_message": error_message},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_message)

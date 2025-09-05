@@ -25,17 +25,17 @@ async def get_schedules_form(request: Request, db: Session = Depends(get_db)):
 
     repositories = db.query(Repository).all()
     cleanup_configs = (
-        db.query(CleanupConfig).filter(CleanupConfig.enabled == True).all()
+        db.query(CleanupConfig).filter(CleanupConfig.enabled).all()
     )
     cloud_sync_configs = (
-        db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled == True).all()
+        db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled).all()
     )
     notification_configs = (
-        db.query(NotificationConfig).filter(NotificationConfig.enabled == True).all()
+        db.query(NotificationConfig).filter(NotificationConfig.enabled).all()
     )
     check_configs = (
         db.query(RepositoryCheckConfig)
-        .filter(RepositoryCheckConfig.enabled == True)
+        .filter(RepositoryCheckConfig.enabled)
         .all()
     )
 
@@ -53,9 +53,11 @@ async def get_schedules_form(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=ScheduleSchema, status_code=status.HTTP_201_CREATED)
-async def create_schedule(request: Request, schedule: ScheduleCreate, db: Session = Depends(get_db)):
+async def create_schedule(
+    request: Request, schedule: ScheduleCreate, db: Session = Depends(get_db)
+):
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         repository = (
             db.query(Repository).filter(Repository.id == schedule.repository_id).first()
@@ -66,7 +68,7 @@ async def create_schedule(request: Request, schedule: ScheduleCreate, db: Sessio
                 return templates.TemplateResponse(
                     "partials/schedules/create_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=404
+                    status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
 
@@ -80,7 +82,7 @@ async def create_schedule(request: Request, schedule: ScheduleCreate, db: Sessio
                 return templates.TemplateResponse(
                     "partials/schedules/create_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=400
+                    status_code=400,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
@@ -113,7 +115,7 @@ async def create_schedule(request: Request, schedule: ScheduleCreate, db: Sessio
                 return templates.TemplateResponse(
                     "partials/schedules/create_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=500
+                    status_code=500,
                 )
             raise HTTPException(status_code=500, detail=error_msg)
 
@@ -122,7 +124,7 @@ async def create_schedule(request: Request, schedule: ScheduleCreate, db: Sessio
             # Trigger schedule list update and return success message
             response = templates.TemplateResponse(
                 "partials/schedules/create_success.html",
-                {"request": request, "schedule_name": schedule.name}
+                {"request": request, "schedule_name": schedule.name},
             )
             response.headers["HX-Trigger"] = "scheduleUpdate"
             return response
@@ -135,7 +137,7 @@ async def create_schedule(request: Request, schedule: ScheduleCreate, db: Sessio
             return templates.TemplateResponse(
                 "partials/schedules/create_error.html",
                 {"request": request, "error_message": str(e.detail)},
-                status_code=e.status_code
+                status_code=e.status_code,
             )
         raise
     except Exception as e:
@@ -145,7 +147,7 @@ async def create_schedule(request: Request, schedule: ScheduleCreate, db: Sessio
             return templates.TemplateResponse(
                 "partials/schedules/create_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
@@ -300,23 +302,22 @@ async def get_cron_expression_form(request: Request, preset: str = ""):
         "preset": preset,
         "is_custom": preset == "custom",
         "cron_expression": preset if preset != "custom" and preset else "",
-        "description": ""
+        "description": "",
     }
-    
+
     # Get human readable description for preset
     if preset and preset != "custom":
         preset_descriptions = {
             "0 2 * * *": "Daily at 2:00 AM",
-            "0 2 * * 0": "Weekly on Sunday at 2:00 AM", 
+            "0 2 * * 0": "Weekly on Sunday at 2:00 AM",
             "0 2 1 * *": "Monthly on 1st at 2:00 AM",
             "0 2 1,15 * *": "Twice monthly (1st and 15th) at 2:00 AM",
-            "0 2 */2 * *": "Every 2 days at 2:00 AM"
+            "0 2 */2 * *": "Every 2 days at 2:00 AM",
         }
         context["description"] = preset_descriptions.get(preset, "")
-    
+
     return templates.TemplateResponse(
-        "partials/schedules/cron_expression_form.html",
-        context
+        "partials/schedules/cron_expression_form.html", context
     )
 
 
@@ -326,18 +327,17 @@ async def update_cron_expression_form(request: Request):
     form_data = await request.form()
     preset = request.query_params.get("preset", "")
     custom_input = form_data.get("custom_cron_input", "").strip()
-    
+
     context = {
         "request": request,
         "preset": preset,
         "is_custom": preset == "custom",
         "cron_expression": custom_input if preset == "custom" else preset,
-        "description": ""
+        "description": "",
     }
-    
+
     return templates.TemplateResponse(
-        "partials/schedules/cron_expression_form.html",
-        context
+        "partials/schedules/cron_expression_form.html", context
     )
 
 

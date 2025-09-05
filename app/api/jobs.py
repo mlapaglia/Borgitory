@@ -9,10 +9,16 @@ from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.services.job_service import job_service, JobService
 from app.services.job_render_service import job_render_service, JobRenderService
 from app.services.job_stream_service import job_stream_service, JobStreamService
+from app.services.job_manager import borg_job_manager, BorgJobManager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
+def get_job_manager() -> BorgJobManager:
+    """Dependency to get job manager instance."""
+    return borg_job_manager
 
 
 @router.post("/backup", response_class=HTMLResponse)
@@ -239,9 +245,9 @@ async def cancel_job(
 
 
 @router.get("/manager/stats")
-def get_job_manager_stats():
+def get_job_manager_stats(job_manager: BorgJobManager = Depends(get_job_manager)):
     """Get JobManager statistics"""
-    jobs = borg_job_manager.jobs
+    jobs = job_manager.jobs
     running_jobs = [job for job in jobs.values() if job.status == "running"]
     completed_jobs = [job for job in jobs.values() if job.status == "completed"]
     failed_jobs = [job for job in jobs.values() if job.status == "failed"]
@@ -251,32 +257,32 @@ def get_job_manager_stats():
         "running_jobs": len(running_jobs),
         "completed_jobs": len(completed_jobs),
         "failed_jobs": len(failed_jobs),
-        "active_processes": len(borg_job_manager._processes),
+        "active_processes": len(job_manager._processes),
         "running_job_ids": [job.id for job in running_jobs],
     }
 
 
 @router.post("/manager/cleanup")
-def cleanup_completed_jobs():
+def cleanup_completed_jobs(job_manager: BorgJobManager = Depends(get_job_manager)):
     """Clean up completed jobs from JobManager memory"""
     cleaned = 0
     jobs_to_remove = []
 
-    for job_id, job in borg_job_manager.jobs.items():
+    for job_id, job in job_manager.jobs.items():
         if job.status in ["completed", "failed"]:
             jobs_to_remove.append(job_id)
 
     for job_id in jobs_to_remove:
-        borg_job_manager.cleanup_job(job_id)
+        job_manager.cleanup_job(job_id)
         cleaned += 1
 
     return {"message": f"Cleaned up {cleaned} completed jobs"}
 
 
 @router.get("/queue/stats")
-def get_queue_stats():
+def get_queue_stats(job_manager: BorgJobManager = Depends(get_job_manager)):
     """Get backup queue statistics"""
-    return borg_job_manager.get_queue_stats()
+    return job_manager.get_queue_stats()
 
 
 @router.post("/migrate")

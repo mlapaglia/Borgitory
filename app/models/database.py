@@ -373,8 +373,9 @@ async def init_db():
     """Initialize database - assumes migrations have already been run"""
     import logging
     import os
+
     logger = logging.getLogger(__name__)
-    
+
     try:
         logger.info(f"Initializing database at: {DATABASE_URL}")
         logger.info(f"Data directory: {DATA_DIR}")
@@ -385,6 +386,7 @@ async def init_db():
 
         # Simple database connection test
         from sqlalchemy import text
+
         with engine.connect() as connection:
             result = connection.execute(text("SELECT 1"))
             result.fetchone()
@@ -393,6 +395,7 @@ async def init_db():
         # Optional: Log current migration status (non-blocking)
         try:
             from app.utils.migrations import get_current_revision
+
             current_revision = get_current_revision()
             logger.info(f"Current database revision: {current_revision}")
         except Exception as e:

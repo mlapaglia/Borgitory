@@ -18,6 +18,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 logger = logging.getLogger(__name__)
 
+
 def get_cloud_sync_service(db: Session = Depends(get_db)) -> CloudSyncService:
     """Dependency to get cloud sync service instance."""
     return CloudSyncService(db)
@@ -30,9 +31,9 @@ async def get_provider_fields(request: Request, provider: str = "s3") -> HTMLRes
         "request": request,
         "provider": provider,
         "is_s3": provider == "s3",
-        "is_sftp": provider == "sftp"
+        "is_sftp": provider == "sftp",
     }
-    
+
     # Update submit button text based on provider
     if provider == "s3":
         context["submit_text"] = "Add S3 Location"
@@ -40,11 +41,11 @@ async def get_provider_fields(request: Request, provider: str = "s3") -> HTMLRes
         context["submit_text"] = "Add SFTP Location"
     else:
         context["submit_text"] = "Add Sync Location"
-    
+
     return templates.TemplateResponse(
         request=request,
         name="partials/cloud_sync/provider_fields.html",
-        context=context
+        context=context,
     )
 
 
@@ -56,28 +57,28 @@ async def create_cloud_sync_config(
 ):
     """Create a new cloud sync configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         result = cloud_sync_service.create_cloud_sync_config(config)
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request=request,
                 name="partials/cloud_sync/create_success.html",
-                context={"config_name": config.name}
+                context={"config_name": config.name},
             )
             response.headers["HX-Trigger"] = "cloudSyncUpdate"
             return response
         else:
             return result
-            
+
     except HTTPException as e:
         if is_htmx_request:
             return templates.TemplateResponse(
                 request=request,
                 name="partials/cloud_sync/create_error.html",
                 context={"error_message": str(e.detail)},
-                status_code=e.status_code
+                status_code=e.status_code,
             )
         raise
     except Exception as e:
@@ -87,7 +88,7 @@ async def create_cloud_sync_config(
                 request=request,
                 name="partials/cloud_sync/create_error.html",
                 context={"error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
@@ -176,24 +177,24 @@ def delete_cloud_sync_config(
 ):
     """Delete a cloud sync configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
         config_name = config.name
         cloud_sync_service.delete_cloud_sync_config(config_id)
         message = f"Cloud sync configuration '{config_name}' deleted successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request=request,
                 name="partials/cloud_sync/action_success.html",
-                context={"message": message}
+                context={"message": message},
             )
             response.headers["HX-Trigger"] = "cloudSyncUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_message = f"Failed to delete cloud sync configuration: {str(e)}"
         if is_htmx_request:
@@ -201,7 +202,7 @@ def delete_cloud_sync_config(
                 request=request,
                 name="partials/cloud_sync/action_error.html",
                 context={"error_message": error_message},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_message)
 
@@ -215,7 +216,7 @@ async def test_cloud_sync_config(
 ):
     """Test a cloud sync configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         result = await cloud_sync_service.test_cloud_sync_config(config_id, rclone)
         config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
@@ -224,12 +225,12 @@ async def test_cloud_sync_config(
             message = f"Successfully connected to {config.name}"
             if result.get("details"):
                 message += f" (Read: {result['details'].get('read_test', 'N/A')}, Write: {result['details'].get('write_test', 'N/A')})"
-            
+
             if is_htmx_request:
                 return templates.TemplateResponse(
                     request=request,
                     name="partials/cloud_sync/test_success.html",
-                    context={"message": message}
+                    context={"message": message},
                 )
             else:
                 return {
@@ -240,12 +241,12 @@ async def test_cloud_sync_config(
                 }
         elif result["status"] == "warning":
             message = f"Connection to {config.name} has issues: {result['message']}"
-            
+
             if is_htmx_request:
                 return templates.TemplateResponse(
                     request=request,
                     name="partials/cloud_sync/test_warning.html",
-                    context={"message": message}
+                    context={"message": message},
                 )
             else:
                 return {
@@ -261,11 +262,11 @@ async def test_cloud_sync_config(
                     request=request,
                     name="partials/cloud_sync/test_error.html",
                     context={"error_message": error_message},
-                    status_code=400
+                    status_code=400,
                 )
             else:
                 raise HTTPException(status_code=400, detail=error_message)
-                
+
     except Exception as e:
         error_message = f"Connection test failed: {str(e)}"
         if is_htmx_request:
@@ -273,7 +274,7 @@ async def test_cloud_sync_config(
                 request=request,
                 name="partials/cloud_sync/test_error.html",
                 context={"error_message": error_message},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_message)
 
@@ -286,22 +287,22 @@ def enable_cloud_sync_config(
 ):
     """Enable a cloud sync configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         config = cloud_sync_service.enable_cloud_sync_config(config_id)
         message = f"Cloud sync configuration '{config.name}' enabled successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request=request,
                 name="partials/cloud_sync/action_success.html",
-                context={"message": message}
+                context={"message": message},
             )
             response.headers["HX-Trigger"] = "cloudSyncUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_message = f"Failed to enable cloud sync: {str(e)}"
         if is_htmx_request:
@@ -309,7 +310,7 @@ def enable_cloud_sync_config(
                 request=request,
                 name="partials/cloud_sync/action_error.html",
                 context={"error_message": error_message},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_message)
 
@@ -322,22 +323,22 @@ def disable_cloud_sync_config(
 ):
     """Disable a cloud sync configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         config = cloud_sync_service.disable_cloud_sync_config(config_id)
         message = f"Cloud sync configuration '{config.name}' disabled successfully!"
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request=request,
                 name="partials/cloud_sync/action_success.html",
-                context={"message": message}
+                context={"message": message},
             )
             response.headers["HX-Trigger"] = "cloudSyncUpdate"
             return response
         else:
             return {"message": message}
-            
+
     except Exception as e:
         error_message = f"Failed to disable cloud sync: {str(e)}"
         if is_htmx_request:
@@ -345,6 +346,6 @@ def disable_cloud_sync_config(
                 request=request,
                 name="partials/cloud_sync/action_error.html",
                 context={"error_message": error_message},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_message)

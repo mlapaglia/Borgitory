@@ -17,9 +17,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.post("/", response_model=RepositoryCheckConfigSchema)
 async def create_repository_check_config(
-    request: Request,
-    config: RepositoryCheckConfigCreate, 
-    db: Session = Depends(get_db)
+    request: Request, config: RepositoryCheckConfigCreate, db: Session = Depends(get_db)
 ):
     """Create a new repository check configuration"""
     is_htmx_request = "hx-request" in request.headers
@@ -37,7 +35,7 @@ async def create_repository_check_config(
                 return templates.TemplateResponse(
                     "partials/repository_check/create_error.html",
                     {"request": request, "error_message": error_msg},
-                    status_code=400
+                    status_code=400,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
@@ -63,20 +61,20 @@ async def create_repository_check_config(
         if is_htmx_request:
             response = templates.TemplateResponse(
                 "partials/repository_check/create_success.html",
-                {"request": request, "config_name": config.name}
+                {"request": request, "config_name": config.name},
             )
             response.headers["HX-Trigger"] = "checkConfigUpdate"
             return response
         else:
             return db_config
-            
+
     except Exception as e:
         error_msg = f"Failed to create check policy: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
                 "partials/repository_check/create_error.html",
                 {"request": request, "error_message": error_msg},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
@@ -95,7 +93,7 @@ async def get_repository_check_form(request: Request, db: Session = Depends(get_
     repositories = db.query(Repository).all()
     check_configs = (
         db.query(RepositoryCheckConfig)
-        .filter(RepositoryCheckConfig.enabled == True)
+        .filter(RepositoryCheckConfig.enabled)
         .all()
     )
 
@@ -123,7 +121,10 @@ def get_repository_check_configs_html(request: Request, db: Session = Depends(ge
     except Exception as e:
         return templates.TemplateResponse(
             "partials/common/error_message.html",
-            {"request": request, "error_message": f"Error loading check policies: {str(e)}"}
+            {
+                "request": request,
+                "error_message": f"Error loading check policies: {str(e)}",
+            },
         )
 
 
@@ -140,7 +141,7 @@ def toggle_custom_options(request: Request, check_config_id: str = ""):
         {
             "request": request,
             "show_custom": show_custom,
-        }
+        },
     )
 
 
@@ -183,7 +184,7 @@ def update_check_options(
             "repair_mode_checked": repair_mode_checked,
             "repair_mode_disabled": repair_mode_disabled,
             "max_duration": max_duration,
-        }
+        },
     )
 
 
@@ -240,9 +241,6 @@ def update_repository_check_config(
     db.refresh(config)
 
     return config
-
-
-
 
 
 @router.delete("/{config_id}")

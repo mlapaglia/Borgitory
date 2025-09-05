@@ -6,9 +6,10 @@ from typing import Dict, Optional, List
 from dataclasses import dataclass, field
 from collections import deque
 
-from app.models.database import Repository, Job, JobTask, get_db, Schedule
+from app.models.database import Repository, Job, JobTask, Schedule
 from app.models.enums import JobType
 from app.services.rclone_service import rclone_service
+from app.utils.db_session import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ class CompositeJobManager:
 
         # Create database job record
         from app.utils.db_session import get_db_session
-        
+
         with get_db_session() as db:
             db_job = Job(
                 repository_id=repository.id,
@@ -721,7 +722,6 @@ class CompositeJobManager:
                         task.error = error
                     if return_code is not None:
                         task.return_code = return_code
-
 
         except Exception as e:
             logger.error(f"Failed to update task status: {e}")

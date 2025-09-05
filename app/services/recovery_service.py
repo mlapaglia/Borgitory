@@ -120,9 +120,7 @@ class RecoveryService:
     async def _release_repository_lock(self, repository: Repository):
         """Use borg break-lock to release any stale locks on a repository"""
         try:
-            logger.info(
-                f"Attempting to release lock on repository: {repository.name}"
-            )
+            logger.info(f"Attempting to release lock on repository: {repository.name}")
 
             # Build borg break-lock command
             command, env = build_secure_borg_command(
@@ -163,9 +161,7 @@ class RecoveryService:
                 process.kill()
 
         except Exception as e:
-            logger.error(
-                f"Error releasing lock for repository {repository.name}: {e}"
-            )
+            logger.error(f"Error releasing lock for repository {repository.name}: {e}")
 
 
 # Global instance

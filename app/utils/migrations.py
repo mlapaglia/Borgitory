@@ -8,7 +8,7 @@ from alembic import command
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 
-from app.config import DATABASE_URL, DATA_DIR
+from app.config import DATA_DIR
 from app.models.database import engine
 
 logger = logging.getLogger(__name__)
@@ -25,21 +25,23 @@ def get_alembic_config() -> Config:
         # Current working directory
         Path.cwd() / "alembic.ini",
     ]
-    
+
     alembic_ini_path = None
     for path in possible_paths:
         if path.exists():
             alembic_ini_path = path
             break
-    
+
     if not alembic_ini_path:
-        raise RuntimeError(f"Alembic configuration not found. Searched: {[str(p) for p in possible_paths]}")
-    
+        raise RuntimeError(
+            f"Alembic configuration not found. Searched: {[str(p) for p in possible_paths]}"
+        )
+
     config = Config(str(alembic_ini_path))
-    
+
     # The database URL is now handled in env.py dynamically
     # No need to set it here as it's set in the env.py get_database_url function
-    
+
     return config
 
 
@@ -69,11 +71,11 @@ def database_needs_migration() -> bool:
     """Check if database needs migration."""
     current = get_current_revision()
     head = get_head_revision()
-    
+
     if current is None and head is None:
         # No migrations exist yet
         return False
-    
+
     return current != head
 
 
@@ -81,15 +83,15 @@ def run_migrations() -> bool:
     """Run database migrations to the latest version."""
     try:
         config = get_alembic_config()
-        
+
         # Ensure data directory exists
         os.makedirs(DATA_DIR, exist_ok=True)
-        
+
         logger.info("Running database migrations...")
         command.upgrade(config, "head")
         logger.info("Database migrations completed successfully")
         return True
-        
+
     except Exception as e:
         logger.error(f"Migration failed: {e}")
         return False
@@ -99,12 +101,12 @@ def create_migration(message: str, autogenerate: bool = True) -> bool:
     """Create a new migration."""
     try:
         config = get_alembic_config()
-        
+
         logger.info(f"Creating migration: {message}")
         command.revision(config, message=message, autogenerate=autogenerate)
         logger.info("Migration created successfully")
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to create migration: {e}")
         return False
@@ -114,12 +116,12 @@ def stamp_database(revision: str = "head") -> bool:
     """Stamp the database with a specific revision without running migrations."""
     try:
         config = get_alembic_config()
-        
+
         logger.info(f"Stamping database with revision: {revision}")
         command.stamp(config, revision)
         logger.info("Database stamped successfully")
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to stamp database: {e}")
         return False

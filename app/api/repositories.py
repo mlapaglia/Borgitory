@@ -142,7 +142,7 @@ async def scan_repositories(request: Request):
         if "hx-request" in request.headers:
             return templates.TemplateResponse(
                 "partials/common/error_message.html",
-                {"request": request, "error_message": f"Error: {str(e)}"}
+                {"request": request, "error_message": f"Error: {str(e)}"},
             )
         else:
             raise HTTPException(
@@ -157,12 +157,15 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
         repositories = db.query(Repository).all()
         return templates.TemplateResponse(
             "partials/repositories/list_content.html",
-            {"request": request, "repositories": repositories}
+            {"request": request, "repositories": repositories},
         )
     except Exception as e:
         return templates.TemplateResponse(
             "partials/common/error_message.html",
-            {"request": request, "error_message": f"Error loading repositories: {str(e)}"}
+            {
+                "request": request,
+                "error_message": f"Error loading repositories: {str(e)}",
+            },
         )
 
 
@@ -290,7 +293,7 @@ async def delete_repository(
     repo_name = repository.name
 
     # Check for active jobs before allowing deletion
-    from app.models.database import Job, JobTask, Schedule
+    from app.models.database import Job, Schedule
 
     active_jobs = (
         db.query(Job)
@@ -308,15 +311,10 @@ async def delete_repository(
             detail=f"Cannot delete repository '{repo_name}' - {len(active_jobs)} active job(s) running: {', '.join(active_job_types)}. Please wait for jobs to complete or cancel them first.",
         )
 
-    # Count entities that will be deleted for reporting
-    jobs_count = db.query(Job).filter(Job.repository_id == repo_id).count()
-    tasks_count = (
-        db.query(JobTask).join(Job).filter(Job.repository_id == repo_id).count()
-    )
+    # Get schedules to delete (needed for APScheduler cleanup)
     schedules_to_delete = (
         db.query(Schedule).filter(Schedule.repository_id == repo_id).all()
     )
-    schedules_count = len(schedules_to_delete)
 
     # Remove scheduled jobs from APScheduler before deleting from database
     from app.services.scheduler_service import scheduler_service
@@ -374,7 +372,7 @@ async def list_archives_html(
 
             # Process archives data for template
             processed_archives = []
-            
+
             if archives:
                 # Show most recent archives first (limit to 10)
                 recent_archives = archives[-10:] if len(archives) > 10 else archives
@@ -411,11 +409,13 @@ async def list_archives_html(
                                     break
                                 size_bytes /= 1024.0
 
-                    processed_archives.append({
-                        "name": archive_name,
-                        "formatted_time": formatted_time,
-                        "size_info": size_info,
-                    })
+                    processed_archives.append(
+                        {
+                            "name": archive_name,
+                            "formatted_time": formatted_time,
+                            "size_info": size_info,
+                        }
+                    )
 
             return templates.TemplateResponse(
                 "partials/archives/list_content.html",
@@ -424,7 +424,7 @@ async def list_archives_html(
                     "repository": repository,
                     "archives": archives,
                     "recent_archives": processed_archives,
-                }
+                },
             )
 
         except Exception as e:
@@ -435,7 +435,7 @@ async def list_archives_html(
                     "request": request,
                     "error_message": str(e),
                     "show_help": True,
-                }
+                },
             )
 
     except HTTPException:
@@ -448,7 +448,7 @@ async def list_archives_html(
                 "request": request,
                 "error_message": "An unexpected error occurred while loading archives.",
                 "show_help": False,
-            }
+            },
         )
 
 
@@ -539,7 +539,7 @@ def update_import_form(request: Request, repo_select: str = ""):
                 "show_keyfile": False,
                 "enable_submit": False,
                 "preview": "",
-            }
+            },
         )
 
     try:
@@ -567,7 +567,7 @@ def update_import_form(request: Request, repo_select: str = ""):
                 "show_keyfile": show_keyfile,
                 "enable_submit": True,
                 "preview": preview,
-            }
+            },
         )
 
     except (json.JSONDecodeError, KeyError) as e:

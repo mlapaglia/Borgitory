@@ -13,6 +13,7 @@ from app.services.rclone_service import RcloneService
 
 logger = logging.getLogger(__name__)
 
+
 class CloudSyncService:
     """Service class for cloud sync configuration operations."""
 
