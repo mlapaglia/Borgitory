@@ -1,5 +1,5 @@
 {% if not configs %}
-<div class="text-gray-500 text-sm py-4 text-center">
+<div class="text-gray-600 dark:text-gray-400 text-sm py-4 text-center">
     <p>No cloud sync locations configured.</p>
     <p class="mt-1">Add one using the form above to automatically sync your repositories to the cloud after each backup.</p>
 </div>
@@ -14,13 +14,13 @@
                     {{ 'Enabled' if config.enabled else 'Disabled' }}
                 </span>
             </div>
-            <div class="text-sm text-gray-600 space-y-1">
+            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
                 <div><strong>Provider:</strong> {{ config.provider_name }}</div>
                 {{ config.provider_details | safe }}
                 {% if config.path_prefix %}
                 <div><strong>Path Prefix:</strong> {{ config.path_prefix }}</div>
                 {% endif %}
-                <div class="text-xs text-gray-500">Created: {{ config.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ config.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
             </div>
         </div>
         <div class="flex flex-col space-y-2 ml-4">

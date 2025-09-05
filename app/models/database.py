@@ -1,6 +1,6 @@
 import base64
 import hashlib
-from datetime import datetime
+from datetime import datetime, UTC
 
 from cryptography.fernet import Fernet
 from passlib.context import CryptContext
@@ -185,8 +185,8 @@ class UserSession(Base):
     session_token = Column(String, unique=True, index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     remember_me = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_activity = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    last_activity = Column(DateTime, default=lambda: datetime.now(UTC))
     user_agent = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
 

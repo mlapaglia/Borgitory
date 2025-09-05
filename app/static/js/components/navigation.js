@@ -17,9 +17,6 @@ window.switchTab = function switchTab(tabName) {
     
     // Add active class to selected nav item
     document.getElementById(`nav-${tabName}`).classList.add('active');
-    
-    // Handle tab-specific initialization
-    // Debug tab now auto-loads via HTMX
 }
 
 // Initialize the first tab as active

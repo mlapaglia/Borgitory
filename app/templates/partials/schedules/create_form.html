@@ -1,6 +1,6 @@
 <!-- Create Schedule -->
 <div class="border dark:border-gray-600 rounded-lg p-4">
-    <h3 class="font-medium text-gray-700 dark:text-gray-200 mb-3">Create Schedule</h3>
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create Schedule</h3>
     <form 
         hx-post="/api/schedules/" 
         hx-ext="json-enc"
@@ -8,11 +8,11 @@
     >
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
                 <input type="text" name="name" required placeholder="Daily backup" class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Repository</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository</label>
                 <select name="repository_id" required class="select-modern w-full">
                     <option value="">Select Repository...</option>
                     {% for repo in repositories %}
@@ -21,7 +21,7 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Source Path</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Source Path</label>
                 <div class="relative">
                     <input type="text" name="source_path" id="schedule-source-path" value="/data" 
                            class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100"
@@ -31,7 +31,7 @@
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Schedule</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Schedule</label>
                 <select 
                     id="schedule-preset" 
                     class="select-modern w-full"
@@ -52,44 +52,44 @@
                 <!-- Dynamic cron expression form elements will be loaded here -->
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Archive Cleanup (Optional)</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Cleanup (Optional)</label>
                 <select name="cleanup_config_id" id="schedule-cleanup-select" class="select-modern w-full">
                     <option value="">No cleanup</option>
                     {% for config in cleanup_configs %}
                     <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Automatically prune old archives after each scheduled backup</p>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Automatically prune old archives after each scheduled backup</p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cloud Backup (Optional)</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Cloud Backup (Optional)</label>
                 <select name="cloud_sync_config_id" id="schedule-cloud-select" class="select-modern w-full">
                     <option value="">No cloud backup</option>
                     {% for config in cloud_sync_configs %}
                     <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Automatically backup to cloud after each scheduled Borg backup</p>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Automatically backup to cloud after each scheduled Borg backup</p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Repository Check (Optional)</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository Check (Optional)</label>
                 <select name="check_config_id" id="schedule-check-select" class="select-modern w-full">
                     <option value="">No check</option>
                     {% for config in check_configs %}
                     <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Verify repository integrity after each scheduled backup</p>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Verify repository integrity after each scheduled backup</p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Notifications (Optional)</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Notifications (Optional)</label>
                 <select name="notification_config_id" id="schedule-notification-select" class="select-modern w-full">
                     <option value="">No notifications</option>
                     {% for config in notification_configs %}
                     <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Get notified when scheduled backup completes or fails</p>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Get notified when scheduled backup completes or fails</p>
             </div>
             <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
                 Create Schedule

@@ -1,6 +1,6 @@
 <!-- Cleanup Configuration - Error State -->
 <div id="cleanup-form-container" class="border rounded-lg p-4">
-    <h3 class="font-medium text-gray-700 mb-3">Prune Old Archives</h3>
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Prune Old Archives</h3>
     
     <!-- Error Message -->
     <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4"
@@ -34,7 +34,7 @@
     >
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700">Repository</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository</label>
                 <select name="repository_id" required class="select-modern w-full">
                     <option value="">Select Repository...</option>
                     {% for repo in repositories %}
@@ -45,42 +45,42 @@
             
             <!-- Retention Strategy -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Retention Strategy</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Retention Strategy</label>
                 <div class="space-y-3">
                     <div class="flex items-center">
                         <input type="radio" name="strategy" value="simple" id="strategy-simple" hx-get="/api/cleanup/strategy-fields"
                                hx-target="#strategy-fields-container"
                                hx-include="this" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300" checked>
-                        <label for="strategy-simple" class="ml-2 block text-sm text-gray-700">Simple: Keep archives within time period</label>
+                        <label for="strategy-simple" class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Simple: Keep archives within time period</label>
                     </div>
                     <div id="simple-strategy" class="ml-6 flex items-center space-x-2">
-                        <span class="text-sm text-gray-600">Keep archives within:</span>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Keep archives within:</span>
                         <input type="number" name="keep_within_days" value="30" min="1" class="w-20 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                        <span class="text-sm text-gray-600">days</span>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">days</span>
                     </div>
                     
                     <div class="flex items-center">
                         <input type="radio" name="strategy" value="advanced" id="strategy-advanced" hx-get="/api/cleanup/strategy-fields"
                                hx-target="#strategy-fields-container"
                                hx-include="this" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
-                        <label for="strategy-advanced" class="ml-2 block text-sm text-gray-700">Advanced: Granular retention schedule</label>
+                        <label for="strategy-advanced" class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Advanced: Granular retention schedule</label>
                     </div>
                     <div id="advanced-strategy" class="ml-6 space-y-2 hidden">
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-xs text-gray-600">Daily archives to keep</label>
+                                <label class="block text-xs text-gray-700 dark:text-gray-300">Daily archives to keep</label>
                                 <input type="number" name="keep_daily" value="7" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-600">Weekly archives to keep</label>
+                                <label class="block text-xs text-gray-700 dark:text-gray-300">Weekly archives to keep</label>
                                 <input type="number" name="keep_weekly" value="4" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-600">Monthly archives to keep</label>
+                                <label class="block text-xs text-gray-700 dark:text-gray-300">Monthly archives to keep</label>
                                 <input type="number" name="keep_monthly" value="6" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-600">Yearly archives to keep</label>
+                                <label class="block text-xs text-gray-700 dark:text-gray-300">Yearly archives to keep</label>
                                 <input type="number" name="keep_yearly" value="2" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
                             </div>
                         </div>
@@ -90,23 +90,23 @@
             
             <!-- Options -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Options</label>
                 <div class="space-y-2">
                     <div class="flex items-center">
                         <input type="checkbox" name="show_list" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-700">Show detailed list of archives being pruned</label>
+                        <label class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Show detailed list of archives being pruned</label>
                     </div>
                     <div class="flex items-center">
                         <input type="checkbox" name="show_stats" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-700">Show statistics for deleted archives</label>
+                        <label class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Show statistics for deleted archives</label>
                     </div>
                     <div class="flex items-center">
                         <input type="checkbox" name="save_space" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-700">Save space mode (slower, but uses less disk space)</label>
+                        <label class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Save space mode (slower, but uses less disk space)</label>
                     </div>
                     <div class="flex items-center">
                         <input type="checkbox" name="dry_run" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-700">Dry Run (preview only - don't actually delete)</label>
+                        <label class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Dry Run (preview only - don't actually delete)</label>
                     </div>
                 </div>
             </div>
@@ -125,7 +125,7 @@
             </button>
             
             <!-- HTMX Loading Indicator -->
-            <div id="cleanup-loading" class="[&.htmx-request]:flex hidden items-center justify-center text-sm text-gray-600 mt-2">
+            <div id="cleanup-loading" class="[&.htmx-request]:flex hidden items-center justify-center text-sm text-gray-700 dark:text-gray-300 mt-2">
                 <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
                 Processing cleanup...
             </div>

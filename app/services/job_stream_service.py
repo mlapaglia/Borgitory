@@ -4,7 +4,7 @@ import logging
 from typing import AsyncGenerator, Dict, Any
 from fastapi.responses import StreamingResponse
 
-from app.services.job_manager import borg_job_manager
+from app.services.job_manager import get_job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class JobStreamService:
     """Service for handling Server-Sent Events streaming for jobs"""
 
     def __init__(self, job_manager=None):
-        self.job_manager = job_manager or borg_job_manager
+        self.job_manager = job_manager or get_job_manager()
 
     async def stream_all_jobs(self) -> StreamingResponse:
         """Stream real-time updates for all jobs via Server-Sent Events"""

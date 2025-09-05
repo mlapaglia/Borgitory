@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class BorgJobManagerConfig:
+    """Configuration for BorgJobManager"""
+    max_concurrent_backups: int = 5
+    auto_cleanup_delay: int = 30
+    max_output_lines: int = 1000
+    queue_poll_interval: float = 0.1
+    sse_keepalive_timeout: float = 30.0
+
+
+@dataclass
 class BorgJobTask:
     """Individual task within a job"""
 
@@ -28,8 +38,8 @@ class BorgJobTask:
     return_code: Optional[int] = None
     error: Optional[str] = None
 
-    # Task-specific output storage
-    output_lines: deque = field(default_factory=lambda: deque(maxlen=1000))
+    # Task-specific output storage (maxlen set during initialization)
+    output_lines: deque = field(default_factory=deque)
 
     # Task-specific parameters (stored as dict for flexibility)
     parameters: Dict = field(default_factory=dict)
@@ -54,13 +64,11 @@ class BorgJob:
     current_task_index: int = 0
 
     # Repository and schedule context (for composite jobs)
-    repository: Optional["Repository"] = None
+    repository_id: Optional[int] = None  # Store ID instead of object to avoid session issues
     schedule: Optional["Schedule"] = None
 
-    # Streaming output storage (for simple jobs)
-    output_lines: deque = field(
-        default_factory=lambda: deque(maxlen=1000)
-    )  # Keep last 1000 lines
+    # Streaming output storage (for simple jobs - maxlen set during initialization)
+    output_lines: deque = field(default_factory=deque)
     current_progress: Dict = field(default_factory=dict)  # Parsed progress info
 
     def get_current_task(self) -> Optional[BorgJobTask]:
@@ -77,25 +85,98 @@ class BorgJob:
 
 
 class BorgJobManager:
-    def __init__(self):
+    def __init__(self, config: Optional[BorgJobManagerConfig] = None):
+        self.config = config or BorgJobManagerConfig()
         self.jobs: Dict[str, BorgJob] = {}
         self._processes: Dict[str, asyncio.subprocess.Process] = {}
         self._event_queues: List[asyncio.Queue] = []  # For SSE streaming
 
-        # Job queue system
-        self.MAX_CONCURRENT_BACKUPS = 5
-        self._backup_queue: asyncio.Queue = asyncio.Queue()
-        self._backup_semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_BACKUPS)
+        # Job queue system - initialize lazily
+        self.MAX_CONCURRENT_BACKUPS = self.config.max_concurrent_backups
+        self._backup_queue: Optional[asyncio.Queue] = None
+        self._backup_semaphore: Optional[asyncio.Semaphore] = None
         self._queue_processor_started = False
+        self._shutdown_requested = False
+
+    def _get_repository_data(self, repository_id: int):
+        """Get repository data from database using a fresh session"""
+        from app.models.database import Repository
+        from app.utils.db_session import get_db_session
+        
+        with get_db_session() as db:
+            repo = db.query(Repository).filter(Repository.id == repository_id).first()
+            if not repo:
+                return None
+            
+            # Extract all needed data while session is active
+            return {
+                'id': repo.id,
+                'name': repo.name,
+                'path': repo.path,
+                'passphrase': repo.get_passphrase()
+            }
+
+    async def initialize(self):
+        """Initialize async resources"""
+        if not self._backup_queue:
+            self._backup_queue = asyncio.Queue()
+            self._backup_semaphore = asyncio.Semaphore(self.config.max_concurrent_backups)
+            logger.info(f"Job manager initialized with max concurrent backups: {self.config.max_concurrent_backups}")
+
+    async def shutdown(self):
+        """Graceful shutdown of all jobs and background tasks"""
+        logger.info("Shutting down BorgJobManager...")
+        self._shutdown_requested = True
+        
+        # Cancel running processes
+        for job_id, process in self._processes.items():
+            try:
+                logger.info(f"Terminating job {job_id}")
+                process.terminate()
+                await asyncio.sleep(1)
+                if process.returncode is None:
+                    process.kill()
+                    logger.warning(f"Force killed job {job_id}")
+            except Exception as e:
+                logger.error(f"Error terminating job {job_id}: {e}")
+        
+        # Clear resources
+        self.jobs.clear()
+        self._processes.clear()
+        self._event_queues.clear()
+        self._queue_processor_started = False
+        
+        logger.info("BorgJobManager shutdown complete")
+
+    def _create_job_task(self, task_type: str, task_name: str, **kwargs) -> BorgJobTask:
+        """Create a BorgJobTask with proper configuration"""
+        task = BorgJobTask(
+            task_type=task_type,
+            task_name=task_name,
+            **kwargs
+        )
+        # Set proper maxlen for output storage
+        task.output_lines = deque(maxlen=self.config.max_output_lines)
+        return task
+
+    def _create_job(self, job_id: str, **kwargs) -> BorgJob:
+        """Create a BorgJob with proper configuration"""
+        job = BorgJob(id=job_id, **kwargs)
+        # Set proper maxlen for output storage
+        job.output_lines = deque(maxlen=self.config.max_output_lines)
+        return job
 
     async def start_borg_command(
         self, command: List[str], env: Optional[Dict] = None, is_backup: bool = False
     ) -> str:
         """Start a Borg command and track its output (backward compatibility)"""
+        # Ensure job manager is initialized
+        await self.initialize()
+        
         job_id = str(uuid.uuid4())
 
-        job = BorgJob(
-            id=job_id,
+        job = self._create_job(
+            job_id=job_id,
             command=command,
             job_type="simple",
             status="queued" if is_backup else "running",
@@ -160,7 +241,13 @@ class BorgJobManager:
         cloud_sync_config_id: Optional[int] = None,
     ) -> str:
         """Create a composite job with multiple tasks"""
+        # Ensure job manager is initialized
+        await self.initialize()
+        
         job_id = str(uuid.uuid4())
+        
+        # Extract repository ID to avoid session issues
+        repository_id = repository.id
 
         # Create database job record
         from app.models.database import Job, JobTask
@@ -168,7 +255,7 @@ class BorgJobManager:
 
         with get_db_session() as db:
             db_job = Job(
-                repository_id=repository.id,
+                repository_id=repository_id,
                 job_uuid=job_id,
                 type=job_type,
                 status="pending",
@@ -182,10 +269,13 @@ class BorgJobManager:
             db.commit()
             db.refresh(db_job)
 
+            # Extract db_job_id while still in session
+            db_job_id = db_job.id
+
             # Create task records in database
             for i, task_def in enumerate(task_definitions):
                 task = JobTask(
-                    job_id=db_job.id,
+                    job_id=db_job_id,
                     task_type=task_def["type"],
                     task_name=task_def["name"],
                     status="pending",
@@ -194,27 +284,27 @@ class BorgJobManager:
                 db.add(task)
 
             logger.info(
-                f"📝 Created composite job {job_id} (db_id: {db_job.id}) with {len(task_definitions)} tasks"
+                f"📝 Created composite job {job_id} (db_id: {db_job_id}) with {len(task_definitions)} tasks"
             )
 
         # Create in-memory job with tasks
         tasks = []
         for task_def in task_definitions:
-            task = BorgJobTask(
+            task = self._create_job_task(
                 task_type=task_def["type"],
                 task_name=task_def["name"],
                 parameters=task_def,  # Store all parameters
             )
             tasks.append(task)
 
-        job = BorgJob(
-            id=job_id,
+        job = self._create_job(
+            job_id=job_id,
             job_type="composite",
             status="pending",
             started_at=datetime.now(),
-            db_job_id=db_job.id,
+            db_job_id=db_job_id,
             tasks=tasks,
-            repository=repository,
+            repository_id=repository_id,  # Store ID instead of object
             schedule=schedule,
         )
 
@@ -1113,7 +1203,13 @@ class BorgJobManager:
     ) -> bool:
         """Execute a borg backup task"""
         try:
-            logger.info(f"🔄 Starting borg backup for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+                
+            logger.info(f"🔄 Starting borg backup for repository {repo_data['name']}")
 
             from app.utils.security import (
                 build_secure_borg_command,
@@ -1147,7 +1243,7 @@ class BorgJobManager:
                 "--json",
                 "--verbose",
                 "--list",
-                f"{job.repository.path}::{archive_name}",
+                f"{repo_data['path']}::{archive_name}",
                 source_path,
             ]
 
@@ -1157,7 +1253,7 @@ class BorgJobManager:
             command, env = build_secure_borg_command(
                 base_command="borg create",
                 repository_path="",
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data['passphrase'],
                 additional_args=additional_args,
             )
 
@@ -1176,7 +1272,13 @@ class BorgJobManager:
     ) -> bool:
         """Execute a borg prune task"""
         try:
-            logger.info(f"🗑️ Starting borg prune for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+                
+            logger.info(f"🗑️ Starting borg prune for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
 
@@ -1208,12 +1310,12 @@ class BorgJobManager:
                 additional_args.append("--dry-run")
 
             # Add repository path
-            additional_args.append(job.repository.path)
+            additional_args.append(repo_data['path'])
 
             command, env = build_secure_borg_command(
                 base_command="borg prune",
                 repository_path="",
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data['passphrase'],
                 additional_args=additional_args,
             )
 
@@ -1231,7 +1333,13 @@ class BorgJobManager:
     ) -> bool:
         """Execute a borg check task"""
         try:
-            logger.info(f"🔍 Starting borg check for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+                
+            logger.info(f"🔍 Starting borg check for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
 
@@ -1256,12 +1364,12 @@ class BorgJobManager:
                 additional_args.append("--save-space")
 
             # Add repository path
-            additional_args.append(job.repository.path)
+            additional_args.append(repo_data['path'])
 
             command, env = build_secure_borg_command(
                 base_command="borg check",
                 repository_path="",
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data['passphrase'],
                 additional_args=additional_args,
             )
 
@@ -1279,10 +1387,16 @@ class BorgJobManager:
     ) -> bool:
         """Execute a cloud sync task"""
         try:
+            # Get repository with fresh session
+            repository = self._get_repository(job.repository_id)
+            if not repository:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+                
             # For now, just log that cloud sync would happen
             # This can be expanded to use rclone service like the composite job manager
             logger.info(
-                f"☁️ Cloud sync task - would sync repository {job.repository.name}"
+                f"☁️ Cloud sync task - would sync repository {repository.name}"
             )
 
             # Add a small delay to simulate work
@@ -1356,5 +1470,35 @@ class BorgJobManager:
             return False
 
 
-# Global job manager instance
-borg_job_manager = BorgJobManager()
+# Factory pattern for job manager
+_job_manager_instance: Optional[BorgJobManager] = None
+
+
+def get_job_manager(config: Optional[BorgJobManagerConfig] = None) -> BorgJobManager:
+    """Factory function for job manager with singleton behavior"""
+    global _job_manager_instance
+    if _job_manager_instance is None:
+        if config is None:
+            # Use environment variables or defaults
+            import os
+            config = BorgJobManagerConfig(
+                max_concurrent_backups=int(os.getenv('BORG_MAX_CONCURRENT_BACKUPS', '5')),
+                auto_cleanup_delay=int(os.getenv('BORG_AUTO_CLEANUP_DELAY', '30')),
+                max_output_lines=int(os.getenv('BORG_MAX_OUTPUT_LINES', '1000')),
+            )
+        _job_manager_instance = BorgJobManager(config)
+        logger.info(f"Created new job manager instance with config: max_concurrent={config.max_concurrent_backups}")
+    return _job_manager_instance
+
+
+def reset_job_manager():
+    """Reset job manager for testing - USE ONLY IN TESTS"""
+    global _job_manager_instance
+    if _job_manager_instance:
+        # Note: In production, you should await shutdown() properly
+        # This is mainly for testing purposes
+        logger.warning("Resetting job manager instance")
+    _job_manager_instance = None
+
+
+# All imports should now use get_job_manager() factory function

@@ -250,6 +250,220 @@ async def list_directories(path: str = "/repos"):
         )
 
 
+@router.get("/import-form-update", response_class=HTMLResponse)
+async def update_import_form(request: Request, path: str = "", loading: str = ""):
+    """Update import form fields based on selected repository path"""
+
+    if not path:
+        # No repository selected - show disabled state
+        return templates.TemplateResponse(
+            "partials/repositories/import_form_dynamic.html",
+            {
+                "request": request,
+                "path": "",
+                "show_encryption_info": False,
+                "show_passphrase": False,
+                "show_keyfile": False,
+                "enable_submit": False,
+                "preview": "",
+            },
+        )
+    
+    # If loading=true, return loading template immediately 
+    if loading == "true":
+        return templates.TemplateResponse(
+            "partials/repositories/import_form_loading.html",
+            {
+                "request": request,
+                "path": path,
+            },
+        )
+
+    try:
+        # Look up repository details by path
+        available_repos = await borg_service.scan_for_repositories()
+        selected_repo = None
+        
+        for repo in available_repos:
+            if repo.get("path") == path:
+                selected_repo = repo
+                break
+        
+        if not selected_repo:
+            logger.warning(f"Repository not found for path: {path}")
+            return templates.TemplateResponse(
+                "partials/repositories/import_form_dynamic.html",
+                {
+                    "request": request,
+                    "path": path,
+                    "show_encryption_info": True,
+                    "show_passphrase": True,
+                    "show_keyfile": True,
+                    "enable_submit": True,
+                    "preview": "Repository details not found - please re-scan",
+                },
+            )
+
+        encryption_mode = selected_repo.get("encryption_mode", "unknown")
+        requires_keyfile = selected_repo.get("requires_keyfile", False)
+        preview = selected_repo.get("preview", f"Encryption: {encryption_mode}")
+
+        # Determine which fields to show
+        show_passphrase = encryption_mode != "none"
+        show_keyfile = requires_keyfile
+        show_encryption_info = True
+
+        return templates.TemplateResponse(
+            "partials/repositories/import_form_simple.html",
+            {
+                "request": request,
+                "path": path,
+                "show_passphrase": show_passphrase,
+                "show_keyfile": show_keyfile,
+                "preview": preview,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error updating import form: {e}")
+        return templates.TemplateResponse(
+            "partials/repositories/import_form_simple.html",
+            {
+                "request": request,
+                "path": path,
+                "show_passphrase": True,
+                "show_keyfile": True,
+                "preview": "Error loading repository details",
+            },
+        )
+
+
+@router.post("/import")
+async def import_repository(
+    request: Request,
+    name: str = Form(...),
+    path: str = Form(...),
+    passphrase: str = Form(...),
+    keyfile: UploadFile = File(None),
+    db: Session = Depends(get_db),
+):
+    """Import an existing Borg repository"""
+    is_htmx_request = "hx-request" in request.headers
+
+    try:
+        # Check for duplicate name
+        db_repo = db.query(Repository).filter(Repository.name == name).first()
+        if db_repo:
+            error_msg = "Repository with this name already exists"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    "partials/repositories/form_import_error.html",
+                    {"request": request, "error_message": error_msg},
+                    status_code=200,
+                )
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        # Check for duplicate path
+        db_repo_path = db.query(Repository).filter(Repository.path == path).first()
+        if db_repo_path:
+            error_msg = f"Repository with path '{path}' already exists with name '{db_repo_path.name}'"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    "partials/repositories/form_import_error.html",
+                    {"request": request, "error_message": error_msg},
+                    status_code=200,
+                )
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        # Handle keyfile if provided
+        keyfile_path = None
+        if keyfile and keyfile.filename:
+            import os
+
+            # Create keyfiles directory if it doesn't exist
+            keyfiles_dir = "/app/data/keyfiles"
+            os.makedirs(keyfiles_dir, exist_ok=True)
+
+            # Save keyfile with a unique name
+            keyfile_path = os.path.join(keyfiles_dir, f"{name}_{keyfile.filename}")
+            with open(keyfile_path, "wb") as f:
+                content = await keyfile.read()
+                f.write(content)
+
+            logger.info(f"Saved keyfile for repository '{name}' at {keyfile_path}")
+
+        # Create repository record
+        db_repo = Repository(name=name, path=path)
+        db_repo.set_passphrase(passphrase)
+
+        # Store keyfile path if we have one (we'll add this field later)
+        # For now, let's just proceed with verification
+
+        db.add(db_repo)
+        db.commit()
+        db.refresh(db_repo)
+
+        # Verify we can access the repository with the given credentials
+        # This tests the user-provided credentials, not the stored ones
+        verification_successful = await borg_service.verify_repository_access(
+            repo_path=path, passphrase=passphrase, keyfile_path=keyfile_path
+        )
+
+        if not verification_successful:
+            # If verification fails, remove the database entry and keyfile
+            if keyfile_path and os.path.exists(keyfile_path):
+                os.remove(keyfile_path)
+            db.delete(db_repo)
+            db.commit()
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
+            )
+
+        # If verification passed, get archive count for logging
+        try:
+            archives = await borg_service.list_archives(db_repo)
+            logger.info(
+                f"Successfully imported repository '{name}' with {len(archives)} archives"
+            )
+        except Exception:
+            logger.info(
+                f"Successfully imported repository '{name}' (could not count archives)"
+            )
+
+        # Success response
+        if is_htmx_request:
+            # Trigger repository list update and return fresh form
+            response = templates.TemplateResponse(
+                "partials/repositories/form_import_success.html",
+                {"request": request, "repository_name": name},
+            )
+            response.headers["HX-Trigger"] = "repositoryUpdate"
+            return response
+        else:
+            # Return JSON for non-HTMX requests
+            return db_repo
+
+    except HTTPException as e:
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                "partials/repositories/form_import_error.html",
+                {"request": request, "error_message": str(e.detail)},
+                status_code=200,
+            )
+        raise
+    except Exception as e:
+        db.rollback()
+        error_msg = f"Failed to import repository: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                "partials/repositories/form_import_error.html",
+                {"request": request, "error_message": error_msg},
+                status_code=200,
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
 @router.get("/{repo_id}", response_model=RepositorySchema)
 def get_repository(repo_id: int, db: Session = Depends(get_db)):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
@@ -521,182 +735,3 @@ async def extract_file(
         return await borg_service.extract_file_stream(repository, archive_name, file)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/import-form-update", response_class=HTMLResponse)
-def update_import_form(request: Request, repo_select: str = ""):
-    """Update import form fields based on selected repository"""
-
-    if not repo_select:
-        # No repository selected - show disabled state
-        return templates.TemplateResponse(
-            "partials/repositories/import_form_dynamic.html",
-            {
-                "request": request,
-                "path": "",
-                "show_encryption_info": False,
-                "show_passphrase": False,
-                "show_keyfile": False,
-                "enable_submit": False,
-                "preview": "",
-            },
-        )
-
-    try:
-        import json
-
-        repo_data = json.loads(repo_select)
-
-        path = repo_data.get("path", "")
-        encryption_mode = repo_data.get("encryption_mode", "unknown")
-        requires_keyfile = repo_data.get("requires_keyfile", False)
-        preview = repo_data.get("preview", f"Encryption: {encryption_mode}")
-
-        # Determine which fields to show
-        show_passphrase = encryption_mode != "none"
-        show_keyfile = requires_keyfile
-        show_encryption_info = True
-
-        return templates.TemplateResponse(
-            "partials/repositories/import_form_dynamic.html",
-            {
-                "request": request,
-                "path": path,
-                "show_encryption_info": show_encryption_info,
-                "show_passphrase": show_passphrase,
-                "show_keyfile": show_keyfile,
-                "enable_submit": True,
-                "preview": preview,
-            },
-        )
-
-    except (json.JSONDecodeError, KeyError) as e:
-        logger.error(f"Error parsing repository selection: {e}")
-        # Return disabled state on error
-        return update_import_form(request, "")
-
-
-@router.post("/import")
-async def import_repository(
-    request: Request,
-    name: str = Form(...),
-    path: str = Form(...),
-    passphrase: str = Form(...),
-    keyfile: UploadFile = File(None),
-    db: Session = Depends(get_db),
-):
-    """Import an existing Borg repository"""
-    is_htmx_request = "hx-request" in request.headers
-
-    try:
-        # Check for duplicate name
-        db_repo = db.query(Repository).filter(Repository.name == name).first()
-        if db_repo:
-            error_msg = "Repository with this name already exists"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    "partials/repositories/form_import_error.html",
-                    {"request": request, "error_message": error_msg},
-                    status_code=200,
-                )
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        # Check for duplicate path
-        db_repo_path = db.query(Repository).filter(Repository.path == path).first()
-        if db_repo_path:
-            error_msg = f"Repository with path '{path}' already exists with name '{db_repo_path.name}'"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    "partials/repositories/form_import_error.html",
-                    {"request": request, "error_message": error_msg},
-                    status_code=200,
-                )
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        # Handle keyfile if provided
-        keyfile_path = None
-        if keyfile and keyfile.filename:
-            import os
-
-            # Create keyfiles directory if it doesn't exist
-            keyfiles_dir = "/app/data/keyfiles"
-            os.makedirs(keyfiles_dir, exist_ok=True)
-
-            # Save keyfile with a unique name
-            keyfile_path = os.path.join(keyfiles_dir, f"{name}_{keyfile.filename}")
-            with open(keyfile_path, "wb") as f:
-                content = await keyfile.read()
-                f.write(content)
-
-            logger.info(f"Saved keyfile for repository '{name}' at {keyfile_path}")
-
-        # Create repository record
-        db_repo = Repository(name=name, path=path)
-        db_repo.set_passphrase(passphrase)
-
-        # Store keyfile path if we have one (we'll add this field later)
-        # For now, let's just proceed with verification
-
-        db.add(db_repo)
-        db.commit()
-        db.refresh(db_repo)
-
-        # Verify we can access the repository with the given credentials
-        # This tests the user-provided credentials, not the stored ones
-        verification_successful = await borg_service.verify_repository_access(
-            repo_path=path, passphrase=passphrase, keyfile_path=keyfile_path
-        )
-
-        if not verification_successful:
-            # If verification fails, remove the database entry and keyfile
-            if keyfile_path and os.path.exists(keyfile_path):
-                os.remove(keyfile_path)
-            db.delete(db_repo)
-            db.commit()
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
-            )
-
-        # If verification passed, get archive count for logging
-        try:
-            archives = await borg_service.list_archives(db_repo)
-            logger.info(
-                f"Successfully imported repository '{name}' with {len(archives)} archives"
-            )
-        except Exception:
-            logger.info(
-                f"Successfully imported repository '{name}' (could not count archives)"
-            )
-
-        # Success response
-        if is_htmx_request:
-            # Trigger repository list update and return fresh form
-            response = templates.TemplateResponse(
-                "partials/repositories/form_import_success.html",
-                {"request": request, "repository_name": name},
-            )
-            response.headers["HX-Trigger"] = "repositoryUpdate"
-            return response
-        else:
-            # Return JSON for non-HTMX requests
-            return db_repo
-
-    except HTTPException as e:
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                "partials/repositories/form_import_error.html",
-                {"request": request, "error_message": str(e.detail)},
-                status_code=200,
-            )
-        raise
-    except Exception as e:
-        db.rollback()
-        error_msg = f"Failed to import repository: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                "partials/repositories/form_import_error.html",
-                {"request": request, "error_message": error_msg},
-                status_code=200,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)

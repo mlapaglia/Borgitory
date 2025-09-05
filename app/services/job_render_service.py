@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.models.database import Job
 from app.models.enums import JobType
-from app.services.job_manager import borg_job_manager
+from app.services.job_manager import get_job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ class JobRenderService:
 
     def __init__(self, templates_dir: str = "app/templates", job_manager=None):
         self.templates = Jinja2Templates(directory=templates_dir)
-        self.job_manager = job_manager or borg_job_manager
+        self.job_manager = job_manager or get_job_manager()
 
     def render_jobs_html(self, db: Session, expand: str = None) -> str:
         """Render job history as HTML"""

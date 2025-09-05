@@ -1,19 +1,17 @@
 {% if repositories %}
 <div id="discovered-repos">
-    <label class="block text-sm font-medium text-gray-700">Found Repositories</label>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Found Repositories</label>
     <select id="repo-select" 
+            name="path"
             hx-get="/api/repositories/import-form-update"
-            hx-target="#import-form-dynamic"
-            hx-include="this"
-            hx-swap="outerHTML"
+            hx-target="#selected-repo-form"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-vals='{"loading": "true"}'
             class="select-modern w-full">
         <option value="">Select a repository...</option>
         {% for repo in repositories %}
-        <option value="{{ repo | tojson }}"
-                data-path="{{ repo.path }}"
-                data-encryption="{{ repo.encryption_mode }}"
-                data-requires-keyfile="{{ 'true' if repo.requires_keyfile else 'false' }}"
-                data-preview="{{ repo.preview if repo.preview else '' }}">
+        <option value="{{ repo.path }}">
             {{ repo.path }} ({{ repo.encryption_mode }})
         </option>
         {% endfor %}

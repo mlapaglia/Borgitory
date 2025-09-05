@@ -230,6 +230,53 @@ async def get_upcoming_backups_html():
         )
 
 
+@router.get("/cron-expression-form")
+async def get_cron_expression_form(request: Request, preset: str = ""):
+    """Get dynamic cron expression form elements based on preset selection"""
+    context = {
+        "request": request,
+        "preset": preset,
+        "is_custom": preset == "custom",
+        "cron_expression": preset if preset != "custom" and preset else "",
+        "description": "",
+    }
+
+    # Get human readable description for preset
+    if preset and preset != "custom":
+        preset_descriptions = {
+            "0 2 * * *": "Daily at 2:00 AM",
+            "0 2 * * 0": "Weekly on Sunday at 2:00 AM",
+            "0 2 1 * *": "Monthly on 1st at 2:00 AM",
+            "0 2 1,15 * *": "Twice monthly (1st and 15th) at 2:00 AM",
+            "0 2 */2 * *": "Every 2 days at 2:00 AM",
+        }
+        context["description"] = preset_descriptions.get(preset, "")
+
+    return templates.TemplateResponse(
+        "partials/schedules/cron_expression_form.html", context
+    )
+
+
+@router.post("/cron-expression-form")
+async def update_cron_expression_form(request: Request):
+    """Update cron expression form with custom input"""
+    form_data = await request.form()
+    preset = request.query_params.get("preset", "")
+    custom_input = form_data.get("custom_cron_input", "").strip()
+
+    context = {
+        "request": request,
+        "preset": preset,
+        "is_custom": preset == "custom",
+        "cron_expression": custom_input if preset == "custom" else preset,
+        "description": "",
+    }
+
+    return templates.TemplateResponse(
+        "partials/schedules/cron_expression_form.html", context
+    )
+
+
 @router.get("/", response_model=List[ScheduleSchema])
 def list_schedules(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     schedules = db.query(Schedule).offset(skip).limit(limit).all()
@@ -286,53 +333,6 @@ async def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
 async def get_active_scheduled_jobs():
     """Get all active scheduled jobs"""
     return {"jobs": await scheduler_service.get_scheduled_jobs()}
-
-
-@router.get("/cron-expression-form")
-async def get_cron_expression_form(request: Request, preset: str = ""):
-    """Get dynamic cron expression form elements based on preset selection"""
-    context = {
-        "request": request,
-        "preset": preset,
-        "is_custom": preset == "custom",
-        "cron_expression": preset if preset != "custom" and preset else "",
-        "description": "",
-    }
-
-    # Get human readable description for preset
-    if preset and preset != "custom":
-        preset_descriptions = {
-            "0 2 * * *": "Daily at 2:00 AM",
-            "0 2 * * 0": "Weekly on Sunday at 2:00 AM",
-            "0 2 1 * *": "Monthly on 1st at 2:00 AM",
-            "0 2 1,15 * *": "Twice monthly (1st and 15th) at 2:00 AM",
-            "0 2 */2 * *": "Every 2 days at 2:00 AM",
-        }
-        context["description"] = preset_descriptions.get(preset, "")
-
-    return templates.TemplateResponse(
-        "partials/schedules/cron_expression_form.html", context
-    )
-
-
-@router.post("/cron-expression-form")
-async def update_cron_expression_form(request: Request):
-    """Update cron expression form with custom input"""
-    form_data = await request.form()
-    preset = request.query_params.get("preset", "")
-    custom_input = form_data.get("custom_cron_input", "").strip()
-
-    context = {
-        "request": request,
-        "preset": preset,
-        "is_custom": preset == "custom",
-        "cron_expression": custom_input if preset == "custom" else preset,
-        "description": "",
-    }
-
-    return templates.TemplateResponse(
-        "partials/schedules/cron_expression_form.html", context
-    )
 
 
 def format_cron_trigger(trigger_str: str) -> str:

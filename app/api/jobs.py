@@ -9,16 +9,16 @@ from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.services.job_service import job_service, JobService
 from app.services.job_render_service import job_render_service, JobRenderService
 from app.services.job_stream_service import job_stream_service, JobStreamService
-from app.services.job_manager import borg_job_manager, BorgJobManager
+from app.services.job_manager import get_job_manager, BorgJobManager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-def get_job_manager() -> BorgJobManager:
+def get_job_manager_dependency() -> BorgJobManager:
     """Dependency to get job manager instance."""
-    return borg_job_manager
+    return get_job_manager()
 
 
 @router.post("/backup", response_class=HTMLResponse)
@@ -245,7 +245,7 @@ async def cancel_job(
 
 
 @router.get("/manager/stats")
-def get_job_manager_stats(job_manager: BorgJobManager = Depends(get_job_manager)):
+def get_job_manager_stats(job_manager: BorgJobManager = Depends(get_job_manager_dependency)):
     """Get JobManager statistics"""
     jobs = job_manager.jobs
     running_jobs = [job for job in jobs.values() if job.status == "running"]
@@ -263,7 +263,7 @@ def get_job_manager_stats(job_manager: BorgJobManager = Depends(get_job_manager)
 
 
 @router.post("/manager/cleanup")
-def cleanup_completed_jobs(job_manager: BorgJobManager = Depends(get_job_manager)):
+def cleanup_completed_jobs(job_manager: BorgJobManager = Depends(get_job_manager_dependency)):
     """Clean up completed jobs from JobManager memory"""
     cleaned = 0
     jobs_to_remove = []
@@ -280,7 +280,7 @@ def cleanup_completed_jobs(job_manager: BorgJobManager = Depends(get_job_manager
 
 
 @router.get("/queue/stats")
-def get_queue_stats(job_manager: BorgJobManager = Depends(get_job_manager)):
+def get_queue_stats(job_manager: BorgJobManager = Depends(get_job_manager_dependency)):
     """Get backup queue statistics"""
     return job_manager.get_queue_stats()
 

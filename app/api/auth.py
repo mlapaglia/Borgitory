@@ -83,6 +83,7 @@ def login_user(
     # Create new session
     user_agent = request.headers.get("user-agent") if request else None
     client_ip = request.client.host if request and hasattr(request, "client") else None
+    current_time = datetime.now(UTC)
 
     db_session = UserSession(
         user_id=user.id,
@@ -91,12 +92,13 @@ def login_user(
         remember_me=remember_me,
         user_agent=user_agent,
         ip_address=client_ip,
-        last_activity=datetime.now(UTC),
+        created_at=current_time,
+        last_activity=current_time,
     )
     db.add(db_session)
 
     # Update user's last login
-    user.last_login = datetime.now(UTC)
+    user.last_login = current_time
     db.commit()
 
     # Set cookie
