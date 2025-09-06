@@ -88,8 +88,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         combined_message = "; ".join(error_messages)
 
         return templates.TemplateResponse(
+            request,
             "partials/repositories/form_create_error.html",
-            {"request": request, "error_message": combined_message},
+            {"error_message": combined_message},
             status_code=200,  # Return 200 for HTMX so it processes the response
         )
     else:
@@ -145,7 +146,7 @@ async def root(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/login", status_code=302)
 
     return templates.TemplateResponse(
-        "index.html", {"request": request, "current_user": current_user}
+        request, "index.html", {"current_user": current_user}
     )
 
 
@@ -161,4 +162,4 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
         # Redirect to main app if already logged in
         return RedirectResponse(url="/", status_code=302)
 
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html", {})

@@ -52,7 +52,7 @@ class Repository(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     path = Column(String, nullable=False)
     encrypted_passphrase = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     jobs = relationship(
         "Job", back_populates="repository", cascade="all, delete-orphan"
@@ -138,7 +138,7 @@ class Schedule(Base):
     enabled = Column(Boolean, default=True)
     last_run = Column(DateTime, nullable=True)
     next_run = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     cloud_sync_config_id = Column(
         Integer, ForeignKey("cloud_sync_configs.id"), nullable=True
     )
@@ -163,7 +163,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     last_login = Column(DateTime, nullable=True)
 
     sessions = relationship("UserSession", back_populates="user")
@@ -198,7 +198,7 @@ class Setting(Base):
 
     key = Column(String, primary_key=True, index=True)
     value = Column(String, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
 class CleanupConfig(Base):
@@ -223,8 +223,8 @@ class CleanupConfig(Base):
     save_space = Column(Boolean, default=False)
 
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
 class NotificationConfig(Base):
@@ -243,8 +243,8 @@ class NotificationConfig(Base):
     notify_on_failure = Column(Boolean, default=True)
 
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     def set_pushover_credentials(self, user_key: str, app_token: str):
         """Encrypt and store Pushover credentials"""
@@ -289,8 +289,8 @@ class CloudSyncConfig(Base):
     # Common fields
     path_prefix = Column(String, default="", nullable=False)
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     def set_credentials(self, access_key: str, secret_key: str):
         """For S3 providers"""
@@ -365,8 +365,8 @@ class RepositoryCheckConfig(Base):
 
     # Metadata
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
 async def init_db():

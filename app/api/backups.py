@@ -40,9 +40,9 @@ async def get_backup_form(
     )
 
     return templates.TemplateResponse(
-        request=request,
-        name="partials/backups/manual_form.html",
-        context={
+        request,
+        "partials/backups/manual_form.html",
+        {
             "repositories": repositories,
             "cleanup_configs": cleanup_configs,
             "cloud_sync_configs": cloud_sync_configs,

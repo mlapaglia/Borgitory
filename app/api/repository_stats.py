@@ -17,8 +17,9 @@ async def get_stats_repository_selector(
     repositories = db.query(Repository).all()
 
     return templates.TemplateResponse(
+        request,
         "partials/statistics/repository_selector.html",
-        {"request": request, "repositories": repositories},
+        {"repositories": repositories},
     )
 
 
@@ -26,7 +27,7 @@ async def get_stats_repository_selector(
 async def get_stats_loading(request: Request):
     """Get loading state for statistics"""
     return templates.TemplateResponse(
-        "partials/statistics/loading_state.html", {"request": request}
+        request, "partials/statistics/loading_state.html", {}
     )
 
 
@@ -37,7 +38,7 @@ async def get_stats_content(
     """Get statistics content based on repository selection"""
     if not repository_id:
         return templates.TemplateResponse(
-            "partials/statistics/empty_state.html", {"request": request}
+            request, "partials/statistics/empty_state.html", {}
         )
 
     # Redirect to the existing stats HTML endpoint
@@ -76,6 +77,7 @@ async def get_repository_statistics_html(
     stats = await repository_stats_service.get_repository_statistics(repository, db)
 
     return templates.TemplateResponse(
+        request,
         "partials/repository_stats/stats_panel.html",
-        {"request": request, "repository": repository, "stats": stats},
+        {"repository": repository, "stats": stats},
     )

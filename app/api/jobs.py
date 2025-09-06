@@ -75,8 +75,9 @@ async def create_prune_job(
         if is_htmx_request:
             repositories = db.query(Repository).all()
             return templates.TemplateResponse(
+                request,
                 "partials/cleanup/config_form_success.html",
-                {"request": request, "repositories": repositories},
+                {"repositories": repositories},
             )
         else:
             return result
@@ -85,9 +86,9 @@ async def create_prune_job(
         if is_htmx_request:
             repositories = db.query(Repository).all()
             return templates.TemplateResponse(
+                request,
                 "partials/cleanup/config_form_error.html",
                 {
-                    "request": request,
                     "error_message": error_msg,
                     "repositories": repositories,
                 },
@@ -100,9 +101,9 @@ async def create_prune_job(
         if is_htmx_request:
             repositories = db.query(Repository).all()
             return templates.TemplateResponse(
+                request,
                 "partials/cleanup/config_form_error.html",
                 {
-                    "request": request,
                     "error_message": error_msg,
                     "repositories": repositories,
                 },

@@ -34,9 +34,9 @@ async def get_schedules_form(request: Request, db: Session = Depends(get_db)):
     )
 
     return templates.TemplateResponse(
+        request,
         "partials/schedules/create_form.html",
         {
-            "request": request,
             "repositories": repositories,
             "cleanup_configs": cleanup_configs,
             "cloud_sync_configs": cloud_sync_configs,
@@ -60,8 +60,9 @@ async def create_schedule(
             error_msg = "Repository not found"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/schedules/create_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
@@ -74,8 +75,9 @@ async def create_schedule(
             error_msg = f"Invalid cron expression: {str(e)}"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/schedules/create_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=400,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
@@ -107,8 +109,9 @@ async def create_schedule(
             error_msg = f"Failed to schedule job: {str(e)}"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/schedules/create_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=500,
                 )
             raise HTTPException(status_code=500, detail=error_msg)
@@ -117,8 +120,9 @@ async def create_schedule(
         if is_htmx_request:
             # Trigger schedule list update and return success message
             response = templates.TemplateResponse(
+                request,
                 "partials/schedules/create_success.html",
-                {"request": request, "schedule_name": schedule.name},
+                {"schedule_name": schedule.name},
             )
             response.headers["HX-Trigger"] = "scheduleUpdate"
             return response
@@ -129,20 +133,22 @@ async def create_schedule(
     except HTTPException as e:
         if is_htmx_request:
             return templates.TemplateResponse(
-                "partials/schedules/create_error.html",
-                {"request": request, "error_message": str(e.detail)},
-                status_code=e.status_code,
-            )
+            request,
+            "partials/schedules/create_error.html",
+            {"error_message": str(e.detail)},
+            status_code=e.status_code,
+        )
         raise
     except Exception as e:
         db.rollback()
         error_msg = f"Failed to create schedule: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-                "partials/schedules/create_error.html",
-                {"request": request, "error_message": error_msg},
-                status_code=500,
-            )
+            request,
+            "partials/schedules/create_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
@@ -234,7 +240,6 @@ async def get_upcoming_backups_html():
 async def get_cron_expression_form(request: Request, preset: str = ""):
     """Get dynamic cron expression form elements based on preset selection"""
     context = {
-        "request": request,
         "preset": preset,
         "is_custom": preset == "custom",
         "cron_expression": preset if preset != "custom" and preset else "",
@@ -265,7 +270,6 @@ async def update_cron_expression_form(request: Request):
     custom_input = form_data.get("custom_cron_input", "").strip()
 
     context = {
-        "request": request,
         "preset": preset,
         "is_custom": preset == "custom",
         "cron_expression": custom_input if preset == "custom" else preset,

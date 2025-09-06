@@ -33,8 +33,9 @@ async def create_repository_check_config(
             error_msg = "A check policy with this name already exists"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/repository_check/create_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=400,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
@@ -60,8 +61,9 @@ async def create_repository_check_config(
 
         if is_htmx_request:
             response = templates.TemplateResponse(
+                request,
                 "partials/repository_check/create_success.html",
-                {"request": request, "config_name": config.name},
+                {"config_name": config.name},
             )
             response.headers["HX-Trigger"] = "checkConfigUpdate"
             return response
@@ -72,8 +74,9 @@ async def create_repository_check_config(
         error_msg = f"Failed to create check policy: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
+                request,
                 "partials/repository_check/create_error.html",
-                {"request": request, "error_message": error_msg},
+                {"error_message": error_msg},
                 status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
@@ -96,9 +99,9 @@ async def get_repository_check_form(request: Request, db: Session = Depends(get_
     )
 
     return templates.TemplateResponse(
+        request,
         "partials/repository_check/form.html",
         {
-            "request": request,
             "repositories": repositories,
             "check_configs": check_configs,
         },
@@ -113,14 +116,15 @@ def get_repository_check_configs_html(request: Request, db: Session = Depends(ge
             db.query(RepositoryCheckConfig).order_by(RepositoryCheckConfig.name).all()
         )
         return templates.TemplateResponse(
+            request,
             "partials/repository_check/config_list_content.html",
-            {"request": request, "configs": configs},
+            {"configs": configs},
         )
     except Exception as e:
         return templates.TemplateResponse(
+            request,
             "partials/common/error_message.html",
             {
-                "request": request,
                 "error_message": f"Error loading check policies: {str(e)}",
             },
         )
@@ -135,9 +139,9 @@ def toggle_custom_options(request: Request, check_config_id: str = ""):
     show_custom = check_config_id == ""
 
     return templates.TemplateResponse(
+        request,
         "partials/repository_check/custom_options.html",
         {
-            "request": request,
             "show_custom": show_custom,
         },
     )
@@ -172,9 +176,9 @@ def update_check_options(
         # Note: We can't show notifications in this context, but the conflict is resolved
 
     return templates.TemplateResponse(
+        request,
         "partials/repository_check/dynamic_options.html",
         {
-            "request": request,
             "verify_data_disabled": verify_data_disabled,
             "verify_data_opacity": verify_data_opacity,
             "time_limit_display": time_limit_display,
@@ -268,8 +272,9 @@ def delete_repository_check_config(
             db.query(RepositoryCheckConfig).order_by(RepositoryCheckConfig.name).all()
         )
         return templates.TemplateResponse(
+            request,
             "partials/repository_check/config_list_content.html",
-            {"request": request, "configs": configs},
+            {"configs": configs},
         )
 
     return {"message": "Check policy deleted successfully"}

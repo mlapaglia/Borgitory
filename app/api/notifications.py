@@ -53,8 +53,9 @@ async def create_notification_config(
 
         if is_htmx_request:
             response = templates.TemplateResponse(
+                request,
                 "partials/notifications/create_success.html",
-                {"request": request, "config_name": notification_config.name},
+                {"config_name": notification_config.name},
             )
             response.headers["HX-Trigger"] = "notificationUpdate"
             return response
@@ -65,8 +66,9 @@ async def create_notification_config(
         error_msg = f"Failed to create notification configuration: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
+                request,
                 "partials/notifications/create_error.html",
-                {"request": request, "error_message": error_msg},
+                {"error_message": error_msg},
                 status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
@@ -133,8 +135,9 @@ async def test_notification_config(
             error_msg = "Notification configuration not found"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/notifications/test_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
@@ -148,17 +151,17 @@ async def test_notification_config(
             if is_htmx_request:
                 if result.get("status") == "success":
                     return templates.TemplateResponse(
+                        request,
                         "partials/notifications/test_success.html",
                         {
-                            "request": request,
                             "message": result.get("message", "Test successful"),
                         },
                     )
                 else:
                     return templates.TemplateResponse(
+                        request,
                         "partials/notifications/test_error.html",
                         {
-                            "request": request,
                             "error_message": result.get("message", "Test failed"),
                         },
                         status_code=400,
@@ -169,8 +172,9 @@ async def test_notification_config(
             error_msg = "Unsupported notification provider"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/notifications/test_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=400,
                 )
             raise HTTPException(status_code=400, detail=error_msg)
@@ -179,8 +183,9 @@ async def test_notification_config(
         error_msg = f"Test failed: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
+                request,
                 "partials/notifications/test_error.html",
-                {"request": request, "error_message": error_msg},
+                {"error_message": error_msg},
                 status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
@@ -203,8 +208,9 @@ async def enable_notification_config(
             error_msg = "Notification configuration not found"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/notifications/action_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
@@ -216,8 +222,9 @@ async def enable_notification_config(
 
         if is_htmx_request:
             response = templates.TemplateResponse(
+                request,
                 "partials/notifications/action_success.html",
-                {"request": request, "message": message},
+                {"message": message},
             )
             response.headers["HX-Trigger"] = "notificationUpdate"
             return response
@@ -228,10 +235,11 @@ async def enable_notification_config(
         error_msg = f"Failed to enable notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-                "partials/notifications/action_error.html",
-                {"request": request, "error_message": error_msg},
-                status_code=500,
-            )
+            request,
+            "partials/notifications/action_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
@@ -252,8 +260,9 @@ async def disable_notification_config(
             error_msg = "Notification configuration not found"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/notifications/action_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
@@ -265,8 +274,9 @@ async def disable_notification_config(
 
         if is_htmx_request:
             response = templates.TemplateResponse(
+                request,
                 "partials/notifications/action_success.html",
-                {"request": request, "message": message},
+                {"message": message},
             )
             response.headers["HX-Trigger"] = "notificationUpdate"
             return response
@@ -277,10 +287,11 @@ async def disable_notification_config(
         error_msg = f"Failed to disable notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-                "partials/notifications/action_error.html",
-                {"request": request, "error_message": error_msg},
-                status_code=500,
-            )
+            request,
+            "partials/notifications/action_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
@@ -301,8 +312,9 @@ async def delete_notification_config(
             error_msg = "Notification configuration not found"
             if is_htmx_request:
                 return templates.TemplateResponse(
+                    request,
                     "partials/notifications/action_error.html",
-                    {"request": request, "error_message": error_msg},
+                    {"error_message": error_msg},
                     status_code=404,
                 )
             raise HTTPException(status_code=404, detail=error_msg)
@@ -315,8 +327,9 @@ async def delete_notification_config(
 
         if is_htmx_request:
             response = templates.TemplateResponse(
+                request,
                 "partials/notifications/action_success.html",
-                {"request": request, "message": message},
+                {"message": message},
             )
             response.headers["HX-Trigger"] = "notificationUpdate"
             return response
@@ -327,8 +340,9 @@ async def delete_notification_config(
         error_msg = f"Failed to delete notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-                "partials/notifications/action_error.html",
-                {"request": request, "error_message": error_msg},
-                status_code=500,
-            )
+            request,
+            "partials/notifications/action_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
         raise HTTPException(status_code=500, detail=error_msg)
