@@ -1,18 +1,11 @@
 """
 Tests for BorgService class - CRITICAL for backup operations and data integrity
 """
-import asyncio
-import json
-import os
-import tempfile
 import pytest
-from unittest.mock import Mock, AsyncMock, patch, mock_open, MagicMock
-from datetime import datetime, UTC
-from pathlib import Path
+from unittest.mock import Mock, AsyncMock, patch, mock_open
 
 from app.services.borg_service import BorgService
-from app.models.database import Repository, Job
-from app.models.enums import JobType
+from app.models.database import Repository
 
 
 class TestBorgService:

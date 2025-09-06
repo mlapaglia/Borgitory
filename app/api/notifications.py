@@ -235,11 +235,11 @@ async def enable_notification_config(
         error_msg = f"Failed to enable notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/notifications/action_error.html",
-            {"error_message": error_msg},
-            status_code=500,
-        )
+                request,
+                "partials/notifications/action_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
@@ -287,11 +287,11 @@ async def disable_notification_config(
         error_msg = f"Failed to disable notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/notifications/action_error.html",
-            {"error_message": error_msg},
-            status_code=500,
-        )
+                request,
+                "partials/notifications/action_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
@@ -340,9 +340,9 @@ async def delete_notification_config(
         error_msg = f"Failed to delete notification: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/notifications/action_error.html",
-            {"error_message": error_msg},
-            status_code=500,
-        )
+                request,
+                "partials/notifications/action_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
         raise HTTPException(status_code=500, detail=error_msg)

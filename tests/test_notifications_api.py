@@ -271,7 +271,6 @@ class TestNotificationsAPI:
         response = await async_client.get("/api/notifications/html")
         
         assert response.status_code == 200
-        content = response.text
         # The template should show notification descriptions based on flags
 
     @pytest.mark.asyncio

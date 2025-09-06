@@ -1,12 +1,9 @@
 import pytest
 from datetime import datetime
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import Mock, AsyncMock, patch
 from fastapi import HTTPException
-from fastapi.responses import HTMLResponse
-from httpx import AsyncClient
 
 from app.api.schedules import (
-    router,
     get_schedules_form,
     create_schedule,
     get_schedules_html,
@@ -107,7 +104,7 @@ class TestSchedulesAPI:
                     mock_templates.TemplateResponse.return_value = Mock(headers={})
 
                     # Execute
-                    result = await create_schedule(mock_request, schedule_data, mock_db)
+                    await create_schedule(mock_request, schedule_data, mock_db)
 
                     # Verify
                     mock_db.add.assert_called_once()

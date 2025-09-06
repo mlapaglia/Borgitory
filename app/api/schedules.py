@@ -133,22 +133,22 @@ async def create_schedule(
     except HTTPException as e:
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/schedules/create_error.html",
-            {"error_message": str(e.detail)},
-            status_code=e.status_code,
-        )
+                request,
+                "partials/schedules/create_error.html",
+                {"error_message": str(e.detail)},
+                status_code=e.status_code,
+            )
         raise
     except Exception as e:
         db.rollback()
         error_msg = f"Failed to create schedule: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/schedules/create_error.html",
-            {"error_message": error_msg},
-            status_code=500,
-        )
+                request,
+                "partials/schedules/create_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
         raise HTTPException(status_code=500, detail=error_msg)
 
 

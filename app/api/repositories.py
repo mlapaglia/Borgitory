@@ -99,22 +99,22 @@ async def create_repository(
     except HTTPException as e:
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/repositories/form_create_error.html",
-            {"error_message": str(e.detail)},
-            status_code=e.status_code,
-        )
+                request,
+                "partials/repositories/form_create_error.html",
+                {"error_message": str(e.detail)},
+                status_code=e.status_code,
+            )
         raise
     except Exception as e:
         db.rollback()
         error_msg = f"Failed to create repository: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/repositories/form_create_error.html",
-            {"error_message": error_msg},
-            status_code=500,
-        )
+                request,
+                "partials/repositories/form_create_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
@@ -300,17 +300,17 @@ async def update_import_form(request: Request, path: str = "", loading: str = ""
         if not selected_repo:
             logger.warning(f"Repository not found for path: {path}")
             return templates.TemplateResponse(
-            request,
-            "partials/repositories/import_form_dynamic.html",
-            {
-                        "path": path,
+                request,
+                "partials/repositories/import_form_dynamic.html",
+                {
+                    "path": path,
                     "show_encryption_info": True,
                     "show_passphrase": True,
                     "show_keyfile": True,
                     "enable_submit": True,
                     "preview": "Repository details not found - please re-scan",
                 },
-        )
+            )
 
         encryption_mode = selected_repo.get("encryption_mode", "unknown")
         requires_keyfile = selected_repo.get("requires_keyfile", False)
@@ -364,11 +364,11 @@ async def import_repository(
             error_msg = "Repository with this name already exists"
             if is_htmx_request:
                 return templates.TemplateResponse(
-            request,
-            "partials/repositories/form_import_error.html",
-            {"error_message": error_msg},
-            status_code=200,
-        )
+                    request,
+                    "partials/repositories/form_import_error.html",
+                    {"error_message": error_msg},
+                    status_code=200,
+                )
             raise HTTPException(status_code=400, detail=error_msg)
 
         # Check for duplicate path
@@ -377,11 +377,11 @@ async def import_repository(
             error_msg = f"Repository with path '{path}' already exists with name '{db_repo_path.name}'"
             if is_htmx_request:
                 return templates.TemplateResponse(
-            request,
-            "partials/repositories/form_import_error.html",
-            {"error_message": error_msg},
-            status_code=200,
-        )
+                    request,
+                    "partials/repositories/form_import_error.html",
+                    {"error_message": error_msg},
+                    status_code=200,
+                )
             raise HTTPException(status_code=400, detail=error_msg)
 
         # Handle keyfile if provided
@@ -444,10 +444,10 @@ async def import_repository(
         if is_htmx_request:
             # Trigger repository list update and return fresh form
             response = templates.TemplateResponse(
-            request,
-            "partials/repositories/form_import_success.html",
-            {"repository_name": name},
-        )
+                request,
+                "partials/repositories/form_import_success.html",
+                {"repository_name": name},
+            )
             response.headers["HX-Trigger"] = "repositoryUpdate"
             return response
         else:
@@ -457,22 +457,22 @@ async def import_repository(
     except HTTPException as e:
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/repositories/form_import_error.html",
-            {"error_message": str(e.detail)},
-            status_code=200,
-        )
+                request,
+                "partials/repositories/form_import_error.html",
+                {"error_message": str(e.detail)},
+                status_code=200,
+            )
         raise
     except Exception as e:
         db.rollback()
         error_msg = f"Failed to import repository: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
-            request,
-            "partials/repositories/form_import_error.html",
-            {"error_message": error_msg},
-            status_code=200,
-        )
+                request,
+                "partials/repositories/form_import_error.html",
+                {"error_message": error_msg},
+                status_code=200,
+            )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
@@ -644,25 +644,25 @@ async def list_archives_html(
                     )
 
             return templates.TemplateResponse(
-            request,
-            "partials/archives/list_content.html",
-            {
-                        "repository": repository,
+                request,
+                "partials/archives/list_content.html",
+                {
+                    "repository": repository,
                     "archives": archives,
                     "recent_archives": processed_archives,
                 },
-        )
+            )
 
         except Exception as e:
             logger.error(f"Error listing archives for repository {repo_id}: {e}")
             return templates.TemplateResponse(
-            request,
-            "partials/archives/error_message.html",
-            {
-                        "error_message": str(e),
+                request,
+                "partials/archives/error_message.html",
+                {
+                    "error_message": str(e),
                     "show_help": True,
                 },
-        )
+            )
 
     except HTTPException:
         raise
@@ -686,10 +686,10 @@ async def get_archives_repository_selector(
     repositories = db.query(Repository).all()
 
     return templates.TemplateResponse(
-            request,
-            "partials/archives/repository_selector.html",
-            {"repositories": repositories},
-        )
+        request,
+        "partials/archives/repository_selector.html",
+        {"repositories": repositories},
+    )
 
 
 @router.get("/archives/list")

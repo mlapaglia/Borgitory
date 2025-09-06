@@ -4,12 +4,10 @@ Tests for repositories API endpoints
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
-from unittest.mock import patch, AsyncMock, Mock, mock_open
-import tempfile
-import os
+from unittest.mock import patch, AsyncMock, mock_open
 from io import BytesIO
 
-from app.models.database import Repository, Job, Schedule, User
+from app.models.database import Repository, Job, Schedule
 
 
 class TestRepositoriesAPI:

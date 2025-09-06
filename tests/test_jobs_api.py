@@ -1,13 +1,9 @@
 import pytest
-import json
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from datetime import datetime
+from unittest.mock import Mock, AsyncMock, patch
 from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
-from httpx import AsyncClient
 
 from app.api.jobs import (
-    router,
     create_backup,
     create_prune_job,
     create_check_job,
@@ -122,7 +118,7 @@ class TestJobsAPI:
 
         with patch("app.api.jobs.templates") as mock_templates:
             mock_templates.TemplateResponse.return_value = "success_template"
-            with patch("app.api.jobs.Repository") as mock_repo_class:
+            with patch("app.api.jobs.Repository"):
                 mock_db.query.return_value.all.return_value = []
 
                 # Execute
@@ -159,7 +155,7 @@ class TestJobsAPI:
 
         with patch("app.api.jobs.templates") as mock_templates:
             mock_templates.TemplateResponse.return_value = "error_template"
-            with patch("app.api.jobs.Repository") as mock_repo_class:
+            with patch("app.api.jobs.Repository"):
                 mock_db.query.return_value.all.return_value = []
 
                 # Execute

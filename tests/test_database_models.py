@@ -2,17 +2,12 @@
 Tests for database models - CRITICAL for data integrity and encryption security
 """
 import pytest
-import tempfile
-import os
 from unittest.mock import Mock, patch
-from datetime import datetime, UTC, timedelta
 from cryptography.fernet import Fernet, InvalidToken
-import base64
-import hashlib
 
 from app.models.database import (
     Repository, User, CloudSyncConfig, NotificationConfig,
-    get_cipher_suite, pwd_context
+    get_cipher_suite
 )
 
 
@@ -40,9 +35,6 @@ class TestCipherSuite:
     def test_cipher_suite_key_derivation(self):
         """Test that cipher suite properly derives key from secret."""
         test_secret = 'test_secret_key_for_derivation'
-        expected_key = base64.urlsafe_b64encode(
-            hashlib.sha256(test_secret.encode()).digest()
-        )
         
         with patch('app.config.get_secret_key', return_value=test_secret):
             # Clear cached instance to force recreation

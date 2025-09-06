@@ -2,7 +2,6 @@
 """
 Development server runner for Borgitory
 """
-import os
 import sys
 import subprocess
 import uvicorn
@@ -14,7 +13,7 @@ def run_migrations():
     
     try:
         # Run alembic upgrade head
-        result = subprocess.run(
+        subprocess.run(
             ["alembic", "upgrade", "head"],
             check=True,
             capture_output=True,

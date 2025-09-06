@@ -4,7 +4,7 @@ Tests for JobStreamService class - Server-Sent Events functionality
 import asyncio
 import json
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi.responses import StreamingResponse
 

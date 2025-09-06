@@ -14,7 +14,7 @@ sys.path.insert(0, str(project_root))
 if not os.getenv("SECRET_KEY"):
     os.environ["SECRET_KEY"] = "dev-secret-key-for-db-management"
 
-from app.utils.migrations import (
+from app.utils.migrations import (  # noqa: E402
     run_migrations,
     create_migration,
     stamp_database,
@@ -24,7 +24,7 @@ from app.utils.migrations import (
     get_head_revision,
     database_needs_migration
 )
-from app.models.database import reset_db
+from app.models.database import reset_db  # noqa: E402
 
 
 def main():
@@ -43,13 +43,13 @@ def main():
                               help="Don't use autogenerate (create empty migration)")
     
     # Status command
-    status_parser = subparsers.add_parser("status", help="Show migration status")
+    subparsers.add_parser("status", help="Show migration status")
     
     # History command
-    history_parser = subparsers.add_parser("history", help="Show migration history")
+    subparsers.add_parser("history", help="Show migration history")
     
     # Current command
-    current_parser = subparsers.add_parser("current", help="Show current revision")
+    subparsers.add_parser("current", help="Show current revision")
     
     # Stamp command
     stamp_parser = subparsers.add_parser("stamp", help="Stamp database with revision")

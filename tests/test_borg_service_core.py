@@ -1,8 +1,6 @@
 """
 Core tests for BorgService - focusing on critical security and functionality
 """
-import os
-import pytest
 from unittest.mock import Mock, patch, mock_open
 
 from app.services.borg_service import BorgService

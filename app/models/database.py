@@ -198,7 +198,9 @@ class Setting(Base):
 
     key = Column(String, primary_key=True, index=True)
     value = Column(String, nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
 
 class CleanupConfig(Base):
@@ -224,7 +226,9 @@ class CleanupConfig(Base):
 
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
 
 class NotificationConfig(Base):
@@ -244,7 +248,9 @@ class NotificationConfig(Base):
 
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
     def set_pushover_credentials(self, user_key: str, app_token: str):
         """Encrypt and store Pushover credentials"""
@@ -290,7 +296,9 @@ class CloudSyncConfig(Base):
     path_prefix = Column(String, default="", nullable=False)
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
     def set_credentials(self, access_key: str, secret_key: str):
         """For S3 providers"""
@@ -366,7 +374,9 @@ class RepositoryCheckConfig(Base):
     # Metadata
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
 
 async def init_db():

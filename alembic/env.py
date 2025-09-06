@@ -15,19 +15,6 @@ from app.models.database import Base
 from app.config import DATABASE_URL
 
 # Import all models to ensure they're registered with Base
-from app.models.database import (
-    Repository,
-    Job,
-    JobTask, 
-    Schedule,
-    User,
-    UserSession,
-    Setting,
-    CleanupConfig,
-    NotificationConfig,
-    CloudSyncConfig,
-    RepositoryCheckConfig,
-)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
