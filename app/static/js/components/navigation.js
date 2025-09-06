@@ -1,5 +1,5 @@
 // Tab Navigation
-function switchTab(tabName) {
+window.switchTab = function switchTab(tabName) {
     // Hide all tab content
     const tabs = document.querySelectorAll('.tab-content');
     tabs.forEach(tab => {
@@ -17,17 +17,6 @@ function switchTab(tabName) {
     
     // Add active class to selected nav item
     document.getElementById(`nav-${tabName}`).classList.add('active');
-    
-    // Handle tab-specific initialization
-    if (tabName === 'archives') {
-        populateArchiveRepositorySelect();
-    } else if (tabName === 'debug') {
-        loadDebugInfo();
-    } else if (tabName === 'statistics') {
-        populateStatisticsRepositories();
-    } else if (tabName === 'repository-check') {
-        initRepositoryCheck();
-    }
 }
 
 // Initialize the first tab as active

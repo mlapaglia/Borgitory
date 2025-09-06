@@ -1,0 +1,25 @@
+<!-- Cloud Sync Creation Success Template -->
+<div class="bg-green-50 border border-green-200 rounded-lg p-3">
+    <span class="text-green-700 text-sm">Cloud sync location "{{ config_name }}" configured successfully!</span>
+</div>
+
+<script>
+// Show success notification
+if (typeof showNotification === 'function') {
+    showNotification('Cloud sync location added successfully!', 'success');
+}
+
+// Reset form fields
+const form = document.querySelector('form[hx-post="/api/cloud-sync/"]');
+if (form) {
+    form.reset();
+    
+    // Reset provider selection to S3 and trigger HTMX update
+    const providerSelect = document.getElementById('provider-select');
+    if (providerSelect) {
+        providerSelect.value = 's3';
+        // Trigger the HTMX request to update fields
+        htmx.trigger(providerSelect, 'change');
+    }
+}
+</script>

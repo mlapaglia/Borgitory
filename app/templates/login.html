@@ -155,7 +155,7 @@
         <div class="login-container rounded-lg shadow-xl p-8 w-full max-w-md mx-auto">
             <div class="text-center mb-8">
                 <h1 class="text-3xl font-bold text-gray-900 mb-2">Borgitory</h1>
-                <p class="text-gray-600">BorgBackup Web Manager</p>
+                <p class="text-gray-700 dark:text-gray-300">BorgBackup Web Manager</p>
             </div>
 
             <!-- Welcome message for first user -->
@@ -168,7 +168,7 @@
             <!-- Login Form -->
             <form id="login-form" class="hidden" onsubmit="submitLogin(event)">
                 <div class="mb-4">
-                    <label for="username" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <label for="username" class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Username</label>
                     <input 
                         type="text" 
                         id="username" 
@@ -180,7 +180,7 @@
                 </div>
 
                 <div class="mb-4">
-                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <label for="password" class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Password</label>
                     <input 
                         type="password" 
                         id="password" 
@@ -199,7 +199,7 @@
                             name="remember_me"
                             class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         >
-                        <span class="ml-2 text-sm text-gray-700">Remember me (stay logged in)</span>
+                        <span class="ml-2 text-sm text-gray-900 dark:text-gray-100">Remember me (stay logged in)</span>
                     </label>
                 </div>
 
@@ -214,7 +214,7 @@
             <!-- Registration Form -->
             <form id="register-form" class="hidden" onsubmit="submitRegistration(event)">
                 <div class="mb-4">
-                    <label for="reg-username" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <label for="reg-username" class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Username</label>
                     <input 
                         type="text" 
                         id="reg-username" 
@@ -227,7 +227,7 @@
                 </div>
 
                 <div class="mb-6">
-                    <label for="reg-password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <label for="reg-password" class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Password</label>
                     <input 
                         type="password" 
                         id="reg-password" 
@@ -256,7 +256,7 @@
             <div id="loading" class="hidden mt-4">
                 <div class="flex items-center justify-center">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span class="ml-3 text-gray-700">Processing...</span>
+                    <span class="ml-3 text-gray-900 dark:text-gray-100">Processing...</span>
                 </div>
             </div>
         </div>

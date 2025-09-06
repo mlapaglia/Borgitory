@@ -1,0 +1,14 @@
+<!-- Cleanup Prune Success Template -->
+<div id="prune-job-{{ job_id }}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+    <div class="flex items-center">
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+        <span class="text-blue-700 text-sm">Archive cleanup job #{{ job_id }} started...</span>
+    </div>
+</div>
+
+<script>
+// Show success notification
+if (typeof showNotification === 'function') {
+    showNotification('Archive cleanup started!', 'success');
+}
+</script>

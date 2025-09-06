@@ -90,31 +90,55 @@
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-/* Dark mode support - dropdowns maintain consistent appearance */
+/* Dark mode support - dropdowns with darker backgrounds for better contrast */
+.dark .select-modern,
+.dark .select-modern-compact {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
+
+.dark .select-modern:hover,
+.dark .select-modern-compact:hover {
+    background-color: #1f2937;
+    border-color: #374151;
+}
+
+.dark .select-modern:focus,
+.dark .select-modern-compact:focus {
+    background-color: #1f2937;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+.dark .select-icon {
+    color: #f3f4f6;
+}
+
+/* Fallback for prefers-color-scheme */
 @media (prefers-color-scheme: dark) {
     .select-modern,
     .select-modern-compact {
-        /* Keep same gray appearance in dark mode for consistency */
-        background-color: #4b5563;
+        background-color: #374151;
         border-color: #4b5563;
-        color: #ffffff;
+        color: #f3f4f6;
     }
     
     .select-modern:hover,
     .select-modern-compact:hover {
-        background-color: #374151;
+        background-color: #1f2937;
         border-color: #374151;
     }
     
     .select-modern:focus,
     .select-modern-compact:focus {
-        background-color: #374151;
+        background-color: #1f2937;
         border-color: #60a5fa;
         box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
     }
     
     .select-icon {
-        color: #ffffff;
+        color: #f3f4f6;
     }
 }
 

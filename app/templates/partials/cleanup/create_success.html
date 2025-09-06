@@ -1,0 +1,25 @@
+<!-- Cleanup Config Creation Success Template -->
+<div class="bg-green-50 border border-green-200 rounded-lg p-3">
+    <span class="text-green-700 text-sm">Cleanup policy "{{ config_name }}" created successfully!</span>
+</div>
+
+<script>
+// Show success notification
+if (typeof showNotification === 'function') {
+    showNotification('Cleanup policy created successfully!', 'success');
+}
+
+// Reset form fields
+const form = document.querySelector('form[hx-post="/api/cleanup/"]');
+if (form) {
+    form.reset();
+    
+    // Reset strategy to simple and trigger HTMX update if needed
+    const simpleRadio = document.getElementById('strategy-simple');
+    if (simpleRadio) {
+        simpleRadio.checked = true;
+        // Trigger the HTMX request to update strategy fields
+        htmx.trigger(simpleRadio, 'change');
+    }
+}
+</script>

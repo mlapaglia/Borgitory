@@ -1,0 +1,11 @@
+<!-- Cleanup Config Creation Error Template -->
+<div class="bg-red-50 border border-red-200 rounded-lg p-3">
+    <span class="text-red-700 text-sm">{{ error_message }}</span>
+</div>
+
+<script>
+// Show error notification
+if (typeof showNotification === 'function') {
+    showNotification('{{ error_message }}', 'error');
+}
+</script>

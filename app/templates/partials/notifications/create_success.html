@@ -1,0 +1,17 @@
+<!-- Notification Configuration Creation Success Template -->
+<div class="bg-green-50 border border-green-200 rounded-lg p-3">
+    <span class="text-green-700 text-sm">Notification configuration "{{ config_name }}" added successfully!</span>
+</div>
+
+<script>
+// Show success notification
+if (typeof showNotification === 'function') {
+    showNotification('Notification configuration added successfully!', 'success');
+}
+
+// Reset form fields
+const form = document.querySelector('form[hx-post="/api/notifications/"]');
+if (form) {
+    form.reset();
+}
+</script>

@@ -1,0 +1,16 @@
+<!-- Import Form Loading State -->
+<div hx-get="/api/repositories/import-form-update"
+     hx-vals='{"path": "{{ path }}"}'
+     hx-trigger="load delay:100ms"
+     hx-swap="innerHTML"
+     hx-target="#selected-repo-form">
+    
+    <!-- Loading state -->
+    <div class="flex items-center justify-center p-6">
+        <svg class="animate-spin h-6 w-6 text-blue-600 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 818-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 414 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span class="text-sm text-gray-600">Loading repository details...</span>
+    </div>
+</div>

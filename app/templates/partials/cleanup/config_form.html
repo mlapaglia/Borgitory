@@ -1,97 +1,94 @@
 <!-- Cleanup Configuration -->
-<div class="border rounded-lg p-4">
-    <h3 class="font-medium text-gray-700 mb-3">Prune Old Archives</h3>
+<div id="cleanup-form-container" class="border dark:border-gray-600 rounded-lg p-4">
+    <h3 class="font-medium text-gray-700 dark:text-gray-200 mb-3">Prune Old Archives</h3>
     <form 
         hx-post="/api/jobs/prune" 
         hx-ext="json-enc"
-        hx-target="#prune-status"
-        hx-on::after-request="handlePruneResponse(event)"
+        hx-target="#cleanup-form-container"
+        hx-swap="outerHTML"
+        hx-indicator="#cleanup-loading"
     >
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700">Repository</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Repository</label>
                 <select name="repository_id" required class="select-modern w-full">
                     <option value="">Select Repository...</option>
+                    {% for repo in repositories %}
+                    <option value="{{ repo.id }}">{{ repo.name }}</option>
+                    {% endfor %}
                 </select>
             </div>
             
             <!-- Retention Strategy -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Retention Strategy</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Retention Strategy</label>
                 <div class="space-y-3">
                     <div class="flex items-center">
-                        <input type="radio" name="strategy" value="simple" id="strategy-simple" onchange="toggleRetentionStrategy()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300" checked>
-                        <label for="strategy-simple" class="ml-2 block text-sm text-gray-700">Simple: Keep archives within time period</label>
-                    </div>
-                    <div id="simple-strategy" class="ml-6 flex items-center space-x-2">
-                        <span class="text-sm text-gray-600">Keep archives within:</span>
-                        <input type="number" name="keep_within_days" value="30" min="1" class="w-20 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                        <span class="text-sm text-gray-600">days</span>
+                        <input type="radio" name="strategy" value="simple" id="strategy-simple" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300" checked
+                               hx-get="/api/cleanup/strategy-fields?strategy=simple"
+                               hx-target="#strategy-fields-container"
+                               hx-trigger="change, load"
+                               hx-swap="innerHTML">
+                        <label for="strategy-simple" class="ml-2 block text-sm text-gray-700 dark:text-gray-200">Simple: Keep archives within time period</label>
                     </div>
                     
                     <div class="flex items-center">
-                        <input type="radio" name="strategy" value="advanced" id="strategy-advanced" onchange="toggleRetentionStrategy()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
-                        <label for="strategy-advanced" class="ml-2 block text-sm text-gray-700">Advanced: Granular retention schedule</label>
+                        <input type="radio" name="strategy" value="advanced" id="strategy-advanced" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                               hx-get="/api/cleanup/strategy-fields?strategy=advanced"
+                               hx-target="#strategy-fields-container"
+                               hx-trigger="change"
+                               hx-swap="innerHTML">
+                        <label for="strategy-advanced" class="ml-2 block text-sm text-gray-700 dark:text-gray-200">Advanced: Granular retention schedule</label>
                     </div>
-                    <div id="advanced-strategy" class="ml-6 space-y-2 hidden">
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-xs text-gray-600">Daily archives to keep</label>
-                                <input type="number" name="keep_daily" value="7" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600">Weekly archives to keep</label>
-                                <input type="number" name="keep_weekly" value="4" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600">Monthly archives to keep</label>
-                                <input type="number" name="keep_monthly" value="6" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600">Yearly archives to keep</label>
-                                <input type="number" name="keep_yearly" value="2" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-                            </div>
-                        </div>
+                    
+                    <!-- Dynamic Strategy Fields Container -->
+                    <div id="strategy-fields-container">
+                        <!-- Strategy fields will be loaded here -->
                     </div>
                 </div>
             </div>
             
             <!-- Options -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Options</label>
                 <div class="space-y-2">
                     <div class="flex items-center">
                         <input type="checkbox" name="show_list" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-700">Show detailed list of archives being pruned</label>
+                        <label class="ml-2 block text-sm text-gray-700 dark:text-gray-200">Show detailed list of archives being pruned</label>
                     </div>
                     <div class="flex items-center">
                         <input type="checkbox" name="show_stats" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-700">Show statistics for deleted archives</label>
+                        <label class="ml-2 block text-sm text-gray-700 dark:text-gray-200">Show statistics for deleted archives</label>
                     </div>
                     <div class="flex items-center">
                         <input type="checkbox" name="save_space" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-700">Save space mode (slower, but uses less disk space)</label>
+                        <label class="ml-2 block text-sm text-gray-700 dark:text-gray-200">Save space mode (slower, but uses less disk space)</label>
                     </div>
                     <div class="flex items-center">
                         <input type="checkbox" name="dry_run" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-700">Dry Run (preview only - don't actually delete)</label>
+                        <label class="ml-2 block text-sm text-gray-700 dark:text-gray-200">Dry Run (preview only - don't actually delete)</label>
                     </div>
                 </div>
             </div>
             
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3">
                 <div class="flex items-center">
                     <svg class="w-4 h-4 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                     </svg>
-                    <span class="text-sm text-yellow-700">Warning: This will permanently delete old backup archives. Always run with dry-run first!</span>
+                    <span class="text-sm text-yellow-700 dark:text-yellow-300">Warning: This will permanently delete old backup archives. Always run with dry-run first!</span>
                 </div>
             </div>
             
-            <button type="submit" class="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+            <button type="submit" class="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center justify-center">
                 Clean Up Archives
             </button>
+            
+            <!-- HTMX Loading Indicator -->
+            <div id="cleanup-loading" class="[&.htmx-request]:flex hidden items-center justify-center text-sm text-gray-600 dark:text-gray-300 mt-2">
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
+                Processing cleanup...
+            </div>
         </div>
     </form>
-    <div id="prune-status" class="mt-4"></div>
 </div>

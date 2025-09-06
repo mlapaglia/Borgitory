@@ -1,13 +1,16 @@
 <!-- Debug Tab -->
 <div id="tab-debug" class="tab-content hidden">
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div class="flex items-center justify-between mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900">Debug Information</h1>
-                <p class="text-gray-600 mt-1">System information for troubleshooting</p>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Debug Information</h1>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">System information for troubleshooting</p>
             </div>
             <button 
-                onclick="refreshDebugInfo()"
+                hx-get="/api/debug/html"
+                hx-target="#debug-info-container"
+                hx-swap="innerHTML"
+                hx-indicator="#debug-loading"
                 id="refresh-debug-btn"
                 class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center space-x-2"
             >
@@ -19,11 +22,23 @@
         </div>
 
         <!-- Debug Info Container -->
-        <div id="debug-info-container" class="space-y-6">
+        <div 
+            id="debug-info-container" 
+            class="space-y-6"
+            hx-get="/api/debug/html"
+            hx-trigger="revealed"
+            hx-swap="innerHTML"
+            hx-indicator="#debug-loading">
             <div class="text-center py-8">
                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p class="text-gray-500">Loading debug information...</p>
+                <p class="text-gray-500 dark:text-gray-400">Click refresh to load debug information</p>
             </div>
+        </div>
+        
+        <!-- Loading Indicator -->
+        <div id="debug-loading" class="[&.htmx-request]:block hidden text-center py-8">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p class="text-gray-500 dark:text-gray-400">Loading debug information...</p>
         </div>
     </div>
 </div>

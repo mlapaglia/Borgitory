@@ -1,10 +1,10 @@
 <!-- Existing Cloud Sync -->
 <div class="border rounded-lg p-4">
-    <h3 class="font-medium text-gray-700 mb-3">Configured Sync Locations</h3>
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Configured Sync Locations</h3>
     <div id="cloud-sync-list" 
          hx-get="/api/cloud-sync/html" 
          hx-trigger="load, cloudSyncUpdate from:body" 
          hx-swap="innerHTML">
-        <div class="text-gray-500 text-sm">Loading cloud sync configurations...</div>
+        <div class="text-gray-600 dark:text-gray-400 text-sm">Loading cloud sync configurations...</div>
     </div>
 </div>

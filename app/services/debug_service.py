@@ -8,7 +8,7 @@ from typing import Dict, Any
 from sqlalchemy.orm import Session
 
 from app.models.database import Repository, Job
-from app.services.job_manager import borg_job_manager
+from app.services.job_manager import get_job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -283,11 +283,11 @@ class DebugService:
             # Count active jobs by checking job statuses
             active_jobs_count = 0
             total_jobs = (
-                len(borg_job_manager.jobs) if hasattr(borg_job_manager, "jobs") else 0
+                len(get_job_manager().jobs) if hasattr(get_job_manager(), "jobs") else 0
             )
 
-            if hasattr(borg_job_manager, "jobs"):
-                for job in borg_job_manager.jobs.values():
+            if hasattr(get_job_manager(), "jobs"):
+                for job in get_job_manager().jobs.values():
                     if hasattr(job, "status") and job.status == "running":
                         active_jobs_count += 1
 

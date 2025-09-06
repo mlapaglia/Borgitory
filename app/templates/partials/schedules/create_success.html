@@ -1,0 +1,31 @@
+<!-- Schedule Creation Success Template -->
+<div class="bg-green-50 border border-green-200 rounded-lg p-3">
+    <span class="text-green-700 text-sm">Schedule created successfully!</span>
+</div>
+
+<script>
+// Trigger HTMX refresh for schedule list
+document.body.dispatchEvent(new CustomEvent('scheduleUpdate'));
+
+// Reset form fields
+const form = document.querySelector('form[hx-post="/api/schedules/"]');
+if (form) {
+    form.reset();
+    
+    // Clear custom form elements
+    const preset = document.getElementById('schedule-preset');
+    const cronExpression = document.getElementById('cron-expression');
+    const customCron = document.getElementById('custom-cron');
+    const cronDescription = document.getElementById('cron-description');
+    
+    if (preset) preset.value = '';
+    if (cronExpression) cronExpression.value = '';
+    if (customCron) customCron.classList.add('hidden');
+    if (cronDescription) cronDescription.classList.add('hidden');
+}
+
+// Show success notification
+if (typeof showNotification === 'function') {
+    showNotification('Schedule created successfully!', 'success');
+}
+</script>

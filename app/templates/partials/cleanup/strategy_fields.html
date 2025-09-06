@@ -1,0 +1,29 @@
+<!-- Dynamic Strategy Fields -->
+{% if strategy == "simple" %}
+<div id="simple-strategy" class="ml-6 flex items-center space-x-2">
+    <span class="text-sm text-gray-600">Keep archives within:</span>
+    <input type="number" name="keep_within_days" value="30" min="1" class="w-20 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+    <span class="text-sm text-gray-600">days</span>
+</div>
+{% elif strategy == "advanced" %}
+<div id="advanced-strategy" class="ml-6 space-y-2">
+    <div class="grid grid-cols-2 gap-2">
+        <div>
+            <label class="block text-xs text-gray-600">Daily archives to keep</label>
+            <input type="number" name="keep_daily" value="7" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-600">Weekly archives to keep</label>
+            <input type="number" name="keep_weekly" value="4" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-600">Monthly archives to keep</label>
+            <input type="number" name="keep_monthly" value="6" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-600">Yearly archives to keep</label>
+            <input type="number" name="keep_yearly" value="2" min="0" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        </div>
+    </div>
+</div>
+{% endif %}

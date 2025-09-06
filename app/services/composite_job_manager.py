@@ -6,8 +6,10 @@ from typing import Dict, Optional, List
 from dataclasses import dataclass, field
 from collections import deque
 
-from app.models.database import Repository, Job, JobTask, get_db, Schedule
+from app.models.database import Repository, Job, JobTask, Schedule
+from app.models.enums import JobType
 from app.services.rclone_service import rclone_service
+from app.utils.db_session import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +59,20 @@ class CompositeJobInfo:
     completed_at: Optional[datetime] = None
     tasks: List[CompositeJobTaskInfo] = field(default_factory=list)
     current_task_index: int = 0
-    repository: Optional["Repository"] = None
+    repository_id: Optional[int] = (
+        None  # Store ID instead of object to avoid session issues
+    )
     schedule: Optional["Schedule"] = None
+
+    def is_composite(self) -> bool:
+        """Check if this is a multi-task composite job"""
+        return True
+
+    def get_current_task(self) -> Optional[CompositeJobTaskInfo]:
+        """Get the currently executing task"""
+        if 0 <= self.current_task_index < len(self.tasks):
+            return self.tasks[self.current_task_index]
+        return None
 
 
 class CompositeJobManager:
@@ -66,9 +80,24 @@ class CompositeJobManager:
         self.jobs: Dict[str, CompositeJobInfo] = {}
         self._event_queues: List[asyncio.Queue] = []  # For SSE streaming
 
+    def _get_repository_data(self, repository_id: int):
+        """Get repository data from database using a fresh session"""
+        with get_db_session() as db:
+            repo = db.query(Repository).filter(Repository.id == repository_id).first()
+            if not repo:
+                return None
+
+            # Extract all needed data while session is active
+            return {
+                "id": repo.id,
+                "name": repo.name,
+                "path": repo.path,
+                "passphrase": repo.get_passphrase(),
+            }
+
     async def create_composite_job(
         self,
-        job_type: str,
+        job_type: JobType,
         task_definitions: List[Dict],
         repository: Repository,
         schedule: Optional[Schedule] = None,
@@ -78,13 +107,17 @@ class CompositeJobManager:
 
         job_id = str(uuid.uuid4())
 
+        # Extract repository ID to avoid session issues
+        repository_id = repository.id
+
         # Create database job record
-        db = next(get_db())
-        try:
+        from app.utils.db_session import get_db_session
+
+        with get_db_session() as db:
             db_job = Job(
-                repository_id=repository.id,
+                repository_id=repository_id,
                 job_uuid=job_id,
-                type=job_type,
+                type=str(job_type),
                 status="pending",
                 job_type="composite",
                 total_tasks=len(task_definitions),
@@ -96,10 +129,13 @@ class CompositeJobManager:
             db.commit()
             db.refresh(db_job)
 
+            # Extract db_job_id while still in session
+            db_job_id = db_job.id
+
             # Create task records
             for i, task_def in enumerate(task_definitions):
                 task = JobTask(
-                    job_id=db_job.id,
+                    job_id=db_job_id,
                     task_type=task_def["type"],
                     task_name=task_def["name"],
                     status="pending",
@@ -107,24 +143,16 @@ class CompositeJobManager:
                 )
                 db.add(task)
 
-            db.commit()
-
             logger.info(
-                f"📝 Created composite job {job_id} (db_id: {db_job.id}) with {len(task_definitions)} tasks"
+                f"📝 Created composite job {job_id} (db_id: {db_job_id}) with {len(task_definitions)} tasks"
             )
-
-        except Exception as e:
-            logger.error(f"Failed to create database job: {e}")
-            raise
-        finally:
-            db.close()
 
         # Create in-memory job info
         composite_job = CompositeJobInfo(
             id=job_id,
-            db_job_id=db_job.id,
-            job_type=job_type,
-            repository=repository,
+            db_job_id=db_job_id,
+            job_type=str(job_type),
+            repository_id=repository_id,
             schedule=schedule,
         )
 
@@ -279,7 +307,13 @@ class CompositeJobManager:
     ) -> bool:
         """Execute a borg backup task"""
         try:
-            logger.info(f"🔄 Starting borg backup for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"🔄 Starting borg backup for repository {repo_data['name']}")
 
             # Use the existing borg service to create backup
             # But we'll stream the output to our task instead of creating a separate job
@@ -310,7 +344,7 @@ class CompositeJobManager:
                 "--json",
                 "--verbose",  # More verbose output
                 "--list",  # List files being processed
-                f"{job.repository.path}::{archive_name}",
+                f"{repo_data['path']}::{archive_name}",
                 source_path,
             ]
 
@@ -321,7 +355,7 @@ class CompositeJobManager:
             command, env = build_secure_borg_command(
                 base_command="borg create",
                 repository_path="",
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -365,7 +399,13 @@ class CompositeJobManager:
     ) -> bool:
         """Execute a borg prune task to clean up old archives"""
         try:
-            logger.info(f"🗑️ Starting borg prune for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"🗑️ Starting borg prune for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
 
@@ -400,16 +440,16 @@ class CompositeJobManager:
                 additional_args.append("--dry-run")
 
             # Repository path as positional argument
-            additional_args.append(job.repository.path)
+            additional_args.append(repo_data["path"])
 
             logger.info(
-                f"🗑️ Prune settings - Repository: {job.repository.path}, Dry run: {task.dry_run}"
+                f"🗑️ Prune settings - Repository: {repo_data['path']}, Dry run: {task.dry_run}"
             )
 
             command, env = build_secure_borg_command(
                 base_command="borg prune",
                 repository_path="",  # Path is in additional_args
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -453,7 +493,13 @@ class CompositeJobManager:
     ) -> bool:
         """Execute a borg check task to verify repository integrity"""
         try:
-            logger.info(f"🔍 Starting borg check for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"🔍 Starting borg check for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
 
@@ -499,16 +545,16 @@ class CompositeJobManager:
                     additional_args.extend(["--last", str(task.last_n_archives)])
 
             # Repository path as positional argument
-            additional_args.append(job.repository.path)
+            additional_args.append(repo_data["path"])
 
             logger.info(
-                f"🔍 Check settings - Type: {task.check_type}, Repository: {job.repository.path}"
+                f"🔍 Check settings - Type: {task.check_type}, Repository: {repo_data['path']}"
             )
 
             command, env = build_secure_borg_command(
                 base_command="borg check",
                 repository_path="",  # Path is in additional_args
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
@@ -552,16 +598,21 @@ class CompositeJobManager:
     ) -> bool:
         """Execute a cloud sync task"""
         try:
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
             if not job.schedule or not job.schedule.cloud_sync_config_id:
                 logger.info("📋 No cloud backup configuration - skipping cloud sync")
                 task.status = "skipped"
                 return True
 
-            logger.info(f"☁️ Starting cloud sync for repository {job.repository.name}")
+            logger.info(f"☁️ Starting cloud sync for repository {repo_data['name']}")
 
             # Get cloud backup configuration
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 from app.models.database import CloudSyncConfig
 
                 config = (
@@ -586,9 +637,14 @@ class CompositeJobManager:
                         f"☁️ Syncing to {config.name} (S3: {config.bucket_name})"
                     )
 
+                    # Create a simple repository object for rclone service
+                    from types import SimpleNamespace
+
+                    repo_obj = SimpleNamespace(path=repo_data["path"])
+
                     # Use rclone service to sync to S3
                     progress_generator = rclone_service.sync_repository_to_s3(
-                        repository=job.repository,
+                        repository=repo_obj,
                         access_key_id=access_key,
                         secret_access_key=secret_key,
                         bucket_name=config.bucket_name,
@@ -603,9 +659,14 @@ class CompositeJobManager:
                         f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})"
                     )
 
+                    # Create a simple repository object for rclone service
+                    from types import SimpleNamespace
+
+                    repo_obj = SimpleNamespace(path=repo_data["path"])
+
                     # Use rclone service to sync to SFTP
                     progress_generator = rclone_service.sync_repository_to_sftp(
-                        repository=job.repository,
+                        repository=repo_obj,
                         host=config.host,
                         username=config.username,
                         remote_path=config.remote_path,
@@ -648,9 +709,6 @@ class CompositeJobManager:
                 logger.info("✅ Cloud sync completed")
                 return True
 
-            finally:
-                db.close()
-
         except Exception as e:
             logger.error(f"❌ Exception in cloud sync task: {str(e)}")
             task.error = str(e)
@@ -663,16 +721,12 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
                 if db_job:
                     db_job.status = status
                     if status == "completed" or status == "failed":
                         db_job.finished_at = datetime.now()
-                    db.commit()
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update job status: {e}")
@@ -684,14 +738,10 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
                 if db_job:
                     db_job.completed_tasks = job.completed_tasks
-                    db.commit()
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update job progress: {e}")
@@ -710,8 +760,7 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 task = (
                     db.query(JobTask)
                     .filter(
@@ -740,10 +789,6 @@ class CompositeJobManager:
                         task.error = error
                     if return_code is not None:
                         task.return_code = return_code
-
-                    db.commit()
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update task status: {e}")
