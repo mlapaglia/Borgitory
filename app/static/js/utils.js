@@ -33,7 +33,6 @@ function showNotification(message, type = 'info') {
 }
 
 // SSE Functions
-
 function initializeSSE() {    
     // Set up Server-Sent Events for real-time job updates
     if (typeof EventSource !== 'undefined') {
@@ -221,90 +220,4 @@ async function viewArchiveContents(repoId, archiveName) {
     } else {
         showNotification('Archive contents modal not found', 'error');
     }
-}
-
-function showArchiveContentsModal(archiveName, contents) {
-    // Create modal backdrop
-    const backdrop = document.createElement('div');
-    backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    backdrop.onclick = (e) => {
-        if (e.target === backdrop) {
-            document.body.removeChild(backdrop);
-        }
-    };
-    
-    // Create modal content
-    const modal = document.createElement('div');
-    modal.className = 'bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] flex flex-col';
-    
-    // Sort contents: directories first, then files, both alphabetically
-    const sortedContents = contents.sort((a, b) => {
-        const aIsDir = a.type === 'd';
-        const bIsDir = b.type === 'd';
-        
-        if (aIsDir && !bIsDir) return -1;
-        if (!aIsDir && bIsDir) return 1;
-        
-        return a.path.localeCompare(b.path);
-    });
-    
-    // Format file size
-    const formatSize = (size) => {
-        if (!size) return '';
-        const units = ['B', 'KB', 'MB', 'GB'];
-        let unitIndex = 0;
-        let fileSize = size;
-        
-        while (fileSize >= 1024 && unitIndex < units.length - 1) {
-            fileSize /= 1024;
-            unitIndex++;
-        }
-        
-        return `${fileSize.toFixed(1)} ${units[unitIndex]}`;
-    };
-    
-    // Generate contents HTML
-    let contentsHtml = '';
-    if (sortedContents.length === 0) {
-        contentsHtml = '<div class="text-center py-8 text-gray-500">This archive is empty</div>';
-    } else {
-        contentsHtml = '<div class="space-y-1">';
-        sortedContents.forEach(item => {
-            const isDir = item.type === 'd';
-            const icon = isDir ? '📁' : '📄';
-            const size = isDir ? '' : formatSize(item.size);
-            contentsHtml += `
-                <div class="flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded text-sm">
-                    <div class="flex items-center min-w-0 flex-1">
-                        <span class="mr-2">${icon}</span>
-                        <span class="truncate font-mono">${item.path}</span>
-                    </div>
-                    <div class="ml-4 text-gray-500 text-xs">${size}</div>
-                </div>
-            `;
-        });
-        contentsHtml += '</div>';
-    }
-    
-    modal.innerHTML = `
-        <div class="flex items-center justify-between p-6 border-b">
-            <h3 class="text-lg font-medium">Archive Contents: ${archiveName}</h3>
-            <button onclick="document.body.removeChild(this.closest('.fixed'))" class="text-gray-400 hover:text-gray-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
-        </div>
-        <div class="flex-1 overflow-y-auto p-6">
-            ${contentsHtml}
-        </div>
-        <div class="p-6 border-t bg-gray-50">
-            <button onclick="document.body.removeChild(this.closest('.fixed'))" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                Close
-            </button>
-        </div>
-    `;
-    
-    backdrop.appendChild(modal);
-    document.body.appendChild(backdrop);
 }
