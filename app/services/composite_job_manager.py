@@ -64,6 +64,16 @@ class CompositeJobInfo:
     )
     schedule: Optional["Schedule"] = None
 
+    def is_composite(self) -> bool:
+        """Check if this is a multi-task composite job"""
+        return True
+
+    def get_current_task(self) -> Optional[CompositeJobTaskInfo]:
+        """Get the currently executing task"""
+        if 0 <= self.current_task_index < len(self.tasks):
+            return self.tasks[self.current_task_index]
+        return None
+
 
 class CompositeJobManager:
     def __init__(self):

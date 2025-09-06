@@ -119,7 +119,7 @@ class JobStreamService:
 
                 try:
                     # Send initial state
-                    yield f"data: {json.dumps({'type': 'initial_state', 'job_id': job_id, 'status': job.status})}\\n\\n"
+                    yield f"data: {json.dumps({'type': 'initial_state', 'job_id': job_id, 'status': job.status})}\n\n"
 
                     # Stream events
                     while True:
@@ -129,20 +129,20 @@ class JobStreamService:
                             )
                             # Only send events for this job
                             if event.get("job_id") == job_id:
-                                yield f"data: {json.dumps(event)}\\n\\n"
+                                yield f"data: {json.dumps(event)}\n\n"
                         except asyncio.TimeoutError:
-                            yield f"data: {json.dumps({'type': 'keepalive'})}\\n\\n"
+                            yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
                         except Exception as e:
-                            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\\n\\n"
+                            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
                             break
                 finally:
                     self.job_manager.unsubscribe_from_events(event_queue)
             else:
                 # Stream regular borg job output
                 async for event in self.job_manager.stream_job_output(job_id):
-                    yield f"data: {json.dumps(event)}\\n\\n"
+                    yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\\n\\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     async def get_job_status(self, job_id: str) -> Dict[str, Any]:
         """Get current job status and progress for streaming"""
