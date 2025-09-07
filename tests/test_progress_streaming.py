@@ -3,9 +3,7 @@ Tests for repository statistics progress streaming functionality
 """
 import pytest
 import asyncio
-import json
-from unittest.mock import Mock, AsyncMock, patch
-from fastapi.testclient import TestClient
+from unittest.mock import Mock, patch
 from httpx import AsyncClient, ASGITransport
 
 from app.main import app

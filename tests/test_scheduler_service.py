@@ -1,10 +1,9 @@
 import pytest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
-import asyncio
 
 from app.services.scheduler_service import SchedulerService, execute_scheduled_backup
-from app.models.database import Schedule, Repository, CleanupConfig, RepositoryCheckConfig
+from app.models.database import Schedule, CleanupConfig, RepositoryCheckConfig
 from app.models.enums import JobType
 
 

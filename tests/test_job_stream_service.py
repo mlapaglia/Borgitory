@@ -263,7 +263,7 @@ class TestJobStreamService:
                 try:
                     data = json.loads(event.split("data: ", 1)[1].strip())
                     parsed_events.append(("data", data))
-                except:
+                except (json.JSONDecodeError, IndexError):
                     pass
             elif "event: " in event and "data: " in event:
                 # Proper SSE event format

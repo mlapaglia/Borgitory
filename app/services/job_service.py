@@ -3,7 +3,13 @@ from datetime import datetime, UTC
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.database import Repository, Job, CleanupConfig, RepositoryCheckConfig, NotificationConfig
+from app.models.database import (
+    Repository,
+    Job,
+    CleanupConfig,
+    RepositoryCheckConfig,
+    NotificationConfig,
+)
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
 from app.services.job_manager import get_job_manager

@@ -244,18 +244,14 @@ async def toggle_job_details(
     job = render_svc.get_job_for_render(job_id, db)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     # Toggle the expand_details state
-    job['expand_details'] = expanded == "false"  # If currently false, expand it
-    
+    job["expand_details"] = expanded == "false"  # If currently false, expand it
+
     logger.debug(f"Job toggle - rendering job {job_id}")
-    
+
     # Return the complete job item with new state
-    return templates.TemplateResponse(
-        request,
-        "partials/jobs/job_item.html",
-        job
-    )
+    return templates.TemplateResponse(request, "partials/jobs/job_item.html", job)
 
 
 @router.get("/{job_id}/details-static", response_class=HTMLResponse)
@@ -269,11 +265,9 @@ async def get_job_details_static(
     job = render_svc.get_job_for_render(job_id, db)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     return templates.TemplateResponse(
-        request,
-        "partials/jobs/job_details_static.html",
-        job
+        request, "partials/jobs/job_details_static.html", job
     )
 
 
@@ -290,39 +284,37 @@ async def toggle_task_details(
     job = render_svc.get_job_for_render(job_id, db)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     # Find the specific task
     task = None
-    if job.get('is_composite') and job.get('sorted_tasks'):
-        for t in job['sorted_tasks']:
+    if job.get("is_composite") and job.get("sorted_tasks"):
+        for t in job["sorted_tasks"]:
             if t.task_order == task_order:
                 task = t
                 break
-    
+
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     # Toggle the task expanded state
     task_expanded = expanded == "false"  # If currently false, expand it
-    
+
     # Create context for the task template - use the UUID-based job context from render service
     context = {
-        "job": job['job'],  # This is already the UUID-based job context from _format_manager_job_for_render
+        "job": job[
+            "job"
+        ],  # This is already the UUID-based job context from _format_manager_job_for_render
         "task": task,
         "task_expanded": task_expanded,
     }
-    
+
     # Choose appropriate template based on job status
-    if job['job'].status == 'running':
+    if job["job"].status == "running":
         template_name = "partials/jobs/task_item_streaming.html"
     else:
         template_name = "partials/jobs/task_item_static.html"
-    
-    return templates.TemplateResponse(
-        request,
-        template_name,
-        context
-    )
+
+    return templates.TemplateResponse(request, template_name, context)
 
 
 @router.post("/{job_id}/copy-output")

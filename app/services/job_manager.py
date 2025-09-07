@@ -583,8 +583,8 @@ class BorgJobManager:
                         )
 
                         # Pass the task error that was set by the execution method
-                        error_msg = task.error if hasattr(task, 'error') else None
-                        
+                        error_msg = task.error if hasattr(task, "error") else None
+
                         # Update database task status - THIS WAS MISSING!
                         self._update_composite_task_status(
                             job_id, i, "failed", error=error_msg, return_code=1
@@ -1456,22 +1456,22 @@ class BorgJobManager:
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
             )
-            
+
             # Stream output to task
             async for line in process.stdout:
                 decoded_line = line.decode("utf-8", errors="replace").rstrip()
-            
+
                 # Store in task output
                 task.output_lines.append(
                     {"timestamp": datetime.now().isoformat(), "text": decoded_line}
                 )
-            
+
                 # Broadcast to SSE listeners
                 self._broadcast_task_output(job.id, task_index, decoded_line)
 
             # Wait for completion
             await process.wait()
-            
+
             if process.returncode == 0:
                 logger.info("✅ Command completed successfully")
                 return True
@@ -1494,23 +1494,25 @@ class BorgJobManager:
             if not job.repository_id:
                 logger.error("Repository ID not found for notification")
                 return False
-                
+
             repository_data = self._get_repository_data(job.repository_id)
             if not repository_data:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
 
-            logger.info(f"📬 Sending notification for repository {repository_data['name']}")
+            logger.info(
+                f"📬 Sending notification for repository {repository_data['name']}"
+            )
 
             # Get notification configuration
             from app.models.database import NotificationConfig
             from app.utils.db_session import get_db_session
-            
+
             with get_db_session() as db:
                 # Find the first enabled notification config (simplified approach)
                 notification_config = (
                     db.query(NotificationConfig)
-                    .filter(NotificationConfig.enabled == True)
+                    .filter(NotificationConfig.enabled)
                     .first()
                 )
 
@@ -1520,19 +1522,24 @@ class BorgJobManager:
                     return True
 
                 # Determine if we should send notification based on job status
-                job_success = all(t.status == "completed" for t in job.tasks[:task_index])
-                should_notify = (
-                    (job_success and notification_config.notify_on_success) or
-                    (not job_success and notification_config.notify_on_failure)
+                job_success = all(
+                    t.status == "completed" for t in job.tasks[:task_index]
                 )
+                should_notify = (
+                    job_success and notification_config.notify_on_success
+                ) or (not job_success and notification_config.notify_on_failure)
 
                 if not should_notify:
-                    logger.info("📋 Notification not configured for current job status - skipping")
+                    logger.info(
+                        "📋 Notification not configured for current job status - skipping"
+                    )
                     task.status = "skipped"
                     return True
 
                 # Add initial output
-                initial_output = f"Sending notification via {notification_config.provider}"
+                initial_output = (
+                    f"Sending notification via {notification_config.provider}"
+                )
                 task.output_lines.append(
                     {"timestamp": datetime.now().isoformat(), "text": initial_output}
                 )
@@ -1544,7 +1551,9 @@ class BorgJobManager:
                         notification_config, job, task, task_index
                     )
                 else:
-                    logger.error(f"Unsupported notification provider: {notification_config.provider}")
+                    logger.error(
+                        f"Unsupported notification provider: {notification_config.provider}"
+                    )
                     task.error = f"Unsupported provider: {notification_config.provider}"
                     return False
 
@@ -1575,16 +1584,22 @@ class BorgJobManager:
             # Decrypt credentials
             cipher_suite = get_cipher_suite()
             user_key = cipher_suite.decrypt(config.encrypted_user_key.encode()).decode()
-            app_token = cipher_suite.decrypt(config.encrypted_app_token.encode()).decode()
+            app_token = cipher_suite.decrypt(
+                config.encrypted_app_token.encode()
+            ).decode()
 
             # Determine job status for message
             job_success = all(t.status == "completed" for t in job.tasks[:task_index])
             status_emoji = "✅" if job_success else "❌"
             status_text = "completed successfully" if job_success else "failed"
-            
+
             # Get repository data for message
-            repository_data = self._get_repository_data(job.repository_id) if job.repository_id else None
-            repository_name = repository_data['name'] if repository_data else "Unknown"
+            repository_data = (
+                self._get_repository_data(job.repository_id)
+                if job.repository_id
+                else None
+            )
+            repository_name = repository_data["name"] if repository_data else "Unknown"
             message = f"Backup {status_text} for repository '{repository_name}'"
             title = f"{status_emoji} Borgitory Backup"
 
@@ -1597,13 +1612,15 @@ class BorgJobManager:
                         "user": user_key,
                         "title": title,
                         "message": message,
-                    }
+                    },
                 )
 
                 if response.status_code == 200:
                     return True
                 else:
-                    error_msg = f"Pushover API error: {response.status_code} - {response.text}"
+                    error_msg = (
+                        f"Pushover API error: {response.status_code} - {response.text}"
+                    )
                     task.error = error_msg
                     task.output_lines.append(
                         {"timestamp": datetime.now().isoformat(), "text": error_msg}

@@ -1,10 +1,8 @@
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 from datetime import datetime, UTC
 
 from app.services.job_render_service import JobRenderService
-from app.models.database import Job, Repository, JobTask
-from app.models.enums import JobType
+from app.models.database import Job, JobTask
 
 
 class TestJobRenderService:

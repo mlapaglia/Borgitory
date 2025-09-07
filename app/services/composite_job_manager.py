@@ -241,8 +241,10 @@ class CompositeJobManager:
                         task.completed_at = datetime.now()
                         task.return_code = 1
                         # Pass the task error that was set by the execution method
-                        error_msg = task.error if hasattr(task, 'error') else None
-                        self._update_task_status(job_id, i, "failed", error=error_msg, return_code=1)
+                        error_msg = task.error if hasattr(task, "error") else None
+                        self._update_task_status(
+                            job_id, i, "failed", error=error_msg, return_code=1
+                        )
 
                         logger.error(
                             f"❌ Task {i + 1}/{len(job.tasks)} failed: {task.task_name}"
@@ -380,17 +382,17 @@ class CompositeJobManager:
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
             )
-            
+
             # Stream output to task
             async for line in process.stdout:
                 decoded_line = line.decode("utf-8", errors="replace").rstrip()
                 task.output_lines.append(
                     {"timestamp": datetime.now().isoformat(), "text": decoded_line}
                 )
-            
+
                 # Broadcast output
                 self._broadcast_task_output(job.id, task_index, decoded_line)
-            
+
             await process.wait()
 
             if process.returncode == 0:
@@ -750,24 +752,31 @@ class CompositeJobManager:
                 )
 
                 if not notification_config or not notification_config.enabled:
-                    logger.info("📋 Notification configuration not found or disabled - skipping")
-                    task.status = "skipped" 
+                    logger.info(
+                        "📋 Notification configuration not found or disabled - skipping"
+                    )
+                    task.status = "skipped"
                     return True
 
                 # Determine if we should send notification based on job status
-                job_success = all(t.status == "completed" for t in job.tasks[:task_index])
-                should_notify = (
-                    (job_success and notification_config.notify_on_success) or
-                    (not job_success and notification_config.notify_on_failure)
+                job_success = all(
+                    t.status == "completed" for t in job.tasks[:task_index]
                 )
+                should_notify = (
+                    job_success and notification_config.notify_on_success
+                ) or (not job_success and notification_config.notify_on_failure)
 
                 if not should_notify:
-                    logger.info("📋 Notification not configured for current job status - skipping")
+                    logger.info(
+                        "📋 Notification not configured for current job status - skipping"
+                    )
                     task.status = "skipped"
                     return True
 
                 # Add initial output
-                initial_output = f"Sending notification via {notification_config.provider}"
+                initial_output = (
+                    f"Sending notification via {notification_config.provider}"
+                )
                 task.output_lines.append(
                     {"timestamp": datetime.now().isoformat(), "text": initial_output}
                 )
@@ -779,7 +788,9 @@ class CompositeJobManager:
                         notification_config, job, repo_data, task, task_index
                     )
                 else:
-                    logger.error(f"Unsupported notification provider: {notification_config.provider}")
+                    logger.error(
+                        f"Unsupported notification provider: {notification_config.provider}"
+                    )
                     task.error = f"Unsupported provider: {notification_config.provider}"
                     return False
 
@@ -800,7 +811,12 @@ class CompositeJobManager:
             return False
 
     async def _send_pushover_notification(
-        self, config, job: CompositeJobInfo, repo_data, task: CompositeJobTaskInfo, task_index: int
+        self,
+        config,
+        job: CompositeJobInfo,
+        repo_data,
+        task: CompositeJobTaskInfo,
+        task_index: int,
     ) -> bool:
         """Send notification via Pushover"""
         try:
@@ -810,13 +826,15 @@ class CompositeJobManager:
             # Decrypt credentials
             cipher_suite = get_cipher_suite()
             user_key = cipher_suite.decrypt(config.encrypted_user_key.encode()).decode()
-            app_token = cipher_suite.decrypt(config.encrypted_app_token.encode()).decode()
+            app_token = cipher_suite.decrypt(
+                config.encrypted_app_token.encode()
+            ).decode()
 
             # Determine job status for message
             job_success = all(t.status == "completed" for t in job.tasks[:task_index])
             status_emoji = "✅" if job_success else "❌"
             status_text = "completed successfully" if job_success else "failed"
-            
+
             # Create message
             message = f"Backup {status_text} for repository '{repo_data['name']}'"
             title = f"{status_emoji} Borgitory Backup"
@@ -830,13 +848,15 @@ class CompositeJobManager:
                         "user": user_key,
                         "title": title,
                         "message": message,
-                    }
+                    },
                 )
 
                 if response.status_code == 200:
                     return True
                 else:
-                    error_msg = f"Pushover API error: {response.status_code} - {response.text}"
+                    error_msg = (
+                        f"Pushover API error: {response.status_code} - {response.text}"
+                    )
                     task.error = error_msg
                     task.output_lines.append(
                         {"timestamp": datetime.now().isoformat(), "text": error_msg}
