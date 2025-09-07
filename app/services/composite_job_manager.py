@@ -2,13 +2,12 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Callable, Any
 from dataclasses import dataclass, field
 from collections import deque
 
 from app.models.database import Repository, Job, JobTask, Schedule, NotificationConfig
 from app.models.enums import JobType
-from app.services.rclone_service import rclone_service
 from app.utils.db_session import get_db_session
 
 logger = logging.getLogger(__name__)
@@ -81,13 +80,25 @@ class CompositeJobInfo:
 
 
 class CompositeJobManager:
-    def __init__(self):
+    def __init__(
+        self,
+        db_session_factory: Optional[Callable] = None,
+        rclone_service=None,
+        subprocess_executor: Optional[Callable] = None,
+        http_client_factory: Optional[Callable] = None,
+    ):
         self.jobs: Dict[str, CompositeJobInfo] = {}
         self._event_queues: List[asyncio.Queue] = []  # For SSE streaming
+        
+        # Dependency injection for testability
+        self._db_session_factory = db_session_factory or get_db_session
+        self._rclone_service = rclone_service
+        self._subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
+        self._http_client_factory = http_client_factory
 
     def _get_repository_data(self, repository_id: int):
         """Get repository data from database using a fresh session"""
-        with get_db_session() as db:
+        with self._db_session_factory() as db:
             repo = db.query(Repository).filter(Repository.id == repository_id).first()
             if not repo:
                 return None
@@ -116,9 +127,7 @@ class CompositeJobManager:
         repository_id = repository.id
 
         # Create database job record
-        from app.utils.db_session import get_db_session
-
-        with get_db_session() as db:
+        with self._db_session_factory() as db:
             db_job = Job(
                 repository_id=repository_id,
                 job_uuid=job_id,
@@ -376,7 +385,7 @@ class CompositeJobManager:
             )
 
             # Execute the command and capture output
-            process = await asyncio.create_subprocess_exec(
+            process = await self._subprocess_executor(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -470,7 +479,7 @@ class CompositeJobManager:
             )
 
             # Execute the command and capture output
-            process = await asyncio.create_subprocess_exec(
+            process = await self._subprocess_executor(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -575,7 +584,7 @@ class CompositeJobManager:
             )
 
             # Execute the command and capture output
-            process = await asyncio.create_subprocess_exec(
+            process = await self._subprocess_executor(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -628,7 +637,7 @@ class CompositeJobManager:
             logger.info(f"☁️ Starting cloud sync for repository {repo_data['name']}")
 
             # Get cloud backup configuration
-            with get_db_session() as db:
+            with self._db_session_factory() as db:
                 from app.models.database import CloudSyncConfig
 
                 config = (
@@ -659,7 +668,11 @@ class CompositeJobManager:
                     repo_obj = SimpleNamespace(path=repo_data["path"])
 
                     # Use rclone service to sync to S3
-                    progress_generator = rclone_service.sync_repository_to_s3(
+                    if not self._rclone_service:
+                        from app.services.rclone_service import rclone_service
+                        self._rclone_service = rclone_service
+                        
+                    progress_generator = self._rclone_service.sync_repository_to_s3(
                         repository=repo_obj,
                         access_key_id=access_key,
                         secret_access_key=secret_key,
@@ -681,7 +694,11 @@ class CompositeJobManager:
                     repo_obj = SimpleNamespace(path=repo_data["path"])
 
                     # Use rclone service to sync to SFTP
-                    progress_generator = rclone_service.sync_repository_to_sftp(
+                    if not self._rclone_service:
+                        from app.services.rclone_service import rclone_service
+                        self._rclone_service = rclone_service
+                        
+                    progress_generator = self._rclone_service.sync_repository_to_sftp(
                         repository=repo_obj,
                         host=config.host,
                         username=config.username,
@@ -744,7 +761,7 @@ class CompositeJobManager:
             logger.info(f"📬 Sending notification for repository {repo_data['name']}")
 
             # Get notification configuration
-            with get_db_session() as db:
+            with self._db_session_factory() as db:
                 notification_config = (
                     db.query(NotificationConfig)
                     .filter(NotificationConfig.id == task.config_id)
@@ -840,7 +857,13 @@ class CompositeJobManager:
             title = f"{status_emoji} Borgitory Backup"
 
             # Send to Pushover API
-            async with httpx.AsyncClient() as client:
+            if self._http_client_factory:
+                client = self._http_client_factory()
+            else:
+                import httpx
+                client = httpx.AsyncClient()
+                
+            async with client:
                 response = await client.post(
                     "https://api.pushover.net/1/messages.json",
                     data={
@@ -873,6 +896,34 @@ class CompositeJobManager:
             self._broadcast_task_output(job.id, task_index, error_msg)
             return False
 
+    async def _execute_repo_scan_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a repository scan task - placeholder for future implementation"""
+        logger.info("📋 Repository scan task - placeholder implementation")
+        return True
+
+    async def _execute_repo_init_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a repository initialization task - placeholder for future implementation"""
+        logger.info("🚀 Repository init task - placeholder implementation")
+        return True
+
+    async def _execute_repo_list_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a repository list task - placeholder for future implementation"""
+        logger.info("📄 Repository list task - placeholder implementation")
+        return True
+
+    async def _execute_repo_info_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a repository info task - placeholder for future implementation"""
+        logger.info("ℹ️ Repository info task - placeholder implementation")
+        return True
+
     def _update_job_status(self, job_id: str, status: str):
         """Update job status in database"""
         try:
@@ -880,7 +931,7 @@ class CompositeJobManager:
             if not job:
                 return
 
-            with get_db_session() as db:
+            with self._db_session_factory() as db:
                 db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
                 if db_job:
                     db_job.status = status
@@ -897,7 +948,7 @@ class CompositeJobManager:
             if not job:
                 return
 
-            with get_db_session() as db:
+            with self._db_session_factory() as db:
                 db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
                 if db_job:
                     db_job.completed_tasks = job.completed_tasks
@@ -919,7 +970,7 @@ class CompositeJobManager:
             if not job:
                 return
 
-            with get_db_session() as db:
+            with self._db_session_factory() as db:
                 task = (
                     db.query(JobTask)
                     .filter(
@@ -992,5 +1043,19 @@ class CompositeJobManager:
                 )
 
 
-# Global composite job manager instance
-composite_job_manager = CompositeJobManager()
+# Global composite job manager instance - lazy initialization for dependency injection
+_composite_job_manager_instance = None
+
+def get_composite_job_manager() -> CompositeJobManager:
+    """Get the global composite job manager instance"""
+    global _composite_job_manager_instance
+    if _composite_job_manager_instance is None:
+        # Import here to avoid circular imports
+        from app.services.rclone_service import rclone_service
+        _composite_job_manager_instance = CompositeJobManager(
+            rclone_service=rclone_service
+        )
+    return _composite_job_manager_instance
+
+# For backward compatibility
+composite_job_manager = get_composite_job_manager()
