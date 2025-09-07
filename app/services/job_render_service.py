@@ -36,10 +36,11 @@ class JobRenderService:
             html_content = '<div class="space-y-3">'
 
             for job in db_jobs:
-                should_expand = expand and (
-                    str(job.id) == expand
-                    or (job.job_uuid and job.job_uuid.startswith(expand[:8]))
-                )
+                # Only render jobs that have UUIDs
+                if not job.job_uuid:
+                    continue
+                    
+                should_expand = expand and job.job_uuid == expand
                 html_content += self._render_job_html(job, expand_details=should_expand)
 
             html_content += "</div>"
@@ -149,6 +150,12 @@ class JobRenderService:
     def _render_job_html(self, job: Job, expand_details: bool = False) -> str:
         """Render HTML for a single job (simple or composite)"""
         repository_name = job.repository.name if job.repository else "Unknown"
+        
+        # Only process jobs that have UUIDs - skip legacy jobs without UUIDs
+        if not job.job_uuid:
+            return ""  # Don't render jobs without UUIDs
+            
+        job_id = job.job_uuid
 
         # Status styling
         if job.status == "completed":
@@ -185,10 +192,26 @@ class JobRenderService:
         sorted_tasks = (
             sorted(job.tasks, key=lambda t: t.task_order) if is_composite else []
         )
+        
+        # Fix task statuses for failed jobs
+        if is_composite and job.status == "failed":
+            sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
+
+        # Create a job context object that uses UUID as the primary ID
+        job_context = type('JobContext', (), {
+            'id': job_id,  # Use the UUID as the ID
+            'status': job.status,
+            'job_type': job.job_type,
+            'type': job.type,
+            'started_at': job.started_at,
+            'finished_at': job.finished_at,
+            'error': job.error,
+            'job_uuid': job.job_uuid,
+        })()
 
         # Render the template with context
         return self.templates.get_template("partials/jobs/job_item.html").render(
-            job=job,
+            job=job_context,
             repository_name=repository_name,
             status_class=status_class,
             status_icon=status_icon,
@@ -199,6 +222,250 @@ class JobRenderService:
             sorted_tasks=sorted_tasks,
             expand_details=expand_details,
         )
+
+    def get_job_for_render(self, job_id: str, db: Session) -> dict:
+        """Get job data formatted for template rendering - UUIDs only"""
+        try:
+            logger.info(f"Getting job {job_id} for rendering")
+            
+            # First check if job exists in manager (running jobs)
+            if job_id in self.job_manager.jobs:
+                logger.info(f"Found running job {job_id} in job manager")
+                manager_job = self.job_manager.jobs[job_id]
+                
+                # Try to find corresponding database job by UUID
+                db_job = db.query(Job).filter(Job.job_uuid == job_id).first()
+                return self._format_manager_job_for_render(manager_job, job_id, db_job)
+            
+            # If not in manager, try to find completed job in database by UUID
+            job = (
+                db.query(Job)
+                .options(joinedload(Job.repository), joinedload(Job.tasks))
+                .filter(Job.job_uuid == job_id)
+                .first()
+            )
+            
+            if not job:
+                logger.info(f"Job {job_id} not found anywhere")
+                return None
+                
+            # Only process jobs with UUIDs
+            if not job.job_uuid:
+                logger.info(f"Job {job_id} has no UUID, skipping")
+                return None
+            
+            repository_name = job.repository.name if job.repository else "Unknown"
+
+            # Status styling
+            if job.status == "completed":
+                status_class = "bg-green-100 text-green-800"
+                status_icon = "✓"
+            elif job.status == "failed":
+                status_class = "bg-red-100 text-red-800"
+                status_icon = "✗"
+            elif job.status == "running":
+                status_class = "bg-blue-100 text-blue-800"
+                status_icon = "⟳"
+            else:
+                status_class = "bg-gray-100 text-gray-800"
+                status_icon = "◦"
+
+            # Format dates
+            started_at = (
+                job.started_at.strftime("%Y-%m-%d %H:%M") if job.started_at else "N/A"
+            )
+            finished_at = (
+                job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "N/A"
+            )
+
+            # Check if this is a composite job
+            is_composite = job.job_type == "composite" and job.tasks
+
+            # Job header
+            job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
+            if is_composite:
+                progress_text = f"({job.completed_tasks}/{job.total_tasks} tasks)"
+                job_title += f" {progress_text}"
+
+            # Sort tasks by order if composite
+            sorted_tasks = (
+                sorted(job.tasks, key=lambda t: t.task_order) if is_composite else []
+            )
+            
+            # Fix task statuses for failed jobs
+            if is_composite and job.status == "failed":
+                sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
+
+            # Create a job context object that uses UUID as the primary ID (same as for manager jobs)
+            job_context = type('JobContext', (), {
+                'id': job.job_uuid,  # Use the UUID as the ID
+                'status': job.status,
+                'job_type': job.job_type,
+                'type': job.type,
+                'started_at': job.started_at,
+                'finished_at': job.finished_at,
+                'error': job.error,
+                'job_uuid': job.job_uuid,
+            })()
+
+            return {
+                "job": job_context,  # Use UUID-based job context
+                "repository_name": repository_name,
+                "status_class": status_class,
+                "status_icon": status_icon,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "job_title": job_title,
+                "is_composite": is_composite,
+                "sorted_tasks": sorted_tasks,
+            }
+        except ValueError:
+            # Try job manager for non-integer IDs
+            if job_id in self.job_manager.jobs:
+                job = self.job_manager.jobs[job_id]
+                # This would need similar formatting for JobManager jobs
+                # For now, return None since we're focusing on database jobs
+                return None
+        except Exception as e:
+            logger.error(f"Error getting job for render: {e}")
+            return None
+
+    def _format_manager_job_for_render(self, manager_job, job_id, db_job=None):
+        """Format a job manager job for template rendering"""
+        try:
+            # Use database job data if available, otherwise create from manager job
+            if db_job:
+                repository_name = db_job.repository.name if db_job.repository else "Unknown"
+                job_type = db_job.type
+                job_status = manager_job.status  # Use current status from manager
+            else:
+                # Extract info from manager job (this may need adjustment based on your job structure)
+                repository_name = getattr(manager_job, 'repository_name', 'Unknown')
+                job_type = getattr(manager_job, 'job_type', 'composite')
+                job_status = manager_job.status
+            
+            # Status styling
+            if job_status == "completed":
+                status_class = "bg-green-100 text-green-800"
+                status_icon = "✓"
+            elif job_status == "failed":
+                status_class = "bg-red-100 text-red-800"
+                status_icon = "✗"
+            elif job_status == "running":
+                status_class = "bg-blue-100 text-blue-800"
+                status_icon = "⟳"
+            else:
+                status_class = "bg-gray-100 text-gray-800"
+                status_icon = "◦"
+
+            # Format dates
+            started_at = (
+                manager_job.started_at.strftime("%Y-%m-%d %H:%M") if manager_job.started_at else "N/A"
+            )
+            finished_at = (
+                manager_job.completed_at.strftime("%Y-%m-%d %H:%M") if hasattr(manager_job, 'completed_at') and manager_job.completed_at else "N/A"
+            )
+
+            # Check if composite job
+            is_composite = hasattr(manager_job, 'is_composite') and manager_job.is_composite()
+            
+            # Job title
+            job_title = f"{job_type.replace('_', ' ').title()} - {repository_name}"
+            if is_composite and hasattr(manager_job, 'tasks'):
+                completed_tasks = sum(1 for task in manager_job.tasks if task.status == 'completed')
+                total_tasks = len(manager_job.tasks)
+                progress_text = f"({completed_tasks}/{total_tasks} tasks)"
+                job_title += f" {progress_text}"
+
+            # Convert manager job tasks to format expected by templates
+            sorted_tasks = []
+            if is_composite and hasattr(manager_job, 'tasks'):
+                for i, task in enumerate(manager_job.tasks):
+                    # Ensure task has task_order property for templates
+                    if not hasattr(task, 'task_order'):
+                        task.task_order = i
+                    
+                    # Convert output_lines to output string for templates
+                    if hasattr(task, 'output_lines') and task.output_lines:
+                        task.output = "\n".join([
+                            line.get("text", "") if isinstance(line, dict) else str(line) 
+                            for line in task.output_lines
+                        ])
+                    else:
+                        task.output = ""
+                    
+                    sorted_tasks.append(task)
+
+            # Create a job context object that uses UUID as the primary ID
+            job_context = type('JobContext', (), {
+                'id': job_id,  # Use the UUID as the ID
+                'status': job_status,
+                'job_type': job_type,
+                'type': job_type,
+                'started_at': manager_job.started_at,
+                'finished_at': getattr(manager_job, 'completed_at', None),
+                'error': getattr(manager_job, 'error', None),
+                'job_uuid': job_id,
+            })()
+
+            return {
+                "job": job_context,  # Use the context object with UUID as ID
+                "job_title": job_title,
+                "status_class": status_class,
+                "status_icon": status_icon,
+                "started_at": started_at,
+                "finished_at": finished_at if job_status != "running" else None,
+                "repository_name": repository_name,
+                "is_composite": is_composite,
+                "sorted_tasks": sorted_tasks,
+                "expand_details": False,  # Will be set by the caller
+            }
+        except Exception as e:
+            logger.error(f"Error formatting manager job {job_id}: {e}")
+            return None
+
+    def _fix_task_statuses_for_failed_job(self, sorted_tasks):
+        """
+        Fix task statuses for failed jobs to ensure proper display.
+        
+        When a job fails:
+        - Tasks before the failed task should be 'completed' 
+        - The task that caused failure should be 'failed'
+        - Tasks after the failed task should be 'skipped'
+        """
+        if not sorted_tasks:
+            return sorted_tasks
+            
+        # Find the first failed task or the first running task (which likely failed)
+        failed_task_index = None
+        for i, task in enumerate(sorted_tasks):
+            if task.status == "failed":
+                failed_task_index = i
+                break
+            elif task.status == "running":
+                # If a task is still showing as running but the job failed,
+                # this task likely failed but wasn't updated properly
+                failed_task_index = i
+                # Update the status to failed for display purposes
+                task.status = "failed"
+                break
+                
+        if failed_task_index is not None:
+            # Mark all tasks after the failed task as skipped
+            for i in range(failed_task_index + 1, len(sorted_tasks)):
+                task = sorted_tasks[i]
+                if task.status in ["pending", "running"]:
+                    task.status = "skipped"
+                    
+        # Also handle the case where no explicit failed task is found
+        # but there are still running tasks in a failed job
+        else:
+            # Mark all running/pending tasks as failed (conservative approach)
+            for task in sorted_tasks:
+                if task.status in ["running", "pending"]:
+                    task.status = "failed"
+                    
+        return sorted_tasks
 
 
 # Global instance for dependency injection

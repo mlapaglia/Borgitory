@@ -111,8 +111,11 @@ class JobStreamService:
     ) -> AsyncGenerator[str, None]:
         """Generate Server-Sent Events for a specific job's output"""
         try:
+            logger.debug(f"Starting SSE stream for job {job_id}")
+            
             # Check if this is a composite job first - look in unified manager
             job = self.job_manager.jobs.get(job_id)
+            
             if job and job.is_composite():
                 # Stream composite job output from unified manager
                 event_queue = self.job_manager.subscribe_to_events()
@@ -129,7 +132,49 @@ class JobStreamService:
                             )
                             # Only send events for this job
                             if event.get("job_id") == job_id:
-                                yield f"data: {json.dumps(event)}\n\n"
+                                # Handle different event types for HTMX SSE
+                                if event.get("type") == "task_output":
+                                    # Send task-specific output for HTMX sse-swap
+                                    task_index = event.get("task_index", 0)
+                                    output_line = event.get("line", "")
+                                    
+                                    # Get current task and build accumulated output
+                                    if hasattr(job, 'tasks') and task_index < len(job.tasks):
+                                        task = job.tasks[task_index]
+                                        if hasattr(task, 'output_lines') and task.output_lines:
+                                            # Build complete output from all lines
+                                            full_output = "\n".join([line.get("text", "") for line in task.output_lines])
+                                            # Send complete accumulated output
+                                            yield f"event: task-{task_index}-output\ndata: {full_output}\n\n"
+                                        else:
+                                            # Fall back to single line
+                                            yield f"event: task-{task_index}-output\ndata: {output_line}\n\n"
+                                    else:
+                                        # Fall back to single line
+                                        yield f"event: task-{task_index}-output\ndata: {output_line}\n\n"
+                                    
+                                elif event.get("type") == "task_started":
+                                    task_index = event.get("task_index", 0)
+                                    # Update task status
+                                    yield f"event: task-{task_index}-status\ndata: ⟳ Running\n\n"
+                                    
+                                elif event.get("type") == "task_completed":
+                                    task_index = event.get("task_index", 0)
+                                    # Update task status
+                                    yield f"event: task-{task_index}-status\ndata: ✓ Completed\n\n"
+                                    
+                                elif event.get("type") == "task_failed":
+                                    task_index = event.get("task_index", 0)
+                                    # Update task status
+                                    yield f"event: task-{task_index}-status\ndata: ✗ Failed\n\n"
+                                    
+                                elif event.get("type") == "job_completed":
+                                    # Send complete event to trigger switch to static view
+                                    yield f"event: complete\ndata: completed\n\n"
+                                    
+                                else:
+                                    # Send generic event
+                                    yield f"data: {json.dumps(event)}\n\n"
                         except asyncio.TimeoutError:
                             yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
                         except Exception as e:
@@ -139,10 +184,132 @@ class JobStreamService:
                     self.job_manager.unsubscribe_from_events(event_queue)
             else:
                 # Stream regular borg job output
-                async for event in self.job_manager.stream_job_output(job_id):
-                    yield f"data: {json.dumps(event)}\n\n"
+                logger.info(f"Starting regular job output stream for {job_id}")
+                output_buffer = []
+                
+                try:
+                    async for event in self.job_manager.stream_job_output(job_id):
+                        logger.debug(f"Job {job_id} received event: {event}")
+                        
+                        if event.get("type") == "output":
+                            # Accumulate output lines
+                            line_data = event.get("data", "")
+                            if isinstance(line_data, dict):
+                                output_buffer.append(line_data.get("text", ""))
+                            else:
+                                output_buffer.append(str(line_data))
+                            
+                            # Send accumulated output for HTMX sse-swap
+                            full_output = "\n".join(output_buffer)
+                            yield f"event: output\ndata: {full_output}\n\n"
+                            
+                            # Also send status update if there's progress
+                            if event.get("progress"):
+                                yield f"event: output-status\ndata: Streaming\n\n"
+                        elif event.get("type") == "complete":
+                            # Send completion event to trigger switch to static view
+                            logger.info(f"Job {job_id} completed, sending completion event")
+                            yield f"event: complete\ndata: completed\n\n"
+                            break
+                        else:
+                            # Send other events as JSON data
+                            yield f"data: {json.dumps(event)}\n\n"
+                except Exception as stream_error:
+                    logger.error(f"Error in job output stream for {job_id}: {stream_error}")
+                    yield f"event: output\ndata: Error streaming output: {stream_error}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    async def stream_task_output(self, job_id: str, task_order: int) -> StreamingResponse:
+        """Stream real-time output for a specific task via Server-Sent Events"""
+        return StreamingResponse(
+            self._task_output_event_generator(job_id, task_order),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+
+    async def _task_output_event_generator(
+        self, job_id: str, task_order: int
+    ) -> AsyncGenerator[str, None]:
+        """Generate Server-Sent Events for a specific task's output"""
+        try:
+            logger.debug(f"Starting task SSE stream for job {job_id}, task {task_order}")
+            
+            # Get the job from manager
+            job = self.job_manager.jobs.get(job_id)
+            if not job:
+                yield f"event: output\ndata: Job {job_id} not found\n\n"
+                return
+                
+            if not (hasattr(job, 'is_composite') and job.is_composite()):
+                yield f"event: output\ndata: Job {job_id} is not a composite job\n\n"
+                return
+                
+            # Find the specific task
+            if not hasattr(job, 'tasks') or task_order >= len(job.tasks):
+                yield f"event: output\ndata: Task {task_order} not found in job {job_id}\n\n"
+                return
+                
+            task = job.tasks[task_order]
+            logger.info(f"Found task {task_order} in job {job_id}: {task.task_name}, status: {task.status}")
+            
+            # Subscribe to events for this job
+            event_queue = self.job_manager.subscribe_to_events()
+            
+            try:
+                # Send current task output if any
+                if hasattr(task, 'output_lines') and task.output_lines:
+                    current_output = "\n".join([line.get("text", "") for line in task.output_lines])
+                    if current_output.strip():
+                        yield f"event: output\ndata: {current_output}\n\n"
+                
+                # Stream live updates
+                while task.status == "running":
+                    try:
+                        event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
+                        
+                        # Only process events for this specific job and task
+                        if (event.get("job_id") == job_id and 
+                            event.get("type") == "task_output" and 
+                            event.get("task_index") == task_order):
+                            
+                            # Send the new output line
+                            output_line = event.get("line", "")
+                            if output_line:
+                                # Get accumulated output for this task
+                                if hasattr(task, 'output_lines') and task.output_lines:
+                                    full_output = "\n".join([line.get("text", "") for line in task.output_lines])
+                                    yield f"event: output\ndata: {full_output}\n\n"
+                                else:
+                                    yield f"event: output\ndata: {output_line}\n\n"
+                                    
+                        elif (event.get("job_id") == job_id and 
+                              event.get("type") in ["task_completed", "task_failed"] and 
+                              event.get("task_index") == task_order):
+                            
+                            # Task completed or failed
+                            logger.info(f"Task {task_order} in job {job_id} {event.get('type')}")
+                            yield f"event: complete\ndata: {event.get('type')}\n\n"
+                            break
+                            
+                    except asyncio.TimeoutError:
+                        # Send heartbeat
+                        yield f"event: heartbeat\ndata: ping\n\n"
+                        continue
+                        
+                # Send final completion if task is no longer running
+                if task.status != "running":
+                    yield f"event: complete\ndata: {task.status}\n\n"
+                    
+            finally:
+                self.job_manager.unsubscribe_from_events(event_queue)
+                
+        except Exception as e:
+            logger.error(f"Error in task output stream for job {job_id}, task {task_order}: {e}")
+            yield f"event: output\ndata: Error streaming task output: {e}\n\n"
 
     async def get_job_status(self, job_id: str) -> Dict[str, Any]:
         """Get current job status and progress for streaming"""

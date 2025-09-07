@@ -3,7 +3,7 @@ from datetime import datetime, UTC
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.database import Repository, Job, CleanupConfig, RepositoryCheckConfig
+from app.models.database import Repository, Job, CleanupConfig, RepositoryCheckConfig, NotificationConfig
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
 from app.services.job_manager import get_job_manager
@@ -60,6 +60,14 @@ class JobService:
             )
             if check_task:
                 task_definitions.append(check_task)
+
+        # Add notification task if notification is configured
+        if backup_request.notification_config_id:
+            notification_task = await self._build_notification_task(
+                backup_request.notification_config_id, repository.name, db
+            )
+            if notification_task:
+                task_definitions.append(notification_task)
 
         # Create composite job using unified manager
         job_id = await self.job_manager.create_composite_job(
@@ -505,6 +513,33 @@ class JobService:
             "first_n_archives": check_config.first_n_archives,
             "last_n_archives": check_config.last_n_archives,
         }
+
+    async def _build_notification_task(
+        self, notification_config_id: int, repository_name: str, db: Session
+    ) -> Optional[Dict[str, Any]]:
+        """Build notification task definition from notification config"""
+        notification_config = (
+            db.query(NotificationConfig)
+            .filter(
+                NotificationConfig.id == notification_config_id,
+                NotificationConfig.enabled,
+            )
+            .first()
+        )
+
+        if not notification_config:
+            return None
+
+        notification_task = {
+            "type": "notification",
+            "name": f"Send notification for {repository_name}",
+            "provider": notification_config.provider,
+            "notify_on_success": notification_config.notify_on_success,
+            "notify_on_failure": notification_config.notify_on_failure,
+            "config_id": notification_config_id,
+        }
+
+        return notification_task
 
 
 # Global instance for dependency injection

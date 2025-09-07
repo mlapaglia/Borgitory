@@ -232,6 +232,130 @@ async def stream_job_output(
     return await stream_svc.stream_job_output(job_id)
 
 
+@router.get("/{job_id}/toggle-details", response_class=HTMLResponse)
+async def toggle_job_details(
+    job_id: str,
+    request: Request,
+    expanded: str = "false",
+    db: Session = Depends(get_db),
+    render_svc: JobRenderService = Depends(lambda: job_render_service),
+):
+    """Toggle job details visibility and return refreshed job item"""
+    job = render_svc.get_job_for_render(job_id, db)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Toggle the expand_details state
+    job['expand_details'] = expanded == "false"  # If currently false, expand it
+    
+    logger.debug(f"Job toggle - rendering job {job_id}")
+    
+    # Return the complete job item with new state
+    return templates.TemplateResponse(
+        request,
+        "partials/jobs/job_item.html",
+        job
+    )
+
+
+@router.get("/{job_id}/details-static", response_class=HTMLResponse)
+async def get_job_details_static(
+    job_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    render_svc: JobRenderService = Depends(lambda: job_render_service),
+):
+    """Get static job details (used when job completes)"""
+    job = render_svc.get_job_for_render(job_id, db)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    return templates.TemplateResponse(
+        request,
+        "partials/jobs/job_details_static.html",
+        job
+    )
+
+
+@router.get("/{job_id}/tasks/{task_order}/toggle-details", response_class=HTMLResponse)
+async def toggle_task_details(
+    job_id: str,
+    task_order: int,
+    request: Request,
+    expanded: str = "false",
+    db: Session = Depends(get_db),
+    render_svc: JobRenderService = Depends(lambda: job_render_service),
+):
+    """Toggle task details visibility and return updated task item"""
+    job = render_svc.get_job_for_render(job_id, db)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Find the specific task
+    task = None
+    if job.get('is_composite') and job.get('sorted_tasks'):
+        for t in job['sorted_tasks']:
+            if t.task_order == task_order:
+                task = t
+                break
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Toggle the task expanded state
+    task_expanded = expanded == "false"  # If currently false, expand it
+    
+    # Create context for the task template - use the UUID-based job context from render service
+    context = {
+        "job": job['job'],  # This is already the UUID-based job context from _format_manager_job_for_render
+        "task": task,
+        "task_expanded": task_expanded,
+    }
+    
+    # Choose appropriate template based on job status
+    if job['job'].status == 'running':
+        template_name = "partials/jobs/task_item_streaming.html"
+    else:
+        template_name = "partials/jobs/task_item_static.html"
+    
+    return templates.TemplateResponse(
+        request,
+        template_name,
+        context
+    )
+
+
+@router.post("/{job_id}/copy-output")
+async def copy_job_output(
+    job_id: str,
+    db: Session = Depends(get_db),
+    job_svc: JobService = Depends(lambda: job_service),
+):
+    """Copy job output to clipboard (returns success message)"""
+    return {"message": "Output copied to clipboard"}
+
+
+@router.get("/{job_id}/tasks/{task_order}/stream")
+async def stream_task_output(
+    job_id: str,
+    task_order: int,
+    stream_svc: JobStreamService = Depends(lambda: job_stream_service),
+):
+    """Stream real-time output for a specific task via Server-Sent Events"""
+    return await stream_svc.stream_task_output(job_id, task_order)
+
+
+@router.post("/{job_id}/tasks/{task_order}/copy-output")
+async def copy_task_output(
+    job_id: str,
+    task_order: int,
+    db: Session = Depends(get_db),
+    job_svc: JobService = Depends(lambda: job_service),
+):
+    """Copy task output to clipboard (returns success message)"""
+    return {"message": "Task output copied to clipboard"}
+
+
 @router.delete("/{job_id}")
 async def cancel_job(
     job_id: str,

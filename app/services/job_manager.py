@@ -582,6 +582,14 @@ class BorgJobManager:
                             f"❌ Task {i + 1}/{len(job.tasks)} failed: {task.task_name}"
                         )
 
+                        # Pass the task error that was set by the execution method
+                        error_msg = task.error if hasattr(task, 'error') else None
+                        
+                        # Update database task status - THIS WAS MISSING!
+                        self._update_composite_task_status(
+                            job_id, i, "failed", error=error_msg, return_code=1
+                        )
+
                         # Mark remaining tasks as skipped
                         self._mark_remaining_tasks_as_skipped(job, i + 1)
 
@@ -608,6 +616,11 @@ class BorgJobManager:
                     task.completed_at = datetime.now()
                     task.return_code = 1
                     task.error = str(e)
+
+                    # Update database task status - THIS WAS MISSING TOO!
+                    self._update_composite_task_status(
+                        job_id, i, "failed", error=str(e), return_code=1
+                    )
 
                     # Mark remaining tasks as skipped
                     self._mark_remaining_tasks_as_skipped(job, i + 1)
@@ -682,6 +695,8 @@ class BorgJobManager:
             return await self._execute_check_task(job, task, task_index)
         elif task.task_type == "cloud_sync":
             return await self._execute_cloud_sync_task(job, task, task_index)
+        elif task.task_type == "notification":
+            return await self._execute_notification_task(job, task, task_index)
         else:
             logger.error(f"Unknown task type: {task.task_type}")
             task.error = f"Unknown task type: {task.task_type}"
@@ -1441,22 +1456,22 @@ class BorgJobManager:
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
             )
-
+            
             # Stream output to task
             async for line in process.stdout:
                 decoded_line = line.decode("utf-8", errors="replace").rstrip()
-
+            
                 # Store in task output
                 task.output_lines.append(
                     {"timestamp": datetime.now().isoformat(), "text": decoded_line}
                 )
-
+            
                 # Broadcast to SSE listeners
                 self._broadcast_task_output(job.id, task_index, decoded_line)
 
             # Wait for completion
             await process.wait()
-
+            
             if process.returncode == 0:
                 logger.info("✅ Command completed successfully")
                 return True
@@ -1468,6 +1483,141 @@ class BorgJobManager:
         except Exception as e:
             logger.error(f"❌ Exception executing command: {str(e)}")
             task.error = str(e)
+            return False
+
+    async def _execute_notification_task(
+        self, job: BorgJob, task: BorgJobTask, task_index: int
+    ) -> bool:
+        """Execute a notification task"""
+        try:
+            # Get repository data from repository_id
+            if not job.repository_id:
+                logger.error("Repository ID not found for notification")
+                return False
+                
+            repository_data = self._get_repository_data(job.repository_id)
+            if not repository_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"📬 Sending notification for repository {repository_data['name']}")
+
+            # Get notification configuration
+            from app.models.database import NotificationConfig
+            from app.utils.db_session import get_db_session
+            
+            with get_db_session() as db:
+                # Find the first enabled notification config (simplified approach)
+                notification_config = (
+                    db.query(NotificationConfig)
+                    .filter(NotificationConfig.enabled == True)
+                    .first()
+                )
+
+                if not notification_config:
+                    logger.info("📋 No notification configuration found - skipping")
+                    task.status = "skipped"
+                    return True
+
+                # Determine if we should send notification based on job status
+                job_success = all(t.status == "completed" for t in job.tasks[:task_index])
+                should_notify = (
+                    (job_success and notification_config.notify_on_success) or
+                    (not job_success and notification_config.notify_on_failure)
+                )
+
+                if not should_notify:
+                    logger.info("📋 Notification not configured for current job status - skipping")
+                    task.status = "skipped"
+                    return True
+
+                # Add initial output
+                initial_output = f"Sending notification via {notification_config.provider}"
+                task.output_lines.append(
+                    {"timestamp": datetime.now().isoformat(), "text": initial_output}
+                )
+                self._broadcast_task_output(job.id, task_index, initial_output)
+
+                # Send notification based on provider
+                if notification_config.provider == "pushover":
+                    success = await self._send_pushover_notification_borgmanager(
+                        notification_config, job, task, task_index
+                    )
+                else:
+                    logger.error(f"Unsupported notification provider: {notification_config.provider}")
+                    task.error = f"Unsupported provider: {notification_config.provider}"
+                    return False
+
+                if success:
+                    success_msg = f"✅ Notification sent successfully via {notification_config.provider}"
+                    task.output_lines.append(
+                        {"timestamp": datetime.now().isoformat(), "text": success_msg}
+                    )
+                    self._broadcast_task_output(job.id, task_index, success_msg)
+                    logger.info(success_msg)
+                    return True
+                else:
+                    return False
+
+        except Exception as e:
+            logger.error(f"❌ Exception in notification task: {str(e)}")
+            task.error = str(e)
+            return False
+
+    async def _send_pushover_notification_borgmanager(
+        self, config, job: BorgJob, task: BorgJobTask, task_index: int
+    ) -> bool:
+        """Send notification via Pushover (BorgJob version)"""
+        try:
+            import httpx
+            from app.utils.encryption import get_cipher_suite
+
+            # Decrypt credentials
+            cipher_suite = get_cipher_suite()
+            user_key = cipher_suite.decrypt(config.encrypted_user_key.encode()).decode()
+            app_token = cipher_suite.decrypt(config.encrypted_app_token.encode()).decode()
+
+            # Determine job status for message
+            job_success = all(t.status == "completed" for t in job.tasks[:task_index])
+            status_emoji = "✅" if job_success else "❌"
+            status_text = "completed successfully" if job_success else "failed"
+            
+            # Get repository data for message
+            repository_data = self._get_repository_data(job.repository_id) if job.repository_id else None
+            repository_name = repository_data['name'] if repository_data else "Unknown"
+            message = f"Backup {status_text} for repository '{repository_name}'"
+            title = f"{status_emoji} Borgitory Backup"
+
+            # Send to Pushover API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.pushover.net/1/messages.json",
+                    data={
+                        "token": app_token,
+                        "user": user_key,
+                        "title": title,
+                        "message": message,
+                    }
+                )
+
+                if response.status_code == 200:
+                    return True
+                else:
+                    error_msg = f"Pushover API error: {response.status_code} - {response.text}"
+                    task.error = error_msg
+                    task.output_lines.append(
+                        {"timestamp": datetime.now().isoformat(), "text": error_msg}
+                    )
+                    self._broadcast_task_output(job.id, task_index, error_msg)
+                    return False
+
+        except Exception as e:
+            error_msg = f"Failed to send Pushover notification: {str(e)}"
+            task.error = error_msg
+            task.output_lines.append(
+                {"timestamp": datetime.now().isoformat(), "text": error_msg}
+            )
+            self._broadcast_task_output(job.id, task_index, error_msg)
             return False
 
 

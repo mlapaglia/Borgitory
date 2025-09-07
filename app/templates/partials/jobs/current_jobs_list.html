@@ -1,8 +1,21 @@
-{# Template for current jobs list #}
+{# Template for current jobs list - simplified for running jobs #}
 {% if current_jobs %}
     <div class="space-y-3">
         {% for job in current_jobs %}
-            {% include 'partials/jobs/current_job_item.html' %}
+        <div class="border border-blue-200 rounded-lg p-3 bg-blue-50 hover:bg-blue-100 transition-colors">
+            <div class="flex items-center">
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-medium text-blue-900">{{ job.type }}</span>
+                        <span class="text-blue-700 text-sm">#{{ job.id }}</span>
+                    </div>
+                    <div class="text-xs text-blue-600 mt-1">
+                        Started: {{ job.started_at }}{% if job.progress_info %} | {{ job.progress_info }}{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
         {% endfor %}
     </div>
 {% else %}

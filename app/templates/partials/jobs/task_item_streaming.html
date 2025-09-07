@@ -1,0 +1,103 @@
+{# Individual task item for composite jobs with streaming support #}
+{% if task.status == "completed" %}
+    {% set task_status_class = "bg-green-100 text-green-800" %}
+    {% set task_status_icon = "✓" %}
+{% elif task.status == "failed" %}
+    {% set task_status_class = "bg-red-100 text-red-800" %}
+    {% set task_status_icon = "✗" %}
+{% elif task.status == "running" %}
+    {% set task_status_class = "bg-blue-100 text-blue-800" %}
+    {% set task_status_icon = "⟳" %}
+{% elif task.status == "skipped" %}
+    {% set task_status_class = "bg-yellow-100 text-yellow-800" %}
+    {% set task_status_icon = "⏸" %}
+{% else %}
+    {% set task_status_class = "bg-gray-100 text-gray-800" %}
+    {% set task_status_icon = "◦" %}
+{% endif %}
+
+{% set task_started = task.started_at.strftime("%H:%M:%S") if task.started_at else "N/A" %}
+{% set task_finished = task.completed_at.strftime("%H:%M:%S") if task.completed_at else "N/A" %}
+
+{% set task_duration = "" %}
+{% if task.started_at and task.completed_at %}
+    {% set duration = task.completed_at - task.started_at %}
+    {% set task_duration = "({:.1f}s)".format(duration.total_seconds()) %}
+{% endif %}
+
+<div class="border dark:border-gray-600 rounded p-3 bg-white dark:bg-gray-600" id="task-item-{{ job.id }}-{{ task.task_order }}">
+    <div class="flex items-center justify-between cursor-pointer" 
+         hx-get="/api/jobs/{{ job.id }}/tasks/{{ task.task_order }}/toggle-details?expanded={{ 'true' if task_expanded else 'false' }}" 
+         hx-target="#task-item-{{ job.id }}-{{ task.task_order }}" 
+         hx-swap="outerHTML">
+        <div class="flex items-center space-x-3">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ task_status_class }}" sse-swap="task-{{ task.task_order }}-status">
+                {{ task_status_icon }} {% if task.status == "skipped" %}Cancelled{% else %}{{ task.status.title() }}{% endif %}
+            </span>
+            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ task.task_name }}</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400" sse-swap="task-{{ task.task_order }}-duration">{{ task_duration }}</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <span class="text-xs text-gray-500 dark:text-gray-400" sse-swap="task-{{ task.task_order }}-timing">{{ task_started }} - {{ task_finished }}</span>
+            <svg class="w-3 h-3 text-gray-400 dark:text-gray-500 transition-transform duration-200 {{ 'rotate-180' if task_expanded else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </div>
+    </div>
+    
+    {% if task_expanded %}
+        <div id="task-details-{{ job.id }}-{{ task.task_order }}">
+            {# Task details for streaming/running tasks #}
+            {% if task.status == "running" %}
+                {# Create SSE connection specifically for this task #}
+                <div class="mt-3 pt-3 border-t dark:border-gray-500" 
+                     hx-ext="sse" 
+                     sse-connect="/api/jobs/{{ job.id }}/tasks/{{ task.task_order }}/stream">
+                    <div class="flex items-center justify-between mb-2">
+                        <h5 class="text-xs font-medium text-gray-700 dark:text-gray-300">Live Output:</h5>
+                        <div class="flex items-center">
+                            <div class="animate-pulse w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                            <span class="text-xs text-green-600" sse-swap="status">Streaming</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto" 
+                         sse-swap="output">
+                        <div class="text-gray-500 dark:text-gray-400">Connecting to task output...</div>
+                    </div>
+                    
+                    {# Auto-refresh to static view when task completes #}
+                    <div style="display: none;" 
+                         hx-get="/api/jobs/{{ job.id }}/tasks/{{ task.task_order }}/toggle-details?expanded=true" 
+                         hx-target="#task-item-{{ job.id }}-{{ task.task_order }}" 
+                         hx-swap="outerHTML"
+                         hx-trigger="sse:complete">
+                    </div>
+                </div>
+            {% else %}
+                {# Static task output #}
+                {% if task.output and task.output.strip() %}
+                    <div class="mt-3 pt-3 border-t dark:border-gray-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <h5 class="text-xs font-medium text-gray-700 dark:text-gray-300">Output:</h5>
+                            <button hx-post="/api/jobs/{{ job.id }}/tasks/{{ task.task_order }}/copy-output" 
+                                    hx-swap="none"
+                                    class="text-xs text-blue-600 hover:text-blue-800">Copy</button>
+                        </div>
+                        <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto">{{ task.output.strip() }}</div>
+                        {% if task.error %}
+                            <div class="mt-2 text-xs text-red-600">Error: {{ task.error }}</div>
+                        {% endif %}
+                    </div>
+                {% elif task.error %}
+                    <div class="mt-3 pt-3 border-t dark:border-gray-500">
+                        <div class="text-xs text-red-600">Error: {{ task.error }}</div>
+                    </div>
+                {% else %}
+                    <div class="mt-3 pt-3 border-t dark:border-gray-500">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">No output available</div>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    {% endif %}
+</div>

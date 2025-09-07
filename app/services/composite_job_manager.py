@@ -6,7 +6,7 @@ from typing import Dict, Optional, List
 from dataclasses import dataclass, field
 from collections import deque
 
-from app.models.database import Repository, Job, JobTask, Schedule
+from app.models.database import Repository, Job, JobTask, Schedule, NotificationConfig
 from app.models.enums import JobType
 from app.services.rclone_service import rclone_service
 from app.utils.db_session import get_db_session
@@ -47,6 +47,11 @@ class CompositeJobTaskInfo:
     archive_glob: Optional[str] = None
     first_n_archives: Optional[int] = None
     last_n_archives: Optional[int] = None
+    # Notification-specific parameters
+    provider: Optional[str] = None
+    notify_on_success: Optional[bool] = None
+    notify_on_failure: Optional[bool] = None
+    config_id: Optional[int] = None
 
 
 @dataclass
@@ -174,6 +179,11 @@ class CompositeJobManager:
                 show_list=task_def.get("show_list"),
                 save_space=task_def.get("save_space"),
                 force_prune=task_def.get("force_prune"),
+                # Notification parameters
+                provider=task_def.get("provider"),
+                notify_on_success=task_def.get("notify_on_success"),
+                notify_on_failure=task_def.get("notify_on_failure"),
+                config_id=task_def.get("config_id"),
             )
             composite_job.tasks.append(task_info)
 
@@ -230,7 +240,9 @@ class CompositeJobManager:
                         task.status = "failed"
                         task.completed_at = datetime.now()
                         task.return_code = 1
-                        self._update_task_status(job_id, i, "failed", return_code=1)
+                        # Pass the task error that was set by the execution method
+                        error_msg = task.error if hasattr(task, 'error') else None
+                        self._update_task_status(job_id, i, "failed", error=error_msg, return_code=1)
 
                         logger.error(
                             f"❌ Task {i + 1}/{len(job.tasks)} failed: {task.task_name}"
@@ -298,6 +310,8 @@ class CompositeJobManager:
             return await self._execute_repo_list_task(job, task, task_index)
         elif task.task_type == "repo_info":
             return await self._execute_repo_info_task(job, task, task_index)
+        elif task.task_type == "notification":
+            return await self._execute_notification_task(job, task, task_index)
         else:
             logger.error(f"Unknown task type: {task.task_type}")
             return False
@@ -366,17 +380,17 @@ class CompositeJobManager:
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
             )
-
+            
             # Stream output to task
             async for line in process.stdout:
                 decoded_line = line.decode("utf-8", errors="replace").rstrip()
                 task.output_lines.append(
                     {"timestamp": datetime.now().isoformat(), "text": decoded_line}
                 )
-
+            
                 # Broadcast output
                 self._broadcast_task_output(job.id, task_index, decoded_line)
-
+            
             await process.wait()
 
             if process.returncode == 0:
@@ -712,6 +726,131 @@ class CompositeJobManager:
         except Exception as e:
             logger.error(f"❌ Exception in cloud sync task: {str(e)}")
             task.error = str(e)
+            return False
+
+    async def _execute_notification_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a notification task"""
+        try:
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"📬 Sending notification for repository {repo_data['name']}")
+
+            # Get notification configuration
+            with get_db_session() as db:
+                notification_config = (
+                    db.query(NotificationConfig)
+                    .filter(NotificationConfig.id == task.config_id)
+                    .first()
+                )
+
+                if not notification_config or not notification_config.enabled:
+                    logger.info("📋 Notification configuration not found or disabled - skipping")
+                    task.status = "skipped" 
+                    return True
+
+                # Determine if we should send notification based on job status
+                job_success = all(t.status == "completed" for t in job.tasks[:task_index])
+                should_notify = (
+                    (job_success and notification_config.notify_on_success) or
+                    (not job_success and notification_config.notify_on_failure)
+                )
+
+                if not should_notify:
+                    logger.info("📋 Notification not configured for current job status - skipping")
+                    task.status = "skipped"
+                    return True
+
+                # Add initial output
+                initial_output = f"Sending notification via {notification_config.provider}"
+                task.output_lines.append(
+                    {"timestamp": datetime.now().isoformat(), "text": initial_output}
+                )
+                self._broadcast_task_output(job.id, task_index, initial_output)
+
+                # Send notification based on provider
+                if notification_config.provider == "pushover":
+                    success = await self._send_pushover_notification(
+                        notification_config, job, repo_data, task, task_index
+                    )
+                else:
+                    logger.error(f"Unsupported notification provider: {notification_config.provider}")
+                    task.error = f"Unsupported provider: {notification_config.provider}"
+                    return False
+
+                if success:
+                    success_msg = f"✅ Notification sent successfully via {notification_config.provider}"
+                    task.output_lines.append(
+                        {"timestamp": datetime.now().isoformat(), "text": success_msg}
+                    )
+                    self._broadcast_task_output(job.id, task_index, success_msg)
+                    logger.info(success_msg)
+                    return True
+                else:
+                    return False
+
+        except Exception as e:
+            logger.error(f"❌ Exception in notification task: {str(e)}")
+            task.error = str(e)
+            return False
+
+    async def _send_pushover_notification(
+        self, config, job: CompositeJobInfo, repo_data, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Send notification via Pushover"""
+        try:
+            import httpx
+            from app.utils.encryption import get_cipher_suite
+
+            # Decrypt credentials
+            cipher_suite = get_cipher_suite()
+            user_key = cipher_suite.decrypt(config.encrypted_user_key.encode()).decode()
+            app_token = cipher_suite.decrypt(config.encrypted_app_token.encode()).decode()
+
+            # Determine job status for message
+            job_success = all(t.status == "completed" for t in job.tasks[:task_index])
+            status_emoji = "✅" if job_success else "❌"
+            status_text = "completed successfully" if job_success else "failed"
+            
+            # Create message
+            message = f"Backup {status_text} for repository '{repo_data['name']}'"
+            title = f"{status_emoji} Borgitory Backup"
+
+            # Send to Pushover API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.pushover.net/1/messages.json",
+                    data={
+                        "token": app_token,
+                        "user": user_key,
+                        "title": title,
+                        "message": message,
+                    }
+                )
+
+                if response.status_code == 200:
+                    return True
+                else:
+                    error_msg = f"Pushover API error: {response.status_code} - {response.text}"
+                    task.error = error_msg
+                    task.output_lines.append(
+                        {"timestamp": datetime.now().isoformat(), "text": error_msg}
+                    )
+                    self._broadcast_task_output(job.id, task_index, error_msg)
+                    return False
+
+        except Exception as e:
+            error_msg = f"Failed to send Pushover notification: {str(e)}"
+            task.error = error_msg
+            task.output_lines.append(
+                {"timestamp": datetime.now().isoformat(), "text": error_msg}
+            )
+            self._broadcast_task_output(job.id, task_index, error_msg)
             return False
 
     def _update_job_status(self, job_id: str, status: str):
