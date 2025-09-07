@@ -1,7 +1,7 @@
 <!-- Dynamic Check Options Template -->
 <!-- Verification Options -->
 <div>
-    <label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Options</label>
     <div class="space-y-2">
         <label class="flex items-center" id="verify-data-option" style="opacity: {{ verify_data_opacity }};">
             <input type="checkbox" name="verify_data" class="mr-2" {% if verify_data_disabled %}disabled{% endif %}>
@@ -34,14 +34,14 @@
     <div id="advanced-options" class="hidden mt-3 p-4 bg-gray-50 rounded-md space-y-4">
         <!-- Time Limit (Repository Only) -->
         <div id="time-limit-section" style="display: {{ time_limit_display }};">
-            <label class="block text-sm font-medium text-gray-700">Time Limit (seconds)</label>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Time Limit (seconds)</label>
             <input type="number" name="max_duration" min="1" placeholder="3600" value="{{ max_duration }}"
                    hx-get="/api/repository-check-configs/update-options" 
                    hx-target="#dynamic-check-options" 
                    hx-include="closest form"
                    hx-trigger="change"
                    hx-swap="innerHTML"
-                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                   class="input-modern mt-1">
             <p class="text-xs text-gray-500 mt-1">For partial repository checks only. Leave empty for full check.</p>
         </div>
 
@@ -49,21 +49,21 @@
         <div id="archive-filters-section" style="display: {{ archive_filters_display }};">
             <div class="grid grid-cols-1 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Archive Prefix</label>
-                    <input type="text" name="archive_prefix" placeholder="backup-2024" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Prefix</label>
+                    <input type="text" name="archive_prefix" placeholder="backup-2024" class="input-modern mt-1">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Archive Glob Pattern</label>
-                    <input type="text" name="archive_glob" placeholder="*2024*" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Glob Pattern</label>
+                    <input type="text" name="archive_glob" placeholder="*2024*" class="input-modern mt-1">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">First N Archives</label>
-                        <input type="number" name="first_n_archives" min="1" placeholder="10" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">First N Archives</label>
+                        <input type="number" name="first_n_archives" min="1" placeholder="10" class="input-modern mt-1">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Last N Archives</label>
-                        <input type="number" name="last_n_archives" min="1" placeholder="10" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Last N Archives</label>
+                        <input type="number" name="last_n_archives" min="1" placeholder="10" class="input-modern mt-1">
                     </div>
                 </div>
             </div>

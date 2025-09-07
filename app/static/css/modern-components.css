@@ -1,3 +1,42 @@
+/* Modern Input Field Styling */
+.input-modern {
+    background-color: #4b5563;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    width: 100%;
+}
+
+.input-modern::placeholder {
+    color: #9ca3af;
+    font-weight: 400;
+}
+
+.input-modern:hover {
+    background-color: #374151;
+    border-color: #374151;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.input-modern:focus {
+    outline: none;
+    background-color: #374151;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.input-modern:disabled {
+    background-color: #6b7280;
+    border-color: #6b7280;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
 /* Modern Select Dropdown Styling */
 .select-modern {
     appearance: none;
@@ -90,7 +129,28 @@
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-/* Dark mode support - dropdowns with darker backgrounds for better contrast */
+/* Dark mode support - inputs and dropdowns with darker backgrounds for better contrast */
+.dark .input-modern {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
+
+.dark .input-modern::placeholder {
+    color: #6b7280;
+}
+
+.dark .input-modern:hover {
+    background-color: #1f2937;
+    border-color: #374151;
+}
+
+.dark .input-modern:focus {
+    background-color: #1f2937;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
 .dark .select-modern,
 .dark .select-modern-compact {
     background-color: #374151;
@@ -117,6 +177,27 @@
 
 /* Fallback for prefers-color-scheme */
 @media (prefers-color-scheme: dark) {
+    .input-modern {
+        background-color: #374151;
+        border-color: #4b5563;
+        color: #f3f4f6;
+    }
+    
+    .input-modern::placeholder {
+        color: #6b7280;
+    }
+    
+    .input-modern:hover {
+        background-color: #1f2937;
+        border-color: #374151;
+    }
+    
+    .input-modern:focus {
+        background-color: #1f2937;
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+    }
+    
     .select-modern,
     .select-modern-compact {
         background-color: #374151;

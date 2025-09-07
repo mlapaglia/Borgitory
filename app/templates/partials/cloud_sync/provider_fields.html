@@ -4,15 +4,15 @@
 <div id="s3-fields">
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bucket Name</label>
-        <input type="text" name="bucket_name" placeholder="my-backup-bucket" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        <input type="text" name="bucket_name" placeholder="my-backup-bucket" class="input-modern mt-1">
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Access Key ID</label>
-        <input type="text" name="access_key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        <input type="text" name="access_key" class="input-modern mt-1">
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Secret Access Key</label>
-        <input type="password" name="secret_key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        <input type="password" name="secret_key" class="input-modern mt-1">
     </div>
 </div>
 {% elif is_sftp %}
@@ -20,27 +20,27 @@
 <div id="sftp-fields">
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Host</label>
-        <input type="text" name="host" placeholder="sftp.example.com" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        <input type="text" name="host" placeholder="sftp.example.com" class="input-modern mt-1">
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Port</label>
-        <input type="number" name="port" value="22" placeholder="22" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        <input type="number" name="port" value="22" placeholder="22" class="input-modern mt-1">
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Username</label>
-        <input type="text" name="username" placeholder="backup-user" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        <input type="text" name="username" placeholder="backup-user" class="input-modern mt-1">
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Remote Path</label>
-        <input type="text" name="remote_path" placeholder="/backups" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        <input type="text" name="remote_path" placeholder="/backups" class="input-modern mt-1">
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Password (optional if using private key)</label>
-        <input type="password" name="password" placeholder="Leave empty if using private key" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+        <input type="password" name="password" placeholder="Leave empty if using private key" class="input-modern mt-1">
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Private Key (optional if using password)</label>
-        <textarea name="private_key" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" rows="6" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"></textarea>
+        <textarea name="private_key" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" rows="6" class="input-modern mt-1"></textarea>
         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Paste your SSH private key here. This will be securely encrypted when stored.</p>
     </div>
 </div>
@@ -49,7 +49,7 @@
 <!-- Common Fields -->
 <div>
     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
-    <input type="text" name="path_prefix" placeholder="backups/borgitory" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+    <input type="text" name="path_prefix" placeholder="backups/borgitory" class="input-modern mt-1">
 </div>
 
 <div class="flex space-x-2">

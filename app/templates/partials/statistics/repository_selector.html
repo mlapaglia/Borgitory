@@ -10,7 +10,7 @@
             hx-swap="innerHTML"
             hx-trigger="change"
             hx-vals='js:{"repository_id": event.target.value}'
-            hx-on::before-request="htmx.ajax('GET', '/api/repositories/stats/loading', {target: '#statistics-content', swap: 'innerHTML'})"
+            hx-on::before-request="if(event.target.value) { htmx.ajax('GET', '/api/repositories/stats/loading?repository_id=' + event.target.value, {target: '#statistics-content', swap: 'innerHTML'}); return false; }"
         >
             <option value="">Select a repository...</option>
             {% for repo in repositories %}
@@ -19,3 +19,4 @@
         </select>
     </div>
 </div>
+

@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable, Optional
 from sqlalchemy.orm import Session
 
 from app.models.database import Repository
@@ -14,18 +14,30 @@ class RepositoryStatsService:
     """Service to gather repository statistics from Borg commands"""
 
     async def get_repository_statistics(
-        self, repository: Repository, db: Session
+        self, repository: Repository, db: Session, progress_callback: Optional[Callable[[str, int], None]] = None
     ) -> Dict[str, Any]:
         """Gather comprehensive repository statistics"""
         try:
+            if progress_callback:
+                progress_callback("Initializing repository analysis...", 5)
+                
             # Get list of all archives
+            if progress_callback:
+                progress_callback("Scanning repository for archives...", 10)
             archives = await self._get_archive_list(repository)
             if not archives:
                 return {"error": "No archives found in repository"}
 
+            if progress_callback:
+                progress_callback(f"Found {len(archives)} archives. Analyzing archive details...", 15)
+
             # Get detailed info for each archive
             archive_stats = []
-            for archive in archives:
+            for i, archive in enumerate(archives):
+                if progress_callback:
+                    # Progress from 15% to 60% during archive analysis
+                    archive_progress = 15 + int((i / len(archives)) * 45)
+                    progress_callback(f"Analyzing archive {i+1}/{len(archives)}: {archive}", archive_progress)
                 archive_info = await self._get_archive_info(repository, archive)
                 if archive_info:
                     archive_stats.append(archive_info)
@@ -36,9 +48,17 @@ class RepositoryStatsService:
             # Sort archives by date
             archive_stats.sort(key=lambda x: x.get("start", ""))
 
-            # Get file type statistics
-            file_type_stats = await self._get_file_type_stats(repository, archives)
+            if progress_callback:
+                progress_callback("Building size and compression statistics...", 65)
 
+            # Get file type statistics
+            if progress_callback:
+                progress_callback("Analyzing file types and extensions...", 70)
+            file_type_stats = await self._get_file_type_stats(repository, archives, progress_callback)
+
+            if progress_callback:
+                progress_callback("Finalizing statistics and building charts...", 90)
+                
             # Build statistics
             stats = {
                 "repository_path": repository.path,
@@ -51,6 +71,9 @@ class RepositoryStatsService:
                 "file_type_stats": file_type_stats,
                 "summary": self._build_summary_stats(archive_stats),
             }
+
+            if progress_callback:
+                progress_callback("Statistics analysis complete!", 100)
 
             return stats
 
@@ -250,7 +273,7 @@ class RepositoryStatsService:
         return dedup_data
 
     async def _get_file_type_stats(
-        self, repository: Repository, archives: List[str]
+        self, repository: Repository, archives: List[str], progress_callback: Optional[Callable[[str, int], None]] = None
     ) -> Dict[str, Any]:
         """Get file type statistics over time"""
         file_type_timeline = {"labels": [], "count_data": {}, "size_data": {}}
@@ -258,7 +281,11 @@ class RepositoryStatsService:
         # Limit to recent archives for performance (last 10)
         recent_archives = archives[-10:] if len(archives) > 10 else archives
 
-        for archive_name in recent_archives:
+        for i, archive_name in enumerate(recent_archives):
+            if progress_callback:
+                # Progress from 70% to 85% during file type analysis
+                file_progress = 70 + int((i / len(recent_archives)) * 15)
+                progress_callback(f"Analyzing file types in archive {i+1}/{len(recent_archives)}: {archive_name}", file_progress)
             try:
                 # Get file listing with sizes
                 command, env = build_secure_borg_command(
