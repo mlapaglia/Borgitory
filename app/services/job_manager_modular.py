@@ -64,7 +64,7 @@ class BorgJob:
     # Repository context
     repository_id: Optional[int] = None
     schedule: Optional["Schedule"] = None
-    
+
     # Configuration IDs for composite jobs
     cloud_sync_config_id: Optional[int] = None
 

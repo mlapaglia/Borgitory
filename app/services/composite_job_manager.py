@@ -67,7 +67,7 @@ class CompositeJobInfo:
         None  # Store ID instead of object to avoid session issues
     )
     schedule: Optional["Schedule"] = None
-    
+
     # Configuration IDs for composite jobs
     cloud_sync_config_id: Optional[int] = None
 
@@ -648,7 +648,9 @@ class CompositeJobManager:
                 return False
 
             # Check for cloud_sync_config_id in job or schedule
-            cloud_sync_config_id = job.cloud_sync_config_id or (job.schedule.cloud_sync_config_id if job.schedule else None)
+            cloud_sync_config_id = job.cloud_sync_config_id or (
+                job.schedule.cloud_sync_config_id if job.schedule else None
+            )
             if not cloud_sync_config_id:
                 logger.info("📋 No cloud backup configuration - skipping cloud sync")
                 task.status = "skipped"
