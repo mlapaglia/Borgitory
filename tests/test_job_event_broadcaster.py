@@ -145,7 +145,6 @@ class TestJobEventBroadcaster:
         queue.put_nowait({"type": "test", "data": "event1"})
         queue.put_nowait({"type": "test", "data": "event2"})
         
-        events = []
         stream_gen = self.broadcaster.stream_events_for_client(queue)
         
         # Get first two events

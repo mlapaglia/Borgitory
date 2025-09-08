@@ -74,7 +74,9 @@ class Repository(Base):
 class Job(Base):
     __tablename__ = "jobs"
 
-    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))  # UUID as primary key
+    id = Column(
+        String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())
+    )  # UUID as primary key
     repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
     type = Column(String, nullable=False)  # backup, restore, list, etc.
     status = Column(
@@ -401,10 +403,14 @@ async def init_db():
             result = connection.execute(text("SELECT 1"))
             result.fetchone()
             logger.info("Database connection test successful")
-            
+
             # Check if tables exist, create them if they don't
             try:
-                result = connection.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='jobs';"))
+                result = connection.execute(
+                    text(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name='jobs';"
+                    )
+                )
                 if not result.fetchone():
                     logger.info("Tables not found, creating them from models...")
                     Base.metadata.create_all(bind=engine)

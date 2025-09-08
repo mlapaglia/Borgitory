@@ -247,7 +247,9 @@ class JobRenderService:
 
             # If job exists in database and is completed/failed, use database data exclusively
             if job and job.status in ["completed", "failed"]:
-                logger.info(f"Found completed/failed job {job_id} in database, using database data")
+                logger.info(
+                    f"Found completed/failed job {job_id} in database, using database data"
+                )
                 return self._format_database_job_for_render(job)
 
             # For running jobs or jobs not in database, check job manager
@@ -300,7 +302,9 @@ class JobRenderService:
             # Job header
             job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
             if is_composite:
-                progress_text = f"({job.completed_tasks or 0}/{job.total_tasks or 0} tasks)"
+                progress_text = (
+                    f"({job.completed_tasks or 0}/{job.total_tasks or 0} tasks)"
+                )
                 job_title += f" {progress_text}"
 
             # Sort tasks by order if composite
@@ -356,7 +360,9 @@ class JobRenderService:
                 if db_job.status in ["completed", "failed"]:
                     job_status = db_job.status
                 else:
-                    job_status = manager_job.status  # Use manager status for running jobs
+                    job_status = (
+                        manager_job.status
+                    )  # Use manager status for running jobs
             else:
                 # Extract info from manager job (this may need adjustment based on your job structure)
                 repository_name = getattr(manager_job, "repository_name", "Unknown")
@@ -411,7 +417,7 @@ class JobRenderService:
                 else:
                     completed_tasks = 0
                     total_tasks = 0
-                
+
                 if total_tasks > 0:
                     progress_text = f"({completed_tasks}/{total_tasks} tasks)"
                     job_title += f" {progress_text}"

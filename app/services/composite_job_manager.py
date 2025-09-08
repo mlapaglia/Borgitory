@@ -1041,18 +1041,22 @@ class CompositeJobManager:
                 queue.put_nowait(event_data)
             except asyncio.QueueFull:
                 pass  # Skip if queue is full
-        
+
         # Also broadcast to external event broadcaster if available
-        if hasattr(self, '_external_event_broadcaster') and self._external_event_broadcaster:
+        if (
+            hasattr(self, "_external_event_broadcaster")
+            and self._external_event_broadcaster
+        ):
             from app.services.job_event_broadcaster import EventType
+
             self._external_event_broadcaster.broadcast_event(
                 EventType.JOB_OUTPUT,  # Use JOB_OUTPUT type
                 job_id=job_id,
                 data={
                     "line": line,
                     "task_index": task_index,
-                    "task_type": "task_output"
-                }
+                    "task_type": "task_output",
+                },
             )
 
     def subscribe_to_events(self) -> asyncio.Queue:

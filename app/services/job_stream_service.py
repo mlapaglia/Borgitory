@@ -260,8 +260,12 @@ class JobStreamService:
             job = self.job_manager.jobs.get(job_id)
             if not job:
                 # Try to get completed job from database
-                logger.info(f"Job {job_id} not in memory, checking database for completed job")
-                async for output in self._stream_completed_task_output(job_id, task_order):
+                logger.info(
+                    f"Job {job_id} not in memory, checking database for completed job"
+                )
+                async for output in self._stream_completed_task_output(
+                    job_id, task_order
+                ):
                     yield output
                 return
 
@@ -292,20 +296,22 @@ class JobStreamService:
                             # Send individual line as div for beforeend appending
                             yield f"event: output\ndata: <div>{line_text}</div>\n\n"
 
-                # Track last line count to send only new lines
-                last_line_count = len(task.output_lines) if hasattr(task, "output_lines") and task.output_lines else 0
-
                 # Stream live updates
                 while task.status == "running":
                     try:
                         event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
 
                         # Only process events for this specific job and task
-                        if event.get("job_id") == job_id and event.get("type") == "job_output":
+                        if (
+                            event.get("job_id") == job_id
+                            and event.get("type") == "job_output"
+                        ):
                             event_data = event.get("data", {})
                             # Check if this is a task-specific event for our task
-                            if (event_data.get("task_type") == "task_output" 
-                                and event_data.get("task_index") == task_order):
+                            if (
+                                event_data.get("task_type") == "task_output"
+                                and event_data.get("task_index") == task_order
+                            ):
                                 output_line = event_data.get("line", "")
                                 if output_line:
                                     # Send individual line as div for beforeend appending
@@ -410,11 +416,13 @@ class JobStreamService:
 
         return current_jobs
 
-    async def _stream_completed_task_output(self, job_id: str, task_order: int) -> AsyncGenerator[str, None]:
+    async def _stream_completed_task_output(
+        self, job_id: str, task_order: int
+    ) -> AsyncGenerator[str, None]:
         """Stream output for completed tasks from database"""
         try:
             from app.models.database import Job, JobTask, SessionLocal
-            
+
             session = SessionLocal()
             try:
                 # Get job from database
@@ -422,31 +430,34 @@ class JobStreamService:
                 if not job:
                     yield f"event: output\ndata: Job {job_id} not found in database\n\n"
                     return
-                
+
                 # Get the specific task
-                task = session.query(JobTask).filter(
-                    JobTask.job_id == job_id,
-                    JobTask.task_order == task_order
-                ).first()
-                
+                task = (
+                    session.query(JobTask)
+                    .filter(JobTask.job_id == job_id, JobTask.task_order == task_order)
+                    .first()
+                )
+
                 if not task:
                     yield f"event: output\ndata: Task {task_order} not found for job {job_id}\n\n"
                     return
-                
-                logger.info(f"Streaming completed task output: {task.task_name} ({task.status})")
-                
+
+                logger.info(
+                    f"Streaming completed task output: {task.task_name} ({task.status})"
+                )
+
                 # Send task output if available
                 if task.output:
                     yield f"event: output\ndata: {task.output}\n\n"
                 else:
-                    yield f"event: output\ndata: No output available for this task\n\n"
-                
+                    yield "event: output\ndata: No output available for this task\n\n"
+
                 # Send completion event
                 yield f"event: complete\ndata: Task completed with status: {task.status}\n\n"
-                
+
             finally:
                 session.close()
-                
+
         except Exception as e:
             logger.error(f"Error streaming completed task output: {e}")
             yield f"event: output\ndata: Error loading task output: {e}\n\n"

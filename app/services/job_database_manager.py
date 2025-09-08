@@ -67,7 +67,7 @@ class JobDatabaseManager:
                     check_config_id=None,  # Explicitly set to None
                     notification_config_id=None,  # Explicitly set to None
                     job_type="composite",  # Set as composite since we have tasks
-                    total_tasks=1,  # Default total tasks  
+                    total_tasks=1,  # Default total tasks
                     completed_tasks=0,  # Default completed tasks
                 )
 
@@ -323,12 +323,16 @@ class JobDatabaseManager:
                 for i, task in enumerate(tasks):
                     # Convert task output lines to string if needed
                     task_output = ""
-                    if hasattr(task, 'output_lines') and task.output_lines:
-                        task_output = "\n".join([
-                            line.get("text", "") if isinstance(line, dict) else str(line)
-                            for line in task.output_lines
-                        ])
-                    elif hasattr(task, 'output') and task.output:
+                    if hasattr(task, "output_lines") and task.output_lines:
+                        task_output = "\n".join(
+                            [
+                                line.get("text", "")
+                                if isinstance(line, dict)
+                                else str(line)
+                                for line in task.output_lines
+                            ]
+                        )
+                    elif hasattr(task, "output") and task.output:
                         task_output = task.output
 
                     db_task = JobTask(
@@ -336,18 +340,20 @@ class JobDatabaseManager:
                         task_type=task.task_type,
                         task_name=task.task_name,
                         status=task.status,
-                        started_at=getattr(task, 'started_at', None),
-                        completed_at=getattr(task, 'completed_at', None),
+                        started_at=getattr(task, "started_at", None),
+                        completed_at=getattr(task, "completed_at", None),
                         output=task_output,
-                        error=getattr(task, 'error', None),
-                        return_code=getattr(task, 'return_code', None),
+                        error=getattr(task, "error", None),
+                        return_code=getattr(task, "return_code", None),
                         task_order=i,
                     )
                     db.add(db_task)
 
                 # Update job task counts
                 db_job.total_tasks = len(tasks)
-                db_job.completed_tasks = sum(1 for task in tasks if task.status == "completed")
+                db_job.completed_tasks = sum(
+                    1 for task in tasks if task.status == "completed"
+                )
 
                 db.commit()
                 logger.info(f"Saved {len(tasks)} tasks for job {job_uuid}")
