@@ -171,10 +171,10 @@ class BorgService:
 
         try:
             from app.services.simple_command_runner import simple_command_runner
-            
+
             # Execute the command directly and wait for result
             result = await simple_command_runner.run_command(command, env, timeout=60)
-            
+
             if result.success:
                 return {
                     "success": True,
@@ -190,7 +190,9 @@ class BorgService:
                     }
 
                 # Return the actual error from borg
-                error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                error_msg = (
+                    result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                )
                 return {
                     "success": False,
                     "message": f"Initialization failed: {error_msg}",

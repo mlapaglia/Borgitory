@@ -310,7 +310,7 @@ class ModularBorgJobManager:
             )
             # Create database job record (UUID is already set as job.id)
             await self.database_manager.create_database_job(db_job_data)
-            
+
             # Save all tasks to database before starting execution
             # This ensures task structure exists even if job is interrupted
             try:

@@ -51,7 +51,9 @@ class RecoveryService:
                 from app.models.database import Job, JobTask
 
                 # Find all jobs in database marked as running or pending (interrupted before completion)
-                interrupted_jobs = db.query(Job).filter(Job.status.in_(["running", "pending"])).all()
+                interrupted_jobs = (
+                    db.query(Job).filter(Job.status.in_(["running", "pending"])).all()
+                )
 
                 if not interrupted_jobs:
                     logger.info("No interrupted database job records found")
