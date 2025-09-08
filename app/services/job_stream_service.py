@@ -1,10 +1,10 @@
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict, Any, Optional
 from fastapi.responses import StreamingResponse
 
-from app.services.job_manager import get_job_manager
+from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class JobStreamService:
     """Service for handling Server-Sent Events streaming for jobs"""
 
-    def __init__(self, job_manager=None):
+    def __init__(self, job_manager: Optional[ModularBorgJobManager] = None):
         self.job_manager = job_manager or get_job_manager()
 
     async def stream_all_jobs(self) -> StreamingResponse:

@@ -7,7 +7,8 @@ from datetime import datetime, UTC
 from typing import Dict, List, Optional
 
 from app.models.database import Repository, Job
-from app.services.job_manager import get_job_manager
+from app.services.job_executor import JobExecutor
+from app.services.job_manager import get_job_manager  # Keep for backup operations that need job tracking
 from app.utils.db_session import get_db_session
 from app.utils.security import (
     build_secure_borg_command,
@@ -20,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class BorgService:
-    def __init__(self):
+    def __init__(self, job_executor: Optional[JobExecutor] = None):
+        self.job_executor = job_executor or JobExecutor()
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
@@ -375,7 +377,7 @@ class BorgService:
             raise Exception(f"Failed to list archives: {str(e)}")
 
     async def get_repo_info(self, repository: Repository) -> Dict[str, any]:
-        """Get repository information"""
+        """Get repository information using direct process execution"""
         try:
             command, env = build_secure_borg_command(
                 base_command="borg info",
@@ -387,41 +389,25 @@ class BorgService:
             raise Exception(f"Security validation failed: {str(e)}")
 
         try:
-            job_manager = get_job_manager()
-            job_id = await job_manager.start_borg_command(command, env=env)
+            # Use JobExecutor directly for simple synchronous operations
+            process = await self.job_executor.start_process(command, env)
+            result = await self.job_executor.monitor_process_output(process)
 
-            # Wait for completion
-            max_wait = 30
-            wait_time = 0
+            if result.return_code == 0:
+                # Parse JSON output from stdout
+                output_text = result.stdout.decode('utf-8', errors='replace')
+                for line in output_text.split('\n'):
+                    line = line.strip()
+                    if line.startswith("{"):
+                        try:
+                            return json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
 
-            while wait_time < max_wait:
-                status = job_manager.get_job_status(job_id)
-                if not status:
-                    raise Exception("Job not found")
-
-                if status["completed"]:
-                    if status["return_code"] == 0:
-                        output = await job_manager.get_job_output_stream(job_id)
-
-                        # Parse JSON output
-                        for line in output.get("lines", []):
-                            line_text = line["text"]
-                            if line_text.startswith("{"):
-                                try:
-                                    return json.loads(line_text)
-                                except json.JSONDecodeError:
-                                    continue
-
-                        raise Exception("No valid JSON output found")
-                    else:
-                        error_lines = [line["text"] for line in output.get("lines", [])]
-                        error_text = "\n".join(error_lines)
-                        raise Exception(f"Borg info failed: {error_text}")
-
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            raise Exception("Get repo info timed out")
+                raise Exception("No valid JSON output found")
+            else:
+                error_text = result.stderr.decode('utf-8', errors='replace') if result.stderr else "Unknown error"
+                raise Exception(f"Borg info failed with code {result.return_code}: {error_text}")
 
         except Exception as e:
             raise Exception(f"Failed to get repository info: {str(e)}")
@@ -442,42 +428,28 @@ class BorgService:
             raise Exception(f"Validation failed: {str(e)}")
 
         try:
-            job_manager = get_job_manager()
-            job_id = await job_manager.start_borg_command(command, env=env)
+            # Use JobExecutor directly for simple synchronous operations
+            process = await self.job_executor.start_process(command, env)
+            result = await self.job_executor.monitor_process_output(process)
 
-            # Wait for completion
-            max_wait = 60
-            wait_time = 0
+            if result.return_code == 0:
+                # Parse JSON lines output from stdout
+                output_text = result.stdout.decode('utf-8', errors='replace')
+                contents = []
+                
+                for line in output_text.split('\n'):
+                    line = line.strip()
+                    if line.startswith("{"):
+                        try:
+                            item = json.loads(line)
+                            contents.append(item)
+                        except json.JSONDecodeError:
+                            continue
 
-            while wait_time < max_wait:
-                status = job_manager.get_job_status(job_id)
-                if not status:
-                    raise Exception("Job not found")
-
-                if status["completed"]:
-                    if status["return_code"] == 0:
-                        output = await job_manager.get_job_output_stream(job_id)
-
-                        contents = []
-                        for line in output.get("lines", []):
-                            line_text = line["text"]
-                            if line_text.startswith("{"):
-                                try:
-                                    item = json.loads(line_text)
-                                    contents.append(item)
-                                except json.JSONDecodeError:
-                                    continue
-
-                        return contents
-                    else:
-                        error_lines = [line["text"] for line in output.get("lines", [])]
-                        error_text = "\n".join(error_lines)
-                        raise Exception(f"Borg list failed: {error_text}")
-
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            raise Exception("List archive contents timed out")
+                return contents
+            else:
+                error_text = result.stderr.decode('utf-8', errors='replace') if result.stderr else "Unknown error"
+                raise Exception(f"Borg list failed with code {result.return_code}: {error_text}")
 
         except Exception as e:
             raise Exception(f"Failed to list archive contents: {str(e)}")

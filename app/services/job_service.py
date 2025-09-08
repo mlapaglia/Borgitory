@@ -12,7 +12,7 @@ from app.models.database import (
 )
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
-from app.services.job_manager import get_job_manager
+from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class JobService:
     """Service for managing job operations"""
 
-    def __init__(self, job_manager=None):
+    def __init__(self, job_manager: Optional[ModularBorgJobManager] = None):
         self.job_manager = job_manager or get_job_manager()
 
     async def create_backup_job(

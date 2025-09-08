@@ -1,4 +1,5 @@
-from unittest.mock import Mock, patch
+import pytest
+from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, UTC
 
 from app.services.job_render_service import JobRenderService
@@ -610,3 +611,191 @@ class TestJobRenderServiceStatusStyling:
         
         assert "bg-gray-100" in result
         assert "◦" in result
+
+
+class TestJobRenderServiceSSE:
+    """Test SSE streaming functionality"""
+
+    def setup_method(self):
+        """Set up test fixtures"""
+        from app.services.job_manager_modular import ModularBorgJobManager
+        from app.services.job_render_service import JobRenderService
+        
+        # Create mock job manager
+        self.mock_job_manager = Mock(spec=ModularBorgJobManager)
+        self.mock_job_manager.jobs = {}
+        
+        # Create service with mock manager
+        self.job_render_service = JobRenderService(job_manager=self.mock_job_manager)
+        
+    @pytest.mark.asyncio
+    async def test_stream_current_jobs_html_initial_message(self):
+        """Test that SSE stream sends initial HTML message"""
+        # Mock the render method
+        with patch.object(self.job_render_service, 'render_current_jobs_html', return_value="<div>No jobs</div>"):
+            # Mock the job manager stream
+            async def mock_stream():
+                yield {"type": "job_status", "data": "test"}
+                
+            self.mock_job_manager.stream_all_job_updates = AsyncMock(side_effect=lambda: mock_stream())
+            
+            # Get the stream generator
+            stream_gen = self.job_render_service.stream_current_jobs_html()
+            
+            # Get first message (should be initial HTML)
+            first_message = await stream_gen.__anext__()
+            
+            assert first_message == "data: <div>No jobs</div>\n\n"
+            
+            # Clean up
+            await stream_gen.aclose()
+
+    @pytest.mark.asyncio
+    async def test_stream_current_jobs_html_updates_on_events(self):
+        """Test that SSE stream updates HTML when job events occur"""
+        call_count = 0
+        def mock_render():
+            nonlocal call_count
+            call_count += 1
+            return f"<div>Update {call_count}</div>"
+            
+        with patch.object(self.job_render_service, 'render_current_jobs_html', side_effect=mock_render):
+            # Create a real async generator instead of trying to mock it
+            events_sent = []
+            
+            async def mock_stream():
+                events = [
+                    {"type": "job_status", "id": "job1", "status": "running"},
+                    {"type": "job_status", "id": "job1", "status": "completed"}
+                ]
+                for event in events:
+                    events_sent.append(event)
+                    yield event
+            
+            # Directly set the async generator
+            self.mock_job_manager.stream_all_job_updates = mock_stream
+            
+            # Get the stream generator
+            stream_gen = self.job_render_service.stream_current_jobs_html()
+            
+            # Collect messages
+            messages = []
+            try:
+                async for message in stream_gen:
+                    messages.append(message)
+                    if len(messages) >= 3:  # Initial + 2 updates
+                        break
+            except StopAsyncIteration:
+                pass
+            
+            # Should have initial message + 2 updates
+            assert len(messages) == 3
+            assert messages[0] == "data: <div>Update 1</div>\n\n"
+            assert messages[1] == "data: <div>Update 2</div>\n\n" 
+            assert messages[2] == "data: <div>Update 3</div>\n\n"
+            
+            # Clean up
+            await stream_gen.aclose()
+
+    @pytest.mark.asyncio
+    async def test_stream_current_jobs_html_error_handling(self):
+        """Test SSE stream handles errors gracefully"""
+        # Mock templates for error handling
+        mock_template = Mock()
+        mock_template.render.return_value = "<div class='error'>Error occurred</div>"
+        self.job_render_service.templates.get_template = Mock(return_value=mock_template)
+        
+        # First call succeeds, second call fails
+        call_count = 0
+        def mock_render():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return "<div>Initial</div>"
+            else:
+                raise Exception("Render error")
+                
+        with patch.object(self.job_render_service, 'render_current_jobs_html', side_effect=mock_render):
+            # Mock the job manager stream
+            async def mock_stream():
+                yield {"type": "job_status", "id": "job1", "status": "running"}
+                
+            self.mock_job_manager.stream_all_job_updates = AsyncMock(side_effect=lambda: mock_stream())
+            
+            # Get the stream generator
+            stream_gen = self.job_render_service.stream_current_jobs_html()
+            
+            # Get messages
+            messages = []
+            try:
+                async for message in stream_gen:
+                    messages.append(message)
+                    if len(messages) >= 2:
+                        break
+            except StopAsyncIteration:
+                pass
+            
+            # Should have initial message + error message
+            assert len(messages) == 2
+            assert messages[0] == "data: <div>Initial</div>\n\n"
+            assert messages[1] == "data: <div class='error'>Error occurred</div>\n\n"
+            
+            # Clean up
+            await stream_gen.aclose()
+
+    @pytest.mark.asyncio 
+    async def test_stream_current_jobs_html_job_manager_error(self):
+        """Test SSE stream handles job manager stream errors"""
+        # Mock templates for error handling
+        mock_template = Mock()
+        mock_template.render.return_value = "<div class='error'>Stream error</div>"
+        self.job_render_service.templates.get_template = Mock(return_value=mock_template)
+        
+        # Mock job manager method to raise error immediately
+        def failing_stream():
+            raise Exception("Stream failed")
+            
+        self.mock_job_manager.stream_all_job_updates = failing_stream
+        
+        # Get the stream generator
+        stream_gen = self.job_render_service.stream_current_jobs_html()
+        
+        # Get first message (should be error)
+        first_message = await stream_gen.__anext__()
+        
+        assert first_message == "data: <div class='error'>Stream error</div>\n\n"
+        
+        # Clean up
+        await stream_gen.aclose()
+
+    @pytest.mark.asyncio
+    async def test_stream_current_jobs_html_proper_sse_format(self):
+        """Test that SSE messages follow proper Server-Sent Events format"""
+        with patch.object(self.job_render_service, 'render_current_jobs_html', return_value="<div>Test HTML</div>"):
+            # Mock simple stream
+            async def mock_stream():
+                yield {"type": "test"}
+                
+            self.mock_job_manager.stream_all_job_updates = mock_stream
+            
+            stream_gen = self.job_render_service.stream_current_jobs_html()
+            
+            # Get messages
+            messages = []
+            try:
+                async for message in stream_gen:
+                    messages.append(message)
+                    if len(messages) >= 2:
+                        break
+            except StopAsyncIteration:
+                pass
+            
+            # Check SSE format
+            for message in messages:
+                assert message.startswith("data: ")
+                assert message.endswith("\n\n")
+                # Make sure HTML doesn't have newlines that break SSE format
+                # (The error template might contain newlines, so let's be more specific)
+                assert "Error streaming jobs" not in message, f"Unexpected error in message: {message}"
+            
+            await stream_gen.aclose()

@@ -9,15 +9,15 @@ from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.services.job_service import job_service, JobService
 from app.services.job_render_service import job_render_service, JobRenderService
 from app.services.job_stream_service import job_stream_service, JobStreamService
-from app.services.job_manager import get_job_manager, BorgJobManager
+from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-def get_job_manager_dependency() -> BorgJobManager:
-    """Dependency to get job manager instance."""
+def get_job_manager_dependency() -> ModularBorgJobManager:
+    """Dependency to get modular job manager instance."""
     return get_job_manager()
 
 
@@ -174,6 +174,25 @@ def get_current_jobs_html(
     """Get current running jobs as HTML"""
     html_content = render_svc.render_current_jobs_html()
     return HTMLResponse(content=html_content)
+
+
+@router.get("/current/stream")
+async def stream_current_jobs_html(
+    render_svc: JobRenderService = Depends(lambda: job_render_service),
+):
+    """Stream current running jobs as HTML via Server-Sent Events"""
+    from fastapi.responses import StreamingResponse
+    
+    return StreamingResponse(
+        render_svc.stream_current_jobs_html(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+        },
+    )
 
 
 @router.get("/{job_id}")
@@ -363,7 +382,7 @@ async def cancel_job(
 
 @router.get("/manager/stats")
 def get_job_manager_stats(
-    job_manager: BorgJobManager = Depends(get_job_manager_dependency),
+    job_manager: ModularBorgJobManager = Depends(get_job_manager_dependency),
 ):
     """Get JobManager statistics"""
     jobs = job_manager.jobs
@@ -383,7 +402,7 @@ def get_job_manager_stats(
 
 @router.post("/manager/cleanup")
 def cleanup_completed_jobs(
-    job_manager: BorgJobManager = Depends(get_job_manager_dependency),
+    job_manager: ModularBorgJobManager = Depends(get_job_manager_dependency),
 ):
     """Clean up completed jobs from JobManager memory"""
     cleaned = 0
@@ -401,7 +420,7 @@ def cleanup_completed_jobs(
 
 
 @router.get("/queue/stats")
-def get_queue_stats(job_manager: BorgJobManager = Depends(get_job_manager_dependency)):
+def get_queue_stats(job_manager: ModularBorgJobManager = Depends(get_job_manager_dependency)):
     """Get backup queue statistics"""
     return job_manager.get_queue_stats()
 

@@ -2,13 +2,14 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Optional, List, Callable, Any
+from typing import Dict, Optional, List, Callable
 from dataclasses import dataclass, field
 from collections import deque
 
 from app.models.database import Repository, Job, JobTask, Schedule, NotificationConfig
 from app.models.enums import JobType
 from app.utils.db_session import get_db_session
+from app.services.job_manager_modular import ModularBorgJobManager
 
 logger = logging.getLogger(__name__)
 
@@ -86,15 +87,21 @@ class CompositeJobManager:
         rclone_service=None,
         subprocess_executor: Optional[Callable] = None,
         http_client_factory: Optional[Callable] = None,
+        job_manager: Optional[ModularBorgJobManager] = None
     ):
         self.jobs: Dict[str, CompositeJobInfo] = {}
         self._event_queues: List[asyncio.Queue] = []  # For SSE streaming
-        
+
         # Dependency injection for testability
         self._db_session_factory = db_session_factory or get_db_session
         self._rclone_service = rclone_service
-        self._subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
+        self._subprocess_executor = (
+            subprocess_executor or asyncio.create_subprocess_exec
+        )
         self._http_client_factory = http_client_factory
+        
+        # Use the new modular job manager for actual execution
+        self._job_manager = job_manager
 
     def _get_repository_data(self, repository_id: int):
         """Get repository data from database using a fresh session"""
@@ -120,7 +127,18 @@ class CompositeJobManager:
         cloud_sync_config_id: Optional[int] = None,
     ) -> str:
         """Create a new composite job with multiple tasks"""
-
+        
+        # If we have the modular job manager, delegate to it
+        if self._job_manager:
+            return await self._job_manager.create_composite_job(
+                job_type=str(job_type),
+                task_definitions=task_definitions,
+                repository=repository,
+                schedule=schedule,
+                cloud_sync_config_id=cloud_sync_config_id
+            )
+        
+        # Fallback to original implementation for backward compatibility
         job_id = str(uuid.uuid4())
 
         # Extract repository ID to avoid session issues
@@ -670,8 +688,9 @@ class CompositeJobManager:
                     # Use rclone service to sync to S3
                     if not self._rclone_service:
                         from app.services.rclone_service import rclone_service
+
                         self._rclone_service = rclone_service
-                        
+
                     progress_generator = self._rclone_service.sync_repository_to_s3(
                         repository=repo_obj,
                         access_key_id=access_key,
@@ -696,8 +715,9 @@ class CompositeJobManager:
                     # Use rclone service to sync to SFTP
                     if not self._rclone_service:
                         from app.services.rclone_service import rclone_service
+
                         self._rclone_service = rclone_service
-                        
+
                     progress_generator = self._rclone_service.sync_repository_to_sftp(
                         repository=repo_obj,
                         host=config.host,
@@ -861,8 +881,9 @@ class CompositeJobManager:
                 client = self._http_client_factory()
             else:
                 import httpx
+
                 client = httpx.AsyncClient()
-                
+
             async with client:
                 response = await client.post(
                     "https://api.pushover.net/1/messages.json",
@@ -1046,16 +1067,21 @@ class CompositeJobManager:
 # Global composite job manager instance - lazy initialization for dependency injection
 _composite_job_manager_instance = None
 
+
 def get_composite_job_manager() -> CompositeJobManager:
     """Get the global composite job manager instance"""
     global _composite_job_manager_instance
     if _composite_job_manager_instance is None:
         # Import here to avoid circular imports
         from app.services.rclone_service import rclone_service
+        from app.services.job_manager import get_job_manager
+
         _composite_job_manager_instance = CompositeJobManager(
-            rclone_service=rclone_service
+            rclone_service=rclone_service,
+            job_manager=get_job_manager()  # Provide the modular job manager
         )
     return _composite_job_manager_instance
+
 
 # For backward compatibility
 composite_job_manager = get_composite_job_manager()

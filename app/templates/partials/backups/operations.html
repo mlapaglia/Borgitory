@@ -2,9 +2,9 @@
 <div class="border rounded-lg p-4">
     <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Current Operations</h3>
     <div id="current-jobs"
-         hx-get="/api/jobs/current/html"
-         hx-trigger="load, every 2s"
-         hx-swap="innerHTML">
+         hx-ext="sse" 
+         sse-connect="/api/jobs/current/stream"
+         sse-swap="message">
         <div class="text-gray-600 dark:text-gray-400 text-sm">Loading current operations...</div>
     </div>
 </div>
