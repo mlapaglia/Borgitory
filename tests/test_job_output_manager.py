@@ -2,10 +2,9 @@
 Tests for JobOutputManager - job output collection, storage, and streaming
 """
 import pytest
-import asyncio
 from datetime import datetime, timedelta
 
-from app.services.job_output_manager import JobOutputManager, JobOutput, OutputLine
+from app.services.job_output_manager import JobOutputManager
 
 
 class TestJobOutputManager:

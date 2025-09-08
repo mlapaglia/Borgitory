@@ -8,7 +8,9 @@ from typing import Dict, List, Optional
 
 from app.models.database import Repository, Job
 from app.services.job_executor import JobExecutor
-from app.services.job_manager import get_job_manager  # Keep for backup operations that need job tracking
+from app.services.job_manager import (
+    get_job_manager,
+)  # Keep for backup operations that need job tracking
 from app.utils.db_session import get_db_session
 from app.utils.security import (
     build_secure_borg_command,
@@ -395,8 +397,8 @@ class BorgService:
 
             if result.return_code == 0:
                 # Parse JSON output from stdout
-                output_text = result.stdout.decode('utf-8', errors='replace')
-                for line in output_text.split('\n'):
+                output_text = result.stdout.decode("utf-8", errors="replace")
+                for line in output_text.split("\n"):
                     line = line.strip()
                     if line.startswith("{"):
                         try:
@@ -406,8 +408,14 @@ class BorgService:
 
                 raise Exception("No valid JSON output found")
             else:
-                error_text = result.stderr.decode('utf-8', errors='replace') if result.stderr else "Unknown error"
-                raise Exception(f"Borg info failed with code {result.return_code}: {error_text}")
+                error_text = (
+                    result.stderr.decode("utf-8", errors="replace")
+                    if result.stderr
+                    else "Unknown error"
+                )
+                raise Exception(
+                    f"Borg info failed with code {result.return_code}: {error_text}"
+                )
 
         except Exception as e:
             raise Exception(f"Failed to get repository info: {str(e)}")
@@ -434,10 +442,10 @@ class BorgService:
 
             if result.return_code == 0:
                 # Parse JSON lines output from stdout
-                output_text = result.stdout.decode('utf-8', errors='replace')
+                output_text = result.stdout.decode("utf-8", errors="replace")
                 contents = []
-                
-                for line in output_text.split('\n'):
+
+                for line in output_text.split("\n"):
                     line = line.strip()
                     if line.startswith("{"):
                         try:
@@ -448,8 +456,14 @@ class BorgService:
 
                 return contents
             else:
-                error_text = result.stderr.decode('utf-8', errors='replace') if result.stderr else "Unknown error"
-                raise Exception(f"Borg list failed with code {result.return_code}: {error_text}")
+                error_text = (
+                    result.stderr.decode("utf-8", errors="replace")
+                    if result.stderr
+                    else "Unknown error"
+                )
+                raise Exception(
+                    f"Borg list failed with code {result.return_code}: {error_text}"
+                )
 
         except Exception as e:
             raise Exception(f"Failed to list archive contents: {str(e)}")

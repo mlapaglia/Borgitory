@@ -3,10 +3,9 @@ Tests for JobExecutor - subprocess execution and process management
 """
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, Mock, patch
-from datetime import datetime
+from unittest.mock import AsyncMock, patch
 
-from app.services.job_executor import JobExecutor, ProcessResult
+from app.services.job_executor import JobExecutor
 
 
 class TestJobExecutor:

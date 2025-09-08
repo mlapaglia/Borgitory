@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import AsyncGenerator, Optional
 from sqlalchemy.orm import Session, joinedload
 from fastapi.templating import Jinja2Templates
 
@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 class JobRenderService:
     """Service for rendering job-related HTML templates"""
 
-    def __init__(self, templates_dir: str = "app/templates", job_manager: Optional[ModularBorgJobManager] = None):
+    def __init__(
+        self,
+        templates_dir: str = "app/templates",
+        job_manager: Optional[ModularBorgJobManager] = None,
+    ):
         self.templates = Jinja2Templates(directory=templates_dir)
         self.job_manager = job_manager or get_job_manager()
 
@@ -496,14 +500,12 @@ class JobRenderService:
 
     async def stream_current_jobs_html(self) -> "AsyncGenerator[str, None]":
         """Stream current jobs as HTML via Server-Sent Events"""
-        import asyncio
-        from typing import AsyncGenerator
-        
+
         try:
             # Send initial HTML
             initial_html = self.render_current_jobs_html()
             yield f"data: {initial_html}\n\n"
-            
+
             # Subscribe to job events for real-time updates
             async for event in self.job_manager.stream_all_job_updates():
                 try:
@@ -513,16 +515,16 @@ class JobRenderService:
                 except Exception as e:
                     logger.error(f"Error generating HTML update: {e}")
                     # Send error state
-                    error_html = self.templates.get_template("partials/jobs/error_state.html").render(
-                        message="Error updating job status", padding="4"
-                    )
+                    error_html = self.templates.get_template(
+                        "partials/jobs/error_state.html"
+                    ).render(message="Error updating job status", padding="4")
                     yield f"data: {error_html}\n\n"
-                    
+
         except Exception as e:
             logger.error(f"Error in HTML job stream: {e}")
-            error_html = self.templates.get_template("partials/jobs/error_state.html").render(
-                message=f"Error streaming jobs: {str(e)}", padding="4"
-            )
+            error_html = self.templates.get_template(
+                "partials/jobs/error_state.html"
+            ).render(message=f"Error streaming jobs: {str(e)}", padding="4")
             yield f"data: {error_html}\n\n"
 
 

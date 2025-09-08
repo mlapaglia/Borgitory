@@ -182,7 +182,7 @@ async def stream_current_jobs_html(
 ):
     """Stream current running jobs as HTML via Server-Sent Events"""
     from fastapi.responses import StreamingResponse
-    
+
     return StreamingResponse(
         render_svc.stream_current_jobs_html(),
         media_type="text/event-stream",
@@ -420,7 +420,9 @@ def cleanup_completed_jobs(
 
 
 @router.get("/queue/stats")
-def get_queue_stats(job_manager: ModularBorgJobManager = Depends(get_job_manager_dependency)):
+def get_queue_stats(
+    job_manager: ModularBorgJobManager = Depends(get_job_manager_dependency),
+):
     """Get backup queue statistics"""
     return job_manager.get_queue_stats()
 

@@ -87,7 +87,7 @@ class CompositeJobManager:
         rclone_service=None,
         subprocess_executor: Optional[Callable] = None,
         http_client_factory: Optional[Callable] = None,
-        job_manager: Optional[ModularBorgJobManager] = None
+        job_manager: Optional[ModularBorgJobManager] = None,
     ):
         self.jobs: Dict[str, CompositeJobInfo] = {}
         self._event_queues: List[asyncio.Queue] = []  # For SSE streaming
@@ -99,7 +99,7 @@ class CompositeJobManager:
             subprocess_executor or asyncio.create_subprocess_exec
         )
         self._http_client_factory = http_client_factory
-        
+
         # Use the new modular job manager for actual execution
         self._job_manager = job_manager
 
@@ -127,7 +127,7 @@ class CompositeJobManager:
         cloud_sync_config_id: Optional[int] = None,
     ) -> str:
         """Create a new composite job with multiple tasks"""
-        
+
         # If we have the modular job manager, delegate to it
         if self._job_manager:
             return await self._job_manager.create_composite_job(
@@ -135,9 +135,9 @@ class CompositeJobManager:
                 task_definitions=task_definitions,
                 repository=repository,
                 schedule=schedule,
-                cloud_sync_config_id=cloud_sync_config_id
+                cloud_sync_config_id=cloud_sync_config_id,
             )
-        
+
         # Fallback to original implementation for backward compatibility
         job_id = str(uuid.uuid4())
 
@@ -1078,7 +1078,7 @@ def get_composite_job_manager() -> CompositeJobManager:
 
         _composite_job_manager_instance = CompositeJobManager(
             rclone_service=rclone_service,
-            job_manager=get_job_manager()  # Provide the modular job manager
+            job_manager=get_job_manager(),  # Provide the modular job manager
         )
     return _composite_job_manager_instance
 

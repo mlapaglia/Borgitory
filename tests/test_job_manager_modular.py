@@ -2,18 +2,15 @@
 Tests for ModularBorgJobManager - integration tests for the refactored modular architecture
 """
 import pytest
-import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 from datetime import datetime, UTC
 
 from app.services.job_manager_modular import (
     ModularBorgJobManager,
-    BorgJob,
-    BorgJobTask
+    BorgJob
 )
 from app.services.job_manager_dependencies import (
     JobManagerConfig,
-    JobManagerDependencies,
     JobManagerFactory
 )
 

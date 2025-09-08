@@ -3,18 +3,14 @@ Tests for CompositeJobManager class - multi-task job orchestration and execution
 """
 import pytest
 import asyncio
-import uuid
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from datetime import datetime
-from typing import Dict, Any, List
-from contextlib import asynccontextmanager
+from unittest.mock import Mock, AsyncMock, patch
 
 from app.services.composite_job_manager import (
     CompositeJobManager, 
     CompositeJobInfo, 
     CompositeJobTaskInfo
 )
-from app.models.database import Repository, Job, JobTask, Schedule, NotificationConfig
+from app.models.database import Repository, Schedule
 from app.models.enums import JobType
 
 

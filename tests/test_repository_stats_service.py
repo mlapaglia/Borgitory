@@ -4,7 +4,6 @@ Tests for RepositoryStatsService class - repository statistics and analytics
 import pytest
 import json
 from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any
 
 from app.services.repository_stats_service import RepositoryStatsService
 from app.models.database import Repository

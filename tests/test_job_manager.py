@@ -1,9 +1,7 @@
-import asyncio
 import pytest
 import uuid
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from collections import deque
 
 from app.services.job_manager import (
     BorgJobManager,
