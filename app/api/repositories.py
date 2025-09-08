@@ -64,23 +64,56 @@ async def create_repository(
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
+        # Create repository object but don't save to database yet
         db_repo = Repository(name=repo.name, path=repo.path)
         db_repo.set_passphrase(repo.passphrase)
 
-        db.add(db_repo)
-        db.commit()
-        db.refresh(db_repo)
-
+        # Try to initialize the Borg repository first
         try:
             init_result = await borg_service.initialize_repository(db_repo)
             if not init_result["success"]:
-                logger.warning(
-                    f"Repository '{repo.name}' created in database but Borg initialization failed: {init_result['message']}"
-                )
+                # Initialization failed, don't save to database
+                borg_error = init_result['message']
+                
+                # Make error message more user-friendly
+                if "Read-only file system" in borg_error:
+                    error_msg = "Cannot create repository: The target directory is read-only. Please choose a writable location."
+                elif "Permission denied" in borg_error:
+                    error_msg = "Cannot create repository: Permission denied. Please check directory permissions."
+                elif "already exists" in borg_error.lower():
+                    error_msg = "A repository already exists at this location."
+                else:
+                    error_msg = f"Failed to initialize repository: {borg_error}"
+                    
+                logger.error(f"Repository initialization failed for '{repo.name}': {borg_error}")
+                if is_htmx_request:
+                    return templates.TemplateResponse(
+                        request,
+                        "partials/repositories/form_create_error.html",
+                        {"error_message": error_msg},
+                        status_code=400,
+                    )
+                raise HTTPException(status_code=400, detail=error_msg)
+                
         except Exception as init_error:
-            logger.error(
-                f"Repository '{repo.name}' created in database but Borg initialization error: {init_error}"
-            )
+            # Initialization threw an exception, don't save to database
+            error_msg = f"Failed to initialize repository: {str(init_error)}"
+            logger.error(error_msg)
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    request,
+                    "partials/repositories/form_create_error.html",
+                    {"error_message": error_msg},
+                    status_code=500,
+                )
+            raise HTTPException(status_code=500, detail=error_msg)
+
+        # Initialization succeeded, now save to database
+        db.add(db_repo)
+        db.commit()
+        db.refresh(db_repo)
+        
+        logger.info(f"Successfully created and initialized repository '{repo.name}')")
 
         # Success response
         if is_htmx_request:

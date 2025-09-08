@@ -170,47 +170,31 @@ class BorgService:
             }
 
         try:
-            job_manager = get_job_manager()
-            job_id = await job_manager.start_borg_command(command, env=env)
+            from app.services.simple_command_runner import simple_command_runner
+            
+            # Execute the command directly and wait for result
+            result = await simple_command_runner.run_command(command, env, timeout=60)
+            
+            if result.success:
+                return {
+                    "success": True,
+                    "message": "Repository initialized successfully",
+                }
+            else:
+                # Check if it's just because repo already exists
+                if "already exists" in result.stderr.lower():
+                    logger.info("Repository already exists, which is fine")
+                    return {
+                        "success": True,
+                        "message": "Repository already exists",
+                    }
 
-            # Wait for initialization to complete (it's usually quick)
-            max_wait = 60  # 60 seconds max
-            wait_time = 0
-
-            while wait_time < max_wait:
-                status = job_manager.get_job_status(job_id)
-                if not status:
-                    return {"success": False, "message": "Job not found"}
-
-                if status["completed"]:
-                    if status["return_code"] == 0:
-                        return {
-                            "success": True,
-                            "message": "Repository initialized successfully",
-                        }
-                    else:
-                        # Get error output
-                        output = await job_manager.get_job_output_stream(job_id)
-                        error_lines = [line["text"] for line in output.get("lines", [])]
-                        error_text = "\n".join(error_lines[-10:])  # Last 10 lines
-
-                        # Check if it's just because repo already exists
-                        if "already exists" in error_text.lower():
-                            logger.info("Repository already exists, which is fine")
-                            return {
-                                "success": True,
-                                "message": "Repository already exists",
-                            }
-
-                        return {
-                            "success": False,
-                            "message": f"Initialization failed: {error_text}",
-                        }
-
-                await asyncio.sleep(1)
-                wait_time += 1
-
-            return {"success": False, "message": "Initialization timed out"}
+                # Return the actual error from borg
+                error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                return {
+                    "success": False,
+                    "message": f"Initialization failed: {error_msg}",
+                }
 
         except Exception as e:
             logger.error(f"Failed to initialize repository: {e}")

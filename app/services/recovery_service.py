@@ -50,18 +50,18 @@ class RecoveryService:
             with get_db_session() as db:
                 from app.models.database import Job, JobTask
 
-                # Find all jobs in database marked as running
-                running_jobs = db.query(Job).filter(Job.status == "running").all()
+                # Find all jobs in database marked as running or pending (interrupted before completion)
+                interrupted_jobs = db.query(Job).filter(Job.status.in_(["running", "pending"])).all()
 
-                if not running_jobs:
+                if not interrupted_jobs:
                     logger.info("No interrupted database job records found")
                     return
 
                 logger.info(
-                    f"Found {len(running_jobs)} interrupted database job records"
+                    f"Found {len(interrupted_jobs)} interrupted database job records"
                 )
 
-                for job in running_jobs:
+                for job in interrupted_jobs:
                     logger.info(
                         f"Cancelling database job record {job.id} ({job.job_type}) - was running since {job.started_at}"
                     )
