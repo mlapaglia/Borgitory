@@ -64,6 +64,9 @@ class BorgJob:
     # Repository context
     repository_id: Optional[int] = None
     schedule: Optional["Schedule"] = None
+    
+    # Configuration IDs for composite jobs
+    cloud_sync_config_id: Optional[int] = None
 
     def get_current_task(self) -> Optional[BorgJobTask]:
         """Get the currently executing task (for composite jobs)"""
@@ -291,6 +294,7 @@ class ModularBorgJobManager:
             tasks=tasks,
             repository_id=repository.id,
             schedule=schedule,
+            cloud_sync_config_id=cloud_sync_config_id,
         )
         self.jobs[job_id] = job
 
@@ -470,6 +474,8 @@ class ModularBorgJobManager:
             job_type="Manual Backup",  # Set appropriate job type
             repository_id=job.repository_id,
             tasks=[composite_task],
+            schedule=job.schedule,
+            cloud_sync_config_id=job.cloud_sync_config_id,
         )
 
         # Execute the task
@@ -522,6 +528,8 @@ class ModularBorgJobManager:
             job_type="Manual Backup",
             repository_id=job.repository_id,
             tasks=[composite_task],
+            schedule=job.schedule,
+            cloud_sync_config_id=job.cloud_sync_config_id,
         )
 
         success = await self._composite_manager._execute_prune_task(
@@ -569,6 +577,8 @@ class ModularBorgJobManager:
             job_type="Manual Backup",
             repository_id=job.repository_id,
             tasks=[composite_task],
+            schedule=job.schedule,
+            cloud_sync_config_id=job.cloud_sync_config_id,
         )
 
         success = await self._composite_manager._execute_check_task(
@@ -605,7 +615,6 @@ class ModularBorgJobManager:
         composite_task = CompositeJobTaskInfo(
             task_type=task.task_type,
             task_name=task.task_name,
-            config_id=task.parameters.get("cloud_sync_config_id"),
         )
 
         composite_job = CompositeJobInfo(
@@ -613,6 +622,8 @@ class ModularBorgJobManager:
             job_type="Manual Backup",
             repository_id=job.repository_id,
             tasks=[composite_task],
+            schedule=job.schedule,
+            cloud_sync_config_id=job.cloud_sync_config_id,
         )
 
         success = await self._composite_manager._execute_cloud_sync_task(
@@ -652,7 +663,7 @@ class ModularBorgJobManager:
             provider=task.parameters.get("provider"),
             notify_on_success=task.parameters.get("notify_on_success", True),
             notify_on_failure=task.parameters.get("notify_on_failure", True),
-            config_id=task.parameters.get("notification_config_id"),
+            config_id=task.parameters.get("config_id"),
         )
 
         composite_job = CompositeJobInfo(
@@ -660,6 +671,8 @@ class ModularBorgJobManager:
             job_type="Manual Backup",
             repository_id=job.repository_id,
             tasks=[composite_task],
+            schedule=job.schedule,
+            cloud_sync_config_id=job.cloud_sync_config_id,
         )
 
         success = await self._composite_manager._execute_notification_task(

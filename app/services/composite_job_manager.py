@@ -67,6 +67,9 @@ class CompositeJobInfo:
         None  # Store ID instead of object to avoid session issues
     )
     schedule: Optional["Schedule"] = None
+    
+    # Configuration IDs for composite jobs
+    cloud_sync_config_id: Optional[int] = None
 
     def is_composite(self) -> bool:
         """Check if this is a multi-task composite job"""
@@ -644,7 +647,9 @@ class CompositeJobManager:
                 logger.error(f"Repository {job.repository_id} not found")
                 return False
 
-            if not job.schedule or not job.schedule.cloud_sync_config_id:
+            # Check for cloud_sync_config_id in job or schedule
+            cloud_sync_config_id = job.cloud_sync_config_id or (job.schedule.cloud_sync_config_id if job.schedule else None)
+            if not cloud_sync_config_id:
                 logger.info("📋 No cloud backup configuration - skipping cloud sync")
                 task.status = "skipped"
                 return True
@@ -657,7 +662,7 @@ class CompositeJobManager:
 
                 config = (
                     db.query(CloudSyncConfig)
-                    .filter(CloudSyncConfig.id == job.schedule.cloud_sync_config_id)
+                    .filter(CloudSyncConfig.id == cloud_sync_config_id)
                     .first()
                 )
 
@@ -855,7 +860,7 @@ class CompositeJobManager:
         """Send notification via Pushover"""
         try:
             import httpx
-            from app.utils.encryption import get_cipher_suite
+            from app.models.database import get_cipher_suite
 
             # Decrypt credentials
             cipher_suite = get_cipher_suite()
