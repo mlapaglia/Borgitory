@@ -39,6 +39,7 @@ class BorgJobTask:
     return_code: Optional[int] = None
     error: Optional[str] = None
     parameters: Dict = field(default_factory=dict)
+    output_lines: List = field(default_factory=list)  # Store task output
 
 
 @dataclass
@@ -57,7 +58,6 @@ class BorgJob:
 
     # Multi-task job support
     job_type: str = "simple"  # 'simple' or 'composite'
-    db_job_id: Optional[int] = None
     tasks: List[BorgJobTask] = field(default_factory=list)
     current_task_index: int = 0
 
@@ -303,9 +303,9 @@ class ModularBorgJobManager:
                 status="pending",
                 started_at=job.started_at,
                 cloud_sync_config_id=cloud_sync_config_id,
-                schedule_id=schedule.id if schedule else None,
             )
-            job.db_job_id = await self.database_manager.create_database_job(db_job_data)
+            # Create database job record (UUID is already set as job.id)
+            await self.database_manager.create_database_job(db_job_data)
 
         # Create output container
         self.output_manager.create_job_output(job_id)
@@ -360,13 +360,16 @@ class ModularBorgJobManager:
                 job.completed_at = datetime.now(UTC)
 
             # Update database
-            if self.database_manager and job.db_job_id:
+            if self.database_manager:
                 await self.database_manager.update_job_status(
                     job_uuid=job.id,
                     status=job.status,
                     finished_at=job.completed_at,
                     return_code=0 if job.status == "completed" else 1,
                 )
+                
+                # Save task details to database
+                await self.database_manager.save_job_tasks(job.id, job.tasks)
 
             # Broadcast completion
             self.event_broadcaster.broadcast_event(
@@ -384,6 +387,23 @@ class ModularBorgJobManager:
             logger.error(f"Composite job {job.id} execution failed: {e}")
 
         finally:
+            # Save task details to database (whether successful or failed)
+            if self.database_manager:
+                try:
+                    # Update final job status
+                    await self.database_manager.update_job_status(
+                        job_uuid=job.id,
+                        status=job.status,
+                        finished_at=job.completed_at,
+                        return_code=0 if job.status == "completed" else 1,
+                        error_message=getattr(job, 'error', None),
+                    )
+                    
+                    # Save all task details
+                    await self.database_manager.save_job_tasks(job.id, job.tasks)
+                except Exception as db_e:
+                    logger.error(f"Failed to save job data to database: {db_e}")
+            
             # Schedule cleanup
             asyncio.create_task(
                 self._auto_cleanup_job(job.id, self.config.auto_cleanup_delay_seconds)
@@ -416,49 +436,214 @@ class ModularBorgJobManager:
     async def _execute_backup_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a backup task"""
-        # This would implement the actual backup logic
-        # For now, return True as placeholder
+        """Execute a backup task using composite job manager"""
+        if not hasattr(self, '_composite_manager') or self._composite_manager is None:
+            from app.services.composite_job_manager import CompositeJobManager
+            self._composite_manager = CompositeJobManager()
+            # Connect composite manager events to our event broadcaster
+            if self.event_broadcaster:
+                self._composite_manager.set_external_event_broadcaster(self.event_broadcaster)
+            
         logger.info(f"Executing backup task: {task.task_name}")
-        return True
+        
+        # Convert BorgJob to CompositeJobInfo format for execution
+        from app.services.composite_job_manager import CompositeJobInfo, CompositeJobTaskInfo
+        from collections import deque
+        
+        # Create a composite task with the same parameters
+        composite_task = CompositeJobTaskInfo(
+            task_type=task.task_type,
+            task_name=task.task_name,
+            source_path=task.parameters.get("source_path", "/data"),
+            compression=task.parameters.get("compression", "zstd"),
+            dry_run=task.parameters.get("dry_run", False),
+        )
+        
+        # Create temporary composite job for execution context
+        composite_job = CompositeJobInfo(
+            id=job.id,
+            job_type="Manual Backup",  # Set appropriate job type
+            repository_id=job.repository_id,
+            tasks=[composite_task]
+        )
+        
+        # Execute the task
+        success = await self._composite_manager._execute_backup_task(composite_job, composite_task, 0)
+        
+        # Copy output and status back to the modular job task
+        if hasattr(composite_task, 'output_lines') and composite_task.output_lines:
+            task.output_lines = list(composite_task.output_lines)
+        if hasattr(composite_task, 'error'):
+            task.error = composite_task.error
+        if hasattr(composite_task, 'return_code'):
+            task.return_code = composite_task.return_code
+            
+        return success
 
     async def _execute_prune_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a prune task"""
+        """Execute a prune task using composite job manager"""
+        if not hasattr(self, '_composite_manager') or self._composite_manager is None:
+            from app.services.composite_job_manager import CompositeJobManager
+            self._composite_manager = CompositeJobManager()
+            
         logger.info(f"Executing prune task: {task.task_name}")
-        return True
+        
+        # Convert to composite task format
+        from app.services.composite_job_manager import CompositeJobInfo, CompositeJobTaskInfo
+        
+        composite_task = CompositeJobTaskInfo(
+            task_type=task.task_type,
+            task_name=task.task_name,
+            keep_within=task.parameters.get("keep_within"),
+            keep_daily=task.parameters.get("keep_daily"),
+            keep_weekly=task.parameters.get("keep_weekly"), 
+            keep_monthly=task.parameters.get("keep_monthly"),
+            keep_yearly=task.parameters.get("keep_yearly"),
+            show_stats=task.parameters.get("show_stats", True),
+            show_list=task.parameters.get("show_list", False),
+            save_space=task.parameters.get("save_space", False),
+        )
+        
+        composite_job = CompositeJobInfo(
+            id=job.id,
+            job_type="Manual Backup",
+            repository_id=job.repository_id,
+            tasks=[composite_task]
+        )
+        
+        success = await self._composite_manager._execute_prune_task(composite_job, composite_task, 0)
+        
+        # Copy results back
+        if hasattr(composite_task, 'output_lines') and composite_task.output_lines:
+            task.output_lines = list(composite_task.output_lines)
+        if hasattr(composite_task, 'error'):
+            task.error = composite_task.error
+        if hasattr(composite_task, 'return_code'):
+            task.return_code = composite_task.return_code
+            
+        return success
 
     async def _execute_check_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a check task"""
+        """Execute a check task using composite job manager"""
+        if not hasattr(self, '_composite_manager') or self._composite_manager is None:
+            from app.services.composite_job_manager import CompositeJobManager
+            self._composite_manager = CompositeJobManager()
+            
         logger.info(f"Executing check task: {task.task_name}")
-        return True
+        
+        # Convert to composite task format
+        from app.services.composite_job_manager import CompositeJobInfo, CompositeJobTaskInfo
+        
+        composite_task = CompositeJobTaskInfo(
+            task_type=task.task_type,
+            task_name=task.task_name,
+            check_type=task.parameters.get("check_type", "full"),
+            verify_data=task.parameters.get("verify_data", False),
+            repair_mode=task.parameters.get("repair_mode", False),
+            max_duration=task.parameters.get("max_duration"),
+        )
+        
+        composite_job = CompositeJobInfo(
+            id=job.id,
+            job_type="Manual Backup",
+            repository_id=job.repository_id,
+            tasks=[composite_task]
+        )
+        
+        success = await self._composite_manager._execute_check_task(composite_job, composite_task, 0)
+        
+        # Copy results back
+        if hasattr(composite_task, 'output_lines') and composite_task.output_lines:
+            task.output_lines = list(composite_task.output_lines)
+        if hasattr(composite_task, 'error'):
+            task.error = composite_task.error
+        if hasattr(composite_task, 'return_code'):
+            task.return_code = composite_task.return_code
+            
+        return success
 
     async def _execute_cloud_sync_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a cloud sync task"""
-        if self.cloud_coordinator and job.repository_id:
-            repository_data = await self._get_repository_data(job.repository_id)
-            if repository_data:
-                cloud_sync_config_id = task.parameters.get("cloud_sync_config_id")
-                if cloud_sync_config_id:
-                    task_id = await self.cloud_coordinator.trigger_cloud_backup(
-                        repository_data=repository_data,
-                        cloud_sync_config_id=cloud_sync_config_id,
-                        source_job_id=job.db_job_id,
-                    )
-                    return task_id is not None
-        return False
+        """Execute a cloud sync task using composite job manager"""
+        if not hasattr(self, '_composite_manager') or self._composite_manager is None:
+            from app.services.composite_job_manager import CompositeJobManager
+            self._composite_manager = CompositeJobManager()
+            
+        logger.info(f"Executing cloud sync task: {task.task_name}")
+        
+        # Convert to composite task format
+        from app.services.composite_job_manager import CompositeJobInfo, CompositeJobTaskInfo
+        
+        composite_task = CompositeJobTaskInfo(
+            task_type=task.task_type,
+            task_name=task.task_name,
+            config_id=task.parameters.get("cloud_sync_config_id"),
+        )
+        
+        composite_job = CompositeJobInfo(
+            id=job.id,
+            job_type="Manual Backup",
+            repository_id=job.repository_id,
+            tasks=[composite_task]
+        )
+        
+        success = await self._composite_manager._execute_cloud_sync_task(composite_job, composite_task, 0)
+        
+        # Copy results back
+        if hasattr(composite_task, 'output_lines') and composite_task.output_lines:
+            task.output_lines = list(composite_task.output_lines)
+        if hasattr(composite_task, 'error'):
+            task.error = composite_task.error
+        if hasattr(composite_task, 'return_code'):
+            task.return_code = composite_task.return_code
+            
+        return success
 
     async def _execute_notification_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a notification task"""
+        """Execute a notification task using composite job manager"""
+        if not hasattr(self, '_composite_manager') or self._composite_manager is None:
+            from app.services.composite_job_manager import CompositeJobManager
+            self._composite_manager = CompositeJobManager()
+            
         logger.info(f"Executing notification task: {task.task_name}")
-        return True
+        
+        # Convert to composite task format
+        from app.services.composite_job_manager import CompositeJobInfo, CompositeJobTaskInfo
+        
+        composite_task = CompositeJobTaskInfo(
+            task_type=task.task_type,
+            task_name=task.task_name,
+            provider=task.parameters.get("provider"),
+            notify_on_success=task.parameters.get("notify_on_success", True),
+            notify_on_failure=task.parameters.get("notify_on_failure", True),
+            config_id=task.parameters.get("notification_config_id"),
+        )
+        
+        composite_job = CompositeJobInfo(
+            id=job.id,
+            job_type="Manual Backup",
+            repository_id=job.repository_id,
+            tasks=[composite_task]
+        )
+        
+        success = await self._composite_manager._execute_notification_task(composite_job, composite_task, 0)
+        
+        # Copy results back
+        if hasattr(composite_task, 'output_lines') and composite_task.output_lines:
+            task.output_lines = list(composite_task.output_lines)
+        if hasattr(composite_task, 'error'):
+            task.error = composite_task.error
+        if hasattr(composite_task, 'return_code'):
+            task.return_code = composite_task.return_code
+            
+        return success
 
     async def _get_repository_data(self, repository_id: int) -> Optional[Dict]:
         """Get repository data from database"""
@@ -515,6 +700,20 @@ class ModularBorgJobManager:
         async for event in self.event_broadcaster.stream_all_events():
             yield event
 
+    def subscribe_to_events(self) -> asyncio.Queue:
+        """Subscribe to job events for SSE streaming"""
+        if hasattr(self.event_broadcaster, 'subscribe_to_events'):
+            return self.event_broadcaster.subscribe_to_events()
+        else:
+            # Fallback: create a queue and return it
+            queue = asyncio.Queue(maxsize=100)
+            return queue
+
+    def unsubscribe_from_events(self, queue: asyncio.Queue) -> None:
+        """Unsubscribe from job events"""
+        if hasattr(self.event_broadcaster, 'unsubscribe_from_events'):
+            self.event_broadcaster.unsubscribe_from_events(queue)
+
     def get_queue_stats(self) -> Dict:
         """Get queue statistics"""
         if self.queue_manager:
@@ -549,6 +748,14 @@ class ModularBorgJobManager:
         if job_id in self.jobs:
             job = self.jobs[job_id]
             if job.status in ["completed", "failed"]:
+                # Ensure task data is persisted before cleanup
+                if self.database_manager and hasattr(job, 'tasks') and job.tasks:
+                    try:
+                        await self.database_manager.save_job_tasks(job_id, job.tasks)
+                        logger.info(f"Persisted task data for job {job_id} before cleanup")
+                    except Exception as e:
+                        logger.error(f"Failed to persist task data for job {job_id}: {e}")
+                
                 self.cleanup_job(job_id)
 
     async def cancel_job(self, job_id: str) -> bool:

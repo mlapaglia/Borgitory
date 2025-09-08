@@ -47,7 +47,7 @@ class TestSyncEndpoints:
         data = response.json()
         assert "job_id" in data
         assert data["status"] == "started"
-        assert isinstance(data["job_id"], int)
+        assert isinstance(data["job_id"], str)  # UUID is now a string
         
         # Verify job was created in database
         job = test_db.query(Job).filter(Job.id == data["job_id"]).first()

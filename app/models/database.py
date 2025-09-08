@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import uuid
 from datetime import datetime, UTC
 
 from cryptography.fernet import Fernet
@@ -73,9 +74,8 @@ class Repository(Base):
 class Job(Base):
     __tablename__ = "jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))  # UUID as primary key
     repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
-    job_uuid = Column(String, nullable=True, index=True)  # Links to JobManager UUID
     type = Column(String, nullable=False)  # backup, restore, list, etc.
     status = Column(
         String, nullable=False, default="pending"
@@ -111,7 +111,7 @@ class JobTask(Base):
     __tablename__ = "job_tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
+    job_id = Column(String, ForeignKey("jobs.id"), nullable=False)  # UUID foreign key
     task_type = Column(String, nullable=False)  # 'backup', 'cloud_sync', 'verify', etc.
     task_name = Column(String, nullable=False)
     status = Column(
@@ -394,13 +394,25 @@ async def init_db():
         os.makedirs(DATA_DIR, exist_ok=True)
         logger.info("Data directory ensured")
 
-        # Simple database connection test
+        # Simple database connection test and table creation
         from sqlalchemy import text
 
         with engine.connect() as connection:
             result = connection.execute(text("SELECT 1"))
             result.fetchone()
             logger.info("Database connection test successful")
+            
+            # Check if tables exist, create them if they don't
+            try:
+                result = connection.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='jobs';"))
+                if not result.fetchone():
+                    logger.info("Tables not found, creating them from models...")
+                    Base.metadata.create_all(bind=engine)
+                    logger.info("Database tables created successfully")
+                else:
+                    logger.info("Database tables already exist")
+            except Exception as e:
+                logger.warning(f"Could not check/create tables: {e}")
 
         # Optional: Log current migration status (non-blocking)
         try:

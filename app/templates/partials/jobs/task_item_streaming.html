@@ -61,7 +61,9 @@
                         </div>
                     </div>
                     <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto" 
-                         sse-swap="output">
+                         id="task-output-container-{{ job.id }}-{{ task.task_order }}"
+                         sse-swap="output"
+                         hx-swap="afterbegin">
                         <div class="text-gray-500 dark:text-gray-400">Connecting to task output...</div>
                     </div>
                     

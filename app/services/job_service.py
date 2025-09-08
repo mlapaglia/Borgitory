@@ -282,11 +282,10 @@ class JobService:
 
         # Try database lookup
         try:
-            db_job_id = int(job_id)
             job = (
                 db.query(Job)
                 .options(joinedload(Job.repository))
-                .filter(Job.id == db_job_id)
+                .filter(Job.id == job_id)
                 .first()
             )
             if job:
@@ -367,11 +366,10 @@ class JobService:
 
         # Try database job
         try:
-            db_job_id = int(job_id)
             job = (
                 db.query(Job)
                 .options(joinedload(Job.repository))
-                .filter(Job.id == db_job_id)
+                .filter(Job.id == job_id)
                 .first()
             )
             if job:

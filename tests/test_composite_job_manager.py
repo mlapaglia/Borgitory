@@ -124,7 +124,6 @@ class TestCompositeJobManager:
         # Create job and task
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -178,7 +177,6 @@ class TestCompositeJobManager:
         """Test backup task execution failure."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -225,7 +223,6 @@ class TestCompositeJobManager:
         """Test successful prune task execution."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -280,7 +277,6 @@ class TestCompositeJobManager:
         """Test successful check task execution."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -329,7 +325,6 @@ class TestCompositeJobManager:
         """Test successful S3 cloud sync task execution."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -377,7 +372,6 @@ class TestCompositeJobManager:
         """Test cloud sync task with no configuration."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -406,7 +400,6 @@ class TestCompositeJobManager:
         """Test successful Pushover notification task."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -459,7 +452,6 @@ class TestCompositeJobManager:
         """Test execution of unknown task type."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -545,7 +537,6 @@ class TestCompositeJobManager:
         """Test marking remaining tasks as skipped."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -573,7 +564,6 @@ class TestCompositeJobManager:
         """Test placeholder repository task implementations."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup",
             repository_id=1
         )
@@ -597,7 +587,6 @@ class TestCompositeJobInfo:
         """Test is_composite method."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup"
         )
         
@@ -607,7 +596,6 @@ class TestCompositeJobInfo:
         """Test getting current task with valid index."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup"
         )
         
@@ -623,7 +611,6 @@ class TestCompositeJobInfo:
         """Test getting current task with invalid index."""
         job = CompositeJobInfo(
             id="test-job",
-            db_job_id=123,
             job_type="scheduled_backup"
         )
         

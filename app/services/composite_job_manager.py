@@ -56,8 +56,7 @@ class CompositeJobTaskInfo:
 
 @dataclass
 class CompositeJobInfo:
-    id: str
-    db_job_id: int
+    id: str  # UUID string
     job_type: str  # 'scheduled_backup', 'manual_backup'
     status: str = "pending"
     started_at: datetime = field(default_factory=datetime.now)
@@ -147,8 +146,8 @@ class CompositeJobManager:
         # Create database job record
         with self._db_session_factory() as db:
             db_job = Job(
+                id=job_id,
                 repository_id=repository_id,
-                job_uuid=job_id,
                 type=str(job_type),
                 status="pending",
                 job_type="composite",
@@ -161,13 +160,12 @@ class CompositeJobManager:
             db.commit()
             db.refresh(db_job)
 
-            # Extract db_job_id while still in session
-            db_job_id = db_job.id
+            # Database job created with UUID as primary key
 
             # Create task records
             for i, task_def in enumerate(task_definitions):
                 task = JobTask(
-                    job_id=db_job_id,
+                    job_id=job_id,  # Use UUID
                     task_type=task_def["type"],
                     task_name=task_def["name"],
                     status="pending",
@@ -176,13 +174,12 @@ class CompositeJobManager:
                 db.add(task)
 
             logger.info(
-                f"📝 Created composite job {job_id} (db_id: {db_job_id}) with {len(task_definitions)} tasks"
+                f"📝 Created composite job {job_id} with {len(task_definitions)} tasks"
             )
 
         # Create in-memory job info
         composite_job = CompositeJobInfo(
             id=job_id,
-            db_job_id=db_job_id,
             job_type=str(job_type),
             repository_id=repository_id,
             schedule=schedule,
@@ -953,7 +950,7 @@ class CompositeJobManager:
                 return
 
             with self._db_session_factory() as db:
-                db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
+                db_job = db.query(Job).filter(Job.id == job.id).first()
                 if db_job:
                     db_job.status = status
                     if status == "completed" or status == "failed":
@@ -970,7 +967,7 @@ class CompositeJobManager:
                 return
 
             with self._db_session_factory() as db:
-                db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
+                db_job = db.query(Job).filter(Job.id == job.id).first()
                 if db_job:
                     db_job.completed_tasks = job.completed_tasks
 
@@ -995,7 +992,7 @@ class CompositeJobManager:
                 task = (
                     db.query(JobTask)
                     .filter(
-                        JobTask.job_id == job.db_job_id,
+                        JobTask.job_id == job.id,
                         JobTask.task_order == task_index,
                     )
                     .first()
@@ -1024,6 +1021,10 @@ class CompositeJobManager:
         except Exception as e:
             logger.error(f"Failed to update task status: {e}")
 
+    def set_external_event_broadcaster(self, event_broadcaster):
+        """Connect to external event broadcaster for unified event streaming"""
+        self._external_event_broadcaster = event_broadcaster
+
     def _broadcast_task_output(self, job_id: str, task_index: int, line: str):
         """Broadcast task output to SSE listeners"""
         event_data = {
@@ -1034,11 +1035,25 @@ class CompositeJobManager:
             "timestamp": datetime.now().isoformat(),
         }
 
+        # Broadcast to internal queues
         for queue in self._event_queues:
             try:
                 queue.put_nowait(event_data)
             except asyncio.QueueFull:
                 pass  # Skip if queue is full
+        
+        # Also broadcast to external event broadcaster if available
+        if hasattr(self, '_external_event_broadcaster') and self._external_event_broadcaster:
+            from app.services.job_event_broadcaster import EventType
+            self._external_event_broadcaster.broadcast_event(
+                EventType.JOB_OUTPUT,  # Use JOB_OUTPUT type
+                job_id=job_id,
+                data={
+                    "line": line,
+                    "task_index": task_index,
+                    "task_type": "task_output"
+                }
+            )
 
     def subscribe_to_events(self) -> asyncio.Queue:
         """Subscribe to job events for SSE streaming"""

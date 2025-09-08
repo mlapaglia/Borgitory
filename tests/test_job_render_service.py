@@ -50,7 +50,7 @@ class TestJobRenderService:
         
         # Create mock job with UUID
         mock_job = Mock(spec=Job)
-        mock_job.job_uuid = "test-uuid-123"
+        mock_job.id = "test-uuid-123"  # UUID as id
         mock_job.id = 1
         mock_job.status = "completed"
         mock_job.job_type = "backup"
@@ -76,8 +76,7 @@ class TestJobRenderService:
         
         # Create mock job without UUID
         mock_job = Mock(spec=Job)
-        mock_job.job_uuid = None
-        mock_job.id = 1
+        mock_job.id = None  # No UUID means no ID
         
         mock_db.query.return_value.options.return_value.order_by.return_value.limit.return_value.all.return_value = [mock_job]
         
@@ -96,7 +95,7 @@ class TestJobRenderService:
         
         # Create mock job with UUID
         mock_job = Mock(spec=Job)
-        mock_job.job_uuid = "test-uuid-123"
+        mock_job.id = "test-uuid-123"  # UUID as id
         mock_job.id = 1
         mock_job.status = "completed"
         mock_job.job_type = "backup"
@@ -213,7 +212,7 @@ class TestJobRenderService:
     def test_render_job_html_without_uuid(self):
         """Test _render_job_html skips job without UUID"""
         mock_job = Mock(spec=Job)
-        mock_job.job_uuid = None
+        mock_job.id = None  # No ID/UUID
         
         result = self.job_render_service._render_job_html(mock_job)
         
@@ -225,7 +224,7 @@ class TestJobRenderService:
         mock_repo.name = "Test Repository"
         
         mock_job = Mock(spec=Job)
-        mock_job.job_uuid = "test-uuid-123"
+        mock_job.id = "test-uuid-123"  # UUID as id
         mock_job.status = "completed"
         mock_job.job_type = "backup"
         mock_job.type = "backup"
@@ -246,7 +245,7 @@ class TestJobRenderService:
         mock_repo.name = "Test Repository"
         
         mock_job = Mock(spec=Job)
-        mock_job.job_uuid = "test-uuid-123"
+        mock_job.id = "test-uuid-123"  # UUID as id
         mock_job.status = "failed"
         mock_job.job_type = "backup"
         mock_job.type = "backup"
@@ -272,7 +271,7 @@ class TestJobRenderService:
         mock_task.status = "completed"
         
         mock_job = Mock(spec=Job)
-        mock_job.job_uuid = "test-uuid-123"
+        mock_job.id = "test-uuid-123"  # UUID as id
         mock_job.status = "completed"
         mock_job.job_type = "composite"
         mock_job.type = "manual_backup"
@@ -314,7 +313,7 @@ class TestJobRenderService:
         mock_db_job = Mock()
         mock_db_job.repository.name = "Test Repo"
         mock_db_job.type = "backup"
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_db_job
+        mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_db_job
         
         result = self.job_render_service.get_job_for_render("test-uuid", mock_db)
         
@@ -328,7 +327,7 @@ class TestJobRenderService:
         mock_repo.name = "Test Repository"
         
         mock_job = Mock(spec=Job)
-        mock_job.job_uuid = "test-uuid-123"
+        mock_job.id = "test-uuid-123"  # UUID as id
         mock_job.status = "completed"
         mock_job.job_type = "backup"
         mock_job.type = "backup"
@@ -350,12 +349,9 @@ class TestJobRenderService:
         assert result["repository_name"] == "Test Repository"
     
     def test_get_job_for_render_job_without_uuid(self):
-        """Test get_job_for_render skips job without UUID"""
-        mock_job = Mock(spec=Job)
-        mock_job.job_uuid = None  # No UUID
-        
+        """Test get_job_for_render with job not found"""
         mock_db = Mock()
-        mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_job
+        mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = None  # Job not found
         
         self.mock_job_manager.jobs = {}
         

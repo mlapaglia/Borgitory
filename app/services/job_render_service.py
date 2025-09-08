@@ -28,7 +28,7 @@ class JobRenderService:
             db_jobs = (
                 db.query(Job)
                 .options(joinedload(Job.repository), joinedload(Job.tasks))
-                .order_by(Job.id.desc())
+                .order_by(Job.started_at.desc())
                 .limit(20)
                 .all()
             )
@@ -42,10 +42,10 @@ class JobRenderService:
 
             for job in db_jobs:
                 # Only render jobs that have UUIDs
-                if not job.job_uuid:
+                if not job.id:
                     continue
 
-                should_expand = expand and job.job_uuid == expand
+                should_expand = expand and job.id == expand
                 html_content += self._render_job_html(job, expand_details=should_expand)
 
             html_content += "</div>"
@@ -157,10 +157,10 @@ class JobRenderService:
         repository_name = job.repository.name if job.repository else "Unknown"
 
         # Only process jobs that have UUIDs - skip legacy jobs without UUIDs
-        if not job.job_uuid:
+        if not job.id:
             return ""  # Don't render jobs without UUIDs
 
-        job_id = job.job_uuid
+        job_id = job.id
 
         # Status styling
         if job.status == "completed":
@@ -184,8 +184,8 @@ class JobRenderService:
             job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "N/A"
         )
 
-        # Check if this is a composite job
-        is_composite = job.job_type == "composite" and job.tasks
+        # Check if this job has tasks (regardless of job_type for backward compatibility)
+        is_composite = job.tasks and len(job.tasks) > 0
 
         # Job header
         job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
@@ -214,7 +214,7 @@ class JobRenderService:
                 "started_at": job.started_at,
                 "finished_at": job.finished_at,
                 "error": job.error,
-                "job_uuid": job.job_uuid,
+                "job_uuid": job.id,
             },
         )()
 
@@ -233,36 +233,43 @@ class JobRenderService:
         )
 
     def get_job_for_render(self, job_id: str, db: Session) -> dict:
-        """Get job data formatted for template rendering - UUIDs only"""
+        """Get job data formatted for template rendering - prioritize database for completed jobs"""
         try:
             logger.info(f"Getting job {job_id} for rendering")
 
-            # First check if job exists in manager (running jobs)
-            if job_id in self.job_manager.jobs:
-                logger.info(f"Found running job {job_id} in job manager")
-                manager_job = self.job_manager.jobs[job_id]
-
-                # Try to find corresponding database job by UUID
-                db_job = db.query(Job).filter(Job.job_uuid == job_id).first()
-                return self._format_manager_job_for_render(manager_job, job_id, db_job)
-
-            # If not in manager, try to find completed job in database by UUID
+            # Always check database first for job data
             job = (
                 db.query(Job)
                 .options(joinedload(Job.repository), joinedload(Job.tasks))
-                .filter(Job.job_uuid == job_id)
+                .filter(Job.id == job_id)
                 .first()
             )
 
-            if not job:
-                logger.info(f"Job {job_id} not found anywhere")
-                return None
+            # If job exists in database and is completed/failed, use database data exclusively
+            if job and job.status in ["completed", "failed"]:
+                logger.info(f"Found completed/failed job {job_id} in database, using database data")
+                return self._format_database_job_for_render(job)
 
-            # Only process jobs with UUIDs
-            if not job.job_uuid:
-                logger.info(f"Job {job_id} has no UUID, skipping")
-                return None
+            # For running jobs or jobs not in database, check job manager
+            if job_id in self.job_manager.jobs:
+                logger.info(f"Found running job {job_id} in job manager")
+                manager_job = self.job_manager.jobs[job_id]
+                return self._format_manager_job_for_render(manager_job, job_id, job)
 
+            # If job exists in database but not completed (edge case), still show it
+            if job:
+                logger.info(f"Found job {job_id} in database (status: {job.status})")
+                return self._format_database_job_for_render(job)
+
+            logger.info(f"Job {job_id} not found anywhere")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting job for render: {e}")
+            return None
+
+    def _format_database_job_for_render(self, job: Job) -> dict:
+        """Format a database job for template rendering"""
+        try:
             repository_name = job.repository.name if job.repository else "Unknown"
 
             # Status styling
@@ -293,7 +300,7 @@ class JobRenderService:
             # Job header
             job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
             if is_composite:
-                progress_text = f"({job.completed_tasks}/{job.total_tasks} tasks)"
+                progress_text = f"({job.completed_tasks or 0}/{job.total_tasks or 0} tasks)"
                 job_title += f" {progress_text}"
 
             # Sort tasks by order if composite
@@ -305,24 +312,24 @@ class JobRenderService:
             if is_composite and job.status == "failed":
                 sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
 
-            # Create a job context object that uses UUID as the primary ID (same as for manager jobs)
+            # Create a job context object that uses UUID as the primary ID
             job_context = type(
                 "JobContext",
                 (),
                 {
-                    "id": job.job_uuid,  # Use the UUID as the ID
+                    "id": job.id,  # Use the UUID as the ID
                     "status": job.status,
                     "job_type": job.job_type,
                     "type": job.type,
                     "started_at": job.started_at,
                     "finished_at": job.finished_at,
                     "error": job.error,
-                    "job_uuid": job.job_uuid,
+                    "job_uuid": job.id,
                 },
             )()
 
             return {
-                "job": job_context,  # Use UUID-based job context
+                "job": job_context,
                 "repository_name": repository_name,
                 "status_class": status_class,
                 "status_icon": status_icon,
@@ -332,15 +339,8 @@ class JobRenderService:
                 "is_composite": is_composite,
                 "sorted_tasks": sorted_tasks,
             }
-        except ValueError:
-            # Try job manager for non-integer IDs
-            if job_id in self.job_manager.jobs:
-                job = self.job_manager.jobs[job_id]
-                # This would need similar formatting for JobManager jobs
-                # For now, return None since we're focusing on database jobs
-                return None
         except Exception as e:
-            logger.error(f"Error getting job for render: {e}")
+            logger.error(f"Error formatting database job {job.id}: {e}")
             return None
 
     def _format_manager_job_for_render(self, manager_job, job_id, db_job=None):
@@ -352,7 +352,11 @@ class JobRenderService:
                     db_job.repository.name if db_job.repository else "Unknown"
                 )
                 job_type = db_job.type
-                job_status = manager_job.status  # Use current status from manager
+                # Prioritize database status for completed/failed jobs to ensure consistency
+                if db_job.status in ["completed", "failed"]:
+                    job_status = db_job.status
+                else:
+                    job_status = manager_job.status  # Use manager status for running jobs
             else:
                 # Extract info from manager job (this may need adjustment based on your job structure)
                 repository_name = getattr(manager_job, "repository_name", "Unknown")
@@ -392,36 +396,54 @@ class JobRenderService:
 
             # Job title
             job_title = f"{job_type.replace('_', ' ').title()} - {repository_name}"
-            if is_composite and hasattr(manager_job, "tasks"):
-                completed_tasks = sum(
-                    1 for task in manager_job.tasks if task.status == "completed"
-                )
-                total_tasks = len(manager_job.tasks)
-                progress_text = f"({completed_tasks}/{total_tasks} tasks)"
-                job_title += f" {progress_text}"
+            if is_composite:
+                # Use appropriate task count based on data source
+                if db_job and db_job.status in ["completed", "failed"]:
+                    # Use database task counts for completed/failed jobs
+                    completed_tasks = db_job.completed_tasks or 0
+                    total_tasks = db_job.total_tasks or 0
+                elif hasattr(manager_job, "tasks"):
+                    # Use manager task counts for running jobs
+                    completed_tasks = sum(
+                        1 for task in manager_job.tasks if task.status == "completed"
+                    )
+                    total_tasks = len(manager_job.tasks)
+                else:
+                    completed_tasks = 0
+                    total_tasks = 0
+                
+                if total_tasks > 0:
+                    progress_text = f"({completed_tasks}/{total_tasks} tasks)"
+                    job_title += f" {progress_text}"
 
             # Convert manager job tasks to format expected by templates
             sorted_tasks = []
-            if is_composite and hasattr(manager_job, "tasks"):
-                for i, task in enumerate(manager_job.tasks):
-                    # Ensure task has task_order property for templates
-                    if not hasattr(task, "task_order"):
-                        task.task_order = i
+            if is_composite:
+                # If we're using database status for completed/failed jobs, use database tasks too
+                if db_job and db_job.status in ["completed", "failed"] and db_job.tasks:
+                    # Use database tasks for consistency
+                    sorted_tasks = sorted(db_job.tasks, key=lambda t: t.task_order)
+                elif hasattr(manager_job, "tasks"):
+                    # Use manager tasks for running jobs
+                    for i, task in enumerate(manager_job.tasks):
+                        # Ensure task has task_order property for templates
+                        if not hasattr(task, "task_order"):
+                            task.task_order = i
 
-                    # Convert output_lines to output string for templates
-                    if hasattr(task, "output_lines") and task.output_lines:
-                        task.output = "\n".join(
-                            [
-                                line.get("text", "")
-                                if isinstance(line, dict)
-                                else str(line)
-                                for line in task.output_lines
-                            ]
-                        )
-                    else:
-                        task.output = ""
+                        # Convert output_lines to output string for templates
+                        if hasattr(task, "output_lines") and task.output_lines:
+                            task.output = "\n".join(
+                                [
+                                    line.get("text", "")
+                                    if isinstance(line, dict)
+                                    else str(line)
+                                    for line in task.output_lines
+                                ]
+                            )
+                        else:
+                            task.output = ""
 
-                    sorted_tasks.append(task)
+                        sorted_tasks.append(task)
 
             # Create a job context object that uses UUID as the primary ID
             job_context = type(

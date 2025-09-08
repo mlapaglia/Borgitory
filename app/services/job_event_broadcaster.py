@@ -272,6 +272,14 @@ class JobEventBroadcaster:
                 logger.error(f"Error in keepalive task: {e}")
                 await asyncio.sleep(self.keepalive_timeout)
 
+    def subscribe_to_events(self) -> asyncio.Queue:
+        """Subscribe to job events for streaming (compatibility method)"""
+        return self.subscribe_client()
+
+    def unsubscribe_from_events(self, queue: asyncio.Queue) -> None:
+        """Unsubscribe from job events (compatibility method)"""
+        self.unsubscribe_client(queue)
+
     def get_client_stats(self) -> Dict[str, Any]:
         """Get statistics about connected clients"""
         return {

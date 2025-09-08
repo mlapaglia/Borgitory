@@ -27,7 +27,6 @@ class DatabaseJobData:
     output: Optional[str] = None
     error_message: Optional[str] = None
     cloud_sync_config_id: Optional[int] = None
-    schedule_id: Optional[int] = None
 
 
 class JobDatabaseManager:
@@ -47,24 +46,29 @@ class JobDatabaseManager:
 
         return get_db_session()
 
-    async def create_database_job(self, job_data: DatabaseJobData) -> Optional[int]:
+    async def create_database_job(self, job_data: DatabaseJobData) -> Optional[str]:
         """Create a new job record in the database"""
         try:
             from app.models.database import Job
 
             with self.db_session_factory() as db:
                 db_job = Job(
-                    job_uuid=job_data.job_uuid,
+                    id=job_data.job_uuid,  # Use UUID as primary key
                     repository_id=job_data.repository_id,
-                    type=job_data.job_type,
+                    type=str(job_data.job_type),  # Convert JobType enum to string
                     status=job_data.status,
                     started_at=job_data.started_at,
                     finished_at=job_data.finished_at,
-                    return_code=job_data.return_code,
-                    output=job_data.output,
-                    error_message=job_data.error_message,
+                    log_output=job_data.output,
+                    error=job_data.error_message,
+                    container_id=None,  # Explicitly set to None
                     cloud_sync_config_id=job_data.cloud_sync_config_id,
-                    schedule_id=job_data.schedule_id,
+                    cleanup_config_id=None,  # Explicitly set to None
+                    check_config_id=None,  # Explicitly set to None
+                    notification_config_id=None,  # Explicitly set to None
+                    job_type="composite",  # Set as composite since we have tasks
+                    total_tasks=1,  # Default total tasks  
+                    completed_tasks=0,  # Default completed tasks
                 )
 
                 db.add(db_job)
@@ -74,7 +78,7 @@ class JobDatabaseManager:
                 logger.info(
                     f"Created database job record {db_job.id} for job {job_data.job_uuid}"
                 )
-                return db_job.id
+                return db_job.id  # Return UUID string
 
         except Exception as e:
             logger.error(f"Failed to create database job record: {e}")
@@ -94,7 +98,7 @@ class JobDatabaseManager:
             from app.models.database import Job
 
             with self.db_session_factory() as db:
-                db_job = db.query(Job).filter(Job.job_uuid == job_uuid).first()
+                db_job = db.query(Job).filter(Job.id == job_uuid).first()
 
                 if not db_job:
                     logger.warning(f"Database job not found for UUID {job_uuid}")
@@ -104,12 +108,10 @@ class JobDatabaseManager:
                 db_job.status = status
                 if finished_at:
                     db_job.finished_at = finished_at
-                if return_code is not None:
-                    db_job.return_code = return_code
                 if output is not None:
-                    db_job.output = output
+                    db_job.log_output = output
                 if error_message is not None:
-                    db_job.error_message = error_message
+                    db_job.error = error_message
 
                 db.commit()
 
@@ -118,7 +120,6 @@ class JobDatabaseManager:
                 # Trigger cloud backup if job completed successfully
                 if (
                     status == "completed"
-                    and return_code == 0
                     and db_job.cloud_sync_config_id
                     and self.cloud_backup_coordinator
                 ):
@@ -136,14 +137,14 @@ class JobDatabaseManager:
             from app.models.database import Job
 
             with self.db_session_factory() as db:
-                db_job = db.query(Job).filter(Job.job_uuid == job_uuid).first()
+                db_job = db.query(Job).filter(Job.id == job_uuid).first()
 
                 if not db_job:
                     return None
 
                 return {
                     "id": db_job.id,
-                    "job_uuid": db_job.job_uuid,
+                    "job_uuid": db_job.id,  # Same as id now
                     "repository_id": db_job.repository_id,
                     "type": db_job.type,
                     "status": db_job.status,
@@ -153,11 +154,9 @@ class JobDatabaseManager:
                     "finished_at": db_job.finished_at.isoformat()
                     if db_job.finished_at
                     else None,
-                    "return_code": db_job.return_code,
-                    "output": db_job.output,
-                    "error_message": db_job.error_message,
+                    "output": db_job.log_output,
+                    "error_message": db_job.error,
                     "cloud_sync_config_id": db_job.cloud_sync_config_id,
-                    "schedule_id": db_job.schedule_id,
                 }
 
         except Exception as e:
@@ -182,7 +181,7 @@ class JobDatabaseManager:
                 return [
                     {
                         "id": job.id,
-                        "job_uuid": job.job_uuid,
+                        "job_uuid": job.id,  # Same as id now
                         "type": job.type,
                         "status": job.status,
                         "started_at": job.started_at.isoformat()
@@ -191,8 +190,7 @@ class JobDatabaseManager:
                         "finished_at": job.finished_at.isoformat()
                         if job.finished_at
                         else None,
-                        "return_code": job.return_code,
-                        "error_message": job.error_message,
+                        "error_message": job.error,
                     }
                     for job in jobs
                 ]
@@ -305,6 +303,59 @@ class JobDatabaseManager:
     async def get_repository_data(self, repository_id: int) -> Optional[Dict[str, Any]]:
         """Get repository data - public interface"""
         return await self._get_repository_data(repository_id)
+
+    async def save_job_tasks(self, job_uuid: str, tasks: List[Any]) -> bool:
+        """Save task data for a job to the database"""
+        try:
+            from app.models.database import Job, JobTask
+
+            with self.db_session_factory() as db:
+                # Find the job by UUID
+                db_job = db.query(Job).filter(Job.id == job_uuid).first()
+                if not db_job:
+                    logger.warning(f"Job not found for UUID {job_uuid}")
+                    return False
+
+                # Clear existing tasks for this job
+                db.query(JobTask).filter(JobTask.job_id == db_job.id).delete()
+
+                # Save each task
+                for i, task in enumerate(tasks):
+                    # Convert task output lines to string if needed
+                    task_output = ""
+                    if hasattr(task, 'output_lines') and task.output_lines:
+                        task_output = "\n".join([
+                            line.get("text", "") if isinstance(line, dict) else str(line)
+                            for line in task.output_lines
+                        ])
+                    elif hasattr(task, 'output') and task.output:
+                        task_output = task.output
+
+                    db_task = JobTask(
+                        job_id=db_job.id,
+                        task_type=task.task_type,
+                        task_name=task.task_name,
+                        status=task.status,
+                        started_at=getattr(task, 'started_at', None),
+                        completed_at=getattr(task, 'completed_at', None),
+                        output=task_output,
+                        error=getattr(task, 'error', None),
+                        return_code=getattr(task, 'return_code', None),
+                        task_order=i,
+                    )
+                    db.add(db_task)
+
+                # Update job task counts
+                db_job.total_tasks = len(tasks)
+                db_job.completed_tasks = sum(1 for task in tasks if task.status == "completed")
+
+                db.commit()
+                logger.info(f"Saved {len(tasks)} tasks for job {job_uuid}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to save job tasks for {job_uuid}: {e}")
+            return False
 
     async def get_job_statistics(self) -> Dict[str, Any]:
         """Get job statistics"""
