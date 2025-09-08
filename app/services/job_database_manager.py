@@ -326,7 +326,7 @@ class JobDatabaseManager:
                     if hasattr(task, "output_lines") and task.output_lines:
                         task_output = "\n".join(
                             [
-                                line.get("text", "")
+                                (line.get("text", "") or "")
                                 if isinstance(line, dict)
                                 else str(line)
                                 for line in task.output_lines

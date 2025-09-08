@@ -5,7 +5,7 @@ services:
       - "8000:8000"   # HTTP port
     volumes:
       # Persistent data storage
-      - ./data:/app/app/data
+      - ./data:/app/data
       # Mount your backup sources (adjust as needed)
       - ./backup-sources:/backup-sources:ro
       # Borg repository storage (where backups are stored)

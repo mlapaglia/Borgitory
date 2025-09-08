@@ -17,7 +17,7 @@ COPY manage_db.py ./manage_db.py
 COPY start.sh /app/start.sh
 
 # Create data directory in container (will be empty initially)
-RUN mkdir -p /app/app/data
+RUN mkdir -p /app/data
 
 # Make script executable
 RUN chmod +x /app/start.sh
