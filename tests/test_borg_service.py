@@ -182,14 +182,20 @@ class TestRepositoryOperations:
     @pytest.mark.asyncio
     async def test_initialize_repository_success(self):
         """Test successful repository initialization."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="job-123")
-        mock_job_manager.get_job_status.return_value = {
-            "completed": True,
-            "return_code": 0
-        }
+        from app.services.simple_command_runner import CommandResult
         
-        with patch('app.services.borg_service.get_job_manager', return_value=mock_job_manager), \
+        mock_command_result = CommandResult(
+            success=True,
+            return_code=0,
+            stdout="",
+            stderr="",
+            duration=1.0
+        )
+        
+        mock_command_runner = Mock()
+        mock_command_runner.run_command = AsyncMock(return_value=mock_command_result)
+        
+        with patch('app.services.simple_command_runner.simple_command_runner', mock_command_runner), \
              patch('app.utils.security.build_secure_borg_command') as mock_build_cmd:
             
             mock_build_cmd.return_value = (["borg", "init", "--encryption=repokey", "/path/to/repo"], {"BORG_PASSPHRASE": "test_passphrase"})
@@ -198,25 +204,25 @@ class TestRepositoryOperations:
             
             assert result["success"] is True
             assert "initialized successfully" in result["message"]
-            mock_job_manager.start_borg_command.assert_called_once()
+            mock_command_runner.run_command.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_initialize_repository_already_exists(self):
         """Test repository initialization when repo already exists."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="job-123")
-        mock_job_manager.get_job_status.return_value = {
-            "completed": True,
-            "return_code": 1
-        }
-        mock_job_manager.get_job_output_stream = AsyncMock(return_value={
-            "lines": [
-                {"text": "A repository already exists at /path/to/repo"},
-                {"text": "Use borg init --force to reinitialize"}
-            ]
-        })
+        from app.services.simple_command_runner import CommandResult
         
-        with patch('app.services.borg_service.get_job_manager', return_value=mock_job_manager), \
+        mock_command_result = CommandResult(
+            success=False,
+            return_code=1,
+            stdout="",
+            stderr="A repository already exists at /path/to/repo",
+            duration=1.0
+        )
+        
+        mock_command_runner = Mock()
+        mock_command_runner.run_command = AsyncMock(return_value=mock_command_result)
+        
+        with patch('app.services.simple_command_runner.simple_command_runner', mock_command_runner), \
              patch('app.utils.security.build_secure_borg_command') as mock_build_cmd:
             
             mock_build_cmd.return_value = (["borg", "init"], {})
