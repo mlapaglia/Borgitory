@@ -610,7 +610,7 @@ async def list_archives(request: Request, repo_id: int, db: Session = Depends(ge
 
     try:
         archives = await borg_service.list_archives(repository)
-        
+
         # Limit to recent archives for display
         recent_archives = archives[:10] if len(archives) > 10 else archives
         return templates.TemplateResponse(
@@ -620,7 +620,7 @@ async def list_archives(request: Request, repo_id: int, db: Session = Depends(ge
                 "repository": repository,
                 "archives": archives,
                 "recent_archives": recent_archives,
-            }
+            },
         )
     except Exception as e:
         logger.error(f"Error listing archives for repository {repo_id}: {e}")
@@ -770,10 +770,10 @@ async def get_repository_info(repo_id: int, db: Session = Depends(get_db)):
 @router.get("/{repo_id}/archives/{archive_name}/contents")
 async def get_archive_contents(
     request: Request,
-    repo_id: int, 
-    archive_name: str, 
-    path: str = "", 
-    db: Session = Depends(get_db)
+    repo_id: int,
+    archive_name: str,
+    path: str = "",
+    db: Session = Depends(get_db),
 ):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
@@ -783,7 +783,7 @@ async def get_archive_contents(
         contents = await borg_service.list_archive_directory_contents(
             repository, archive_name, path
         )
-        
+
         return templates.TemplateResponse(
             request,
             "partials/archives/directory_contents.html",
@@ -792,8 +792,8 @@ async def get_archive_contents(
                 "archive_name": archive_name,
                 "path": path,
                 "items": contents,
-                "breadcrumb_parts": path.split('/') if path else [],
-            }
+                "breadcrumb_parts": path.split("/") if path else [],
+            },
         )
     except Exception as e:
         return templates.TemplateResponse(
