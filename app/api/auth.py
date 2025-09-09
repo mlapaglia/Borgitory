@@ -15,21 +15,17 @@ templates = Jinja2Templates(directory="app/templates")
 def check_users_exist(request: Request, db: Session = Depends(get_db)):
     user_count = db.query(User).count()
     has_users = user_count > 0
-    
+
     # Return the appropriate form template based on user existence
     if has_users:
         # Show login form for existing users
         return templates.TemplateResponse(
-            request,
-            "partials/auth/login_form_active.html",
-            {}
+            request, "partials/auth/login_form_active.html", {}
         )
     else:
         # Show welcome message and register form for first user
         return templates.TemplateResponse(
-            request,
-            "partials/auth/register_form_active.html",
-            {}
+            request, "partials/auth/register_form_active.html", {}
         )
 
 
@@ -38,7 +34,7 @@ def register_user(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     try:
         # Check if any users exist
@@ -88,11 +84,9 @@ def register_user(
 
         # Return success response
         return templates.TemplateResponse(
-            request,
-            "partials/auth/register_success.html",
-            {}
+            request, "partials/auth/register_success.html", {}
         )
-        
+
     except Exception as e:
         return templates.TemplateResponse(
             request,
@@ -139,7 +133,9 @@ def login_user(
 
         # Create new session
         user_agent = request.headers.get("user-agent") if request else None
-        client_ip = request.client.host if request and hasattr(request, "client") else None
+        client_ip = (
+            request.client.host if request and hasattr(request, "client") else None
+        )
         current_time = datetime.now(UTC)
 
         db_session = UserSession(
@@ -160,9 +156,7 @@ def login_user(
 
         # Create success template response and set cookie
         success_response = templates.TemplateResponse(
-            request,
-            "partials/auth/login_success.html",
-            {}
+            request, "partials/auth/login_success.html", {}
         )
         success_response.set_cookie(
             key="auth_token",
@@ -173,7 +167,7 @@ def login_user(
             max_age=max_age,
         )
         return success_response
-        
+
     except Exception as e:
         return templates.TemplateResponse(
             request,

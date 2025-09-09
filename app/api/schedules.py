@@ -258,12 +258,8 @@ async def get_cron_expression_form(request: Request, preset: str = ""):
         context["description"] = preset_descriptions.get(preset, "")
 
     return templates.TemplateResponse(
-        request,
-        "partials/schedules/cron_expression_form.html", 
-        context
+        request, "partials/schedules/cron_expression_form.html", context
     )
-
-
 
 
 @router.get("/", response_model=List[ScheduleSchema])
@@ -281,7 +277,9 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{schedule_id}/toggle")
-async def toggle_schedule(schedule_id: int, request: Request = None, db: Session = Depends(get_db)):
+async def toggle_schedule(
+    schedule_id: int, request: Request = None, db: Session = Depends(get_db)
+):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -300,7 +298,7 @@ async def toggle_schedule(schedule_id: int, request: Request = None, db: Session
                 request,
                 "partials/common/error_message.html",
                 {"error_message": f"Failed to update schedule: {str(e)}"},
-                status_code=500
+                status_code=500,
             )
         raise HTTPException(
             status_code=500, detail=f"Failed to update schedule: {str(e)}"
@@ -312,14 +310,16 @@ async def toggle_schedule(schedule_id: int, request: Request = None, db: Session
         return templates.TemplateResponse(
             request,
             "partials/schedules/schedule_list_content.html",
-            {"schedules": schedules}
+            {"schedules": schedules},
         )
-    
+
     return {"message": f"Schedule {'enabled' if schedule.enabled else 'disabled'}"}
 
 
 @router.delete("/{schedule_id}")
-async def delete_schedule(schedule_id: int, request: Request = None, db: Session = Depends(get_db)):
+async def delete_schedule(
+    schedule_id: int, request: Request = None, db: Session = Depends(get_db)
+):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -332,11 +332,14 @@ async def delete_schedule(schedule_id: int, request: Request = None, db: Session
             return templates.TemplateResponse(
                 request,
                 "partials/common/error_message.html",
-                {"error_message": f"Failed to remove schedule from scheduler: {str(e)}"},
-                status_code=500
+                {
+                    "error_message": f"Failed to remove schedule from scheduler: {str(e)}"
+                },
+                status_code=500,
             )
         raise HTTPException(
-            status_code=500, detail=f"Failed to remove schedule from scheduler: {str(e)}"
+            status_code=500,
+            detail=f"Failed to remove schedule from scheduler: {str(e)}",
         )
 
     # Delete from database
@@ -349,7 +352,7 @@ async def delete_schedule(schedule_id: int, request: Request = None, db: Session
         return templates.TemplateResponse(
             request,
             "partials/schedules/schedule_list_content.html",
-            {"schedules": schedules}
+            {"schedules": schedules},
         )
 
     return {"message": "Schedule deleted successfully"}
