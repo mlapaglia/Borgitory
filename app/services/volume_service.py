@@ -121,7 +121,3 @@ class VolumeService:
                 "total_mounted_volumes": 0,
                 "accessible": False,
             }
-
-
-# Create a singleton instance
-volume_service = VolumeService()

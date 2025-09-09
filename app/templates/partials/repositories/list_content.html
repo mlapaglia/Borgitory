@@ -1,0 +1,39 @@
+<!-- Repository List Content Template -->
+{% if repositories %}
+<div class="space-y-3">
+    {% for repo in repositories %}
+    <div class="border dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ repo.name }}</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-300">{{ repo.path }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Created: {{ repo.created_at.strftime("%Y-%m-%d %H:%M") if repo.created_at else "Unknown" }}
+                </p>
+            </div>
+            <div class="flex space-x-2">
+                <button hx-get="/api/repositories/{{ repo.id }}/archives"
+                        hx-target="#archives-list"
+                        hx-trigger="click"
+                        onclick="document.querySelector('button[data-tab=archives]').click()"
+                        class="px-3 py-1 text-sm bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200 rounded hover:bg-green-200 dark:hover:bg-green-700">
+                    View Archives
+                </button>
+                <button hx-delete="/api/repositories/{{ repo.id }}"
+                        hx-confirm="Are you sure you want to delete the repository '{{ repo.name }}'? This action cannot be undone."
+                        hx-target="#repository-list"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 text-sm bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-700">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-gray-600 dark:text-gray-300 text-center py-4">
+    <p>No repositories configured.</p>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Create or import a repository to get started.</p>
+</div>
+{% endif %}

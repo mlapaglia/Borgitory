@@ -1,0 +1,22 @@
+<!-- Repository Selector -->
+<div class="mb-6">
+    <div>
+        <label for="stats-repository-select" class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository</label>
+        <select 
+            id="stats-repository-select" 
+            class="select-modern w-64"
+            hx-get="/api/repositories/stats/content"
+            hx-target="#statistics-content"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-vals='js:{"repository_id": event.target.value}'
+            hx-on::before-request="if(event.target.value) { htmx.ajax('GET', '/api/repositories/stats/loading?repository_id=' + event.target.value, {target: '#statistics-content', swap: 'innerHTML'}); return false; }"
+        >
+            <option value="">Select a repository...</option>
+            {% for repo in repositories %}
+            <option value="{{ repo.id }}">{{ repo.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+

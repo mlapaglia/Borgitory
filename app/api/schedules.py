@@ -1,62 +1,158 @@
 from typing import List
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.models.database import Schedule, Repository, get_db
 from app.models.schemas import Schedule as ScheduleSchema, ScheduleCreate
-from app.services.scheduler_service import scheduler_service
+from app.dependencies import SchedulerServiceDep
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+@router.get("/form")
+async def get_schedules_form(request: Request, db: Session = Depends(get_db)):
+    """Get schedules form with all dropdowns populated"""
+    from app.models.database import (
+        CleanupConfig,
+        CloudSyncConfig,
+        NotificationConfig,
+        RepositoryCheckConfig,
+    )
+
+    repositories = db.query(Repository).all()
+    cleanup_configs = db.query(CleanupConfig).filter(CleanupConfig.enabled).all()
+    cloud_sync_configs = db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled).all()
+    notification_configs = (
+        db.query(NotificationConfig).filter(NotificationConfig.enabled).all()
+    )
+    check_configs = (
+        db.query(RepositoryCheckConfig).filter(RepositoryCheckConfig.enabled).all()
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/create_form.html",
+        {
+            "repositories": repositories,
+            "cleanup_configs": cleanup_configs,
+            "cloud_sync_configs": cloud_sync_configs,
+            "notification_configs": notification_configs,
+            "check_configs": check_configs,
+        },
+    )
+
+
 @router.post("/", response_model=ScheduleSchema, status_code=status.HTTP_201_CREATED)
-async def create_schedule(schedule: ScheduleCreate, db: Session = Depends(get_db)):
-    repository = (
-        db.query(Repository).filter(Repository.id == schedule.repository_id).first()
-    )
-    if not repository:
-        raise HTTPException(status_code=404, detail="Repository not found")
+async def create_schedule(
+    request: Request,
+    schedule: ScheduleCreate,
+    scheduler_service: SchedulerServiceDep,
+    db: Session = Depends(get_db),
+):
+    is_htmx_request = "hx-request" in request.headers
 
     try:
-        from apscheduler.triggers.cron import CronTrigger
+        repository = (
+            db.query(Repository).filter(Repository.id == schedule.repository_id).first()
+        )
+        if not repository:
+            error_msg = "Repository not found"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    request,
+                    "partials/schedules/create_error.html",
+                    {"error_message": error_msg},
+                    status_code=404,
+                )
+            raise HTTPException(status_code=404, detail=error_msg)
 
-        CronTrigger.from_crontab(schedule.cron_expression)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid cron expression: {str(e)}"
+        try:
+            from apscheduler.triggers.cron import CronTrigger
+
+            CronTrigger.from_crontab(schedule.cron_expression)
+        except ValueError as e:
+            error_msg = f"Invalid cron expression: {str(e)}"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    request,
+                    "partials/schedules/create_error.html",
+                    {"error_message": error_msg},
+                    status_code=400,
+                )
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        db_schedule = Schedule(
+            name=schedule.name,
+            repository_id=schedule.repository_id,
+            cron_expression=schedule.cron_expression,
+            source_path=schedule.source_path,
+            enabled=True,
+            cloud_sync_config_id=schedule.cloud_sync_config_id,
+            cleanup_config_id=schedule.cleanup_config_id,
+            notification_config_id=schedule.notification_config_id,
         )
 
-    db_schedule = Schedule(
-        name=schedule.name,
-        repository_id=schedule.repository_id,
-        cron_expression=schedule.cron_expression,
-        source_path=schedule.source_path,
-        enabled=True,
-        cloud_sync_config_id=schedule.cloud_sync_config_id,
-        cleanup_config_id=schedule.cleanup_config_id,
-        notification_config_id=schedule.notification_config_id,
-    )
-
-    db.add(db_schedule)
-    db.commit()
-    db.refresh(db_schedule)
-
-    # Add to scheduler
-    try:
-        await scheduler_service.add_schedule(
-            db_schedule.id, db_schedule.name, db_schedule.cron_expression
-        )
-    except Exception as e:
-        # Rollback database changes if scheduler fails
-        db.delete(db_schedule)
+        db.add(db_schedule)
         db.commit()
-        raise HTTPException(status_code=500, detail=f"Failed to schedule job: {str(e)}")
+        db.refresh(db_schedule)
 
-    return db_schedule
+        # Add to scheduler
+        try:
+            await scheduler_service.add_schedule(
+                db_schedule.id, db_schedule.name, db_schedule.cron_expression
+            )
+        except Exception as e:
+            # Rollback database changes if scheduler fails
+            db.delete(db_schedule)
+            db.commit()
+            error_msg = f"Failed to schedule job: {str(e)}"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    request,
+                    "partials/schedules/create_error.html",
+                    {"error_message": error_msg},
+                    status_code=500,
+                )
+            raise HTTPException(status_code=500, detail=error_msg)
+
+        # Success response
+        if is_htmx_request:
+            # Trigger schedule list update and return success message
+            response = templates.TemplateResponse(
+                request,
+                "partials/schedules/create_success.html",
+                {"schedule_name": schedule.name},
+            )
+            response.headers["HX-Trigger"] = "scheduleUpdate"
+            return response
+        else:
+            # Return JSON for non-HTMX requests
+            return db_schedule
+
+    except HTTPException as e:
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/schedules/create_error.html",
+                {"error_message": str(e.detail)},
+                status_code=e.status_code,
+            )
+        raise
+    except Exception as e:
+        db.rollback()
+        error_msg = f"Failed to create schedule: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/schedules/create_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.get("/html", response_class=HTMLResponse)
@@ -70,7 +166,7 @@ def get_schedules_html(skip: int = 0, limit: int = 100, db: Session = Depends(ge
 
 
 @router.get("/upcoming/html", response_class=HTMLResponse)
-async def get_upcoming_backups_html():
+async def get_upcoming_backups_html(scheduler_service: SchedulerServiceDep):
     """Get upcoming scheduled backups as formatted HTML"""
     try:
         jobs_raw = await scheduler_service.get_scheduled_jobs()
@@ -143,6 +239,32 @@ async def get_upcoming_backups_html():
         )
 
 
+@router.get("/cron-expression-form")
+async def get_cron_expression_form(request: Request, preset: str = ""):
+    """Get dynamic cron expression form elements based on preset selection"""
+    context = {
+        "preset": preset,
+        "is_custom": preset == "custom",
+        "cron_expression": preset if preset != "custom" and preset else "",
+        "description": "",
+    }
+
+    # Get human readable description for preset
+    if preset and preset != "custom":
+        preset_descriptions = {
+            "0 2 * * *": "Daily at 2:00 AM",
+            "0 2 * * 0": "Weekly on Sunday at 2:00 AM",
+            "0 2 1 * *": "Monthly on 1st at 2:00 AM",
+            "0 2 1,15 * *": "Twice monthly (1st and 15th) at 2:00 AM",
+            "0 2 */2 * *": "Every 2 days at 2:00 AM",
+        }
+        context["description"] = preset_descriptions.get(preset, "")
+
+    return templates.TemplateResponse(
+        request, "partials/schedules/cron_expression_form.html", context
+    )
+
+
 @router.get("/", response_model=List[ScheduleSchema])
 def list_schedules(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     schedules = db.query(Schedule).offset(skip).limit(limit).all()
@@ -158,7 +280,12 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{schedule_id}/toggle")
-async def toggle_schedule(schedule_id: int, db: Session = Depends(get_db)):
+async def toggle_schedule(
+    schedule_id: int,
+    scheduler_service: SchedulerServiceDep,
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -172,31 +299,76 @@ async def toggle_schedule(schedule_id: int, db: Session = Depends(get_db)):
             schedule.id, schedule.name, schedule.cron_expression, schedule.enabled
         )
     except Exception as e:
+        if request and "hx-request" in request.headers:
+            return templates.TemplateResponse(
+                request,
+                "partials/common/error_message.html",
+                {"error_message": f"Failed to update schedule: {str(e)}"},
+                status_code=500,
+            )
         raise HTTPException(
             status_code=500, detail=f"Failed to update schedule: {str(e)}"
+        )
+
+    # Return updated schedule list for HTMX requests
+    if request and "hx-request" in request.headers:
+        schedules = db.query(Schedule).all()
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/schedule_list_content.html",
+            {"schedules": schedules},
         )
 
     return {"message": f"Schedule {'enabled' if schedule.enabled else 'disabled'}"}
 
 
 @router.delete("/{schedule_id}")
-async def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
+async def delete_schedule(
+    schedule_id: int,
+    scheduler_service: SchedulerServiceDep,
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
 
     # Remove from scheduler
-    await scheduler_service.remove_schedule(schedule_id)
+    try:
+        await scheduler_service.remove_schedule(schedule_id)
+    except Exception as e:
+        if request and "hx-request" in request.headers:
+            return templates.TemplateResponse(
+                request,
+                "partials/common/error_message.html",
+                {
+                    "error_message": f"Failed to remove schedule from scheduler: {str(e)}"
+                },
+                status_code=500,
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to remove schedule from scheduler: {str(e)}",
+        )
 
     # Delete from database
     db.delete(schedule)
     db.commit()
 
+    # Return updated schedule list for HTMX requests
+    if request and "hx-request" in request.headers:
+        schedules = db.query(Schedule).all()
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/schedule_list_content.html",
+            {"schedules": schedules},
+        )
+
     return {"message": "Schedule deleted successfully"}
 
 
 @router.get("/jobs/active")
-async def get_active_scheduled_jobs():
+async def get_active_scheduled_jobs(scheduler_service: SchedulerServiceDep):
     """Get all active scheduled jobs"""
     return {"jobs": await scheduler_service.get_scheduled_jobs()}
 

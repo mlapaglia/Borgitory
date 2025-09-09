@@ -1,0 +1,44 @@
+{% if configs %}
+<div class="space-y-3">
+    {% for config in configs %}
+    <div class="border dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ config.name }}</h4>
+                {% if config.description %}
+                <p class="text-sm text-gray-600 dark:text-gray-300">{{ config.description }}</p>
+                {% endif %}
+                <div class="text-xs text-gray-500 dark:text-gray-400 space-x-4 mt-1">
+                    <span>Type: {{ config.check_type|title }}</span>
+                    {% if config.verify_data %}
+                    <span class="text-blue-600">✓ Data Verify</span>
+                    {% endif %}
+                    {% if config.repair_mode %}
+                    <span class="text-red-600">⚠️ Repair</span>
+                    {% endif %}
+                    {% if config.save_space %}
+                    <span class="text-green-600">💾 Save Space</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <button 
+                    hx-delete="/api/repository-check-configs/{{ config.id }}"
+                    hx-confirm="Are you sure you want to delete the check policy '{{ config.name }}'?"
+                    hx-target="#check-policies-list"
+                    hx-swap="innerHTML"
+                    class="px-2 py-1 text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                    title="Delete policy">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-4">
+    <p class="text-gray-500 dark:text-gray-400 text-sm">No check policies configured.</p>
+    <p class="text-gray-400 dark:text-gray-500 text-xs mt-1">Create a policy above to get started.</p>
+</div>
+{% endif %}

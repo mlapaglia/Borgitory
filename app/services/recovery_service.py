@@ -8,8 +8,9 @@ shut down or crashed while backup jobs were running.
 import logging
 from datetime import datetime
 
-from app.models.database import get_db, Repository
+from app.models.database import Repository
 from app.utils.security import build_secure_borg_command
+from app.utils.db_session import get_db_session
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -27,14 +28,14 @@ class RecoveryService:
         Legacy jobs are only used for utility operations (scan, list archives, etc.)
         which don't need recovery - they can simply be re-run if needed.
         """
-        logger.info("🔧 Starting recovery: checking for interrupted jobs...")
+        logger.info("Starting recovery: checking for interrupted jobs...")
 
         # Only need to check database Job records - in-memory composite jobs
         # are always empty on startup since they don't persist across restarts
         await self.recover_database_job_records()
 
         logger.info(
-            "✅ Recovery complete - all interrupted backup jobs cancelled and locks released"
+            "Recovery complete - all interrupted backup jobs cancelled and locks released"
         )
 
     async def recover_database_job_records(self):
@@ -44,26 +45,27 @@ class RecoveryService:
         but database records still show 'running' status.
         """
         try:
-            logger.info("🔧 Checking database for interrupted job records...")
+            logger.info("Checking database for interrupted job records...")
 
-            db = next(get_db())
-            try:
+            with get_db_session() as db:
                 from app.models.database import Job, JobTask
 
-                # Find all jobs in database marked as running
-                running_jobs = db.query(Job).filter(Job.status == "running").all()
+                # Find all jobs in database marked as running or pending (interrupted before completion)
+                interrupted_jobs = (
+                    db.query(Job).filter(Job.status.in_(["running", "pending"])).all()
+                )
 
-                if not running_jobs:
-                    logger.info("✅ No interrupted database job records found")
+                if not interrupted_jobs:
+                    logger.info("No interrupted database job records found")
                     return
 
                 logger.info(
-                    f"🔍 Found {len(running_jobs)} interrupted database job records"
+                    f"Found {len(interrupted_jobs)} interrupted database job records"
                 )
 
-                for job in running_jobs:
+                for job in interrupted_jobs:
                     logger.info(
-                        f"🔧 Cancelling database job record {job.id} ({job.job_type}) - was running since {job.started_at}"
+                        f"Cancelling database job record {job.id} ({job.job_type}) - was running since {job.started_at}"
                     )
 
                     # Mark job as failed
@@ -85,7 +87,7 @@ class RecoveryService:
                         task.status = "failed"
                         task.completed_at = datetime.now()
                         task.error = "Task cancelled on startup - job was interrupted by application shutdown"
-                        logger.info(f"  ✅ Task '{task.task_name}' marked as failed")
+                        logger.info(f"  Task '{task.task_name}' marked as failed")
 
                     # Release repository lock if this was a backup job (including composite jobs)
                     if (
@@ -100,7 +102,7 @@ class RecoveryService:
                         )
                         if repository:
                             logger.info(
-                                f"🔓 Releasing repository lock for: {repository.name}"
+                                f"Releasing repository lock for: {repository.name}"
                             )
                             await self._release_repository_lock(repository)
                         else:
@@ -112,21 +114,15 @@ class RecoveryService:
                             f"Job {job.id} is not a backup job or has no repository_id - skipping lock release"
                         )
 
-                db.commit()
-                logger.info("✅ All interrupted database job records cancelled")
-
-            finally:
-                db.close()
+                logger.info("All interrupted database job records cancelled")
 
         except Exception as e:
-            logger.error(f"❌ Error recovering database job records: {e}")
+            logger.error(f"Error recovering database job records: {e}")
 
     async def _release_repository_lock(self, repository: Repository):
         """Use borg break-lock to release any stale locks on a repository"""
         try:
-            logger.info(
-                f"🔓 Attempting to release lock on repository: {repository.name}"
-            )
+            logger.info(f"Attempting to release lock on repository: {repository.name}")
 
             # Build borg break-lock command
             command, env = build_secure_borg_command(
@@ -151,26 +147,20 @@ class RecoveryService:
 
                 if process.returncode == 0:
                     logger.info(
-                        f"✅ Successfully released lock on repository: {repository.name}"
+                        f"Successfully released lock on repository: {repository.name}"
                     )
                 else:
                     # Log the error but don't fail - lock might not exist
                     stderr_text = stderr.decode() if stderr else "No error details"
                     logger.warning(
-                        f"⚠️  Break-lock returned {process.returncode} for {repository.name}: {stderr_text}"
+                        f"Break-lock returned {process.returncode} for {repository.name}: {stderr_text}"
                     )
 
             except asyncio.TimeoutError:
                 logger.warning(
-                    f"⚠️  Break-lock timed out for repository: {repository.name}"
+                    f"Break-lock timed out for repository: {repository.name}"
                 )
                 process.kill()
 
         except Exception as e:
-            logger.error(
-                f"❌ Error releasing lock for repository {repository.name}: {e}"
-            )
-
-
-# Global instance
-recovery_service = RecoveryService()
+            logger.error(f"Error releasing lock for repository {repository.name}: {e}")

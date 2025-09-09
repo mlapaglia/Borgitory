@@ -6,8 +6,13 @@ import os
 from datetime import datetime, UTC
 from typing import Dict, List, Optional
 
-from app.models.database import Repository, Job, get_db
-from app.services.job_manager import borg_job_manager
+from app.models.database import Repository, Job
+from app.services.job_executor import JobExecutor
+from app.services.simple_command_runner import SimpleCommandRunner
+from app.services.job_manager import (
+    get_job_manager,
+)  # Keep for backup operations that need job tracking
+from app.utils.db_session import get_db_session
 from app.utils.security import (
     build_secure_borg_command,
     validate_archive_name,
@@ -19,7 +24,13 @@ logger = logging.getLogger(__name__)
 
 
 class BorgService:
-    def __init__(self):
+    def __init__(
+        self,
+        job_executor: Optional[JobExecutor] = None,
+        command_runner: Optional[SimpleCommandRunner] = None,
+    ):
+        self.job_executor = job_executor or JobExecutor()
+        self.command_runner = command_runner or SimpleCommandRunner()
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
@@ -165,46 +176,31 @@ class BorgService:
             }
 
         try:
-            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            # Execute the command directly and wait for result
+            result = await self.command_runner.run_command(command, env, timeout=60)
 
-            # Wait for initialization to complete (it's usually quick)
-            max_wait = 60  # 60 seconds max
-            wait_time = 0
+            if result.success:
+                return {
+                    "success": True,
+                    "message": "Repository initialized successfully",
+                }
+            else:
+                # Check if it's just because repo already exists
+                if "already exists" in result.stderr.lower():
+                    logger.info("Repository already exists, which is fine")
+                    return {
+                        "success": True,
+                        "message": "Repository already exists",
+                    }
 
-            while wait_time < max_wait:
-                status = borg_job_manager.get_job_status(job_id)
-                if not status:
-                    return {"success": False, "message": "Job not found"}
-
-                if status["completed"]:
-                    if status["return_code"] == 0:
-                        return {
-                            "success": True,
-                            "message": "Repository initialized successfully",
-                        }
-                    else:
-                        # Get error output
-                        output = await borg_job_manager.get_job_output_stream(job_id)
-                        error_lines = [line["text"] for line in output.get("lines", [])]
-                        error_text = "\n".join(error_lines[-10:])  # Last 10 lines
-
-                        # Check if it's just because repo already exists
-                        if "already exists" in error_text.lower():
-                            logger.info("Repository already exists, which is fine")
-                            return {
-                                "success": True,
-                                "message": "Repository already exists",
-                            }
-
-                        return {
-                            "success": False,
-                            "message": f"Initialization failed: {error_text}",
-                        }
-
-                await asyncio.sleep(1)
-                wait_time += 1
-
-            return {"success": False, "message": "Initialization timed out"}
+                # Return the actual error from borg
+                error_msg = (
+                    result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                )
+                return {
+                    "success": False,
+                    "message": f"Initialization failed: {error_msg}",
+                }
 
         except Exception as e:
             logger.error(f"Failed to initialize repository: {e}")
@@ -259,29 +255,25 @@ class BorgService:
             raise Exception(f"Security validation failed: {str(e)}")
 
         try:
-            job_id = await borg_job_manager.start_borg_command(
+            job_id = await get_job_manager().start_borg_command(
                 command, env=env, is_backup=True
             )
 
             # Create job record in database
-            db = next(get_db())
-            try:
+            from app.utils.db_session import get_db_session
+
+            with get_db_session() as db:
                 job = Job(
+                    id=job_id,  # Store the JobManager UUID as the primary key
                     repository_id=repository.id,
-                    job_uuid=job_id,  # Store the JobManager UUID
                     type="backup",
                     status="queued",  # Will be updated to 'running' when started
                     started_at=datetime.now(),
                     cloud_sync_config_id=cloud_sync_config_id,
                 )
                 db.add(job)
-                db.commit()
                 db.refresh(job)
                 logger.info(f"Created job record {job.id} for backup job {job_id}")
-            except Exception as e:
-                logger.error(f"Failed to create job record: {e}")
-            finally:
-                db.close()
 
             return job_id
 
@@ -302,37 +294,34 @@ class BorgService:
             raise Exception(f"Security validation failed: {str(e)}")
 
         try:
-            # Create database job record for tracking
-            db = next(get_db())
-            try:
-                job_id = await borg_job_manager.start_borg_command(command, env=env)
+            # Start the borg list command
+            job_manager = get_job_manager()
+            job_id = await job_manager.start_borg_command(command, env=env)
 
-                # Create database job record
+            # Create database job record for tracking
+            with get_db_session() as db:
                 db_job = Job(
+                    id=job_id,  # Store the JobManager UUID as the primary key
                     repository_id=repository.id,
-                    job_uuid=job_id,
                     type="list",
                     status="running",
                     started_at=datetime.now(UTC),
                 )
                 db.add(db_job)
-                db.commit()
                 logger.info(f"Created database record for list archives job {job_id}")
-            finally:
-                db.close()
 
             # Wait for completion (list is usually quick)
             max_wait = 30  # 30 seconds max
             wait_time = 0
 
             while wait_time < max_wait:
-                status = borg_job_manager.get_job_status(job_id)
+                status = job_manager.get_job_status(job_id)
                 if not status:
                     raise Exception("Job not found")
 
                 if status["completed"] or status["status"] in ["completed", "failed"]:
                     # Get the output first
-                    output = await borg_job_manager.get_job_output_stream(job_id)
+                    output = await get_job_manager().get_job_output_stream(job_id)
 
                     if status["return_code"] == 0:
                         # Parse JSON output - look for complete JSON structure
@@ -380,7 +369,7 @@ class BorgService:
             raise Exception(f"Failed to list archives: {str(e)}")
 
     async def get_repo_info(self, repository: Repository) -> Dict[str, any]:
-        """Get repository information"""
+        """Get repository information using direct process execution"""
         try:
             command, env = build_secure_borg_command(
                 base_command="borg info",
@@ -392,40 +381,31 @@ class BorgService:
             raise Exception(f"Security validation failed: {str(e)}")
 
         try:
-            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            # Use JobExecutor directly for simple synchronous operations
+            process = await self.job_executor.start_process(command, env)
+            result = await self.job_executor.monitor_process_output(process)
 
-            # Wait for completion
-            max_wait = 30
-            wait_time = 0
+            if result.return_code == 0:
+                # Parse JSON output from stdout
+                output_text = result.stdout.decode("utf-8", errors="replace")
+                for line in output_text.split("\n"):
+                    line = line.strip()
+                    if line.startswith("{"):
+                        try:
+                            return json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
 
-            while wait_time < max_wait:
-                status = borg_job_manager.get_job_status(job_id)
-                if not status:
-                    raise Exception("Job not found")
-
-                if status["completed"]:
-                    if status["return_code"] == 0:
-                        output = await borg_job_manager.get_job_output_stream(job_id)
-
-                        # Parse JSON output
-                        for line in output.get("lines", []):
-                            line_text = line["text"]
-                            if line_text.startswith("{"):
-                                try:
-                                    return json.loads(line_text)
-                                except json.JSONDecodeError:
-                                    continue
-
-                        raise Exception("No valid JSON output found")
-                    else:
-                        error_lines = [line["text"] for line in output.get("lines", [])]
-                        error_text = "\n".join(error_lines)
-                        raise Exception(f"Borg info failed: {error_text}")
-
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            raise Exception("Get repo info timed out")
+                raise Exception("No valid JSON output found")
+            else:
+                error_text = (
+                    result.stderr.decode("utf-8", errors="replace")
+                    if result.stderr
+                    else "Unknown error"
+                )
+                raise Exception(
+                    f"Borg info failed with code {result.return_code}: {error_text}"
+                )
 
         except Exception as e:
             raise Exception(f"Failed to get repository info: {str(e)}")
@@ -446,41 +426,34 @@ class BorgService:
             raise Exception(f"Validation failed: {str(e)}")
 
         try:
-            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            # Use JobExecutor directly for simple synchronous operations
+            process = await self.job_executor.start_process(command, env)
+            result = await self.job_executor.monitor_process_output(process)
 
-            # Wait for completion
-            max_wait = 60
-            wait_time = 0
+            if result.return_code == 0:
+                # Parse JSON lines output from stdout
+                output_text = result.stdout.decode("utf-8", errors="replace")
+                contents = []
 
-            while wait_time < max_wait:
-                status = borg_job_manager.get_job_status(job_id)
-                if not status:
-                    raise Exception("Job not found")
+                for line in output_text.split("\n"):
+                    line = line.strip()
+                    if line.startswith("{"):
+                        try:
+                            item = json.loads(line)
+                            contents.append(item)
+                        except json.JSONDecodeError:
+                            continue
 
-                if status["completed"]:
-                    if status["return_code"] == 0:
-                        output = await borg_job_manager.get_job_output_stream(job_id)
-
-                        contents = []
-                        for line in output.get("lines", []):
-                            line_text = line["text"]
-                            if line_text.startswith("{"):
-                                try:
-                                    item = json.loads(line_text)
-                                    contents.append(item)
-                                except json.JSONDecodeError:
-                                    continue
-
-                        return contents
-                    else:
-                        error_lines = [line["text"] for line in output.get("lines", [])]
-                        error_text = "\n".join(error_lines)
-                        raise Exception(f"Borg list failed: {error_text}")
-
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            raise Exception("List archive contents timed out")
+                return contents
+            else:
+                error_text = (
+                    result.stderr.decode("utf-8", errors="replace")
+                    if result.stderr
+                    else "Unknown error"
+                )
+                raise Exception(
+                    f"Borg list failed with code {result.return_code}: {error_text}"
+                )
 
         except Exception as e:
             raise Exception(f"Failed to list archive contents: {str(e)}")
@@ -537,20 +510,21 @@ class BorgService:
             raise Exception(f"Validation failed: {str(e)}")
 
         try:
-            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            job_manager = get_job_manager()
+            job_id = await job_manager.start_borg_command(command, env=env)
 
             # Wait for completion
             max_wait = 60
             wait_time = 0
 
             while wait_time < max_wait:
-                status = borg_job_manager.get_job_status(job_id)
+                status = job_manager.get_job_status(job_id)
                 if not status:
                     raise Exception("Job not found")
 
                 if status["completed"]:
                     if status["return_code"] == 0:
-                        output = await borg_job_manager.get_job_output_stream(job_id)
+                        output = await job_manager.get_job_output_stream(job_id)
 
                         # Parse all entries
                         all_entries = []
@@ -765,8 +739,9 @@ class BorgService:
 
         # If no specific path provided, scan all mounted volumes
         if scan_path is None:
-            from app.services.volume_service import volume_service
+            from app.dependencies import get_volume_service
 
+            volume_service = get_volume_service()
             mounted_volumes = await volume_service.get_mounted_volumes()
 
             if not mounted_volumes:
@@ -832,7 +807,7 @@ class BorgService:
 
         try:
             logger.info(f"Executing scan command: {' '.join(command)}")
-            job_id = await borg_job_manager.start_borg_command(command, env={})
+            job_id = await get_job_manager().start_borg_command(command, env={})
             logger.info(f"Repository scan job {job_id} started")
             return job_id
 
@@ -842,14 +817,14 @@ class BorgService:
 
     async def check_scan_status(self, job_id: str) -> Dict[str, any]:
         """Check status of repository scan job"""
-        status = borg_job_manager.get_job_status(job_id)
+        status = get_job_manager().get_job_status(job_id)
         if not status:
             return {"running": False, "completed": False, "error": "Job not found"}
 
         # Get job output for error debugging
         output = ""
         try:
-            job_output = await borg_job_manager.get_job_output_stream(job_id)
+            job_output = await get_job_manager().get_job_output_stream(job_id)
             if "lines" in job_output:
                 output = "\n".join(
                     [line["text"] for line in job_output["lines"][-20:]]
@@ -871,7 +846,7 @@ class BorgService:
     async def get_scan_results(self, job_id: str) -> List[Dict]:
         """Get results of completed repository scan"""
         try:
-            status = borg_job_manager.get_job_status(job_id)
+            status = get_job_manager().get_job_status(job_id)
             if not status or not status["completed"]:
                 return []
 
@@ -882,7 +857,7 @@ class BorgService:
                 return []
 
             # Get the output
-            output = await borg_job_manager.get_job_output_stream(job_id)
+            output = await get_job_manager().get_job_output_stream(job_id)
 
             repo_paths = []
             for line in output.get("lines", []):
@@ -907,7 +882,7 @@ class BorgService:
                     )
 
             # Clean up job after getting results
-            borg_job_manager.cleanup_job(job_id)
+            get_job_manager().cleanup_job(job_id)
 
             return repo_paths
 
@@ -937,14 +912,15 @@ class BorgService:
             return False
 
         try:
-            job_id = await borg_job_manager.start_borg_command(command, env=env)
+            job_manager = get_job_manager()
+            job_id = await job_manager.start_borg_command(command, env=env)
 
             # Wait for completion
             max_wait = 30
             wait_time = 0
 
             while wait_time < max_wait:
-                status = borg_job_manager.get_job_status(job_id)
+                status = job_manager.get_job_status(job_id)
 
                 if not status:
                     return False
@@ -952,7 +928,7 @@ class BorgService:
                 if status["completed"] or status["status"] == "failed":
                     success = status["return_code"] == 0
                     # Clean up job
-                    borg_job_manager.cleanup_job(job_id)
+                    get_job_manager().cleanup_job(job_id)
                     return success
 
                 await asyncio.sleep(0.5)
@@ -1016,4 +992,4 @@ class BorgService:
         return []
 
 
-borg_service = BorgService()
+# borg_service = BorgService()

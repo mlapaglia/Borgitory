@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, Response, Form
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 import secrets
 from datetime import datetime, timedelta, UTC
@@ -7,48 +8,92 @@ from typing import Optional
 from app.models.database import User, UserSession, get_db
 
 router = APIRouter()
+templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/check-users")
-def check_users_exist(db: Session = Depends(get_db)):
+def check_users_exist(request: Request, db: Session = Depends(get_db)):
     user_count = db.query(User).count()
-    return {"has_users": user_count > 0, "user_count": user_count}
+    has_users = user_count > 0
+
+    # Return the appropriate form template based on user existence
+    if has_users:
+        # Show login form for existing users
+        return templates.TemplateResponse(
+            request, "partials/auth/login_form_active.html", {}
+        )
+    else:
+        # Show welcome message and register form for first user
+        return templates.TemplateResponse(
+            request, "partials/auth/register_form_active.html", {}
+        )
 
 
 @router.post("/register")
 def register_user(
-    username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db),
 ):
-    # Check if any users exist
-    user_count = db.query(User).count()
-    if user_count > 0:
-        raise HTTPException(status_code=403, detail="Registration is closed")
+    try:
+        # Check if any users exist
+        user_count = db.query(User).count()
+        if user_count > 0:
+            return templates.TemplateResponse(
+                request,
+                "partials/auth/register_error.html",
+                {"error_message": "Registration is closed"},
+                status_code=403,
+            )
 
-    # Check if username already exists
-    existing_user = db.query(User).filter(User.username == username).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already exists")
+        # Check if username already exists
+        existing_user = db.query(User).filter(User.username == username).first()
+        if existing_user:
+            return templates.TemplateResponse(
+                request,
+                "partials/auth/register_error.html",
+                {"error_message": "Username already exists"},
+                status_code=400,
+            )
 
-    # Validate inputs
-    if not username or len(username.strip()) < 3:
-        raise HTTPException(
-            status_code=400, detail="Username must be at least 3 characters"
+        # Validate inputs
+        if not username or len(username.strip()) < 3:
+            return templates.TemplateResponse(
+                request,
+                "partials/auth/register_error.html",
+                {"error_message": "Username must be at least 3 characters"},
+                status_code=400,
+            )
+
+        if not password or len(password) < 6:
+            return templates.TemplateResponse(
+                request,
+                "partials/auth/register_error.html",
+                {"error_message": "Password must be at least 6 characters"},
+                status_code=400,
+            )
+
+        # Create new user
+        user = User(username=username.strip())
+        user.set_password(password)
+
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        # Return success response
+        return templates.TemplateResponse(
+            request, "partials/auth/register_success.html", {}
         )
 
-    if not password or len(password) < 6:
-        raise HTTPException(
-            status_code=400, detail="Password must be at least 6 characters"
+    except Exception as e:
+        return templates.TemplateResponse(
+            request,
+            "partials/auth/register_error.html",
+            {"error_message": f"Registration failed: {str(e)}"},
+            status_code=500,
         )
-
-    # Create new user
-    user = User(username=username.strip())
-    user.set_password(password)
-
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    return {"status": "success", "message": "User created successfully"}
 
 
 @router.post("/login")
@@ -60,56 +105,76 @@ def login_user(
     remember_me: bool = Form(False),
     db: Session = Depends(get_db),
 ):
-    # Find user
-    user = db.query(User).filter(User.username == username).first()
-    if not user or not user.verify_password(password):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+    try:
+        # Find user
+        user = db.query(User).filter(User.username == username).first()
+        if not user or not user.verify_password(password):
+            return templates.TemplateResponse(
+                request,
+                "partials/auth/login_error.html",
+                {"error_message": "Invalid username or password"},
+                status_code=401,
+            )
 
-    # Create session token
-    auth_token = secrets.token_urlsafe(32)
+        # Create session token
+        auth_token = secrets.token_urlsafe(32)
 
-    if remember_me:
-        expires_at = datetime.now(UTC) + timedelta(days=365)
-        max_age = 365 * 24 * 60 * 60
-    else:
-        expires_at = datetime.now(UTC) + timedelta(minutes=30)
-        max_age = 30 * 60
+        if remember_me:
+            expires_at = datetime.now(UTC) + timedelta(days=365)
+            max_age = 365 * 24 * 60 * 60
+        else:
+            expires_at = datetime.now(UTC) + timedelta(minutes=30)
+            max_age = 30 * 60
 
-    # Clean up expired sessions
-    db.query(UserSession).filter(
-        UserSession.user_id == user.id, UserSession.expires_at < datetime.now(UTC)
-    ).delete()
+        # Clean up expired sessions
+        db.query(UserSession).filter(
+            UserSession.user_id == user.id, UserSession.expires_at < datetime.now(UTC)
+        ).delete()
 
-    # Create new session
-    user_agent = request.headers.get("user-agent") if request else None
-    client_ip = request.client.host if request and hasattr(request, "client") else None
+        # Create new session
+        user_agent = request.headers.get("user-agent") if request else None
+        client_ip = (
+            request.client.host if request and hasattr(request, "client") else None
+        )
+        current_time = datetime.now(UTC)
 
-    db_session = UserSession(
-        user_id=user.id,
-        session_token=auth_token,
-        expires_at=expires_at,
-        remember_me=remember_me,
-        user_agent=user_agent,
-        ip_address=client_ip,
-        last_activity=datetime.now(UTC),
-    )
-    db.add(db_session)
+        db_session = UserSession(
+            user_id=user.id,
+            session_token=auth_token,
+            expires_at=expires_at,
+            remember_me=remember_me,
+            user_agent=user_agent,
+            ip_address=client_ip,
+            created_at=current_time,
+            last_activity=current_time,
+        )
+        db.add(db_session)
 
-    # Update user's last login
-    user.last_login = datetime.now(UTC)
-    db.commit()
+        # Update user's last login
+        user.last_login = current_time
+        db.commit()
 
-    # Set cookie
-    response.set_cookie(
-        key="auth_token",
-        value=auth_token,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        max_age=max_age,
-    )
+        # Create success template response and set cookie
+        success_response = templates.TemplateResponse(
+            request, "partials/auth/login_success.html", {}
+        )
+        success_response.set_cookie(
+            key="auth_token",
+            value=auth_token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=max_age,
+        )
+        return success_response
 
-    return {"status": "success", "remember_me": remember_me}
+    except Exception as e:
+        return templates.TemplateResponse(
+            request,
+            "partials/auth/login_error.html",
+            {"error_message": f"Login failed: {str(e)}"},
+            status_code=500,
+        )
 
 
 @router.post("/logout")

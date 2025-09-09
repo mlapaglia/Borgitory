@@ -1,0 +1,73 @@
+<!-- Dynamic Check Options Template -->
+<!-- Verification Options -->
+<div>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Options</label>
+    <div class="space-y-2">
+        <label class="flex items-center" id="verify-data-option" style="opacity: {{ verify_data_opacity }};">
+            <input type="checkbox" name="verify_data" class="mr-2" {% if verify_data_disabled %}disabled{% endif %}>
+            <span class="text-sm dark:text-gray-200">Verify Data Integrity</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">(Very slow but thorough)</span>
+        </label>
+        <label class="flex items-center">
+            <input type="checkbox" name="repair_mode" class="mr-2" id="repair-mode-checkbox" 
+                   {% if repair_mode_checked %}checked{% endif %} {% if repair_mode_disabled %}disabled{% endif %}>
+            <span class="text-sm dark:text-gray-200">Repair Mode</span>
+            <span class="text-xs text-red-600 dark:text-red-400 ml-2">⚠️ DANGEROUS - Backup first!</span>
+        </label>
+        <label class="flex items-center">
+            <input type="checkbox" name="save_space" class="mr-2">
+            <span class="text-sm dark:text-gray-200">Save Space</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">(Slower but uses less memory)</span>
+        </label>
+    </div>
+</div>
+
+<!-- Advanced Options (Collapsible) -->
+<div>
+    <button type="button" onclick="document.getElementById('advanced-options').classList.toggle('hidden'); document.getElementById('advanced-chevron').classList.toggle('rotate-90')" class="flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
+        <svg id="advanced-chevron" class="w-4 h-4 mr-1 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        Advanced Options
+    </button>
+    
+    <div id="advanced-options" class="hidden mt-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-md space-y-4">
+        <!-- Time Limit (Repository Only) -->
+        <div id="time-limit-section" style="display: {{ time_limit_display }};">
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Time Limit (seconds)</label>
+            <input type="number" name="max_duration" min="1" placeholder="3600" value="{{ max_duration }}"
+                   hx-get="/api/repository-check-configs/update-options" 
+                   hx-target="#dynamic-check-options" 
+                   hx-include="closest form"
+                   hx-trigger="change"
+                   hx-swap="innerHTML"
+                   class="input-modern mt-1">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">For partial repository checks only. Leave empty for full check.</p>
+        </div>
+
+        <!-- Archive Filters -->
+        <div id="archive-filters-section" style="display: {{ archive_filters_display }};">
+            <div class="grid grid-cols-1 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Prefix</label>
+                    <input type="text" name="archive_prefix" placeholder="backup-2024" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Glob Pattern</label>
+                    <input type="text" name="archive_glob" placeholder="*2024*" class="input-modern mt-1">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">First N Archives</label>
+                        <input type="number" name="first_n_archives" min="1" placeholder="10" class="input-modern mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Last N Archives</label>
+                        <input type="number" name="last_n_archives" min="1" placeholder="10" class="input-modern mt-1">
+                    </div>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Archive filters are only used with Full Check or Archives Only.</p>
+        </div>
+    </div>
+</div>

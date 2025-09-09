@@ -9,8 +9,10 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 from app.config import DATABASE_URL
-from app.models.database import Schedule, get_db
-from app.services.composite_job_manager import composite_job_manager
+from app.models.database import Schedule
+from app.models.enums import JobType
+from app.services.task_definition_builder import TaskDefinitionBuilder
+from app.utils.db_session import get_db_session
 
 # Configure APScheduler logging only (don't override main basicConfig)
 logging.getLogger("apscheduler").setLevel(logging.INFO)
@@ -19,144 +21,73 @@ logger = logging.getLogger(__name__)
 
 async def execute_scheduled_backup(schedule_id: int):
     """Execute a scheduled backup"""
-    print(f"🔥🔥🔥 SCHEDULER FUNCTION CALLED: schedule_id={schedule_id}")
     logger.info(
-        f"🔥 SCHEDULER: execute_scheduled_backup called for schedule_id: {schedule_id}"
+        f"SCHEDULER: execute_scheduled_backup called for schedule_id: {schedule_id}"
     )
 
-    db = next(get_db())
-    try:
-        logger.info(f"🔍 SCHEDULER: Looking up schedule {schedule_id}")
+    with get_db_session() as db:
+        logger.info(f"SCHEDULER: Looking up schedule {schedule_id}")
         schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
         if not schedule:
-            logger.error(f"❌ SCHEDULER: Schedule {schedule_id} not found")
+            logger.error(f"SCHEDULER: Schedule {schedule_id} not found")
             return
 
         logger.info(
-            f"✅ SCHEDULER: Found schedule '{schedule.name}' for repository_id {schedule.repository_id}"
+            f"SCHEDULER: Found schedule '{schedule.name}' for repository_id {schedule.repository_id}"
         )
         logger.info(
-            f"📊 SCHEDULER: Schedule details - cloud_sync_config_id: {schedule.cloud_sync_config_id}"
+            f"SCHEDULER: Schedule details - cloud_sync_config_id: {schedule.cloud_sync_config_id}"
         )
 
         repository = schedule.repository
         if not repository:
-            logger.error(
-                f"❌ SCHEDULER: Repository not found for schedule {schedule_id}"
-            )
+            logger.error(f"SCHEDULER: Repository not found for schedule {schedule_id}")
             return
 
-        logger.info(f"✅ SCHEDULER: Found repository '{repository.name}'")
+        logger.info(f"SCHEDULER: Found repository '{repository.name}'")
 
         # Update schedule last run
-        logger.info("📝 SCHEDULER: Updating schedule last run time")
+        logger.info("SCHEDULER: Updating schedule last run time")
         schedule.last_run = datetime.now(UTC)
         db.commit()
 
         try:
-            logger.info("🚀 SCHEDULER: Creating composite job for scheduled backup")
+            logger.info("SCHEDULER: Creating composite job for scheduled backup")
             logger.info(f"  - repository: {repository.name}")
             logger.info(f"  - schedule: {schedule.name}")
             logger.info(f"  - source_path: {schedule.source_path}")
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
-            # Define the tasks for this composite job
-            task_definitions = [
-                {
-                    "type": "backup",
-                    "name": f"Backup {repository.name}",
-                    "source_path": schedule.source_path,
-                    "compression": "zstd",  # Default compression for scheduled backups
-                    "dry_run": False,
-                }
-            ]
+            # Use TaskDefinitionBuilder to create all task definitions
+            builder = TaskDefinitionBuilder(db)
 
-            # Add prune task if cleanup is configured
-            if schedule.cleanup_config_id:
-                from app.models.database import CleanupConfig
+            backup_params = {
+                "source_path": schedule.source_path,
+                "compression": "zstd",  # Default compression for scheduled backups
+                "dry_run": False,
+            }
 
-                cleanup_config = (
-                    db.query(CleanupConfig)
-                    .filter(
-                        CleanupConfig.id == schedule.cleanup_config_id,
-                        CleanupConfig.enabled,
-                    )
-                    .first()
-                )
+            task_definitions = builder.build_task_list(
+                repository_name=repository.name,
+                include_backup=True,
+                backup_params=backup_params,
+                cleanup_config_id=schedule.cleanup_config_id,
+                check_config_id=schedule.check_config_id,
+                include_cloud_sync=schedule.cloud_sync_config_id is not None,
+                notification_config_id=schedule.notification_config_id,
+            )
 
-                if cleanup_config:
-                    prune_task = {
-                        "type": "prune",
-                        "name": f"Clean up {repository.name}",
-                        "dry_run": False,  # Don't dry run when chained after backup
-                        "show_list": cleanup_config.show_list,
-                        "show_stats": cleanup_config.show_stats,
-                        "save_space": cleanup_config.save_space,
-                    }
-
-                    # Add retention parameters based on strategy
-                    if (
-                        cleanup_config.strategy == "simple"
-                        and cleanup_config.keep_within_days
-                    ):
-                        prune_task["keep_within"] = (
-                            f"{cleanup_config.keep_within_days}d"
-                        )
-                    elif cleanup_config.strategy == "advanced":
-                        if cleanup_config.keep_daily:
-                            prune_task["keep_daily"] = cleanup_config.keep_daily
-                        if cleanup_config.keep_weekly:
-                            prune_task["keep_weekly"] = cleanup_config.keep_weekly
-                        if cleanup_config.keep_monthly:
-                            prune_task["keep_monthly"] = cleanup_config.keep_monthly
-                        if cleanup_config.keep_yearly:
-                            prune_task["keep_yearly"] = cleanup_config.keep_yearly
-
-                    task_definitions.append(prune_task)
-                    logger.info("📋 SCHEDULER: Added cleanup task to composite job")
-
-            # Add check task if repository check is configured
-            if schedule.check_config_id:
-                from app.models.database import RepositoryCheckConfig
-
-                check_config = (
-                    db.query(RepositoryCheckConfig)
-                    .filter(
-                        RepositoryCheckConfig.id == schedule.check_config_id,
-                        RepositoryCheckConfig.enabled,
-                    )
-                    .first()
-                )
-
-                if check_config:
-                    check_task = {
-                        "type": "check",
-                        "name": f"Check {repository.name} ({check_config.name})",
-                        "check_type": check_config.check_type,
-                        "verify_data": check_config.verify_data,
-                        "repair_mode": check_config.repair_mode,
-                        "save_space": check_config.save_space,
-                        "max_duration": check_config.max_duration,
-                        "archive_prefix": check_config.archive_prefix,
-                        "archive_glob": check_config.archive_glob,
-                        "first_n_archives": check_config.first_n_archives,
-                        "last_n_archives": check_config.last_n_archives,
-                    }
-                    task_definitions.append(check_task)
-                    logger.info("📋 SCHEDULER: Added check task to composite job")
-            else:
-                logger.info("📋 SCHEDULER: No repository check configured")
-
-            # Add cloud sync task if cloud backup is configured
-            if schedule.cloud_sync_config_id:
-                task_definitions.append({"type": "cloud_sync", "name": "Sync to Cloud"})
-                logger.info("📋 SCHEDULER: Added cloud sync task to composite job")
-            else:
-                logger.info("📋 SCHEDULER: No cloud backup configured")
+            logger.info(
+                f"SCHEDULER: Built {len(task_definitions)} tasks using TaskDefinitionBuilder"
+            )
+            for task in task_definitions:
+                logger.info(f"  - {task['type']}: {task['name']}")
 
             # Create composite job
+            from app.services.composite_job_manager import composite_job_manager
+
             job_id = await composite_job_manager.create_composite_job(
-                job_type="scheduled_backup",
+                job_type=JobType.SCHEDULED_BACKUP,
                 task_definitions=task_definitions,
                 repository=repository,
                 schedule=schedule,
@@ -164,25 +95,17 @@ async def execute_scheduled_backup(schedule_id: int):
             )
 
             logger.info(
-                f"✅ SCHEDULER: Created composite job {job_id} with {len(task_definitions)} tasks"
+                f"SCHEDULER: Created composite job {job_id} with {len(task_definitions)} tasks"
             )
 
         except Exception as e:
             logger.error(
-                f"❌ SCHEDULER: Error creating composite job for schedule {schedule_id}: {str(e)}"
+                f"SCHEDULER: Error creating composite job for schedule {schedule_id}: {str(e)}"
             )
             import traceback
 
-            logger.error(f"❌ SCHEDULER: Traceback: {traceback.format_exc()}")
+            logger.error(f"SCHEDULER: Traceback: {traceback.format_exc()}")
             raise  # Re-raise so APScheduler marks the job as failed
-
-    except Exception as e:
-        logger.error(
-            f"Fatal error in scheduled backup for schedule {schedule_id}: {str(e)}"
-        )
-        raise
-    finally:
-        db.close()
 
 
 class SchedulerService:
@@ -236,17 +159,18 @@ class SchedulerService:
 
     async def _reload_schedules(self):
         """Reload all schedules from database"""
-        db = next(get_db())
-        try:
-            schedules = db.query(Schedule).filter(Schedule.enabled).all()
-            for schedule in schedules:
-                await self._add_schedule_internal(
-                    schedule.id, schedule.name, schedule.cron_expression, persist=False
-                )
-        except Exception as e:
-            logger.error(f"Error reloading schedules: {str(e)}")
-        finally:
-            db.close()
+        with get_db_session() as db:
+            try:
+                schedules = db.query(Schedule).filter(Schedule.enabled).all()
+                for schedule in schedules:
+                    await self._add_schedule_internal(
+                        schedule.id,
+                        schedule.name,
+                        schedule.cron_expression,
+                        persist=False,
+                    )
+            except Exception as e:
+                logger.error(f"Error reloading schedules: {str(e)}")
 
     async def add_schedule(
         self, schedule_id: int, schedule_name: str, cron_expression: str
@@ -313,21 +237,20 @@ class SchedulerService:
         try:
             job = self.scheduler.get_job(job_id)
             if job and job.next_run_time:
-                db = next(get_db())
-                try:
-                    schedule = (
-                        db.query(Schedule).filter(Schedule.id == schedule_id).first()
-                    )
-                    if schedule:
-                        schedule.next_run = job.next_run_time
-                        db.commit()
-                        logger.info(
-                            f"Updated next run time for schedule {schedule_id}: {job.next_run_time}"
+                with get_db_session() as db:
+                    try:
+                        schedule = (
+                            db.query(Schedule)
+                            .filter(Schedule.id == schedule_id)
+                            .first()
                         )
-                except Exception as e:
-                    logger.error(f"Failed to update next run time: {str(e)}")
-                finally:
-                    db.close()
+                        if schedule:
+                            schedule.next_run = job.next_run_time
+                            logger.info(
+                                f"Updated next run time for schedule {schedule_id}: {job.next_run_time}"
+                            )
+                    except Exception as e:
+                        logger.error(f"Failed to update next run time: {str(e)}")
         except Exception as e:
             logger.error(f"Error updating next run time: {str(e)}")
 
@@ -380,7 +303,3 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"Error getting scheduled jobs: {str(e)}")
         return jobs
-
-
-# Global scheduler instance
-scheduler_service = SchedulerService()

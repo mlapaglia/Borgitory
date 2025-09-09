@@ -1,23 +1,32 @@
 <!-- Repositories Tab -->
 <div id="tab-repositories" class="tab-content">
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Repository Management</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Repository Management</h2>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Repository Forms -->
-            <div class="border rounded-lg p-4">
-                <!-- Tabs -->
-                <div class="flex mb-4 border-b">
-                    <button onclick="switchRepositoryTab('create')" id="create-tab" class="px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
+            <div class="border dark:border-gray-600 rounded-lg p-4">
+                <!-- Hidden radio buttons for tab state -->
+                <input type="radio" id="tab-create" name="repo-tab" class="hidden peer/create" checked>
+                <input type="radio" id="tab-import" name="repo-tab" class="hidden peer/import">
+                
+                <!-- Tab buttons -->
+                <div class="flex mb-4 border-b dark:border-gray-600">
+                    <label for="tab-create" class="cursor-pointer px-4 py-2 text-sm font-medium peer-checked/create:text-blue-600 peer-checked/create:border-b-2 peer-checked/create:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
                         Create New
-                    </button>
-                    <button onclick="switchRepositoryTab('import')" id="import-tab" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+                    </label>
+                    <label for="tab-import" class="cursor-pointer px-4 py-2 text-sm font-medium peer-checked/import:text-blue-600 peer-checked/import:border-b-2 peer-checked/import:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
                         Import Existing
-                    </button>
+                    </label>
                 </div>
                 
-                {% include "partials/repositories/form_create.html" %}
-                {% include "partials/repositories/form_import.html" %}
+                <!-- Tab content -->
+                <div class="peer-checked/create:block peer-checked/import:hidden">
+                    {% include "partials/repositories/form_create.html" %}
+                </div>
+                <div class="peer-checked/import:block peer-checked/create:hidden">
+                    {% include "partials/repositories/form_import.html" %}
+                </div>
             </div>
 
             {% include "partials/repositories/list.html" %}

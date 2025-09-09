@@ -1,6 +1,7 @@
 import base64
 import hashlib
-from datetime import datetime
+import uuid
+from datetime import datetime, UTC
 
 from cryptography.fernet import Fernet
 from passlib.context import CryptContext
@@ -52,7 +53,7 @@ class Repository(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     path = Column(String, nullable=False)
     encrypted_passphrase = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     jobs = relationship(
         "Job", back_populates="repository", cascade="all, delete-orphan"
@@ -73,9 +74,10 @@ class Repository(Base):
 class Job(Base):
     __tablename__ = "jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())
+    )  # UUID as primary key
     repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
-    job_uuid = Column(String, nullable=True, index=True)  # Links to JobManager UUID
     type = Column(String, nullable=False)  # backup, restore, list, etc.
     status = Column(
         String, nullable=False, default="pending"
@@ -111,7 +113,7 @@ class JobTask(Base):
     __tablename__ = "job_tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
+    job_id = Column(String, ForeignKey("jobs.id"), nullable=False)  # UUID foreign key
     task_type = Column(String, nullable=False)  # 'backup', 'cloud_sync', 'verify', etc.
     task_name = Column(String, nullable=False)
     status = Column(
@@ -138,7 +140,7 @@ class Schedule(Base):
     enabled = Column(Boolean, default=True)
     last_run = Column(DateTime, nullable=True)
     next_run = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     cloud_sync_config_id = Column(
         Integer, ForeignKey("cloud_sync_configs.id"), nullable=True
     )
@@ -163,7 +165,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     last_login = Column(DateTime, nullable=True)
 
     sessions = relationship("UserSession", back_populates="user")
@@ -185,8 +187,8 @@ class UserSession(Base):
     session_token = Column(String, unique=True, index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     remember_me = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_activity = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    last_activity = Column(DateTime, default=lambda: datetime.now(UTC))
     user_agent = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
 
@@ -198,7 +200,9 @@ class Setting(Base):
 
     key = Column(String, primary_key=True, index=True)
     value = Column(String, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
 
 class CleanupConfig(Base):
@@ -223,8 +227,10 @@ class CleanupConfig(Base):
     save_space = Column(Boolean, default=False)
 
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
 
 class NotificationConfig(Base):
@@ -243,8 +249,10 @@ class NotificationConfig(Base):
     notify_on_failure = Column(Boolean, default=True)
 
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
     def set_pushover_credentials(self, user_key: str, app_token: str):
         """Encrypt and store Pushover credentials"""
@@ -289,8 +297,10 @@ class CloudSyncConfig(Base):
     # Common fields
     path_prefix = Column(String, default="", nullable=False)
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
     def set_credentials(self, access_key: str, secret_key: str):
         """For S3 providers"""
@@ -365,36 +375,66 @@ class RepositoryCheckConfig(Base):
 
     # Metadata
     enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
 
 async def init_db():
-    """Initialize database with schema migration support"""
+    """Initialize database - assumes migrations have already been run"""
+    import logging
+    import os
+
+    logger = logging.getLogger(__name__)
+
     try:
-        print(f"Initializing database at: {DATABASE_URL}")
-        print(f"Data directory: {DATA_DIR}")
+        logger.info(f"Initializing database at: {DATABASE_URL}")
+        logger.info(f"Data directory: {DATA_DIR}")
 
-        # Create all tables (will create new tables only)
-        Base.metadata.create_all(bind=engine)
-        print("✅ Database tables created/verified")
+        # Ensure data directory exists
+        os.makedirs(DATA_DIR, exist_ok=True)
+        logger.info("Data directory ensured")
 
-        # Run migrations for schema updates
+        # Simple database connection test and table creation
+        from sqlalchemy import text
+
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT 1"))
+            result.fetchone()
+            logger.info("Database connection test successful")
+
+            # Check if tables exist, create them if they don't
+            try:
+                result = connection.execute(
+                    text(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name='jobs';"
+                    )
+                )
+                if not result.fetchone():
+                    logger.info("Tables not found, creating them from models...")
+                    Base.metadata.create_all(bind=engine)
+                    logger.info("Database tables created successfully")
+                else:
+                    logger.info("Database tables already exist")
+            except Exception as e:
+                logger.warning(f"Could not check/create tables: {e}")
+
+        # Optional: Log current migration status (non-blocking)
         try:
-            from app.utils.migration_add_source_path import migrate_add_source_path
+            from app.utils.migrations import get_current_revision
 
-            migrate_add_source_path()
-        except Exception as migration_error:
-            print(f"⚠️  Migration warning: {migration_error}")
-            # Don't fail startup for migration issues
+            current_revision = get_current_revision()
+            logger.info(f"Current database revision: {current_revision}")
+        except Exception as e:
+            logger.warning(f"Could not check migration status: {e}")
+
+        logger.info("Database initialization completed successfully")
 
     except Exception as e:
-        print(f"❌ Database initialization error: {e}")
-        print("If you're getting schema errors, you may need to reset the database.")
-        print(
-            "You can do this by deleting the database file and restarting the container."
-        )
-        raise  # Re-raise the exception so the app doesn't start with a broken database
+        logger.error(f"Database initialization error: {e}")
+        logger.error("Make sure migrations have been run with: alembic upgrade head")
+        raise
 
 
 def reset_db():

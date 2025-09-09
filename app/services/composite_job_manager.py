@@ -2,12 +2,14 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Callable
 from dataclasses import dataclass, field
 from collections import deque
 
-from app.models.database import Repository, Job, JobTask, get_db, Schedule
-from app.services.rclone_service import rclone_service
+from app.models.database import Repository, Job, JobTask, Schedule, NotificationConfig
+from app.models.enums import JobType
+from app.utils.db_session import get_db_session
+from app.services.job_manager_modular import ModularBorgJobManager
 
 logger = logging.getLogger(__name__)
 
@@ -45,30 +47,82 @@ class CompositeJobTaskInfo:
     archive_glob: Optional[str] = None
     first_n_archives: Optional[int] = None
     last_n_archives: Optional[int] = None
+    # Notification-specific parameters
+    provider: Optional[str] = None
+    notify_on_success: Optional[bool] = None
+    notify_on_failure: Optional[bool] = None
+    config_id: Optional[int] = None
 
 
 @dataclass
 class CompositeJobInfo:
-    id: str
-    db_job_id: int
+    id: str  # UUID string
     job_type: str  # 'scheduled_backup', 'manual_backup'
     status: str = "pending"
     started_at: datetime = field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
     tasks: List[CompositeJobTaskInfo] = field(default_factory=list)
     current_task_index: int = 0
-    repository: Optional["Repository"] = None
+    repository_id: Optional[int] = (
+        None  # Store ID instead of object to avoid session issues
+    )
     schedule: Optional["Schedule"] = None
+
+    # Configuration IDs for composite jobs
+    cloud_sync_config_id: Optional[int] = None
+
+    def is_composite(self) -> bool:
+        """Check if this is a multi-task composite job"""
+        return True
+
+    def get_current_task(self) -> Optional[CompositeJobTaskInfo]:
+        """Get the currently executing task"""
+        if 0 <= self.current_task_index < len(self.tasks):
+            return self.tasks[self.current_task_index]
+        return None
 
 
 class CompositeJobManager:
-    def __init__(self):
+    def __init__(
+        self,
+        db_session_factory: Optional[Callable] = None,
+        rclone_service=None,
+        subprocess_executor: Optional[Callable] = None,
+        http_client_factory: Optional[Callable] = None,
+        job_manager: Optional[ModularBorgJobManager] = None,
+    ):
         self.jobs: Dict[str, CompositeJobInfo] = {}
         self._event_queues: List[asyncio.Queue] = []  # For SSE streaming
 
+        # Dependency injection for testability
+        self._db_session_factory = db_session_factory or get_db_session
+        self._rclone_service = rclone_service
+        self._subprocess_executor = (
+            subprocess_executor or asyncio.create_subprocess_exec
+        )
+        self._http_client_factory = http_client_factory
+
+        # Use the new modular job manager for actual execution
+        self._job_manager = job_manager
+
+    def _get_repository_data(self, repository_id: int):
+        """Get repository data from database using a fresh session"""
+        with self._db_session_factory() as db:
+            repo = db.query(Repository).filter(Repository.id == repository_id).first()
+            if not repo:
+                return None
+
+            # Extract all needed data while session is active
+            return {
+                "id": repo.id,
+                "name": repo.name,
+                "path": repo.path,
+                "passphrase": repo.get_passphrase(),
+            }
+
     async def create_composite_job(
         self,
-        job_type: str,
+        job_type: JobType,
         task_definitions: List[Dict],
         repository: Repository,
         schedule: Optional[Schedule] = None,
@@ -76,15 +130,28 @@ class CompositeJobManager:
     ) -> str:
         """Create a new composite job with multiple tasks"""
 
+        # If we have the modular job manager, delegate to it
+        if self._job_manager:
+            return await self._job_manager.create_composite_job(
+                job_type=str(job_type),
+                task_definitions=task_definitions,
+                repository=repository,
+                schedule=schedule,
+                cloud_sync_config_id=cloud_sync_config_id,
+            )
+
+        # Fallback to original implementation for backward compatibility
         job_id = str(uuid.uuid4())
 
+        # Extract repository ID to avoid session issues
+        repository_id = repository.id
+
         # Create database job record
-        db = next(get_db())
-        try:
+        with self._db_session_factory() as db:
             db_job = Job(
-                repository_id=repository.id,
-                job_uuid=job_id,
-                type=job_type,
+                id=job_id,
+                repository_id=repository_id,
+                type=str(job_type),
                 status="pending",
                 job_type="composite",
                 total_tasks=len(task_definitions),
@@ -96,10 +163,12 @@ class CompositeJobManager:
             db.commit()
             db.refresh(db_job)
 
+            # Database job created with UUID as primary key
+
             # Create task records
             for i, task_def in enumerate(task_definitions):
                 task = JobTask(
-                    job_id=db_job.id,
+                    job_id=job_id,  # Use UUID
                     task_type=task_def["type"],
                     task_name=task_def["name"],
                     status="pending",
@@ -107,24 +176,15 @@ class CompositeJobManager:
                 )
                 db.add(task)
 
-            db.commit()
-
             logger.info(
-                f"📝 Created composite job {job_id} (db_id: {db_job.id}) with {len(task_definitions)} tasks"
+                f"📝 Created composite job {job_id} with {len(task_definitions)} tasks"
             )
-
-        except Exception as e:
-            logger.error(f"Failed to create database job: {e}")
-            raise
-        finally:
-            db.close()
 
         # Create in-memory job info
         composite_job = CompositeJobInfo(
             id=job_id,
-            db_job_id=db_job.id,
-            job_type=job_type,
-            repository=repository,
+            job_type=str(job_type),
+            repository_id=repository_id,
             schedule=schedule,
         )
 
@@ -146,6 +206,11 @@ class CompositeJobManager:
                 show_list=task_def.get("show_list"),
                 save_space=task_def.get("save_space"),
                 force_prune=task_def.get("force_prune"),
+                # Notification parameters
+                provider=task_def.get("provider"),
+                notify_on_success=task_def.get("notify_on_success"),
+                notify_on_failure=task_def.get("notify_on_failure"),
+                config_id=task_def.get("config_id"),
             )
             composite_job.tasks.append(task_info)
 
@@ -202,7 +267,11 @@ class CompositeJobManager:
                         task.status = "failed"
                         task.completed_at = datetime.now()
                         task.return_code = 1
-                        self._update_task_status(job_id, i, "failed", return_code=1)
+                        # Pass the task error that was set by the execution method
+                        error_msg = task.error if hasattr(task, "error") else None
+                        self._update_task_status(
+                            job_id, i, "failed", error=error_msg, return_code=1
+                        )
 
                         logger.error(
                             f"❌ Task {i + 1}/{len(job.tasks)} failed: {task.task_name}"
@@ -270,6 +339,8 @@ class CompositeJobManager:
             return await self._execute_repo_list_task(job, task, task_index)
         elif task.task_type == "repo_info":
             return await self._execute_repo_info_task(job, task, task_index)
+        elif task.task_type == "notification":
+            return await self._execute_notification_task(job, task, task_index)
         else:
             logger.error(f"Unknown task type: {task.task_type}")
             return False
@@ -279,7 +350,13 @@ class CompositeJobManager:
     ) -> bool:
         """Execute a borg backup task"""
         try:
-            logger.info(f"🔄 Starting borg backup for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"🔄 Starting borg backup for repository {repo_data['name']}")
 
             # Use the existing borg service to create backup
             # But we'll stream the output to our task instead of creating a separate job
@@ -310,7 +387,7 @@ class CompositeJobManager:
                 "--json",
                 "--verbose",  # More verbose output
                 "--list",  # List files being processed
-                f"{job.repository.path}::{archive_name}",
+                f"{repo_data['path']}::{archive_name}",
                 source_path,
             ]
 
@@ -321,12 +398,12 @@ class CompositeJobManager:
             command, env = build_secure_borg_command(
                 base_command="borg create",
                 repository_path="",
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
             # Execute the command and capture output
-            process = await asyncio.create_subprocess_exec(
+            process = await self._subprocess_executor(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -365,7 +442,13 @@ class CompositeJobManager:
     ) -> bool:
         """Execute a borg prune task to clean up old archives"""
         try:
-            logger.info(f"🗑️ Starting borg prune for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"🗑️ Starting borg prune for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
 
@@ -400,21 +483,21 @@ class CompositeJobManager:
                 additional_args.append("--dry-run")
 
             # Repository path as positional argument
-            additional_args.append(job.repository.path)
+            additional_args.append(repo_data["path"])
 
             logger.info(
-                f"🗑️ Prune settings - Repository: {job.repository.path}, Dry run: {task.dry_run}"
+                f"🗑️ Prune settings - Repository: {repo_data['path']}, Dry run: {task.dry_run}"
             )
 
             command, env = build_secure_borg_command(
                 base_command="borg prune",
                 repository_path="",  # Path is in additional_args
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
             # Execute the command and capture output
-            process = await asyncio.create_subprocess_exec(
+            process = await self._subprocess_executor(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -453,7 +536,13 @@ class CompositeJobManager:
     ) -> bool:
         """Execute a borg check task to verify repository integrity"""
         try:
-            logger.info(f"🔍 Starting borg check for repository {job.repository.name}")
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"🔍 Starting borg check for repository {repo_data['name']}")
 
             from app.utils.security import build_secure_borg_command
 
@@ -499,21 +588,21 @@ class CompositeJobManager:
                     additional_args.extend(["--last", str(task.last_n_archives)])
 
             # Repository path as positional argument
-            additional_args.append(job.repository.path)
+            additional_args.append(repo_data["path"])
 
             logger.info(
-                f"🔍 Check settings - Type: {task.check_type}, Repository: {job.repository.path}"
+                f"🔍 Check settings - Type: {task.check_type}, Repository: {repo_data['path']}"
             )
 
             command, env = build_secure_borg_command(
                 base_command="borg check",
                 repository_path="",  # Path is in additional_args
-                passphrase=job.repository.get_passphrase(),
+                passphrase=repo_data["passphrase"],
                 additional_args=additional_args,
             )
 
             # Execute the command and capture output
-            process = await asyncio.create_subprocess_exec(
+            process = await self._subprocess_executor(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -552,21 +641,30 @@ class CompositeJobManager:
     ) -> bool:
         """Execute a cloud sync task"""
         try:
-            if not job.schedule or not job.schedule.cloud_sync_config_id:
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            # Check for cloud_sync_config_id in job or schedule
+            cloud_sync_config_id = job.cloud_sync_config_id or (
+                job.schedule.cloud_sync_config_id if job.schedule else None
+            )
+            if not cloud_sync_config_id:
                 logger.info("📋 No cloud backup configuration - skipping cloud sync")
                 task.status = "skipped"
                 return True
 
-            logger.info(f"☁️ Starting cloud sync for repository {job.repository.name}")
+            logger.info(f"☁️ Starting cloud sync for repository {repo_data['name']}")
 
             # Get cloud backup configuration
-            db = next(get_db())
-            try:
+            with self._db_session_factory() as db:
                 from app.models.database import CloudSyncConfig
 
                 config = (
                     db.query(CloudSyncConfig)
-                    .filter(CloudSyncConfig.id == job.schedule.cloud_sync_config_id)
+                    .filter(CloudSyncConfig.id == cloud_sync_config_id)
                     .first()
                 )
 
@@ -586,9 +684,19 @@ class CompositeJobManager:
                         f"☁️ Syncing to {config.name} (S3: {config.bucket_name})"
                     )
 
+                    # Create a simple repository object for rclone service
+                    from types import SimpleNamespace
+
+                    repo_obj = SimpleNamespace(path=repo_data["path"])
+
                     # Use rclone service to sync to S3
-                    progress_generator = rclone_service.sync_repository_to_s3(
-                        repository=job.repository,
+                    if not self._rclone_service:
+                        from app.dependencies import get_rclone_service
+
+                        self._rclone_service = get_rclone_service()
+
+                    progress_generator = self._rclone_service.sync_repository_to_s3(
+                        repository=repo_obj,
                         access_key_id=access_key,
                         secret_access_key=secret_key,
                         bucket_name=config.bucket_name,
@@ -603,9 +711,19 @@ class CompositeJobManager:
                         f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})"
                     )
 
+                    # Create a simple repository object for rclone service
+                    from types import SimpleNamespace
+
+                    repo_obj = SimpleNamespace(path=repo_data["path"])
+
                     # Use rclone service to sync to SFTP
-                    progress_generator = rclone_service.sync_repository_to_sftp(
-                        repository=job.repository,
+                    if not self._rclone_service:
+                        from app.dependencies import get_rclone_service
+
+                        self._rclone_service = get_rclone_service()
+
+                    progress_generator = self._rclone_service.sync_repository_to_sftp(
+                        repository=repo_obj,
                         host=config.host,
                         username=config.username,
                         remote_path=config.remote_path,
@@ -648,13 +766,188 @@ class CompositeJobManager:
                 logger.info("✅ Cloud sync completed")
                 return True
 
-            finally:
-                db.close()
-
         except Exception as e:
             logger.error(f"❌ Exception in cloud sync task: {str(e)}")
             task.error = str(e)
             return False
+
+    async def _execute_notification_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a notification task"""
+        try:
+            # Get repository data with fresh session
+            repo_data = self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                return False
+
+            logger.info(f"📬 Sending notification for repository {repo_data['name']}")
+
+            # Get notification configuration
+            with self._db_session_factory() as db:
+                notification_config = (
+                    db.query(NotificationConfig)
+                    .filter(NotificationConfig.id == task.config_id)
+                    .first()
+                )
+
+                if not notification_config or not notification_config.enabled:
+                    logger.info(
+                        "📋 Notification configuration not found or disabled - skipping"
+                    )
+                    task.status = "skipped"
+                    return True
+
+                # Determine if we should send notification based on job status
+                job_success = all(
+                    t.status == "completed" for t in job.tasks[:task_index]
+                )
+                should_notify = (
+                    job_success and notification_config.notify_on_success
+                ) or (not job_success and notification_config.notify_on_failure)
+
+                if not should_notify:
+                    logger.info(
+                        "📋 Notification not configured for current job status - skipping"
+                    )
+                    task.status = "skipped"
+                    return True
+
+                # Add initial output
+                initial_output = (
+                    f"Sending notification via {notification_config.provider}"
+                )
+                task.output_lines.append(
+                    {"timestamp": datetime.now().isoformat(), "text": initial_output}
+                )
+                self._broadcast_task_output(job.id, task_index, initial_output)
+
+                # Send notification based on provider
+                if notification_config.provider == "pushover":
+                    success = await self._send_pushover_notification(
+                        notification_config, job, repo_data, task, task_index
+                    )
+                else:
+                    logger.error(
+                        f"Unsupported notification provider: {notification_config.provider}"
+                    )
+                    task.error = f"Unsupported provider: {notification_config.provider}"
+                    return False
+
+                if success:
+                    success_msg = f"✅ Notification sent successfully via {notification_config.provider}"
+                    task.output_lines.append(
+                        {"timestamp": datetime.now().isoformat(), "text": success_msg}
+                    )
+                    self._broadcast_task_output(job.id, task_index, success_msg)
+                    logger.info(success_msg)
+                    return True
+                else:
+                    return False
+
+        except Exception as e:
+            logger.error(f"❌ Exception in notification task: {str(e)}")
+            task.error = str(e)
+            return False
+
+    async def _send_pushover_notification(
+        self,
+        config,
+        job: CompositeJobInfo,
+        repo_data,
+        task: CompositeJobTaskInfo,
+        task_index: int,
+    ) -> bool:
+        """Send notification via Pushover"""
+        try:
+            import httpx
+            from app.models.database import get_cipher_suite
+
+            # Decrypt credentials
+            cipher_suite = get_cipher_suite()
+            user_key = cipher_suite.decrypt(config.encrypted_user_key.encode()).decode()
+            app_token = cipher_suite.decrypt(
+                config.encrypted_app_token.encode()
+            ).decode()
+
+            # Determine job status for message
+            job_success = all(t.status == "completed" for t in job.tasks[:task_index])
+            status_emoji = "✅" if job_success else "❌"
+            status_text = "completed successfully" if job_success else "failed"
+
+            # Create message
+            message = f"Backup {status_text} for repository '{repo_data['name']}'"
+            title = f"{status_emoji} Borgitory Backup"
+
+            # Send to Pushover API
+            if self._http_client_factory:
+                client = self._http_client_factory()
+            else:
+                import httpx
+
+                client = httpx.AsyncClient()
+
+            async with client:
+                response = await client.post(
+                    "https://api.pushover.net/1/messages.json",
+                    data={
+                        "token": app_token,
+                        "user": user_key,
+                        "title": title,
+                        "message": message,
+                    },
+                )
+
+                if response.status_code == 200:
+                    return True
+                else:
+                    error_msg = (
+                        f"Pushover API error: {response.status_code} - {response.text}"
+                    )
+                    task.error = error_msg
+                    task.output_lines.append(
+                        {"timestamp": datetime.now().isoformat(), "text": error_msg}
+                    )
+                    self._broadcast_task_output(job.id, task_index, error_msg)
+                    return False
+
+        except Exception as e:
+            error_msg = f"Failed to send Pushover notification: {str(e)}"
+            task.error = error_msg
+            task.output_lines.append(
+                {"timestamp": datetime.now().isoformat(), "text": error_msg}
+            )
+            self._broadcast_task_output(job.id, task_index, error_msg)
+            return False
+
+    async def _execute_repo_scan_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a repository scan task - placeholder for future implementation"""
+        logger.info("📋 Repository scan task - placeholder implementation")
+        return True
+
+    async def _execute_repo_init_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a repository initialization task - placeholder for future implementation"""
+        logger.info("🚀 Repository init task - placeholder implementation")
+        return True
+
+    async def _execute_repo_list_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a repository list task - placeholder for future implementation"""
+        logger.info("📄 Repository list task - placeholder implementation")
+        return True
+
+    async def _execute_repo_info_task(
+        self, job: CompositeJobInfo, task: CompositeJobTaskInfo, task_index: int
+    ) -> bool:
+        """Execute a repository info task - placeholder for future implementation"""
+        logger.info("ℹ️ Repository info task - placeholder implementation")
+        return True
 
     def _update_job_status(self, job_id: str, status: str):
         """Update job status in database"""
@@ -663,16 +956,12 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
-                db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
+            with self._db_session_factory() as db:
+                db_job = db.query(Job).filter(Job.id == job.id).first()
                 if db_job:
                     db_job.status = status
                     if status == "completed" or status == "failed":
                         db_job.finished_at = datetime.now()
-                    db.commit()
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update job status: {e}")
@@ -684,14 +973,10 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
-                db_job = db.query(Job).filter(Job.id == job.db_job_id).first()
+            with self._db_session_factory() as db:
+                db_job = db.query(Job).filter(Job.id == job.id).first()
                 if db_job:
                     db_job.completed_tasks = job.completed_tasks
-                    db.commit()
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Failed to update job progress: {e}")
@@ -710,12 +995,11 @@ class CompositeJobManager:
             if not job:
                 return
 
-            db = next(get_db())
-            try:
+            with self._db_session_factory() as db:
                 task = (
                     db.query(JobTask)
                     .filter(
-                        JobTask.job_id == job.db_job_id,
+                        JobTask.job_id == job.id,
                         JobTask.task_order == task_index,
                     )
                     .first()
@@ -741,12 +1025,12 @@ class CompositeJobManager:
                     if return_code is not None:
                         task.return_code = return_code
 
-                    db.commit()
-            finally:
-                db.close()
-
         except Exception as e:
             logger.error(f"Failed to update task status: {e}")
+
+    def set_external_event_broadcaster(self, event_broadcaster):
+        """Connect to external event broadcaster for unified event streaming"""
+        self._external_event_broadcaster = event_broadcaster
 
     def _broadcast_task_output(self, job_id: str, task_index: int, line: str):
         """Broadcast task output to SSE listeners"""
@@ -758,11 +1042,29 @@ class CompositeJobManager:
             "timestamp": datetime.now().isoformat(),
         }
 
+        # Broadcast to internal queues
         for queue in self._event_queues:
             try:
                 queue.put_nowait(event_data)
             except asyncio.QueueFull:
                 pass  # Skip if queue is full
+
+        # Also broadcast to external event broadcaster if available
+        if (
+            hasattr(self, "_external_event_broadcaster")
+            and self._external_event_broadcaster
+        ):
+            from app.services.job_event_broadcaster import EventType
+
+            self._external_event_broadcaster.broadcast_event(
+                EventType.JOB_OUTPUT,  # Use JOB_OUTPUT type
+                job_id=job_id,
+                data={
+                    "line": line,
+                    "task_index": task_index,
+                    "task_type": "task_output",
+                },
+            )
 
     def subscribe_to_events(self) -> asyncio.Queue:
         """Subscribe to job events for SSE streaming"""
@@ -788,5 +1090,24 @@ class CompositeJobManager:
                 )
 
 
-# Global composite job manager instance
-composite_job_manager = CompositeJobManager()
+# Global composite job manager instance - lazy initialization for dependency injection
+_composite_job_manager_instance = None
+
+
+def get_composite_job_manager() -> CompositeJobManager:
+    """Get the global composite job manager instance"""
+    global _composite_job_manager_instance
+    if _composite_job_manager_instance is None:
+        # Import here to avoid circular imports
+        from app.dependencies import get_rclone_service
+        from app.services.job_manager import get_job_manager
+
+        _composite_job_manager_instance = CompositeJobManager(
+            rclone_service=get_rclone_service(),
+            job_manager=get_job_manager(),  # Provide the modular job manager
+        )
+    return _composite_job_manager_instance
+
+
+# For backward compatibility
+composite_job_manager = get_composite_job_manager()

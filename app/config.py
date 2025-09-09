@@ -1,7 +1,11 @@
 import os
+from pathlib import Path
 
-DATABASE_URL = "sqlite:////app/data/borgitory.db"
-DATA_DIR = "/app/data"
+# Use app/data for both local and container environments
+APP_DIR = Path(__file__).parent  # This is the app/ directory
+DATA_DIR = str(APP_DIR / "data")
+DATABASE_PATH = str(APP_DIR / "data" / "borgitory.db")
+DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 
 def get_secret_key():

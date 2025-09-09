@@ -1,0 +1,31 @@
+<!-- Custom Check Options Template -->
+{% if show_custom %}
+<div id="custom-check-options">
+    <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-md space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Check Type</label>
+            <select name="check_type" class="select-modern w-full">
+                <option value="full">Full Check</option>
+                <option value="repository_only">Repository Only</option>
+                <option value="archives_only">Archives Only</option>
+            </select>
+        </div>
+        <div class="space-y-2">
+            <label class="flex items-center">
+                <input type="checkbox" name="verify_data" class="mr-2">
+                <span class="text-sm dark:text-gray-200">Verify Data Integrity</span>
+            </label>
+            <label class="flex items-center">
+                <input type="checkbox" name="repair_mode" class="mr-2">
+                <span class="text-sm dark:text-gray-200">Repair Mode ⚠️</span>
+            </label>
+            <label class="flex items-center">
+                <input type="checkbox" name="save_space" class="mr-2">
+                <span class="text-sm dark:text-gray-200">Save Space</span>
+            </label>
+        </div>
+    </div>
+</div>
+{% else %}
+<div id="custom-check-options" style="display: none;"></div>
+{% endif %}

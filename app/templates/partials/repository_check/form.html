@@ -1,0 +1,67 @@
+<!-- Repository Check Form -->
+<form 
+    hx-post="/api/jobs/check" 
+    hx-ext="json-enc"
+    hx-target="#check-status"
+    hx-swap="innerHTML"
+    id="check-form"
+    class="space-y-4"
+>
+    <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Repository</label>
+        <select name="repository_id" required class="select-modern w-full" id="check-repository-select">
+            <option value="">Select Repository...</option>
+            {% for repo in repositories %}
+            <option value="{{ repo.id }}">{{ repo.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Check Policy</label>
+        <select name="check_config_id" class="select-modern w-full" id="check-policy-select" 
+                hx-get="/api/repository-check-configs/toggle-custom-options" 
+                hx-target="#custom-check-options" 
+                hx-include="this"
+                hx-swap="outerHTML">
+            <option value="">Custom Check...</option>
+            {% for config in check_configs %}
+            <option value="{{ config.id }}">{{ config.name }}</option>
+            {% endfor %}
+        </select>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Select a policy or choose "Custom Check" for manual configuration</p>
+    </div>
+
+    <!-- Custom Check Options (shown when no policy selected) -->
+    <div id="custom-check-options">
+        <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-md space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Check Type</label>
+                <select name="check_type" class="select-modern w-full">
+                    <option value="full">Full Check</option>
+                    <option value="repository_only">Repository Only</option>
+                    <option value="archives_only">Archives Only</option>
+                </select>
+            </div>
+            <div class="space-y-2">
+                <label class="flex items-center">
+                    <input type="checkbox" name="verify_data" class="mr-2">
+                    <span class="text-sm dark:text-gray-200">Verify Data Integrity</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" name="repair_mode" class="mr-2">
+                    <span class="text-sm dark:text-gray-200">Repair Mode ⚠️</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" name="save_space" class="mr-2">
+                    <span class="text-sm dark:text-gray-200">Save Space</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 font-medium">
+        Start Repository Check
+    </button>
+</form>
+

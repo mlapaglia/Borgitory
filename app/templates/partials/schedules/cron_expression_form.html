@@ -1,0 +1,23 @@
+<!-- Dynamic Cron Expression Form Elements -->
+{% if is_custom %}
+<div id="custom-cron">
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Custom Cron Expression</label>
+    <input 
+        type="text" 
+        id="custom-cron-input" 
+        name="custom_cron_input"
+        value="{{ cron_expression if is_custom else '' }}"
+        placeholder="0 2 * * *" 
+        oninput="document.getElementById('cron-expression').value = this.value"
+        class="input-modern mt-1">
+    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Format: minute hour day month weekday</p>
+</div>
+{% endif %}
+
+<input type="hidden" name="cron_expression" id="cron-expression" value="{{ cron_expression }}" required>
+
+{% if description %}
+<div id="cron-description" class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-gray-800 p-2 rounded">
+    {{ description }}
+</div>
+{% endif %}

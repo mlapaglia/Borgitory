@@ -3,7 +3,6 @@ Test configuration and fixtures
 """
 import asyncio
 import os
-import tempfile
 from typing import AsyncGenerator, Generator
 from unittest.mock import Mock
 
@@ -20,12 +19,11 @@ if not os.getenv("SECRET_KEY"):
 
 from app.main import app
 from app.models.database import Base, get_db
-from app.services.rclone_service import RcloneService
 
 # Import all models to ensure they're registered with Base
 from app.models.database import (
-    Repository, Job, Schedule, CloudSyncConfig, CleanupConfig,
-    RepositoryCheckConfig, User
+    Repository, Schedule, User, UserSession, Setting, CloudSyncConfig, 
+    CleanupConfig, RepositoryCheckConfig, NotificationConfig, Job, JobTask
 )
 
 

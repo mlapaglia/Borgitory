@@ -1,41 +1,40 @@
 <!-- Add New Notification -->
-<div class="border rounded-lg p-4">
-    <h3 class="font-medium text-gray-700 mb-3">Add Pushover Notification</h3>
+<div class="border dark:border-gray-600 rounded-lg p-4">
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Add Pushover Notification</h3>
     <form 
         hx-post="/api/notifications/" 
         hx-ext="json-enc"
         hx-target="#notification-status"
-        hx-on::after-request="handleNotificationResponse(event)"
         class="space-y-4"
         id="notification-form"
     >
         <div>
-            <label class="block text-sm font-medium text-gray-700">Name</label>
-            <input type="text" name="name" required placeholder="My Phone" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
+            <input type="text" name="name" required placeholder="My Phone" class="input-modern mt-1">
         </div>
         
         <div>
-            <label class="block text-sm font-medium text-gray-700">Pushover User Key</label>
-            <input type="text" name="user_key" required placeholder="u1a2b3c4d5e6f7g8h9i0j1k2l3m4n5" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-            <p class="mt-1 text-xs text-gray-500">Found in your Pushover dashboard</p>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Pushover User Key</label>
+            <input type="text" name="user_key" required placeholder="u1a2b3c4d5e6f7g8h9i0j1k2l3m4n5" class="input-modern mt-1">
+            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Found in your Pushover dashboard</p>
         </div>
         
         <div>
-            <label class="block text-sm font-medium text-gray-700">App Token</label>
-            <input type="text" name="app_token" required placeholder="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900">
-            <p class="mt-1 text-xs text-gray-500">Create an application in Pushover to get this token</p>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">App Token</label>
+            <input type="text" name="app_token" required placeholder="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8" class="input-modern mt-1">
+            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Create an application in Pushover to get this token</p>
         </div>
         
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Notification Types</label>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Notification Types</label>
             <div class="space-y-2">
                 <div class="flex items-center">
                     <input type="checkbox" name="notify_on_success" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label class="ml-2 block text-sm text-gray-700">Notify on successful backups</label>
+                    <label class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Notify on successful backups</label>
                 </div>
                 <div class="flex items-center">
                     <input type="checkbox" name="notify_on_failure" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label class="ml-2 block text-sm text-gray-700">Notify on failed backups</label>
+                    <label class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Notify on failed backups</label>
                 </div>
             </div>
         </div>

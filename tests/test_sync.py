@@ -5,7 +5,10 @@ import pytest
 from httpx import AsyncClient
 from unittest.mock import Mock, patch
 
+from app.main import app
 from app.models.database import Repository, Job, CloudSyncConfig
+from app.dependencies import get_rclone_service
+from app.services.rclone_service import RcloneService
 
 
 class TestSyncEndpoints:
@@ -14,10 +17,17 @@ class TestSyncEndpoints:
     @pytest.mark.asyncio
     async def test_list_remotes(self, async_client: AsyncClient, mock_rclone_service):
         """Test listing configured remotes."""
-        with patch('app.api.sync.rclone_service', mock_rclone_service):
-            mock_rclone_service.get_configured_remotes.return_value = ["remote1", "remote2"]
-            
+        mock_rclone_service.get_configured_remotes.return_value = ["remote1", "remote2"]
+        
+        # Override dependency injection
+        app.dependency_overrides[get_rclone_service] = lambda: mock_rclone_service
+        
+        try:
             response = await async_client.get("/api/sync/remotes")
+        finally:
+            # Clean up
+            if get_rclone_service in app.dependency_overrides:
+                del app.dependency_overrides[get_rclone_service]
         
         assert response.status_code == 200
         data = response.json()
@@ -37,24 +47,31 @@ class TestSyncEndpoints:
         test_db.add(repository)
         test_db.commit()
         
-        with patch('app.api.sync.rclone_service', mock_rclone_service):
+        # Override dependency injection
+        app.dependency_overrides[get_rclone_service] = lambda: mock_rclone_service
+        
+        try:
             response = await async_client.post(
                 "/api/sync/sync",
                 json=sample_sync_request
             )
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert "job_id" in data
-        assert data["status"] == "started"
-        assert isinstance(data["job_id"], int)
-        
-        # Verify job was created in database
-        job = test_db.query(Job).filter(Job.id == data["job_id"]).first()
-        assert job is not None
-        assert job.repository_id == sample_sync_request["repository_id"]
-        assert job.type == "sync"
-        assert job.status == "pending"
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert "job_id" in data
+            assert data["status"] == "started"
+            assert isinstance(data["job_id"], str)  # UUID is now a string
+            
+            # Verify job was created in database
+            job = test_db.query(Job).filter(Job.id == data["job_id"]).first()
+            assert job is not None
+            assert job.repository_id == sample_sync_request["repository_id"]
+            assert job.type == "sync"
+            assert job.status == "pending"
+        finally:
+            # Clean up
+            if get_rclone_service in app.dependency_overrides:
+                del app.dependency_overrides[get_rclone_service]
     
     @pytest.mark.asyncio
     async def test_sync_repository_not_found(self, async_client: AsyncClient, sample_sync_request):

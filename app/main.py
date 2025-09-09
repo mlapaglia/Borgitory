@@ -2,12 +2,15 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
 
 from app.utils.security import get_or_generate_secret_key
-from app.models.database import init_db
+from app.models.database import init_db, get_db
 from app.api import (
     repositories,
     jobs,
@@ -16,13 +19,13 @@ from app.api import (
     sync,
     cloud_sync,
     cleanup,
+    backups,
     notifications,
     debug,
     repository_stats,
     repository_check_configs,
 )
-from app.services.scheduler_service import scheduler_service
-from app.services.recovery_service import recovery_service
+from app.dependencies import get_recovery_service, get_scheduler_service
 
 # Configure logging to show container output
 logging.basicConfig(
@@ -51,8 +54,10 @@ async def lifespan(app: FastAPI):
         logger.info("Database initialized")
 
         # Recover any interrupted backup jobs from previous shutdown/crash
+        recovery_service = get_recovery_service()
         await recovery_service.recover_stale_jobs()
 
+        scheduler_service = get_scheduler_service()
         await scheduler_service.start()
         logger.info("Scheduler started")
         yield
@@ -67,6 +72,34 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Borgitory - BorgBackup Web Manager", lifespan=lifespan)
+
+
+# Custom exception handler for validation errors (422)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Check if this is an HTMX request
+    if "hx-request" in request.headers:
+        # Parse validation errors into user-friendly messages
+        error_messages = []
+        for error in exc.errors():
+            field = error.get("loc", [])[-1] if error.get("loc") else "field"
+            message = error.get("msg", "Invalid value")
+            error_messages.append(f"{field.title()}: {message}")
+
+        combined_message = "; ".join(error_messages)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/repositories/form_create_error.html",
+            {"error_message": combined_message},
+            status_code=200,  # Return 200 for HTMX so it processes the response
+        )
+    else:
+        # Return JSON for non-HTMX requests (default behavior)
+        return HTMLResponse(
+            content=f"Validation Error: {exc.errors()}", status_code=422
+        )
+
 
 # Mount static files if directory exists
 if os.path.exists("app/static"):
@@ -89,6 +122,7 @@ app.include_router(schedules.router, prefix="/api/schedules", tags=["schedules"]
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(cloud_sync.router, prefix="/api/cloud-sync", tags=["cloud-sync"])
 app.include_router(cleanup.router, prefix="/api/cleanup", tags=["cleanup"])
+app.include_router(backups.router, prefix="/api/backups", tags=["backups"])
 app.include_router(
     repository_check_configs.router,
     prefix="/api/repository-check-configs",
@@ -101,13 +135,11 @@ app.include_router(debug.router)
 
 
 @app.get("/")
-async def root(request: Request):
+async def root(request: Request, db: Session = Depends(get_db)):
     from fastapi.responses import RedirectResponse
     from app.api.auth import get_current_user_optional
-    from app.models.database import get_db
 
     # Check if user is authenticated
-    db = next(get_db())
     current_user = get_current_user_optional(request, db)
 
     if not current_user:
@@ -115,22 +147,20 @@ async def root(request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     return templates.TemplateResponse(
-        "index.html", {"request": request, "current_user": current_user}
+        request, "index.html", {"current_user": current_user}
     )
 
 
 @app.get("/login")
-async def login_page(request: Request):
+async def login_page(request: Request, db: Session = Depends(get_db)):
     from fastapi.responses import RedirectResponse
     from app.api.auth import get_current_user_optional
-    from app.models.database import get_db
 
     # Check if user is already authenticated
-    db = next(get_db())
     current_user = get_current_user_optional(request, db)
 
     if current_user:
         # Redirect to main app if already logged in
         return RedirectResponse(url="/", status_code=302)
 
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html", {})
