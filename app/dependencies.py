@@ -1,6 +1,7 @@
 """
 FastAPI dependency providers for the application.
 """
+
 from functools import lru_cache
 from typing import Annotated
 
@@ -14,7 +15,7 @@ from app.services.borg_service import BorgService
 def get_simple_command_runner() -> SimpleCommandRunner:
     """
     Provide a SimpleCommandRunner instance.
-    
+
     Using lru_cache ensures we get a singleton instance while
     still allowing for proper dependency injection and testing.
     """
@@ -25,7 +26,7 @@ def get_simple_command_runner() -> SimpleCommandRunner:
 def get_borg_service() -> BorgService:
     """
     Provide a BorgService instance with proper dependency injection.
-    
+
     Using lru_cache ensures we get a singleton instance while
     still allowing for proper dependency injection and testing.
     """
@@ -33,5 +34,7 @@ def get_borg_service() -> BorgService:
 
 
 # Type aliases for dependency injection
-SimpleCommandRunnerDep = Annotated[SimpleCommandRunner, Depends(get_simple_command_runner)]
+SimpleCommandRunnerDep = Annotated[
+    SimpleCommandRunner, Depends(get_simple_command_runner)
+]
 BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]

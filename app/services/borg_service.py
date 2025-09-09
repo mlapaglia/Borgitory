@@ -25,9 +25,9 @@ logger = logging.getLogger(__name__)
 
 class BorgService:
     def __init__(
-        self, 
+        self,
         job_executor: Optional[JobExecutor] = None,
-        command_runner: Optional[SimpleCommandRunner] = None
+        command_runner: Optional[SimpleCommandRunner] = None,
     ):
         self.job_executor = job_executor or JobExecutor()
         self.command_runner = command_runner or SimpleCommandRunner()

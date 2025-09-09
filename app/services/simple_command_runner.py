@@ -133,5 +133,3 @@ class SimpleCommandRunner:
                 duration=duration,
                 error=error_msg,
             )
-
-
