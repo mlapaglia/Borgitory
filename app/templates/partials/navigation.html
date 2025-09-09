@@ -28,7 +28,7 @@
     <nav class="mt-4">
         <div class="px-4 space-y-2">
             <button 
-                onclick="switchTab('repositories'); closeMobileSidebar();"
+                onclick="switchTab('repositories'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-repositories"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -39,7 +39,7 @@
             </button>
             
             <button 
-                onclick="switchTab('backups'); closeMobileSidebar();"
+                onclick="switchTab('backups'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-backups"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -50,7 +50,7 @@
             </button>
             
             <button 
-                onclick="switchTab('schedules'); closeMobileSidebar();"
+                onclick="switchTab('schedules'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-schedules"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -61,7 +61,7 @@
             </button>
             
             <button 
-                onclick="switchTab('cloud-sync'); closeMobileSidebar();"
+                onclick="switchTab('cloud-sync'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-cloud-sync"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -72,7 +72,7 @@
             </button>
             
             <button 
-                onclick="switchTab('archives'); closeMobileSidebar();"
+                onclick="switchTab('archives'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-archives"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -83,7 +83,7 @@
             </button>
             
             <button 
-                onclick="switchTab('statistics'); closeMobileSidebar();"
+                onclick="switchTab('statistics'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-statistics"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -94,7 +94,7 @@
             </button>
             
             <button 
-                onclick="switchTab('cleanup'); closeMobileSidebar();"
+                onclick="switchTab('cleanup'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-cleanup"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -105,7 +105,7 @@
             </button>
             
             <button 
-                onclick="switchTab('notifications'); closeMobileSidebar();"
+                onclick="switchTab('notifications'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-notifications"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -116,7 +116,7 @@
             </button>
             
             <button 
-                onclick="switchTab('jobs'); closeMobileSidebar();"
+                onclick="switchTab('jobs'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-jobs"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -127,7 +127,7 @@
             </button>
             
             <button 
-                onclick="switchTab('repository-check'); closeMobileSidebar();"
+                onclick="switchTab('repository-check'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-repository-check"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -138,7 +138,7 @@
             </button>
             
             <button 
-                onclick="switchTab('debug'); closeMobileSidebar();"
+                onclick="switchTab('debug'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
                 id="nav-debug"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >

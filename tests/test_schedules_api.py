@@ -9,7 +9,6 @@ from app.api.schedules import (
     get_schedules_html,
     get_upcoming_backups_html,
     get_cron_expression_form,
-    update_cron_expression_form,
     list_schedules,
     get_schedule,
     toggle_schedule,
@@ -307,23 +306,6 @@ class TestSchedulesAPI:
             # Verify
             assert result == "cron_form_template"
 
-    @pytest.mark.asyncio
-    async def test_update_cron_expression_form(self, mock_request):
-        """Test updating cron expression form"""
-        # Setup
-        mock_form_data = {"custom_cron_input": "0 3 * * *"}
-        mock_request.form = AsyncMock(return_value=mock_form_data)  # Make it async
-        mock_request.query_params = {"preset": "custom"}
-
-        with patch("app.api.schedules.templates") as mock_templates:
-            mock_templates.TemplateResponse.return_value = "updated_form_template"
-
-            # Execute
-            result = await update_cron_expression_form(mock_request)
-
-            # Verify
-            assert result == "updated_form_template"
-
     def test_list_schedules(self, mock_db):
         """Test listing schedules"""
         # Setup
@@ -375,7 +357,7 @@ class TestSchedulesAPI:
             mock_scheduler_service.update_schedule.return_value = None
 
             # Execute
-            result = await toggle_schedule(1, mock_db)
+            result = await toggle_schedule(1, None, mock_db)
 
             # Verify
             assert result == {"message": "Schedule enabled"}
@@ -391,7 +373,7 @@ class TestSchedulesAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await toggle_schedule(999, mock_db)
+            await toggle_schedule(999, None, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Schedule not found" in str(exc_info.value.detail)
@@ -409,7 +391,7 @@ class TestSchedulesAPI:
 
             # Execute & Verify
             with pytest.raises(HTTPException) as exc_info:
-                await toggle_schedule(1, mock_db)
+                await toggle_schedule(1, None, mock_db)
 
             assert exc_info.value.status_code == 500
             assert "Failed to update schedule" in str(exc_info.value.detail)
@@ -426,7 +408,7 @@ class TestSchedulesAPI:
             mock_scheduler_service.remove_schedule.return_value = None
 
             # Execute
-            result = await delete_schedule(1, mock_db)
+            result = await delete_schedule(1, None, mock_db)
 
             # Verify
             assert result == {"message": "Schedule deleted successfully"}
@@ -442,7 +424,7 @@ class TestSchedulesAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await delete_schedule(999, mock_db)
+            await delete_schedule(999, None, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Schedule not found" in str(exc_info.value.detail)

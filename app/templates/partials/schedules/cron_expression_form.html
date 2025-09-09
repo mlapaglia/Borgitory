@@ -6,11 +6,9 @@
         type="text" 
         id="custom-cron-input" 
         name="custom_cron_input"
+        value="{{ cron_expression if is_custom else '' }}"
         placeholder="0 2 * * *" 
-        hx-post="/api/schedules/cron-expression-form?preset=custom"
-        hx-target="#cron-expression-container"
-        hx-trigger="input changed delay:500ms"
-        hx-include="this"
+        oninput="document.getElementById('cron-expression').value = this.value"
         class="input-modern mt-1">
     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Format: minute hour day month weekday</p>
 </div>

@@ -19,11 +19,16 @@
         <div class="text-xs text-gray-400 dark:text-gray-500">{{ schedule.cron_expression }}</div>
     </div>
     <div class="flex space-x-2">
-        <button onclick="toggleSchedule({{ schedule.id }})" 
+        <button hx-put="/api/schedules/{{ schedule.id }}/toggle"
+                hx-target="#schedules-list"
+                hx-swap="innerHTML"
                 class="px-3 py-1 text-sm {{ 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800' if schedule.enabled else 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800' }} rounded">
             {{ 'Disable' if schedule.enabled else 'Enable' }}
         </button>
-        <button onclick="deleteSchedule({{ schedule.id }}, '{{ schedule.name }}')" 
+        <button hx-delete="/api/schedules/{{ schedule.id }}"
+                hx-target="#schedules-list"
+                hx-swap="innerHTML"
+                hx-confirm="Are you sure you want to delete the schedule '{{ schedule.name }}'?"
                 class="px-3 py-1 text-sm bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800">
             Delete
         </button>

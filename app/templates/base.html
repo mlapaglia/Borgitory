@@ -39,6 +39,24 @@
         }
 
         initializeDarkMode();
+        
+        // HTMX-compatible mobile sidebar close function
+        window.htmxCloseMobileSidebar = function() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const hamburgerIcon = document.getElementById('hamburger-icon');
+            const closeIcon = document.getElementById('close-icon');
+            const button = document.getElementById('mobile-menu-button');
+            const body = document.body;
+            
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('show');
+            hamburgerIcon.classList.remove('hidden');
+            closeIcon.classList.add('hidden');
+            button.setAttribute('aria-expanded', 'false');
+            body.classList.remove('mobile-sidebar-open');
+        }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/static/css/modern-components.css">
@@ -54,7 +72,15 @@
                     <!-- Hamburger Menu Button (Mobile Only) -->
                     <button 
                         id="mobile-menu-button" 
-                        onclick="toggleMobileSidebar()"
+                        hx-on:click="
+                            document.getElementById('sidebar').classList.toggle('mobile-open');
+                            document.getElementById('sidebar-overlay').classList.toggle('hidden');
+                            document.getElementById('sidebar-overlay').classList.toggle('show');
+                            document.getElementById('hamburger-icon').classList.toggle('hidden');
+                            document.getElementById('close-icon').classList.toggle('hidden');
+                            document.body.classList.toggle('mobile-sidebar-open');
+                            this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');
+                        "
                         class="lg:hidden mr-3 p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
                         aria-expanded="false"
                         aria-controls="mobile-sidebar"
@@ -129,57 +155,6 @@
             }
         });
 
-        // Mobile Sidebar Functionality (Global functions)
-        window.toggleMobileSidebar = function() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            const hamburgerIcon = document.getElementById('hamburger-icon');
-            const closeIcon = document.getElementById('close-icon');
-            const button = document.getElementById('mobile-menu-button');
-            const body = document.body;
-            
-            const isOpen = sidebar.classList.contains('mobile-open');
-            
-            if (isOpen) {
-                closeMobileSidebar();
-            } else {
-                openMobileSidebar();
-            }
-        }
-        
-        window.openMobileSidebar = function() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            const hamburgerIcon = document.getElementById('hamburger-icon');
-            const closeIcon = document.getElementById('close-icon');
-            const button = document.getElementById('mobile-menu-button');
-            const body = document.body;
-            
-            sidebar.classList.add('mobile-open');
-            overlay.classList.remove('hidden');
-            overlay.classList.add('show');
-            hamburgerIcon.classList.add('hidden');
-            closeIcon.classList.remove('hidden');
-            button.setAttribute('aria-expanded', 'true');
-            body.classList.add('mobile-sidebar-open');
-        }
-        
-        window.closeMobileSidebar = function() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            const hamburgerIcon = document.getElementById('hamburger-icon');
-            const closeIcon = document.getElementById('close-icon');
-            const button = document.getElementById('mobile-menu-button');
-            const body = document.body;
-            
-            sidebar.classList.remove('mobile-open');
-            overlay.classList.add('hidden');
-            overlay.classList.remove('show');
-            hamburgerIcon.classList.remove('hidden');
-            closeIcon.classList.add('hidden');
-            button.setAttribute('aria-expanded', 'false');
-            body.classList.remove('mobile-sidebar-open');
-        }
         
         // Close sidebar when clicking outside on mobile
         document.addEventListener('click', function(event) {
@@ -190,7 +165,7 @@
             const isMobile = window.innerWidth < 1024;
             
             if (isMobile && !isClickInsideSidebar && !isClickOnButton && sidebar.classList.contains('mobile-open')) {
-                closeMobileSidebar();
+                htmxCloseMobileSidebar();
             }
         });
         
@@ -198,7 +173,7 @@
         window.addEventListener('resize', function() {
             const sidebar = document.getElementById('sidebar');
             if (window.innerWidth >= 1024 && sidebar.classList.contains('mobile-open')) {
-                closeMobileSidebar();
+                htmxCloseMobileSidebar();
             }
         });
         
@@ -206,7 +181,7 @@
         document.addEventListener('keydown', function(event) {
             const sidebar = document.getElementById('sidebar');
             if (event.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
-                closeMobileSidebar();
+                htmxCloseMobileSidebar();
             }
         });
     </script>

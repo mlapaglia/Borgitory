@@ -258,27 +258,12 @@ async def get_cron_expression_form(request: Request, preset: str = ""):
         context["description"] = preset_descriptions.get(preset, "")
 
     return templates.TemplateResponse(
-        "partials/schedules/cron_expression_form.html", context
+        request,
+        "partials/schedules/cron_expression_form.html", 
+        context
     )
 
 
-@router.post("/cron-expression-form")
-async def update_cron_expression_form(request: Request):
-    """Update cron expression form with custom input"""
-    form_data = await request.form()
-    preset = request.query_params.get("preset", "")
-    custom_input = form_data.get("custom_cron_input", "").strip()
-
-    context = {
-        "preset": preset,
-        "is_custom": preset == "custom",
-        "cron_expression": custom_input if preset == "custom" else preset,
-        "description": "",
-    }
-
-    return templates.TemplateResponse(
-        "partials/schedules/cron_expression_form.html", context
-    )
 
 
 @router.get("/", response_model=List[ScheduleSchema])
@@ -296,7 +281,7 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{schedule_id}/toggle")
-async def toggle_schedule(schedule_id: int, db: Session = Depends(get_db)):
+async def toggle_schedule(schedule_id: int, request: Request = None, db: Session = Depends(get_db)):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -310,25 +295,62 @@ async def toggle_schedule(schedule_id: int, db: Session = Depends(get_db)):
             schedule.id, schedule.name, schedule.cron_expression, schedule.enabled
         )
     except Exception as e:
+        if request and "hx-request" in request.headers:
+            return templates.TemplateResponse(
+                request,
+                "partials/common/error_message.html",
+                {"error_message": f"Failed to update schedule: {str(e)}"},
+                status_code=500
+            )
         raise HTTPException(
             status_code=500, detail=f"Failed to update schedule: {str(e)}"
         )
 
+    # Return updated schedule list for HTMX requests
+    if request and "hx-request" in request.headers:
+        schedules = db.query(Schedule).all()
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/schedule_list_content.html",
+            {"schedules": schedules}
+        )
+    
     return {"message": f"Schedule {'enabled' if schedule.enabled else 'disabled'}"}
 
 
 @router.delete("/{schedule_id}")
-async def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
+async def delete_schedule(schedule_id: int, request: Request = None, db: Session = Depends(get_db)):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
 
     # Remove from scheduler
-    await scheduler_service.remove_schedule(schedule_id)
+    try:
+        await scheduler_service.remove_schedule(schedule_id)
+    except Exception as e:
+        if request and "hx-request" in request.headers:
+            return templates.TemplateResponse(
+                request,
+                "partials/common/error_message.html",
+                {"error_message": f"Failed to remove schedule from scheduler: {str(e)}"},
+                status_code=500
+            )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to remove schedule from scheduler: {str(e)}"
+        )
 
     # Delete from database
     db.delete(schedule)
     db.commit()
+
+    # Return updated schedule list for HTMX requests
+    if request and "hx-request" in request.headers:
+        schedules = db.query(Schedule).all()
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/schedule_list_content.html",
+            {"schedules": schedules}
+        )
 
     return {"message": "Schedule deleted successfully"}
 

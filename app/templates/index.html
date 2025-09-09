@@ -3,7 +3,15 @@
 {% block content %}
 <div x-data="borgitoryApp()" x-init="initApp()" class="flex h-screen bg-gray-100 dark:bg-gray-900">
     <!-- Mobile sidebar overlay -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden hidden" onclick="closeMobileSidebar()"></div>
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden hidden" hx-on:click="
+        document.getElementById('sidebar').classList.remove('mobile-open');
+        this.classList.add('hidden');
+        this.classList.remove('show');
+        document.getElementById('hamburger-icon').classList.remove('hidden');
+        document.getElementById('close-icon').classList.add('hidden');
+        document.getElementById('mobile-menu-button').setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('mobile-sidebar-open');
+    "></div>
     
     {% include "partials/navigation.html" %}
 
