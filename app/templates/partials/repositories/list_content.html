@@ -12,7 +12,10 @@
                 </p>
             </div>
             <div class="flex space-x-2">
-                <button onclick="switchTab('archives'); document.getElementById('archive-repository-select').value = '{{ repo.id }}'; loadArchives();" 
+                <button hx-get="/api/repositories/{{ repo.id }}/archives"
+                        hx-target="#archives-list"
+                        hx-trigger="click"
+                        onclick="document.querySelector('button[data-tab=archives]').click()"
                         class="px-3 py-1 text-sm bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200 rounded hover:bg-green-200 dark:hover:bg-green-700">
                     View Archives
                 </button>

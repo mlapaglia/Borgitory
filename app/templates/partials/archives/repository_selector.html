@@ -3,11 +3,12 @@
     <div class="flex-1">
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Select Repository</label>
         <select id="archive-repository-select" 
+                name="repository_id"
                 hx-get="/api/repositories/archives/list"
                 hx-target="#archives-list"
                 hx-swap="innerHTML"
                 hx-trigger="change"
-                hx-vals='js:{"repository_id": event.target.value}'
+                hx-include="this"
                 class="select-modern w-full">
             <option value="">Select a repository to view archives...</option>
             {% for repo in repositories %}
@@ -20,7 +21,7 @@
             hx-get="/api/repositories/archives/list"
             hx-target="#archives-list"
             hx-swap="innerHTML"
-            hx-vals='js:{"repository_id": document.getElementById("archive-repository-select").value}'
+            hx-include="#archive-repository-select"
             hx-trigger="click"
             id="refresh-archives-btn"
             class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"

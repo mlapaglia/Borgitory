@@ -603,18 +603,31 @@ async def delete_repository(
 
 
 @router.get("/{repo_id}/archives")
-async def list_archives(repo_id: int, db: Session = Depends(get_db)):
+async def list_archives(request: Request, repo_id: int, db: Session = Depends(get_db)):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
 
     try:
         archives = await borg_service.list_archives(repository)
-        return {"archives": archives}
+        
+        # Limit to recent archives for display
+        recent_archives = archives[:10] if len(archives) > 10 else archives
+        return templates.TemplateResponse(
+            request,
+            "partials/archives/list_content.html",
+            {
+                "repository": repository,
+                "archives": archives,
+                "recent_archives": recent_archives,
+            }
+        )
     except Exception as e:
         logger.error(f"Error listing archives for repository {repo_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list archives: {str(e)}"
+        return templates.TemplateResponse(
+            request,
+            "partials/common/error_message.html",
+            {"error_message": f"Error loading archives: {str(e)}"},
         )
 
 
@@ -756,7 +769,11 @@ async def get_repository_info(repo_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{repo_id}/archives/{archive_name}/contents")
 async def get_archive_contents(
-    repo_id: int, archive_name: str, path: str = "", db: Session = Depends(get_db)
+    request: Request,
+    repo_id: int, 
+    archive_name: str, 
+    path: str = "", 
+    db: Session = Depends(get_db)
 ):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
@@ -766,9 +783,24 @@ async def get_archive_contents(
         contents = await borg_service.list_archive_directory_contents(
             repository, archive_name, path
         )
-        return {"archive": archive_name, "path": path, "items": contents}
+        
+        return templates.TemplateResponse(
+            request,
+            "partials/archives/directory_contents.html",
+            {
+                "repository": repository,
+                "archive_name": archive_name,
+                "path": path,
+                "items": contents,
+                "breadcrumb_parts": path.split('/') if path else [],
+            }
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return templates.TemplateResponse(
+            request,
+            "partials/common/error_message.html",
+            {"error_message": f"Error loading directory contents: {str(e)}"},
+        )
 
 
 @router.get("/{repo_id}/archives/{archive_name}/extract")

@@ -260,8 +260,8 @@ class BorgService:
 
             with get_db_session() as db:
                 job = Job(
+                    id=job_id,  # Store the JobManager UUID as the primary key
                     repository_id=repository.id,
-                    job_uuid=job_id,  # Store the JobManager UUID
                     type="backup",
                     status="queued",  # Will be updated to 'running' when started
                     started_at=datetime.now(),
@@ -297,8 +297,8 @@ class BorgService:
             # Create database job record for tracking
             with get_db_session() as db:
                 db_job = Job(
+                    id=job_id,  # Store the JobManager UUID as the primary key
                     repository_id=repository.id,
-                    job_uuid=job_id,
                     type="list",
                     status="running",
                     started_at=datetime.now(UTC),

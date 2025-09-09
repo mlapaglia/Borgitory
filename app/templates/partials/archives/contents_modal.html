@@ -4,7 +4,8 @@
         <!-- Modal Header -->
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Archive Contents</h2>
-            <button onclick="closeArchiveModal()" class="text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-100">
+            <button onclick="document.getElementById('archive-contents-modal').classList.add('hidden')" 
+                    class="text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-100">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -13,12 +14,12 @@
         
         <!-- Archive Browser Container -->
         <div id="archive-browser-container" class="min-h-96">
-            <!-- Content will be populated by JavaScript -->
+            <!-- Content will be populated by HTMX -->
         </div>
         
         <!-- Modal Footer -->
         <div class="flex justify-end mt-6 pt-4 border-t dark:border-gray-600">
-            <button onclick="closeArchiveModal()" 
+            <button onclick="document.getElementById('archive-contents-modal').classList.add('hidden')" 
                     class="px-4 py-2 bg-gray-500 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-500">
                 Close
             </button>

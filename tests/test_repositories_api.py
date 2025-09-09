@@ -552,29 +552,6 @@ class TestRepositoriesAPI:
             assert response.status_code == 200
             mock_remove.assert_called_once_with(schedule.id)
 
-    @pytest.mark.asyncio
-    async def test_list_archives_success(self, async_client: AsyncClient, test_db: Session):
-        """Test listing repository archives."""
-        repo = Repository(name="archives-test-repo", path="/tmp/archives-test")
-        repo.set_passphrase("archives-passphrase")
-        test_db.add(repo)
-        test_db.commit()
-        
-        mock_archives = [
-            {"name": "archive1", "time": "2023-01-01T12:00:00"},
-            {"name": "archive2", "time": "2023-01-02T12:00:00"}
-        ]
-        
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list:
-            mock_list.return_value = mock_archives
-            
-            response = await async_client.get(f"/api/repositories/{repo.id}/archives")
-            
-            assert response.status_code == 200
-            response_data = response.json()
-            assert "archives" in response_data
-            assert len(response_data["archives"]) == 2
 
     @pytest.mark.asyncio
     async def test_list_archives_repository_not_found(self, async_client: AsyncClient):
@@ -583,22 +560,6 @@ class TestRepositoriesAPI:
         
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
-    async def test_list_archives_borg_service_error(self, async_client: AsyncClient, test_db: Session):
-        """Test listing archives with Borg service error."""
-        repo = Repository(name="borg-error-repo", path="/tmp/borg-error")
-        repo.set_passphrase("borg-error-passphrase")
-        test_db.add(repo)
-        test_db.commit()
-        
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list:
-            mock_list.side_effect = Exception("Borg error")
-            
-            response = await async_client.get(f"/api/repositories/{repo.id}/archives")
-            
-            assert response.status_code == 500
-            assert "Failed to list archives" in response.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_list_archives_html_success(self, async_client: AsyncClient, test_db: Session):
@@ -711,29 +672,6 @@ class TestRepositoriesAPI:
         
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
-    async def test_get_archive_contents_success(self, async_client: AsyncClient, test_db: Session):
-        """Test getting archive contents."""
-        repo = Repository(name="contents-repo", path="/tmp/contents")
-        repo.set_passphrase("contents-passphrase")
-        test_db.add(repo)
-        test_db.commit()
-        
-        mock_contents = [
-            {"path": "file1.txt", "type": "f", "size": 100},
-            {"path": "dir1", "type": "d", "size": 0}
-        ]
-        
-        with patch('app.services.borg_service.borg_service.list_archive_directory_contents',
-                   new_callable=AsyncMock) as mock_contents_fn:
-            mock_contents_fn.return_value = mock_contents
-            
-            response = await async_client.get(f"/api/repositories/{repo.id}/archives/test-archive/contents")
-            
-            assert response.status_code == 200
-            response_data = response.json()
-            assert "items" in response_data
-            assert len(response_data["items"]) == 2
 
     @pytest.mark.asyncio
     async def test_get_archive_contents_not_found(self, async_client: AsyncClient):

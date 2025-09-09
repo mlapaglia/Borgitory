@@ -31,5 +31,3 @@ function showNotification(message, type = 'info') {
         }, 300);
     }, 5000);
 }
-
-// Modern HTMX-based job system - old SSE functions removed
