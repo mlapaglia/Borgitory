@@ -135,5 +135,3 @@ class SimpleCommandRunner:
             )
 
 
-# Global instance for use across the application
-simple_command_runner = SimpleCommandRunner()

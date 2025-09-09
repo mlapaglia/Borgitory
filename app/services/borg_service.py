@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 
 from app.models.database import Repository, Job
 from app.services.job_executor import JobExecutor
+from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.job_manager import (
     get_job_manager,
 )  # Keep for backup operations that need job tracking
@@ -23,8 +24,13 @@ logger = logging.getLogger(__name__)
 
 
 class BorgService:
-    def __init__(self, job_executor: Optional[JobExecutor] = None):
+    def __init__(
+        self, 
+        job_executor: Optional[JobExecutor] = None,
+        command_runner: Optional[SimpleCommandRunner] = None
+    ):
         self.job_executor = job_executor or JobExecutor()
+        self.command_runner = command_runner or SimpleCommandRunner()
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
@@ -170,10 +176,8 @@ class BorgService:
             }
 
         try:
-            from app.services.simple_command_runner import simple_command_runner
-
             # Execute the command directly and wait for result
-            result = await simple_command_runner.run_command(command, env, timeout=60)
+            result = await self.command_runner.run_command(command, env, timeout=60)
 
             if result.success:
                 return {

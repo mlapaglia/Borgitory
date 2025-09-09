@@ -185,7 +185,8 @@ class TestRepositoryOperations:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.mock_command_runner = Mock()
+        self.borg_service = BorgService(command_runner=self.mock_command_runner)
         
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.id = 1
@@ -206,19 +207,16 @@ class TestRepositoryOperations:
             duration=1.0
         )
         
-        mock_command_runner = Mock()
-        mock_command_runner.run_command = AsyncMock(return_value=mock_command_result)
+        self.mock_command_runner.run_command = AsyncMock(return_value=mock_command_result)
         
-        with patch('app.services.simple_command_runner.simple_command_runner', mock_command_runner), \
-             patch('app.utils.security.build_secure_borg_command') as mock_build_cmd:
-            
+        with patch('app.utils.security.build_secure_borg_command') as mock_build_cmd:
             mock_build_cmd.return_value = (["borg", "init", "--encryption=repokey", "/path/to/repo"], {"BORG_PASSPHRASE": "test_passphrase"})
             
             result = await self.borg_service.initialize_repository(self.mock_repository)
             
             assert result["success"] is True
             assert "initialized successfully" in result["message"]
-            mock_command_runner.run_command.assert_called_once()
+            self.mock_command_runner.run_command.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_initialize_repository_already_exists(self):
@@ -233,11 +231,9 @@ class TestRepositoryOperations:
             duration=1.0
         )
         
-        mock_command_runner = Mock()
-        mock_command_runner.run_command = AsyncMock(return_value=mock_command_result)
+        self.mock_command_runner.run_command = AsyncMock(return_value=mock_command_result)
         
-        with patch('app.services.simple_command_runner.simple_command_runner', mock_command_runner), \
-             patch('app.utils.security.build_secure_borg_command') as mock_build_cmd:
+        with patch('app.utils.security.build_secure_borg_command') as mock_build_cmd:
             
             mock_build_cmd.return_value = (["borg", "init"], {})
             
