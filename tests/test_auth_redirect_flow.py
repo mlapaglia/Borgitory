@@ -43,9 +43,9 @@ class TestAuthRedirectFlow:
         print(f"Auth token: {auth_token}")
         
         # Now try to access the main page with the cookie
+        async_client.cookies.set("auth_token", auth_token)
         response2 = await async_client.get(
             "/",
-            cookies={"auth_token": auth_token},
             headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
             follow_redirects=False
         )

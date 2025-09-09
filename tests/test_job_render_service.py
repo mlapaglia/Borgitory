@@ -716,7 +716,7 @@ class TestJobRenderServiceSSE:
             async def mock_stream():
                 yield {"type": "job_status", "id": "job1", "status": "running"}
                 
-            self.mock_job_manager.stream_all_job_updates = AsyncMock(side_effect=lambda: mock_stream())
+            self.mock_job_manager.stream_all_job_updates.return_value = mock_stream()
             
             # Get the stream generator
             stream_gen = self.job_render_service.stream_current_jobs_html()

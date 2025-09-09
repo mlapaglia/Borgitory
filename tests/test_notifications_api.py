@@ -297,16 +297,24 @@ class TestNotificationsAPI:
         test_db.add(config)
         test_db.commit()
         
-        with patch('app.services.pushover_service.pushover_service.test_pushover_connection',
-                   new_callable=AsyncMock) as mock_test:
-            mock_test.return_value = {"status": "success", "message": "Connection successful"}
-            
+        # Override the dependency directly in the FastAPI app
+        from app.main import app
+        from app.dependencies import get_pushover_service
+        mock_pushover = AsyncMock()
+        mock_pushover.test_pushover_connection.return_value = {"status": "success", "message": "Connection successful"}
+        
+        app.dependency_overrides[get_pushover_service] = lambda: mock_pushover
+        
+        try:
             response = await async_client.post(f"/api/notifications/{config.id}/test")
             
             assert response.status_code == 200
             response_data = response.json()
             assert response_data["status"] == "success"
-            mock_test.assert_called_once()
+            mock_pushover.test_pushover_connection.assert_called_once()
+        finally:
+            # Clean up the override
+            app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_test_pushover_config_failure(self, async_client: AsyncClient, test_db: Session):
@@ -322,15 +330,23 @@ class TestNotificationsAPI:
         test_db.add(config)
         test_db.commit()
         
-        with patch('app.services.pushover_service.pushover_service.test_pushover_connection',
-                   new_callable=AsyncMock) as mock_test:
-            mock_test.return_value = {"status": "error", "message": "Invalid credentials"}
-            
+        # Override the dependency directly in the FastAPI app
+        from app.main import app
+        from app.dependencies import get_pushover_service
+        mock_pushover = AsyncMock()
+        mock_pushover.test_pushover_connection.return_value = {"status": "error", "message": "Invalid credentials"}
+        
+        app.dependency_overrides[get_pushover_service] = lambda: mock_pushover
+        
+        try:
             response = await async_client.post(f"/api/notifications/{config.id}/test")
             
             assert response.status_code == 200
             response_data = response.json()
             assert response_data["status"] == "error"
+        finally:
+            # Clean up the override
+            app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_test_config_not_found(self, async_client: AsyncClient):
@@ -373,10 +389,15 @@ class TestNotificationsAPI:
         test_db.add(config)
         test_db.commit()
         
-        with patch('app.services.pushover_service.pushover_service.test_pushover_connection',
-                   new_callable=AsyncMock) as mock_test:
-            mock_test.return_value = {"status": "success", "message": "Test successful"}
-            
+        # Override the dependency directly in the FastAPI app
+        from app.main import app
+        from app.dependencies import get_pushover_service
+        mock_pushover = AsyncMock()
+        mock_pushover.test_pushover_connection.return_value = {"status": "success", "message": "Test successful"}
+        
+        app.dependency_overrides[get_pushover_service] = lambda: mock_pushover
+        
+        try:
             response = await async_client.post(
                 f"/api/notifications/{config.id}/test",
                 headers={"hx-request": "true"}
@@ -384,6 +405,9 @@ class TestNotificationsAPI:
             
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
+        finally:
+            # Clean up the override
+            app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_test_config_htmx_error(self, async_client: AsyncClient, test_db: Session):
@@ -399,16 +423,24 @@ class TestNotificationsAPI:
         test_db.add(config)
         test_db.commit()
         
-        with patch('app.services.pushover_service.pushover_service.test_pushover_connection',
-                   new_callable=AsyncMock) as mock_test:
-            mock_test.return_value = {"status": "error", "message": "Test failed"}
-            
+        # Override the dependency directly in the FastAPI app
+        from app.main import app
+        from app.dependencies import get_pushover_service
+        mock_pushover = AsyncMock()
+        mock_pushover.test_pushover_connection.return_value = {"status": "error", "message": "Test failed"}
+        
+        app.dependency_overrides[get_pushover_service] = lambda: mock_pushover
+        
+        try:
             response = await async_client.post(
                 f"/api/notifications/{config.id}/test",
                 headers={"hx-request": "true"}
             )
             
             assert response.status_code == 400
+        finally:
+            # Clean up the override
+            app.dependency_overrides.clear()
             assert "text/html" in response.headers["content-type"]
 
     @pytest.mark.asyncio
@@ -602,11 +634,20 @@ class TestNotificationsAPI:
         assert enable_response.status_code == 200
         
         # Test (with mocked service)
-        with patch('app.services.pushover_service.pushover_service.test_pushover_connection',
-                   new_callable=AsyncMock) as mock_test:
-            mock_test.return_value = {"status": "success", "message": "Test successful"}
+        from app.main import app
+        from app.dependencies import get_pushover_service
+        mock_pushover = AsyncMock()
+        mock_pushover.test_pushover_connection.return_value = {"status": "success", "message": "Test successful"}
+        
+        app.dependency_overrides[get_pushover_service] = lambda: mock_pushover
+        
+        try:
             test_response = await async_client.post(f"/api/notifications/{config_id}/test")
             assert test_response.status_code == 200
+        finally:
+            # Clean up only the pushover service override
+            if get_pushover_service in app.dependency_overrides:
+                del app.dependency_overrides[get_pushover_service]
         
         # Delete
         delete_response = await async_client.delete(f"/api/notifications/{config_id}")
@@ -626,11 +667,19 @@ class TestNotificationsAPI:
         test_db.add(config)
         test_db.commit()
         
-        with patch('app.services.pushover_service.pushover_service.test_pushover_connection',
-                   new_callable=AsyncMock) as mock_test:
-            mock_test.side_effect = Exception("Service unavailable")
-            
+        # Override the dependency directly in the FastAPI app
+        from app.main import app
+        from app.dependencies import get_pushover_service
+        mock_pushover = AsyncMock()
+        mock_pushover.test_pushover_connection.side_effect = Exception("Service unavailable")
+        
+        app.dependency_overrides[get_pushover_service] = lambda: mock_pushover
+        
+        try:
             response = await async_client.post(f"/api/notifications/{config.id}/test")
             
             assert response.status_code == 500
-            assert "Test failed" in response.json()["detail"]
+            assert "Service unavailable" in response.json()["detail"]
+        finally:
+            # Clean up the override
+            app.dependency_overrides.clear()

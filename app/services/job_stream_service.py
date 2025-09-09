@@ -463,5 +463,3 @@ class JobStreamService:
             yield f"event: output\ndata: Error loading task output: {e}\n\n"
 
 
-# Global instance for dependency injection
-job_stream_service = JobStreamService()

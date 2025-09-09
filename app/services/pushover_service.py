@@ -156,5 +156,3 @@ class PushoverService:
             return {"status": "error", "message": f"Connection test failed: {str(e)}"}
 
 
-# Global instance
-pushover_service = PushoverService()

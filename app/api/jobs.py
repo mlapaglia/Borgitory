@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.models.database import get_db, Repository
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
-from app.services.job_service import job_service, JobService
+from app.services.job_service import JobService
+from app.dependencies import JobServiceDep
 from app.services.job_render_service import job_render_service, JobRenderService
-from app.services.job_stream_service import job_stream_service, JobStreamService
+from app.dependencies import JobStreamServiceDep
 from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
 
 logger = logging.getLogger(__name__)
@@ -25,8 +26,8 @@ def get_job_manager_dependency() -> ModularBorgJobManager:
 async def create_backup(
     backup_request: BackupRequest,
     request: Request,
+    job_svc: JobServiceDep,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Start a backup job and return HTML status"""
     try:
@@ -63,8 +64,8 @@ async def create_backup(
 async def create_prune_job(
     request: Request,
     prune_request: PruneRequest,
+    job_svc: JobServiceDep,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Start an archive pruning job and return job_id for tracking"""
     is_htmx_request = "hx-request" in request.headers
@@ -115,8 +116,8 @@ async def create_prune_job(
 @router.post("/check")
 async def create_check_job(
     check_request: CheckRequest,
+    job_svc: JobServiceDep,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Start a repository check job and return job_id for tracking"""
     try:
@@ -138,7 +139,7 @@ async def create_check_job(
 
 @router.get("/stream")
 async def stream_all_jobs(
-    stream_svc: JobStreamService = Depends(lambda: job_stream_service),
+    stream_svc: JobStreamServiceDep,
 ):
     """Stream real-time updates for all jobs via Server-Sent Events"""
     return await stream_svc.stream_all_jobs()
@@ -146,11 +147,11 @@ async def stream_all_jobs(
 
 @router.get("/")
 def list_jobs(
+    job_svc: JobServiceDep,
     skip: int = 0,
     limit: int = 100,
     type: str = None,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """List database job records (legacy jobs) and active JobManager jobs"""
     return job_svc.list_jobs(skip, limit, type, db)
@@ -198,8 +199,8 @@ async def stream_current_jobs_html(
 @router.get("/{job_id}")
 def get_job(
     job_id: str,
+    job_svc: JobServiceDep,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Get job details - supports both database IDs and JobManager IDs"""
     job = job_svc.get_job(job_id, db)
@@ -210,7 +211,7 @@ def get_job(
 
 @router.get("/{job_id}/status")
 async def get_job_status(
-    job_id: str, job_svc: JobService = Depends(lambda: job_service)
+    job_id: str, job_svc: JobServiceDep
 ):
     """Get current job status and progress"""
     try:
@@ -226,9 +227,9 @@ async def get_job_status(
 @router.get("/{job_id}/output")
 async def get_job_output(
     job_id: str,
+    job_svc: JobServiceDep,
     last_n_lines: int = 100,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Get job output lines"""
     try:
@@ -244,8 +245,8 @@ async def get_job_output(
 @router.get("/{job_id}/stream")
 async def stream_job_output(
     job_id: str,
+    stream_svc: JobStreamServiceDep,
     db: Session = Depends(get_db),
-    stream_svc: JobStreamService = Depends(lambda: job_stream_service),
 ):
     """Stream real-time job output via Server-Sent Events"""
     return await stream_svc.stream_job_output(job_id)
@@ -339,8 +340,8 @@ async def toggle_task_details(
 @router.post("/{job_id}/copy-output")
 async def copy_job_output(
     job_id: str,
+    job_svc: JobServiceDep,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Copy job output to clipboard (returns success message)"""
     return {"message": "Output copied to clipboard"}
@@ -350,7 +351,7 @@ async def copy_job_output(
 async def stream_task_output(
     job_id: str,
     task_order: int,
-    stream_svc: JobStreamService = Depends(lambda: job_stream_service),
+    stream_svc: JobStreamServiceDep,
 ):
     """Stream real-time output for a specific task via Server-Sent Events"""
     return await stream_svc.stream_task_output(job_id, task_order)
@@ -360,8 +361,8 @@ async def stream_task_output(
 async def copy_task_output(
     job_id: str,
     task_order: int,
+    job_svc: JobServiceDep,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Copy task output to clipboard (returns success message)"""
     return {"message": "Task output copied to clipboard"}
@@ -370,8 +371,8 @@ async def copy_task_output(
 @router.delete("/{job_id}")
 async def cancel_job(
     job_id: str,
+    job_svc: JobServiceDep,
     db: Session = Depends(get_db),
-    job_svc: JobService = Depends(lambda: job_service),
 ):
     """Cancel a running job"""
     success = await job_svc.cancel_job(job_id, db)

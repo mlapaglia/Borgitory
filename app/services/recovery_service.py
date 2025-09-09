@@ -166,5 +166,3 @@ class RecoveryService:
             logger.error(f"Error releasing lock for repository {repository.name}: {e}")
 
 
-# Global instance
-recovery_service = RecoveryService()

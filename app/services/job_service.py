@@ -544,7 +544,3 @@ class JobService:
         }
 
         return notification_task
-
-
-# Global instance for dependency injection
-job_service = JobService()

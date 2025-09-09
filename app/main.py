@@ -26,7 +26,7 @@ from app.api import (
     repository_check_configs,
 )
 from app.services.scheduler_service import scheduler_service
-from app.services.recovery_service import recovery_service
+from app.dependencies import get_recovery_service
 
 # Configure logging to show container output
 logging.basicConfig(
@@ -55,6 +55,7 @@ async def lifespan(app: FastAPI):
         logger.info("Database initialized")
 
         # Recover any interrupted backup jobs from previous shutdown/crash
+        recovery_service = get_recovery_service()
         await recovery_service.recover_stale_jobs()
 
         await scheduler_service.start()

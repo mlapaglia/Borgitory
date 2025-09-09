@@ -173,10 +173,10 @@ class TestJobEventBroadcaster:
         """Test streaming all events creates and manages client subscription"""
         # Mock the client streaming
         with patch.object(self.broadcaster, 'stream_events_for_client') as mock_stream:
-            mock_stream.return_value = AsyncMock()
-            mock_stream.return_value.__aiter__.return_value = iter([
-                {"type": "test", "data": "value"}
-            ])
+            async def mock_async_iterator():
+                yield {"type": "test", "data": "value"}
+            
+            mock_stream.return_value = mock_async_iterator()
             
             stream_gen = self.broadcaster.stream_all_events()
             events = [event async for event in stream_gen]

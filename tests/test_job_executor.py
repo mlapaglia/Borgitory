@@ -3,7 +3,7 @@ Tests for JobExecutor - subprocess execution and process management
 """
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from app.services.job_executor import JobExecutor
 
@@ -164,7 +164,7 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_error(self):
         """Test error during process termination"""
-        mock_process = AsyncMock()
+        mock_process = Mock()
         mock_process.returncode = None
         mock_process.terminate.side_effect = Exception("Termination error")
         

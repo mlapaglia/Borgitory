@@ -69,7 +69,7 @@ class TestJobsAPI:
         mock_job_service.create_backup_job.return_value = {"job_id": "test-job-123"}
 
         # Execute
-        result = await create_backup(backup_request, mock_request, mock_db, mock_job_service)
+        result = await create_backup(backup_request, mock_request, mock_job_service, mock_db)
 
         # Verify
         assert isinstance(result, str)
@@ -86,7 +86,7 @@ class TestJobsAPI:
         mock_job_service.create_backup_job.side_effect = ValueError("Repository not found")
 
         # Execute
-        result = await create_backup(backup_request, mock_request, mock_db, mock_job_service)
+        result = await create_backup(backup_request, mock_request, mock_job_service, mock_db)
 
         # Verify
         assert isinstance(result, str)
@@ -101,7 +101,7 @@ class TestJobsAPI:
         mock_job_service.create_backup_job.side_effect = Exception("Database error")
 
         # Execute
-        result = await create_backup(backup_request, mock_request, mock_db, mock_job_service)
+        result = await create_backup(backup_request, mock_request, mock_job_service, mock_db)
 
         # Verify
         assert isinstance(result, str)
@@ -122,7 +122,7 @@ class TestJobsAPI:
                 mock_db.query.return_value.all.return_value = []
 
                 # Execute
-                result = await create_prune_job(mock_request, prune_request, mock_db, mock_job_service)
+                result = await create_prune_job(mock_request, prune_request, mock_job_service, mock_db)
 
                 # Verify
                 assert result == "success_template"
@@ -139,7 +139,7 @@ class TestJobsAPI:
         mock_job_service.create_prune_job.return_value = expected_result
 
         # Execute
-        result = await create_prune_job(mock_request, prune_request, mock_db, mock_job_service)
+        result = await create_prune_job(mock_request, prune_request, mock_job_service, mock_db)
 
         # Verify
         assert result == expected_result
@@ -159,7 +159,7 @@ class TestJobsAPI:
                 mock_db.query.return_value.all.return_value = []
 
                 # Execute
-                result = await create_prune_job(mock_request, prune_request, mock_db, mock_job_service)
+                result = await create_prune_job(mock_request, prune_request, mock_job_service, mock_db)
 
                 # Verify
                 assert result == "error_template"
@@ -175,7 +175,7 @@ class TestJobsAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await create_prune_job(mock_request, prune_request, mock_db, mock_job_service)
+            await create_prune_job(mock_request, prune_request, mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Repository not found" in str(exc_info.value.detail)
@@ -189,7 +189,7 @@ class TestJobsAPI:
         mock_job_service.create_check_job.return_value = expected_result
 
         # Execute
-        result = await create_check_job(check_request, mock_db, mock_job_service)
+        result = await create_check_job(check_request, mock_job_service, mock_db)
 
         # Verify
         assert result == expected_result
@@ -204,7 +204,7 @@ class TestJobsAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await create_check_job(check_request, mock_db, mock_job_service)
+            await create_check_job(check_request, mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Repository not found" in str(exc_info.value.detail)
@@ -218,7 +218,7 @@ class TestJobsAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await create_check_job(check_request, mock_db, mock_job_service)
+            await create_check_job(check_request, mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 400
         assert "Repository disabled" in str(exc_info.value.detail)
@@ -232,7 +232,7 @@ class TestJobsAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await create_check_job(check_request, mock_db, mock_job_service)
+            await create_check_job(check_request, mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 500
         assert "Failed to start check job" in str(exc_info.value.detail)
@@ -259,7 +259,7 @@ class TestJobsAPI:
         mock_job_service.list_jobs.return_value = expected_jobs
 
         # Execute
-        result = list_jobs(skip=10, limit=20, type="backup", db=mock_db, job_svc=mock_job_service)
+        result = list_jobs(job_svc=mock_job_service, skip=10, limit=20, type="backup", db=mock_db)
 
         # Verify
         assert result == expected_jobs
@@ -299,7 +299,7 @@ class TestJobsAPI:
         mock_job_service.get_job.return_value = job_data
 
         # Execute
-        result = get_job("test-job", mock_db, mock_job_service)
+        result = get_job("test-job", mock_job_service, mock_db)
 
         # Verify
         assert result == job_data
@@ -313,7 +313,7 @@ class TestJobsAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            get_job("nonexistent-job", mock_db, mock_job_service)
+            get_job("nonexistent-job", mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Job not found" in str(exc_info.value.detail)
@@ -368,7 +368,7 @@ class TestJobsAPI:
         mock_job_service.get_job_output.return_value = output_data
 
         # Execute
-        result = await get_job_output("test-job", last_n_lines=50, db=mock_db, job_svc=mock_job_service)
+        result = await get_job_output("test-job", job_svc=mock_job_service, last_n_lines=50, db=mock_db)
 
         # Verify
         assert result == output_data
@@ -383,7 +383,7 @@ class TestJobsAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await get_job_output("nonexistent-job", db=mock_db, job_svc=mock_job_service)
+            await get_job_output("nonexistent-job", job_svc=mock_job_service, db=mock_db)
 
         # Due to exception handling bug, HTTPException(404) gets caught and re-raised as 500
         assert exc_info.value.status_code == 500
@@ -397,7 +397,7 @@ class TestJobsAPI:
         mock_job_stream_service.stream_job_output.return_value = expected_stream
 
         # Execute
-        result = await stream_job_output("test-job", mock_db, mock_job_stream_service)
+        result = await stream_job_output("test-job", mock_job_stream_service, mock_db)
 
         # Verify
         assert result == expected_stream
@@ -410,7 +410,7 @@ class TestJobsAPI:
         mock_job_service.cancel_job.return_value = True
 
         # Execute
-        result = await cancel_job("test-job", mock_db, mock_job_service)
+        result = await cancel_job("test-job", mock_job_service, mock_db)
 
         # Verify
         assert result == {"message": "Job cancelled successfully"}
@@ -424,7 +424,7 @@ class TestJobsAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await cancel_job("nonexistent-job", mock_db, mock_job_service)
+            await cancel_job("nonexistent-job", mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Job not found" in str(exc_info.value.detail)

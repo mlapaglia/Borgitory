@@ -15,7 +15,7 @@ from app.models.schemas import (
     NotificationConfig as NotificationConfigSchema,
     NotificationConfigCreate,
 )
-from app.services.pushover_service import pushover_service
+from app.dependencies import PushoverServiceDep
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -120,7 +120,10 @@ def get_notification_configs_html(request: Request, db: Session = Depends(get_db
 
 @router.post("/{config_id}/test")
 async def test_notification_config(
-    request: Request, config_id: int, db: Session = Depends(get_db)
+    request: Request,
+    config_id: int,
+    pushover_svc: PushoverServiceDep,
+    db: Session = Depends(get_db),
 ):
     """Test a notification configuration"""
     is_htmx_request = "hx-request" in request.headers
@@ -144,7 +147,7 @@ async def test_notification_config(
 
         if notification_config.provider == "pushover":
             user_key, app_token = notification_config.get_pushover_credentials()
-            result = await pushover_service.test_pushover_connection(
+            result = await pushover_svc.test_pushover_connection(
                 user_key, app_token
             )
 

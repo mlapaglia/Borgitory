@@ -8,7 +8,7 @@ from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi.responses import StreamingResponse
 
-from app.services.job_stream_service import JobStreamService, job_stream_service
+from app.services.job_stream_service import JobStreamService
 
 
 class TestJobStreamService:
@@ -498,9 +498,16 @@ class TestJobStreamService:
         # Should be empty since no jobs are running
         assert len(current_jobs) == 0
 
-    def test_global_service_instance(self):
-        """Test that global service instance is properly initialized."""
-        # Test the global instance
-        assert job_stream_service is not None
-        assert isinstance(job_stream_service, JobStreamService)
-        assert hasattr(job_stream_service, 'job_manager')
+    def test_dependency_injection_service_instance(self):
+        """Test that dependency injection provides proper service instance."""
+        from app.dependencies import get_job_stream_service
+        
+        # Test the dependency provider
+        service = get_job_stream_service()
+        assert service is not None
+        assert isinstance(service, JobStreamService)
+        assert hasattr(service, 'job_manager')
+        
+        # Test singleton behavior
+        service2 = get_job_stream_service()
+        assert service is service2

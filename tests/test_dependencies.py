@@ -3,9 +3,13 @@ Tests for FastAPI dependency providers
 """
 import pytest
 
-from app.dependencies import get_simple_command_runner, get_borg_service
+from app.dependencies import get_simple_command_runner, get_borg_service, get_job_service, get_recovery_service, get_pushover_service, get_job_stream_service
 from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
+from app.services.job_service import JobService
+from app.services.recovery_service import RecoveryService
+from app.services.pushover_service import PushoverService
+from app.services.job_stream_service import JobStreamService
 
 
 class TestDependencies:
@@ -52,14 +56,62 @@ class TestDependencies:
         assert service.command_runner is mock_runner
         assert isinstance(mock_runner, Mock)
 
+    def test_get_job_service(self):
+        """Test JobService dependency provider."""
+        service = get_job_service()
+        
+        assert isinstance(service, JobService)
+        
+        # Should return same instance due to lru_cache
+        service2 = get_job_service()
+        assert service is service2
+
+    def test_get_recovery_service(self):
+        """Test RecoveryService dependency provider."""
+        service = get_recovery_service()
+        
+        assert isinstance(service, RecoveryService)
+        
+        # Should return same instance due to lru_cache
+        service2 = get_recovery_service()
+        assert service is service2
+
+    def test_get_pushover_service(self):
+        """Test PushoverService dependency provider."""
+        service = get_pushover_service()
+        
+        assert isinstance(service, PushoverService)
+        
+        # Should return same instance due to lru_cache
+        service2 = get_pushover_service()
+        assert service is service2
+
+    def test_get_job_stream_service(self):
+        """Test JobStreamService dependency provider."""
+        service = get_job_stream_service()
+        
+        assert isinstance(service, JobStreamService)
+        
+        # Should return same instance due to lru_cache
+        service2 = get_job_stream_service()
+        assert service is service2
+
     def test_default_initialization_still_works(self):
         """Test that services can still be initialized without dependency injection."""
         # This ensures backward compatibility
         runner = SimpleCommandRunner()
         service = BorgService()
+        job_service = JobService()
+        recovery_service = RecoveryService()
+        pushover_service = PushoverService()
+        job_stream_service = JobStreamService()
         
         assert isinstance(runner, SimpleCommandRunner)
         assert isinstance(service, BorgService)
+        assert isinstance(job_service, JobService)
+        assert isinstance(recovery_service, RecoveryService)
+        assert isinstance(pushover_service, PushoverService)
+        assert isinstance(job_stream_service, JobStreamService)
         assert isinstance(service.command_runner, SimpleCommandRunner)
         
         # These should be different instances (not singletons)
