@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.models.database import get_db, Repository
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
-from app.services.job_service import JobService
 from app.dependencies import JobServiceDep
 from app.services.job_render_service import job_render_service, JobRenderService
 from app.dependencies import JobStreamServiceDep
@@ -210,9 +209,7 @@ def get_job(
 
 
 @router.get("/{job_id}/status")
-async def get_job_status(
-    job_id: str, job_svc: JobServiceDep
-):
+async def get_job_status(job_id: str, job_svc: JobServiceDep):
     """Get current job status and progress"""
     try:
         output = await job_svc.get_job_status(job_id)

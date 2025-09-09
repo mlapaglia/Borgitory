@@ -164,5 +164,3 @@ class RecoveryService:
 
         except Exception as e:
             logger.error(f"Error releasing lock for repository {repository.name}: {e}")
-
-

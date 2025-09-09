@@ -147,9 +147,7 @@ async def test_notification_config(
 
         if notification_config.provider == "pushover":
             user_key, app_token = notification_config.get_pushover_credentials()
-            result = await pushover_svc.test_pushover_connection(
-                user_key, app_token
-            )
+            result = await pushover_svc.test_pushover_connection(user_key, app_token)
 
             if is_htmx_request:
                 if result.get("status") == "success":

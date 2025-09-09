@@ -154,5 +154,3 @@ class PushoverService:
 
         except Exception as e:
             return {"status": "error", "message": f"Connection test failed: {str(e)}"}
-
-

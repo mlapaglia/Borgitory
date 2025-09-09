@@ -41,7 +41,7 @@ def get_borg_service() -> BorgService:
 def get_job_service() -> JobService:
     """
     Provide a JobService instance with proper dependency injection.
-    
+
     Using lru_cache ensures we get a singleton instance while
     still allowing for proper dependency injection and testing.
     """
@@ -52,7 +52,7 @@ def get_job_service() -> JobService:
 def get_recovery_service() -> RecoveryService:
     """
     Provide a RecoveryService instance with proper dependency injection.
-    
+
     Using lru_cache ensures we get a singleton instance while
     still allowing for proper dependency injection and testing.
     """
@@ -63,7 +63,7 @@ def get_recovery_service() -> RecoveryService:
 def get_pushover_service() -> PushoverService:
     """
     Provide a PushoverService instance with proper dependency injection.
-    
+
     Using lru_cache ensures we get a singleton instance while
     still allowing for proper dependency injection and testing.
     """
@@ -74,7 +74,7 @@ def get_pushover_service() -> PushoverService:
 def get_job_stream_service() -> JobStreamService:
     """
     Provide a JobStreamService instance with proper dependency injection.
-    
+
     Using lru_cache ensures we get a singleton instance while
     still allowing for proper dependency injection and testing.
     """

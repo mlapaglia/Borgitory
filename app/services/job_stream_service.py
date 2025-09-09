@@ -461,5 +461,3 @@ class JobStreamService:
         except Exception as e:
             logger.error(f"Error streaming completed task output: {e}")
             yield f"event: output\ndata: Error loading task output: {e}\n\n"
-
-
