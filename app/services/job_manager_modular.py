@@ -504,55 +504,68 @@ class ModularBorgJobManager:
     async def _execute_prune_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a prune task using composite job manager"""
-        if not hasattr(self, "_composite_manager") or self._composite_manager is None:
-            from app.services.composite_job_manager import CompositeJobManager
-
-            self._composite_manager = CompositeJobManager()
-
+        """Execute a prune task using job executor"""
         logger.info(f"Executing prune task: {task.task_name}")
 
-        # Convert to composite task format
-        from app.services.composite_job_manager import (
-            CompositeJobInfo,
-            CompositeJobTaskInfo,
-        )
+        # Get repository data
+        repo_data = await self._get_repository_data(job.repository_id)
+        if not repo_data:
+            logger.error(f"Repository {job.repository_id} not found")
+            task.error = "Repository not found"
+            task.return_code = 1
+            return False
 
-        composite_task = CompositeJobTaskInfo(
-            task_type=task.task_type,
-            task_name=task.task_name,
-            keep_within=task.parameters.get("keep_within"),
-            keep_daily=task.parameters.get("keep_daily"),
-            keep_weekly=task.parameters.get("keep_weekly"),
-            keep_monthly=task.parameters.get("keep_monthly"),
-            keep_yearly=task.parameters.get("keep_yearly"),
-            show_stats=task.parameters.get("show_stats", True),
-            show_list=task.parameters.get("show_list", False),
-            save_space=task.parameters.get("save_space", False),
-        )
+        # Create output callback for streaming
+        def output_callback(line: str, progress_info: dict):
+            # Store output in task
+            task.output_lines.append({
+                "timestamp": datetime.now().isoformat(),
+                "text": line
+            })
+            
+            # Broadcast to event system if available
+            if self.event_broadcaster:
+                self.event_broadcaster.broadcast_event(
+                    EventType.JOB_OUTPUT,
+                    job_id=job.id,
+                    data={
+                        "line": line,
+                        "task_index": task_index,
+                        "task_type": "prune",
+                        "progress_info": progress_info
+                    }
+                )
 
-        composite_job = CompositeJobInfo(
-            id=job.id,
-            job_type="Manual Backup",
-            repository_id=job.repository_id,
-            tasks=[composite_task],
-            schedule=job.schedule,
-            cloud_sync_config_id=job.cloud_sync_config_id,
-        )
-
-        success = await self._composite_manager._execute_prune_task(
-            composite_job, composite_task, 0
-        )
-
-        # Copy results back
-        if hasattr(composite_task, "output_lines") and composite_task.output_lines:
-            task.output_lines = list(composite_task.output_lines)
-        if hasattr(composite_task, "error"):
-            task.error = composite_task.error
-        if hasattr(composite_task, "return_code"):
-            task.return_code = composite_task.return_code
-
-        return success
+        # Execute prune task using job executor
+        try:
+            result = await self.executor.execute_prune_task(
+                repository_path=repo_data["path"],
+                passphrase=repo_data["passphrase"],
+                keep_within=task.parameters.get("keep_within"),
+                keep_daily=task.parameters.get("keep_daily"),
+                keep_weekly=task.parameters.get("keep_weekly"),
+                keep_monthly=task.parameters.get("keep_monthly"),
+                keep_yearly=task.parameters.get("keep_yearly"),
+                show_stats=task.parameters.get("show_stats", True),
+                show_list=task.parameters.get("show_list", False),
+                save_space=task.parameters.get("save_space", False),
+                force_prune=task.parameters.get("force_prune", False),
+                dry_run=task.parameters.get("dry_run", False),
+                output_callback=output_callback
+            )
+            
+            # Store result data
+            task.return_code = result.return_code
+            if result.error:
+                task.error = result.error
+                
+            return result.return_code == 0
+            
+        except Exception as e:
+            logger.error(f"Exception in prune task: {str(e)}")
+            task.error = str(e)
+            task.return_code = -1
+            return False
 
     async def _execute_check_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
@@ -606,47 +619,62 @@ class ModularBorgJobManager:
     async def _execute_cloud_sync_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a cloud sync task using composite job manager"""
-        if not hasattr(self, "_composite_manager") or self._composite_manager is None:
-            from app.services.composite_job_manager import CompositeJobManager
-
-            self._composite_manager = CompositeJobManager()
-
+        """Execute a cloud sync task using job executor"""
         logger.info(f"Executing cloud sync task: {task.task_name}")
 
-        # Convert to composite task format
-        from app.services.composite_job_manager import (
-            CompositeJobInfo,
-            CompositeJobTaskInfo,
-        )
+        # Get repository data
+        repo_data = await self._get_repository_data(job.repository_id)
+        if not repo_data:
+            logger.error(f"Repository {job.repository_id} not found")
+            task.error = "Repository not found"
+            task.return_code = 1
+            return False
 
-        composite_task = CompositeJobTaskInfo(
-            task_type=task.task_type,
-            task_name=task.task_name,
-        )
+        # Create output callback for streaming
+        def output_callback(line: str, progress_info: dict):
+            # Store output in task
+            task.output_lines.append({
+                "timestamp": datetime.now().isoformat(),
+                "text": line
+            })
+            
+            # Broadcast to event system if available
+            if self.event_broadcaster:
+                self.event_broadcaster.broadcast_event(
+                    EventType.JOB_OUTPUT,
+                    job_id=job.id,
+                    data={
+                        "line": line,
+                        "task_index": task_index,
+                        "task_type": "cloud_sync",
+                        "progress_info": progress_info
+                    }
+                )
 
-        composite_job = CompositeJobInfo(
-            id=job.id,
-            job_type="Manual Backup",
-            repository_id=job.repository_id,
-            tasks=[composite_task],
-            schedule=job.schedule,
-            cloud_sync_config_id=job.cloud_sync_config_id,
-        )
-
-        success = await self._composite_manager._execute_cloud_sync_task(
-            composite_job, composite_task, 0
-        )
-
-        # Copy results back
-        if hasattr(composite_task, "output_lines") and composite_task.output_lines:
-            task.output_lines = list(composite_task.output_lines)
-        if hasattr(composite_task, "error"):
-            task.error = composite_task.error
-        if hasattr(composite_task, "return_code"):
-            task.return_code = composite_task.return_code
-
-        return success
+        # Execute cloud sync task using job executor
+        try:
+            result = await self.executor.execute_cloud_sync_task(
+                repository_path=repo_data["path"],
+                passphrase=repo_data["passphrase"],
+                cloud_sync_config_id=job.cloud_sync_config_id,
+                output_callback=output_callback,
+                db_session_factory=self.database_manager._db_session_factory,
+                rclone_service=None,  # Will use default
+                http_client_factory=None  # Will use default
+            )
+            
+            # Store result data
+            task.return_code = result.return_code
+            if result.error:
+                task.error = result.error
+                
+            return result.return_code == 0
+            
+        except Exception as e:
+            logger.error(f"Exception in cloud sync task: {str(e)}")
+            task.error = str(e)
+            task.return_code = -1
+            return False
 
     async def _execute_notification_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
