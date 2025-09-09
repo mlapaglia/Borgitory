@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.database import Schedule, Repository, get_db
 from app.models.schemas import Schedule as ScheduleSchema, ScheduleCreate
-from app.services.scheduler_service import scheduler_service
+from app.dependencies import SchedulerServiceDep
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -48,7 +48,7 @@ async def get_schedules_form(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=ScheduleSchema, status_code=status.HTTP_201_CREATED)
 async def create_schedule(
-    request: Request, schedule: ScheduleCreate, db: Session = Depends(get_db)
+    request: Request, schedule: ScheduleCreate, scheduler_service: SchedulerServiceDep, db: Session = Depends(get_db)
 ):
     is_htmx_request = "hx-request" in request.headers
 
@@ -163,7 +163,7 @@ def get_schedules_html(skip: int = 0, limit: int = 100, db: Session = Depends(ge
 
 
 @router.get("/upcoming/html", response_class=HTMLResponse)
-async def get_upcoming_backups_html():
+async def get_upcoming_backups_html(scheduler_service: SchedulerServiceDep):
     """Get upcoming scheduled backups as formatted HTML"""
     try:
         jobs_raw = await scheduler_service.get_scheduled_jobs()
@@ -278,7 +278,7 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{schedule_id}/toggle")
 async def toggle_schedule(
-    schedule_id: int, request: Request = None, db: Session = Depends(get_db)
+    schedule_id: int, scheduler_service: SchedulerServiceDep, request: Request = None, db: Session = Depends(get_db)
 ):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
@@ -318,7 +318,7 @@ async def toggle_schedule(
 
 @router.delete("/{schedule_id}")
 async def delete_schedule(
-    schedule_id: int, request: Request = None, db: Session = Depends(get_db)
+    schedule_id: int, scheduler_service: SchedulerServiceDep, request: Request = None, db: Session = Depends(get_db)
 ):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
@@ -359,7 +359,7 @@ async def delete_schedule(
 
 
 @router.get("/jobs/active")
-async def get_active_scheduled_jobs():
+async def get_active_scheduled_jobs(scheduler_service: SchedulerServiceDep):
     """Get all active scheduled jobs"""
     return {"jobs": await scheduler_service.get_scheduled_jobs()}
 

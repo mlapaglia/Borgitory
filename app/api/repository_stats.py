@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 import asyncio
 
 from app.models.database import get_db, Repository
-from app.services.repository_stats_service import repository_stats_service
+from app.services.repository_stats_service import RepositoryStatsService
+from app.dependencies import RepositoryStatsServiceDep
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -50,14 +51,14 @@ async def get_stats_content(
 
 
 @router.get("/{repository_id}/stats")
-async def get_repository_statistics(repository_id: int, db: Session = Depends(get_db)):
+async def get_repository_statistics(repository_id: int, stats_svc: RepositoryStatsServiceDep, db: Session = Depends(get_db)):
     """Get comprehensive repository statistics"""
 
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    stats = await repository_stats_service.get_repository_statistics(repository, db)
+    stats = await stats_svc.get_repository_statistics(repository, db)
 
     if "error" in stats:
         raise HTTPException(status_code=500, detail=stats["error"])
@@ -67,7 +68,7 @@ async def get_repository_statistics(repository_id: int, db: Session = Depends(ge
 
 @router.get("/{repository_id}/stats/progress")
 async def get_repository_statistics_progress(
-    repository_id: int, request: Request, db: Session = Depends(get_db)
+    repository_id: int, request: Request, stats_svc: RepositoryStatsServiceDep, db: Session = Depends(get_db)
 ):
     """Stream repository statistics generation progress via Server-Sent Events"""
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
@@ -87,7 +88,7 @@ async def get_repository_statistics_progress(
 
         # Start stats generation in background
         stats_task = asyncio.create_task(
-            repository_stats_service.get_repository_statistics(
+            stats_svc.get_repository_statistics(
                 repository, db, progress_callback
             )
         )
@@ -139,7 +140,7 @@ async def get_repository_statistics_progress(
 
 @router.get("/{repository_id}/stats/html")
 async def get_repository_statistics_html(
-    repository_id: int, request: Request, db: Session = Depends(get_db)
+    repository_id: int, request: Request, stats_svc: RepositoryStatsServiceDep, db: Session = Depends(get_db)
 ):
     """Get repository statistics as HTML partial"""
     from fastapi.templating import Jinja2Templates
@@ -150,7 +151,7 @@ async def get_repository_statistics_html(
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    stats = await repository_stats_service.get_repository_statistics(repository, db)
+    stats = await stats_svc.get_repository_statistics(repository, db)
 
     return templates.TemplateResponse(
         request,

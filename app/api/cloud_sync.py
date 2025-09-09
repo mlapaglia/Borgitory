@@ -12,7 +12,8 @@ from app.models.schemas import (
     CloudSyncConfig as CloudSyncConfigSchema,
 )
 from app.services.cloud_sync_service import CloudSyncService
-from app.services.rclone_service import rclone_service, RcloneService
+from app.services.rclone_service import RcloneService
+from app.dependencies import RcloneServiceDep
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -208,8 +209,8 @@ def delete_cloud_sync_config(
 async def test_cloud_sync_config(
     request: Request,
     config_id: int,
+    rclone: RcloneServiceDep,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
-    rclone: RcloneService = Depends(lambda: rclone_service),
 ):
     """Test a cloud sync configuration"""
     is_htmx_request = "hx-request" in request.headers

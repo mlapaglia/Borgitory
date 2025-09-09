@@ -739,8 +739,9 @@ class BorgService:
 
         # If no specific path provided, scan all mounted volumes
         if scan_path is None:
-            from app.services.volume_service import volume_service
+            from app.dependencies import get_volume_service
 
+            volume_service = get_volume_service()
             mounted_volumes = await volume_service.get_mounted_volumes()
 
             if not mounted_volumes:
@@ -991,4 +992,4 @@ class BorgService:
         return []
 
 
-borg_service = BorgService()
+# borg_service = BorgService()

@@ -5,9 +5,12 @@ import pytest
 import re
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
-from unittest.mock import patch, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 
+from app.main import app
 from app.models.database import Repository
+from app.dependencies import get_borg_service
+from app.services.borg_service import BorgService
 
 
 class TestArchiveBrowserHTMX:
@@ -26,16 +29,20 @@ class TestArchiveBrowserHTMX:
             {"name": "archive2", "time": "2023-01-02T10:00:00"},
         ]
 
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list_archives:
-            mock_list_archives.return_value = mock_archives
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archives = AsyncMock(return_value=mock_archives)
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             # Make HTMX request
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives",
                 headers={"hx-request": "true"}
             )
-
+            
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
             
@@ -46,6 +53,10 @@ class TestArchiveBrowserHTMX:
             # Check for proper HTML structure (archive list uses different classes)
             assert 'class="border dark:border-gray-600' in response.text  # Archive cards
             assert "View Contents" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_list_archives_htmx_empty(self, async_client: AsyncClient, test_db: Session):
@@ -55,10 +66,14 @@ class TestArchiveBrowserHTMX:
         test_db.add(repo)
         test_db.commit()
 
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list_archives:
-            mock_list_archives.return_value = []
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archives = AsyncMock(return_value=[])
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives",
                 headers={"hx-request": "true"}
@@ -68,6 +83,10 @@ class TestArchiveBrowserHTMX:
             
             # Should show empty state message
             assert "No Archives Found" in response.text or "doesn't contain any backup archives" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_list_archives_htmx_error(self, async_client: AsyncClient, test_db: Session):
@@ -77,10 +96,14 @@ class TestArchiveBrowserHTMX:
         test_db.add(repo)
         test_db.commit()
 
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list_archives:
-            mock_list_archives.side_effect = Exception("Repository access failed")
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archives = AsyncMock(side_effect=Exception("Repository access failed"))
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives",
                 headers={"hx-request": "true"}
@@ -91,6 +114,10 @@ class TestArchiveBrowserHTMX:
             # Should show error message
             assert "Error loading archives" in response.text
             assert "Repository access failed" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_list_archives_htmx_not_found(self, async_client: AsyncClient):
@@ -127,10 +154,14 @@ class TestArchiveBrowserHTMX:
             }
         ]
 
-        with patch('app.services.borg_service.borg_service.list_archive_directory_contents',
-                   new_callable=AsyncMock) as mock_contents_service:
-            mock_contents_service.return_value = mock_contents
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archive_directory_contents = AsyncMock(return_value=mock_contents)
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives/test-archive/contents",
                 headers={"hx-request": "true"}
@@ -156,6 +187,10 @@ class TestArchiveBrowserHTMX:
             
             # Check download links for files
             assert "extract" in response.text and "href=" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_archive_contents_htmx_with_path(self, async_client: AsyncClient, test_db: Session):
@@ -175,10 +210,14 @@ class TestArchiveBrowserHTMX:
             }
         ]
 
-        with patch('app.services.borg_service.borg_service.list_archive_directory_contents',
-                   new_callable=AsyncMock) as mock_contents_service:
-            mock_contents_service.return_value = mock_contents
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archive_directory_contents = AsyncMock(return_value=mock_contents)
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives/test-archive/contents?path=subdir",
                 headers={"hx-request": "true"}
@@ -192,6 +231,10 @@ class TestArchiveBrowserHTMX:
             # Check file content
             assert "subfile.txt" in response.text
             assert "2.0 KB" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_archive_contents_htmx_empty_directory(self, async_client: AsyncClient, test_db: Session):
@@ -201,10 +244,14 @@ class TestArchiveBrowserHTMX:
         test_db.add(repo)
         test_db.commit()
 
-        with patch('app.services.borg_service.borg_service.list_archive_directory_contents',
-                   new_callable=AsyncMock) as mock_contents:
-            mock_contents.return_value = []
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archive_directory_contents = AsyncMock(return_value=[])
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives/test-archive/contents?path=empty",
                 headers={"hx-request": "true"}
@@ -214,6 +261,10 @@ class TestArchiveBrowserHTMX:
             
             # Check for empty directory message
             assert "This directory is empty" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_archive_contents_htmx_error(self, async_client: AsyncClient, test_db: Session):
@@ -223,10 +274,14 @@ class TestArchiveBrowserHTMX:
         test_db.add(repo)
         test_db.commit()
 
-        with patch('app.services.borg_service.borg_service.list_archive_directory_contents',
-                   new_callable=AsyncMock) as mock_contents:
-            mock_contents.side_effect = Exception("Archive not found")
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archive_directory_contents = AsyncMock(side_effect=Exception("Archive not found"))
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives/test-archive/contents",
                 headers={"hx-request": "true"}
@@ -237,6 +292,10 @@ class TestArchiveBrowserHTMX:
             # Should show error message
             assert "Error loading directory contents" in response.text
             assert "Archive not found" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_archive_contents_htmx_not_found(self, async_client: AsyncClient):
@@ -263,10 +322,14 @@ class TestArchiveBrowserHTMX:
             {"name": "large.txt", "path": "large.txt", "is_directory": False, "size": 2147483648, "modified": "2023-01-01T10:00:00"},  # 2GB
         ]
 
-        with patch('app.services.borg_service.borg_service.list_archive_directory_contents',
-                   new_callable=AsyncMock) as mock_contents_service:
-            mock_contents_service.return_value = mock_contents
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archive_directory_contents = AsyncMock(return_value=mock_contents)
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives/test-archive/contents",
                 headers={"hx-request": "true"}
@@ -279,6 +342,10 @@ class TestArchiveBrowserHTMX:
             assert "2.0 KB" in response.text  
             assert "5.0 MB" in response.text
             assert "2.0 GB" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_archive_repository_selector(self, async_client: AsyncClient, test_db: Session):
@@ -323,10 +390,14 @@ class TestArchiveBrowserHTMX:
 
         mock_archives = [{"name": "form-archive", "time": "2023-01-01T10:00:00"}]
 
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list_archives:
-            mock_list_archives.return_value = mock_archives
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archives = AsyncMock(return_value=mock_archives)
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             # Test with form data (simulating select change)
             response = await async_client.get(
                 f"/api/repositories/archives/list?repository_id={repo.id}",
@@ -335,6 +406,10 @@ class TestArchiveBrowserHTMX:
 
             assert response.status_code == 200
             assert "form-archive" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
         # Test with empty repository_id (should show empty state)
         response = await async_client.get(
@@ -364,10 +439,14 @@ class TestArchiveBrowserHTMX:
             }
         ]
 
-        with patch('app.services.borg_service.borg_service.list_archive_directory_contents',
-                   new_callable=AsyncMock) as mock_contents_service:
-            mock_contents_service.return_value = mock_contents
-            
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archive_directory_contents = AsyncMock(return_value=mock_contents)
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 f"/api/repositories/{repo.id}/archives/test-archive/contents",
                 headers={"hx-request": "true"}
@@ -385,3 +464,7 @@ class TestArchiveBrowserHTMX:
             
             # Check breadcrumb navigation
             assert "Root" in response.text or "Root Directory" in response.text
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]

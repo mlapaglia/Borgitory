@@ -691,9 +691,9 @@ class CompositeJobManager:
 
                     # Use rclone service to sync to S3
                     if not self._rclone_service:
-                        from app.services.rclone_service import rclone_service
+                        from app.dependencies import get_rclone_service
 
-                        self._rclone_service = rclone_service
+                        self._rclone_service = get_rclone_service()
 
                     progress_generator = self._rclone_service.sync_repository_to_s3(
                         repository=repo_obj,
@@ -718,9 +718,9 @@ class CompositeJobManager:
 
                     # Use rclone service to sync to SFTP
                     if not self._rclone_service:
-                        from app.services.rclone_service import rclone_service
+                        from app.dependencies import get_rclone_service
 
-                        self._rclone_service = rclone_service
+                        self._rclone_service = get_rclone_service()
 
                     progress_generator = self._rclone_service.sync_repository_to_sftp(
                         repository=repo_obj,
@@ -1099,11 +1099,11 @@ def get_composite_job_manager() -> CompositeJobManager:
     global _composite_job_manager_instance
     if _composite_job_manager_instance is None:
         # Import here to avoid circular imports
-        from app.services.rclone_service import rclone_service
+        from app.dependencies import get_rclone_service
         from app.services.job_manager import get_job_manager
 
         _composite_job_manager_instance = CompositeJobManager(
-            rclone_service=rclone_service,
+            rclone_service=get_rclone_service(),
             job_manager=get_job_manager(),  # Provide the modular job manager
         )
     return _composite_job_manager_instance

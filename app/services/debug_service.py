@@ -146,8 +146,9 @@ class DebugService:
         """Get Docker and volume mount information"""
         try:
             # Use the shared volume service for volume discovery
-            from app.services.volume_service import volume_service
+            from app.dependencies import get_volume_service
 
+            volume_service = get_volume_service()
             volume_info = await volume_service.get_volume_info()
             mounted_volumes = volume_info.get("mounted_volumes", [])
 
@@ -298,6 +299,3 @@ class DebugService:
             }
         except Exception as e:
             return {"error": str(e), "job_manager_running": False}
-
-
-debug_service = DebugService()

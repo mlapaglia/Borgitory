@@ -554,7 +554,3 @@ class JobRenderService:
                 "partials/jobs/error_state.html"
             ).render(message=f"Error streaming jobs: {str(e)}", padding="4")
             yield f"data: {error_html}\n\n"
-
-
-# Global instance for dependency injection
-job_render_service = JobRenderService()

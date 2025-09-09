@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from app.models.database import get_db, Repository
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.dependencies import JobServiceDep
-from app.services.job_render_service import job_render_service, JobRenderService
-from app.dependencies import JobStreamServiceDep
+from app.services.job_render_service import JobRenderService
+from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
 
 logger = logging.getLogger(__name__)
@@ -159,9 +159,9 @@ def list_jobs(
 @router.get("/html", response_class=HTMLResponse)
 def get_jobs_html(
     request: Request,
+    render_svc: JobRenderServiceDep,
     expand: str = None,
     db: Session = Depends(get_db),
-    render_svc: JobRenderService = Depends(lambda: job_render_service),
 ):
     """Get job history as HTML"""
     return render_svc.render_jobs_html(db, expand)
@@ -169,7 +169,7 @@ def get_jobs_html(
 
 @router.get("/current/html", response_class=HTMLResponse)
 def get_current_jobs_html(
-    request: Request, render_svc: JobRenderService = Depends(lambda: job_render_service)
+    request: Request, render_svc: JobRenderServiceDep
 ):
     """Get current running jobs as HTML"""
     html_content = render_svc.render_current_jobs_html()
@@ -178,7 +178,7 @@ def get_current_jobs_html(
 
 @router.get("/current/stream")
 async def stream_current_jobs_html(
-    render_svc: JobRenderService = Depends(lambda: job_render_service),
+    render_svc: JobRenderServiceDep,
 ):
     """Stream current running jobs as HTML via Server-Sent Events"""
     from fastapi.responses import StreamingResponse
@@ -253,9 +253,9 @@ async def stream_job_output(
 async def toggle_job_details(
     job_id: str,
     request: Request,
+    render_svc: JobRenderServiceDep,
     expanded: str = "false",
     db: Session = Depends(get_db),
-    render_svc: JobRenderService = Depends(lambda: job_render_service),
 ):
     """Toggle job details visibility and return refreshed job item"""
     job = render_svc.get_job_for_render(job_id, db)
@@ -275,8 +275,8 @@ async def toggle_job_details(
 async def get_job_details_static(
     job_id: str,
     request: Request,
+    render_svc: JobRenderServiceDep,
     db: Session = Depends(get_db),
-    render_svc: JobRenderService = Depends(lambda: job_render_service),
 ):
     """Get static job details (used when job completes)"""
     job = render_svc.get_job_for_render(job_id, db)
@@ -293,9 +293,9 @@ async def toggle_task_details(
     job_id: str,
     task_order: int,
     request: Request,
+    render_svc: JobRenderServiceDep,
     expanded: str = "false",
     db: Session = Depends(get_db),
-    render_svc: JobRenderService = Depends(lambda: job_render_service),
 ):
     """Toggle task details visibility and return updated task item"""
     job = render_svc.get_job_for_render(job_id, db)

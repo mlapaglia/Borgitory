@@ -25,8 +25,7 @@ from app.api import (
     repository_stats,
     repository_check_configs,
 )
-from app.services.scheduler_service import scheduler_service
-from app.dependencies import get_recovery_service
+from app.dependencies import get_recovery_service, get_scheduler_service
 
 # Configure logging to show container output
 logging.basicConfig(
@@ -58,6 +57,7 @@ async def lifespan(app: FastAPI):
         recovery_service = get_recovery_service()
         await recovery_service.recover_stale_jobs()
 
+        scheduler_service = get_scheduler_service()
         await scheduler_service.start()
         logger.info("Scheduler started")
         yield

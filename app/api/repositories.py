@@ -20,7 +20,8 @@ from app.models.schemas import (
     RepositoryCreate,
     RepositoryUpdate,
 )
-from app.services.borg_service import borg_service
+from app.services.borg_service import BorgService
+from app.dependencies import BorgServiceDep, get_borg_service, SchedulerServiceDep, VolumeServiceDep
 from app.api.auth import get_current_user
 
 router = APIRouter()
@@ -32,6 +33,7 @@ templates = Jinja2Templates(directory="app/templates")
 async def create_repository(
     request: Request,
     repo: RepositoryCreate,
+    borg_svc: BorgServiceDep,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -70,7 +72,7 @@ async def create_repository(
 
         # Try to initialize the Borg repository first
         try:
-            init_result = await borg_service.initialize_repository(db_repo)
+            init_result = await borg_svc.initialize_repository(db_repo)
             if not init_result["success"]:
                 # Initialization failed, don't save to database
                 borg_error = init_result["message"]
@@ -160,10 +162,10 @@ def list_repositories(skip: int = 0, limit: int = 100, db: Session = Depends(get
 
 
 @router.get("/scan")
-async def scan_repositories(request: Request):
+async def scan_repositories(request: Request, borg_svc: BorgServiceDep):
     """Scan for existing repositories and return HTML for HTMX"""
     try:
-        available_repos = await borg_service.scan_for_repositories()
+        available_repos = await borg_svc.scan_for_repositories()
 
         # Check if request wants JSON (for backward compatibility)
         accept_header = request.headers.get("Accept", "")
@@ -213,12 +215,10 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/directories")
-async def list_directories(path: str = "/repos"):
+async def list_directories(volume_svc: VolumeServiceDep, path: str = "/repos"):
     """List directories at the given path for autocomplete functionality"""
     try:
-        from app.services.volume_service import volume_service
-
-        mounted_volumes = await volume_service.get_mounted_volumes()
+        mounted_volumes = await volume_svc.get_mounted_volumes()
 
         allowed = path == "/"
         if not allowed:
@@ -294,7 +294,7 @@ async def list_directories(path: str = "/repos"):
 
 
 @router.get("/import-form-update", response_class=HTMLResponse)
-async def update_import_form(request: Request, path: str = "", loading: str = ""):
+async def update_import_form(request: Request, borg_svc: BorgServiceDep, path: str = "", loading: str = ""):
     """Update import form fields based on selected repository path"""
 
     if not path:
@@ -324,7 +324,7 @@ async def update_import_form(request: Request, path: str = "", loading: str = ""
 
     try:
         # Look up repository details by path
-        available_repos = await borg_service.scan_for_repositories()
+        available_repos = await borg_svc.scan_for_repositories()
         selected_repo = None
 
         for repo in available_repos:
@@ -383,6 +383,7 @@ async def update_import_form(request: Request, path: str = "", loading: str = ""
 @router.post("/import")
 async def import_repository(
     request: Request,
+    borg_svc: BorgServiceDep,
     name: str = Form(...),
     path: str = Form(...),
     passphrase: str = Form(...),
@@ -449,7 +450,7 @@ async def import_repository(
 
         # Verify we can access the repository with the given credentials
         # This tests the user-provided credentials, not the stored ones
-        verification_successful = await borg_service.verify_repository_access(
+        verification_successful = await borg_svc.verify_repository_access(
             repo_path=path, passphrase=passphrase, keyfile_path=keyfile_path
         )
 
@@ -466,7 +467,7 @@ async def import_repository(
 
         # If verification passed, get archive count for logging
         try:
-            archives = await borg_service.list_archives(db_repo)
+            archives = await borg_svc.list_archives(db_repo)
             logger.info(
                 f"Successfully imported repository '{name}' with {len(archives)} archives"
             )
@@ -544,6 +545,7 @@ def update_repository(
 async def delete_repository(
     repo_id: int,
     request: Request,
+    scheduler_svc: SchedulerServiceDep,
     delete_borg_repo: bool = False,
     db: Session = Depends(get_db),
 ):
@@ -578,11 +580,9 @@ async def delete_repository(
     )
 
     # Remove scheduled jobs from APScheduler before deleting from database
-    from app.services.scheduler_service import scheduler_service
-
     for schedule in schedules_to_delete:
         try:
-            await scheduler_service.remove_schedule(schedule.id)
+            await scheduler_svc.remove_schedule(schedule.id)
             logger.info(f"Removed scheduled job for schedule ID {schedule.id}")
         except Exception as e:
             logger.warning(
@@ -603,13 +603,13 @@ async def delete_repository(
 
 
 @router.get("/{repo_id}/archives")
-async def list_archives(request: Request, repo_id: int, db: Session = Depends(get_db)):
+async def list_archives(request: Request, repo_id: int, borg_svc: BorgServiceDep, db: Session = Depends(get_db)):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
 
     try:
-        archives = await borg_service.list_archives(repository)
+        archives = await borg_svc.list_archives(repository)
 
         # Limit to recent archives for display
         recent_archives = archives[:10] if len(archives) > 10 else archives
@@ -633,7 +633,7 @@ async def list_archives(request: Request, repo_id: int, db: Session = Depends(ge
 
 @router.get("/{repo_id}/archives/html", response_class=HTMLResponse)
 async def list_archives_html(
-    repo_id: int, request: Request, db: Session = Depends(get_db)
+    repo_id: int, request: Request, borg_svc: BorgServiceDep, db: Session = Depends(get_db)
 ):
     """Get repository archives as HTML"""
     try:
@@ -642,7 +642,7 @@ async def list_archives_html(
             raise HTTPException(status_code=404, detail="Repository not found")
 
         try:
-            archives = await borg_service.list_archives(repository)
+            archives = await borg_svc.list_archives(repository)
 
             # Process archives data for template
             processed_archives = []
@@ -742,7 +742,7 @@ async def get_archives_repository_selector(
 
 @router.get("/archives/list")
 async def get_archives_list(
-    request: Request, repository_id: int = None, db: Session = Depends(get_db)
+    request: Request, borg_svc: BorgServiceDep, repository_id: int = None, db: Session = Depends(get_db)
 ):
     """Get archives list or empty state"""
     if not repository_id:
@@ -751,17 +751,17 @@ async def get_archives_list(
         )
 
     # Redirect to the existing archives HTML endpoint
-    return await list_archives_html(repository_id, request, db)
+    return await list_archives_html(repository_id, request, borg_svc, db)
 
 
 @router.get("/{repo_id}/info")
-async def get_repository_info(repo_id: int, db: Session = Depends(get_db)):
+async def get_repository_info(repo_id: int, borg_svc: BorgServiceDep, db: Session = Depends(get_db)):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
 
     try:
-        info = await borg_service.get_repo_info(repository)
+        info = await borg_svc.get_repo_info(repository)
         return info
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -772,6 +772,7 @@ async def get_archive_contents(
     request: Request,
     repo_id: int,
     archive_name: str,
+    borg_svc: BorgServiceDep,
     path: str = "",
     db: Session = Depends(get_db),
 ):
@@ -780,7 +781,7 @@ async def get_archive_contents(
         raise HTTPException(status_code=404, detail="Repository not found")
 
     try:
-        contents = await borg_service.list_archive_directory_contents(
+        contents = await borg_svc.list_archive_directory_contents(
             repository, archive_name, path
         )
 
@@ -805,13 +806,13 @@ async def get_archive_contents(
 
 @router.get("/{repo_id}/archives/{archive_name}/extract")
 async def extract_file(
-    repo_id: int, archive_name: str, file: str, db: Session = Depends(get_db)
+    repo_id: int, archive_name: str, file: str, borg_svc: BorgServiceDep, db: Session = Depends(get_db)
 ):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
 
     try:
-        return await borg_service.extract_file_stream(repository, archive_name, file)
+        return await borg_svc.extract_file_stream(repository, archive_name, file)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

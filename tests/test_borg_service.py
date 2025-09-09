@@ -722,7 +722,7 @@ class TestRepositoryScanningComprehensive:
         mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-456")
         
         with patch('app.services.borg_service.get_job_manager', return_value=mock_job_manager), \
-             patch('app.services.volume_service.volume_service', mock_volume_service), \
+             patch('app.dependencies.get_volume_service', return_value=mock_volume_service), \
              patch('app.utils.security.sanitize_path', side_effect=lambda x: x), \
              patch('os.path.exists', return_value=True), \
              patch('os.path.isdir', return_value=True):
@@ -750,7 +750,7 @@ class TestRepositoryScanningComprehensive:
         mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-789")
         
         with patch('app.services.borg_service.get_job_manager', return_value=mock_job_manager), \
-             patch('app.services.volume_service.volume_service', mock_volume_service):
+             patch('app.dependencies.get_volume_service', return_value=mock_volume_service):
             
             job_id = await self.borg_service.start_repository_scan()
             

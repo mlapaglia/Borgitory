@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.models.database import Repository, Job, get_db
-from app.services.rclone_service import rclone_service, RcloneService
+from app.services.rclone_service import RcloneService
+from app.dependencies import RcloneServiceDep
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class SyncRequest(BaseModel):
 
 @router.post("/remotes/s3")
 async def configure_s3_remote(
-    config: S3RemoteConfig, rclone: RcloneService = Depends(lambda: rclone_service)
+    config: S3RemoteConfig, rclone: RcloneServiceDep
 ):
     """Configure a new S3 remote"""
     success = await rclone.configure_s3_remote(
@@ -43,7 +44,7 @@ async def configure_s3_remote(
 
 
 @router.get("/remotes")
-def list_remotes(rclone: RcloneService = Depends(lambda: rclone_service)):
+def list_remotes(rclone: RcloneServiceDep):
     """List all configured Rclone remotes"""
     remotes = rclone.get_configured_remotes()
     return {"remotes": remotes}
@@ -53,7 +54,7 @@ def list_remotes(rclone: RcloneService = Depends(lambda: rclone_service)):
 async def test_remote_connection(
     remote_name: str,
     bucket_name: str,
-    rclone: RcloneService = Depends(lambda: rclone_service),
+    rclone: RcloneServiceDep,
 ):
     """Test connection to an S3 remote"""
     result = await rclone.test_s3_connection(remote_name, bucket_name)
@@ -92,10 +93,9 @@ async def sync_repository_task(
         db = db_session
         should_close_db = False
 
-    # Use provided rclone service or default (for testing vs production)
-    if rclone is None:
-        rclone = rclone_service
-
+    # Use provided rclone service (injected via DI)
+    # No need to check for None since DI guarantees it's provided
+    
     try:
         # Get fresh instances from the new session
         logger.info("Looking up database records...")
@@ -184,8 +184,8 @@ async def sync_repository_task(
 async def sync_repository(
     sync_request: SyncRequest,
     background_tasks: BackgroundTasks,
+    rclone: RcloneServiceDep,
     db: Session = Depends(get_db),
-    rclone: RcloneService = Depends(lambda: rclone_service),
 ):
     """Sync a repository to S3"""
     repository = (

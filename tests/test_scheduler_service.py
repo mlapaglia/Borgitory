@@ -299,7 +299,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.scheduler_service.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             mock_create_job.return_value = "job-uuid-123"
@@ -355,7 +355,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.side_effect = mock_query_side_effect
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.scheduler_service.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             mock_create_job.return_value = "job-uuid-123"
@@ -412,7 +412,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.side_effect = mock_query_side_effect
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.scheduler_service.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             mock_create_job.return_value = "job-uuid-123"
@@ -449,7 +449,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.scheduler_service.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             mock_create_job.return_value = "job-uuid-123"
@@ -516,7 +516,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.scheduler_service.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             mock_create_job.side_effect = Exception("Job creation failed")

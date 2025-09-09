@@ -504,12 +504,17 @@ class TestJobRenderService:
         assert result[0].status == "completed"
         assert result[1].status == "failed"  # Should be marked as failed
     
-    def test_global_service_instance(self):
-        """Test that global service instance is created"""
-        from app.services.job_render_service import job_render_service
+    def test_dependency_injection_service(self):
+        """Test that dependency injection service works"""
+        from app.dependencies import get_job_render_service
         
-        assert job_render_service is not None
-        assert isinstance(job_render_service, JobRenderService)
+        service = get_job_render_service()
+        assert service is not None
+        assert isinstance(service, JobRenderService)
+        
+        # Test singleton behavior
+        service2 = get_job_render_service()
+        assert service is service2
 
 
 class TestJobRenderServiceStatusStyling:

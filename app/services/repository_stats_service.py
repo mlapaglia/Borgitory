@@ -496,4 +496,4 @@ class RepositoryStatsService:
         }
 
 
-repository_stats_service = RepositoryStatsService()
+# repository_stats_service = RepositoryStatsService()

@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from unittest.mock import patch, AsyncMock, mock_open
 from io import BytesIO
 
+from app.main import app
 from app.models.database import Repository, Job, Schedule
+from app.dependencies import get_borg_service, get_volume_service, get_scheduler_service
+from app.services.borg_service import BorgService
+from app.services.volume_service import VolumeService
+from app.services.scheduler_service import SchedulerService
 
 
 class TestRepositoriesAPI:
@@ -68,16 +73,25 @@ class TestRepositoriesAPI:
             {"name": "repo2", "path": "/path/to/repo2", "encryption_mode": "keyfile"}
         ]
         
-        with patch('app.services.borg_service.borg_service.scan_for_repositories',
-                   new_callable=AsyncMock) as mock_scan:
-            mock_scan.return_value = mock_repos
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.scan_for_repositories.return_value = mock_repos
+        
+        # Override the dependency
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get("/api/repositories/scan")
             
             assert response.status_code == 200
             response_data = response.json()
             assert "repositories" in response_data
             assert len(response_data["repositories"]) == 2
+            mock_borg_service.scan_for_repositories.assert_called_once()
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_scan_repositories_htmx_response(self, async_client: AsyncClient):
@@ -86,10 +100,14 @@ class TestRepositoriesAPI:
             {"name": "htmx-repo", "path": "/path/to/htmx-repo", "encryption_mode": "repokey"}
         ]
         
-        with patch('app.services.borg_service.borg_service.scan_for_repositories',
-                   new_callable=AsyncMock) as mock_scan:
-            mock_scan.return_value = mock_repos
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.scan_for_repositories.return_value = mock_repos
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 "/api/repositories/scan",
                 headers={"hx-request": "true"}
@@ -97,26 +115,42 @@ class TestRepositoriesAPI:
             
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_scan_repositories_service_error(self, async_client: AsyncClient):
         """Test repository scanning with service error."""
-        with patch('app.services.borg_service.borg_service.scan_for_repositories',
-                   new_callable=AsyncMock) as mock_scan:
-            mock_scan.side_effect = Exception("Scan error")
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.scan_for_repositories.side_effect = Exception("Scan error")
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get("/api/repositories/scan")
             
             assert response.status_code == 500
             assert "Failed to scan repositories" in response.json()["detail"]
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_scan_repositories_htmx_error(self, async_client: AsyncClient):
         """Test repository scanning error with HTMX."""
-        with patch('app.services.borg_service.borg_service.scan_for_repositories',
-                   new_callable=AsyncMock) as mock_scan:
-            mock_scan.side_effect = Exception("Scan error")
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.scan_for_repositories.side_effect = Exception("Scan error")
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(
                 "/api/repositories/scan",
                 headers={"hx-request": "true"}
@@ -124,6 +158,10 @@ class TestRepositoriesAPI:
             
             assert response.status_code == 200  # Returns error template
             assert "text/html" in response.headers["content-type"]
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_get_repositories_html_empty(self, async_client: AsyncClient):
@@ -161,10 +199,14 @@ class TestRepositoriesAPI:
         """Test listing directories at root."""
         mock_volumes = ["/data", "/backups"]
         
-        with patch('app.services.volume_service.volume_service.get_mounted_volumes',
-                   new_callable=AsyncMock) as mock_volumes_fn:
-            mock_volumes_fn.return_value = mock_volumes
-            
+        # Create mock service
+        mock_volume_service = AsyncMock(spec=VolumeService)
+        mock_volume_service.get_mounted_volumes.return_value = mock_volumes
+        
+        # Override dependency injection
+        app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
+        
+        try:
             with patch('os.path.exists', return_value=True), \
                  patch('os.path.isdir', return_value=True), \
                  patch('os.listdir', return_value=["data", "backups", "bin", "etc"]), \
@@ -181,16 +223,24 @@ class TestRepositoriesAPI:
                 assert "backups" in dir_names
                 assert "bin" not in dir_names
                 assert "etc" not in dir_names
+        finally:
+            # Clean up
+            if get_volume_service in app.dependency_overrides:
+                del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
     async def test_list_directories_valid_path(self, async_client: AsyncClient):
         """Test listing directories at valid path."""
         mock_volumes = ["/data"]
         
-        with patch('app.services.volume_service.volume_service.get_mounted_volumes',
-                   new_callable=AsyncMock) as mock_volumes_fn:
-            mock_volumes_fn.return_value = mock_volumes
-            
+        # Create mock service
+        mock_volume_service = AsyncMock(spec=VolumeService)
+        mock_volume_service.get_mounted_volumes.return_value = mock_volumes
+        
+        # Override dependency injection
+        app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
+        
+        try:
             with patch('os.path.exists', return_value=True), \
                  patch('os.path.isdir', return_value=True), \
                  patch('os.listdir', return_value=["subdir1", "subdir2"]):
@@ -203,32 +253,48 @@ class TestRepositoriesAPI:
                 assert len(directories) == 2
                 assert directories[0]["name"] == "subdir1"
                 assert directories[1]["name"] == "subdir2"
+        finally:
+            # Clean up
+            if get_volume_service in app.dependency_overrides:
+                del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
     async def test_list_directories_nonexistent_path(self, async_client: AsyncClient):
         """Test listing directories for non-existent path."""
         mock_volumes = ["/data"]
         
-        with patch('app.services.volume_service.volume_service.get_mounted_volumes',
-                   new_callable=AsyncMock) as mock_volumes_fn:
-            mock_volumes_fn.return_value = mock_volumes
-            
+        # Create mock service
+        mock_volume_service = AsyncMock(spec=VolumeService)
+        mock_volume_service.get_mounted_volumes.return_value = mock_volumes
+        
+        # Override dependency injection
+        app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
+        
+        try:
             with patch('os.path.exists', return_value=False):
                 response = await async_client.get("/api/repositories/directories?path=/data/nonexistent")
                 
                 assert response.status_code == 200
                 response_data = response.json()
                 assert response_data["directories"] == []
+        finally:
+            # Clean up
+            if get_volume_service in app.dependency_overrides:
+                del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
     async def test_list_directories_permission_denied(self, async_client: AsyncClient):
         """Test listing directories with permission denied."""
         mock_volumes = ["/data"]
         
-        with patch('app.services.volume_service.volume_service.get_mounted_volumes',
-                   new_callable=AsyncMock) as mock_volumes_fn:
-            mock_volumes_fn.return_value = mock_volumes
-            
+        # Create mock service
+        mock_volume_service = AsyncMock(spec=VolumeService)
+        mock_volume_service.get_mounted_volumes.return_value = mock_volumes
+        
+        # Override dependency injection
+        app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
+        
+        try:
             with patch('os.path.exists', return_value=True), \
                  patch('os.path.isdir', return_value=True), \
                  patch('os.listdir', side_effect=PermissionError("Permission denied")):
@@ -238,20 +304,32 @@ class TestRepositoriesAPI:
                 assert response.status_code == 200
                 response_data = response.json()
                 assert response_data["directories"] == []
+        finally:
+            # Clean up
+            if get_volume_service in app.dependency_overrides:
+                del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
     async def test_list_directories_not_under_mounted_volume(self, async_client: AsyncClient):
         """Test listing directories outside mounted volumes."""
         mock_volumes = ["/data"]
         
-        with patch('app.services.volume_service.volume_service.get_mounted_volumes',
-                   new_callable=AsyncMock) as mock_volumes_fn:
-            mock_volumes_fn.return_value = mock_volumes
-            
+        # Create mock service
+        mock_volume_service = AsyncMock(spec=VolumeService)
+        mock_volume_service.get_mounted_volumes.return_value = mock_volumes
+        
+        # Override dependency injection
+        app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
+        
+        try:
             response = await async_client.get("/api/repositories/directories?path=/invalid")
             
             assert response.status_code == 500  # API catches HTTPException and converts to 500
             assert "Path must be root directory or under one of the mounted volumes" in response.json()["detail"]
+        finally:
+            # Clean up
+            if get_volume_service in app.dependency_overrides:
+                del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
     async def test_update_import_form_no_path(self, async_client: AsyncClient):
@@ -281,81 +359,107 @@ class TestRepositoriesAPI:
             }
         ]
         
-        with patch('app.services.borg_service.borg_service.scan_for_repositories',
-                   new_callable=AsyncMock) as mock_scan:
-            mock_scan.return_value = mock_repos
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.scan_for_repositories.return_value = mock_repos
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get("/api/repositories/import-form-update?path=/test/repo")
             
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_update_import_form_repo_not_found(self, async_client: AsyncClient):
         """Test import form update with repository not found."""
-        with patch('app.services.borg_service.borg_service.scan_for_repositories',
-                   new_callable=AsyncMock) as mock_scan:
-            mock_scan.return_value = []  # No repositories found
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.scan_for_repositories.return_value = []  # No repositories found
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get("/api/repositories/import-form-update?path=/missing/repo")
             
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_import_repository_success(self, async_client: AsyncClient, test_db: Session):
         """Test successful repository import."""
-        with patch('app.services.borg_service.borg_service.verify_repository_access',
-                   new_callable=AsyncMock) as mock_verify:
-            mock_verify.return_value = True
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.verify_repository_access.return_value = True
+        mock_borg_service.list_archives.return_value = [{"name": "archive1"}, {"name": "archive2"}]
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
+            form_data = {
+                "name": "imported-repo",
+                "path": "/path/to/existing/repo",
+                "passphrase": "existing-passphrase"
+            }
             
-            with patch('app.services.borg_service.borg_service.list_archives',
-                       new_callable=AsyncMock) as mock_list:
-                mock_list.return_value = [{"name": "archive1"}, {"name": "archive2"}]
-                
-                form_data = {
-                    "name": "imported-repo",
-                    "path": "/path/to/existing/repo",
-                    "passphrase": "existing-passphrase"
-                }
-                
-                response = await async_client.post("/api/repositories/import", data=form_data)
-                
-                assert response.status_code == 200
-                response_data = response.json()
-                assert response_data["name"] == "imported-repo"
-                
-                # Verify repository was created in database
-                repo = test_db.query(Repository).filter(Repository.name == "imported-repo").first()
-                assert repo is not None
+            response = await async_client.post("/api/repositories/import", data=form_data)
+            
+            assert response.status_code == 200
+            response_data = response.json()
+            assert response_data["name"] == "imported-repo"
+            
+            # Verify repository was created in database
+            repo = test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+            assert repo is not None
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_import_repository_htmx_success(self, async_client: AsyncClient, test_db: Session):
         """Test successful repository import via HTMX."""
-        with patch('app.services.borg_service.borg_service.verify_repository_access',
-                   new_callable=AsyncMock) as mock_verify:
-            mock_verify.return_value = True
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.verify_repository_access.return_value = True
+        mock_borg_service.list_archives.return_value = []
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
+            form_data = {
+                "name": "htmx-imported-repo",
+                "path": "/path/to/htmx/repo",
+                "passphrase": "htmx-passphrase"
+            }
             
-            with patch('app.services.borg_service.borg_service.list_archives',
-                       new_callable=AsyncMock) as mock_list:
-                mock_list.return_value = []
-                
-                form_data = {
-                    "name": "htmx-imported-repo",
-                    "path": "/path/to/htmx/repo",
-                    "passphrase": "htmx-passphrase"
-                }
-                
-                response = await async_client.post(
-                    "/api/repositories/import",
-                    data=form_data,
-                    headers={"hx-request": "true"}
-                )
-                
-                assert response.status_code == 200
-                assert "text/html" in response.headers["content-type"]
-                assert "HX-Trigger" in response.headers
-                assert response.headers["HX-Trigger"] == "repositoryUpdate"
+            response = await async_client.post(
+                "/api/repositories/import",
+                data=form_data,
+                headers={"hx-request": "true"}
+            )
+            
+            assert response.status_code == 200
+            assert "text/html" in response.headers["content-type"]
+            assert "HX-Trigger" in response.headers
+            assert response.headers["HX-Trigger"] == "repositoryUpdate"
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_import_repository_duplicate_name(self, async_client: AsyncClient, test_db: Session):
@@ -382,15 +486,17 @@ class TestRepositoriesAPI:
         """Test repository import with keyfile."""
         keyfile_content = b"fake-keyfile-content"
         
-        with patch('app.services.borg_service.borg_service.verify_repository_access',
-                   new_callable=AsyncMock) as mock_verify:
-            mock_verify.return_value = True
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.verify_repository_access.return_value = True
+        mock_borg_service.list_archives.return_value = []
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             with patch('builtins.open', mock_open()) as mock_file, \
-                 patch('os.makedirs'), \
-                 patch('app.services.borg_service.borg_service.list_archives',
-                       new_callable=AsyncMock) as mock_list:
-                mock_list.return_value = []
+                 patch('os.makedirs'):
                 
                 files = {"keyfile": ("keyfile.key", BytesIO(keyfile_content), "application/octet-stream")}
                 data = {
@@ -403,14 +509,22 @@ class TestRepositoriesAPI:
                 
                 assert response.status_code == 200
                 mock_file.assert_called()
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_import_repository_verification_failure(self, async_client: AsyncClient, test_db: Session):
         """Test repository import with verification failure."""
-        with patch('app.services.borg_service.borg_service.verify_repository_access',
-                   new_callable=AsyncMock) as mock_verify:
-            mock_verify.return_value = False  # Verification fails
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.verify_repository_access.return_value = False  # Verification fails
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             form_data = {
                 "name": "verify-fail-repo",
                 "path": "/path/to/bad/repo",
@@ -425,6 +539,10 @@ class TestRepositoriesAPI:
             # Verify repository was not created in database
             repo = test_db.query(Repository).filter(Repository.name == "verify-fail-repo").first()
             assert repo is None
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_get_repository_success(self, async_client: AsyncClient, test_db: Session):
@@ -486,8 +604,13 @@ class TestRepositoriesAPI:
         test_db.commit()
         repo_id = repo.id
         
-        with patch('app.services.scheduler_service.scheduler_service.remove_schedule',
-                   new_callable=AsyncMock):
+        # Create mock service
+        mock_scheduler_service = AsyncMock(spec=SchedulerService)
+        
+        # Override dependency injection
+        app.dependency_overrides[get_scheduler_service] = lambda: mock_scheduler_service
+        
+        try:
             response = await async_client.delete(f"/api/repositories/{repo_id}")
             
             assert response.status_code == 200
@@ -496,6 +619,10 @@ class TestRepositoriesAPI:
             # Verify repository was deleted
             deleted_repo = test_db.query(Repository).filter(Repository.id == repo_id).first()
             assert deleted_repo is None
+        finally:
+            # Clean up
+            if get_scheduler_service in app.dependency_overrides:
+                del app.dependency_overrides[get_scheduler_service]
 
     @pytest.mark.asyncio
     async def test_delete_repository_not_found(self, async_client: AsyncClient):
@@ -545,12 +672,21 @@ class TestRepositoriesAPI:
         test_db.add(schedule)
         test_db.commit()
         
-        with patch('app.services.scheduler_service.scheduler_service.remove_schedule',
-                   new_callable=AsyncMock) as mock_remove:
+        # Create mock service
+        mock_scheduler_service = AsyncMock(spec=SchedulerService)
+        
+        # Override dependency injection
+        app.dependency_overrides[get_scheduler_service] = lambda: mock_scheduler_service
+        
+        try:
             response = await async_client.delete(f"/api/repositories/{repo.id}")
             
             assert response.status_code == 200
-            mock_remove.assert_called_once_with(schedule.id)
+            mock_scheduler_service.remove_schedule.assert_called_once_with(schedule.id)
+        finally:
+            # Clean up
+            if get_scheduler_service in app.dependency_overrides:
+                del app.dependency_overrides[get_scheduler_service]
 
 
     @pytest.mark.asyncio
@@ -577,14 +713,22 @@ class TestRepositoriesAPI:
             }
         ]
         
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list:
-            mock_list.return_value = mock_archives
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.list_archives.return_value = mock_archives
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(f"/api/repositories/{repo.id}/archives/html")
             
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_list_archives_html_error_handling(self, async_client: AsyncClient, test_db: Session):
@@ -594,14 +738,22 @@ class TestRepositoriesAPI:
         test_db.add(repo)
         test_db.commit()
         
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list:
-            mock_list.side_effect = Exception("List archives error")
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.list_archives.side_effect = Exception("List archives error")
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(f"/api/repositories/{repo.id}/archives/html")
             
             assert response.status_code == 200  # Returns error template
             assert "text/html" in response.headers["content-type"]
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_get_archives_repository_selector(self, async_client: AsyncClient, test_db: Session):
@@ -632,14 +784,22 @@ class TestRepositoriesAPI:
         test_db.add(repo)
         test_db.commit()
         
-        with patch('app.services.borg_service.borg_service.list_archives',
-                   new_callable=AsyncMock) as mock_list:
-            mock_list.return_value = []
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.list_archives.return_value = []
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(f"/api/repositories/archives/list?repository_id={repo.id}")
             
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_get_repository_info_success(self, async_client: AsyncClient, test_db: Session):
@@ -655,15 +815,23 @@ class TestRepositoriesAPI:
             "cache": {"stats": {"total_size": 1024}}
         }
         
-        with patch('app.services.borg_service.borg_service.get_repo_info',
-                   new_callable=AsyncMock) as mock_info_fn:
-            mock_info_fn.return_value = mock_info
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.get_repo_info.return_value = mock_info
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(f"/api/repositories/{repo.id}/info")
             
             assert response.status_code == 200
             response_data = response.json()
             assert "repository" in response_data
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_get_repository_info_not_found(self, async_client: AsyncClient):
@@ -690,13 +858,21 @@ class TestRepositoriesAPI:
         
         mock_file_stream = b"file content"
         
-        with patch('app.services.borg_service.borg_service.extract_file_stream',
-                   new_callable=AsyncMock) as mock_extract:
-            mock_extract.return_value = mock_file_stream
-            
+        # Create mock service
+        mock_borg_service = AsyncMock(spec=BorgService)
+        mock_borg_service.extract_file_stream.return_value = mock_file_stream
+        
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+        
+        try:
             response = await async_client.get(f"/api/repositories/{repo.id}/archives/test-archive/extract?file=test.txt")
             
             assert response.status_code == 200
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
     async def test_extract_file_not_found(self, async_client: AsyncClient):

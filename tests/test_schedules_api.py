@@ -3,6 +3,9 @@ from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch
 from fastapi import HTTPException
 
+from app.main import app
+from app.dependencies import get_scheduler_service
+from app.services.scheduler_service import SchedulerService
 from app.api.schedules import (
     get_schedules_form,
     create_schedule,
@@ -97,18 +100,26 @@ class TestSchedulesAPI:
 
         with patch("app.api.schedules.Schedule") as mock_schedule_class:
             mock_schedule_class.return_value = mock_db_schedule
-            with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
+            
+            # Override dependency injection
+            app.dependency_overrides[get_scheduler_service] = lambda: mock_scheduler_service
+            
+            try:
                 mock_scheduler_service.add_schedule.return_value = None
                 with patch("app.api.schedules.templates") as mock_templates:
                     mock_templates.TemplateResponse.return_value = Mock(headers={})
 
                     # Execute
-                    await create_schedule(mock_request, schedule_data, mock_db)
+                    await create_schedule(mock_request, schedule_data, mock_scheduler_service, mock_db)
 
                     # Verify
                     mock_db.add.assert_called_once()
                     mock_db.commit.assert_called()
                     mock_scheduler_service.add_schedule.assert_called_once_with(123, "Test Schedule", "0 2 * * *")
+            finally:
+                # Clean up
+                if get_scheduler_service in app.dependency_overrides:
+                    del app.dependency_overrides[get_scheduler_service]
 
     @pytest.mark.asyncio
     async def test_create_schedule_success_non_htmx(self, mock_request, mock_db, mock_scheduler_service):
@@ -136,15 +147,23 @@ class TestSchedulesAPI:
 
         with patch("app.api.schedules.Schedule") as mock_schedule_class:
             mock_schedule_class.return_value = mock_db_schedule
-            with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
+            
+            # Override dependency injection
+            app.dependency_overrides[get_scheduler_service] = lambda: mock_scheduler_service
+            
+            try:
                 mock_scheduler_service.add_schedule.return_value = None
 
                 # Execute
-                result = await create_schedule(mock_request, schedule_data, mock_db)
+                result = await create_schedule(mock_request, schedule_data, mock_scheduler_service, mock_db)
 
                 # Verify
                 assert result == mock_db_schedule
                 mock_scheduler_service.add_schedule.assert_called_once_with(123, "Test Schedule", "0 2 * * *")
+            finally:
+                # Clean up
+                if get_scheduler_service in app.dependency_overrides:
+                    del app.dependency_overrides[get_scheduler_service]
 
     @pytest.mark.asyncio
     async def test_create_schedule_repository_not_found(self, mock_request, mock_db):
@@ -159,9 +178,12 @@ class TestSchedulesAPI:
 
         with patch("app.api.schedules.templates") as mock_templates:
             mock_templates.TemplateResponse.return_value = "error_template"
+            
+            # Mock scheduler service for function signature
+            mock_scheduler_service = AsyncMock()
 
             # Execute
-            result = await create_schedule(mock_request, schedule_data, mock_db)
+            result = await create_schedule(mock_request, schedule_data, mock_scheduler_service, mock_db)
 
             # Verify
             assert result == "error_template"
@@ -183,9 +205,12 @@ class TestSchedulesAPI:
             mock_templates.TemplateResponse.return_value = "error_template"
             with patch("apscheduler.triggers.cron.CronTrigger") as mock_cron:
                 mock_cron.from_crontab.side_effect = ValueError("Invalid cron expression")
+                
+                # Mock scheduler service for function signature
+                mock_scheduler_service = AsyncMock()
 
                 # Execute
-                result = await create_schedule(mock_request, schedule_data, mock_db)
+                result = await create_schedule(mock_request, schedule_data, mock_scheduler_service, mock_db)
 
                 # Verify
                 assert result == "error_template"
@@ -214,17 +239,25 @@ class TestSchedulesAPI:
 
         with patch("app.api.schedules.Schedule") as mock_schedule_class:
             mock_schedule_class.return_value = mock_db_schedule
-            with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
+            
+            # Override dependency injection
+            app.dependency_overrides[get_scheduler_service] = lambda: mock_scheduler_service
+            
+            try:
                 mock_scheduler_service.add_schedule.side_effect = Exception("Scheduler error")
                 with patch("app.api.schedules.templates") as mock_templates:
                     mock_templates.TemplateResponse.return_value = "error_template"
 
                     # Execute
-                    result = await create_schedule(mock_request, schedule_data, mock_db)
+                    result = await create_schedule(mock_request, schedule_data, mock_scheduler_service, mock_db)
 
                     # Verify
                     assert result == "error_template"
                     mock_db.delete.assert_called_once_with(mock_db_schedule)
+            finally:
+                # Clean up
+                if get_scheduler_service in app.dependency_overrides:
+                    del app.dependency_overrides[get_scheduler_service]
 
     def test_get_schedules_html(self, mock_db):
         """Test getting schedules as HTML"""
@@ -262,36 +295,34 @@ class TestSchedulesAPI:
             },
         ]
 
-        with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
-            mock_scheduler_service.get_scheduled_jobs.return_value = mock_jobs
-            with patch("app.api.schedules.templates") as mock_templates:
-                mock_template = Mock()
-                mock_template.render.return_value = "<div>Upcoming Backups</div>"
-                mock_templates.get_template.return_value = mock_template
+        mock_scheduler_service.get_scheduled_jobs.return_value = mock_jobs
+        with patch("app.api.schedules.templates") as mock_templates:
+            mock_template = Mock()
+            mock_template.render.return_value = "<div>Upcoming Backups</div>"
+            mock_templates.get_template.return_value = mock_template
 
-                # Execute
-                result = await get_upcoming_backups_html()
+            # Execute
+            result = await get_upcoming_backups_html(mock_scheduler_service)
 
-                # Verify
-                assert result == "<div>Upcoming Backups</div>"
-                mock_scheduler_service.get_scheduled_jobs.assert_called_once()
+            # Verify
+            assert result == "<div>Upcoming Backups</div>"
+            mock_scheduler_service.get_scheduled_jobs.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_upcoming_backups_html_error(self, mock_scheduler_service):
         """Test getting upcoming backups HTML with error"""
         # Setup
-        with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
-            mock_scheduler_service.get_scheduled_jobs.side_effect = Exception("Scheduler error")
-            with patch("app.api.schedules.templates") as mock_templates:
-                mock_template = Mock()
-                mock_template.render.return_value = "<div>Error loading backups</div>"
-                mock_templates.get_template.return_value = mock_template
+        mock_scheduler_service.get_scheduled_jobs.side_effect = Exception("Scheduler error")
+        with patch("app.api.schedules.templates") as mock_templates:
+            mock_template = Mock()
+            mock_template.render.return_value = "<div>Error loading backups</div>"
+            mock_templates.get_template.return_value = mock_template
 
-                # Execute
-                result = await get_upcoming_backups_html()
+            # Execute
+            result = await get_upcoming_backups_html(mock_scheduler_service)
 
-                # Verify
-                assert result == "<div>Error loading backups</div>"
+            # Verify
+            assert result == "<div>Error loading backups</div>"
 
     @pytest.mark.asyncio
     async def test_get_cron_expression_form(self, mock_request):
@@ -353,17 +384,16 @@ class TestSchedulesAPI:
         mock_schedule.enabled = False
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
 
-        with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
-            mock_scheduler_service.update_schedule.return_value = None
+        mock_scheduler_service.update_schedule.return_value = None
 
-            # Execute
-            result = await toggle_schedule(1, None, mock_db)
+        # Execute
+        result = await toggle_schedule(1, mock_scheduler_service, None, mock_db)
 
-            # Verify
-            assert result == {"message": "Schedule enabled"}
-            assert mock_schedule.enabled is True
-            mock_db.commit.assert_called_once()
-            mock_scheduler_service.update_schedule.assert_called_once_with(1, "Test Schedule", "0 2 * * *", True)
+        # Verify
+        assert result == {"message": "Schedule enabled"}
+        assert mock_schedule.enabled is True
+        mock_db.commit.assert_called_once()
+        mock_scheduler_service.update_schedule.assert_called_once_with(1, "Test Schedule", "0 2 * * *", True)
 
     @pytest.mark.asyncio
     async def test_toggle_schedule_not_found(self, mock_db):
@@ -373,7 +403,9 @@ class TestSchedulesAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await toggle_schedule(999, None, mock_db)
+            # Mock scheduler service for function signature
+            mock_scheduler_service = AsyncMock()
+            await toggle_schedule(999, mock_scheduler_service, None, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Schedule not found" in str(exc_info.value.detail)
@@ -386,15 +418,14 @@ class TestSchedulesAPI:
         mock_schedule.enabled = False
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
 
-        with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
-            mock_scheduler_service.update_schedule.side_effect = Exception("Scheduler error")
+        mock_scheduler_service.update_schedule.side_effect = Exception("Scheduler error")
 
-            # Execute & Verify
-            with pytest.raises(HTTPException) as exc_info:
-                await toggle_schedule(1, None, mock_db)
+        # Execute & Verify
+        with pytest.raises(HTTPException) as exc_info:
+            await toggle_schedule(1, mock_scheduler_service, None, mock_db)
 
-            assert exc_info.value.status_code == 500
-            assert "Failed to update schedule" in str(exc_info.value.detail)
+        assert exc_info.value.status_code == 500
+        assert "Failed to update schedule" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
     async def test_delete_schedule_success(self, mock_db, mock_scheduler_service):
@@ -404,17 +435,16 @@ class TestSchedulesAPI:
         mock_schedule.id = 1
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
 
-        with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
-            mock_scheduler_service.remove_schedule.return_value = None
+        mock_scheduler_service.remove_schedule.return_value = None
 
-            # Execute
-            result = await delete_schedule(1, None, mock_db)
+        # Execute
+        result = await delete_schedule(1, mock_scheduler_service, None, mock_db)
 
-            # Verify
-            assert result == {"message": "Schedule deleted successfully"}
-            mock_scheduler_service.remove_schedule.assert_called_once_with(1)
-            mock_db.delete.assert_called_once_with(mock_schedule)
-            mock_db.commit.assert_called_once()
+        # Verify
+        assert result == {"message": "Schedule deleted successfully"}
+        mock_scheduler_service.remove_schedule.assert_called_once_with(1)
+        mock_db.delete.assert_called_once_with(mock_schedule)
+        mock_db.commit.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_delete_schedule_not_found(self, mock_db):
@@ -424,7 +454,9 @@ class TestSchedulesAPI:
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await delete_schedule(999, None, mock_db)
+            # Mock scheduler service for function signature
+            mock_scheduler_service = AsyncMock()
+            await delete_schedule(999, mock_scheduler_service, None, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Schedule not found" in str(exc_info.value.detail)
@@ -434,15 +466,14 @@ class TestSchedulesAPI:
         """Test getting active scheduled jobs"""
         # Setup
         mock_jobs = [{"name": "job1"}, {"name": "job2"}]
-        with patch("app.api.schedules.scheduler_service", mock_scheduler_service):
-            mock_scheduler_service.get_scheduled_jobs.return_value = mock_jobs
+        mock_scheduler_service.get_scheduled_jobs.return_value = mock_jobs
 
-            # Execute
-            result = await get_active_scheduled_jobs()
+        # Execute
+        result = await get_active_scheduled_jobs(mock_scheduler_service)
 
-            # Verify
-            assert result == {"jobs": mock_jobs}
-            mock_scheduler_service.get_scheduled_jobs.assert_called_once()
+        # Verify
+        assert result == {"jobs": mock_jobs}
+        mock_scheduler_service.get_scheduled_jobs.assert_called_once()
 
 
 class TestScheduleUtilityFunctions:

@@ -8,7 +8,8 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.models.database import Repository, get_db
-from app.services.repository_stats_service import repository_stats_service
+from app.services.repository_stats_service import RepositoryStatsService
+from app.dependencies import get_repository_stats_service
 
 
 class TestProgressStreaming:
@@ -67,7 +68,13 @@ class TestProgressStreaming:
                 "summary": {"total_archives": 3}
             }
         
-        with patch.object(repository_stats_service, 'get_repository_statistics', side_effect=mock_get_stats):
+        # Mock the dependency injection
+        mock_stats_service = Mock(spec=RepositoryStatsService)
+        mock_stats_service.get_repository_statistics.side_effect = mock_get_stats
+        
+        app.dependency_overrides[get_repository_stats_service] = lambda: mock_stats_service
+        
+        try:
             # Use AsyncClient for SSE endpoint testing
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
                 # Make request to progress streaming endpoint
@@ -108,9 +115,10 @@ class TestProgressStreaming:
                     assert percentages[0] >= 5, "Should start at least at 5%"
                     if len(percentages) > 1:
                         assert percentages[-1] >= percentages[0], "Should progress forward"
-        
-        # Clean up dependency override
-        app.dependency_overrides.clear()
+        finally:
+            # Clean up dependency override
+            if get_repository_stats_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_stats_service]
 
     @pytest.mark.asyncio
     async def test_progress_streaming_error_handling(self, mock_repository, mock_db):
@@ -133,7 +141,13 @@ class TestProgressStreaming:
             
             return {"error": "No archives found in repository"}
         
-        with patch.object(repository_stats_service, 'get_repository_statistics', side_effect=mock_get_stats_error):
+        # Mock the dependency injection for error case
+        mock_stats_service = Mock(spec=RepositoryStatsService)
+        mock_stats_service.get_repository_statistics.side_effect = mock_get_stats_error
+        
+        app.dependency_overrides[get_repository_stats_service] = lambda: mock_stats_service
+        
+        try:
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
                 response = await ac.get(f"/api/repositories/{mock_repository.id}/stats/progress")
                 
@@ -153,8 +167,10 @@ class TestProgressStreaming:
                 assert "text-red-700" in error_html, "Error should be styled with red text"
                 assert "No archives found" in error_html, "Error should contain expected message"
         
-        # Clean up dependency override
-        app.dependency_overrides.clear()
+        finally:
+            # Clean up dependency override
+            if get_repository_stats_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_stats_service]
 
     @pytest.mark.asyncio
     async def test_progress_streaming_repository_not_found(self, mock_db):

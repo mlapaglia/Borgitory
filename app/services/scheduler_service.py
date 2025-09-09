@@ -11,7 +11,6 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from app.config import DATABASE_URL
 from app.models.database import Schedule
 from app.models.enums import JobType
-from app.services.composite_job_manager import composite_job_manager
 from app.utils.db_session import get_db_session
 
 # Configure APScheduler logging only (don't override main basicConfig)
@@ -153,6 +152,8 @@ async def execute_scheduled_backup(schedule_id: int):
                 logger.info("SCHEDULER: No cloud backup configured")
 
             # Create composite job
+            from app.services.composite_job_manager import composite_job_manager
+            
             job_id = await composite_job_manager.create_composite_job(
                 job_type=JobType.SCHEDULED_BACKUP,
                 task_definitions=task_definitions,
@@ -373,4 +374,4 @@ class SchedulerService:
 
 
 # Global scheduler instance
-scheduler_service = SchedulerService()
+# scheduler_service = SchedulerService()
