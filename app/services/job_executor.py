@@ -195,9 +195,9 @@ class JobExecutor:
         return " ".join(safe_command)
 
     async def execute_prune_task(
-        self, 
-        repository_path: str, 
-        passphrase: str, 
+        self,
+        repository_path: str,
+        passphrase: str,
         keep_within: Optional[str] = None,
         keep_daily: Optional[int] = None,
         keep_weekly: Optional[int] = None,
@@ -208,17 +208,17 @@ class JobExecutor:
         save_space: bool = False,
         force_prune: bool = False,
         dry_run: bool = False,
-        output_callback: Optional[Callable] = None
+        output_callback: Optional[Callable] = None,
     ) -> ProcessResult:
         """
         Execute a borg prune task with the job executor's proper streaming
-        
+
         Args:
             repository_path: Path to the borg repository
             passphrase: Repository passphrase
             keep_within: Keep archives within this time range
             keep_daily: Number of daily archives to keep
-            keep_weekly: Number of weekly archives to keep  
+            keep_weekly: Number of weekly archives to keep
             keep_monthly: Number of monthly archives to keep
             keep_yearly: Number of yearly archives to keep
             show_stats: Show statistics
@@ -227,16 +227,16 @@ class JobExecutor:
             force_prune: Force pruning
             dry_run: Perform dry run
             output_callback: Callback for streaming output
-            
+
         Returns:
             ProcessResult with execution details
         """
         try:
             from app.utils.security import build_secure_borg_command
-            
+
             # Build prune command arguments based on task configuration
             additional_args = []
-            
+
             # Add retention policy arguments
             if keep_within:
                 additional_args.extend(["--keep-within", keep_within])
@@ -248,7 +248,7 @@ class JobExecutor:
                 additional_args.extend(["--keep-monthly", str(keep_monthly)])
             if keep_yearly:
                 additional_args.extend(["--keep-yearly", str(keep_yearly)])
-                
+
             # Add common options
             if show_stats:
                 additional_args.append("--stats")
@@ -258,43 +258,44 @@ class JobExecutor:
                 additional_args.append("--save-space")
             if force_prune:
                 additional_args.append("--force")
-                
+
             # Add dry run flag if requested
             if dry_run:
                 additional_args.append("--dry-run")
-                
+
             # Repository path as positional argument
             additional_args.append(repository_path)
-            
-            logger.info(f"🗑️ Starting borg prune - Repository: {repository_path}, Dry run: {dry_run}")
-            
+
+            logger.info(
+                f"🗑️ Starting borg prune - Repository: {repository_path}, Dry run: {dry_run}"
+            )
+
             command, env = build_secure_borg_command(
                 base_command="borg prune",
                 repository_path="",  # Path is in additional_args
                 passphrase=passphrase,
                 additional_args=additional_args,
             )
-            
+
             # Start the process
             process = await self.start_process(command, env)
-            
+
             # Monitor output with callback
             result = await self.monitor_process_output(process, output_callback)
-            
+
             if result.return_code == 0:
                 logger.info("✅ Prune task completed successfully")
             else:
-                logger.error(f"❌ Prune task failed with return code {result.return_code}")
-                
+                logger.error(
+                    f"❌ Prune task failed with return code {result.return_code}"
+                )
+
             return result
-            
+
         except Exception as e:
             logger.error(f"❌ Exception in prune task: {str(e)}")
             return ProcessResult(
-                return_code=-1,
-                stdout=b"",
-                stderr=str(e).encode(),
-                error=str(e)
+                return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
             )
 
     async def execute_cloud_sync_task(
@@ -304,12 +305,12 @@ class JobExecutor:
         cloud_sync_config_id: Optional[int] = None,
         output_callback: Optional[Callable] = None,
         db_session_factory: Optional[Callable] = None,
-        rclone_service = None,
-        http_client_factory: Optional[Callable] = None
+        rclone_service=None,
+        http_client_factory: Optional[Callable] = None,
     ) -> ProcessResult:
         """
         Execute a cloud sync task with the job executor's proper streaming
-        
+
         Args:
             repository_path: Path to the borg repository
             passphrase: Repository passphrase (not used but kept for consistency)
@@ -318,7 +319,7 @@ class JobExecutor:
             db_session_factory: Factory for database sessions
             rclone_service: Rclone service instance
             http_client_factory: HTTP client factory for notifications
-            
+
         Returns:
             ProcessResult with execution details
         """
@@ -327,22 +328,21 @@ class JobExecutor:
             from app.utils.db_session import get_db_session
             from app.models.database import CloudSyncConfig
             from types import SimpleNamespace
-            from datetime import datetime
-            
+
             # Use provided session factory or default
             session_factory = db_session_factory or get_db_session
-            
+
             if not cloud_sync_config_id:
                 logger.info("📋 No cloud backup configuration - skipping cloud sync")
                 return ProcessResult(
                     return_code=0,
                     stdout=b"Cloud sync skipped - no configuration",
                     stderr=b"",
-                    error=None
+                    error=None,
                 )
 
             logger.info(f"☁️ Starting cloud sync for repository {repository_path}")
-            
+
             if output_callback:
                 output_callback("☁️ Starting cloud sync...", {})
 
@@ -355,14 +355,19 @@ class JobExecutor:
                 )
 
                 if not config or not config.enabled:
-                    logger.info("📋 Cloud backup configuration not found or disabled - skipping")
+                    logger.info(
+                        "📋 Cloud backup configuration not found or disabled - skipping"
+                    )
                     if output_callback:
-                        output_callback("📋 Cloud backup configuration not found or disabled - skipping", {})
+                        output_callback(
+                            "📋 Cloud backup configuration not found or disabled - skipping",
+                            {},
+                        )
                     return ProcessResult(
                         return_code=0,
                         stdout=b"Cloud sync skipped - configuration disabled",
                         stderr=b"",
-                        error=None
+                        error=None,
                     )
 
                 # Handle different provider types
@@ -370,16 +375,23 @@ class JobExecutor:
                     # Get S3 credentials
                     access_key, secret_key = config.get_credentials()
 
-                    logger.info(f"☁️ Syncing to {config.name} (S3: {config.bucket_name})")
+                    logger.info(
+                        f"☁️ Syncing to {config.name} (S3: {config.bucket_name})"
+                    )
                     if output_callback:
-                        output_callback(f"☁️ Syncing to {config.name} (S3: {config.bucket_name})", {})
+                        output_callback(
+                            f"☁️ Syncing to {config.name} (S3: {config.bucket_name})", {}
+                        )
 
                     # Create a simple repository object for rclone service
                     repo_obj = SimpleNamespace(path=repository_path)
 
                     # Use rclone service to sync to S3
                     if not rclone_service:
-                        from app.services.rclone_service import rclone_service as default_rclone_service
+                        from app.services.rclone_service import (
+                            rclone_service as default_rclone_service,
+                        )
+
                         rclone_service = default_rclone_service
 
                     progress_generator = rclone_service.sync_repository_to_s3(
@@ -394,16 +406,24 @@ class JobExecutor:
                     # Get SFTP credentials
                     password, private_key = config.get_sftp_credentials()
 
-                    logger.info(f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})")
+                    logger.info(
+                        f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})"
+                    )
                     if output_callback:
-                        output_callback(f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})", {})
+                        output_callback(
+                            f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})",
+                            {},
+                        )
 
                     # Create a simple repository object for rclone service
                     repo_obj = SimpleNamespace(path=repository_path)
 
                     # Use rclone service to sync to SFTP
                     if not rclone_service:
-                        from app.services.rclone_service import rclone_service as default_rclone_service
+                        from app.services.rclone_service import (
+                            rclone_service as default_rclone_service,
+                        )
+
                         rclone_service = default_rclone_service
 
                     progress_generator = rclone_service.sync_repository_to_sftp(
@@ -426,7 +446,7 @@ class JobExecutor:
                         return_code=1,
                         stdout=b"",
                         stderr=error_msg.encode(),
-                        error=error_msg
+                        error=error_msg,
                     )
 
                 # Process progress from either S3 or SFTP sync
@@ -445,19 +465,21 @@ class JobExecutor:
                             return_code=1,
                             stdout=b"",
                             stderr=error_msg.encode(),
-                            error=error_msg
+                            error=error_msg,
                         )
 
                     elif progress.get("type") == "completed":
                         if progress["status"] == "success":
                             logger.info("✅ Cloud sync completed successfully")
                             if output_callback:
-                                output_callback("✅ Cloud sync completed successfully", {})
+                                output_callback(
+                                    "✅ Cloud sync completed successfully", {}
+                                )
                             return ProcessResult(
                                 return_code=0,
                                 stdout=b"Cloud sync completed successfully",
                                 stderr=b"",
-                                error=None
+                                error=None,
                             )
                         else:
                             error_msg = "Cloud sync failed"
@@ -468,7 +490,7 @@ class JobExecutor:
                                 return_code=1,
                                 stdout=b"",
                                 stderr=error_msg.encode(),
-                                error=error_msg
+                                error=error_msg,
                             )
 
                 # If we get here, sync completed without explicit success/failure
@@ -479,16 +501,13 @@ class JobExecutor:
                     return_code=0,
                     stdout=b"Cloud sync completed",
                     stderr=b"",
-                    error=None
+                    error=None,
                 )
-                
+
         except Exception as e:
             logger.error(f"❌ Exception in cloud sync task: {str(e)}")
             if output_callback:
                 output_callback(f"❌ Exception in cloud sync task: {str(e)}", {})
             return ProcessResult(
-                return_code=-1,
-                stdout=b"",
-                stderr=str(e).encode(),
-                error=str(e)
+                return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
             )

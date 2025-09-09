@@ -518,11 +518,10 @@ class ModularBorgJobManager:
         # Create output callback for streaming
         def output_callback(line: str, progress_info: dict):
             # Store output in task
-            task.output_lines.append({
-                "timestamp": datetime.now().isoformat(),
-                "text": line
-            })
-            
+            task.output_lines.append(
+                {"timestamp": datetime.now().isoformat(), "text": line}
+            )
+
             # Broadcast to event system if available
             if self.event_broadcaster:
                 self.event_broadcaster.broadcast_event(
@@ -532,8 +531,8 @@ class ModularBorgJobManager:
                         "line": line,
                         "task_index": task_index,
                         "task_type": "prune",
-                        "progress_info": progress_info
-                    }
+                        "progress_info": progress_info,
+                    },
                 )
 
         # Execute prune task using job executor
@@ -551,16 +550,16 @@ class ModularBorgJobManager:
                 save_space=task.parameters.get("save_space", False),
                 force_prune=task.parameters.get("force_prune", False),
                 dry_run=task.parameters.get("dry_run", False),
-                output_callback=output_callback
+                output_callback=output_callback,
             )
-            
+
             # Store result data
             task.return_code = result.return_code
             if result.error:
                 task.error = result.error
-                
+
             return result.return_code == 0
-            
+
         except Exception as e:
             logger.error(f"Exception in prune task: {str(e)}")
             task.error = str(e)
@@ -633,11 +632,10 @@ class ModularBorgJobManager:
         # Create output callback for streaming
         def output_callback(line: str, progress_info: dict):
             # Store output in task
-            task.output_lines.append({
-                "timestamp": datetime.now().isoformat(),
-                "text": line
-            })
-            
+            task.output_lines.append(
+                {"timestamp": datetime.now().isoformat(), "text": line}
+            )
+
             # Broadcast to event system if available
             if self.event_broadcaster:
                 self.event_broadcaster.broadcast_event(
@@ -647,8 +645,8 @@ class ModularBorgJobManager:
                         "line": line,
                         "task_index": task_index,
                         "task_type": "cloud_sync",
-                        "progress_info": progress_info
-                    }
+                        "progress_info": progress_info,
+                    },
                 )
 
         # Execute cloud sync task using job executor
@@ -660,16 +658,16 @@ class ModularBorgJobManager:
                 output_callback=output_callback,
                 db_session_factory=self.database_manager._db_session_factory,
                 rclone_service=None,  # Will use default
-                http_client_factory=None  # Will use default
+                http_client_factory=None,  # Will use default
             )
-            
+
             # Store result data
             task.return_code = result.return_code
             if result.error:
                 task.error = result.error
-                
+
             return result.return_code == 0
-            
+
         except Exception as e:
             logger.error(f"Exception in cloud sync task: {str(e)}")
             task.error = str(e)
