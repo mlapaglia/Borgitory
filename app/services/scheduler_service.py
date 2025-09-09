@@ -60,13 +60,13 @@ async def execute_scheduled_backup(schedule_id: int):
 
             # Use TaskDefinitionBuilder to create all task definitions
             builder = TaskDefinitionBuilder(db)
-            
+
             backup_params = {
                 "source_path": schedule.source_path,
                 "compression": "zstd",  # Default compression for scheduled backups
-                "dry_run": False
+                "dry_run": False,
             }
-            
+
             task_definitions = builder.build_task_list(
                 repository_name=repository.name,
                 include_backup=True,
@@ -74,10 +74,12 @@ async def execute_scheduled_backup(schedule_id: int):
                 cleanup_config_id=schedule.cleanup_config_id,
                 check_config_id=schedule.check_config_id,
                 include_cloud_sync=schedule.cloud_sync_config_id is not None,
-                notification_config_id=schedule.notification_config_id
+                notification_config_id=schedule.notification_config_id,
             )
-            
-            logger.info(f"SCHEDULER: Built {len(task_definitions)} tasks using TaskDefinitionBuilder")
+
+            logger.info(
+                f"SCHEDULER: Built {len(task_definitions)} tasks using TaskDefinitionBuilder"
+            )
             for task in task_definitions:
                 logger.info(f"  - {task['type']}: {task['name']}")
 

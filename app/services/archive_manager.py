@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class ArchiveManager:
     """
     Handles Borg archive operations and content management.
-    
+
     Responsibilities:
     - List and query archive contents
     - Extract files from archives
@@ -26,11 +26,11 @@ class ArchiveManager:
     - Stream file content from archives
     - Manage archive metadata and structure
     """
-    
+
     def __init__(
         self,
         job_executor: Optional[JobExecutor] = None,
-        command_builder: Optional[BorgCommandBuilder] = None
+        command_builder: Optional[BorgCommandBuilder] = None,
     ):
         self.job_executor = job_executor or JobExecutor()
         self.command_builder = command_builder or BorgCommandBuilder()
@@ -219,7 +219,9 @@ class ArchiveManager:
                 # Read any error messages
                 stderr_data = await process.stderr.read()
                 error_msg = stderr_data.decode("utf-8", errors="replace")
-                raise Exception(f"Borg extract failed with code {return_code}: {error_msg}")
+                raise Exception(
+                    f"Borg extract failed with code {return_code}: {error_msg}"
+                )
 
         except Exception as e:
             # Ensure the process is terminated
@@ -239,7 +241,7 @@ class ArchiveManager:
         try:
             # Get repository info which includes archive information
             command, env = self.command_builder.build_repo_info_command(repository)
-            
+
             # Use JobExecutor for consistent execution
             process = await self.job_executor.start_process(command, env)
             result = await self.job_executor.monitor_process_output(process)
@@ -249,12 +251,12 @@ class ArchiveManager:
                 try:
                     repo_info = json.loads(output_text)
                     archives = repo_info.get("archives", [])
-                    
+
                     # Find the specific archive
                     for archive in archives:
                         if archive.get("name") == archive_name:
                             return archive
-                    
+
                     return None  # Archive not found
                 except json.JSONDecodeError:
                     logger.warning("Could not parse repository info JSON")
@@ -272,23 +274,28 @@ class ArchiveManager:
             logger.error(f"Error getting archive metadata: {e}")
             return None
 
-    def calculate_directory_size(self, entries: List[Dict], directory_path: str = "") -> int:
+    def calculate_directory_size(
+        self, entries: List[Dict], directory_path: str = ""
+    ) -> int:
         """Calculate the total size of all files in a directory path"""
         total_size = 0
         directory_path = directory_path.strip().strip("/")
-        
+
         for entry in entries:
             entry_path = entry.get("path", "").lstrip("/")
-            
+
             # Check if this entry is within the target directory
             if directory_path:
-                if not entry_path.startswith(directory_path + "/") and entry_path != directory_path:
+                if (
+                    not entry_path.startswith(directory_path + "/")
+                    and entry_path != directory_path
+                ):
                     continue
-            
+
             # Add size if it's a file (not a directory)
             if entry.get("type") != "d":
                 total_size += entry.get("size", 0)
-        
+
         return total_size
 
     def find_entries_by_pattern(
@@ -296,7 +303,7 @@ class ArchiveManager:
     ) -> List[Dict]:
         """Find archive entries matching a pattern"""
         import re
-        
+
         flags = 0 if case_sensitive else re.IGNORECASE
         try:
             regex = re.compile(pattern, flags)
@@ -304,21 +311,21 @@ class ArchiveManager:
             # If pattern is not a valid regex, treat it as a literal string
             pattern = re.escape(pattern)
             regex = re.compile(pattern, flags)
-        
+
         matching_entries = []
         for entry in entries:
             path = entry.get("path", "")
             name = entry.get("name", path.split("/")[-1] if path else "")
-            
+
             if regex.search(path) or regex.search(name):
                 matching_entries.append(entry)
-        
+
         return matching_entries
 
     def get_file_type_summary(self, entries: List[Dict]) -> Dict[str, int]:
         """Get a summary of file types in the archive"""
         type_counts = {}
-        
+
         for entry in entries:
             if entry.get("type") == "d":
                 entry_type = "directory"
@@ -329,23 +336,25 @@ class ArchiveManager:
                     entry_type = f".{extension}"
                 else:
                     entry_type = "no extension"
-            
+
             type_counts[entry_type] = type_counts.get(entry_type, 0) + 1
-        
+
         return dict(sorted(type_counts.items(), key=lambda x: x[1], reverse=True))
 
-    def validate_archive_path(self, archive_name: str, file_path: str) -> Dict[str, str]:
+    def validate_archive_path(
+        self, archive_name: str, file_path: str
+    ) -> Dict[str, str]:
         """Validate archive name and file path parameters"""
         errors = {}
-        
+
         try:
             validate_archive_name(archive_name)
         except Exception as e:
             errors["archive_name"] = str(e)
-        
+
         try:
             sanitize_path(file_path)
         except Exception as e:
             errors["file_path"] = str(e)
-        
+
         return errors

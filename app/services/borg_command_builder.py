@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 class BorgCommandBuilder:
     """
     Handles construction and validation of Borg commands.
-    
+
     Responsibilities:
     - Build secure Borg commands with proper argument validation
     - Generate archive names and validate parameters
     - Construct commands for different Borg operations
     - Apply security and validation rules consistently
     """
-    
+
     def __init__(self):
         pass
 
@@ -37,15 +37,15 @@ class BorgCommandBuilder:
         source_path: str,
         compression: str = "zstd",
         dry_run: bool = False,
-        archive_name: Optional[str] = None
+        archive_name: Optional[str] = None,
     ) -> Tuple[List[str], Dict[str, str]]:
         """Build a secure backup command with validation"""
         try:
             validate_compression(compression)
-            
+
             if archive_name is None:
                 archive_name = f"backup-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-            
+
             validate_archive_name(archive_name)
         except Exception as e:
             raise Exception(f"Validation failed: {str(e)}")
@@ -56,14 +56,17 @@ class BorgCommandBuilder:
         if dry_run:
             additional_args.append("--dry-run")
 
-        additional_args.extend([
-            "--compression", compression,
-            "--stats",
-            "--progress",
-            "--json",  # Enable JSON output for progress parsing
-            f"{repository.path}::{archive_name}",
-            source_path,
-        ])
+        additional_args.extend(
+            [
+                "--compression",
+                compression,
+                "--stats",
+                "--progress",
+                "--json",  # Enable JSON output for progress parsing
+                f"{repository.path}::{archive_name}",
+                source_path,
+            ]
+        )
 
         try:
             command, env = build_secure_borg_command(
@@ -76,7 +79,9 @@ class BorgCommandBuilder:
         except Exception as e:
             raise Exception(f"Security validation failed: {str(e)}")
 
-    def build_list_archives_command(self, repository: Repository) -> Tuple[List[str], Dict[str, str]]:
+    def build_list_archives_command(
+        self, repository: Repository
+    ) -> Tuple[List[str], Dict[str, str]]:
         """Build command to list all archives in a repository"""
         try:
             command, env = build_secure_borg_command(
@@ -89,7 +94,9 @@ class BorgCommandBuilder:
         except Exception as e:
             raise Exception(f"Security validation failed: {str(e)}")
 
-    def build_repo_info_command(self, repository: Repository) -> Tuple[List[str], Dict[str, str]]:
+    def build_repo_info_command(
+        self, repository: Repository
+    ) -> Tuple[List[str], Dict[str, str]]:
         """Build command to get repository information"""
         try:
             command, env = build_secure_borg_command(
@@ -106,7 +113,7 @@ class BorgCommandBuilder:
         self,
         repository: Repository,
         archive_name: str,
-        directory_path: Optional[str] = None
+        directory_path: Optional[str] = None,
     ) -> Tuple[List[str], Dict[str, str]]:
         """Build command to list contents of a specific archive"""
         try:
@@ -115,10 +122,10 @@ class BorgCommandBuilder:
             raise Exception(f"Archive name validation failed: {str(e)}")
 
         additional_args = ["--json-lines"]
-        
+
         # Build the archive specification
         archive_spec = f"{repository.path}::{archive_name}"
-        
+
         # If directory path is specified, add it
         if directory_path:
             try:
@@ -145,7 +152,7 @@ class BorgCommandBuilder:
         repository: Repository,
         archive_name: str,
         file_path: str,
-        extract_to_stdout: bool = True
+        extract_to_stdout: bool = True,
     ) -> Tuple[List[str], Dict[str, str]]:
         """Build command to extract a specific file from an archive"""
         try:
@@ -155,7 +162,7 @@ class BorgCommandBuilder:
             raise Exception(f"Validation failed: {str(e)}")
 
         additional_args = []
-        
+
         if extract_to_stdout:
             additional_args.append("--stdout")
 
@@ -175,9 +182,7 @@ class BorgCommandBuilder:
             raise Exception(f"Security validation failed: {str(e)}")
 
     def build_initialize_repository_command(
-        self,
-        repository: Repository,
-        encryption_mode: str = "repokey-blake2"
+        self, repository: Repository, encryption_mode: str = "repokey-blake2"
     ) -> Tuple[List[str], Dict[str, str]]:
         """Build command to initialize a new Borg repository"""
         additional_args = ["--encryption", encryption_mode, repository.path]
@@ -205,7 +210,7 @@ class BorgCommandBuilder:
         show_list: bool = True,
         show_stats: bool = True,
         save_space: bool = False,
-        force_prune: bool = False
+        force_prune: bool = False,
     ) -> Tuple[List[str], Dict[str, str]]:
         """Build command to prune old archives from a repository"""
         additional_args = []
@@ -259,7 +264,7 @@ class BorgCommandBuilder:
         archive_prefix: Optional[str] = None,
         archive_glob: Optional[str] = None,
         first_n_archives: Optional[int] = None,
-        last_n_archives: Optional[int] = None
+        last_n_archives: Optional[int] = None,
     ) -> Tuple[List[str], Dict[str, str]]:
         """Build command to check repository integrity"""
         additional_args = []
@@ -315,9 +320,9 @@ class BorgCommandBuilder:
 
     def generate_archive_name(self, prefix: str = "backup") -> str:
         """Generate a timestamped archive name"""
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         archive_name = f"{prefix}-{timestamp}"
-        
+
         try:
             validate_archive_name(archive_name)
             return archive_name
@@ -331,7 +336,7 @@ class BorgCommandBuilder:
         repository: Repository,
         archive_name: Optional[str] = None,
         source_path: Optional[str] = None,
-        compression: Optional[str] = None
+        compression: Optional[str] = None,
     ) -> Dict[str, str]:
         """Validate all command parameters and return any validation errors"""
         errors = {}

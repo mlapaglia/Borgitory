@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 class RepositoryParser:
     """
     Handles Borg repository discovery, parsing, and validation.
-    
+
     Responsibilities:
     - Parse Borg repository configurations
     - Scan filesystem for Borg repositories
     - Verify repository access and validity
     - Extract repository metadata
     """
-    
+
     def __init__(self, command_runner: Optional[SimpleCommandRunner] = None):
         self.command_runner = command_runner or SimpleCommandRunner()
 
@@ -89,11 +89,17 @@ class RepositoryParser:
                         key_type = f.read().strip()
                         logger.info(f"Key type: {key_type}")
                         preview_parts.append(f"Key type: {key_type}")
-                        
-                        if key_type in ["blake2-chacha20-poly1305", "argon2-chacha20-poly1305"]:
+
+                        if key_type in [
+                            "blake2-chacha20-poly1305",
+                            "argon2-chacha20-poly1305",
+                        ]:
                             mode = "encrypted"
                             requires_keyfile = False  # Passphrase mode
-                        elif key_type in ["blake2-aes256-ctr-hmac-sha256", "argon2-aes256-ctr-hmac-sha256"]:
+                        elif key_type in [
+                            "blake2-aes256-ctr-hmac-sha256",
+                            "argon2-aes256-ctr-hmac-sha256",
+                        ]:
                             mode = "encrypted"
                             requires_keyfile = True  # Key file mode
                         else:
@@ -108,11 +114,13 @@ class RepositoryParser:
                     security_files = os.listdir(security_dir)
                     logger.info(f"Security directory contents: {security_files}")
                     preview_parts.append(f"Security files: {len(security_files)} files")
-                    
+
                     if not mode or mode == "unknown":
                         if security_files:
                             mode = "encrypted"
-                            requires_keyfile = False  # Security dir usually means passphrase
+                            requires_keyfile = (
+                                False  # Security dir usually means passphrase
+                            )
                         else:
                             mode = "unencrypted"
                             requires_keyfile = False
@@ -136,12 +144,18 @@ class RepositoryParser:
                     if "version" in repo_section:
                         preview_parts.append(f"Version: {repo_section['version']}")
                     if "segments_per_dir" in repo_section:
-                        preview_parts.append(f"Segments per dir: {repo_section['segments_per_dir']}")
+                        preview_parts.append(
+                            f"Segments per dir: {repo_section['segments_per_dir']}"
+                        )
                 except Exception as e:
                     logger.warning(f"Could not read repository section: {e}")
 
-            preview = "; ".join(preview_parts) if preview_parts else f"Borg repository detected ({mode})"
-            
+            preview = (
+                "; ".join(preview_parts)
+                if preview_parts
+                else f"Borg repository detected ({mode})"
+            )
+
             return {
                 "mode": mode,
                 "requires_keyfile": requires_keyfile,
@@ -171,9 +185,17 @@ class RepositoryParser:
         command = [
             "find",
             scan_path,
-            "-type", "d", "-name", "config", 
-            "-execdir", "test", "-d", "data", ";",
-            "-printf", "%h\\n"
+            "-type",
+            "d",
+            "-name",
+            "config",
+            "-execdir",
+            "test",
+            "-d",
+            "data",
+            ";",
+            "-printf",
+            "%h\\n",
         ]
 
         # Alternative: Look for the specific Borg repository marker files
@@ -207,13 +229,13 @@ class RepositoryParser:
         try:
             job_manager = get_job_manager()
             status = job_manager.get_job_status(job_id)
-            
+
             if not status:
                 return {
                     "exists": False,
                     "completed": False,
                     "status": "not_found",
-                    "error": "Job not found"
+                    "error": "Job not found",
                 }
 
             return {
@@ -221,7 +243,7 @@ class RepositoryParser:
                 "completed": status.get("completed", False),
                 "status": status.get("status", "unknown"),
                 "output": status.get("output", ""),
-                "error": status.get("error")
+                "error": status.get("error"),
             }
         except Exception as e:
             logger.error(f"Error checking scan status for job {job_id}: {e}")
@@ -229,7 +251,7 @@ class RepositoryParser:
                 "exists": False,
                 "completed": False,
                 "status": "error",
-                "error": str(e)
+                "error": str(e),
             }
 
     async def get_scan_results(self, job_id: str) -> List[Dict]:
@@ -237,7 +259,7 @@ class RepositoryParser:
         try:
             job_manager = get_job_manager()
             job_status = job_manager.get_job_status(job_id)
-            
+
             if not job_status or not job_status.get("completed"):
                 logger.warning(f"Job {job_id} is not completed yet")
                 return []
@@ -245,7 +267,7 @@ class RepositoryParser:
             output = job_status.get("output", "")
             if job_status.get("error"):
                 logger.error(f"Scan job {job_id} had errors: {job_status['error']}")
-                
+
             return await self._parse_scan_output(output)
         except Exception as e:
             logger.error(f"Error getting scan results for job {job_id}: {e}")
@@ -254,22 +276,22 @@ class RepositoryParser:
     async def _parse_scan_output(self, output: str) -> List[Dict]:
         """Parse the output from find command to identify potential Borg repositories"""
         repositories = []
-        
+
         if not output.strip():
             logger.warning("Scan output is empty")
             return repositories
 
         # Process each line as a potential repository path
-        for line in output.strip().split('\n'):
+        for line in output.strip().split("\n"):
             repo_path = line.strip()
             if not repo_path or not os.path.exists(repo_path):
                 continue
 
             logger.info(f"Examining potential repository at: {repo_path}")
-            
+
             # Parse the repository config to get more info
             config_info = self.parse_borg_config(repo_path)
-            
+
             # Skip if it's not a valid Borg repository
             if config_info["mode"] in ["invalid", "error"]:
                 logger.debug(f"Skipping {repo_path}: {config_info['preview']}")
@@ -287,7 +309,7 @@ class RepositoryParser:
                 "requires_keyfile": config_info["requires_keyfile"],
                 "preview": config_info["preview"],
                 "size": "Unknown",
-                "last_backup": None
+                "last_backup": None,
             }
 
             # Try to get additional repository info if accessible
@@ -309,17 +331,17 @@ class RepositoryParser:
     async def _get_repository_metadata(self, repo_path: str) -> Dict[str, any]:
         """Try to get additional metadata about a repository (size, last backup, etc.)"""
         metadata = {}
-        
+
         try:
             # Try to get repository size
             if os.path.exists(repo_path):
                 # Use du to get directory size
                 result = await self.command_runner.run_command(
-                    ["du", "-sh", repo_path], 
-                    timeout=10  # Quick timeout
+                    ["du", "-sh", repo_path],
+                    timeout=10,  # Quick timeout
                 )
                 if result.returncode == 0:
-                    size_line = result.stdout.strip().split('\t')[0]
+                    size_line = result.stdout.strip().split("\t")[0]
                     metadata["size"] = size_line
         except Exception as e:
             logger.debug(f"Could not get size for {repo_path}: {e}")
@@ -339,9 +361,11 @@ class RepositoryParser:
                                 latest_mtime = mtime
                         except OSError:
                             continue
-                
+
                 if latest_mtime > 0:
-                    metadata["last_backup"] = datetime.fromtimestamp(latest_mtime, UTC).isoformat()
+                    metadata["last_backup"] = datetime.fromtimestamp(
+                        latest_mtime, UTC
+                    ).isoformat()
         except Exception as e:
             logger.debug(f"Could not get last backup time for {repo_path}: {e}")
 
@@ -353,8 +377,12 @@ class RepositoryParser:
         """Verify that we can access a repository with given credentials"""
         try:
             # Use the provided passphrase or the one stored in the repository
-            passphrase = test_passphrase if test_passphrase is not None else repository.get_passphrase()
-            
+            passphrase = (
+                test_passphrase
+                if test_passphrase is not None
+                else repository.get_passphrase()
+            )
+
             command, env = build_secure_borg_command(
                 base_command="borg info",
                 repository_path=repository.path,
@@ -365,7 +393,7 @@ class RepositoryParser:
             return {
                 "accessible": False,
                 "error": f"Security validation failed: {str(e)}",
-                "requires_passphrase": True
+                "requires_passphrase": True,
             }
 
         try:
@@ -383,50 +411,54 @@ class RepositoryParser:
                     return {
                         "accessible": False,
                         "error": "Verification job not found",
-                        "requires_passphrase": True
+                        "requires_passphrase": True,
                     }
 
                 if status["completed"] or status["status"] in ["completed", "failed"]:
                     if status.get("error"):
                         error_msg = status["error"]
-                        
+
                         # Check for common error patterns
-                        if "PassphraseWrong" in error_msg or "passphrase" in error_msg.lower():
+                        if (
+                            "PassphraseWrong" in error_msg
+                            or "passphrase" in error_msg.lower()
+                        ):
                             return {
                                 "accessible": False,
                                 "error": "Incorrect passphrase",
-                                "requires_passphrase": True
+                                "requires_passphrase": True,
                             }
                         elif "does not exist" in error_msg:
                             return {
                                 "accessible": False,
                                 "error": "Repository does not exist or is not a Borg repository",
-                                "requires_passphrase": False
+                                "requires_passphrase": False,
                             }
                         else:
                             return {
                                 "accessible": False,
                                 "error": f"Repository access failed: {error_msg}",
-                                "requires_passphrase": True
+                                "requires_passphrase": True,
                             }
                     else:
                         # Success case
                         output = status.get("output", "")
                         repo_info = {}
-                        
+
                         try:
                             if output.strip():
                                 import json
+
                                 repo_info = json.loads(output)
                         except json.JSONDecodeError:
                             # Output might not be JSON, that's okay
                             pass
-                        
+
                         return {
                             "accessible": True,
                             "error": None,
                             "requires_passphrase": False,
-                            "repository_info": repo_info
+                            "repository_info": repo_info,
                         }
 
                 await asyncio.sleep(0.5)
@@ -436,7 +468,7 @@ class RepositoryParser:
             return {
                 "accessible": False,
                 "error": "Repository verification timed out",
-                "requires_passphrase": True
+                "requires_passphrase": True,
             }
 
         except Exception as e:
@@ -444,7 +476,7 @@ class RepositoryParser:
             return {
                 "accessible": False,
                 "error": f"Verification error: {str(e)}",
-                "requires_passphrase": True
+                "requires_passphrase": True,
             }
 
     async def scan_for_repositories(self, scan_path: str = None) -> List[Dict]:

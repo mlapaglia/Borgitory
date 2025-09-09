@@ -37,10 +37,10 @@ async def get_stats_loading(request: Request, repository_id: int = None):
 
 @router.get("/stats/content")
 async def get_stats_content(
-    request: Request, 
+    request: Request,
     stats_svc: RepositoryStatsServiceDep,
-    repository_id: int = None, 
-    db: Session = Depends(get_db)
+    repository_id: int = None,
+    db: Session = Depends(get_db),
 ):
     """Get statistics content based on repository selection"""
     if not repository_id:

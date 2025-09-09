@@ -33,13 +33,13 @@ class JobService:
 
         # Use TaskDefinitionBuilder to create all task definitions
         builder = TaskDefinitionBuilder(db)
-        
+
         backup_params = {
             "source_path": backup_request.source_path,
             "compression": backup_request.compression,
-            "dry_run": backup_request.dry_run
+            "dry_run": backup_request.dry_run,
         }
-        
+
         task_definitions = builder.build_task_list(
             repository_name=repository.name,
             include_backup=True,
@@ -47,7 +47,7 @@ class JobService:
             cleanup_config_id=backup_request.cleanup_config_id,
             check_config_id=backup_request.check_config_id,
             include_cloud_sync=backup_request.cloud_sync_config_id is not None,
-            notification_config_id=backup_request.notification_config_id
+            notification_config_id=backup_request.notification_config_id,
         )
 
         # Create composite job using unified manager
@@ -107,7 +107,7 @@ class JobService:
 
         # Use TaskDefinitionBuilder to create check task
         builder = TaskDefinitionBuilder(db)
-        
+
         # Determine check parameters - either from config or request
         if check_request.check_config_id:
             task_def = builder.build_check_task_from_config(
@@ -117,7 +117,9 @@ class JobService:
                 raise ValueError("Check configuration not found or disabled")
         else:
             # Use custom parameters from request
-            task_def = builder.build_check_task_from_request(check_request, repository.name)
+            task_def = builder.build_check_task_from_request(
+                check_request, repository.name
+            )
 
         task_definitions = [task_def]
 
@@ -364,4 +366,3 @@ class JobService:
     def get_queue_stats(self) -> Dict[str, Any]:
         """Get backup queue statistics"""
         return self.job_manager.get_queue_stats()
-
