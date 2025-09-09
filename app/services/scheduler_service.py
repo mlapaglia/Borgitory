@@ -11,6 +11,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from app.config import DATABASE_URL
 from app.models.database import Schedule
 from app.models.enums import JobType
+from app.services.task_definition_builder import TaskDefinitionBuilder
 from app.utils.db_session import get_db_session
 
 # Configure APScheduler logging only (don't override main basicConfig)
@@ -57,99 +58,28 @@ async def execute_scheduled_backup(schedule_id: int):
             logger.info(f"  - source_path: {schedule.source_path}")
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
-            # Define the tasks for this composite job
-            task_definitions = [
-                {
-                    "type": "backup",
-                    "name": f"Backup {repository.name}",
-                    "source_path": schedule.source_path,
-                    "compression": "zstd",  # Default compression for scheduled backups
-                    "dry_run": False,
-                }
-            ]
-
-            # Add prune task if cleanup is configured
-            if schedule.cleanup_config_id:
-                from app.models.database import CleanupConfig
-
-                cleanup_config = (
-                    db.query(CleanupConfig)
-                    .filter(
-                        CleanupConfig.id == schedule.cleanup_config_id,
-                        CleanupConfig.enabled,
-                    )
-                    .first()
-                )
-
-                if cleanup_config:
-                    prune_task = {
-                        "type": "prune",
-                        "name": f"Clean up {repository.name}",
-                        "dry_run": False,  # Don't dry run when chained after backup
-                        "show_list": cleanup_config.show_list,
-                        "show_stats": cleanup_config.show_stats,
-                        "save_space": cleanup_config.save_space,
-                    }
-
-                    # Add retention parameters based on strategy
-                    if (
-                        cleanup_config.strategy == "simple"
-                        and cleanup_config.keep_within_days
-                    ):
-                        prune_task["keep_within"] = (
-                            f"{cleanup_config.keep_within_days}d"
-                        )
-                    elif cleanup_config.strategy == "advanced":
-                        if cleanup_config.keep_daily:
-                            prune_task["keep_daily"] = cleanup_config.keep_daily
-                        if cleanup_config.keep_weekly:
-                            prune_task["keep_weekly"] = cleanup_config.keep_weekly
-                        if cleanup_config.keep_monthly:
-                            prune_task["keep_monthly"] = cleanup_config.keep_monthly
-                        if cleanup_config.keep_yearly:
-                            prune_task["keep_yearly"] = cleanup_config.keep_yearly
-
-                    task_definitions.append(prune_task)
-                    logger.info("SCHEDULER: Added cleanup task to composite job")
-
-            # Add check task if repository check is configured
-            if schedule.check_config_id:
-                from app.models.database import RepositoryCheckConfig
-
-                check_config = (
-                    db.query(RepositoryCheckConfig)
-                    .filter(
-                        RepositoryCheckConfig.id == schedule.check_config_id,
-                        RepositoryCheckConfig.enabled,
-                    )
-                    .first()
-                )
-
-                if check_config:
-                    check_task = {
-                        "type": "check",
-                        "name": f"Check {repository.name} ({check_config.name})",
-                        "check_type": check_config.check_type,
-                        "verify_data": check_config.verify_data,
-                        "repair_mode": check_config.repair_mode,
-                        "save_space": check_config.save_space,
-                        "max_duration": check_config.max_duration,
-                        "archive_prefix": check_config.archive_prefix,
-                        "archive_glob": check_config.archive_glob,
-                        "first_n_archives": check_config.first_n_archives,
-                        "last_n_archives": check_config.last_n_archives,
-                    }
-                    task_definitions.append(check_task)
-                    logger.info("SCHEDULER: Added check task to composite job")
-            else:
-                logger.info("SCHEDULER: No repository check configured")
-
-            # Add cloud sync task if cloud backup is configured
-            if schedule.cloud_sync_config_id:
-                task_definitions.append({"type": "cloud_sync", "name": "Sync to Cloud"})
-                logger.info("SCHEDULER: Added cloud sync task to composite job")
-            else:
-                logger.info("SCHEDULER: No cloud backup configured")
+            # Use TaskDefinitionBuilder to create all task definitions
+            builder = TaskDefinitionBuilder(db)
+            
+            backup_params = {
+                "source_path": schedule.source_path,
+                "compression": "zstd",  # Default compression for scheduled backups
+                "dry_run": False
+            }
+            
+            task_definitions = builder.build_task_list(
+                repository_name=repository.name,
+                include_backup=True,
+                backup_params=backup_params,
+                cleanup_config_id=schedule.cleanup_config_id,
+                check_config_id=schedule.check_config_id,
+                include_cloud_sync=schedule.cloud_sync_config_id is not None,
+                notification_config_id=schedule.notification_config_id
+            )
+            
+            logger.info(f"SCHEDULER: Built {len(task_definitions)} tasks using TaskDefinitionBuilder")
+            for task in task_definitions:
+                logger.info(f"  - {task['type']}: {task['name']}")
 
             # Create composite job
             from app.services.composite_job_manager import composite_job_manager

@@ -3,16 +3,11 @@ from datetime import datetime, UTC
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.database import (
-    Repository,
-    Job,
-    CleanupConfig,
-    RepositoryCheckConfig,
-    NotificationConfig,
-)
+from app.models.database import Repository, Job
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
 from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
+from app.services.task_definition_builder import TaskDefinitionBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -36,44 +31,24 @@ class JobService:
         if repository is None:
             raise ValueError("Repository not found")
 
-        # Define the tasks for this manual backup job
-        task_definitions = [
-            {
-                "type": "backup",
-                "name": f"Backup {repository.name}",
-                "source_path": backup_request.source_path,
-                "compression": backup_request.compression,
-                "dry_run": backup_request.dry_run,
-            }
-        ]
-
-        # Add prune task if cleanup is configured
-        if backup_request.cleanup_config_id:
-            prune_task = await self._build_prune_task(
-                backup_request.cleanup_config_id, repository.name, db
-            )
-            if prune_task:
-                task_definitions.append(prune_task)
-
-        # Add cloud sync task if cloud backup is configured
-        if backup_request.cloud_sync_config_id:
-            task_definitions.append({"type": "cloud_sync", "name": "Sync to Cloud"})
-
-        # Add check task if repository check is configured
-        if backup_request.check_config_id:
-            check_task = await self._build_check_task(
-                backup_request.check_config_id, repository.name, db
-            )
-            if check_task:
-                task_definitions.append(check_task)
-
-        # Add notification task if notification is configured
-        if backup_request.notification_config_id:
-            notification_task = await self._build_notification_task(
-                backup_request.notification_config_id, repository.name, db
-            )
-            if notification_task:
-                task_definitions.append(notification_task)
+        # Use TaskDefinitionBuilder to create all task definitions
+        builder = TaskDefinitionBuilder(db)
+        
+        backup_params = {
+            "source_path": backup_request.source_path,
+            "compression": backup_request.compression,
+            "dry_run": backup_request.dry_run
+        }
+        
+        task_definitions = builder.build_task_list(
+            repository_name=repository.name,
+            include_backup=True,
+            backup_params=backup_params,
+            cleanup_config_id=backup_request.cleanup_config_id,
+            check_config_id=backup_request.check_config_id,
+            include_cloud_sync=backup_request.cloud_sync_config_id is not None,
+            notification_config_id=backup_request.notification_config_id
+        )
 
         # Create composite job using unified manager
         job_id = await self.job_manager.create_composite_job(
@@ -99,30 +74,9 @@ class JobService:
         if repository is None:
             raise ValueError("Repository not found")
 
-        # Build task definition based on strategy
-        task_def = {
-            "type": "prune",
-            "name": f"Prune {repository.name}",
-            "dry_run": prune_request.dry_run,
-            "show_list": prune_request.show_list,
-            "show_stats": prune_request.show_stats,
-            "save_space": prune_request.save_space,
-            "force_prune": prune_request.force_prune,
-        }
-
-        # Add retention parameters based on strategy
-        if prune_request.strategy == "simple" and prune_request.keep_within_days:
-            task_def["keep_within"] = f"{prune_request.keep_within_days}d"
-        elif prune_request.strategy == "advanced":
-            if prune_request.keep_daily:
-                task_def["keep_daily"] = prune_request.keep_daily
-            if prune_request.keep_weekly:
-                task_def["keep_weekly"] = prune_request.keep_weekly
-            if prune_request.keep_monthly:
-                task_def["keep_monthly"] = prune_request.keep_monthly
-            if prune_request.keep_yearly:
-                task_def["keep_yearly"] = prune_request.keep_yearly
-
+        # Use TaskDefinitionBuilder to create prune task
+        builder = TaskDefinitionBuilder(db)
+        task_def = builder.build_prune_task_from_request(prune_request, repository.name)
         task_definitions = [task_def]
 
         # Import here to avoid circular imports
@@ -151,26 +105,19 @@ class JobService:
         if repository is None:
             raise ValueError("Repository not found")
 
-        # Determine check parameters - either from policy or custom
+        # Use TaskDefinitionBuilder to create check task
+        builder = TaskDefinitionBuilder(db)
+        
+        # Determine check parameters - either from config or request
         if check_request.check_config_id:
-            task_def = await self._build_check_task_from_config(
-                check_request.check_config_id, repository.name, db
+            task_def = builder.build_check_task_from_config(
+                check_request.check_config_id, repository.name
             )
+            if task_def is None:
+                raise ValueError("Check configuration not found or disabled")
         else:
-            # Use custom parameters
-            task_def = {
-                "type": "check",
-                "name": f"Check {repository.name}",
-                "check_type": check_request.check_type,
-                "verify_data": check_request.verify_data,
-                "repair_mode": check_request.repair_mode,
-                "save_space": check_request.save_space,
-                "max_duration": check_request.max_duration,
-                "archive_prefix": check_request.archive_prefix,
-                "archive_glob": check_request.archive_glob,
-                "first_n_archives": check_request.first_n_archives,
-                "last_n_archives": check_request.last_n_archives,
-            }
+            # Use custom parameters from request
+            task_def = builder.build_check_task_from_request(check_request, repository.name)
 
         task_definitions = [task_def]
 
@@ -418,129 +365,3 @@ class JobService:
         """Get backup queue statistics"""
         return self.job_manager.get_queue_stats()
 
-    async def _build_prune_task(
-        self, cleanup_config_id: int, repository_name: str, db: Session
-    ) -> Optional[Dict[str, Any]]:
-        """Build prune task definition from cleanup config"""
-        cleanup_config = (
-            db.query(CleanupConfig)
-            .filter(
-                CleanupConfig.id == cleanup_config_id,
-                CleanupConfig.enabled,
-            )
-            .first()
-        )
-
-        if not cleanup_config:
-            return None
-
-        prune_task = {
-            "type": "prune",
-            "name": f"Clean up {repository_name}",
-            "dry_run": False,  # Don't dry run when chained after backup
-            "show_list": cleanup_config.show_list,
-            "show_stats": cleanup_config.show_stats,
-            "save_space": cleanup_config.save_space,
-        }
-
-        # Add retention parameters based on strategy
-        if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
-            prune_task["keep_within"] = f"{cleanup_config.keep_within_days}d"
-        elif cleanup_config.strategy == "advanced":
-            if cleanup_config.keep_daily:
-                prune_task["keep_daily"] = cleanup_config.keep_daily
-            if cleanup_config.keep_weekly:
-                prune_task["keep_weekly"] = cleanup_config.keep_weekly
-            if cleanup_config.keep_monthly:
-                prune_task["keep_monthly"] = cleanup_config.keep_monthly
-            if cleanup_config.keep_yearly:
-                prune_task["keep_yearly"] = cleanup_config.keep_yearly
-
-        return prune_task
-
-    async def _build_check_task(
-        self, check_config_id: int, repository_name: str, db: Session
-    ) -> Optional[Dict[str, Any]]:
-        """Build check task definition from check config"""
-        check_config = (
-            db.query(RepositoryCheckConfig)
-            .filter(
-                RepositoryCheckConfig.id == check_config_id,
-                RepositoryCheckConfig.enabled,
-            )
-            .first()
-        )
-
-        if not check_config:
-            return None
-
-        return {
-            "type": "check",
-            "name": f"Check {repository_name} ({check_config.name})",
-            "check_type": check_config.check_type,
-            "verify_data": check_config.verify_data,
-            "repair_mode": check_config.repair_mode,
-            "save_space": check_config.save_space,
-            "max_duration": check_config.max_duration,
-            "archive_prefix": check_config.archive_prefix,
-            "archive_glob": check_config.archive_glob,
-            "first_n_archives": check_config.first_n_archives,
-            "last_n_archives": check_config.last_n_archives,
-        }
-
-    async def _build_check_task_from_config(
-        self, check_config_id: int, repository_name: str, db: Session
-    ) -> Dict[str, Any]:
-        """Build check task definition from existing check policy"""
-        check_config = (
-            db.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.id == check_config_id)
-            .first()
-        )
-
-        if not check_config:
-            raise ValueError("Check policy not found")
-
-        if not check_config.enabled:
-            raise ValueError("Check policy is disabled")
-
-        return {
-            "type": "check",
-            "name": f"Check {repository_name} ({check_config.name})",
-            "check_type": check_config.check_type,
-            "verify_data": check_config.verify_data,
-            "repair_mode": check_config.repair_mode,
-            "save_space": check_config.save_space,
-            "max_duration": check_config.max_duration,
-            "archive_prefix": check_config.archive_prefix,
-            "archive_glob": check_config.archive_glob,
-            "first_n_archives": check_config.first_n_archives,
-            "last_n_archives": check_config.last_n_archives,
-        }
-
-    async def _build_notification_task(
-        self, notification_config_id: int, repository_name: str, db: Session
-    ) -> Optional[Dict[str, Any]]:
-        """Build notification task definition from notification config"""
-        notification_config = (
-            db.query(NotificationConfig)
-            .filter(
-                NotificationConfig.id == notification_config_id,
-                NotificationConfig.enabled,
-            )
-            .first()
-        )
-
-        if not notification_config:
-            return None
-
-        notification_task = {
-            "type": "notification",
-            "name": f"Send notification for {repository_name}",
-            "provider": notification_config.provider,
-            "notify_on_success": notification_config.notify_on_success,
-            "notify_on_failure": notification_config.notify_on_failure,
-            "config_id": notification_config_id,
-        }
-
-        return notification_task

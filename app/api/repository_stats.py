@@ -37,7 +37,10 @@ async def get_stats_loading(request: Request, repository_id: int = None):
 
 @router.get("/stats/content")
 async def get_stats_content(
-    request: Request, repository_id: int = None, db: Session = Depends(get_db)
+    request: Request, 
+    stats_svc: RepositoryStatsServiceDep,
+    repository_id: int = None, 
+    db: Session = Depends(get_db)
 ):
     """Get statistics content based on repository selection"""
     if not repository_id:
@@ -46,7 +49,7 @@ async def get_stats_content(
         )
 
     # Redirect to the existing stats HTML endpoint
-    return await get_repository_statistics_html(repository_id, request, db)
+    return await get_repository_statistics_html(repository_id, request, stats_svc, db)
 
 
 @router.get("/{repository_id}/stats")

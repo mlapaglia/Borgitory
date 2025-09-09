@@ -881,3 +881,273 @@ class TestRepositoriesAPI:
         
         assert response.status_code == 404
 
+    @pytest.mark.asyncio
+    async def test_get_stats_selector(self, async_client: AsyncClient, test_db: Session):
+        """Test getting repository selector for statistics."""
+        # Create test repositories
+        repo1 = Repository(name="stats-repo-1", path="/tmp/stats1")
+        repo1.set_passphrase("pass1")
+        repo2 = Repository(name="stats-repo-2", path="/tmp/stats2")
+        repo2.set_passphrase("pass2")
+        
+        test_db.add_all([repo1, repo2])
+        test_db.commit()
+        
+        response = await async_client.get("/api/repositories/stats/selector")
+        
+        assert response.status_code == 200
+        # Verify HTML response contains repository options
+        content = response.text
+        assert "stats-repo-1" in content
+        assert "stats-repo-2" in content
+
+    @pytest.mark.asyncio
+    async def test_get_stats_loading(self, async_client: AsyncClient):
+        """Test getting loading state for statistics."""
+        response = await async_client.get("/api/repositories/stats/loading?repository_id=1")
+        
+        assert response.status_code == 200
+        # Verify HTML response contains loading template
+        content = response.text
+        assert "repository_id" in content or "loading" in content.lower()
+
+    @pytest.mark.asyncio
+    async def test_get_stats_loading_no_repository(self, async_client: AsyncClient):
+        """Test getting loading state without repository ID."""
+        response = await async_client.get("/api/repositories/stats/loading")
+        
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_get_stats_content_no_repository(self, async_client: AsyncClient):
+        """Test getting stats content without repository ID shows empty state."""
+        from app.dependencies import get_repository_stats_service
+        from app.services.repository_stats_service import RepositoryStatsService
+        
+        # Mock the stats service
+        mock_stats_service = AsyncMock(spec=RepositoryStatsService)
+        app.dependency_overrides[get_repository_stats_service] = lambda: mock_stats_service
+        
+        try:
+            response = await async_client.get("/api/repositories/stats/content")
+            
+            assert response.status_code == 200
+            # Should show empty state
+            content = response.text
+            assert "empty" in content.lower() or content.strip() != ""
+        finally:
+            if get_repository_stats_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_stats_service]
+
+    @pytest.mark.asyncio
+    async def test_get_stats_content_with_repository(self, async_client: AsyncClient, test_db: Session):
+        """Test getting stats content with valid repository ID."""
+        from app.dependencies import get_repository_stats_service
+        from app.services.repository_stats_service import RepositoryStatsService
+        
+        # Create test repository
+        repo = Repository(name="stats-test-repo", path="/tmp/stats-test")
+        repo.set_passphrase("stats-pass")
+        test_db.add(repo)
+        test_db.commit()
+        
+        # Mock the stats service
+        mock_stats_service = AsyncMock(spec=RepositoryStatsService)
+        mock_stats_service.get_repository_statistics.return_value = {
+            "repository_path": "/tmp/stats-test",
+            "total_archives": 5,
+            "archive_stats": [],
+            "size_over_time": {"count_chart": {"labels": [], "datasets": []}, "size_chart": {"labels": [], "datasets": []}},
+            "dedup_compression_stats": {},
+            "file_type_stats": {
+                "count_chart": {"labels": [], "datasets": []},
+                "size_chart": {"labels": [], "datasets": []}
+            },
+            "summary": {
+                "total_archives": 5,
+                "latest_archive_date": "2024-01-01",
+                "total_original_size_gb": 10.0,
+                "total_compressed_size_gb": 7.5,
+                "total_deduplicated_size_gb": 5.0,
+                "overall_compression_ratio": 25.0,
+                "overall_deduplication_ratio": 33.3
+            }
+        }
+        
+        app.dependency_overrides[get_repository_stats_service] = lambda: mock_stats_service
+        
+        try:
+            response = await async_client.get(f"/api/repositories/stats/content?repository_id={repo.id}")
+            
+            assert response.status_code == 200
+            # Should call the stats service and return HTML
+            mock_stats_service.get_repository_statistics.assert_called_once()
+            
+            # Verify response is HTML (not empty state)
+            content = response.text
+            assert content.strip() != ""
+            
+        finally:
+            if get_repository_stats_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_stats_service]
+
+    @pytest.mark.asyncio
+    async def test_get_stats_content_repository_not_found(self, async_client: AsyncClient):
+        """Test getting stats content with non-existent repository ID."""
+        from app.dependencies import get_repository_stats_service
+        from app.services.repository_stats_service import RepositoryStatsService
+        
+        # Mock the stats service
+        mock_stats_service = AsyncMock(spec=RepositoryStatsService)
+        app.dependency_overrides[get_repository_stats_service] = lambda: mock_stats_service
+        
+        try:
+            response = await async_client.get("/api/repositories/stats/content?repository_id=999")
+            
+            # Should return 404 for non-existent repository
+            assert response.status_code == 404
+            
+        finally:
+            if get_repository_stats_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_stats_service]
+
+    @pytest.mark.asyncio
+    async def test_get_repository_statistics_direct(self, async_client: AsyncClient, test_db: Session):
+        """Test the direct repository statistics endpoint."""
+        from app.dependencies import get_repository_stats_service
+        from app.services.repository_stats_service import RepositoryStatsService
+        
+        # Create test repository
+        repo = Repository(name="direct-stats-repo", path="/tmp/direct-stats")
+        repo.set_passphrase("direct-pass")
+        test_db.add(repo)
+        test_db.commit()
+        
+        # Mock the stats service
+        mock_stats_service = AsyncMock(spec=RepositoryStatsService)
+        mock_stats_service.get_repository_statistics.return_value = {
+            "repository_path": "/tmp/direct-stats",
+            "total_archives": 3,
+            "archive_stats": [],
+            "size_over_time": {"count_chart": {"labels": ["2024-01-01"], "datasets": []}, "size_chart": {"labels": ["2024-01-01"], "datasets": []}},
+            "dedup_compression_stats": {},
+            "file_type_stats": {
+                "count_chart": {"labels": ["text"], "datasets": [{"data": [100]}]},
+                "size_chart": {"labels": ["text"], "datasets": [{"data": [1000]}]}
+            },
+            "summary": {
+                "total_archives": 3,
+                "latest_archive_date": "2024-01-01",
+                "total_original_size_gb": 5.0,
+                "total_compressed_size_gb": 4.0,
+                "total_deduplicated_size_gb": 3.0,
+                "overall_compression_ratio": 20.0,
+                "overall_deduplication_ratio": 25.0
+            }
+        }
+        
+        app.dependency_overrides[get_repository_stats_service] = lambda: mock_stats_service
+        
+        try:
+            response = await async_client.get(f"/api/repositories/{repo.id}/stats")
+            
+            assert response.status_code == 200
+            response_data = response.json()
+            
+            # Verify the response structure matches the stats service return
+            assert response_data["repository_path"] == "/tmp/direct-stats"
+            assert response_data["total_archives"] == 3
+            assert "archive_stats" in response_data
+            assert "size_over_time" in response_data
+            assert "dedup_compression_stats" in response_data
+            assert "count_chart" in response_data["file_type_stats"]
+            assert "size_chart" in response_data["file_type_stats"]
+            assert "summary" in response_data
+            assert response_data["summary"]["total_archives"] == 3
+            
+        finally:
+            if get_repository_stats_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_stats_service]
+
+    @pytest.mark.asyncio
+    async def test_get_repository_statistics_not_found(self, async_client: AsyncClient):
+        """Test repository statistics endpoint with non-existent repository."""
+        from app.dependencies import get_repository_stats_service
+        from app.services.repository_stats_service import RepositoryStatsService
+        
+        # Mock the stats service
+        mock_stats_service = AsyncMock(spec=RepositoryStatsService)
+        app.dependency_overrides[get_repository_stats_service] = lambda: mock_stats_service
+        
+        try:
+            response = await async_client.get("/api/repositories/999/stats")
+            
+            assert response.status_code == 404
+            
+        finally:
+            if get_repository_stats_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_stats_service]
+
+    @pytest.mark.asyncio
+    async def test_stats_content_dependency_injection_regression(self, async_client: AsyncClient, test_db: Session):
+        """
+        Regression test to ensure /api/repositories/stats/content doesn't fail
+        with AttributeError: 'Depends' object has no attribute 'query'
+        
+        This test specifically catches the bug where a FastAPI Depends object
+        was being passed instead of the actual database session.
+        """
+        from app.dependencies import get_repository_stats_service
+        from app.services.repository_stats_service import RepositoryStatsService
+        
+        # Create test repository
+        repo = Repository(name="regression-test-repo", path="/tmp/regression-test")
+        repo.set_passphrase("regression-pass")
+        test_db.add(repo)
+        test_db.commit()
+        
+        # Mock the stats service
+        mock_stats_service = AsyncMock(spec=RepositoryStatsService)
+        mock_stats_service.get_repository_statistics.return_value = {
+            "repository_path": "/tmp/regression-test",
+            "total_archives": 1,
+            "archive_stats": [],
+            "size_over_time": {"count_chart": {"labels": [], "datasets": []}, "size_chart": {"labels": [], "datasets": []}},
+            "dedup_compression_stats": {},
+            "file_type_stats": {
+                "count_chart": {"labels": [], "datasets": []},
+                "size_chart": {"labels": [], "datasets": []}
+            },
+            "summary": {
+                "total_archives": 1,
+                "latest_archive_date": "2024-01-01",
+                "total_original_size_gb": 1.0,
+                "total_compressed_size_gb": 1.0,
+                "total_deduplicated_size_gb": 1.0,
+                "overall_compression_ratio": 0.0,
+                "overall_deduplication_ratio": 0.0
+            }
+        }
+        
+        app.dependency_overrides[get_repository_stats_service] = lambda: mock_stats_service
+        
+        try:
+            # This should NOT raise AttributeError: 'Depends' object has no attribute 'query'
+            response = await async_client.get(f"/api/repositories/stats/content?repository_id={repo.id}")
+            
+            # The key assertion: should not be a 500 Internal Server Error
+            assert response.status_code != 500, f"Got 500 error, likely dependency injection issue: {response.text}"
+            assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+            
+            # Should successfully call the stats service
+            mock_stats_service.get_repository_statistics.assert_called_once()
+            
+            # Response should be valid HTML
+            content = response.text
+            assert content.strip() != ""
+            assert "text/html" in response.headers.get("content-type", "").lower()
+            
+        finally:
+            if get_repository_stats_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_stats_service]
+

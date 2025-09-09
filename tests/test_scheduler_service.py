@@ -295,6 +295,7 @@ class TestExecuteScheduledBackup:
         mock_schedule.cloud_sync_config_id = None
         mock_schedule.cleanup_config_id = None
         mock_schedule.check_config_id = None
+        mock_schedule.notification_config_id = None
         
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
@@ -343,6 +344,7 @@ class TestExecuteScheduledBackup:
         mock_schedule.cloud_sync_config_id = None
         mock_schedule.cleanup_config_id = 1
         mock_schedule.check_config_id = None
+        mock_schedule.notification_config_id = None
         
         # Setup query mocks
         def mock_query_side_effect(model):
@@ -400,6 +402,7 @@ class TestExecuteScheduledBackup:
         mock_schedule.cloud_sync_config_id = None
         mock_schedule.cleanup_config_id = None
         mock_schedule.check_config_id = 1
+        mock_schedule.notification_config_id = None
         
         # Setup query mocks
         def mock_query_side_effect(model):
@@ -445,6 +448,7 @@ class TestExecuteScheduledBackup:
         mock_schedule.cloud_sync_config_id = 1  # Has cloud sync
         mock_schedule.cleanup_config_id = None
         mock_schedule.check_config_id = None
+        mock_schedule.notification_config_id = None
         
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
@@ -512,6 +516,7 @@ class TestExecuteScheduledBackup:
         mock_schedule.cloud_sync_config_id = None
         mock_schedule.cleanup_config_id = None
         mock_schedule.check_config_id = None
+        mock_schedule.notification_config_id = None
         
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         

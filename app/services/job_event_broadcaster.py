@@ -326,3 +326,14 @@ class JobEventBroadcaster:
         self._recent_events.clear()
 
         logger.info("Job event broadcaster shutdown complete")
+
+
+_global_broadcaster: JobEventBroadcaster = None
+
+
+def get_job_event_broadcaster() -> JobEventBroadcaster:
+    """Get the global JobEventBroadcaster instance"""
+    global _global_broadcaster
+    if _global_broadcaster is None:
+        _global_broadcaster = JobEventBroadcaster()
+    return _global_broadcaster

@@ -6,6 +6,8 @@ from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
+from sqlalchemy.orm import Session
+from app.models.database import get_db
 
 from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
@@ -18,7 +20,13 @@ from app.services.debug_service import DebugService
 from app.services.rclone_service import RcloneService
 from app.services.repository_stats_service import RepositoryStatsService
 from app.services.scheduler_service import SchedulerService
+from app.services.task_definition_builder import TaskDefinitionBuilder
 from app.services.volume_service import VolumeService
+from app.services.repository_parser import RepositoryParser
+from app.services.borg_command_builder import BorgCommandBuilder
+from app.services.archive_manager import ArchiveManager
+from app.services.cloud_sync_manager import CloudSyncManager
+from app.services.job_event_broadcaster import JobEventBroadcaster, get_job_event_broadcaster
 
 
 @lru_cache()
@@ -153,6 +161,71 @@ def get_volume_service() -> VolumeService:
     return VolumeService()
 
 
+def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinitionBuilder:
+    """
+    Provide a TaskDefinitionBuilder instance with database session.
+    
+    Note: This is not cached because it needs a database session per request.
+    """
+    return TaskDefinitionBuilder(db)
+
+
+@lru_cache()
+def get_repository_parser() -> RepositoryParser:
+    """
+    Provide a RepositoryParser instance with proper dependency injection.
+    
+    Using lru_cache ensures we get a singleton instance while
+    still allowing for proper dependency injection and testing.
+    """
+    return RepositoryParser(command_runner=get_simple_command_runner())
+
+
+@lru_cache()
+def get_borg_command_builder() -> BorgCommandBuilder:
+    """
+    Provide a BorgCommandBuilder instance.
+    
+    Using lru_cache ensures we get a singleton instance.
+    """
+    return BorgCommandBuilder()
+
+
+@lru_cache()
+def get_archive_manager() -> ArchiveManager:
+    """
+    Provide an ArchiveManager instance with proper dependency injection.
+    
+    Using lru_cache ensures we get a singleton instance while
+    still allowing for proper dependency injection and testing.
+    """
+    from app.services.job_executor import JobExecutor
+    return ArchiveManager(
+        job_executor=JobExecutor(),
+        command_builder=get_borg_command_builder()
+    )
+
+
+@lru_cache()
+def get_cloud_sync_manager() -> CloudSyncManager:
+    """
+    Provide a CloudSyncManager instance.
+    
+    Using lru_cache ensures we get a singleton instance.
+    """
+    return CloudSyncManager()
+
+
+def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
+    """
+    Provide the global JobEventBroadcaster instance.
+    
+    Note: This uses the global instance to ensure all components
+    share the same event broadcaster.
+    """
+    return get_job_event_broadcaster()
+
+
 # Type aliases for dependency injection
 SimpleCommandRunnerDep = Annotated[
     SimpleCommandRunner, Depends(get_simple_command_runner)
@@ -170,3 +243,9 @@ RepositoryStatsServiceDep = Annotated[
 ]
 SchedulerServiceDep = Annotated[SchedulerService, Depends(get_scheduler_service)]
 VolumeServiceDep = Annotated[VolumeService, Depends(get_volume_service)]
+TaskDefinitionBuilderDep = Annotated[TaskDefinitionBuilder, Depends(get_task_definition_builder)]
+RepositoryParserDep = Annotated[RepositoryParser, Depends(get_repository_parser)]
+BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
+ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
+CloudSyncManagerDep = Annotated[CloudSyncManager, Depends(get_cloud_sync_manager)]
+JobEventBroadcasterDep = Annotated[JobEventBroadcaster, Depends(get_job_event_broadcaster_dep)]
