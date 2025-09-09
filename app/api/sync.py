@@ -27,9 +27,7 @@ class SyncRequest(BaseModel):
 
 
 @router.post("/remotes/s3")
-async def configure_s3_remote(
-    config: S3RemoteConfig, rclone: RcloneServiceDep
-):
+async def configure_s3_remote(config: S3RemoteConfig, rclone: RcloneServiceDep):
     """Configure a new S3 remote"""
     success = await rclone.configure_s3_remote(
         remote_name=config.remote_name,
@@ -95,7 +93,7 @@ async def sync_repository_task(
 
     # Use provided rclone service (injected via DI)
     # No need to check for None since DI guarantees it's provided
-    
+
     try:
         # Get fresh instances from the new session
         logger.info("Looking up database records...")

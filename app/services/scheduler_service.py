@@ -153,7 +153,7 @@ async def execute_scheduled_backup(schedule_id: int):
 
             # Create composite job
             from app.services.composite_job_manager import composite_job_manager
-            
+
             job_id = await composite_job_manager.create_composite_job(
                 job_type=JobType.SCHEDULED_BACKUP,
                 task_definitions=task_definitions,

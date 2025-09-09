@@ -5,7 +5,6 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.models.database import get_db
-from app.services.debug_service import DebugService
 from app.dependencies import DebugServiceDep
 
 router = APIRouter(prefix="/api/debug", tags=["debug"])
@@ -23,7 +22,9 @@ async def get_debug_info(debug_svc: DebugServiceDep, db: Session = Depends(get_d
 
 
 @router.get("/html", response_class=HTMLResponse)
-async def get_debug_html(request: Request, debug_svc: DebugServiceDep, db: Session = Depends(get_db)):
+async def get_debug_html(
+    request: Request, debug_svc: DebugServiceDep, db: Session = Depends(get_db)
+):
     """Get debug information as HTML"""
     try:
         debug_info = await debug_svc.get_debug_info(db)

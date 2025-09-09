@@ -12,7 +12,6 @@ from app.models.schemas import (
     CloudSyncConfig as CloudSyncConfigSchema,
 )
 from app.services.cloud_sync_service import CloudSyncService
-from app.services.rclone_service import RcloneService
 from app.dependencies import RcloneServiceDep
 
 router = APIRouter()

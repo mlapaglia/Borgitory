@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 import asyncio
 
 from app.models.database import get_db, Repository
-from app.services.repository_stats_service import RepositoryStatsService
 from app.dependencies import RepositoryStatsServiceDep
 
 router = APIRouter()
@@ -51,7 +50,11 @@ async def get_stats_content(
 
 
 @router.get("/{repository_id}/stats")
-async def get_repository_statistics(repository_id: int, stats_svc: RepositoryStatsServiceDep, db: Session = Depends(get_db)):
+async def get_repository_statistics(
+    repository_id: int,
+    stats_svc: RepositoryStatsServiceDep,
+    db: Session = Depends(get_db),
+):
     """Get comprehensive repository statistics"""
 
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
@@ -68,7 +71,10 @@ async def get_repository_statistics(repository_id: int, stats_svc: RepositorySta
 
 @router.get("/{repository_id}/stats/progress")
 async def get_repository_statistics_progress(
-    repository_id: int, request: Request, stats_svc: RepositoryStatsServiceDep, db: Session = Depends(get_db)
+    repository_id: int,
+    request: Request,
+    stats_svc: RepositoryStatsServiceDep,
+    db: Session = Depends(get_db),
 ):
     """Stream repository statistics generation progress via Server-Sent Events"""
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
@@ -88,9 +94,7 @@ async def get_repository_statistics_progress(
 
         # Start stats generation in background
         stats_task = asyncio.create_task(
-            stats_svc.get_repository_statistics(
-                repository, db, progress_callback
-            )
+            stats_svc.get_repository_statistics(repository, db, progress_callback)
         )
 
         try:
@@ -140,7 +144,10 @@ async def get_repository_statistics_progress(
 
 @router.get("/{repository_id}/stats/html")
 async def get_repository_statistics_html(
-    repository_id: int, request: Request, stats_svc: RepositoryStatsServiceDep, db: Session = Depends(get_db)
+    repository_id: int,
+    request: Request,
+    stats_svc: RepositoryStatsServiceDep,
+    db: Session = Depends(get_db),
 ):
     """Get repository statistics as HTML partial"""
     from fastapi.templating import Jinja2Templates

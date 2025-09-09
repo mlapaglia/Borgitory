@@ -48,7 +48,10 @@ async def get_schedules_form(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=ScheduleSchema, status_code=status.HTTP_201_CREATED)
 async def create_schedule(
-    request: Request, schedule: ScheduleCreate, scheduler_service: SchedulerServiceDep, db: Session = Depends(get_db)
+    request: Request,
+    schedule: ScheduleCreate,
+    scheduler_service: SchedulerServiceDep,
+    db: Session = Depends(get_db),
 ):
     is_htmx_request = "hx-request" in request.headers
 
@@ -278,7 +281,10 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{schedule_id}/toggle")
 async def toggle_schedule(
-    schedule_id: int, scheduler_service: SchedulerServiceDep, request: Request = None, db: Session = Depends(get_db)
+    schedule_id: int,
+    scheduler_service: SchedulerServiceDep,
+    request: Request = None,
+    db: Session = Depends(get_db),
 ):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:
@@ -318,7 +324,10 @@ async def toggle_schedule(
 
 @router.delete("/{schedule_id}")
 async def delete_schedule(
-    schedule_id: int, scheduler_service: SchedulerServiceDep, request: Request = None, db: Session = Depends(get_db)
+    schedule_id: int,
+    scheduler_service: SchedulerServiceDep,
+    request: Request = None,
+    db: Session = Depends(get_db),
 ):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if schedule is None:

@@ -20,8 +20,7 @@ from app.models.schemas import (
     RepositoryCreate,
     RepositoryUpdate,
 )
-from app.services.borg_service import BorgService
-from app.dependencies import BorgServiceDep, get_borg_service, SchedulerServiceDep, VolumeServiceDep
+from app.dependencies import BorgServiceDep, SchedulerServiceDep, VolumeServiceDep
 from app.api.auth import get_current_user
 
 router = APIRouter()
@@ -294,7 +293,9 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/repos"):
 
 
 @router.get("/import-form-update", response_class=HTMLResponse)
-async def update_import_form(request: Request, borg_svc: BorgServiceDep, path: str = "", loading: str = ""):
+async def update_import_form(
+    request: Request, borg_svc: BorgServiceDep, path: str = "", loading: str = ""
+):
     """Update import form fields based on selected repository path"""
 
     if not path:
@@ -603,7 +604,12 @@ async def delete_repository(
 
 
 @router.get("/{repo_id}/archives")
-async def list_archives(request: Request, repo_id: int, borg_svc: BorgServiceDep, db: Session = Depends(get_db)):
+async def list_archives(
+    request: Request,
+    repo_id: int,
+    borg_svc: BorgServiceDep,
+    db: Session = Depends(get_db),
+):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -633,7 +639,10 @@ async def list_archives(request: Request, repo_id: int, borg_svc: BorgServiceDep
 
 @router.get("/{repo_id}/archives/html", response_class=HTMLResponse)
 async def list_archives_html(
-    repo_id: int, request: Request, borg_svc: BorgServiceDep, db: Session = Depends(get_db)
+    repo_id: int,
+    request: Request,
+    borg_svc: BorgServiceDep,
+    db: Session = Depends(get_db),
 ):
     """Get repository archives as HTML"""
     try:
@@ -742,7 +751,10 @@ async def get_archives_repository_selector(
 
 @router.get("/archives/list")
 async def get_archives_list(
-    request: Request, borg_svc: BorgServiceDep, repository_id: int = None, db: Session = Depends(get_db)
+    request: Request,
+    borg_svc: BorgServiceDep,
+    repository_id: int = None,
+    db: Session = Depends(get_db),
 ):
     """Get archives list or empty state"""
     if not repository_id:
@@ -755,7 +767,9 @@ async def get_archives_list(
 
 
 @router.get("/{repo_id}/info")
-async def get_repository_info(repo_id: int, borg_svc: BorgServiceDep, db: Session = Depends(get_db)):
+async def get_repository_info(
+    repo_id: int, borg_svc: BorgServiceDep, db: Session = Depends(get_db)
+):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -806,7 +820,11 @@ async def get_archive_contents(
 
 @router.get("/{repo_id}/archives/{archive_name}/extract")
 async def extract_file(
-    repo_id: int, archive_name: str, file: str, borg_svc: BorgServiceDep, db: Session = Depends(get_db)
+    repo_id: int,
+    archive_name: str,
+    file: str,
+    borg_svc: BorgServiceDep,
+    db: Session = Depends(get_db),
 ):
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:

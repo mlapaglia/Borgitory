@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from app.models.database import get_db, Repository
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.dependencies import JobServiceDep
-from app.services.job_render_service import JobRenderService
 from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
 
@@ -168,9 +167,7 @@ def get_jobs_html(
 
 
 @router.get("/current/html", response_class=HTMLResponse)
-def get_current_jobs_html(
-    request: Request, render_svc: JobRenderServiceDep
-):
+def get_current_jobs_html(request: Request, render_svc: JobRenderServiceDep):
     """Get current running jobs as HTML"""
     html_content = render_svc.render_current_jobs_html()
     return HTMLResponse(content=html_content)

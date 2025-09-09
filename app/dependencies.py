@@ -165,6 +165,8 @@ JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service
 JobRenderServiceDep = Annotated[JobRenderService, Depends(get_job_render_service)]
 DebugServiceDep = Annotated[DebugService, Depends(get_debug_service)]
 RcloneServiceDep = Annotated[RcloneService, Depends(get_rclone_service)]
-RepositoryStatsServiceDep = Annotated[RepositoryStatsService, Depends(get_repository_stats_service)]
+RepositoryStatsServiceDep = Annotated[
+    RepositoryStatsService, Depends(get_repository_stats_service)
+]
 SchedulerServiceDep = Annotated[SchedulerService, Depends(get_scheduler_service)]
 VolumeServiceDep = Annotated[VolumeService, Depends(get_volume_service)]
