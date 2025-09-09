@@ -371,7 +371,3 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"Error getting scheduled jobs: {str(e)}")
         return jobs
-
-
-# Global scheduler instance
-# scheduler_service = SchedulerService()
