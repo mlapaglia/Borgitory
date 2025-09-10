@@ -333,12 +333,18 @@ class BorgService:
                     with get_db_session() as db:
                         db_job = db.query(Job).filter(Job.id == job_id).first()
                         if db_job:
-                            db_job.status = "completed" if status["return_code"] == 0 else "failed"
+                            db_job.status = (
+                                "completed" if status["return_code"] == 0 else "failed"
+                            )
                             db_job.finished_at = datetime.now(UTC)
                             if status["return_code"] != 0:
                                 # Get error output
-                                output = await get_job_manager().get_job_output_stream(job_id)
-                                error_lines = [line["text"] for line in output.get("lines", [])]
+                                output = await get_job_manager().get_job_output_stream(
+                                    job_id
+                                )
+                                error_lines = [
+                                    line["text"] for line in output.get("lines", [])
+                                ]
                                 db_job.error = "\n".join(error_lines)
                             db.commit()
 
@@ -494,11 +500,11 @@ class BorgService:
         """List contents of a specific directory within an archive using virtual tree"""
         # Use the new virtual tree-based archive explorer
         from app.services.virtual_archive_tree import ArchiveExplorer
-        
+
         # Get or create explorer instance (could be made a class attribute for caching)
-        if not hasattr(self, '_archive_explorer'):
+        if not hasattr(self, "_archive_explorer"):
             self._archive_explorer = ArchiveExplorer()
-        
+
         return await self._archive_explorer.list_archive_directory_contents(
             repository, archive_name, path
         )
