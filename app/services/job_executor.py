@@ -388,11 +388,9 @@ class JobExecutor:
 
                     # Use rclone service to sync to S3
                     if not rclone_service:
-                        from app.services.rclone_service import (
-                            rclone_service as default_rclone_service,
-                        )
-
-                        rclone_service = default_rclone_service
+                        from app.services.rclone_service import RcloneService
+                        
+                        rclone_service = RcloneService()
 
                     progress_generator = rclone_service.sync_repository_to_s3(
                         repository=repo_obj,
@@ -420,11 +418,9 @@ class JobExecutor:
 
                     # Use rclone service to sync to SFTP
                     if not rclone_service:
-                        from app.services.rclone_service import (
-                            rclone_service as default_rclone_service,
-                        )
-
-                        rclone_service = default_rclone_service
+                        from app.services.rclone_service import RcloneService
+                        
+                        rclone_service = RcloneService()
 
                     progress_generator = rclone_service.sync_repository_to_sftp(
                         repository=repo_obj,
