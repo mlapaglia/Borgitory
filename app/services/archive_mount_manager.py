@@ -159,11 +159,11 @@ class ArchiveMountManager:
         try:
             if not mount_point.exists() or not mount_point.is_dir():
                 return False
-            
+
             # Check if directory has actual contents (files/folders)
             contents = list(mount_point.iterdir())
             return len(contents) > 0
-            
+
         except (OSError, PermissionError):
             return False
 
