@@ -758,20 +758,19 @@ async def get_archives_loading(request: Request):
 
 
 @router.post("/archives/load-with-spinner")
-async def load_archives_with_spinner(
-    request: Request,
-    repository_id: str = Form("")
-):
+async def load_archives_with_spinner(request: Request, repository_id: str = Form("")):
     """Show loading spinner then trigger loading actual archives"""
     if not repository_id or repository_id == "":
         return templates.TemplateResponse(
             request, "partials/archives/empty_state.html", {}
         )
-    
+
     try:
         repo_id = int(repository_id)
         return templates.TemplateResponse(
-            request, "partials/archives/loading_with_trigger.html", {"repository_id": repo_id}
+            request,
+            "partials/archives/loading_with_trigger.html",
+            {"repository_id": repo_id},
         )
     except (ValueError, TypeError):
         return templates.TemplateResponse(
@@ -829,15 +828,11 @@ async def load_archive_contents_with_spinner(
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
-    
+
     return templates.TemplateResponse(
-        request, 
-        "partials/archives/directory_loading_with_trigger.html", 
-        {
-            "repository_id": repo_id,
-            "archive_name": archive_name,
-            "path": path
-        }
+        request,
+        "partials/archives/directory_loading_with_trigger.html",
+        {"repository_id": repo_id, "archive_name": archive_name, "path": path},
     )
 
 
