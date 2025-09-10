@@ -81,11 +81,24 @@ class TestArchiveMountManager:
     def test_initialization_cross_platform_paths(self):
         """Test that path handling works across platforms."""
         with tempfile.TemporaryDirectory() as temp_dir:
+            # Test Windows-style path handling
             with patch('os.name', 'nt'), \
                  patch.dict(os.environ, {'TEMP': temp_dir}):
                 manager = ArchiveMountManager()
-                expected_path = Path(temp_dir) / "borgitory_mounts"
-                assert manager.base_mount_dir == expected_path
+                # Check that the path was constructed correctly (use string comparison to avoid Path type issues)
+                expected_path_str = os.path.join(temp_dir, "borgitory_mounts")
+                assert str(manager.base_mount_dir) == expected_path_str
+                assert manager.base_mount_dir.exists()  # Should be created
+            
+        # Test Unix-style path handling with a safe path
+        with tempfile.TemporaryDirectory() as temp_unix_dir:
+            # Patch both os.name and the temp directory creation to use our safe temp dir
+            unix_mount_path = os.path.join(temp_unix_dir, "borgitory_mounts") 
+            with patch('os.name', 'posix'):
+                # Override the default Unix path to use our temp directory
+                manager = ArchiveMountManager(base_mount_dir=unix_mount_path)
+                assert str(manager.base_mount_dir) == unix_mount_path
+                assert manager.base_mount_dir.exists()  # Should be created
 
     def test_get_mount_key(self):
         """Test mount key generation."""
