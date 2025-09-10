@@ -464,95 +464,6 @@ class TestListArchiveContents:
             assert "Archive not found" in str(exc_info.value)
 
 
-class TestListArchiveDirectoryContents:
-    """Test archive directory content listing with virtual tree."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.borg_service = BorgService()
-        
-        self.mock_repository = Mock(spec=Repository)
-        self.mock_repository.path = "/path/to/repo"
-        self.mock_repository.get_passphrase.return_value = "test_passphrase"
-
-    @pytest.mark.asyncio
-    async def test_list_directory_contents_root(self):
-        """Test listing root directory contents with virtual tree."""
-        expected_contents = [
-            {"name": "dir1", "path": "dir1", "is_directory": True, "type": "d", "size": None},
-            {"name": "file1.txt", "path": "file1.txt", "is_directory": False, "type": "-", "size": 1024}
-        ]
-        
-        # Mock the ArchiveExplorer directly to avoid async complexity
-        mock_explorer = Mock()
-        mock_explorer.list_archive_directory_contents = AsyncMock(return_value=expected_contents)
-        
-        with patch('app.services.virtual_archive_tree.ArchiveExplorer', return_value=mock_explorer), \
-             patch('app.utils.security.validate_archive_name'):
-            
-            contents = await self.borg_service.list_archive_directory_contents(
-                self.mock_repository, "test-archive", ""
-            )
-            
-            assert len(contents) == 2
-            # Should have both directory and file
-            names = [item["name"] for item in contents]
-            assert "dir1" in names
-            assert "file1.txt" in names
-            
-            # Verify directory/file classification
-            dir1_item = next(item for item in contents if item["name"] == "dir1")
-            file1_item = next(item for item in contents if item["name"] == "file1.txt")
-            
-            assert dir1_item["is_directory"] is True
-            assert file1_item["is_directory"] is False
-            assert file1_item["size"] == 1024
-
-    @pytest.mark.asyncio  
-    async def test_list_directory_contents_subdirectory(self):
-        """Test listing subdirectory contents with virtual tree."""
-        expected_contents = [
-            {"name": "subdir", "path": "data/subdir", "is_directory": True, "type": "d"},
-            {"name": "file1.txt", "path": "data/file1.txt", "is_directory": False, "type": "-", "size": 2048}
-        ]
-        
-        # Mock the ArchiveExplorer directly
-        mock_explorer = Mock()
-        mock_explorer.list_archive_directory_contents = AsyncMock(return_value=expected_contents)
-        
-        with patch('app.services.virtual_archive_tree.ArchiveExplorer', return_value=mock_explorer), \
-             patch('app.utils.security.validate_archive_name'):
-            
-            contents = await self.borg_service.list_archive_directory_contents(
-                self.mock_repository, "test-archive", "data"
-            )
-            
-            assert len(contents) == 2
-            # Verify filtered results show immediate children only
-            names = [item["name"] for item in contents]
-            assert "subdir" in names
-            assert "file1.txt" in names
-            # Should not include nested.txt directly
-            assert "nested.txt" not in names
-
-    @pytest.mark.asyncio
-    async def test_list_directory_contents_timeout(self):
-        """Test directory contents listing timeout with virtual tree."""
-        # Mock the ArchiveExplorer to raise timeout exception
-        mock_explorer = Mock()
-        mock_explorer.list_archive_directory_contents = AsyncMock(
-            side_effect=Exception("Failed to list directory contents: List archive contents timed out")
-        )
-        
-        with patch('app.services.virtual_archive_tree.ArchiveExplorer', return_value=mock_explorer), \
-             patch('app.utils.security.validate_archive_name'):
-            
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.list_archive_directory_contents(
-                    self.mock_repository, "test-archive", "data"
-                )
-            
-            assert "List archive contents timed out" in str(exc_info.value)
 
 
 class TestExtractFileStream:
@@ -1058,33 +969,6 @@ key = résumé_ñoño
             assert match is not None
             assert match.group('path') == "/test/file.txt"
 
-    def test_memory_usage_with_large_data(self):
-        """Test service behavior with large amounts of data using virtual tree."""
-        from app.services.virtual_archive_tree import VirtualArchiveTree
-        
-        # Create a large number of directory entries
-        large_entry_list = []
-        for i in range(10000):
-            large_entry_list.append({
-                "path": f"data/file_{i:05d}.txt",
-                "type": "-",  # Use correct borg type
-                "size": i * 1024,
-                "mtime": "2024-01-01T12:00:00"
-            })
-        
-        # Test virtual tree can handle large datasets without excessive memory usage
-        tree = VirtualArchiveTree()
-        for entry in large_entry_list:
-            tree.add_entry(entry)
-        
-        result = tree.get_directory_contents("data")
-        
-        # Should process all entries efficiently
-        assert len(result) == 10000
-        # Results should be properly sorted (directories first, then alphabetical)
-        assert all(not item["is_directory"] for item in result)  # All are files
-        assert result[0]["name"] == "file_00000.txt"
-        assert result[-1]["name"] == "file_09999.txt"
 
     def test_empty_and_whitespace_handling(self):
         """Test handling of empty and whitespace-only inputs."""

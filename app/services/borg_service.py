@@ -319,7 +319,11 @@ class BorgService:
             while wait_time < max_wait:
                 status = job_manager.get_job_status(job_id)
                 if not status:
-                    final_status = {"status": "failed", "return_code": -1, "error": "Job not found"}
+                    final_status = {
+                        "status": "failed",
+                        "return_code": -1,
+                        "error": "Job not found",
+                    }
                     break
 
                 if status["completed"] or status["status"] in ["completed", "failed"]:
@@ -328,29 +332,35 @@ class BorgService:
 
                 await asyncio.sleep(0.5)
                 wait_time += 0.5
-            
+
             # Handle timeout
             if final_status is None:
-                final_status = {"status": "failed", "return_code": -1, "error": "List archives timed out"}
-            
+                final_status = {
+                    "status": "failed",
+                    "return_code": -1,
+                    "error": "List archives timed out",
+                }
+
             # Single database update at the end
             with get_db_session() as db:
                 db_job = db.query(Job).filter(Job.id == job_id).first()
                 if db_job:
-                    db_job.status = "completed" if final_status["return_code"] == 0 else "failed"
+                    db_job.status = (
+                        "completed" if final_status["return_code"] == 0 else "failed"
+                    )
                     db_job.finished_at = datetime.now(UTC)
                     if final_status["return_code"] != 0:
                         db_job.error = final_status.get("error", "Unknown error")
                     db.commit()
-            
+
             # Handle the result
             if final_status["return_code"] != 0:
                 error_msg = final_status.get("error", "Unknown error")
                 raise Exception(f"Borg list failed: {error_msg}")
-            
+
             # Get and process the output
             output = await get_job_manager().get_job_output_stream(job_id)
-            
+
             # Parse JSON output - look for complete JSON structure
             json_lines = []
             for line in output.get("lines", []):
@@ -369,9 +379,7 @@ class BorgService:
                     return data["archives"]
             except json.JSONDecodeError as je:
                 logger.error(f"JSON decode error: {je}")
-                logger.error(
-                    f"Raw output: {full_json[:500]}..."
-                )  # Log first 500 chars
+                logger.error(f"Raw output: {full_json[:500]}...")  # Log first 500 chars
 
             # Fallback: return empty list if no valid JSON found
             logger.warning(
@@ -475,18 +483,13 @@ class BorgService:
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
     ) -> List[Dict[str, any]]:
-        """List contents of a specific directory within an archive using virtual tree"""
-        # Use the new virtual tree-based archive explorer
-        from app.services.virtual_archive_tree import ArchiveExplorer
-
-        # Get or create explorer instance with proper DI
-        if not hasattr(self, "_archive_explorer"):
-            # Inject the job manager for consistency and testability
-            from app.services.job_manager_modular import get_job_manager
-
-            self._archive_explorer = ArchiveExplorer(job_manager=get_job_manager())
-
-        return await self._archive_explorer.list_archive_directory_contents(
+        """List contents of a specific directory within an archive using FUSE mount"""
+        # Use the archive manager which now uses FUSE mounting
+        if not hasattr(self, "_archive_manager"):
+            from app.services.archive_manager import ArchiveManager
+            self._archive_manager = ArchiveManager()
+        
+        return await self._archive_manager.list_archive_directory_contents(
             repository, archive_name, path
         )
 
