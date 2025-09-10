@@ -153,7 +153,7 @@ class CloudSyncManager:
             # Start the sync and process the async generator
             sync_success = False
             final_result = None
-            
+
             async for event in rclone_service.sync_repository_to_s3(
                 repository=repo_obj,
                 access_key_id=access_key,
@@ -182,7 +182,9 @@ class CloudSyncManager:
                     output_callback(success_msg)
                 return True
             else:
-                return_code = final_result.get('return_code', -1) if final_result else -1
+                return_code = (
+                    final_result.get("return_code", -1) if final_result else -1
+                )
                 error_msg = f"❌ Cloud sync failed (return code: {return_code})"
                 logger.error(error_msg)
                 if output_callback:
