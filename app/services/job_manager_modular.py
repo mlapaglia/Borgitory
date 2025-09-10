@@ -656,7 +656,7 @@ class ModularBorgJobManager:
                 passphrase=repo_data["passphrase"],
                 cloud_sync_config_id=job.cloud_sync_config_id,
                 output_callback=output_callback,
-                db_session_factory=self.database_manager._db_session_factory,
+                db_session_factory=self.database_manager.db_session_factory,
                 rclone_service=None,  # Will use default
                 http_client_factory=None,  # Will use default
             )
