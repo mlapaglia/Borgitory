@@ -21,10 +21,6 @@ from app.main import app
 from app.models.database import Base, get_db
 
 # Import all models to ensure they're registered with Base
-from app.models.database import (
-    Repository, Schedule, User, UserSession, Setting, CloudSyncConfig, 
-    CleanupConfig, RepositoryCheckConfig, NotificationConfig, Job, JobTask
-)
 
 
 @pytest.fixture(scope="session")

@@ -6,7 +6,7 @@ the AttributeError with _db_session_factory that was encountered during cloud sy
 """
 import pytest
 import uuid
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, UTC
 
 from app.services.job_database_manager import JobDatabaseManager, DatabaseJobData

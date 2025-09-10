@@ -3,10 +3,10 @@ Test suite for verifying cloud sync and notification task output saving
 """
 import pytest
 import uuid
-from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime, UTC
+from unittest.mock import Mock
+from datetime import datetime
 
-from app.services.composite_job_manager import CompositeJobManager, CompositeJobInfo, CompositeJobTaskInfo
+from app.services.composite_job_manager import CompositeJobManager, CompositeJobTaskInfo
 from app.services.job_database_manager import JobDatabaseManager
 
 
@@ -43,7 +43,6 @@ class TestTaskOutputSaving:
         )
         
         # Simulate adding output lines like the real implementation does
-        from datetime import datetime
         
         # This is how the cloud sync task adds output
         log_line = "[rclone] Syncing repository to cloud..."
@@ -71,7 +70,6 @@ class TestTaskOutputSaving:
         )
         
         # Simulate adding output lines like the real implementation does
-        from datetime import datetime
         
         # This is how the notification task adds output
         initial_output = "Sending notification via pushover"
@@ -250,7 +248,6 @@ class TestTaskOutputDebugging:
         )
         
         # This is exactly how the composite job manager adds output
-        from datetime import datetime
         log_line = "[stdout] Syncing to S3..."
         task.output_lines.append(
             {"timestamp": datetime.now().isoformat(), "text": log_line}

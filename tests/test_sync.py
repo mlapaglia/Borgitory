@@ -3,12 +3,11 @@ Tests for sync API endpoints
 """
 import pytest
 from httpx import AsyncClient
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from app.main import app
 from app.models.database import Repository, Job, CloudSyncConfig
 from app.dependencies import get_rclone_service
-from app.services.rclone_service import RcloneService
 
 
 class TestSyncEndpoints:

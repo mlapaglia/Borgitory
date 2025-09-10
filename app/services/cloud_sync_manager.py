@@ -134,15 +134,6 @@ class CloudSyncManager:
 
             rclone_service = RcloneService()
 
-            # Create the S3 configuration
-            s3_config = {
-                "type": "s3",
-                "access_key_id": access_key,
-                "secret_access_key": secret_key,
-                "region": config.region or "us-east-1",
-                "endpoint": config.endpoint,
-            }
-
             # Set up progress callback if provided
             progress_callback = None
             if output_callback:

@@ -4,7 +4,6 @@ Tests for auth HTMX functionality
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
-from unittest.mock import patch
 
 from app.models.database import User
 

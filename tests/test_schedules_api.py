@@ -5,7 +5,6 @@ from fastapi import HTTPException
 
 from app.main import app
 from app.dependencies import get_scheduler_service
-from app.services.scheduler_service import SchedulerService
 from app.api.schedules import (
     get_schedules_form,
     create_schedule,

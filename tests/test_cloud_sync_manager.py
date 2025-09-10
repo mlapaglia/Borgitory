@@ -5,8 +5,6 @@ This test focuses on preventing the specific import and method call issues
 that caused the cloud sync failures.
 """
 import pytest
-import asyncio
-from unittest.mock import Mock, patch
 
 from app.services.cloud_sync_manager import CloudSyncManager
 
@@ -194,7 +192,6 @@ class TestCloudSyncManagerCritical:
         """
         from app.services.rclone_service import RcloneService
         from types import SimpleNamespace
-        import asyncio
         
         service = RcloneService()
         
