@@ -138,8 +138,7 @@ class TestArchiveMountManager:
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process), \
              patch('app.utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
-             patch.object(self.manager, '_is_mounted', return_value=True), \
-             patch('asyncio.sleep'):
+             patch.object(self.manager, '_wait_for_mount_ready', return_value=True):
             
             mount_point = await self.manager.mount_archive(self.mock_repository, "test-archive")
             
@@ -188,9 +187,8 @@ class TestArchiveMountManager:
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process), \
              patch('app.utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
-             patch.object(self.manager, '_is_mounted', return_value=False), \
-             patch.object(self.manager, '_unmount_path'), \
-             patch('asyncio.sleep'):
+             patch.object(self.manager, '_wait_for_mount_ready', return_value=False), \
+             patch.object(self.manager, "_unmount_path"):
             
             with pytest.raises(Exception) as exc_info:
                 await self.manager.mount_archive(self.mock_repository, "test-archive")
@@ -201,20 +199,23 @@ class TestArchiveMountManager:
     async def test_mount_archive_timeout(self):
         """Test archive mounting timeout."""
         mock_process = Mock()
+        mock_process.returncode = None
         mock_process.wait = AsyncMock(side_effect=asyncio.TimeoutError())
         mock_process.terminate = Mock()
+        mock_process.kill = Mock()
+        mock_process.stderr.read = AsyncMock(return_value=b"Timeout error")
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process), \
              patch('app.utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
-             patch.object(self.manager, '_is_mounted', return_value=False), \
-             patch.object(self.manager, '_unmount_path'), \
-             patch('asyncio.sleep'):
+             patch.object(self.manager, '_wait_for_mount_ready', return_value=False), \
+             patch.object(self.manager, '_unmount_path'):
             
             with pytest.raises(Exception) as exc_info:
                 await self.manager.mount_archive(self.mock_repository, "test-archive")
             
-            assert "Mount process timed out" in str(exc_info.value)
+            assert "Mount process timed out and could not be terminated" in str(exc_info.value)
             mock_process.terminate.assert_called_once()
+            mock_process.kill.assert_called_once()
 
     def test_is_mounted_success(self):
         """Test successful mount check."""
@@ -229,6 +230,50 @@ class TestArchiveMountManager:
         """Test mount check failure."""
         non_existent_dir = Path(self.test_mount_dir) / "non_existent"
         assert self.manager._is_mounted(non_existent_dir) is False
+    
+    @pytest.mark.asyncio
+    async def test_wait_for_mount_ready_success(self):
+        """Test successful mount readiness waiting."""
+        # Create a test directory with some content
+        test_dir = Path(self.test_mount_dir) / "test_mount"
+        test_dir.mkdir(exist_ok=True)
+        (test_dir / "test_file.txt").touch()
+        
+        # Mock process that stays alive
+        mock_process = Mock()
+        mock_process.returncode = None
+        
+        # Should return True quickly since directory exists and has content
+        result = await self.manager._wait_for_mount_ready(test_dir, mock_process, timeout=5)
+        assert result is True
+    
+    @pytest.mark.asyncio
+    async def test_wait_for_mount_ready_timeout(self):
+        """Test mount readiness waiting timeout."""
+        # Use non-existent directory
+        non_existent_dir = Path(self.test_mount_dir) / "non_existent"
+        
+        # Mock process that stays alive
+        mock_process = Mock()
+        mock_process.returncode = None
+        
+        # Should return False after timeout
+        result = await self.manager._wait_for_mount_ready(non_existent_dir, mock_process, timeout=0.1)
+        assert result is False
+    
+    @pytest.mark.asyncio
+    async def test_wait_for_mount_ready_process_exit(self):
+        """Test mount readiness when process exits with error."""
+        test_dir = Path(self.test_mount_dir) / "test_mount"
+        test_dir.mkdir(exist_ok=True)
+        
+        # Mock process that exits with error
+        mock_process = Mock()
+        mock_process.returncode = 1  # Error exit code
+        
+        # Should return False immediately when process exits with error
+        result = await self.manager._wait_for_mount_ready(test_dir, mock_process, timeout=5)
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_unmount_archive_success(self):
@@ -645,8 +690,7 @@ class TestArchiveMountManagerIntegration:
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process), \
              patch('app.utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
-             patch.object(manager, '_is_mounted', return_value=True), \
-             patch('asyncio.sleep'):
+             patch.object(manager, '_wait_for_mount_ready', return_value=True):
             
             # Mount archive
             mount_point = await manager.mount_archive(mock_repository, "test-archive")
