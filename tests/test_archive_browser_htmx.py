@@ -367,7 +367,7 @@ class TestArchiveBrowserHTMX:
         
         # Check select element has HTMX attributes
         assert 'id="archive-repository-select"' in response.text
-        assert "hx-get" in response.text
+        assert "hx-post" in response.text
         assert "hx-target" in response.text
         assert "hx-trigger" in response.text
         
@@ -454,7 +454,7 @@ class TestArchiveBrowserHTMX:
             assert response.status_code == 200
             
             # Check for HTMX attributes in navigation elements
-            assert "hx-get" in response.text
+            assert "hx-post" in response.text
             assert "hx-target" in response.text
             assert "hx-swap" in response.text
             

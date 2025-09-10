@@ -39,17 +39,23 @@ async def get_stats_loading(request: Request, repository_id: int = None):
 async def get_stats_content(
     request: Request,
     stats_svc: RepositoryStatsServiceDep,
-    repository_id: int = None,
+    repository_id: str = "",
     db: Session = Depends(get_db),
 ):
     """Get statistics content based on repository selection"""
-    if not repository_id:
+    if not repository_id or repository_id == "":
         return templates.TemplateResponse(
             request, "partials/statistics/empty_state.html", {}
         )
 
-    # Redirect to the existing stats HTML endpoint
-    return await get_repository_statistics_html(repository_id, request, stats_svc, db)
+    try:
+        repo_id = int(repository_id)
+        # Redirect to the existing stats HTML endpoint
+        return await get_repository_statistics_html(repo_id, request, stats_svc, db)
+    except (ValueError, TypeError):
+        return templates.TemplateResponse(
+            request, "partials/statistics/empty_state.html", {}
+        )
 
 
 @router.get("/{repository_id}/stats")
