@@ -297,7 +297,7 @@ class ArchiveExplorer:
             if status["completed"]:
                 # Get output for both success and error cases
                 output = await job_manager.get_job_output_stream(job_id)
-                
+
                 if status["return_code"] == 0:
                     entries = []
                     count = 0

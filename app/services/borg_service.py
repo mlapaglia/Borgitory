@@ -505,6 +505,7 @@ class BorgService:
         if not hasattr(self, "_archive_explorer"):
             # Inject the job manager for consistency and testability
             from app.services.job_manager_modular import get_job_manager
+
             self._archive_explorer = ArchiveExplorer(job_manager=get_job_manager())
 
         return await self._archive_explorer.list_archive_directory_contents(

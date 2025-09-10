@@ -1063,19 +1063,25 @@ key = résumé_ñoño
             assert match.group('path') == "/test/file.txt"
 
     def test_memory_usage_with_large_data(self):
-        """Test service behavior with large amounts of data."""
+        """Test service behavior with large amounts of data using virtual tree."""
+        from app.services.virtual_archive_tree import VirtualArchiveTree
+        
         # Create a large number of directory entries
         large_entry_list = []
         for i in range(10000):
             large_entry_list.append({
                 "path": f"data/file_{i:05d}.txt",
-                "type": "f",
+                "type": "-",  # Use correct borg type
                 "size": i * 1024,
                 "mtime": "2024-01-01T12:00:00"
             })
         
-        # Should handle large datasets without excessive memory usage
-        result = self.borg_service._filter_directory_contents(large_entry_list, "data")
+        # Test virtual tree can handle large datasets without excessive memory usage
+        tree = VirtualArchiveTree()
+        for entry in large_entry_list:
+            tree.add_entry(entry)
+        
+        result = tree.get_directory_contents("data")
         
         # Should process all entries efficiently
         assert len(result) == 10000
