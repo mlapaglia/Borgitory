@@ -314,92 +314,70 @@ class BorgService:
             # Wait for completion (list is usually quick)
             max_wait = 30  # 30 seconds max
             wait_time = 0
+            final_status = None
 
             while wait_time < max_wait:
                 status = job_manager.get_job_status(job_id)
                 if not status:
-                    # Update job status to failed if job not found
-                    with get_db_session() as db:
-                        db_job = db.query(Job).filter(Job.id == job_id).first()
-                        if db_job:
-                            db_job.status = "failed"
-                            db_job.finished_at = datetime.now(UTC)
-                            db_job.error = "Job not found"
-                            db.commit()
-                    raise Exception("Job not found")
+                    final_status = {"status": "failed", "return_code": -1, "error": "Job not found"}
+                    break
 
                 if status["completed"] or status["status"] in ["completed", "failed"]:
-                    # Update job status in database
-                    with get_db_session() as db:
-                        db_job = db.query(Job).filter(Job.id == job_id).first()
-                        if db_job:
-                            db_job.status = (
-                                "completed" if status["return_code"] == 0 else "failed"
-                            )
-                            db_job.finished_at = datetime.now(UTC)
-                            if status["return_code"] != 0:
-                                # Get error output
-                                output = await get_job_manager().get_job_output_stream(
-                                    job_id
-                                )
-                                error_lines = [
-                                    line["text"] for line in output.get("lines", [])
-                                ]
-                                db_job.error = "\n".join(error_lines)
-                            db.commit()
-
-                    # Get the output
-                    output = await get_job_manager().get_job_output_stream(job_id)
-
-                    if status["return_code"] == 0:
-                        # Parse JSON output - look for complete JSON structure
-                        json_lines = []
-                        for line in output.get("lines", []):
-                            line_text = line["text"].strip()
-                            if line_text:
-                                json_lines.append(line_text)
-
-                        # Try to parse the complete JSON output
-                        full_json = "\n".join(json_lines)
-                        try:
-                            data = json.loads(full_json)
-                            if "archives" in data:
-                                logger.info(
-                                    f"Successfully parsed {len(data['archives'])} archives from repository"
-                                )
-                                return data["archives"]
-                        except json.JSONDecodeError as je:
-                            logger.error(f"JSON decode error: {je}")
-                            logger.error(
-                                f"Raw output: {full_json[:500]}..."
-                            )  # Log first 500 chars
-
-                        # Fallback: return empty list if no valid JSON found
-                        logger.warning(
-                            "No valid archives JSON found in output, returning empty list"
-                        )
-                        return []
-                    else:
-                        error_lines = [line["text"] for line in output.get("lines", [])]
-                        error_text = "\n".join(error_lines)
-                        raise Exception(
-                            f"Borg list failed with return code {status['return_code']}: {error_text}"
-                        )
-
-                    break  # Exit the while loop since job is complete
+                    final_status = status
+                    break
 
                 await asyncio.sleep(0.5)
                 wait_time += 0.5
-
-            # Handle timeout case
+            
+            # Handle timeout
+            if final_status is None:
+                final_status = {"status": "failed", "return_code": -1, "error": "List archives timed out"}
+            
+            # Single database update at the end
             with get_db_session() as db:
                 db_job = db.query(Job).filter(Job.id == job_id).first()
                 if db_job:
-                    db_job.status = "failed"
+                    db_job.status = "completed" if final_status["return_code"] == 0 else "failed"
                     db_job.finished_at = datetime.now(UTC)
-                    db_job.error = "List archives timed out"
+                    if final_status["return_code"] != 0:
+                        db_job.error = final_status.get("error", "Unknown error")
                     db.commit()
-            raise Exception("List archives timed out")
+            
+            # Handle the result
+            if final_status["return_code"] != 0:
+                error_msg = final_status.get("error", "Unknown error")
+                raise Exception(f"Borg list failed: {error_msg}")
+            
+            # Get and process the output
+            output = await get_job_manager().get_job_output_stream(job_id)
+            
+            # Parse JSON output - look for complete JSON structure
+            json_lines = []
+            for line in output.get("lines", []):
+                line_text = line["text"].strip()
+                if line_text:
+                    json_lines.append(line_text)
+
+            # Try to parse the complete JSON output
+            full_json = "\n".join(json_lines)
+            try:
+                data = json.loads(full_json)
+                if "archives" in data:
+                    logger.info(
+                        f"Successfully parsed {len(data['archives'])} archives from repository"
+                    )
+                    return data["archives"]
+            except json.JSONDecodeError as je:
+                logger.error(f"JSON decode error: {je}")
+                logger.error(
+                    f"Raw output: {full_json[:500]}..."
+                )  # Log first 500 chars
+
+            # Fallback: return empty list if no valid JSON found
+            logger.warning(
+                "No valid archives JSON found in output, returning empty list"
+            )
+            return []
 
         except Exception as e:
             raise Exception(f"Failed to list archives: {str(e)}")
