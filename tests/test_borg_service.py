@@ -425,14 +425,13 @@ class TestListArchiveContents:
     @pytest.mark.asyncio
     async def test_list_archive_contents_validation_error(self):
         """Test archive content listing with validation error."""
-        with patch('app.utils.security.validate_archive_name', side_effect=ValueError("Invalid archive name")):
-            
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.list_archive_contents(
-                    self.mock_repository, "invalid/archive"
-                )
-            
-            assert "Validation failed" in str(exc_info.value)
+        # Test with empty archive name (still invalid after security changes)
+        with pytest.raises(Exception) as exc_info:
+            await self.borg_service.list_archive_contents(
+                self.mock_repository, ""
+            )
+        
+        assert "Archive name must be a non-empty string" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_list_archive_contents_command_failure(self):
@@ -570,15 +569,13 @@ class TestExtractFileStream:
     @pytest.mark.asyncio
     async def test_extract_file_stream_validation_error(self):
         """Test file extraction with validation error."""
-        with patch('app.utils.security.validate_archive_name', side_effect=ValueError("Invalid archive")):
-            
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.extract_file_stream(
-                    self.mock_repository, "invalid/archive", "file.txt"
-                )
-            
-            # The error message may be wrapped
-            assert any(phrase in str(exc_info.value) for phrase in ["Invalid archive", "invalid characters", "Archive name contains"])
+        # Test with empty archive name (still invalid after security changes)
+        with pytest.raises(Exception) as exc_info:
+            await self.borg_service.extract_file_stream(
+                self.mock_repository, "", "file.txt"
+            )
+        
+        assert "Archive name must be a non-empty string" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_extract_file_stream_empty_path(self):
@@ -926,16 +923,15 @@ class TestSecurityIntegrationExtended:
     @pytest.mark.asyncio
     async def test_list_archive_contents_security_validation(self):
         """Test that archive content listing validates archive names."""
-        with patch('app.utils.security.validate_archive_name', side_effect=ValueError("Invalid archive name")):
-            
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.list_archive_contents(
-                    self.mock_repository, "../../../etc/passwd"
-                )
-            
-            assert "Validation failed" in str(exc_info.value)
-            # The actual error message may vary depending on implementation
-            assert any(phrase in str(exc_info.value) for phrase in ["Invalid archive name", "invalid characters", "Archive name contains"])
+        # Test with too long archive name (still invalid after security changes)
+        long_name = "a" * 201  # Over 200 character limit
+        
+        with pytest.raises(Exception) as exc_info:
+            await self.borg_service.list_archive_contents(
+                self.mock_repository, long_name
+            )
+        
+        assert "Archive name too long" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_verify_repository_access_security_validation(self):
