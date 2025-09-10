@@ -150,30 +150,40 @@ class CloudSyncManager:
                 def progress_callback(line: str):
                     output_callback(f"☁️ {line}")
 
-            # Start the sync
-            result = await rclone_service.sync_to_s3(
+            # Start the sync and process the async generator
+            sync_success = False
+            final_result = None
+            
+            async for event in rclone_service.sync_repository_to_s3(
                 repository=repo_obj,
+                access_key_id=access_key,
+                secret_access_key=secret_key,
                 bucket_name=config.bucket_name,
-                s3_config=s3_config,
-                progress_callback=progress_callback,
-            )
+                path_prefix="",
+            ):
+                if event["type"] == "started":
+                    if output_callback:
+                        output_callback(f"☁️ Starting sync: {event.get('command', '')}")
+                elif event["type"] == "progress":
+                    if output_callback:
+                        progress_msg = f"☁️ Progress: {event.get('message', '')}"
+                        output_callback(progress_msg)
+                elif event["type"] == "log":
+                    if output_callback:
+                        output_callback(f"☁️ {event.get('message', '')}")
+                elif event["type"] == "completed":
+                    final_result = event
+                    sync_success = event.get("status") == "success"
 
-            if result["success"]:
+            if sync_success:
                 success_msg = "✅ Cloud sync completed successfully"
                 logger.info(success_msg)
                 if output_callback:
                     output_callback(success_msg)
-                    if result.get("stats"):
-                        stats = result["stats"]
-                        output_callback(
-                            f"📊 Transferred: {stats.get('bytes', 0)} bytes"
-                        )
-                        output_callback(f"📊 Files: {stats.get('files', 0)} files")
                 return True
             else:
-                error_msg = (
-                    f"❌ Cloud sync failed: {result.get('error', 'Unknown error')}"
-                )
+                return_code = final_result.get('return_code', -1) if final_result else -1
+                error_msg = f"❌ Cloud sync failed (return code: {return_code})"
                 logger.error(error_msg)
                 if output_callback:
                     output_callback(error_msg)
