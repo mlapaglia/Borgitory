@@ -1,7 +1,6 @@
 """
 Tests for FastAPI dependency providers
 """
-import pytest
 
 from app.dependencies import get_simple_command_runner, get_borg_service, get_job_service, get_recovery_service, get_pushover_service, get_job_stream_service, get_job_render_service, get_debug_service, get_rclone_service, get_repository_stats_service
 from app.services.simple_command_runner import SimpleCommandRunner

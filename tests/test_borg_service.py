@@ -15,8 +15,6 @@ All tests use proper mocking to avoid external dependencies.
 """
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, mock_open
-import asyncio
-import json
 
 from app.services.borg_service import BorgService
 from app.models.database import Repository

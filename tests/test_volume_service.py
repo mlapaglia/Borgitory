@@ -2,7 +2,6 @@
 Tests for VolumeService - Service to discover and manage mounted volumes
 """
 
-import asyncio
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from app.services.volume_service import VolumeService

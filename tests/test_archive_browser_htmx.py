@@ -2,10 +2,9 @@
 Tests for archive browser HTMX functionality
 """
 import pytest
-import re
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 
 from app.main import app
 from app.models.database import Repository

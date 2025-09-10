@@ -5,10 +5,7 @@ Tests for repository_check_configs API endpoints
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import Request
-from fastapi.testclient import TestClient
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from app.api.repository_check_configs import router
 from app.models.database import RepositoryCheckConfig, Repository
 from app.models.schemas import RepositoryCheckConfigCreate, RepositoryCheckConfigUpdate
 

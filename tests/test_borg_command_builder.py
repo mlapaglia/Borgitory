@@ -3,7 +3,6 @@ Tests for BorgCommandBuilder - Borg command construction and validation
 """
 import pytest
 from unittest.mock import patch, MagicMock
-from datetime import datetime
 
 from app.services.borg_command_builder import BorgCommandBuilder
 from app.models.database import Repository

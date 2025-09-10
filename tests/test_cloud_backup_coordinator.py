@@ -2,8 +2,7 @@
 Tests for CloudBackupCoordinator service
 """
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC, timedelta
 from sqlalchemy.orm import Session
 
