@@ -60,13 +60,15 @@ async def lifespan(app: FastAPI):
         scheduler_service = get_scheduler_service()
         await scheduler_service.start()
         logger.info("Scheduler started")
-        
+
         # Initialize mount cleanup task
         from app.services.archive_mount_manager import get_archive_mount_manager
+
         mount_manager = get_archive_mount_manager()
-        
+
         # Start background cleanup task
         import asyncio
+
         async def cleanup_task():
             while True:
                 try:
@@ -74,25 +76,25 @@ async def lifespan(app: FastAPI):
                     await mount_manager.cleanup_old_mounts()
                 except Exception as e:
                     logger.error(f"Mount cleanup error: {e}")
-        
+
         cleanup_task_handle = asyncio.create_task(cleanup_task())
         logger.info("Mount cleanup task started")
-        
+
         yield
-        
+
         logger.info("Shutting down...")
-        
+
         # Cancel cleanup task
         cleanup_task_handle.cancel()
         try:
             await cleanup_task_handle
         except asyncio.CancelledError:
             pass
-        
+
         # Unmount all archives
         await mount_manager.unmount_all()
         logger.info("All mounts cleaned up")
-        
+
         await scheduler_service.stop()
     except Exception as e:
         logger.error(f"Lifespan error: {e}")

@@ -88,16 +88,18 @@ class ArchiveManager:
         )
 
         from app.services.archive_mount_manager import get_archive_mount_manager
-        
+
         mount_manager = get_archive_mount_manager()
-        
+
         # Mount the archive if not already mounted
         await mount_manager.mount_archive(repository, archive_name)
-        
+
         # List the directory contents using filesystem operations
         contents = mount_manager.list_directory(repository, archive_name, path)
-        
-        logger.info(f"Listed {len(contents)} items from mounted archive {archive_name} path '{path}'")
+
+        logger.info(
+            f"Listed {len(contents)} items from mounted archive {archive_name} path '{path}'"
+        )
         return contents
 
     def _filter_directory_contents(

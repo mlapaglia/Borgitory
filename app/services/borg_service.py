@@ -487,8 +487,9 @@ class BorgService:
         # Use the archive manager which now uses FUSE mounting
         if not hasattr(self, "_archive_manager"):
             from app.services.archive_manager import ArchiveManager
+
             self._archive_manager = ArchiveManager()
-        
+
         return await self._archive_manager.list_archive_directory_contents(
             repository, archive_name, path
         )

@@ -62,26 +62,30 @@ class TestArchiveMountManager:
     def test_initialization_with_custom_params(self):
         """Test ArchiveMountManager initialization with custom parameters."""
         custom_job_executor = Mock(spec=JobExecutor)
-        custom_dir = "/custom/mount/dir"
-        manager = ArchiveMountManager(
-            base_mount_dir=custom_dir,
-            job_executor=custom_job_executor,
-            cleanup_interval=120,
-            mount_timeout=600
-        )
-        # Use Path comparison to handle cross-platform differences
-        assert manager.base_mount_dir == Path(custom_dir)
-        assert manager.cleanup_interval == 120
-        assert manager.mount_timeout == 600
-        assert manager.job_executor is custom_job_executor
+        
+        # Use a temporary directory to avoid permission issues
+        with tempfile.TemporaryDirectory() as temp_dir:
+            custom_dir = os.path.join(temp_dir, "custom_mount_dir")
+            manager = ArchiveMountManager(
+                base_mount_dir=custom_dir,
+                job_executor=custom_job_executor,
+                cleanup_interval=120,
+                mount_timeout=600
+            )
+            # Use Path comparison to handle cross-platform differences
+            assert manager.base_mount_dir == Path(custom_dir)
+            assert manager.cleanup_interval == 120
+            assert manager.mount_timeout == 600
+            assert manager.job_executor is custom_job_executor
 
     def test_initialization_cross_platform_paths(self):
         """Test that path handling works across platforms."""
-        with patch('os.name', 'nt'), \
-             patch.dict(os.environ, {'TEMP': 'C:\\Windows\\Temp'}):
-            manager = ArchiveMountManager()
-            expected_path = Path("C:\\Windows\\Temp\\borgitory_mounts")
-            assert manager.base_mount_dir == expected_path
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch('os.name', 'nt'), \
+                 patch.dict(os.environ, {'TEMP': temp_dir}):
+                manager = ArchiveMountManager()
+                expected_path = Path(temp_dir) / "borgitory_mounts"
+                assert manager.base_mount_dir == expected_path
 
     def test_get_mount_key(self):
         """Test mount key generation."""
@@ -509,18 +513,21 @@ class TestGetArchiveMountManagerGlobal:
         """Test getting global instance with custom parameters."""
         custom_job_executor = Mock(spec=JobExecutor)
         
-        manager = get_archive_mount_manager(
-            base_mount_dir="/custom/dir",
-            job_executor=custom_job_executor,
-            cleanup_interval=120,
-            mount_timeout=600
-        )
-        
-        assert isinstance(manager, ArchiveMountManager)
-        assert manager.base_mount_dir == Path("/custom/dir")
-        assert manager.job_executor is custom_job_executor
-        assert manager.cleanup_interval == 120
-        assert manager.mount_timeout == 600
+        # Use a temporary directory to avoid permission issues
+        with tempfile.TemporaryDirectory() as temp_dir:
+            custom_dir = os.path.join(temp_dir, "custom_dir")
+            manager = get_archive_mount_manager(
+                base_mount_dir=custom_dir,
+                job_executor=custom_job_executor,
+                cleanup_interval=120,
+                mount_timeout=600
+            )
+            
+            assert isinstance(manager, ArchiveMountManager)
+            assert manager.base_mount_dir == Path(custom_dir)
+            assert manager.job_executor is custom_job_executor
+            assert manager.cleanup_interval == 120
+            assert manager.mount_timeout == 600
 
 
 class TestMountInfoDataclass:
@@ -637,19 +644,24 @@ class TestArchiveMountManagerIntegration:
 
     def test_error_handling_robustness(self):
         """Test error handling in various scenarios."""
-        manager = ArchiveMountManager(
-            base_mount_dir="/non/existent/path",  # This should be handled gracefully
-            job_executor=self.mock_job_executor
-        )
-        
-        # Manager should still be created, but operations may fail gracefully
-        assert isinstance(manager, ArchiveMountManager)
-        
-        mock_repository = Mock(spec=Repository)
-        mock_repository.name = "test-repo"
-        mock_repository.path = "/path/to/repo"
-        
-        # Test listing directory on non-mounted archive
-        with pytest.raises(Exception) as exc_info:
-            manager.list_directory(mock_repository, "test-archive", "")
-        assert "not mounted" in str(exc_info.value)
+        # Use a path that will be created but may have permission issues
+        with tempfile.TemporaryDirectory() as temp_dir:
+            restricted_path = os.path.join(temp_dir, "restricted_path")
+            
+            # Create the manager with a path that exists but might have restrictions
+            manager = ArchiveMountManager(
+                base_mount_dir=restricted_path,
+                job_executor=self.mock_job_executor
+            )
+            
+            # Manager should still be created
+            assert isinstance(manager, ArchiveMountManager)
+            
+            mock_repository = Mock(spec=Repository)
+            mock_repository.name = "test-repo"
+            mock_repository.path = "/path/to/repo"
+            
+            # Test listing directory on non-mounted archive
+            with pytest.raises(Exception) as exc_info:
+                manager.list_directory(mock_repository, "test-archive", "")
+            assert "not mounted" in str(exc_info.value)
