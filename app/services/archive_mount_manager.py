@@ -105,8 +105,10 @@ class ArchiveMountManager:
             )
 
             # Wait for the mount to establish by polling until it's ready
-            mount_ready = await self._wait_for_mount_ready(mount_point, process, timeout=30)
-            
+            mount_ready = await self._wait_for_mount_ready(
+                mount_point, process, timeout=5
+            )
+
             if not mount_ready:
                 # Try to get error information from the process
                 try:
@@ -124,7 +126,9 @@ class ArchiveMountManager:
                         raise Exception(f"Mount timed out: {error_msg}")
                 except asyncio.TimeoutError:
                     process.kill()
-                    raise Exception("Mount process timed out and could not be terminated")
+                    raise Exception(
+                        "Archive contents not available after 5 seconds - mount failed"
+                    )
 
             # Store mount info
             mount_info = MountInfo(
@@ -151,51 +155,37 @@ class ArchiveMountManager:
             raise Exception(f"Failed to mount archive: {str(e)}")
 
     def _is_mounted(self, mount_point: Path) -> bool:
-        """Check if a path is actually mounted"""
+        """Check if mount point has actual archive contents"""
         try:
-            # Try to list the directory - if it's mounted, this should work
-            # and return archive contents rather than an empty directory
-            list(mount_point.iterdir())
-            # For FUSE mounts, an empty directory usually means the mount isn't ready yet
-            # But we should also check if the directory exists and is accessible
-            return True  # If we can list it without error, assume it's mounted
+            if not mount_point.exists() or not mount_point.is_dir():
+                return False
+            
+            # Check if directory has actual contents (files/folders)
+            contents = list(mount_point.iterdir())
+            return len(contents) > 0
+            
         except (OSError, PermissionError):
             return False
-    
-    async def _wait_for_mount_ready(self, mount_point: Path, process: asyncio.subprocess.Process, timeout: int = 30) -> bool:
-        """Wait for mount to be ready by polling, with exponential backoff"""
-        start_time = asyncio.get_event_loop().time()
-        attempt = 0
-        
-        while (asyncio.get_event_loop().time() - start_time) < timeout:
+
+    async def _wait_for_mount_ready(
+        self, mount_point: Path, process: asyncio.subprocess.Process, timeout: int = 5
+    ) -> bool:
+        """Wait for mount to have contents, checking every second for up to 5 seconds"""
+        for attempt in range(int(timeout)):
             # Check if process has exited with error
             if process.returncode is not None and process.returncode != 0:
                 return False
-                
-            # Check if mount is ready
+
+            # Check if mount has contents
             if self._is_mounted(mount_point):
-                # Double-check by trying to access the mount point
-                try:
-                    # Try to get some basic info about the mounted filesystem
-                    if mount_point.exists() and mount_point.is_dir():
-                        # Additional verification: try to stat the directory
-                        mount_point.stat()
-                        logger.info(f"Mount ready after {asyncio.get_event_loop().time() - start_time:.2f}s")
-                        return True
-                except (OSError, PermissionError):
-                    pass
-            
-            # Exponential backoff: start with short intervals, increase over time
-            if attempt < 5:
-                delay = 0.1 * (2 ** attempt)  # 0.1, 0.2, 0.4, 0.8, 1.6 seconds
-            else:
-                delay = 2.0  # Cap at 2 seconds for longer waits
-            
-            await asyncio.sleep(delay)
-            attempt += 1
-        
-        # Final check before giving up
-        return self._is_mounted(mount_point)
+                logger.info(f"Mount ready after {attempt + 1} second(s)")
+                return True
+
+            # Wait 1 second before next check
+            await asyncio.sleep(1)
+
+        # No contents found after timeout
+        return False
 
     async def unmount_archive(self, repository: Repository, archive_name: str) -> bool:
         """Unmount a specific archive"""

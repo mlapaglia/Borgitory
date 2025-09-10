@@ -213,7 +213,7 @@ class TestArchiveMountManager:
             with pytest.raises(Exception) as exc_info:
                 await self.manager.mount_archive(self.mock_repository, "test-archive")
             
-            assert "Mount process timed out and could not be terminated" in str(exc_info.value)
+            assert "Archive contents not available after 5 seconds - mount failed" in str(exc_info.value)
             mock_process.terminate.assert_called_once()
             mock_process.kill.assert_called_once()
 
