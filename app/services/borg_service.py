@@ -501,9 +501,11 @@ class BorgService:
         # Use the new virtual tree-based archive explorer
         from app.services.virtual_archive_tree import ArchiveExplorer
 
-        # Get or create explorer instance (could be made a class attribute for caching)
+        # Get or create explorer instance with proper DI
         if not hasattr(self, "_archive_explorer"):
-            self._archive_explorer = ArchiveExplorer()
+            # Inject the job manager for consistency and testability
+            from app.services.job_manager_modular import get_job_manager
+            self._archive_explorer = ArchiveExplorer(job_manager=get_job_manager())
 
         return await self._archive_explorer.list_archive_directory_contents(
             repository, archive_name, path

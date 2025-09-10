@@ -287,7 +287,7 @@ class TestPushoverService:
     @pytest.mark.asyncio
     async def test_test_pushover_connection_failure(self, pushover_service):
         """Test failed Pushover connection test"""
-        with patch.object(pushover_service, 'send_notification', return_value=False) as mock_send:
+        with patch.object(pushover_service, 'send_notification', return_value=False):
             result = await pushover_service.test_pushover_connection(
                 user_key="invalid_user",
                 app_token="invalid_token"
@@ -300,7 +300,7 @@ class TestPushoverService:
     async def test_test_pushover_connection_exception(self, pushover_service):
         """Test connection test with exception"""
         with patch.object(pushover_service, 'send_notification', 
-                         side_effect=Exception("Network error")) as mock_send:
+                         side_effect=Exception("Network error")):
             result = await pushover_service.test_pushover_connection(
                 user_key="test_user",
                 app_token="test_token"

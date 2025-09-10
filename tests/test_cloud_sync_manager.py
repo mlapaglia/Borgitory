@@ -163,7 +163,7 @@ class TestCloudSyncManagerCritical:
         """
         # This import should fail - there is no 'rclone_service' function/object to import
         try:
-            from app.services.rclone_service import rclone_service
+            from app.services.rclone_service import rclone_service  # noqa: F401
             pytest.fail("ERROR: Found old 'rclone_service' import - this should not exist!")
         except ImportError:
             # This is expected - the old import should fail

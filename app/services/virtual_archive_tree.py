@@ -156,8 +156,9 @@ class VirtualArchiveTree:
 class ArchiveExplorer:
     """Main class for exploring borg archives with virtual tree support"""
 
-    def __init__(self):
+    def __init__(self, job_manager=None):
         self.tree_cache: Dict[str, VirtualArchiveTree] = {}  # Cache per archive
+        self.job_manager = job_manager  # Allow dependency injection
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
@@ -280,7 +281,8 @@ class ArchiveExplorer:
             f"Running borg command: {' '.join(command[:3])}..."
         )  # Don't log full command for security
 
-        job_manager = get_job_manager()
+        # Use injected job manager or get default
+        job_manager = self.job_manager or get_job_manager()
         job_id = await job_manager.start_borg_command(command, env=env)
 
         # Wait for completion
@@ -293,9 +295,10 @@ class ArchiveExplorer:
                 raise Exception("Job not found")
 
             if status["completed"]:
+                # Get output for both success and error cases
+                output = await job_manager.get_job_output_stream(job_id)
+                
                 if status["return_code"] == 0:
-                    output = await job_manager.get_job_output_stream(job_id)
-
                     entries = []
                     count = 0
                     for line in output.get("lines", []):
