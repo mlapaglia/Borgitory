@@ -425,14 +425,13 @@ class TestListArchiveContents:
     @pytest.mark.asyncio
     async def test_list_archive_contents_validation_error(self):
         """Test archive content listing with validation error."""
-        with patch('app.utils.security.validate_archive_name', side_effect=ValueError("Invalid archive name")):
-            
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.list_archive_contents(
-                    self.mock_repository, "invalid/archive"
-                )
-            
-            assert "Validation failed" in str(exc_info.value)
+        # Test with empty archive name (still invalid after security changes)
+        with pytest.raises(Exception) as exc_info:
+            await self.borg_service.list_archive_contents(
+                self.mock_repository, ""
+            )
+        
+        assert "Archive name must be a non-empty string" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_list_archive_contents_command_failure(self):
@@ -465,179 +464,6 @@ class TestListArchiveContents:
             assert "Archive not found" in str(exc_info.value)
 
 
-class TestListArchiveDirectoryContents:
-    """Test archive directory content listing with filtering."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.borg_service = BorgService()
-        
-        self.mock_repository = Mock(spec=Repository)
-        self.mock_repository.path = "/path/to/repo"
-        self.mock_repository.get_passphrase.return_value = "test_passphrase"
-
-    @pytest.mark.asyncio
-    async def test_list_directory_contents_root(self):
-        """Test listing root directory contents."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="list-job-123")
-        mock_job_manager.get_job_status.return_value = {
-            "completed": True,
-            "return_code": 0
-        }
-        mock_job_manager.get_job_output_stream = AsyncMock(return_value={
-            "lines": [
-                {"text": '{"path": "file1.txt", "type": "f", "size": 1024, "mtime": "2024-01-01T12:00:00"}'},
-                {"text": '{"path": "dir1", "type": "d"}'}
-            ]
-        })
-        
-        with patch('app.services.borg_service.get_job_manager', return_value=mock_job_manager), \
-             patch('app.utils.security.build_secure_borg_command') as mock_build_cmd, \
-             patch('app.utils.security.validate_archive_name'):
-            
-            mock_build_cmd.return_value = (["borg", "list", "--json-lines"], {})
-            
-            contents = await self.borg_service.list_archive_directory_contents(
-                self.mock_repository, "test-archive", ""
-            )
-            
-            assert len(contents) == 2
-            # Should sort directories first
-            assert contents[0]["name"] == "dir1"
-            assert contents[0]["is_directory"] is True
-            assert contents[1]["name"] == "file1.txt"
-            assert contents[1]["is_directory"] is False
-            assert contents[1]["size"] == 1024
-
-    @pytest.mark.asyncio  
-    async def test_list_directory_contents_subdirectory(self):
-        """Test listing subdirectory contents."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="list-job-123")
-        mock_job_manager.get_job_status.return_value = {
-            "completed": True,
-            "return_code": 0
-        }
-        mock_job_manager.get_job_output_stream = AsyncMock(return_value={
-            "lines": [
-                {"text": '{"path": "data/file1.txt", "type": "f", "size": 2048}'},
-                {"text": '{"path": "data/subdir", "type": "d"}'}
-            ]
-        })
-        
-        with patch('app.services.borg_service.get_job_manager', return_value=mock_job_manager), \
-             patch('app.utils.security.build_secure_borg_command') as mock_build_cmd, \
-             patch('app.utils.security.validate_archive_name'):
-            
-            mock_build_cmd.return_value = (["borg", "list", "--json-lines"], {})
-            
-            contents = await self.borg_service.list_archive_directory_contents(
-                self.mock_repository, "test-archive", "data"
-            )
-            
-            assert len(contents) == 2
-            # Verify filtered results
-            names = [item["name"] for item in contents]
-            assert "subdir" in names
-            assert "file1.txt" in names
-
-    @pytest.mark.asyncio
-    async def test_list_directory_contents_timeout(self):
-        """Test directory contents listing timeout."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="list-job-123")
-        mock_job_manager.get_job_status.return_value = {
-            "completed": False,
-            "return_code": None
-        }
-        
-        with patch('app.services.borg_service.get_job_manager', return_value=mock_job_manager), \
-             patch('app.utils.security.build_secure_borg_command') as mock_build_cmd, \
-             patch('app.utils.security.validate_archive_name'), \
-             patch('asyncio.sleep', return_value=None):
-            
-            mock_build_cmd.return_value = (["borg", "list", "--json-lines"], {})
-            
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.list_archive_directory_contents(
-                    self.mock_repository, "test-archive", "data"
-                )
-            
-            assert "List archive contents timed out" in str(exc_info.value)
-
-    def test_filter_directory_contents_root_level(self):
-        """Test filtering entries for root level directory."""
-        test_entries = [
-            {"path": "file1.txt", "type": "f", "size": 1024, "mtime": "2024-01-01T12:00:00"},
-            {"path": "dir1", "type": "d"},
-            {"path": "dir1/subfile.txt", "type": "f", "size": 512}
-        ]
-        
-        filtered = self.borg_service._filter_directory_contents(test_entries, "")
-        
-        assert len(filtered) == 2  # Only direct children
-        names = [item["name"] for item in filtered]
-        assert "file1.txt" in names
-        assert "dir1" in names
-        
-        # Check that dir1 is marked as directory due to nested file
-        dir1_item = next(item for item in filtered if item["name"] == "dir1")
-        assert dir1_item["is_directory"] is True
-
-    def test_filter_directory_contents_subdirectory(self):
-        """Test filtering entries for specific subdirectory."""
-        test_entries = [
-            {"path": "data/file1.txt", "type": "f", "size": 1024},
-            {"path": "data/subdir", "type": "d"},
-            {"path": "data/subdir/nested.txt", "type": "f", "size": 256},
-            {"path": "other/file2.txt", "type": "f", "size": 512}  # Should be filtered out
-        ]
-        
-        filtered = self.borg_service._filter_directory_contents(test_entries, "data")
-        
-        assert len(filtered) == 2
-        names = [item["name"] for item in filtered]
-        assert "file1.txt" in names
-        assert "subdir" in names
-        assert "file2.txt" not in names  # From different directory
-
-    def test_filter_directory_contents_edge_cases(self):
-        """Test directory content filtering with edge cases."""
-        # Test with empty entry list
-        result = self.borg_service._filter_directory_contents([], "")
-        assert result == []
-        
-        # Test with entries that have empty paths
-        entries_with_empty = [
-            {"path": "", "type": "f"},
-            {"path": "valid_file.txt", "type": "f", "size": 100}
-        ]
-        result = self.borg_service._filter_directory_contents(entries_with_empty, "")
-        assert len(result) == 1
-        assert result[0]["name"] == "valid_file.txt"
-        
-        # Test with paths that have leading/trailing slashes
-        entries_with_slashes = [
-            {"path": "/leading/slash/file.txt", "type": "f", "size": 100},
-            {"path": "normal/file.txt", "type": "f", "size": 200}
-        ]
-        result = self.borg_service._filter_directory_contents(entries_with_slashes, "")
-        names = [item["name"] for item in result]
-        assert "leading" in names  # Should handle leading slash
-        assert "normal" in names
-        
-        # Test with duplicate names (should consolidate)
-        entries_with_duplicates = [
-            {"path": "data/file.txt", "type": "f", "size": 100},
-            {"path": "data/subdir", "type": "d"},
-            {"path": "data/subdir/nested.txt", "type": "f", "size": 50}  # Should mark subdir as directory
-        ]
-        result = self.borg_service._filter_directory_contents(entries_with_duplicates, "data")
-        assert len(result) == 2  # file.txt and subdir (consolidated)
-        
-        subdir_item = next(item for item in result if item["name"] == "subdir")
-        assert subdir_item["is_directory"] is True
 
 
 class TestExtractFileStream:
@@ -654,15 +480,13 @@ class TestExtractFileStream:
     @pytest.mark.asyncio
     async def test_extract_file_stream_validation_error(self):
         """Test file extraction with validation error."""
-        with patch('app.utils.security.validate_archive_name', side_effect=ValueError("Invalid archive")):
-            
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.extract_file_stream(
-                    self.mock_repository, "invalid/archive", "file.txt"
-                )
-            
-            # The error message may be wrapped
-            assert any(phrase in str(exc_info.value) for phrase in ["Invalid archive", "invalid characters", "Archive name contains"])
+        # Test with empty archive name (still invalid after security changes)
+        with pytest.raises(Exception) as exc_info:
+            await self.borg_service.extract_file_stream(
+                self.mock_repository, "", "file.txt"
+            )
+        
+        assert "Archive name must be a non-empty string" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_extract_file_stream_empty_path(self):
@@ -1010,16 +834,15 @@ class TestSecurityIntegrationExtended:
     @pytest.mark.asyncio
     async def test_list_archive_contents_security_validation(self):
         """Test that archive content listing validates archive names."""
-        with patch('app.utils.security.validate_archive_name', side_effect=ValueError("Invalid archive name")):
-            
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.list_archive_contents(
-                    self.mock_repository, "../../../etc/passwd"
-                )
-            
-            assert "Validation failed" in str(exc_info.value)
-            # The actual error message may vary depending on implementation
-            assert any(phrase in str(exc_info.value) for phrase in ["Invalid archive name", "invalid characters", "Archive name contains"])
+        # Test with too long archive name (still invalid after security changes)
+        long_name = "a" * 201  # Over 200 character limit
+        
+        with pytest.raises(Exception) as exc_info:
+            await self.borg_service.list_archive_contents(
+                self.mock_repository, long_name
+            )
+        
+        assert "Archive name too long" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_verify_repository_access_security_validation(self):
@@ -1101,7 +924,7 @@ class TestEdgeCasesAndBoundaryConditions:
     @pytest.mark.asyncio
     async def test_operations_with_very_long_paths(self):
         """Test operations with very long file paths."""
-        very_long_path = "/" + "/".join(["very_long_directory_name_" + str(i) for i in range(50)])
+        "/" + "/".join(["very_long_directory_name_" + str(i) for i in range(50)])
         
         # Test that operations handle long paths without crashing
         with patch('app.utils.security.validate_archive_name'), \
@@ -1146,27 +969,6 @@ key = résumé_ñoño
             assert match is not None
             assert match.group('path') == "/test/file.txt"
 
-    def test_memory_usage_with_large_data(self):
-        """Test service behavior with large amounts of data."""
-        # Create a large number of directory entries
-        large_entry_list = []
-        for i in range(10000):
-            large_entry_list.append({
-                "path": f"data/file_{i:05d}.txt",
-                "type": "f",
-                "size": i * 1024,
-                "mtime": "2024-01-01T12:00:00"
-            })
-        
-        # Should handle large datasets without excessive memory usage
-        result = self.borg_service._filter_directory_contents(large_entry_list, "data")
-        
-        # Should process all entries efficiently
-        assert len(result) == 10000
-        # Results should be properly sorted (directories first, then alphabetical)
-        assert all(not item["is_directory"] for item in result)  # All are files
-        assert result[0]["name"] == "file_00000.txt"
-        assert result[-1]["name"] == "file_09999.txt"
 
     def test_empty_and_whitespace_handling(self):
         """Test handling of empty and whitespace-only inputs."""

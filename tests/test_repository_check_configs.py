@@ -81,7 +81,7 @@ class TestRepositoryCheckConfigs:
         # Mock no existing config with same name
         mock_db.query.return_value.filter.return_value.first.return_value = None
         
-        result = await create_repository_check_config(mock_request, sample_config_create, mock_db)
+        await create_repository_check_config(mock_request, sample_config_create, mock_db)
         
         # Should add, commit, and refresh
         mock_db.add.assert_called_once()
@@ -112,7 +112,7 @@ class TestRepositoryCheckConfigs:
             mock_response.headers = {}
             mock_templates.TemplateResponse.return_value = mock_response
             
-            result = await create_repository_check_config(mock_htmx_request, sample_config_create, mock_db)
+            await create_repository_check_config(mock_htmx_request, sample_config_create, mock_db)
             
             # Should return template response with HX-Trigger header
             assert "HX-Trigger" in mock_response.headers
@@ -129,7 +129,7 @@ class TestRepositoryCheckConfigs:
         with patch('app.api.repository_check_configs.templates') as mock_templates:
             mock_templates.TemplateResponse.return_value = MagicMock()
             
-            result = await create_repository_check_config(mock_htmx_request, sample_config_create, mock_db)
+            await create_repository_check_config(mock_htmx_request, sample_config_create, mock_db)
             
             # Should return error template
             mock_templates.TemplateResponse.assert_called()
@@ -180,7 +180,7 @@ class TestRepositoryCheckConfigs:
         mock_db.query.side_effect = query_side_effect
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = await get_repository_check_form(mock_request, mock_db)
+            await get_repository_check_form(mock_request, mock_db)
             
             mock_templates.TemplateResponse.assert_called_once()
             args, kwargs = mock_templates.TemplateResponse.call_args
@@ -195,7 +195,7 @@ class TestRepositoryCheckConfigs:
         mock_db.query.return_value.order_by.return_value.all.return_value = [mock_config]
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = get_repository_check_configs_html(mock_request, mock_db)
+            get_repository_check_configs_html(mock_request, mock_db)
             
             mock_templates.TemplateResponse.assert_called_once()
             args, kwargs = mock_templates.TemplateResponse.call_args
@@ -209,7 +209,7 @@ class TestRepositoryCheckConfigs:
         mock_db.query.side_effect = Exception("Database error")
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = get_repository_check_configs_html(mock_request, mock_db)
+            get_repository_check_configs_html(mock_request, mock_db)
             
             mock_templates.TemplateResponse.assert_called_once()
             args, kwargs = mock_templates.TemplateResponse.call_args
@@ -221,7 +221,7 @@ class TestRepositoryCheckConfigs:
         from app.api.repository_check_configs import toggle_custom_options
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = toggle_custom_options(mock_request, check_config_id="")
+            toggle_custom_options(mock_request, check_config_id="")
             
             args, kwargs = mock_templates.TemplateResponse.call_args
             context = args[2]
@@ -232,7 +232,7 @@ class TestRepositoryCheckConfigs:
         from app.api.repository_check_configs import toggle_custom_options
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = toggle_custom_options(mock_request, check_config_id="123")
+            toggle_custom_options(mock_request, check_config_id="123")
             
             args, kwargs = mock_templates.TemplateResponse.call_args
             context = args[2]
@@ -243,7 +243,7 @@ class TestRepositoryCheckConfigs:
         from app.api.repository_check_configs import update_check_options
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = update_check_options(
+            update_check_options(
                 mock_request,
                 check_type="repository_only",
                 max_duration="3600",
@@ -261,7 +261,7 @@ class TestRepositoryCheckConfigs:
         from app.api.repository_check_configs import update_check_options
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = update_check_options(
+            update_check_options(
                 mock_request,
                 check_type="full",
                 max_duration="",
@@ -280,7 +280,7 @@ class TestRepositoryCheckConfigs:
         from app.api.repository_check_configs import update_check_options
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = update_check_options(
+            update_check_options(
                 mock_request,
                 check_type="full",
                 max_duration="3600",  # Has time limit
@@ -393,7 +393,7 @@ class TestRepositoryCheckConfigs:
         mock_db.query.return_value.order_by.return_value.all.return_value = [mock_config]
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            result = delete_repository_check_config(1, mock_htmx_request, mock_db)
+            delete_repository_check_config(1, mock_htmx_request, mock_db)
             
             mock_db.delete.assert_called_once_with(mock_config)
             mock_templates.TemplateResponse.assert_called_once()
@@ -413,7 +413,7 @@ class TestRepositoryCheckConfigs:
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
             # Test with empty repair_mode
-            result = update_check_options(
+            update_check_options(
                 mock_request,
                 check_type="full",
                 max_duration="",

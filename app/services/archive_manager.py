@@ -82,24 +82,25 @@ class ArchiveManager:
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
     ) -> List[Dict[str, any]]:
-        """List contents of a specific directory within an archive, showing only immediate children"""
+        """List contents of a specific directory within an archive using FUSE mount"""
         logger.info(
-            f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}'"
+            f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
         )
 
-        # Get all contents of the archive
-        try:
-            all_contents = await self.list_archive_contents(repository, archive_name)
-        except Exception as e:
-            raise Exception(f"Failed to get archive contents: {str(e)}")
+        from app.services.archive_mount_manager import get_archive_mount_manager
 
-        # Filter to show only immediate children of the specified path
-        filtered_contents = self._filter_directory_contents(all_contents, path)
+        mount_manager = get_archive_mount_manager()
+
+        # Mount the archive if not already mounted
+        await mount_manager.mount_archive(repository, archive_name)
+
+        # List the directory contents using filesystem operations
+        contents = mount_manager.list_directory(repository, archive_name, path)
 
         logger.info(
-            f"Found {len(filtered_contents)} items in directory '{path}' (filtered from {len(all_contents)} total)"
+            f"Listed {len(contents)} items from mounted archive {archive_name} path '{path}'"
         )
-        return filtered_contents
+        return contents
 
     def _filter_directory_contents(
         self, all_entries: List[Dict], target_path: str = ""

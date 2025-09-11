@@ -4,7 +4,7 @@
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Select Repository</label>
         <select id="archive-repository-select" 
                 name="repository_id"
-                hx-get="/api/repositories/archives/list"
+                hx-post="/api/repositories/archives/load-with-spinner"
                 hx-target="#archives-list"
                 hx-swap="innerHTML"
                 hx-trigger="change"
@@ -18,7 +18,7 @@
     </div>
     <div class="flex-shrink-0 pt-6">
         <button 
-            hx-get="/api/repositories/archives/list"
+            hx-post="/api/repositories/archives/load-with-spinner"
             hx-target="#archives-list"
             hx-swap="innerHTML"
             hx-include="#archive-repository-select"

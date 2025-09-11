@@ -749,21 +749,56 @@ async def get_archives_repository_selector(
     )
 
 
-@router.get("/archives/list")
-async def get_archives_list(
-    request: Request,
-    borg_svc: BorgServiceDep,
-    repository_id: int = None,
-    db: Session = Depends(get_db),
-):
-    """Get archives list or empty state"""
-    if not repository_id:
+@router.get("/archives/loading")
+async def get_archives_loading(request: Request):
+    """Get loading state for archives"""
+    return templates.TemplateResponse(
+        request, "partials/archives/loading_state.html", {}
+    )
+
+
+@router.post("/archives/load-with-spinner")
+async def load_archives_with_spinner(request: Request, repository_id: str = Form("")):
+    """Show loading spinner then trigger loading actual archives"""
+    if not repository_id or repository_id == "":
         return templates.TemplateResponse(
             request, "partials/archives/empty_state.html", {}
         )
 
-    # Redirect to the existing archives HTML endpoint
-    return await list_archives_html(repository_id, request, borg_svc, db)
+    try:
+        repo_id = int(repository_id)
+        return templates.TemplateResponse(
+            request,
+            "partials/archives/loading_with_trigger.html",
+            {"repository_id": repo_id},
+        )
+    except (ValueError, TypeError):
+        return templates.TemplateResponse(
+            request, "partials/archives/empty_state.html", {}
+        )
+
+
+@router.get("/archives/list")
+async def get_archives_list(
+    request: Request,
+    borg_svc: BorgServiceDep,
+    repository_id: str = "",
+    db: Session = Depends(get_db),
+):
+    """Get archives list or empty state"""
+    if not repository_id or repository_id == "":
+        return templates.TemplateResponse(
+            request, "partials/archives/empty_state.html", {}
+        )
+
+    try:
+        repo_id = int(repository_id)
+        # Redirect to the existing archives HTML endpoint
+        return await list_archives_html(repo_id, request, borg_svc, db)
+    except (ValueError, TypeError):
+        return templates.TemplateResponse(
+            request, "partials/archives/empty_state.html", {}
+        )
 
 
 @router.get("/{repo_id}/info")
@@ -779,6 +814,26 @@ async def get_repository_info(
         return info
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{repo_id}/archives/{archive_name}/contents/load-with-spinner")
+async def load_archive_contents_with_spinner(
+    request: Request,
+    repo_id: int,
+    archive_name: str,
+    path: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Show loading spinner then trigger loading actual directory contents"""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if repository is None:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    return templates.TemplateResponse(
+        request,
+        "partials/archives/directory_loading_with_trigger.html",
+        {"repository_id": repo_id, "archive_name": archive_name, "path": path},
+    )
 
 
 @router.get("/{repo_id}/archives/{archive_name}/contents")

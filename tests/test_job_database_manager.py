@@ -124,7 +124,7 @@ class TestJobDatabaseManager:
         job_uuid = str(uuid.uuid4())
         
         # Mock the Job model and query
-        with patch('app.models.database.Job') as MockJob:
+        with patch('app.models.database.Job'):
             mock_job_instance = Mock()
             mock_job_instance.id = job_uuid
             mock_job_instance.status = "running"
@@ -157,7 +157,7 @@ class TestJobDatabaseManager:
         job_uuid = str(uuid.uuid4())
         
         # Mock the Job model and query
-        with patch('app.models.database.Job') as MockJob:
+        with patch('app.models.database.Job'):
             mock_job_instance = Mock()
             mock_job_instance.id = job_uuid
             mock_job_instance.cloud_sync_config_id = 123
@@ -194,7 +194,7 @@ class TestJobDatabaseManager:
         job_uuid = str(uuid.uuid4())
         
         # Mock the Job model and query
-        with patch('app.models.database.Job') as MockJob:
+        with patch('app.models.database.Job'):
             mock_job_instance = Mock()
             mock_job_instance.id = job_uuid
             mock_job_instance.repository_id = 1
@@ -229,7 +229,7 @@ class TestJobDatabaseManager:
         repository_id = 1
         
         # Mock the Job model and query
-        with patch('app.models.database.Job') as MockJob:
+        with patch('app.models.database.Job'):
             mock_job1 = Mock()
             mock_job1.id = str(uuid.uuid4())
             mock_job1.type = "backup"
@@ -290,8 +290,8 @@ class TestJobDatabaseManager:
         tasks = [mock_task1, mock_task2]
         
         # Mock the Job and JobTask models
-        with patch('app.models.database.Job') as MockJob, \
-             patch('app.models.database.JobTask') as MockJobTask:
+        with patch('app.models.database.Job'), \
+             patch('app.models.database.JobTask'):
             
             mock_job_instance = Mock()
             mock_job_instance.id = job_uuid
@@ -346,7 +346,7 @@ class TestJobDatabaseManager:
         # Mock database error
         mock_session.add.side_effect = Exception("Database error")
         
-        with patch('app.models.database.Job') as MockJob:
+        with patch('app.models.database.Job'):
             sample_data = DatabaseJobData(
                 job_uuid=str(uuid.uuid4()),
                 repository_id=1,
@@ -366,7 +366,7 @@ class TestJobDatabaseManager:
         # Mock database error
         mock_session.commit.side_effect = Exception("Database error")
         
-        with patch('app.models.database.Job') as MockJob:
+        with patch('app.models.database.Job'):
             mock_job_instance = Mock()
             mock_query = Mock()
             mock_query.filter.return_value.first.return_value = mock_job_instance
@@ -383,7 +383,7 @@ class TestJobDatabaseManager:
         """Test scenarios where job is not found"""
         factory, mock_session = mock_db_session_factory
         
-        with patch('app.models.database.Job') as MockJob:
+        with patch('app.models.database.Job'):
             # Mock no job found
             mock_query = Mock()
             mock_query.filter.return_value.first.return_value = None

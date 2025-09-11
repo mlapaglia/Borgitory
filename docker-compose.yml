@@ -1,6 +1,10 @@
 services:
   borgitory:
     build: .
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse:rwm
     ports:
       - "8000:8000"   # HTTP port
     volumes:

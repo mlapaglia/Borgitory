@@ -37,10 +37,9 @@
                     </div>
                     <div class="flex-shrink-0">
                         <button 
-                            hx-get="/api/repositories/{{ repository.id }}/archives/{{ archive.name }}/contents"
+                            hx-post="/api/repositories/{{ repository.id }}/archives/{{ archive.name }}/contents/load-with-spinner"
                             hx-target="#archive-browser-container"
                             hx-swap="innerHTML"
-                            hx-indicator="#loading-indicator"
                             onclick="document.getElementById('archive-contents-modal').classList.remove('hidden')"
                             class="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800/50 focus:ring-2 focus:ring-blue-500">
                             View Contents

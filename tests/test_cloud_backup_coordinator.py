@@ -158,7 +158,7 @@ class TestCloudBackupCoordinator:
         mock_config.enabled = True
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_config
         
-        with patch.object(coordinator, '_execute_cloud_backup', new_callable=AsyncMock) as mock_execute:
+        with patch.object(coordinator, '_execute_cloud_backup', new_callable=AsyncMock):
             task_id = await coordinator.trigger_cloud_backup(sample_repository_data, 1, source_job_id=123)
             
             assert task_id is not None
@@ -292,7 +292,7 @@ class TestCloudBackupCoordinator:
         )
         coordinator._active_tasks[task.task_id] = task
         
-        with patch.object(coordinator, '_get_cloud_sync_config', return_value=None) as mock_get_config, \
+        with patch.object(coordinator, '_get_cloud_sync_config', return_value=None), \
              patch.object(coordinator, '_update_cloud_backup_status', new_callable=AsyncMock) as mock_update:
             
             await coordinator._execute_cloud_backup(task, sample_repository_data)

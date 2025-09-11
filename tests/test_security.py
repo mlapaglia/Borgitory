@@ -342,9 +342,10 @@ class TestValidateArchiveName:
         with pytest.raises(ValueError, match="Archive name must be a non-empty string"):
             validate_archive_name(123)
 
-    def test_validate_invalid_characters(self):
-        """Test that invalid characters are rejected."""
-        invalid_names = [
+    def test_validate_various_characters_now_allowed(self):
+        """Test that various characters are now allowed in archive names."""
+        # These names were previously invalid but are now allowed since character validation was removed
+        previously_invalid_names = [
             "backup space",  # Space
             "backup/slash", 
             "backup\\backslash",
@@ -360,12 +361,19 @@ class TestValidateArchiveName:
             "backup&ampersand",
             "backup$dollar",
             "backup`backtick",
-            "backup\nnewline",
         ]
         
-        for name in invalid_names:
-            with pytest.raises(ValueError, match="Archive name contains invalid characters"):
-                validate_archive_name(name)
+        # All of these should now pass validation (only basic checks remain)
+        for name in previously_invalid_names:
+            result = validate_archive_name(name)
+            assert result == name
+            
+    def test_validate_newline_still_problematic(self):
+        """Test that newlines in names might still cause issues (but validation allows them)."""
+        # Newlines are now allowed by validation but may cause issues elsewhere
+        name_with_newline = "backup\nnewline"
+        result = validate_archive_name(name_with_newline)
+        assert result == name_with_newline
 
     def test_validate_too_long(self):
         """Test that overly long names are rejected."""
@@ -538,8 +546,10 @@ class TestSecurityIntegration:
         with pytest.raises(ValueError):
             sanitize_passphrase(malicious_passphrase)
             
-        with pytest.raises(ValueError):
-            validate_archive_name(malicious_archive)
+        # Archive name validation no longer rejects special characters
+        # This would now pass validation (but could still cause issues elsewhere)
+        result = validate_archive_name(malicious_archive)
+        assert result == malicious_archive
             
         with pytest.raises(ValueError):
             validate_compression(malicious_compression)

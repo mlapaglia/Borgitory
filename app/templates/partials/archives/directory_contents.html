@@ -6,10 +6,9 @@
         <!-- Breadcrumb Navigation -->
         <div class="breadcrumb-nav mt-2">
             <button 
-                hx-get="/api/repositories/{{ repository.id }}/archives/{{ archive_name }}/contents"
+                hx-post="/api/repositories/{{ repository.id }}/archives/{{ archive_name }}/contents/load-with-spinner"
                 hx-target="closest .archive-browser"
                 hx-swap="outerHTML"
-                hx-indicator="#loading-indicator"
                 class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
                 Root
             </button>
@@ -22,10 +21,10 @@
                             / <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ part }}</span>
                         {% else %}
                             / <button 
-                                hx-get="/api/repositories/{{ repository.id }}/archives/{{ archive_name }}/contents?path={{ current_path | urlencode }}"
+                                hx-post="/api/repositories/{{ repository.id }}/archives/{{ archive_name }}/contents/load-with-spinner"
+                                hx-vals='{"path": "{{ current_path }}"}'
                                 hx-target="closest .archive-browser"
                                 hx-swap="outerHTML"
-                                hx-indicator="#loading-indicator"
                                 class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
                                 {{ part }}
                             </button>
@@ -38,11 +37,6 @@
         </div>
     </div>
 
-    <!-- Loading Indicator -->
-    <div id="loading-indicator" class="htmx-indicator p-4 text-center">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-        <span class="text-sm text-gray-500 dark:text-gray-400">Loading directory contents...</span>
-    </div>
 
     <!-- Directory Tree -->
     <div class="archive-tree border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
@@ -65,10 +59,10 @@
                         <div class="flex-1">
                             {% if item.is_directory %}
                                 <button 
-                                    hx-get="/api/repositories/{{ repository.id }}/archives/{{ archive_name }}/contents?path={{ item.path | urlencode }}"
+                                    hx-post="/api/repositories/{{ repository.id }}/archives/{{ archive_name }}/contents/load-with-spinner"
+                                    hx-vals='{"path": "{{ item.path }}"}'
                                     hx-target="closest .archive-browser"
                                     hx-swap="outerHTML"
-                                    hx-indicator="#loading-indicator"
                                     class="text-left text-sm text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">
                                     {{ item.name }}
                                 </button>

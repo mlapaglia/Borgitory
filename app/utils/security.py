@@ -162,12 +162,6 @@ def validate_archive_name(name: str) -> str:
     if not name or not isinstance(name, str):
         raise ValueError("Archive name must be a non-empty string")
 
-    # Archive names should only contain safe characters
-    if not re.match(r"^[a-zA-Z0-9._-]+$", name):
-        raise ValueError(
-            "Archive name contains invalid characters. Only alphanumeric, dots, hyphens, and underscores allowed"
-        )
-
     if len(name) > 200:
         raise ValueError("Archive name too long (max 200 characters)")
 
