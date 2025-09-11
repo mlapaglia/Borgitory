@@ -6,7 +6,11 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.models.database import Schedule, Repository, get_db
-from app.models.schemas import Schedule as ScheduleSchema, ScheduleCreate, ScheduleUpdate
+from app.models.schemas import (
+    Schedule as ScheduleSchema,
+    ScheduleCreate,
+    ScheduleUpdate,
+)
 from app.dependencies import SchedulerServiceDep
 
 router = APIRouter()
@@ -281,9 +285,7 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{schedule_id}/edit", response_class=HTMLResponse)
 async def get_schedule_edit_form(
-    request: Request,
-    schedule_id: int,
-    db: Session = Depends(get_db)
+    request: Request, schedule_id: int, db: Session = Depends(get_db)
 ) -> HTMLResponse:
     """Get edit form for a specific schedule"""
     from app.models.database import (
@@ -292,18 +294,24 @@ async def get_schedule_edit_form(
         NotificationConfig,
         RepositoryCheckConfig,
     )
-    
+
     try:
         schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
         if schedule is None:
             raise HTTPException(status_code=404, detail="Schedule not found")
-        
+
         # Get all the dropdown options
         repositories = db.query(Repository).all()
         cleanup_configs = db.query(CleanupConfig).filter(CleanupConfig.enabled).all()
-        cloud_sync_configs = db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled).all()
-        notification_configs = db.query(NotificationConfig).filter(NotificationConfig.enabled).all()
-        check_configs = db.query(RepositoryCheckConfig).filter(RepositoryCheckConfig.enabled).all()
+        cloud_sync_configs = (
+            db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled).all()
+        )
+        notification_configs = (
+            db.query(NotificationConfig).filter(NotificationConfig.enabled).all()
+        )
+        check_configs = (
+            db.query(RepositoryCheckConfig).filter(RepositoryCheckConfig.enabled).all()
+        )
 
         context = {
             "schedule": schedule,
@@ -332,20 +340,20 @@ async def update_schedule(
 ):
     """Update a schedule"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
         if schedule is None:
             raise HTTPException(status_code=404, detail="Schedule not found")
-        
+
         # Update fields if provided
         update_data = schedule_update.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(schedule, field, value)
-        
+
         db.commit()
         db.refresh(schedule)
-        
+
         # Update the scheduler if enabled
         if schedule.enabled:
             try:
@@ -355,7 +363,7 @@ async def update_schedule(
             except Exception:
                 # If scheduler update fails, we still want to return the updated schedule
                 pass
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request,
@@ -366,7 +374,7 @@ async def update_schedule(
             return response
         else:
             return schedule
-            
+
     except HTTPException as e:
         if is_htmx_request:
             return templates.TemplateResponse(
@@ -439,7 +447,7 @@ async def delete_schedule(
     db: Session = Depends(get_db),
 ):
     is_htmx_request = request and "hx-request" in request.headers
-    
+
     try:
         schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
         if schedule is None:

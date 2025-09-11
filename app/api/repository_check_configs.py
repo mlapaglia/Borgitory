@@ -230,7 +230,7 @@ async def get_repository_check_config_edit_form(
         )
         if not config:
             raise HTTPException(status_code=404, detail="Check policy not found")
-        
+
         context = {
             "config": config,
             "is_edit_mode": True,

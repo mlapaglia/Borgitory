@@ -118,13 +118,38 @@
     <div id="notification-area" class="fixed top-4 right-4 z-50"></div>
 
     <!-- Component JavaScript Files -->
-    <script src="/static/js/utils.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/components/navigation.js"></script>
     <script src="/static/js/components/jobs.js"></script>
     <script src="/static/js/components/path-autocomplete.js"></script>
 
     <script>
+        // HTMX notification helper function
+        function showHTMXNotification(message, type, targetContainer = '#notification-status') {
+            // Try to use the page-specific notification container first
+            let target = document.querySelector(targetContainer);
+            if (!target) {
+                // Fallback to any notification status container
+                target = document.querySelector('[id$="-status"]');
+            }
+            if (!target) {
+                // Create temporary container if none exists
+                const tempContainer = document.createElement('div');
+                tempContainer.id = 'temp-notification';
+                tempContainer.style.position = 'fixed';
+                tempContainer.style.top = '20px';
+                tempContainer.style.right = '20px';
+                tempContainer.style.zIndex = '1000';
+                document.body.appendChild(tempContainer);
+                target = tempContainer;
+            }
+            
+            htmx.ajax('GET', `/api/shared/notification?type=${type}&message=${encodeURIComponent(message)}`, {
+                target: target,
+                swap: 'innerHTML'
+            });
+        }
+
         // Logout function (specific to base template)
         async function logout() {
             try {
@@ -134,16 +159,16 @@
                 });
                 
                 if (response.ok) {
-                    showNotification('Logged out successfully', 'success');
+                    showHTMXNotification('Logged out successfully', 'success');
                     setTimeout(() => {
                         window.location.href = '/login';
                     }, 1000);
                 } else {
-                    showNotification('Logout failed', 'error');
+                    showHTMXNotification('Logout failed', 'error');
                 }
             } catch (error) {
                 console.error('Logout error:', error);
-                showNotification('Logout failed', 'error');
+                showHTMXNotification('Logout failed', 'error');
             }
         }
 
@@ -151,7 +176,7 @@
         document.body.addEventListener('htmx:responseError', function(evt) {
             // Only show if no specific handler was used
             if (!evt.target.hasAttribute('hx-on::after-request')) {
-                showNotification('An error occurred: ' + evt.detail.xhr.statusText, 'error');
+                showHTMXNotification('An error occurred: ' + evt.detail.xhr.statusText, 'error');
             }
         });
 

@@ -28,32 +28,55 @@ async def create_backup(
     db: Session = Depends(get_db),
 ):
     """Start a backup job and return HTML status"""
+    is_htmx_request = "hx-request" in request.headers
+    
     try:
         result = await job_svc.create_backup_job(backup_request, db)
         job_id = result["job_id"]
 
-        # Return HTML showing the backup started
-        return f"""
-            <div id="backup-job-{job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div class="flex items-center">
-                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                    <span class="text-blue-700 text-sm">Backup job #{job_id} started...</span>
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/jobs/backup_success.html",
+                {"job_id": job_id},
+            )
+        else:
+            # Return HTML showing the backup started for non-HTMX requests
+            return f"""
+                <div id="backup-job-{job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div class="flex items-center">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                        <span class="text-blue-700 text-sm">Backup job #{job_id} started...</span>
+                    </div>
                 </div>
-            </div>
-        """
+            """
     except ValueError as e:
-        # Return error HTML
+        error_msg = f"Repository not found: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/jobs/backup_error.html",
+                {"error_message": error_msg},
+                status_code=400,
+            )
         return f"""
             <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                <span class="text-red-700 text-sm">Repository not found: {str(e)}</span>
+                <span class="text-red-700 text-sm">{error_msg}</span>
             </div>
         """
     except Exception as e:
         logger.error(f"Failed to start backup: {e}")
-        # Return error HTML
+        error_msg = f"Failed to start backup: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/jobs/backup_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
         return f"""
             <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                <span class="text-red-700 text-sm">Failed to start backup: {str(e)}</span>
+                <span class="text-red-700 text-sm">{error_msg}</span>
             </div>
         """
 
@@ -111,10 +134,10 @@ async def create_check_job(
 ):
     """Start a repository check job and return job_id for tracking"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         result = await job_svc.create_check_job(check_request, db)
-        
+
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
@@ -123,7 +146,7 @@ async def create_check_job(
             )
         else:
             return result
-            
+
     except ValueError as e:
         error_msg = str(e)
         if is_htmx_request:

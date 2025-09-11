@@ -1,6 +1,6 @@
-<!-- Cloud Sync Test Error Template -->
-<script>
-if (typeof showNotification === 'function') {
-    showNotification('{{ error_message }}', 'error');
-}
-</script>
+<!-- HTMX notification trigger -->
+<div hx-get="/api/shared/notification?type=error&message={{ error_message | urlencode }}"
+     hx-target="#cloud-sync-status"
+     hx-swap="innerHTML"
+     hx-trigger="load">
+</div>
