@@ -10,7 +10,7 @@
       method="post"
       action="/auth/register"
       hx-post="/auth/register"
-      hx-target="#status-message"
+      hx-target="#register-status-message"
       hx-swap="outerHTML">
     <div class="mb-4">
         <label for="reg-username" class="block text-sm font-medium text-gray-900 mb-2">Username</label>
@@ -49,3 +49,8 @@
         Create Account
     </button>
 </form>
+
+<!-- Status messages -->
+<div id="register-status-message" class="mt-4">
+    <!-- HTMX register responses will be inserted here -->
+</div>
