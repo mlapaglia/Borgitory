@@ -3,7 +3,7 @@
       method="post"
       action="/auth/login"
       hx-post="/auth/login"
-      hx-target="#status-message"
+      hx-target="#login-status-message"
       hx-swap="outerHTML">
     <div class="mb-4">
         <label for="username" class="block text-sm font-medium text-gray-900 mb-2">Username</label>
@@ -48,3 +48,8 @@
         Sign In
     </button>
 </form>
+
+<!-- Status messages -->
+<div id="login-status-message" class="mt-4">
+    <!-- HTMX login responses will be inserted here -->
+</div>
