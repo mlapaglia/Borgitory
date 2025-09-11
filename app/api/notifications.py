@@ -296,6 +296,119 @@ async def disable_notification_config(
         raise HTTPException(status_code=500, detail=error_msg)
 
 
+@router.get("/{config_id}/edit", response_class=HTMLResponse)
+async def get_notification_config_edit_form(
+    request: Request,
+    config_id: int,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Get edit form for a specific notification configuration"""
+    try:
+        notification_config = (
+            db.query(NotificationConfig)
+            .filter(NotificationConfig.id == config_id)
+            .first()
+        )
+        if not notification_config:
+            raise HTTPException(
+                status_code=404, detail="Notification configuration not found"
+            )
+
+        # Decrypt credentials for edit form
+        user_key, app_token = "", ""
+        if notification_config.provider == "pushover":
+            user_key, app_token = notification_config.get_pushover_credentials()
+
+        context = {
+            "config": notification_config,
+            "user_key": user_key,
+            "app_token": app_token,
+            "is_edit_mode": True,
+        }
+
+        return templates.TemplateResponse(
+            request, "partials/notifications/edit_form.html", context
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=404, detail=f"Notification configuration not found: {str(e)}"
+        )
+
+
+@router.put("/{config_id}", response_model=NotificationConfigSchema)
+async def update_notification_config(
+    request: Request,
+    config_id: int,
+    notification_config: NotificationConfigCreate,
+    db: Session = Depends(get_db),
+):
+    """Update a notification configuration"""
+    is_htmx_request = "hx-request" in request.headers
+
+    try:
+        existing_config = (
+            db.query(NotificationConfig)
+            .filter(NotificationConfig.id == config_id)
+            .first()
+        )
+        if not existing_config:
+            error_msg = "Notification configuration not found"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    request,
+                    "partials/notifications/update_error.html",
+                    {"error_message": error_msg},
+                    status_code=404,
+                )
+            raise HTTPException(status_code=404, detail=error_msg)
+
+        # Update basic fields
+        existing_config.name = notification_config.name
+        existing_config.provider = notification_config.provider
+        existing_config.notify_on_success = notification_config.notify_on_success
+        existing_config.notify_on_failure = notification_config.notify_on_failure
+
+        # Update credentials
+        existing_config.set_pushover_credentials(
+            notification_config.user_key, notification_config.app_token
+        )
+
+        db.commit()
+        db.refresh(existing_config)
+
+        if is_htmx_request:
+            response = templates.TemplateResponse(
+                request,
+                "partials/notifications/update_success.html",
+                {"config_name": notification_config.name},
+            )
+            response.headers["HX-Trigger"] = "notificationUpdate"
+            return response
+        else:
+            return existing_config
+
+    except Exception as e:
+        error_msg = f"Failed to update notification configuration: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/notifications/update_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
+@router.get("/form", response_class=HTMLResponse)
+async def get_notification_form(request: Request) -> HTMLResponse:
+    """Get notification creation form"""
+    return templates.TemplateResponse(
+        request,
+        "partials/notifications/add_form.html",
+        {},
+    )
+
+
 @router.delete("/{config_id}")
 async def delete_notification_config(
     request: Request, config_id: int, db: Session = Depends(get_db)

@@ -1,37 +1,62 @@
 {% if not schedules %}
-<div class="text-gray-500 dark:text-gray-400 text-center py-4">
-    <p>No schedules configured</p>
+<div class="text-gray-600 dark:text-gray-400 text-sm py-4 text-center">
+    <p>No scheduled backups configured.</p>
+    <p class="mt-1">Add one using the form above to automatically run backups on a schedule.</p>
 </div>
 {% else %}
 {% for schedule in schedules %}
-<div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg mb-2 bg-white dark:bg-gray-800 {{ 'bg-gray-50 dark:bg-gray-700' if not schedule.enabled }}">
-    <div>
-        <div class="font-medium {{ 'text-gray-500 dark:text-gray-400' if not schedule.enabled else 'text-gray-900 dark:text-gray-100' }}">{{ schedule.name }}</div>
-        <div class="text-sm text-gray-500 dark:text-gray-400">
-            <span class="inline-flex px-2 py-1 text-xs rounded-full {{ 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' if schedule.enabled else 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' }}">
-                {{ 'Active' if schedule.enabled else 'Disabled' }}
-            </span>
-            Last: {{ schedule.last_run.strftime('%m/%d/%Y, %I:%M:%S %p') if schedule.last_run else 'Never run' }}
-            {% if schedule.next_run %}
-            | Next: {{ schedule.next_run.strftime('%m/%d/%Y, %I:%M:%S %p') }}
-            {% endif %}
+<div class="border border-gray-600 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800 mb-3">
+    <div class="flex justify-between items-start">
+        <div class="flex-1">
+            <div class="flex items-center mb-2">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ schedule.name }}</h4>
+                <span class="ml-2 px-2 py-1 text-xs rounded-full {{ 'bg-green-100 text-green-800' if schedule.enabled else 'bg-red-100 text-red-800' }}">
+                    {{ 'Enabled' if schedule.enabled else 'Disabled' }}
+                </span>
+            </div>
+            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                <div><strong>Repository:</strong> {{ schedule.repository.name }}</div>
+                <div><strong>Cron Expression:</strong> {{ schedule.cron_expression }}</div>
+                {% if schedule.last_run %}
+                <div><strong>Last Run:</strong> {{ schedule.last_run.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                {% endif %}
+                {% if schedule.next_run %}
+                <div><strong>Next Run:</strong> {{ schedule.next_run.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                {% endif %}
+                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ schedule.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+            </div>
         </div>
-        <div class="text-xs text-gray-400 dark:text-gray-500">{{ schedule.cron_expression }}</div>
-    </div>
-    <div class="flex space-x-2">
-        <button hx-put="/api/schedules/{{ schedule.id }}/toggle"
+        <div class="flex flex-col space-y-2 ml-4">
+            <button 
+                hx-get="/api/schedules/{{ schedule.id }}/edit"
+                hx-target="#schedule-form-container"
+                hx-swap="innerHTML"
+                class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500"
+            >
+                Edit
+            </button>
+            <button 
+                hx-put="/api/schedules/{{ schedule.id }}/toggle"
                 hx-target="#schedules-list"
                 hx-swap="innerHTML"
-                class="px-3 py-1 text-sm {{ 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800' if schedule.enabled else 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800' }} rounded">
-            {{ 'Disable' if schedule.enabled else 'Enable' }}
-        </button>
-        <button hx-delete="/api/schedules/{{ schedule.id }}"
-                hx-target="#schedules-list"
+                hx-indicator="this"
+                class="px-3 py-1 text-xs {{ 'bg-yellow-600 hover:bg-yellow-700' if schedule.enabled else 'bg-blue-600 hover:bg-blue-700' }} text-white rounded focus:ring-2 focus:ring-blue-500 [&.htmx-request]:opacity-50"
+            >
+                <span class="[.htmx-request_&]:hidden">{{ 'Disable' if schedule.enabled else 'Enable' }}</span>
+                <span class="hidden [.htmx-request_&]:inline">{{ 'Disabling...' if schedule.enabled else 'Enabling...' }}</span>
+            </button>
+            <button 
+                hx-delete="/api/schedules/{{ schedule.id }}"
+                hx-target="#schedule-status"
                 hx-swap="innerHTML"
+                hx-indicator="this"
                 hx-confirm="Are you sure you want to delete the schedule '{{ schedule.name }}'?"
-                class="px-3 py-1 text-sm bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800">
-            Delete
-        </button>
+                class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500 [&.htmx-request]:opacity-50"
+            >
+                <span class="[.htmx-request_&]:hidden">Delete</span>
+                <span class="hidden [.htmx-request_&]:inline">Deleting...</span>
+            </button>
+        </div>
     </div>
 </div>
 {% endfor %}

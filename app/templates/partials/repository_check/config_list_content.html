@@ -1,44 +1,66 @@
-{% if configs %}
-<div class="space-y-3">
-    {% for config in configs %}
-    <div class="border dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
-        <div class="flex items-center justify-between">
-            <div class="flex-1">
-                <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ config.name }}</h4>
-                {% if config.description %}
-                <p class="text-sm text-gray-600 dark:text-gray-300">{{ config.description }}</p>
-                {% endif %}
-                <div class="text-xs text-gray-500 dark:text-gray-400 space-x-4 mt-1">
-                    <span>Type: {{ config.check_type|title }}</span>
-                    {% if config.verify_data %}
-                    <span class="text-blue-600">✓ Data Verify</span>
-                    {% endif %}
-                    {% if config.repair_mode %}
-                    <span class="text-red-600">⚠️ Repair</span>
-                    {% endif %}
-                    {% if config.save_space %}
-                    <span class="text-green-600">💾 Save Space</span>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="flex space-x-2">
-                <button 
-                    hx-delete="/api/repository-check-configs/{{ config.id }}"
-                    hx-confirm="Are you sure you want to delete the check policy '{{ config.name }}'?"
-                    hx-target="#check-policies-list"
-                    hx-swap="innerHTML"
-                    class="px-2 py-1 text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800"
-                    title="Delete policy">
-                    Delete
-                </button>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
+{% if not configs %}
+<div class="text-gray-600 dark:text-gray-400 text-sm py-4 text-center">
+    <p>No check policies configured.</p>
+    <p class="mt-1">Create one using the form above to verify repository integrity.</p>
 </div>
 {% else %}
-<div class="text-center py-4">
-    <p class="text-gray-500 dark:text-gray-400 text-sm">No check policies configured.</p>
-    <p class="text-gray-400 dark:text-gray-500 text-xs mt-1">Create a policy above to get started.</p>
+{% for config in configs %}
+<div class="border border-gray-600 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800 mb-3">
+    <div class="flex justify-between items-start">
+        <div class="flex-1">
+            <div class="flex items-center mb-2">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ config.name }}</h4>
+                <span class="ml-2 px-2 py-1 text-xs rounded-full {{ 'bg-green-100 text-green-800' if config.enabled else 'bg-red-100 text-red-800' }}">
+                    {{ 'Enabled' if config.enabled else 'Disabled' }}
+                </span>
+            </div>
+            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                {% if config.description %}
+                <div><strong>Description:</strong> {{ config.description }}</div>
+                {% endif %}
+                <div><strong>Type:</strong> {{ config.check_type|title }}</div>
+                <div>
+                    <strong>Options:</strong>
+                    {% if config.verify_data %}<span class="text-blue-600">✓ Data Verify</span>{% endif %}
+                    {% if config.repair_mode %}<span class="text-red-600 ml-2">⚠️ Repair</span>{% endif %}
+                    {% if config.save_space %}<span class="text-green-600 ml-2">💾 Save Space</span>{% endif %}
+                    {% if not config.verify_data and not config.repair_mode and not config.save_space %}<span class="text-gray-500">None</span>{% endif %}
+                </div>
+                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ config.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+            </div>
+        </div>
+        <div class="flex flex-col space-y-2 ml-4">
+            <button 
+                hx-get="/api/repository-check-configs/{{ config.id }}/edit"
+                hx-target="#check-policy-form-container"
+                hx-swap="innerHTML"
+                class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500"
+            >
+                Edit
+            </button>
+            <button 
+                hx-post="/api/repository-check-configs/{{ config.id }}/{{ 'disable' if config.enabled else 'enable' }}"
+                hx-target="#check-policy-status"
+                hx-swap="innerHTML"
+                hx-indicator="this"
+                class="px-3 py-1 text-xs {{ 'bg-yellow-600 hover:bg-yellow-700' if config.enabled else 'bg-blue-600 hover:bg-blue-700' }} text-white rounded focus:ring-2 focus:ring-blue-500 [&.htmx-request]:opacity-50"
+            >
+                <span class="[.htmx-request_&]:hidden">{{ 'Disable' if config.enabled else 'Enable' }}</span>
+                <span class="hidden [.htmx-request_&]:inline">{{ 'Disabling...' if config.enabled else 'Enabling...' }}</span>
+            </button>
+            <button 
+                hx-delete="/api/repository-check-configs/{{ config.id }}"
+                hx-target="#check-policy-status"
+                hx-swap="innerHTML"
+                hx-indicator="this"
+                hx-confirm="Are you sure you want to delete the check policy '{{ config.name }}'?"
+                class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500 [&.htmx-request]:opacity-50"
+            >
+                <span class="[.htmx-request_&]:hidden">Delete</span>
+                <span class="hidden [.htmx-request_&]:inline">Deleting...</span>
+            </button>
+        </div>
+    </div>
 </div>
+{% endfor %}
 {% endif %}

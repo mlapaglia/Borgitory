@@ -1,17 +1,13 @@
-<!-- Notification Configuration Creation Success Template -->
-<div class="bg-green-50 border border-green-200 rounded-lg p-3">
-    <span class="text-green-700 text-sm">Notification configuration "{{ config_name }}" added successfully!</span>
+<!-- HTMX notification trigger -->
+<div hx-get="/api/shared/notification?type=success&message=Notification configuration '{{ config_name }}' added successfully!"
+     hx-target="#notification-status"
+     hx-swap="innerHTML"
+     hx-trigger="load">
 </div>
 
-<script>
-// Show success notification
-if (typeof showNotification === 'function') {
-    showNotification('Notification configuration added successfully!', 'success');
-}
-
-// Reset form fields
-const form = document.querySelector('form[hx-post="/api/notifications/"]');
-if (form) {
-    form.reset();
-}
-</script>
+<!-- Reset form by loading clean form -->
+<div hx-get="/api/notifications/form"
+     hx-target="#notification-form-container"
+     hx-swap="innerHTML"
+     hx-trigger="load delay:100ms">
+</div>

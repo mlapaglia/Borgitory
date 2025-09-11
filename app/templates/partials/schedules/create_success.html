@@ -1,13 +1,18 @@
-<!-- Schedule Creation Success Template -->
-<div class="bg-green-50 border border-green-200 rounded-lg p-3">
-    <span class="text-green-700 text-sm">Schedule created successfully!</span>
+<!-- HTMX Notification Trigger -->
+<div hx-get="/api/shared/notification?message=Schedule created successfully!&type=success"
+     hx-target="body"
+     hx-swap="beforeend"
+     hx-trigger="load">
+</div>
+
+<!-- Trigger schedule list refresh -->
+<div hx-trigger="load"
+     hx-swap="none"
+     hx-on::load="document.body.dispatchEvent(new CustomEvent('scheduleUpdate'))">
 </div>
 
 <script>
-// Trigger HTMX refresh for schedule list
-document.body.dispatchEvent(new CustomEvent('scheduleUpdate'));
-
-// Reset form fields
+// Reset form fields (keeping this JavaScript for complex form logic)
 const form = document.querySelector('form[hx-post="/api/schedules/"]');
 if (form) {
     form.reset();
@@ -22,10 +27,5 @@ if (form) {
     if (cronExpression) cronExpression.value = '';
     if (customCron) customCron.classList.add('hidden');
     if (cronDescription) cronDescription.classList.add('hidden');
-}
-
-// Show success notification
-if (typeof showNotification === 'function') {
-    showNotification('Schedule created successfully!', 'success');
 }
 </script>

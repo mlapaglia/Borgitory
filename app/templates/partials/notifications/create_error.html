@@ -1,11 +1,6 @@
-<!-- Notification Configuration Creation Error Template -->
-<div class="bg-red-50 border border-red-200 rounded-lg p-3">
-    <span class="text-red-700 text-sm">{{ error_message }}</span>
+<!-- HTMX notification trigger -->
+<div hx-get="/api/shared/notification?type=error&message={{ error_message | urlencode }}"
+     hx-target="#notification-status"
+     hx-swap="innerHTML"
+     hx-trigger="load">
 </div>
-
-<script>
-// Show error notification
-if (typeof showNotification === 'function') {
-    showNotification('{{ error_message }}', 'error');
-}
-</script>

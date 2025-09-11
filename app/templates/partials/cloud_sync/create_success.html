@@ -1,25 +1,13 @@
-<!-- Cloud Sync Creation Success Template -->
-<div class="bg-green-50 border border-green-200 rounded-lg p-3">
-    <span class="text-green-700 text-sm">Cloud sync location "{{ config_name }}" configured successfully!</span>
+<!-- HTMX notification trigger -->
+<div hx-get="/api/shared/notification?type=success&message=Cloud sync location '{{ config_name }}' added successfully!"
+     hx-target="#cloud-sync-status"
+     hx-swap="innerHTML"
+     hx-trigger="load">
 </div>
 
-<script>
-// Show success notification
-if (typeof showNotification === 'function') {
-    showNotification('Cloud sync location added successfully!', 'success');
-}
-
-// Reset form fields
-const form = document.querySelector('form[hx-post="/api/cloud-sync/"]');
-if (form) {
-    form.reset();
-    
-    // Reset provider selection to S3 and trigger HTMX update
-    const providerSelect = document.getElementById('provider-select');
-    if (providerSelect) {
-        providerSelect.value = 's3';
-        // Trigger the HTMX request to update fields
-        htmx.trigger(providerSelect, 'change');
-    }
-}
-</script>
+<!-- Reset form by loading clean form -->
+<div hx-get="/api/cloud-sync/form"
+     hx-target="#cloud-sync-form-container"
+     hx-swap="innerHTML"
+     hx-trigger="load delay:100ms">
+</div>

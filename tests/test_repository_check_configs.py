@@ -311,7 +311,7 @@ class TestRepositoryCheckConfigs:
         with pytest.raises(Exception):  # Should raise HTTPException
             get_repository_check_config(999, mock_db)
 
-    def test_update_repository_check_config_success(self, mock_db, mock_config):
+    async def test_update_repository_check_config_success(self, mock_db, mock_config):
         """Test successful update of repository check config"""
         from app.api.repository_check_configs import update_repository_check_config
         
@@ -324,13 +324,16 @@ class TestRepositoryCheckConfigs:
         
         update_data = RepositoryCheckConfigUpdate(name="updated-config")
         
-        result = update_repository_check_config(1, update_data, mock_db)
+        # Need to create a mock request for the async function
+        mock_request = MagicMock()
+        mock_request.headers = {}
+        result = await update_repository_check_config(mock_request, 1, update_data, mock_db)
         
         assert result == mock_config
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once_with(mock_config)
 
-    def test_update_repository_check_config_not_found(self, mock_db):
+    async def test_update_repository_check_config_not_found(self, mock_db):
         """Test updating non-existent repository check config"""
         from app.api.repository_check_configs import update_repository_check_config
         
@@ -338,10 +341,12 @@ class TestRepositoryCheckConfigs:
         
         update_data = RepositoryCheckConfigUpdate(name="updated-config")
         
+        mock_request = MagicMock()
+        mock_request.headers = {}
         with pytest.raises(Exception):  # Should raise HTTPException
-            update_repository_check_config(999, update_data, mock_db)
+            await update_repository_check_config(mock_request, 999, update_data, mock_db)
 
-    def test_update_repository_check_config_name_conflict(self, mock_db, mock_config):
+    async def test_update_repository_check_config_name_conflict(self, mock_db, mock_config):
         """Test updating with conflicting name"""
         from app.api.repository_check_configs import update_repository_check_config
         
@@ -353,10 +358,12 @@ class TestRepositoryCheckConfigs:
         
         update_data = RepositoryCheckConfigUpdate(name="conflicting-name")
         
+        mock_request = MagicMock()
+        mock_request.headers = {}
         with pytest.raises(Exception):  # Should raise HTTPException
-            update_repository_check_config(1, update_data, mock_db)
+            await update_repository_check_config(mock_request, 1, update_data, mock_db)
 
-    def test_update_repository_check_config_same_name(self, mock_db, mock_config):
+    async def test_update_repository_check_config_same_name(self, mock_db, mock_config):
         """Test updating with same name (should be allowed)"""
         from app.api.repository_check_configs import update_repository_check_config
         
@@ -365,24 +372,26 @@ class TestRepositoryCheckConfigs:
         
         update_data = RepositoryCheckConfigUpdate(name="existing-name")  # Same name
         
-        result = update_repository_check_config(1, update_data, mock_db)
+        mock_request = MagicMock()
+        mock_request.headers = {}
+        result = await update_repository_check_config(mock_request, 1, update_data, mock_db)
         
         assert result == mock_config
         mock_db.commit.assert_called_once()
 
-    def test_delete_repository_check_config_success(self, mock_request, mock_db, mock_config):
+    async def test_delete_repository_check_config_success(self, mock_request, mock_db, mock_config):
         """Test successful deletion of repository check config"""
         from app.api.repository_check_configs import delete_repository_check_config
         
         mock_db.query.return_value.filter.return_value.first.return_value = mock_config
         
-        result = delete_repository_check_config(1, mock_request, mock_db)
+        result = await delete_repository_check_config(mock_request, 1, mock_db)
         
         mock_db.delete.assert_called_once_with(mock_config)
         mock_db.commit.assert_called_once()
         assert result == {"message": "Check policy deleted successfully"}
 
-    def test_delete_repository_check_config_htmx(self, mock_htmx_request, mock_db, mock_config):
+    async def test_delete_repository_check_config_htmx(self, mock_htmx_request, mock_db, mock_config):
         """Test HTMX deletion of repository check config"""
         from app.api.repository_check_configs import delete_repository_check_config
         
@@ -393,19 +402,19 @@ class TestRepositoryCheckConfigs:
         mock_db.query.return_value.order_by.return_value.all.return_value = [mock_config]
         
         with patch('app.api.repository_check_configs.templates') as mock_templates:
-            delete_repository_check_config(1, mock_htmx_request, mock_db)
+            await delete_repository_check_config(mock_htmx_request, 1, mock_db)
             
             mock_db.delete.assert_called_once_with(mock_config)
             mock_templates.TemplateResponse.assert_called_once()
 
-    def test_delete_repository_check_config_not_found(self, mock_request, mock_db):
+    async def test_delete_repository_check_config_not_found(self, mock_request, mock_db):
         """Test deleting non-existent repository check config"""
         from app.api.repository_check_configs import delete_repository_check_config
         
         mock_db.query.return_value.filter.return_value.first.return_value = None
         
         with pytest.raises(Exception):  # Should raise HTTPException
-            delete_repository_check_config(999, mock_request, mock_db)
+            await delete_repository_check_config(mock_request, 999, mock_db)
 
     def test_update_check_options_various_parameters(self, mock_request):
         """Test update_check_options with various parameter combinations"""

@@ -1,0 +1,6 @@
+<!-- HTMX Error Notification Trigger -->
+<div hx-get="/api/shared/notification?message=Update Failed: {{ error_message | urlencode }}&type=error"
+     hx-target="body"
+     hx-swap="beforeend"
+     hx-trigger="load">
+</div>

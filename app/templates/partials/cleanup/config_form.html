@@ -1,11 +1,12 @@
 <!-- Cleanup Configuration -->
 <div id="cleanup-form-container" class="border dark:border-gray-600 rounded-lg p-4">
     <h3 class="font-medium text-gray-700 dark:text-gray-200 mb-3">Prune Old Archives</h3>
+    <div id="cleanup-status" class="mb-4"></div>
     <form 
         hx-post="/api/jobs/prune" 
         hx-ext="json-enc"
-        hx-target="#cleanup-form-container"
-        hx-swap="outerHTML"
+        hx-target="#cleanup-status"
+        hx-swap="innerHTML"
         hx-indicator="#cleanup-loading"
     >
         <div class="space-y-4">

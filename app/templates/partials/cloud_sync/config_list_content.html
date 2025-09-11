@@ -25,6 +25,14 @@
         </div>
         <div class="flex flex-col space-y-2 ml-4">
             <button 
+                hx-get="/api/cloud-sync/{{ config.id }}/edit"
+                hx-target="#cloud-sync-form-container"
+                hx-swap="innerHTML"
+                class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500"
+            >
+                Edit
+            </button>
+            <button 
                 hx-post="/api/cloud-sync/{{ config.id }}/test"
                 hx-target="body"
                 hx-swap="beforeend"

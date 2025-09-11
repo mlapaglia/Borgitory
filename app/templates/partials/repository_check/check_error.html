@@ -1,0 +1,11 @@
+<!-- HTMX Error Notification Trigger -->
+<div hx-get="/api/shared/notification?message=Check Failed: {{ error_message | urlencode }}&type=error"
+     hx-target="body"
+     hx-swap="beforeend"
+     hx-trigger="load">
+</div>
+
+<!-- Show Error in Form -->
+<div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+    <span class="text-red-700 text-sm">{{ error_message }}</span>
+</div>

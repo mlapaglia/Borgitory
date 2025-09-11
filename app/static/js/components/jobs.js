@@ -1,14 +1,13 @@
-// Job History UI Functions - Modern HTMX version
-
+// Job History UI Functions
 window.copyJobOutput = function(jobId) {
     const outputDiv = document.getElementById(`job-output-${jobId}`);
     if (outputDiv) {
         const text = outputDiv.textContent || outputDiv.innerText;
         navigator.clipboard.writeText(text).then(() => {
-            showNotification('Job output copied to clipboard', 'success');
+            showHTMXNotification('Job output copied to clipboard', 'success');
         }).catch(err => {
             console.error('Failed to copy job output: ', err);
-            showNotification('Failed to copy job output', 'error');
+            showHTMXNotification('Failed to copy job output', 'error');
         });
     }
 }
@@ -18,34 +17,45 @@ window.copyTaskOutput = function(jobId, taskOrder) {
     if (outputDiv) {
         const text = outputDiv.textContent || outputDiv.innerText;
         navigator.clipboard.writeText(text).then(() => {
-            showNotification('Task output copied to clipboard', 'success');
+            showHTMXNotification('Task output copied to clipboard', 'success');
         }).catch(err => {
             console.error('Failed to copy task output: ', err);
-            showNotification('Failed to copy task output', 'error');
+            showHTMXNotification('Failed to copy task output', 'error');
         });
     }
 }
 
-
-// Helper function for showing notifications (assumes it exists in utils.js)
-function showNotification(message, type = 'info') {
-    // Check if a different showNotification exists globally, avoiding self-reference
-    if (typeof window.showNotification === 'function' && window.showNotification !== showNotification) {
-        window.showNotification(message, type);
-    } else {
-        // Simple fallback notification
-        const notification = document.createElement('div');
-        notification.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-50 ${
-            type === 'success' ? 'bg-green-500' : 
-            type === 'error' ? 'bg-red-500' : 
-            'bg-blue-500'
-        }`;
-        notification.textContent = message;
-        document.body.appendChild(notification);
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
+function showHTMXNotification(message, type, targetContainer = null) {
+    // Try to find the best notification container
+    let target = null;
+    
+    if (targetContainer) {
+        target = document.querySelector(targetContainer);
     }
+    
+    if (!target) {
+        // Try common job-related containers first
+        const containers = ['#backup-status', '#job-status', '#notification-status', '[id$="-status"]'];
+        for (const containerSelector of containers) {
+            target = document.querySelector(containerSelector);
+            if (target) break;
+        }
+    }
+    
+    if (!target) {
+        // Create temporary container if none exists
+        const tempContainer = document.createElement('div');
+        tempContainer.id = 'temp-notification';
+        tempContainer.style.position = 'fixed';
+        tempContainer.style.top = '20px';
+        tempContainer.style.right = '20px';
+        tempContainer.style.zIndex = '1000';
+        document.body.appendChild(tempContainer);
+        target = tempContainer;
+    }
+    
+    htmx.ajax('GET', `/api/shared/notification?type=${type}&message=${encodeURIComponent(message)}`, {
+        target: target,
+        swap: 'innerHTML'
+    });
 }

@@ -299,8 +299,8 @@ class TestCleanupAPI:
         """Test deleting non-existent config."""
         response = await async_client.delete("/api/cleanup/999")
         
-        assert response.status_code == 500  # Service throws generic error
-        assert "Failed to delete cleanup configuration" in response.json()["detail"]
+        assert response.status_code == 404  # Not found error
+        assert "Cleanup configuration not found" in response.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_htmx_responses_have_correct_headers(self, async_client: AsyncClient, test_db: Session):

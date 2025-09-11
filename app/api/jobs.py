@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.models.database import get_db, Repository
+from app.models.database import get_db
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.dependencies import JobServiceDep
 from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
@@ -28,32 +28,55 @@ async def create_backup(
     db: Session = Depends(get_db),
 ):
     """Start a backup job and return HTML status"""
+    is_htmx_request = "hx-request" in request.headers
+
     try:
         result = await job_svc.create_backup_job(backup_request, db)
         job_id = result["job_id"]
 
-        # Return HTML showing the backup started
-        return f"""
-            <div id="backup-job-{job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div class="flex items-center">
-                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                    <span class="text-blue-700 text-sm">Backup job #{job_id} started...</span>
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/jobs/backup_success.html",
+                {"job_id": job_id},
+            )
+        else:
+            # Return HTML showing the backup started for non-HTMX requests
+            return f"""
+                <div id="backup-job-{job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div class="flex items-center">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                        <span class="text-blue-700 text-sm">Backup job #{job_id} started...</span>
+                    </div>
                 </div>
-            </div>
-        """
+            """
     except ValueError as e:
-        # Return error HTML
+        error_msg = f"Repository not found: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/jobs/backup_error.html",
+                {"error_message": error_msg},
+                status_code=400,
+            )
         return f"""
             <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                <span class="text-red-700 text-sm">Repository not found: {str(e)}</span>
+                <span class="text-red-700 text-sm">{error_msg}</span>
             </div>
         """
     except Exception as e:
         logger.error(f"Failed to start backup: {e}")
-        # Return error HTML
+        error_msg = f"Failed to start backup: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/jobs/backup_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
         return f"""
             <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                <span class="text-red-700 text-sm">Failed to start backup: {str(e)}</span>
+                <span class="text-red-700 text-sm">{error_msg}</span>
             </div>
         """
 
@@ -72,67 +95,84 @@ async def create_prune_job(
         result = await job_svc.create_prune_job(prune_request, db)
 
         if is_htmx_request:
-            repositories = db.query(Repository).all()
             return templates.TemplateResponse(
                 request,
-                "partials/cleanup/config_form_success.html",
-                {"repositories": repositories},
+                "partials/cleanup/prune_success.html",
+                {"job_id": result.get("job_id", "unknown")},
             )
         else:
             return result
     except ValueError as e:
         error_msg = str(e)
         if is_htmx_request:
-            repositories = db.query(Repository).all()
             return templates.TemplateResponse(
                 request,
-                "partials/cleanup/config_form_error.html",
-                {
-                    "error_message": error_msg,
-                    "repositories": repositories,
-                },
-                status_code=200,
+                "partials/cleanup/prune_error.html",
+                {"error_message": error_msg},
+                status_code=400,
             )
         raise HTTPException(status_code=404, detail=error_msg)
     except Exception as e:
         logger.error(f"Failed to start prune job: {e}")
         error_msg = f"Failed to start prune job: {str(e)}"
         if is_htmx_request:
-            repositories = db.query(Repository).all()
             return templates.TemplateResponse(
                 request,
-                "partials/cleanup/config_form_error.html",
-                {
-                    "error_message": error_msg,
-                    "repositories": repositories,
-                },
-                status_code=200,
+                "partials/cleanup/prune_error.html",
+                {"error_message": error_msg},
+                status_code=500,
             )
         raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.post("/check")
 async def create_check_job(
+    request: Request,
     check_request: CheckRequest,
     job_svc: JobServiceDep,
     db: Session = Depends(get_db),
 ):
     """Start a repository check job and return job_id for tracking"""
+    is_htmx_request = "hx-request" in request.headers
+
     try:
         result = await job_svc.create_check_job(check_request, db)
-        return result
-    except ValueError as e:
-        if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail=str(e))
-        elif "disabled" in str(e).lower():
-            raise HTTPException(status_code=400, detail=str(e))
+
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/repository_check/check_success.html",
+                {"job_id": result.get("job_id", "unknown")},
+            )
         else:
-            raise HTTPException(status_code=400, detail=str(e))
+            return result
+
+    except ValueError as e:
+        error_msg = str(e)
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/repository_check/check_error.html",
+                {"error_message": error_msg},
+                status_code=400,
+            )
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        elif "disabled" in error_msg.lower():
+            raise HTTPException(status_code=400, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
         logger.error(f"Failed to start check job: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to start check job: {str(e)}"
-        )
+        error_msg = f"Failed to start check job: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/repository_check/check_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.get("/stream")

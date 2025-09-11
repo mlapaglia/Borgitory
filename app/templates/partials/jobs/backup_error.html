@@ -1,0 +1,6 @@
+<!-- HTMX notification trigger -->
+<div hx-get="/api/shared/notification?type=error&message={{ error_message | urlencode }}"
+     hx-target="#backup-status"
+     hx-swap="innerHTML"
+     hx-trigger="load">
+</div>

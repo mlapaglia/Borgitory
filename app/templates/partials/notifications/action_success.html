@@ -1,6 +1,6 @@
-<!-- Notification Action Success Template -->
-<script>
-if (typeof showNotification === 'function') {
-    showNotification('{{ message }}', 'success');
-}
-</script>
+<!-- HTMX notification trigger -->
+<div hx-get="/api/shared/notification?type=success&message={{ message | urlencode }}"
+     hx-target="#notification-status"
+     hx-swap="innerHTML"
+     hx-trigger="load">
+</div>

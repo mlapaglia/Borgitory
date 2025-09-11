@@ -118,16 +118,14 @@ class TestJobsAPI:
 
         with patch("app.api.jobs.templates") as mock_templates:
             mock_templates.TemplateResponse.return_value = "success_template"
-            with patch("app.api.jobs.Repository"):
-                mock_db.query.return_value.all.return_value = []
+            
+            # Execute
+            result = await create_prune_job(mock_request, prune_request, mock_job_service, mock_db)
 
-                # Execute
-                result = await create_prune_job(mock_request, prune_request, mock_job_service, mock_db)
-
-                # Verify
-                assert result == "success_template"
-                mock_job_service.create_prune_job.assert_called_once_with(prune_request, mock_db)
-                mock_templates.TemplateResponse.assert_called_once()
+            # Verify
+            assert result == "success_template"
+            mock_job_service.create_prune_job.assert_called_once_with(prune_request, mock_db)
+            mock_templates.TemplateResponse.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_prune_job_success_non_htmx(self, mock_request, mock_db, mock_job_service):
@@ -155,15 +153,13 @@ class TestJobsAPI:
 
         with patch("app.api.jobs.templates") as mock_templates:
             mock_templates.TemplateResponse.return_value = "error_template"
-            with patch("app.api.jobs.Repository"):
-                mock_db.query.return_value.all.return_value = []
+            
+            # Execute
+            result = await create_prune_job(mock_request, prune_request, mock_job_service, mock_db)
 
-                # Execute
-                result = await create_prune_job(mock_request, prune_request, mock_job_service, mock_db)
-
-                # Verify
-                assert result == "error_template"
-                mock_templates.TemplateResponse.assert_called_once()
+            # Verify
+            assert result == "error_template"
+            mock_templates.TemplateResponse.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_prune_job_value_error_non_htmx(self, mock_request, mock_db, mock_job_service):
@@ -184,12 +180,14 @@ class TestJobsAPI:
     async def test_create_check_job_success(self, mock_db, mock_job_service):
         """Test successful check job creation"""
         # Setup
+        mock_request = Mock()
+        mock_request.headers = {}  # Non-HTMX request
         check_request = Mock()
         expected_result = {"job_id": "check-job-789"}
         mock_job_service.create_check_job.return_value = expected_result
 
         # Execute
-        result = await create_check_job(check_request, mock_job_service, mock_db)
+        result = await create_check_job(mock_request, check_request, mock_job_service, mock_db)
 
         # Verify
         assert result == expected_result
@@ -199,12 +197,14 @@ class TestJobsAPI:
     async def test_create_check_job_not_found_error(self, mock_db, mock_job_service):
         """Test check job creation with not found error"""
         # Setup
+        mock_request = Mock()
+        mock_request.headers = {}
         check_request = Mock()
         mock_job_service.create_check_job.side_effect = ValueError("Repository not found")
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await create_check_job(check_request, mock_job_service, mock_db)
+            await create_check_job(mock_request, check_request, mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Repository not found" in str(exc_info.value.detail)
@@ -213,12 +213,14 @@ class TestJobsAPI:
     async def test_create_check_job_disabled_error(self, mock_db, mock_job_service):
         """Test check job creation with disabled repository error"""
         # Setup
+        mock_request = Mock()
+        mock_request.headers = {}
         check_request = Mock()
         mock_job_service.create_check_job.side_effect = ValueError("Repository disabled")
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await create_check_job(check_request, mock_job_service, mock_db)
+            await create_check_job(mock_request, check_request, mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 400
         assert "Repository disabled" in str(exc_info.value.detail)
@@ -227,12 +229,14 @@ class TestJobsAPI:
     async def test_create_check_job_general_error(self, mock_db, mock_job_service):
         """Test check job creation with general error"""
         # Setup
+        mock_request = Mock()
+        mock_request.headers = {}
         check_request = Mock()
         mock_job_service.create_check_job.side_effect = Exception("Database error")
 
         # Execute & Verify
         with pytest.raises(HTTPException) as exc_info:
-            await create_check_job(check_request, mock_job_service, mock_db)
+            await create_check_job(mock_request, check_request, mock_job_service, mock_db)
 
         assert exc_info.value.status_code == 500
         assert "Failed to start check job" in str(exc_info.value.detail)

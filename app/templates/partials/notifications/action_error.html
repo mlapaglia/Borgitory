@@ -1,6 +1,6 @@
-<!-- Notification Action Error Template -->
-<script>
-if (typeof showNotification === 'function') {
-    showNotification('{{ error_message }}', 'error');
-}
-</script>
+<!-- HTMX notification trigger -->
+<div hx-get="/api/shared/notification?type=error&message={{ error_message | urlencode }}"
+     hx-target="#notification-status"
+     hx-swap="innerHTML"
+     hx-trigger="load">
+</div>

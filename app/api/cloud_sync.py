@@ -24,8 +24,14 @@ def get_cloud_sync_service(db: Session = Depends(get_db)) -> CloudSyncService:
     return CloudSyncService(db)
 
 
+@router.get("/add-form", response_class=HTMLResponse)
+async def get_add_form(request: Request) -> HTMLResponse:
+    """Get the add form (for cancel functionality)"""
+    return templates.TemplateResponse(request, "partials/cloud_sync/add_form.html", {})
+
+
 @router.get("/provider-fields", response_class=HTMLResponse)
-async def get_provider_fields(request: Request, provider: str = "s3") -> HTMLResponse:
+async def get_provider_fields(request: Request, provider: str = "") -> HTMLResponse:
     """Get dynamic provider fields based on selection"""
     context = {
         "provider": provider,
@@ -38,8 +44,15 @@ async def get_provider_fields(request: Request, provider: str = "s3") -> HTMLRes
         context["submit_text"] = "Add S3 Location"
     elif provider == "sftp":
         context["submit_text"] = "Add SFTP Location"
+    elif provider == "":
+        context["submit_text"] = "Add Sync Location"
+        context["show_submit"] = False
     else:
         context["submit_text"] = "Add Sync Location"
+        context["show_submit"] = True
+
+    # Set show_submit flag
+    context["show_submit"] = provider != ""
 
     return templates.TemplateResponse(
         request, "partials/cloud_sync/provider_fields.html", context
@@ -156,14 +169,121 @@ def get_cloud_sync_config(
     return cloud_sync_service.get_cloud_sync_config_by_id(config_id)
 
 
+@router.get("/{config_id}/edit", response_class=HTMLResponse)
+async def get_cloud_sync_edit_form(
+    request: Request,
+    config_id: int,
+    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+) -> HTMLResponse:
+    """Get edit form for a specific cloud sync configuration"""
+    try:
+        config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
+
+        # Decrypt sensitive fields for editing
+        decrypted_config = {
+            "id": config.id,
+            "name": config.name,
+            "provider": config.provider,
+            "path_prefix": config.path_prefix,
+            "enabled": config.enabled,
+            "created_at": config.created_at,
+            "updated_at": config.updated_at,
+        }
+
+        # Add provider-specific decrypted fields
+        if config.provider == "s3":
+            decrypted_config["bucket_name"] = config.bucket_name
+            if config.encrypted_access_key and config.encrypted_secret_key:
+                access_key, secret_key = config.get_credentials()
+                decrypted_config["access_key"] = access_key
+                decrypted_config["secret_key"] = secret_key
+        elif config.provider == "sftp":
+            decrypted_config.update(
+                {
+                    "host": config.host,
+                    "port": config.port,
+                    "username": config.username,
+                    "remote_path": config.remote_path,
+                }
+            )
+            if config.encrypted_password or config.encrypted_private_key:
+                password, private_key = config.get_sftp_credentials()
+                if password:
+                    decrypted_config["password"] = password
+                if private_key:
+                    decrypted_config["private_key"] = private_key
+
+        # Create a simple object for template access
+        config_obj = type("Config", (), decrypted_config)()
+
+        context = {
+            "config": config_obj,
+            "provider": config.provider,
+            "is_s3": config.provider == "s3",
+            "is_sftp": config.provider == "sftp",
+            "is_edit_mode": True,
+        }
+
+        # Set submit button text based on provider
+        if config.provider == "s3":
+            context["submit_text"] = "Update S3 Location"
+        elif config.provider == "sftp":
+            context["submit_text"] = "Update SFTP Location"
+        else:
+            context["submit_text"] = "Update Sync Location"
+
+        return templates.TemplateResponse(
+            request, "partials/cloud_sync/edit_form.html", context
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=404, detail=f"Cloud sync configuration not found: {str(e)}"
+        )
+
+
 @router.put("/{config_id}", response_model=CloudSyncConfigSchema)
 async def update_cloud_sync_config(
+    request: Request,
     config_id: int,
     config_update: CloudSyncConfigUpdate,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
 ):
     """Update a cloud sync configuration"""
-    return cloud_sync_service.update_cloud_sync_config(config_id, config_update)
+    is_htmx_request = "hx-request" in request.headers
+
+    try:
+        result = cloud_sync_service.update_cloud_sync_config(config_id, config_update)
+
+        if is_htmx_request:
+            response = templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/update_success.html",
+                {"config_name": result.name},
+            )
+            response.headers["HX-Trigger"] = "cloudSyncUpdate"
+            return response
+        else:
+            return result
+
+    except HTTPException as e:
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/update_error.html",
+                {"error_message": str(e.detail)},
+                status_code=e.status_code,
+            )
+        raise
+    except Exception as e:
+        error_msg = f"Failed to update cloud sync configuration: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/update_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.delete("/{config_id}", response_model=None)
