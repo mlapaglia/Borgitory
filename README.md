@@ -36,27 +36,54 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- Access to Docker socket (`/var/run/docker.sock`)
+- Docker (Docker Compose optional but recommended)
 
 ### Installation
 
-1. **Clone the repository**
+1. **Pull and run the Docker image**
 
    ```bash
-   git clone <repository-url>
-   cd Borgitory
+   # Using Docker directly
+   docker run -d \
+     -p 8000:8000 \
+     -v ./data:/app/data \
+     -v /path/to/backup/sources:/backup/sources:ro \
+     -v /path/to/borg/repos:/repos \
+     --cap-add SYS_ADMIN \
+     --device /dev/fuse \
+     --name borgitory \
+     mlapaglia/borgitory:latest
    ```
 
-2. **Start with Docker Compose**
+   **Or using Docker Compose** (create a `docker-compose.yml`):
+
+   ```yaml
+   version: '3.8'
+   services:
+     borgitory:
+       image: mlapaglia/borgitory:latest
+       ports:
+         - "8000:8000"
+       volumes:
+         - ./data:/app/data
+         - /path/to/backup/sources:/backup/sources:ro
+         - /path/to/borg/repos:/repos
+       cap_add:
+         - SYS_ADMIN
+       devices:
+         - /dev/fuse
+       restart: unless-stopped
+   ```
 
    ```bash
    docker-compose up -d
    ```
 
-3. **Access the web interface**
+2. **Access the web interface**
    - Open <http://localhost:8000> in your browser
    - Create your first admin account on initial setup
+
+**Docker Hub**: Available at [mlapaglia/borgitory](https://hub.docker.com/r/mlapaglia/borgitory)
 
 ### Development Setup
 
@@ -211,7 +238,6 @@ docker run -d \
   -v ./data:/app/data \
   -v /path/to/backup/sources:/backup/sources:ro \
   -v /path/to/borg/repos:/repos \
-  -v /var/run/docker.sock:/var/run/docker.sock \
   --cap-add SYS_ADMIN \
   --device /dev/fuse \
   --name borgitory \
@@ -222,7 +248,6 @@ docker run -d \
 
 - `--cap-add SYS_ADMIN`: Required for FUSE filesystem mounting to enable archive browsing
 - `--device /dev/fuse`: Provides access to FUSE device for archive file system mounting
-- `-v /var/run/docker.sock:/var/run/docker.sock`: Allows container to manage Borg Docker containers
 
 **FUSE Requirements:**
 
