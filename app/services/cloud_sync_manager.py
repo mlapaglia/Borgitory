@@ -258,7 +258,7 @@ class CloudSyncManager:
                 "valid": True,
                 "provider": "s3",
                 "bucket": config.bucket_name,
-                "region": config.region or "us-east-1",
+                "region": getattr(config, "region", "us-east-1"),
             }
 
         except Exception as e:
