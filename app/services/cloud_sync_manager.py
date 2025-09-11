@@ -252,13 +252,10 @@ class CloudSyncManager:
             except Exception as e:
                 return {"valid": False, "error": f"Invalid S3 credentials: {str(e)}"}
 
-            # Could add more validation like testing connection to S3
-            # For now, just check basic configuration
             return {
                 "valid": True,
                 "provider": "s3",
                 "bucket": config.bucket_name,
-                "region": getattr(config, "region", "us-east-1"),
             }
 
         except Exception as e:
@@ -283,7 +280,6 @@ class CloudSyncManager:
                     "provider": config.provider,
                     "name": config.name,
                     "bucket_name": getattr(config, "bucket_name", None),
-                    "region": getattr(config, "region", None),
                     "created_at": config.created_at.isoformat()
                     if hasattr(config, "created_at") and config.created_at
                     else None,
