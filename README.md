@@ -6,12 +6,9 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ## System Status
 
-✅ **Core Features**: Fully implemented and tested  
-✅ **Notification System**: Complete HTMX-based unified notification system  
-✅ **Archive Browsing**: Interactive exploration with FUSE mounting  
-✅ **Multi-Task Jobs**: Backup, prune, check, and cloud sync operations  
-✅ **User Interface**: Modern HTMX + Tailwind CSS with mobile responsiveness  
-✅ **API Coverage**: 933 tests passing with comprehensive test coverage
+✅ **Archive Browsing**: Interactive exploration with FUSE mounting
+✅ **Multi-Task Jobs**: Backup, prune, check, and cloud sync operations
+✅ **User Interface**: Modern HTMX + Tailwind CSS with mobile responsiveness
 
 ## Features
 
