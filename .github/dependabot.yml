@@ -1,0 +1,64 @@
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "@me"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    groups:
+      fastapi-ecosystem:
+        patterns:
+          - "fastapi*"
+          - "uvicorn*"
+          - "starlette*"
+          - "pydantic*"
+      database:
+        patterns:
+          - "sqlalchemy*"
+          - "alembic*"
+      testing:
+        patterns:
+          - "pytest*"
+          - "httpx*"
+      security:
+        patterns:
+          - "cryptography*"
+          - "passlib*"
+          - "bcrypt*"
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "@me"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "@me"
+    commit-message:
+      prefix: "ci"
+      include: "scope"

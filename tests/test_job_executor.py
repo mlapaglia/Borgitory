@@ -34,7 +34,11 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_start_process_failure(self):
         """Test process start failure"""
-        self.mock_subprocess.side_effect = Exception("Process start failed")
+        # Use AsyncMock side_effect properly to avoid unawaited coroutine warnings
+        async def mock_failure(*args, **kwargs):
+            raise Exception("Process start failed")
+        
+        self.mock_subprocess.side_effect = mock_failure
         
         command = ["borg", "list", "repo"]
         

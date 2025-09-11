@@ -105,7 +105,10 @@ class TestPushoverService:
         })
 
         mock_session = MagicMock(spec=ClientSession)
-        mock_session.post.return_value.__aenter__.return_value = mock_response
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
             result = await pushover_service.send_notification(
@@ -125,7 +128,10 @@ class TestPushoverService:
         mock_response.text = AsyncMock(return_value="Bad Request")
 
         mock_session = MagicMock(spec=ClientSession)
-        mock_session.post.return_value.__aenter__.return_value = mock_response
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
             result = await pushover_service.send_notification(
@@ -317,7 +323,10 @@ class TestPushoverService:
         mock_response.json = AsyncMock(return_value={"status": 0})
 
         mock_session = MagicMock(spec=ClientSession)
-        mock_session.post.return_value.__aenter__.return_value = mock_response
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
             result = await pushover_service.send_notification(
