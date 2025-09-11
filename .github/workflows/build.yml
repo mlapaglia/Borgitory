@@ -35,12 +35,12 @@ jobs:
     
     - name: Run tests with coverage
       run: |
-        pytest tests/ --cov=app --junitxml=junit.xml -o junit_family=legacy
+        pytest tests/ --cov=app --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
-        file: ./junit.xml
+        file: ./coverage.xml
         token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Upload test results to Codecov
