@@ -310,7 +310,9 @@ async def get_notification_config_edit_form(
             .first()
         )
         if not notification_config:
-            raise HTTPException(status_code=404, detail="Notification configuration not found")
+            raise HTTPException(
+                status_code=404, detail="Notification configuration not found"
+            )
 
         # Decrypt credentials for edit form
         user_key, app_token = "", ""
@@ -328,7 +330,9 @@ async def get_notification_config_edit_form(
             request, "partials/notifications/edit_form.html", context
         )
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Notification configuration not found: {str(e)}")
+        raise HTTPException(
+            status_code=404, detail=f"Notification configuration not found: {str(e)}"
+        )
 
 
 @router.put("/{config_id}", response_model=NotificationConfigSchema)

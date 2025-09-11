@@ -29,7 +29,7 @@ async def create_backup(
 ):
     """Start a backup job and return HTML status"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         result = await job_svc.create_backup_job(backup_request, db)
         job_id = result["job_id"]
