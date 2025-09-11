@@ -1,0 +1,106 @@
+<!-- Edit Cloud Sync Configuration -->
+<div class="border dark:border-gray-600 rounded-lg p-4">
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Edit Cloud Sync Location</h3>
+    <form 
+        hx-put="/api/cloud-sync/{{ config.id }}" 
+        hx-ext="json-enc"
+        hx-target="#cloud-sync-status"
+        class="space-y-4"
+        id="cloud-sync-edit-form"
+    >
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
+            <input type="text" name="name" required value="{{ config.name }}" class="input-modern mt-1">
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Provider Type</label>
+            <select 
+                name="provider" 
+                id="provider-select-edit" 
+                class="select-modern w-full"
+                hx-get="/api/cloud-sync/provider-fields"
+                hx-target="#provider-fields-container-edit"
+                hx-trigger="change"
+                hx-swap="innerHTML"
+                hx-include="this">
+                <option value="">Select Provider Type</option>
+                <option value="s3" {{ 'selected' if config.provider == 's3' else '' }}>AWS S3</option>
+                <option value="sftp" {{ 'selected' if config.provider == 'sftp' else '' }}>SFTP (SSH)</option>
+            </select>
+        </div>
+
+        <!-- Dynamic Provider Fields Container -->
+        <div id="provider-fields-container-edit">
+            <!-- S3 Fields -->
+            {% if is_s3 %}
+            <div id="s3-fields">
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bucket Name</label>
+                    <input type="text" name="bucket_name" value="{{ config.bucket_name or '' }}" placeholder="my-backup-bucket" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Access Key ID</label>
+                    <input type="text" name="access_key" value="{{ config.access_key or '' }}" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Secret Access Key</label>
+                    <input type="password" name="secret_key" value="{{ config.secret_key or '' }}" placeholder="Current value will be used if left empty" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
+                    <input type="text" name="path_prefix" value="{{ config.path_prefix or '' }}" placeholder="backups/borgitory" class="input-modern mt-1">
+                </div>
+            </div>
+            {% elif is_sftp %}
+            <!-- SFTP Fields -->
+            <div id="sftp-fields">
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Host</label>
+                    <input type="text" name="host" value="{{ config.host or '' }}" placeholder="sftp.example.com" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Port</label>
+                    <input type="number" name="port" value="{{ config.port or 22 }}" placeholder="22" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Username</label>
+                    <input type="text" name="username" value="{{ config.username or '' }}" placeholder="backup-user" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Remote Path</label>
+                    <input type="text" name="remote_path" value="{{ config.remote_path or '' }}" placeholder="/backups" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Password (optional if using private key)</label>
+                    <input type="password" name="password" value="{{ config.password or '' }}" placeholder="Current value will be used if left empty" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Private Key (optional if using password)</label>
+                    <textarea name="private_key" rows="6" class="input-modern mt-1" placeholder="Current value will be used if left empty">{{ config.private_key or '' }}</textarea>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Current private key will be used if left empty.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
+                    <input type="text" name="path_prefix" value="{{ config.path_prefix or '' }}" placeholder="backups/borgitory" class="input-modern mt-1">
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="flex space-x-2 mt-4">
+                <button type="submit" id="update-button" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                    {{ submit_text }}
+                </button>
+                <button 
+                    type="button" 
+                    hx-get="/api/cloud-sync/add-form"
+                    hx-target="#cloud-sync-form-container"
+                    hx-swap="innerHTML"
+                    class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </form>
+    <div id="cloud-sync-status" class="mt-4"></div>
+</div>

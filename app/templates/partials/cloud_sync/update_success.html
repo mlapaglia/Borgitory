@@ -1,0 +1,13 @@
+<!-- HTMX Notification Trigger -->
+<div hx-get="/api/shared/notification?message=Cloud sync configuration '{{ config_name }}' updated successfully!&type=success"
+     hx-target="body"
+     hx-swap="beforeend"
+     hx-trigger="load">
+</div>
+
+<!-- Restore Add Form -->
+<div hx-get="/api/cloud-sync/add-form" 
+     hx-target="#cloud-sync-form-container" 
+     hx-swap="innerHTML" 
+     hx-trigger="load delay:100ms">
+</div>

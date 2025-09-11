@@ -24,6 +24,7 @@
                 hx-trigger="change"
                 hx-swap="innerHTML"
                 hx-include="this">
+                <option value="">Select Provider Type</option>
                 <option value="s3">AWS S3</option>
                 <option value="sftp">SFTP (SSH)</option>
             </select>
@@ -31,41 +32,11 @@
 
         <!-- Dynamic Provider Fields Container -->
         <div 
-            id="provider-fields-container">
-            <!-- Provider fields will be loaded here -->
+            id="provider-fields-container"
+            hx-get="/api/cloud-sync/provider-fields"
+            hx-trigger="load"
+            hx-swap="innerHTML">
         </div>
     </form>
     <div id="cloud-sync-status" class="mt-4"></div>
 </div>
-
-<script>
-// Load initial provider fields when the form is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    const providerSelect = document.getElementById('provider-select');
-    const container = document.getElementById('provider-fields-container');
-    
-    if (providerSelect && container) {
-        // Load initial S3 fields
-        htmx.ajax('GET', '/api/cloud-sync/provider-fields?provider=s3', {
-            target: '#provider-fields-container',
-            swap: 'innerHTML'
-        });
-    }
-});
-
-// Also trigger on HTMX afterSwap for dynamic loading
-document.body.addEventListener('htmx:afterSwap', function(evt) {
-    if (evt.target.closest('.cloud-sync-form') || evt.target.id === 'provider-fields-container') {
-        const providerSelect = document.getElementById('provider-select');
-        const container = document.getElementById('provider-fields-container');
-        
-        if (providerSelect && container && !container.innerHTML.trim()) {
-            // Load initial S3 fields if container is empty
-            htmx.ajax('GET', '/api/cloud-sync/provider-fields?provider=s3', {
-                target: '#provider-fields-container',
-                swap: 'innerHTML'
-            });
-        }
-    }
-});
-</script>

@@ -24,6 +24,7 @@ from app.api import (
     debug,
     repository_stats,
     repository_check_configs,
+    shared,
 )
 from app.dependencies import get_recovery_service, get_scheduler_service
 
@@ -121,9 +122,30 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
         combined_message = "; ".join(error_messages)
 
+        # Determine the appropriate error template based on the request path
+        path = str(request.url.path)
+        if "/api/cloud-sync" in path:
+            template_path = "partials/cloud_sync/create_error.html"
+        elif "/api/repositories" in path:
+            template_path = "partials/repositories/form_create_error.html"
+        elif "/api/schedules" in path:
+            template_path = "partials/schedules/create_error.html"
+        elif "/api/notifications" in path:
+            template_path = "partials/notifications/create_error.html"
+        elif "/api/cleanup" in path:
+            template_path = "partials/cleanup/create_error.html"
+        else:
+            # Use the new shared notification system as fallback
+            return templates.TemplateResponse(
+                request,
+                "partials/shared/notification.html",
+                {"message": f"Validation Error: {combined_message}", "type": "error"},
+                status_code=200,
+            )
+
         return templates.TemplateResponse(
             request,
-            "partials/repositories/form_create_error.html",
+            template_path,
             {"error_message": combined_message},
             status_code=200,  # Return 200 for HTMX so it processes the response
         )
@@ -164,6 +186,7 @@ app.include_router(
 app.include_router(
     notifications.router, prefix="/api/notifications", tags=["notifications"]
 )
+app.include_router(shared.router, prefix="/api/shared", tags=["shared"])
 app.include_router(debug.router)
 
 
