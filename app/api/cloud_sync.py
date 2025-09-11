@@ -27,9 +27,7 @@ def get_cloud_sync_service(db: Session = Depends(get_db)) -> CloudSyncService:
 @router.get("/add-form", response_class=HTMLResponse)
 async def get_add_form(request: Request) -> HTMLResponse:
     """Get the add form (for cancel functionality)"""
-    return templates.TemplateResponse(
-        request, "partials/cloud_sync/add_form.html", {}
-    )
+    return templates.TemplateResponse(request, "partials/cloud_sync/add_form.html", {})
 
 
 @router.get("/provider-fields", response_class=HTMLResponse)
@@ -180,7 +178,7 @@ async def get_cloud_sync_edit_form(
     """Get edit form for a specific cloud sync configuration"""
     try:
         config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
-        
+
         # Decrypt sensitive fields for editing
         decrypted_config = {
             "id": config.id,
@@ -200,12 +198,14 @@ async def get_cloud_sync_edit_form(
                 decrypted_config["access_key"] = access_key
                 decrypted_config["secret_key"] = secret_key
         elif config.provider == "sftp":
-            decrypted_config.update({
-                "host": config.host,
-                "port": config.port,
-                "username": config.username,
-                "remote_path": config.remote_path,
-            })
+            decrypted_config.update(
+                {
+                    "host": config.host,
+                    "port": config.port,
+                    "username": config.username,
+                    "remote_path": config.remote_path,
+                }
+            )
             if config.encrypted_password or config.encrypted_private_key:
                 password, private_key = config.get_sftp_credentials()
                 if password:
@@ -215,7 +215,7 @@ async def get_cloud_sync_edit_form(
 
         # Create a simple object for template access
         config_obj = type("Config", (), decrypted_config)()
-        
+
         context = {
             "config": config_obj,
             "provider": config.provider,
@@ -236,7 +236,9 @@ async def get_cloud_sync_edit_form(
             request, "partials/cloud_sync/edit_form.html", context
         )
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Cloud sync configuration not found: {str(e)}")
+        raise HTTPException(
+            status_code=404, detail=f"Cloud sync configuration not found: {str(e)}"
+        )
 
 
 @router.put("/{config_id}", response_model=CloudSyncConfigSchema)
@@ -248,10 +250,10 @@ async def update_cloud_sync_config(
 ):
     """Update a cloud sync configuration"""
     is_htmx_request = "hx-request" in request.headers
-    
+
     try:
         result = cloud_sync_service.update_cloud_sync_config(config_id, config_update)
-        
+
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request,
@@ -262,7 +264,7 @@ async def update_cloud_sync_config(
             return response
         else:
             return result
-            
+
     except HTTPException as e:
         if is_htmx_request:
             return templates.TemplateResponse(
