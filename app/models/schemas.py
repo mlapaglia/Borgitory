@@ -191,6 +191,69 @@ class ScheduleCreate(ScheduleBase):
         return int(v)
 
 
+class ScheduleUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=128)
+    cron_expression: Optional[str] = Field(None, min_length=5)
+    repository_id: Optional[int] = None
+    source_path: Optional[str] = None
+    cloud_sync_config_id: Optional[int] = None
+    cleanup_config_id: Optional[int] = None
+    check_config_id: Optional[int] = None
+    notification_config_id: Optional[int] = None
+    enabled: Optional[bool] = None
+
+    @field_validator("cron_expression")
+    @classmethod
+    def validate_cron_expression(cls, v):
+        if v is None:
+            return v
+        parts = v.split()
+        if len(parts) != 5:
+            raise ValueError(
+                "Invalid cron expression format. Expected 5 parts: minute hour day_of_month month day_of_week"
+            )
+        for i, part in enumerate(parts):
+            if not re.match(r"^[\d\*\-\,\/]+$", part):
+                raise ValueError(f"Invalid cron expression part {i + 1}: {part}")
+        return v
+
+    @field_validator("cloud_sync_config_id", mode="before")
+    @classmethod
+    def validate_cloud_sync_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
+
+    @field_validator("cleanup_config_id", mode="before")
+    @classmethod
+    def validate_cleanup_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
+
+    @field_validator("check_config_id", mode="before")
+    @classmethod
+    def validate_check_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
+
+    @field_validator("notification_config_id", mode="before")
+    @classmethod
+    def validate_notification_config_id(cls, v):
+        if v == "" or v == "none":
+            return None
+        if v is None:
+            return None
+        return int(v)
+
+
 class Schedule(ScheduleBase):
     id: int = Field(gt=0)
     repository_id: int = Field(gt=0)

@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.models.database import Schedule, Repository, get_db
-from app.models.schemas import Schedule as ScheduleSchema, ScheduleCreate
+from app.models.schemas import Schedule as ScheduleSchema, ScheduleCreate, ScheduleUpdate
 from app.dependencies import SchedulerServiceDep
 
 router = APIRouter()
@@ -279,6 +279,115 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)):
     return schedule
 
 
+@router.get("/{schedule_id}/edit", response_class=HTMLResponse)
+async def get_schedule_edit_form(
+    request: Request,
+    schedule_id: int,
+    db: Session = Depends(get_db)
+) -> HTMLResponse:
+    """Get edit form for a specific schedule"""
+    from app.models.database import (
+        CleanupConfig,
+        CloudSyncConfig,
+        NotificationConfig,
+        RepositoryCheckConfig,
+    )
+    
+    try:
+        schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+        if schedule is None:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+        
+        # Get all the dropdown options
+        repositories = db.query(Repository).all()
+        cleanup_configs = db.query(CleanupConfig).filter(CleanupConfig.enabled).all()
+        cloud_sync_configs = db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled).all()
+        notification_configs = db.query(NotificationConfig).filter(NotificationConfig.enabled).all()
+        check_configs = db.query(RepositoryCheckConfig).filter(RepositoryCheckConfig.enabled).all()
+
+        context = {
+            "schedule": schedule,
+            "repositories": repositories,
+            "cleanup_configs": cleanup_configs,
+            "cloud_sync_configs": cloud_sync_configs,
+            "notification_configs": notification_configs,
+            "check_configs": check_configs,
+            "is_edit_mode": True,
+        }
+
+        return templates.TemplateResponse(
+            request, "partials/schedules/edit_form.html", context
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Schedule not found: {str(e)}")
+
+
+@router.put("/{schedule_id}", response_model=ScheduleSchema)
+async def update_schedule(
+    request: Request,
+    schedule_id: int,
+    schedule_update: ScheduleUpdate,
+    scheduler_service: SchedulerServiceDep,
+    db: Session = Depends(get_db),
+):
+    """Update a schedule"""
+    is_htmx_request = "hx-request" in request.headers
+    
+    try:
+        schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+        if schedule is None:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+        
+        # Update fields if provided
+        update_data = schedule_update.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(schedule, field, value)
+        
+        db.commit()
+        db.refresh(schedule)
+        
+        # Update the scheduler if enabled
+        if schedule.enabled:
+            try:
+                await scheduler_service.update_schedule(
+                    schedule_id, schedule.cron_expression, schedule.repository_id
+                )
+            except Exception:
+                # If scheduler update fails, we still want to return the updated schedule
+                pass
+        
+        if is_htmx_request:
+            response = templates.TemplateResponse(
+                request,
+                "partials/schedules/update_success.html",
+                {"schedule_name": schedule.name},
+            )
+            response.headers["HX-Trigger"] = "scheduleUpdate"
+            return response
+        else:
+            return schedule
+            
+    except HTTPException as e:
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/schedules/update_error.html",
+                {"error_message": str(e.detail)},
+                status_code=e.status_code,
+            )
+        raise
+    except Exception as e:
+        error_msg = f"Failed to update schedule: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/schedules/update_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
 @router.put("/{schedule_id}/toggle")
 async def toggle_schedule(
     schedule_id: int,
@@ -329,42 +438,72 @@ async def delete_schedule(
     request: Request = None,
     db: Session = Depends(get_db),
 ):
-    schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
-    if schedule is None:
-        raise HTTPException(status_code=404, detail="Schedule not found")
-
-    # Remove from scheduler
+    is_htmx_request = request and "hx-request" in request.headers
+    
     try:
-        await scheduler_service.remove_schedule(schedule_id)
-    except Exception as e:
-        if request and "hx-request" in request.headers:
+        schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+        if schedule is None:
+            error_msg = "Schedule not found"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    request,
+                    "partials/schedules/delete_error.html",
+                    {"error_message": error_msg},
+                    status_code=404,
+                )
+            raise HTTPException(status_code=404, detail=error_msg)
+
+        schedule_name = schedule.name  # Store name before deletion
+
+        # Remove from scheduler
+        try:
+            await scheduler_service.remove_schedule(schedule_id)
+        except Exception as e:
+            error_msg = f"Failed to remove schedule from scheduler: {str(e)}"
+            if is_htmx_request:
+                return templates.TemplateResponse(
+                    request,
+                    "partials/schedules/delete_error.html",
+                    {"error_message": error_msg},
+                    status_code=500,
+                )
+            raise HTTPException(status_code=500, detail=error_msg)
+
+        # Delete from database
+        db.delete(schedule)
+        db.commit()
+
+        # Success response
+        if is_htmx_request:
+            response = templates.TemplateResponse(
+                request,
+                "partials/schedules/delete_success.html",
+                {"schedule_name": schedule_name},
+            )
+            response.headers["HX-Trigger"] = "scheduleUpdate"
+            return response
+        else:
+            return {"message": "Schedule deleted successfully"}
+
+    except HTTPException as e:
+        if is_htmx_request:
             return templates.TemplateResponse(
                 request,
-                "partials/common/error_message.html",
-                {
-                    "error_message": f"Failed to remove schedule from scheduler: {str(e)}"
-                },
+                "partials/schedules/delete_error.html",
+                {"error_message": str(e.detail)},
+                status_code=e.status_code,
+            )
+        raise
+    except Exception as e:
+        error_msg = f"Failed to delete schedule: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/schedules/delete_error.html",
+                {"error_message": error_msg},
                 status_code=500,
             )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to remove schedule from scheduler: {str(e)}",
-        )
-
-    # Delete from database
-    db.delete(schedule)
-    db.commit()
-
-    # Return updated schedule list for HTMX requests
-    if request and "hx-request" in request.headers:
-        schedules = db.query(Schedule).all()
-        return templates.TemplateResponse(
-            request,
-            "partials/schedules/schedule_list_content.html",
-            {"schedules": schedules},
-        )
-
-    return {"message": "Schedule deleted successfully"}
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.get("/jobs/active")

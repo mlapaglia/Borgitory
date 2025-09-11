@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.models.database import CleanupConfig, Repository, get_db
-from app.models.schemas import CleanupConfig as CleanupConfigSchema, CleanupConfigCreate
+from app.models.schemas import CleanupConfig as CleanupConfigSchema, CleanupConfigCreate, CleanupConfigUpdate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -81,6 +81,24 @@ class CleanupService:
         self.db.commit()
         return cleanup_config
 
+    def update_cleanup_config(
+        self, config_id: int, cleanup_config: CleanupConfigUpdate
+    ) -> CleanupConfig:
+        """Update a cleanup configuration."""
+        existing_config = self.get_cleanup_config_by_id(config_id)
+        
+        # Validate the update
+        self._validate_cleanup_config_update(cleanup_config)
+        
+        # Update fields if provided
+        update_data = cleanup_config.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(existing_config, field, value)
+        
+        self.db.commit()
+        self.db.refresh(existing_config)
+        return existing_config
+
     def delete_cleanup_config(self, config_id: int) -> None:
         """Delete a cleanup configuration."""
         cleanup_config = self.get_cleanup_config_by_id(config_id)
@@ -107,6 +125,27 @@ class CleanupService:
                     detail="Advanced strategy requires at least one keep_* parameter",
                 )
 
+    def _validate_cleanup_config_update(self, cleanup_config: CleanupConfigUpdate) -> None:
+        """Validate cleanup configuration update parameters."""
+        if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days is not None and not cleanup_config.keep_within_days:
+            raise HTTPException(
+                status_code=400, detail="Simple strategy requires keep_within_days"
+            )
+        elif cleanup_config.strategy == "advanced":
+            # Check if any keep_* parameters are being set
+            keep_params = [
+                cleanup_config.keep_daily,
+                cleanup_config.keep_weekly,
+                cleanup_config.keep_monthly,
+                cleanup_config.keep_yearly,
+            ]
+            # Only validate if we're setting keep parameters (not None)
+            if any(param is not None for param in keep_params) and not any(keep_params):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Advanced strategy requires at least one keep_* parameter",
+                )
+
 
 def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
     """Dependency to get cleanup service instance."""
@@ -117,13 +156,25 @@ def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
 async def get_cleanup_form(
     request: Request, db: Session = Depends(get_db)
 ) -> HTMLResponse:
-    """Get cleanup form with repositories populated"""
+    """Get manual cleanup form with repositories populated"""
     repositories = db.query(Repository).all()
 
     return templates.TemplateResponse(
         request,
         "partials/cleanup/config_form.html",
         {"repositories": repositories},
+    )
+
+
+@router.get("/policy-form", response_class=HTMLResponse)
+async def get_policy_form(
+    request: Request, db: Session = Depends(get_db)
+) -> HTMLResponse:
+    """Get policy creation form"""
+    return templates.TemplateResponse(
+        request,
+        "partials/cleanup/create_form.html",
+        {},
     )
 
 
@@ -309,6 +360,73 @@ async def disable_cleanup_config(
         raise HTTPException(status_code=500, detail=error_message)
 
 
+@router.get("/{config_id}/edit", response_class=HTMLResponse)
+async def get_cleanup_config_edit_form(
+    request: Request,
+    config_id: int,
+    cleanup_service: CleanupService = Depends(get_cleanup_service),
+) -> HTMLResponse:
+    """Get edit form for a specific cleanup configuration"""
+    try:
+        config = cleanup_service.get_cleanup_config_by_id(config_id)
+        
+        context = {
+            "config": config,
+            "is_edit_mode": True,
+        }
+
+        return templates.TemplateResponse(
+            request, "partials/cleanup/edit_form.html", context
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Cleanup configuration not found: {str(e)}")
+
+
+@router.put("/{config_id}", response_model=CleanupConfigSchema)
+async def update_cleanup_config(
+    request: Request,
+    config_id: int,
+    config_update: CleanupConfigUpdate,
+    cleanup_service: CleanupService = Depends(get_cleanup_service),
+):
+    """Update a cleanup configuration"""
+    is_htmx_request = "hx-request" in request.headers
+    
+    try:
+        updated_config = cleanup_service.update_cleanup_config(config_id, config_update)
+        
+        if is_htmx_request:
+            response = templates.TemplateResponse(
+                request,
+                "partials/cleanup/update_success.html",
+                {"config_name": updated_config.name},
+            )
+            response.headers["HX-Trigger"] = "cleanupConfigUpdate"
+            return response
+        else:
+            return updated_config
+            
+    except HTTPException as e:
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/cleanup/update_error.html",
+                {"error_message": str(e.detail)},
+                status_code=e.status_code,
+            )
+        raise
+    except Exception as e:
+        error_msg = f"Failed to update cleanup configuration: {str(e)}"
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/cleanup/update_error.html",
+                {"error_message": error_msg},
+                status_code=500,
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
 @router.delete("/{config_id}", response_model=None)
 async def delete_cleanup_config(
     request: Request,
@@ -322,25 +440,33 @@ async def delete_cleanup_config(
         config = cleanup_service.get_cleanup_config_by_id(config_id)
         config_name = config.name
         cleanup_service.delete_cleanup_config(config_id)
-        message = f"Cleanup policy '{config_name}' deleted successfully!"
 
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request,
-                "partials/cleanup/action_success.html",
-                {"message": message},
+                "partials/cleanup/delete_success.html",
+                {"config_name": config_name},
             )
             response.headers["HX-Trigger"] = "cleanupConfigUpdate"
             return response
         else:
-            return {"message": message}
+            return {"message": f"Cleanup policy '{config_name}' deleted successfully!"}
 
+    except HTTPException as e:
+        if is_htmx_request:
+            return templates.TemplateResponse(
+                request,
+                "partials/cleanup/delete_error.html",
+                {"error_message": str(e.detail)},
+                status_code=e.status_code,
+            )
+        raise
     except Exception as e:
         error_message = f"Failed to delete cleanup configuration: {str(e)}"
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
-                "partials/cleanup/action_error.html",
+                "partials/cleanup/delete_error.html",
                 {"error_message": error_message},
                 status_code=500,
             )

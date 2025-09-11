@@ -1,0 +1,13 @@
+<!-- HTMX Notification Trigger -->
+<div hx-get="/api/shared/notification?message=Check policy '{{ config_name }}' deleted successfully!&type=success"
+     hx-target="body"
+     hx-swap="beforeend"
+     hx-trigger="load">
+</div>
+
+<!-- Update Check Policies List -->
+<div hx-get="/api/repository-check-configs/html" 
+     hx-target="#check-policies-list" 
+     hx-swap="innerHTML" 
+     hx-trigger="load delay:100ms">
+</div>

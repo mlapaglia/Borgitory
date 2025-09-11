@@ -1,0 +1,126 @@
+<!-- Edit Schedule -->
+<div class="border dark:border-gray-600 rounded-lg p-4">
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Edit Schedule</h3>
+    <form 
+        hx-put="/api/schedules/{{ schedule.id }}" 
+        hx-ext="json-enc"
+        hx-target="#schedule-status"
+    >
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
+                <input type="text" name="name" required value="{{ schedule.name }}" placeholder="Daily backup" class="mt-1 input-modern block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository</label>
+                <select name="repository_id" required class="select-modern w-full">
+                    <option value="">Select Repository...</option>
+                    {% for repo in repositories %}
+                    <option value="{{ repo.id }}" {{ 'selected' if repo.id == schedule.repository_id else '' }}>{{ repo.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Source Path</label>
+                <div class="relative">
+                    <input type="text" name="source_path" id="schedule-edit-source-path" value="{{ schedule.source_path or '/' }}" 
+                           class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 input-modern mt-1"
+                           autocomplete="off">
+                    <div id="schedule-edit-source-path-dropdown" class="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg mt-1 hidden">
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Schedule</label>
+                <select 
+                    id="schedule-edit-preset" 
+                    class="select-modern w-full"
+                    hx-get="/api/schedules/cron-expression-form"
+                    hx-target="#cron-expression-edit-container"
+                    hx-include="this"
+                    name="preset">
+                    <option value="">Select a preset...</option>
+                    <option value="0 2 * * *" {{ 'selected' if schedule.cron_expression == '0 2 * * *' else '' }}>Daily at 2:00 AM</option>
+                    <option value="0 2 * * 0" {{ 'selected' if schedule.cron_expression == '0 2 * * 0' else '' }}>Weekly on Sunday at 2:00 AM</option>
+                    <option value="0 2 1 * *" {{ 'selected' if schedule.cron_expression == '0 2 1 * *' else '' }}>Monthly on 1st at 2:00 AM</option>
+                    <option value="0 2 1,15 * *" {{ 'selected' if schedule.cron_expression == '0 2 1,15 * *' else '' }}>Twice monthly (1st and 15th) at 2:00 AM</option>
+                    <option value="0 2 */2 * *" {{ 'selected' if schedule.cron_expression == '0 2 */2 * *' else '' }}>Every 2 days at 2:00 AM</option>
+                    <option value="custom" {{ 'selected' if schedule.cron_expression not in ['0 2 * * *', '0 2 * * 0', '0 2 1 * *', '0 2 1,15 * *', '0 2 */2 * *'] else '' }}>Custom (cron expression)</option>
+                </select>
+            </div>
+            <div id="cron-expression-edit-container">
+                <!-- Dynamic cron expression form elements will be loaded here -->
+                {% if schedule.cron_expression not in ['0 2 * * *', '0 2 * * 0', '0 2 1 * *', '0 2 1,15 * *', '0 2 */2 * *'] %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Custom Cron Expression</label>
+                    <input type="text" name="cron_expression" value="{{ schedule.cron_expression }}" required class="input-modern mt-1 w-full" placeholder="0 2 * * *">
+                    <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Enter your custom cron expression (minute hour day month day_of_week)</p>
+                </div>
+                {% else %}
+                <input type="hidden" name="cron_expression" value="{{ schedule.cron_expression }}">
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Cleanup (Optional)</label>
+                <select name="cleanup_config_id" id="schedule-edit-cleanup-select" class="select-modern w-full">
+                    <option value="">No cleanup</option>
+                    {% for config in cleanup_configs %}
+                    <option value="{{ config.id }}" {{ 'selected' if config.id == schedule.cleanup_config_id else '' }}>{{ config.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Automatically prune old archives after each scheduled backup</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Cloud Backup (Optional)</label>
+                <select name="cloud_sync_config_id" id="schedule-edit-cloud-select" class="select-modern w-full">
+                    <option value="">No cloud backup</option>
+                    {% for config in cloud_sync_configs %}
+                    <option value="{{ config.id }}" {{ 'selected' if config.id == schedule.cloud_sync_config_id else '' }}>{{ config.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Automatically backup to cloud after each scheduled Borg backup</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository Check (Optional)</label>
+                <select name="check_config_id" id="schedule-edit-check-select" class="select-modern w-full">
+                    <option value="">No check</option>
+                    {% for config in check_configs %}
+                    <option value="{{ config.id }}" {{ 'selected' if config.id == schedule.check_config_id else '' }}>{{ config.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Verify repository integrity after each scheduled backup</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Notifications (Optional)</label>
+                <select name="notification_config_id" id="schedule-edit-notification-select" class="select-modern w-full">
+                    <option value="">No notifications</option>
+                    {% for config in notification_configs %}
+                    <option value="{{ config.id }}" {{ 'selected' if config.id == schedule.notification_config_id else '' }}>{{ config.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Get notified when scheduled backup completes or fails</p>
+            </div>
+            <div class="flex space-x-2">
+                <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                    Update Schedule
+                </button>
+                <button 
+                    type="button" 
+                    hx-get="/api/schedules/form"
+                    hx-target="#schedule-form-container"
+                    hx-swap="innerHTML"
+                    class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </form>
+    <div id="schedule-status" class="mt-4"></div>
+</div>
+
+<script>
+// Initialize path autocomplete for dynamically loaded edit form
+if (typeof PathAutocomplete !== 'undefined') {
+    new PathAutocomplete('schedule-edit-source-path', 'schedule-edit-source-path-dropdown');
+}
+</script>
