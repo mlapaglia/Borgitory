@@ -4,6 +4,15 @@
 
 A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities.
 
+## System Status
+
+✅ **Core Features**: Fully implemented and tested  
+✅ **Notification System**: Complete HTMX-based unified notification system  
+✅ **Archive Browsing**: Interactive exploration with FUSE mounting  
+✅ **Multi-Task Jobs**: Backup, prune, check, and cloud sync operations  
+✅ **User Interface**: Modern HTMX + Tailwind CSS with mobile responsiveness  
+✅ **API Coverage**: 933 tests passing with comprehensive test coverage
+
 ## Features
 
 ### Core Functionality
@@ -88,10 +97,20 @@ The application requires these volume mounts:
 
 ```yaml
 volumes:
-  - ./data:/app/data # Persistent data
+  - ./data:/app/data # Persistent application data (required)
+  - /path/to/backup/sources:/backup/sources:ro # Source directories to backup (read-only)
+  - /path/to/borg/repos:/repos # Borg repository storage (read-write)
+  - /additional/source:/additional:ro # Additional source directories as needed
+  - /another/repo/location:/alt-repos # Additional repository locations as needed
 ```
 
-Any other mounts for back up sources and Borg repositories can be made anywhere.
+**Volume Strategy:**
+
+- Mount as many volumes as necessary to access all your backup sources and repository locations
+- Source directories can be mounted read-only (`:ro`) for safety
+- Repository directories need read-write access for Borg operations
+- Each volume can be mapped to any convenient path inside the container
+- Supports distributed setups where repositories and sources are in different locations
 
 ## Usage
 
@@ -135,15 +154,22 @@ Any other mounts for back up sources and Borg repositories can be made anywhere.
 **Exploring Archives:**
 
 1. Click "View Contents" on any archive to open the browser
-2. Navigate through directories by clicking folder names
+2. Navigate through directories by clicking folder names  
 3. View file details including size and modification dates
+4. Real-time directory exploration using FUSE-mounted archive filesystems
 
 **Downloading Files:**
 
 1. Click the download button (⬇) next to any file
-2. Files stream directly from the archive without temporary storage
+2. Files stream directly from the mounted archive without temporary storage
 3. Works efficiently with large files and slow connections
 4. Multiple downloads can run simultaneously
+5. Uses FUSE mounting for fast, direct file access
+
+**Requirements:**
+
+- Docker container must run with `--cap-add SYS_ADMIN` and `--device /dev/fuse`
+- Without FUSE support, archive browsing will be disabled
 
 ### 5. Cloud Sync
 
@@ -182,14 +208,31 @@ docker-compose -f docker-compose.yml up -d
 # Build image
 docker build -t borgitory .
 
-# Run container
+# Run container with FUSE support for archive browsing
 docker run -d \
   -p 8000:8000 \
   -v ./data:/app/data \
-  -v /backup/sources:/data:ro \
+  -v /path/to/backup/sources:/backup/sources:ro \
+  -v /path/to/borg/repos:/repos \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  --cap-add SYS_ADMIN \
+  --device /dev/fuse \
   --name borgitory \
   borgitory
 ```
+
+**Required Docker Parameters:**
+
+- `--cap-add SYS_ADMIN`: Required for FUSE filesystem mounting to enable archive browsing
+- `--device /dev/fuse`: Provides access to FUSE device for archive file system mounting
+- `-v /var/run/docker.sock:/var/run/docker.sock`: Allows container to manage Borg Docker containers
+
+**FUSE Requirements:**
+
+- FUSE mounting enables the interactive archive browser feature
+- Allows real-time exploration of backup archives without extraction
+- Supports direct file downloads from mounted archive filesystems
+- Without FUSE support, archive browsing will be disabled
 
 ## Architecture
 
@@ -208,7 +251,6 @@ docker run -d \
 - **Alpine.js**: Lightweight JavaScript reactivity
 - **Tailwind CSS**: Utility-first styling with responsive design
 - **Server-Sent Events**: Real-time progress updates and live job monitoring
-- **Component Architecture**: Modular JavaScript and template organization
 
 ### Job Management System
 
@@ -223,7 +265,6 @@ docker run -d \
 - Username/password authentication with bcrypt hashing
 - Secure session management
 - Encrypted credential storage (Fernet)
-- Docker container isolation
 - No network access for Borg containers
 
 ## Troubleshooting
