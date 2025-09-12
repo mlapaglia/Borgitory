@@ -87,10 +87,11 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ### Development Setup
 
-1. **Install Python dependencies**
+1. **Install Python tools and the application**
 
    ```bash
    pip install -r requirements.txt
+   pip install -e .
    ```
 
 2. **Install Rclone** (for cloud sync)
