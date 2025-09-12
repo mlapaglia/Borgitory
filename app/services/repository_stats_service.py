@@ -13,26 +13,30 @@ logger = logging.getLogger(__name__)
 
 class CommandExecutorInterface(ABC):
     """Abstract interface for executing Borg commands"""
-    
+
     @abstractmethod
     async def execute_borg_list(self, repository: Repository) -> List[str]:
         """Execute borg list command to get archive names"""
         pass
-    
+
     @abstractmethod
-    async def execute_borg_info(self, repository: Repository, archive_name: str) -> Dict[str, Any]:
+    async def execute_borg_info(
+        self, repository: Repository, archive_name: str
+    ) -> Dict[str, Any]:
         """Execute borg info command to get archive details"""
         pass
-    
+
     @abstractmethod
-    async def execute_borg_list_files(self, repository: Repository, archive_name: str) -> List[Dict[str, Any]]:
+    async def execute_borg_list_files(
+        self, repository: Repository, archive_name: str
+    ) -> List[Dict[str, Any]]:
         """Execute borg list command to get file details from an archive"""
         pass
 
 
 class SubprocessCommandExecutor(CommandExecutorInterface):
     """Concrete implementation using subprocess for command execution"""
-    
+
     async def execute_borg_list(self, repository: Repository) -> List[str]:
         """Execute borg list command to get archive names"""
         try:
@@ -62,8 +66,10 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
         except Exception as e:
             logger.error(f"Exception while listing archives: {e}")
             return []
-    
-    async def execute_borg_info(self, repository: Repository, archive_name: str) -> Dict[str, Any]:
+
+    async def execute_borg_info(
+        self, repository: Repository, archive_name: str
+    ) -> Dict[str, Any]:
         """Execute borg info command to get archive details"""
         try:
             command, env = build_secure_borg_command(
@@ -87,9 +93,15 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
                     "start": archive_info.get("start", ""),
                     "end": archive_info.get("end", ""),
                     "duration": archive_info.get("duration", 0),
-                    "original_size": archive_info.get("stats", {}).get("original_size", 0),
-                    "compressed_size": archive_info.get("stats", {}).get("compressed_size", 0),
-                    "deduplicated_size": archive_info.get("stats", {}).get("deduplicated_size", 0),
+                    "original_size": archive_info.get("stats", {}).get(
+                        "original_size", 0
+                    ),
+                    "compressed_size": archive_info.get("stats", {}).get(
+                        "compressed_size", 0
+                    ),
+                    "deduplicated_size": archive_info.get("stats", {}).get(
+                        "deduplicated_size", 0
+                    ),
                     "nfiles": archive_info.get("stats", {}).get("nfiles", 0),
                 }
             else:
@@ -98,8 +110,10 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
         except Exception as e:
             logger.error(f"Exception while getting archive info: {e}")
             return {}
-    
-    async def execute_borg_list_files(self, repository: Repository, archive_name: str) -> List[Dict[str, Any]]:
+
+    async def execute_borg_list_files(
+        self, repository: Repository, archive_name: str
+    ) -> List[Dict[str, Any]]:
         """Execute borg list command to get file details from an archive"""
         try:
             command, env = build_secure_borg_command(
@@ -172,7 +186,9 @@ class RepositoryStatsService:
                         f"Analyzing archive {i + 1}/{len(archives)}: {archive}",
                         archive_progress,
                     )
-                archive_info = await self.command_executor.execute_borg_info(repository, archive)
+                archive_info = await self.command_executor.execute_borg_info(
+                    repository, archive
+                )
                 if archive_info:
                     archive_stats.append(archive_info)
 
@@ -622,17 +638,17 @@ class RepositoryStatsService:
         }
 
     async def _get_file_type_stats(
-        self, 
-        repository: Repository, 
-        archives: List[str], 
-        progress_callback: Optional[Callable[[str, int], None]] = None
+        self,
+        repository: Repository,
+        archives: List[str],
+        progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> Dict[str, Any]:
         """Get file type statistics from archives"""
         # For now, return empty stats structure
         # This can be implemented later using the command executor
         return {
             "count_chart": {"labels": [], "datasets": []},
-            "size_chart": {"labels": [], "datasets": []}
+            "size_chart": {"labels": [], "datasets": []},
         }
 
 
