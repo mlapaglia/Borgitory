@@ -25,11 +25,7 @@ from app.api.auth import get_current_user
 from app.utils.secure_path import (
     create_secure_filename,
     secure_path_join,
-    secure_exists,
-    secure_isdir,
     secure_remove_file,
-    get_directory_listing,
-    validate_path_within_base,
     PathSecurityError,
     # User-facing functions for repos/backup sources (only /mnt)
     user_secure_exists,

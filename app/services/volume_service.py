@@ -8,22 +8,22 @@ logger = logging.getLogger(__name__)
 
 class FileSystemInterface(ABC):
     """Abstract interface for filesystem operations"""
-    
+
     @abstractmethod
     def exists(self, path: str) -> bool:
         """Check if path exists"""
         pass
-    
+
     @abstractmethod
     def is_dir(self, path: str) -> bool:
         """Check if path is a directory"""
         pass
-    
+
     @abstractmethod
     def listdir(self, path: str) -> List[str]:
         """List contents of directory"""
         pass
-    
+
     @abstractmethod
     def join(self, *paths: str) -> str:
         """Join path components"""
@@ -32,16 +32,16 @@ class FileSystemInterface(ABC):
 
 class OsFileSystem(FileSystemInterface):
     """Concrete filesystem implementation using os module"""
-    
+
     def exists(self, path: str) -> bool:
         return os.path.exists(path)
-    
+
     def is_dir(self, path: str) -> bool:
         return os.path.isdir(path)
-    
+
     def listdir(self, path: str) -> List[str]:
         return os.listdir(path)
-    
+
     def join(self, *paths: str) -> str:
         return os.path.join(*paths)
 
@@ -59,7 +59,9 @@ class VolumeService:
             mounted_volumes = []
 
             # Check if /mnt exists
-            if not self.filesystem.exists(mnt_path) or not self.filesystem.is_dir(mnt_path):
+            if not self.filesystem.exists(mnt_path) or not self.filesystem.is_dir(
+                mnt_path
+            ):
                 logger.info("No /mnt directory found")
                 return []
 

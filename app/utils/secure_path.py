@@ -25,30 +25,30 @@ class PathSecurityError(Exception):
 def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optional[Path]:
     """
     Validate that a path is under allowed directories. Simple and secure.
-    
+
     Allowed paths:
     - /mnt/* - For user repos, backup sources, keyfiles, etc.
     - /app/app/data/* - For application database, secret key, etc. (if allow_app_data=True)
-    
+
     This function uses pathlib.Path.resolve() to handle symlinks, relative paths,
     and normalization automatically, preventing path traversal attacks.
-    
+
     Args:
         user_path: The user-provided path to validate
         allow_app_data: Whether to allow /app/app/data paths (default: True)
-        
+
     Returns:
         Resolved Path object if valid and under allowed directories, None otherwise
     """
     try:
         # Resolve symlinks and normalize path
         resolved_path = Path(user_path).resolve()
-        
+
         # Define allowed root directories
         allowed_roots = [Path("/mnt").resolve()]
         if allow_app_data:
             allowed_roots.append(Path("/app/app/data").resolve())
-        
+
         # Check if path is under any allowed root
         for allowed_root in allowed_roots:
             try:
@@ -57,12 +57,14 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
                 return resolved_path
             except ValueError:
                 continue  # Not under this root, try next
-        
+
         # Path not under any allowed root
         allowed_paths = ["/mnt"] + (["/app/app/data"] if allow_app_data else [])
-        logger.warning(f"Path validation failed for '{user_path}': not under allowed paths {allowed_paths}")
+        logger.warning(
+            f"Path validation failed for '{user_path}': not under allowed paths {allowed_paths}"
+        )
         return None
-        
+
     except (OSError,) as e:
         logger.warning(f"Path validation failed for '{user_path}': {e}")
         return None
@@ -90,15 +92,15 @@ def validate_path_within_base(
     """
     Legacy function for backward compatibility.
     Now enforces secure path policy for both /mnt and /app/app/data.
-    
+
     Args:
         path: The path to validate
         base_dir: Ignored - paths must be under /mnt or /app/app/data
         allow_equal: Ignored - handled automatically
-        
+
     Returns:
         The resolved path as string if valid
-        
+
     Raises:
         PathSecurityError: If the path is not under allowed directories
     """
@@ -180,22 +182,24 @@ def create_secure_filename(
 def secure_path_join(base_dir: str, *path_parts: str) -> str:
     """
     Securely join path components and validate the result is under allowed directories.
-    
+
     Args:
         base_dir: Starting path (must be under /mnt or /app/app/data)
         path_parts: Path components to join
-        
+
     Returns:
         The secure joined path
-        
+
     Raises:
         PathSecurityError: If the resulting path would not be under allowed directories
     """
     # Validate base directory is under allowed directories
     validated_base = validate_secure_path(base_dir, allow_app_data=True)
     if validated_base is None:
-        raise PathSecurityError(f"Base directory '{base_dir}' must be under /mnt or /app/app/data")
-    
+        raise PathSecurityError(
+            f"Base directory '{base_dir}' must be under /mnt or /app/app/data"
+        )
+
     # Clean and join path parts
     safe_parts = []
     for part in path_parts:
@@ -211,14 +215,14 @@ def secure_path_join(base_dir: str, *path_parts: str) -> str:
 
     # Join with the validated base
     joined_path = validated_base / Path(*safe_parts)
-    
+
     # Validate the final result is still under allowed directories
     final_validated = validate_secure_path(str(joined_path), allow_app_data=True)
     if final_validated is None:
         raise PathSecurityError(
             f"Joined path '{joined_path}' would be outside allowed directories"
         )
-    
+
     return str(final_validated)
 
 
@@ -236,7 +240,7 @@ def secure_exists(path: str, allowed_base_dirs: List[str] = None) -> bool:
     validated_path = validate_secure_path(path, allow_app_data=True)
     if validated_path is None:
         return False
-    
+
     try:
         return validated_path.exists()
     except (PermissionError, OSError) as e:
@@ -258,7 +262,7 @@ def secure_isdir(path: str, allowed_base_dirs: List[str] = None) -> bool:
     validated_path = validate_secure_path(path, allow_app_data=True)
     if validated_path is None:
         return False
-    
+
     try:
         return validated_path.is_dir()
     except (PermissionError, OSError) as e:
@@ -280,7 +284,7 @@ def secure_listdir(path: str, allowed_base_dirs: List[str] = None) -> List[str]:
     validated_path = validate_secure_path(path, allow_app_data=True)
     if validated_path is None:
         return []
-    
+
     try:
         return [item.name for item in validated_path.iterdir()]
     except (PermissionError, OSError) as e:
@@ -303,7 +307,7 @@ def secure_remove_file(file_path: str, allowed_base_dirs: List[str] = None) -> b
     if validated_path is None:
         logger.warning(f"File '{file_path}' not under allowed directories")
         return False
-    
+
     try:
         if validated_path.exists():
             validated_path.unlink()
@@ -359,7 +363,7 @@ def user_secure_exists(path: str) -> bool:
     validated_path = validate_mnt_path(path)
     if validated_path is None:
         return False
-    
+
     try:
         return validated_path.exists()
     except (PermissionError, OSError) as e:
@@ -372,7 +376,7 @@ def user_secure_isdir(path: str) -> bool:
     validated_path = validate_mnt_path(path)
     if validated_path is None:
         return False
-    
+
     try:
         return validated_path.is_dir()
     except (PermissionError, OSError) as e:
@@ -380,7 +384,9 @@ def user_secure_isdir(path: str) -> bool:
         return False
 
 
-def user_get_directory_listing(path: str, include_files: bool = False) -> List[Dict[str, str]]:
+def user_get_directory_listing(
+    path: str, include_files: bool = False
+) -> List[Dict[str, str]]:
     """Get directory listing - /mnt only (for user repos/backup sources)."""
     validated_path = validate_mnt_path(path)
     if validated_path is None:

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Callable, Optional
 from sqlalchemy.orm import Session
 
@@ -10,8 +11,133 @@ from app.utils.security import build_secure_borg_command
 logger = logging.getLogger(__name__)
 
 
+class CommandExecutorInterface(ABC):
+    """Abstract interface for executing Borg commands"""
+    
+    @abstractmethod
+    async def execute_borg_list(self, repository: Repository) -> List[str]:
+        """Execute borg list command to get archive names"""
+        pass
+    
+    @abstractmethod
+    async def execute_borg_info(self, repository: Repository, archive_name: str) -> Dict[str, Any]:
+        """Execute borg info command to get archive details"""
+        pass
+    
+    @abstractmethod
+    async def execute_borg_list_files(self, repository: Repository, archive_name: str) -> List[Dict[str, Any]]:
+        """Execute borg list command to get file details from an archive"""
+        pass
+
+
+class SubprocessCommandExecutor(CommandExecutorInterface):
+    """Concrete implementation using subprocess for command execution"""
+    
+    async def execute_borg_list(self, repository: Repository) -> List[str]:
+        """Execute borg list command to get archive names"""
+        try:
+            command, env = build_secure_borg_command(
+                base_command="borg list",
+                repository_path=repository.path,
+                passphrase=repository.get_passphrase(),
+                additional_args=["--short"],
+            )
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
+            stdout, stderr = await process.communicate()
+            if process.returncode == 0:
+                archives = [
+                    line.strip()
+                    for line in stdout.decode().strip().split("\n")
+                    if line.strip()
+                ]
+                return archives
+            else:
+                logger.error(f"Failed to list archives: {stderr.decode()}")
+                return []
+        except Exception as e:
+            logger.error(f"Exception while listing archives: {e}")
+            return []
+    
+    async def execute_borg_info(self, repository: Repository, archive_name: str) -> Dict[str, Any]:
+        """Execute borg info command to get archive details"""
+        try:
+            command, env = build_secure_borg_command(
+                base_command="borg info",
+                repository_path="",
+                passphrase=repository.get_passphrase(),
+                additional_args=["--json", f"{repository.path}::{archive_name}"],
+            )
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
+            stdout, stderr = await process.communicate()
+            if process.returncode == 0:
+                info_data = json.loads(stdout.decode())
+                archive_info = info_data.get("archives", [{}])[0]
+                return {
+                    "name": archive_info.get("name", archive_name),
+                    "start": archive_info.get("start", ""),
+                    "end": archive_info.get("end", ""),
+                    "duration": archive_info.get("duration", 0),
+                    "original_size": archive_info.get("stats", {}).get("original_size", 0),
+                    "compressed_size": archive_info.get("stats", {}).get("compressed_size", 0),
+                    "deduplicated_size": archive_info.get("stats", {}).get("deduplicated_size", 0),
+                    "nfiles": archive_info.get("stats", {}).get("nfiles", 0),
+                }
+            else:
+                logger.error(f"Failed to get archive info: {stderr.decode()}")
+                return {}
+        except Exception as e:
+            logger.error(f"Exception while getting archive info: {e}")
+            return {}
+    
+    async def execute_borg_list_files(self, repository: Repository, archive_name: str) -> List[Dict[str, Any]]:
+        """Execute borg list command to get file details from an archive"""
+        try:
+            command, env = build_secure_borg_command(
+                base_command="borg list",
+                repository_path="",
+                passphrase=repository.get_passphrase(),
+                additional_args=["--json-lines", f"{repository.path}::{archive_name}"],
+            )
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
+            stdout, stderr = await process.communicate()
+            if process.returncode == 0:
+                files = []
+                for line in stdout.decode().strip().split("\n"):
+                    if line.strip():
+                        try:
+                            file_info = json.loads(line)
+                            files.append(file_info)
+                        except json.JSONDecodeError:
+                            continue
+                return files
+            else:
+                logger.error(f"Failed to list files: {stderr.decode()}")
+                return []
+        except Exception as e:
+            logger.error(f"Exception while listing files: {e}")
+            return []
+
+
 class RepositoryStatsService:
     """Service to gather repository statistics from Borg commands"""
+
+    def __init__(self, command_executor: CommandExecutorInterface = None):
+        self.command_executor = command_executor or SubprocessCommandExecutor()
 
     async def get_repository_statistics(
         self,
@@ -27,7 +153,7 @@ class RepositoryStatsService:
             # Get list of all archives
             if progress_callback:
                 progress_callback("Scanning repository for archives...", 10)
-            archives = await self._get_archive_list(repository)
+            archives = await self.command_executor.execute_borg_list(repository)
             if not archives:
                 return {"error": "No archives found in repository"}
 
@@ -46,7 +172,7 @@ class RepositoryStatsService:
                         f"Analyzing archive {i + 1}/{len(archives)}: {archive}",
                         archive_progress,
                     )
-                archive_info = await self._get_archive_info(repository, archive)
+                archive_info = await self.command_executor.execute_borg_info(repository, archive)
                 if archive_info:
                     archive_stats.append(archive_info)
 
@@ -493,6 +619,20 @@ class RepositoryStatsService:
             )
             if archive_stats
             else 0,
+        }
+
+    async def _get_file_type_stats(
+        self, 
+        repository: Repository, 
+        archives: List[str], 
+        progress_callback: Optional[Callable[[str, int], None]] = None
+    ) -> Dict[str, Any]:
+        """Get file type statistics from archives"""
+        # For now, return empty stats structure
+        # This can be implemented later using the command executor
+        return {
+            "count_chart": {"labels": [], "datasets": []},
+            "size_chart": {"labels": [], "datasets": []}
         }
 
 

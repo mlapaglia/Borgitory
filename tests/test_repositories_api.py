@@ -207,7 +207,6 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
         
         try:
-            from pathlib import Path
             from unittest.mock import Mock
             
             # Mock pathlib.Path methods
@@ -254,7 +253,6 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
         
         try:
-            from pathlib import Path
             from unittest.mock import Mock
             
             # Mock pathlib.Path methods

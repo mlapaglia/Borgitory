@@ -4,9 +4,43 @@ Tests for RepositoryStatsService class - repository statistics and analytics
 import pytest
 import json
 from unittest.mock import Mock, AsyncMock, patch
+from typing import Dict, Any, List
 
-from app.services.repository_stats_service import RepositoryStatsService
+from app.services.repository_stats_service import RepositoryStatsService, CommandExecutorInterface
 from app.models.database import Repository
+
+
+class MockCommandExecutor(CommandExecutorInterface):
+    """Mock command executor for testing"""
+    
+    def __init__(self):
+        self.archive_list = []
+        self.archive_info_data = {}
+        self.file_data = {}
+    
+    def set_archive_list(self, archives: List[str]):
+        """Set the list of archives to return"""
+        self.archive_list = archives
+    
+    def set_archive_info(self, archive_name: str, info: Dict[str, Any]):
+        """Set archive info data for a specific archive"""
+        self.archive_info_data[archive_name] = info
+    
+    def set_file_data(self, archive_name: str, files: List[Dict[str, Any]]):
+        """Set file data for a specific archive"""
+        self.file_data[archive_name] = files
+    
+    async def execute_borg_list(self, repository) -> List[str]:
+        """Return mock archive list"""
+        return self.archive_list
+    
+    async def execute_borg_info(self, repository, archive_name: str) -> Dict[str, Any]:
+        """Return mock archive info"""
+        return self.archive_info_data.get(archive_name, {})
+    
+    async def execute_borg_list_files(self, repository, archive_name: str) -> List[Dict[str, Any]]:
+        """Return mock file data"""
+        return self.file_data.get(archive_name, [])
 
 
 class TestRepositoryStatsService:
@@ -14,7 +48,8 @@ class TestRepositoryStatsService:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.service = RepositoryStatsService()
+        self.mock_executor = MockCommandExecutor()
+        self.service = RepositoryStatsService(command_executor=self.mock_executor)
         
         # Create mock repository
         self.mock_repository = Mock(spec=Repository)
@@ -33,91 +68,86 @@ class TestRepositoryStatsService:
     @pytest.mark.asyncio
     async def test_get_repository_statistics_success(self):
         """Test successful repository statistics gathering."""
-        with patch.object(self.service, '_get_archive_list', new_callable=AsyncMock) as mock_archive_list, \
-             patch.object(self.service, '_get_archive_info', new_callable=AsyncMock) as mock_archive_info, \
-             patch.object(self.service, '_get_file_type_stats', new_callable=AsyncMock) as mock_file_stats:
-            
-            # Setup mocks
-            mock_archive_list.return_value = ["archive1", "archive2"]
-            mock_archive_info.side_effect = [
-                {
-                    "name": "archive1",
-                    "start": "2023-01-01T10:00:00",
-                    "end": "2023-01-01T10:30:00",
-                    "duration": 1800,
-                    "original_size": 1000000,
-                    "compressed_size": 500000,
-                    "deduplicated_size": 300000,
-                    "nfiles": 100
-                },
-                {
-                    "name": "archive2", 
-                    "start": "2023-01-02T10:00:00",
-                    "end": "2023-01-02T10:30:00",
-                    "duration": 1800,
-                    "original_size": 1200000,
-                    "compressed_size": 600000,
-                    "deduplicated_size": 400000,
-                    "nfiles": 120
-                }
-            ]
-            mock_file_stats.return_value = {
-                "count_chart": {"labels": [], "datasets": []},
-                "size_chart": {"labels": [], "datasets": []}
-            }
-            
-            result = await self.service.get_repository_statistics(
-                self.mock_repository, 
-                self.mock_db,
-                self.progress_callback
-            )
-            
-            # Verify result structure
-            assert "repository_path" in result
-            assert "total_archives" in result
-            assert "archive_stats" in result
-            assert "size_over_time" in result
-            assert "dedup_compression_stats" in result
-            assert "file_type_stats" in result
-            assert "summary" in result
-            
-            assert result["repository_path"] == "/path/to/repo"
-            assert result["total_archives"] == 2
-            assert len(result["archive_stats"]) == 2
-            
-            # Verify progress callbacks were called
-            assert len(self.progress_calls) > 0
-            assert self.progress_calls[-1] == ("Statistics analysis complete!", 100)
+        # Setup mock data
+        self.mock_executor.set_archive_list(["archive1", "archive2"])
+        self.mock_executor.set_archive_info("archive1", {
+            "name": "archive1",
+            "start": "2023-01-01T10:00:00",
+            "end": "2023-01-01T10:30:00",
+            "duration": 1800,
+            "original_size": 1000000,
+            "compressed_size": 500000,
+            "deduplicated_size": 300000,
+            "nfiles": 100
+        })
+        self.mock_executor.set_archive_info("archive2", {
+            "name": "archive2", 
+            "start": "2023-01-02T10:00:00",
+            "end": "2023-01-02T10:30:00",
+            "duration": 1800,
+            "original_size": 1200000,
+            "compressed_size": 600000,
+            "deduplicated_size": 400000,
+            "nfiles": 120
+        })
+        
+        result = await self.service.get_repository_statistics(
+            self.mock_repository, 
+            self.mock_db,
+            self.progress_callback
+        )
+        
+        # Verify result structure
+        assert "repository_path" in result
+        assert "total_archives" in result
+        assert "archive_stats" in result
+        assert "size_over_time" in result
+        assert "dedup_compression_stats" in result
+        assert "file_type_stats" in result
+        assert "summary" in result
+        
+        assert result["repository_path"] == "/path/to/repo"
+        assert result["total_archives"] == 2
+        assert len(result["archive_stats"]) == 2
+        
+        # Verify progress callbacks were called
+        assert len(self.progress_calls) > 0
+        assert self.progress_calls[-1] == ("Statistics analysis complete!", 100)
 
     @pytest.mark.asyncio
     async def test_get_repository_statistics_no_archives(self):
         """Test statistics gathering when no archives exist."""
-        with patch.object(self.service, '_get_archive_list', new_callable=AsyncMock) as mock_archive_list:
-            mock_archive_list.return_value = []
-            
-            result = await self.service.get_repository_statistics(
-                self.mock_repository,
-                self.mock_db,
-                self.progress_callback
-            )
-            
-            assert "error" in result
-            assert result["error"] == "No archives found in repository"
+        # Set empty archive list
+        self.mock_executor.set_archive_list([])
+        
+        result = await self.service.get_repository_statistics(
+            self.mock_repository,
+            self.mock_db,
+            self.progress_callback
+        )
+        
+        assert "error" in result
+        assert result["error"] == "No archives found in repository"
 
     @pytest.mark.asyncio
     async def test_get_repository_statistics_exception(self):
         """Test statistics gathering handles exceptions properly."""
-        with patch.object(self.service, '_get_archive_list', new_callable=AsyncMock) as mock_archive_list:
-            mock_archive_list.side_effect = Exception("Test error")
-            
-            result = await self.service.get_repository_statistics(
-                self.mock_repository,
-                self.mock_db,
-                self.progress_callback
-            )
-            
-            assert "error" in result
-            assert "Test error" in result["error"]
+        # Create an executor that throws exceptions
+        class ExceptionExecutor(MockCommandExecutor):
+            async def execute_borg_list(self, repository):
+                raise Exception("Test error")
+        
+        exception_executor = ExceptionExecutor()
+        service_with_exception = RepositoryStatsService(command_executor=exception_executor)
+        
+        result = await service_with_exception.get_repository_statistics(
+            self.mock_repository,
+            self.mock_db,
+            self.progress_callback
+        )
+        
+        assert "error" in result
+        assert "Test error" in result["error"]
 
     @pytest.mark.asyncio
     async def test_get_archive_list_success(self):
