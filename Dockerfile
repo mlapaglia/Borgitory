@@ -2,6 +2,13 @@ FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
+# Install build dependencies for pyfuse3 compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    pkg-config \
+    libfuse3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml .
 
 RUN python -m venv /opt/venv
@@ -16,6 +23,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     rclone \
     borgbackup \
+    fuse3 \
+    python3-pyfuse3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir -p /app/data
