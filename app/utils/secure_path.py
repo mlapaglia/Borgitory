@@ -88,45 +88,42 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
         Resolved Path object if valid and under allowed directories, None otherwise
     """
     try:
-        # Pre-validate user input before Path operations
         allowed_prefixes = ["/mnt"]
         if allow_app_data:
             allowed_prefixes.append("/app/app/data")
-        
+
         if not _pre_validate_user_input(user_path, allowed_prefixes):
             return None
-        
-        # For each allowed root, check if normalized target path stays inside allowed root
+
         for allowed_root_str in allowed_prefixes:
-            # Get the realpath of the allowed root
             allowed_root_real = os.path.realpath(allowed_root_str)
-            
-            # Compose the target path (absolute or relative)
-            if os.path.isabs(user_path) or user_path.startswith('/'):
-                # Use user_path directly
-                target_path = user_path
-            else:
-                target_path = os.path.join(allowed_root_str, user_path)
-            
-            # Normalize and resolve the target path to its real location
+
+            # Compose the target path
+            target_path = (
+                user_path
+                if os.path.isabs(user_path)
+                else os.path.join(allowed_root_str, user_path)
+            )
+            # Canonicalize target path
             target_realpath = os.path.realpath(os.path.normpath(target_path))
-            
-            try:
-                # Enforce containment: target_realpath starts with allowed_root_real and separator
-                normalized_root = os.path.join(allowed_root_real, '')
-                if target_realpath == allowed_root_real or target_realpath.startswith(normalized_root):
+
+            # Hardened containment check: must be strictly inside allowed_root_real
+            normalized_root = os.path.join(allowed_root_real, "")
+            if target_realpath == allowed_root_real or target_realpath.startswith(normalized_root):
+                # Disallow symlinks that point outside, ensure target_realpath is inside root
+                # Additional defense: verify relpath does not start with ../
+                rel_path = os.path.relpath(target_realpath, allowed_root_real)
+                if not rel_path.startswith(".."):
                     logger.debug(f"Validated path: {user_path} -> {target_realpath}")
                     return Path(target_realpath)
-            except Exception:
-                continue  # Not under this root, try next
-
-        # Path not under any allowed root
+                else:
+                    logger.warning(f"Path traversal attempt detected for '{user_path}' resolved as '{target_realpath}' relative '{rel_path}'")
+                    return None
         allowed_paths = ["/mnt"] + (["/app/app/data"] if allow_app_data else [])
         logger.warning(
             f"Path validation failed for '{user_path}': not under allowed paths {allowed_paths}"
         )
         return None
-
     except (OSError,) as e:
         logger.warning(f"Path validation failed for '{user_path}': {e}")
         return None
@@ -387,15 +384,16 @@ def user_secure_exists(path: str) -> bool:
 def user_secure_isdir(path: str) -> bool:
     """Check if path is directory - /mnt only (for user repos/backup sources)."""
     validated_path = validate_mnt_path(path)
-    if validated_path is None:
+    # Additional defense: require that validated_path is inside /mnt
+    mnt_real = os.path.realpath("/mnt")
+    if validated_path is None or not str(validated_path).startswith(mnt_real):
+        logger.warning(f"Directory check blocked: Path '{path}' not contained in /mnt")
         return False
-
     try:
         return validated_path.is_dir()
     except (PermissionError, OSError) as e:
         logger.warning(f"Cannot access path '{path}': {e}")
         return False
-
 
 def user_get_directory_listing(
     path: str, include_files: bool = False
