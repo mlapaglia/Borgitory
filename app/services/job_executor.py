@@ -293,9 +293,7 @@ class JobExecutor:
             if result.return_code == 0:
                 logger.info("Prune task completed successfully")
             else:
-                logger.error(
-                    f"Prune task failed with return code {result.return_code}"
-                )
+                logger.error(f"Prune task failed with return code {result.return_code}")
 
             return result
 
@@ -474,9 +472,7 @@ class JobExecutor:
                         if progress["status"] == "success":
                             logger.info("Cloud sync completed successfully")
                             if output_callback:
-                                output_callback(
-                                    "Cloud sync completed successfully", {}
-                                )
+                                output_callback("Cloud sync completed successfully", {})
                             return ProcessResult(
                                 return_code=0,
                                 stdout=b"Cloud sync completed successfully",
