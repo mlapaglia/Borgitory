@@ -159,17 +159,16 @@ def login_user(
         user.last_login = current_time
         db.commit()
 
-        # Create success template response with redirect and set cookie
+        # Create success template response with HTMX redirect header and set cookie
         success_response = templates.TemplateResponse(
             request,
             "partials/shared/notification.html",
             {
                 "type": "success",
                 "message": "Login successful! Redirecting...",
-                "redirect_url": "/",
-                "redirect_delay": 1000,
             },
         )
+        success_response.headers["HX-Redirect"] = "/"
         success_response.set_cookie(
             key="auth_token",
             value=auth_token,

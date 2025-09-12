@@ -22,10 +22,23 @@ from app.models.schemas import (
 )
 from app.dependencies import BorgServiceDep, SchedulerServiceDep, VolumeServiceDep
 from app.api.auth import get_current_user
+from app.utils.secure_path import (
+    create_secure_filename,
+    secure_path_join,
+    secure_exists,
+    secure_isdir,
+    secure_remove_file,
+    get_directory_listing,
+    validate_path_within_base,
+    PathSecurityError,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="app/templates")
+
+
+# Legacy functions replaced by secure_path utilities
 
 
 @router.post("/")
@@ -232,58 +245,38 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/repos"):
                 detail=f"Path must be root directory or under one of the mounted volumes: {', '.join(mounted_volumes)}",
             )
 
-        # Normalize path
-        path = os.path.normpath(path)
-
-        # Check if path exists and is a directory
-        if not os.path.exists(path):
-            return {"directories": []}
-
-        if not os.path.isdir(path):
-            return {"directories": []}
-
-        directories = []
+        # Use secure path operations
         try:
-            for item in os.listdir(path):
-                item_path = os.path.join(path, item)
-                if os.path.isdir(item_path):
-                    # For root directory, filter out system directories
-                    if path == "/":
-                        # Hardcoded list of root directories to ignore
-                        ignored_dirs = {
-                            "opt",
-                            "home",
-                            "usr",
-                            "var",
-                            "bin",
-                            "sbin",
-                            "lib",
-                            "lib64",
-                            "etc",
-                            "proc",
-                            "sys",
-                            "dev",
-                            "run",
-                            "tmp",
-                            "boot",
-                            "mnt",
-                            "media",
-                            "srv",
-                            "root",
-                        }
+            # Validate path is within allowed directories
+            allowed_base_dirs = ["/"] + mounted_volumes if mounted_volumes else ["/"]
+            
+            # Normalize the path using secure validation
+            validated_path = validate_path_within_base(path, "/")
+            
+            # Check if path exists and is a directory using secure functions
+            if not secure_exists(validated_path, allowed_base_dirs):
+                return {"directories": []}
 
-                        if item not in ignored_dirs:
-                            directories.append({"name": item, "path": item_path})
-                    else:
-                        directories.append({"name": item, "path": item_path})
-        except PermissionError:
-            logger.warning(f"Permission denied accessing directory: {path}")
+            if not secure_isdir(validated_path, allowed_base_dirs):
+                return {"directories": []}
+
+            # Get directory listing using secure function
+            directories = get_directory_listing(validated_path, allowed_base_dirs, include_files=False)
+            
+            # For root directory, filter out system directories
+            if validated_path == "/":
+                ignored_dirs = {
+                    "opt", "home", "usr", "var", "bin", "sbin", "lib", "lib64",
+                    "etc", "proc", "sys", "dev", "run", "tmp", "boot", "mnt",
+                    "media", "srv", "root",
+                }
+                directories = [d for d in directories if d["name"] not in ignored_dirs]
+
+            return {"directories": directories}
+            
+        except PathSecurityError as e:
+            logger.warning(f"Path security violation: {e}")
             return {"directories": []}
-
-        # Sort directories alphabetically
-        directories.sort(key=lambda x: x["name"].lower())
-
-        return {"directories": directories}
 
     except Exception as e:
         logger.error(f"Error listing directories at {path}: {e}")
@@ -407,7 +400,6 @@ async def import_repository(
     is_htmx_request = "hx-request" in request.headers
 
     try:
-        # Check for duplicate name
         db_repo = db.query(Repository).filter(Repository.name == name).first()
         if db_repo:
             error_msg = "Repository with this name already exists"
@@ -420,7 +412,6 @@ async def import_repository(
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
-        # Check for duplicate path
         db_repo_path = db.query(Repository).filter(Repository.path == path).first()
         if db_repo_path:
             error_msg = f"Repository with path '{path}' already exists with name '{db_repo_path.name}'"
@@ -433,44 +424,46 @@ async def import_repository(
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
-        # Handle keyfile if provided
         keyfile_path = None
         if keyfile and keyfile.filename:
-            import os
-
-            # Create keyfiles directory if it doesn't exist
             keyfiles_dir = "/app/data/keyfiles"
             os.makedirs(keyfiles_dir, exist_ok=True)
 
-            # Save keyfile with a unique name
-            keyfile_path = os.path.join(keyfiles_dir, f"{name}_{keyfile.filename}")
-            with open(keyfile_path, "wb") as f:
-                content = await keyfile.read()
-                f.write(content)
+            try:
+                safe_filename = create_secure_filename(name, keyfile.filename, add_uuid=True)
+                keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
+                
+                with open(keyfile_path, "wb") as f:
+                    content = await keyfile.read()
+                    f.write(content)
 
-            logger.info(f"Saved keyfile for repository '{name}' at {keyfile_path}")
+                logger.info(f"Saved keyfile for repository '{name}' at {keyfile_path}")
+            except (PathSecurityError, OSError) as e:
+                error_msg = f"Failed to save keyfile: {str(e)}"
+                logger.error(error_msg)
+                if is_htmx_request:
+                    return templates.TemplateResponse(
+                        request,
+                        "partials/repositories/form_import_error.html",
+                        {"error_message": error_msg},
+                        status_code=200,
+                    )
+                raise HTTPException(status_code=400, detail=error_msg)
 
-        # Create repository record
         db_repo = Repository(name=name, path=path)
         db_repo.set_passphrase(passphrase)
-
-        # Store keyfile path if we have one (we'll add this field later)
-        # For now, let's just proceed with verification
 
         db.add(db_repo)
         db.commit()
         db.refresh(db_repo)
 
-        # Verify we can access the repository with the given credentials
-        # This tests the user-provided credentials, not the stored ones
         verification_successful = await borg_svc.verify_repository_access(
             repo_path=path, passphrase=passphrase, keyfile_path=keyfile_path
         )
 
         if not verification_successful:
-            # If verification fails, remove the database entry and keyfile
-            if keyfile_path and os.path.exists(keyfile_path):
-                os.remove(keyfile_path)
+            if keyfile_path:
+                secure_remove_file(keyfile_path, ["/app/data/keyfiles"])
             db.delete(db_repo)
             db.commit()
             raise HTTPException(
@@ -478,7 +471,6 @@ async def import_repository(
                 detail="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
             )
 
-        # If verification passed, get archive count for logging
         try:
             archives = await borg_svc.list_archives(db_repo)
             logger.info(
@@ -489,9 +481,7 @@ async def import_repository(
                 f"Successfully imported repository '{name}' (could not count archives)"
             )
 
-        # Success response
         if is_htmx_request:
-            # Trigger repository list update and return success trigger
             response = templates.TemplateResponse(
                 request,
                 "partials/repositories/form_import_success.html",
@@ -500,7 +490,6 @@ async def import_repository(
             response.headers["HX-Trigger"] = "repositoryUpdate"
             return response
         else:
-            # Return JSON for non-HTMX requests
             return db_repo
 
     except HTTPException as e:
@@ -568,7 +557,6 @@ async def delete_repository(
 
     repo_name = repository.name
 
-    # Check for active jobs before allowing deletion
     from app.models.database import Job, Schedule
 
     active_jobs = (
@@ -587,12 +575,10 @@ async def delete_repository(
             detail=f"Cannot delete repository '{repo_name}' - {len(active_jobs)} active job(s) running: {', '.join(active_job_types)}. Please wait for jobs to complete or cancel them first.",
         )
 
-    # Get schedules to delete (needed for APScheduler cleanup)
     schedules_to_delete = (
         db.query(Schedule).filter(Schedule.repository_id == repo_id).all()
     )
 
-    # Remove scheduled jobs from APScheduler before deleting from database
     for schedule in schedules_to_delete:
         try:
             await scheduler_svc.remove_schedule(schedule.id)
@@ -602,16 +588,9 @@ async def delete_repository(
                 f"Could not remove scheduled job for schedule ID {schedule.id}: {e}"
             )
 
-    # Delete the repository - this will cascade to jobs and schedules due to the
-    # cascade="all, delete-orphan" relationships defined in the Repository model.
-    # Jobs will then cascade to JobTask records as well.
     db.delete(repository)
     db.commit()
 
-    # TODO: If delete_borg_repo is True, we could also delete the actual Borg repository
-    # This would require careful implementation to avoid data loss
-
-    # Return updated repository list HTML (HTMX way)
     return get_repositories_html(request, db)
 
 
@@ -629,7 +608,6 @@ async def list_archives(
     try:
         archives = await borg_svc.list_archives(repository)
 
-        # Limit to recent archives for display
         recent_archives = archives[:10] if len(archives) > 10 else archives
         return templates.TemplateResponse(
             request,
@@ -665,20 +643,16 @@ async def list_archives_html(
         try:
             archives = await borg_svc.list_archives(repository)
 
-            # Process archives data for template
             processed_archives = []
 
             if archives:
-                # Show most recent archives first (limit to 10)
                 recent_archives = archives[-10:] if len(archives) > 10 else archives
-                recent_archives.reverse()  # Most recent first
+                recent_archives.reverse()
 
                 for archive in recent_archives:
-                    # Parse archive information
                     archive_name = archive.get("name", "Unknown")
                     archive_time = archive.get("time", "")
 
-                    # Format the timestamp if available
                     formatted_time = archive_time
                     if archive_time:
                         try:
@@ -691,12 +665,10 @@ async def list_archives_html(
                         except (ValueError, TypeError):
                             pass
 
-                    # Archive size information
                     size_info = ""
                     if "stats" in archive:
                         stats = archive["stats"]
                         if "original_size" in stats:
-                            # Convert bytes to human readable
                             size_bytes = stats["original_size"]
                             for unit in ["B", "KB", "MB", "GB", "TB"]:
                                 if size_bytes < 1024.0:
@@ -805,7 +777,6 @@ async def get_archives_list(
 
     try:
         repo_id = int(repository_id)
-        # Redirect to the existing archives HTML endpoint
         return await list_archives_html(repo_id, request, borg_svc, db)
     except (ValueError, TypeError):
         return templates.TemplateResponse(
