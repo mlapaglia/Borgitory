@@ -37,10 +37,6 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="app/templates")
 
-
-# Legacy functions replaced by secure_path utilities
-
-
 @router.post("/")
 async def create_repository(
     request: Request,
@@ -52,7 +48,6 @@ async def create_repository(
     is_htmx_request = "hx-request" in request.headers
 
     try:
-        # Check for duplicate name
         db_repo = db.query(Repository).filter(Repository.name == repo.name).first()
         if db_repo:
             error_msg = "Repository with this name already exists"
@@ -65,7 +60,6 @@ async def create_repository(
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
-        # Check for duplicate path
         db_repo_path = db.query(Repository).filter(Repository.path == repo.path).first()
         if db_repo_path:
             error_msg = f"Repository with path '{repo.path}' already exists with name '{db_repo_path.name}'"
@@ -78,18 +72,14 @@ async def create_repository(
                 )
             raise HTTPException(status_code=400, detail=error_msg)
 
-        # Create repository object but don't save to database yet
         db_repo = Repository(name=repo.name, path=repo.path)
         db_repo.set_passphrase(repo.passphrase)
 
-        # Try to initialize the Borg repository first
         try:
             init_result = await borg_svc.initialize_repository(db_repo)
             if not init_result["success"]:
-                # Initialization failed, don't save to database
                 borg_error = init_result["message"]
 
-                # Make error message more user-friendly
                 if "Read-only file system" in borg_error:
                     error_msg = "Cannot create repository: The target directory is read-only. Please choose a writable location."
                 elif "Permission denied" in borg_error:
@@ -112,7 +102,6 @@ async def create_repository(
                 raise HTTPException(status_code=400, detail=error_msg)
 
         except Exception as init_error:
-            # Initialization threw an exception, don't save to database
             error_msg = f"Failed to initialize repository: {str(init_error)}"
             logger.error(error_msg)
             if is_htmx_request:
@@ -124,16 +113,13 @@ async def create_repository(
                 )
             raise HTTPException(status_code=500, detail=error_msg)
 
-        # Initialization succeeded, now save to database
         db.add(db_repo)
         db.commit()
         db.refresh(db_repo)
 
         logger.info(f"Successfully created and initialized repository '{repo.name}')")
 
-        # Success response
         if is_htmx_request:
-            # Trigger repository list update and return success trigger
             response = templates.TemplateResponse(
                 request,
                 "partials/repositories/form_create_success.html",
@@ -142,7 +128,6 @@ async def create_repository(
             response.headers["HX-Trigger"] = "repositoryUpdate"
             return response
         else:
-            # Return JSON for non-HTMX requests
             return db_repo
 
     except HTTPException as e:
@@ -179,12 +164,10 @@ async def scan_repositories(request: Request, borg_svc: BorgServiceDep):
     try:
         available_repos = await borg_svc.scan_for_repositories()
 
-        # Check if request wants JSON (for backward compatibility)
         accept_header = request.headers.get("Accept", "")
         if "application/json" in accept_header or "hx-request" not in request.headers:
             return {"repositories": available_repos}
 
-        # Return HTML for HTMX
         return templates.TemplateResponse(
             request,
             "partials/repositories/scan_results.html",
@@ -193,7 +176,6 @@ async def scan_repositories(request: Request, borg_svc: BorgServiceDep):
     except Exception as e:
         logger.error(f"Error scanning for repositories: {e}")
 
-        # Check if this is an HTMX request
         if "hx-request" in request.headers:
             return templates.TemplateResponse(
                 request,
@@ -229,28 +211,21 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
 @router.get("/directories")
 async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt"):
     """List directories at the given path for autocomplete functionality. All paths must be under /mnt."""
+
     try:
-        # With /mnt-only security model, we don't need to check mounted volumes
-        # The secure_path utilities will handle validation
-        pass
-
-        # Use user-facing secure path operations - /mnt only for repos/backup sources
-        try:
-            # Check if path exists and is a directory using user functions (prevents /app/app/data)
-            if not user_secure_exists(path):
-                return {"directories": []}
-
-            if not user_secure_isdir(path):
-                return {"directories": []}
-
-            # Get directory listing using user function (prevents /app/app/data)
-            directories = user_get_directory_listing(path, include_files=False)
-
-            return {"directories": directories}
-
-        except PathSecurityError as e:
-            logger.warning(f"Path security violation: {e}")
+        if not user_secure_exists(path):
             return {"directories": []}
+
+        if not user_secure_isdir(path):
+            return {"directories": []}
+
+        directories = user_get_directory_listing(path, include_files=False)
+
+        return {"directories": directories}
+
+    except PathSecurityError as e:
+        logger.warning(f"Path security violation: {e}")
+        return {"directories": []}
 
     except Exception as e:
         logger.error(f"Error listing directories at {path}: {e}")
@@ -266,7 +241,6 @@ async def update_import_form(
     """Update import form fields based on selected repository path"""
 
     if not path:
-        # No repository selected - show disabled state
         return templates.TemplateResponse(
             request,
             "partials/repositories/import_form_dynamic.html",
@@ -280,7 +254,6 @@ async def update_import_form(
             },
         )
 
-    # If loading=true, return loading template immediately
     if loading == "true":
         return templates.TemplateResponse(
             request,
@@ -291,7 +264,6 @@ async def update_import_form(
         )
 
     try:
-        # Look up repository details by path
         available_repos = await borg_svc.scan_for_repositories()
         selected_repo = None
 
@@ -319,7 +291,6 @@ async def update_import_form(
         requires_keyfile = selected_repo.get("requires_keyfile", False)
         preview = selected_repo.get("preview", f"Encryption: {encryption_mode}")
 
-        # Determine which fields to show
         show_passphrase = encryption_mode != "none"
         show_keyfile = requires_keyfile
 

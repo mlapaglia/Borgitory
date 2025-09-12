@@ -16,6 +16,53 @@ from typing import List, Dict, Optional
 logger = logging.getLogger(__name__)
 
 
+def _pre_validate_user_input(user_path: str, allowed_prefixes: List[str]) -> bool:
+    """
+    Pre-validate user input before Path operations to prevent security issues.
+    
+    Args:
+        user_path: The user-provided path to validate
+        allowed_prefixes: List of allowed absolute path prefixes (e.g., ["/mnt", "/app/app/data"])
+    
+    Returns:
+        True if input is safe to process, False otherwise
+    """
+    # Check if input is a proper non-empty string without null bytes
+    if not isinstance(user_path, str) or user_path.strip() == "" or "\x00" in user_path:
+        logger.warning(f"Path validation failed for '{user_path}': empty or invalid path string")
+        return False
+    
+    # Only permit absolute paths if they start with allowed prefixes
+    # Check both OS-specific absolute paths and Unix-style paths (for Docker containers)
+    is_absolute = os.path.isabs(user_path) or user_path.startswith('/')
+    if is_absolute:
+        # For Unix-style paths, check with forward slash
+        unix_match = any(
+            user_path.startswith(prefix + "/") or user_path == prefix 
+            for prefix in allowed_prefixes
+        )
+        # For Windows-style paths, convert allowed prefixes to Windows format and check
+        windows_match = False
+        if os.name == 'nt' and os.path.isabs(user_path):
+            # Convert Unix prefixes to Windows format for local development
+            windows_prefixes = []
+            for prefix in allowed_prefixes:
+                if prefix == "/mnt":
+                    windows_prefixes.append("C:\\mnt")
+                elif prefix == "/app/app/data":
+                    windows_prefixes.append("C:\\app\\app\\data")
+            windows_match = any(
+                user_path.startswith(prefix + "\\") or user_path.startswith(prefix + "/") or user_path == prefix
+                for prefix in windows_prefixes
+            )
+        
+        if not (unix_match or windows_match):
+            logger.warning(f"Path validation failed for '{user_path}': absolute path not under allowed roots")
+            return False
+    
+    return True
+
+
 class PathSecurityError(Exception):
     """Raised when a path operation violates security constraints."""
 
@@ -41,6 +88,14 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
         Resolved Path object if valid and under allowed directories, None otherwise
     """
     try:
+        # Pre-validate user input before Path operations
+        allowed_prefixes = ["/mnt"]
+        if allow_app_data:
+            allowed_prefixes.append("/app/app/data")
+        
+        if not _pre_validate_user_input(user_path, allowed_prefixes):
+            return None
+        
         # Resolve symlinks and normalize path
         resolved_path = Path(user_path).resolve()
 
@@ -84,33 +139,6 @@ def validate_user_repository_path(user_path: str) -> Optional[Path]:
     This prevents users from putting repositories in /app/app/data.
     """
     return validate_mnt_path(user_path)
-
-
-def validate_path_within_base(
-    path: str, base_dir: str, allow_equal: bool = True
-) -> str:
-    """
-    Legacy function for backward compatibility.
-    Now enforces secure path policy for both /mnt and /app/app/data.
-
-    Args:
-        path: The path to validate
-        base_dir: Ignored - paths must be under /mnt or /app/app/data
-        allow_equal: Ignored - handled automatically
-
-    Returns:
-        The resolved path as string if valid
-
-    Raises:
-        PathSecurityError: If the path is not under allowed directories
-    """
-    validated_path = validate_secure_path(path, allow_app_data=True)
-    if validated_path is None:
-        raise PathSecurityError(
-            f"Path '{path}' must be under /mnt or /app/app/data directories"
-        )
-    return str(validated_path)
-
 
 def sanitize_filename(filename: str, max_length: int = 100) -> str:
     """
@@ -268,29 +296,7 @@ def secure_isdir(path: str, allowed_base_dirs: List[str] = None) -> bool:
     except (PermissionError, OSError) as e:
         logger.warning(f"Cannot access path '{path}': {e}")
         return False
-
-
-def secure_listdir(path: str, allowed_base_dirs: List[str] = None) -> List[str]:
-    """
-    Securely list directory contents, validating the path is under allowed directories.
-
-    Args:
-        path: The directory path to list
-        allowed_base_dirs: Ignored - kept for backward compatibility
-
-    Returns:
-        List of directory contents, or empty list if path is invalid/inaccessible
-    """
-    validated_path = validate_secure_path(path, allow_app_data=True)
-    if validated_path is None:
-        return []
-
-    try:
-        return [item.name for item in validated_path.iterdir()]
-    except (PermissionError, OSError) as e:
-        logger.warning(f"Cannot access directory '{path}': {e}")
-        return []
-
+        
 
 def secure_remove_file(file_path: str, allowed_base_dirs: List[str] = None) -> bool:
     """

@@ -525,7 +525,7 @@ class TestExecuteScheduledBackup:
         mock_repository = Mock()
         mock_repository.name = "Test Repository"
         mock_repository.id = 1
-        mock_repository.id = 1
+        
         
         mock_schedule = Mock()
         mock_schedule.id = schedule_id
