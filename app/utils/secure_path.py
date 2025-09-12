@@ -96,21 +96,31 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
         if not _pre_validate_user_input(user_path, allowed_prefixes):
             return None
         
-        # Resolve symlinks and normalize path
-        resolved_path = Path(user_path).resolve()
-
-        # Define allowed root directories
-        allowed_roots = [Path("/mnt").resolve()]
-        if allow_app_data:
-            allowed_roots.append(Path("/app/app/data").resolve())
-
-        # Check if path is under any allowed root
-        for allowed_root in allowed_roots:
+        # For each allowed root, check if normalized target path stays inside allowed root
+        for allowed_root_str in allowed_prefixes:
+            allowed_root = Path(allowed_root_str).resolve(strict=False)
+            
+            # Handle absolute vs relative paths correctly
+            if os.path.isabs(user_path) or user_path.startswith('/'):
+                # For absolute paths, use as-is (already validated by pre-check)
+                target_path = user_path
+            else:
+                # For relative paths, join with allowed root
+                target_path = os.path.join(allowed_root_str, user_path)
+            
+            # Normalize the target path
+            normalized_path = os.path.normpath(target_path)
+            normalized_path_obj = Path(normalized_path)
+            
             try:
-                resolved_path.relative_to(allowed_root)
-                logger.debug(f"Validated path: {user_path} -> {resolved_path}")
-                return resolved_path
-            except ValueError:
+                # For cross-platform compatibility, resolve both paths and compare
+                normalized_resolved = normalized_path_obj.resolve(strict=False)
+                
+                # Check containment after resolution (handles symlinks)
+                normalized_resolved.relative_to(allowed_root)
+                logger.debug(f"Validated path: {user_path} -> {normalized_resolved}")
+                return normalized_resolved
+            except (ValueError, RuntimeError):
                 continue  # Not under this root, try next
 
         # Path not under any allowed root
