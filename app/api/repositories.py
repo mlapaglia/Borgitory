@@ -249,10 +249,10 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/repos"):
         try:
             # Validate path is within allowed directories
             allowed_base_dirs = ["/"] + mounted_volumes if mounted_volumes else ["/"]
-            
+
             # Normalize the path using secure validation
             validated_path = validate_path_within_base(path, "/")
-            
+
             # Check if path exists and is a directory using secure functions
             if not secure_exists(validated_path, allowed_base_dirs):
                 return {"directories": []}
@@ -261,19 +261,37 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/repos"):
                 return {"directories": []}
 
             # Get directory listing using secure function
-            directories = get_directory_listing(validated_path, allowed_base_dirs, include_files=False)
-            
+            directories = get_directory_listing(
+                validated_path, allowed_base_dirs, include_files=False
+            )
+
             # For root directory, filter out system directories
             if validated_path == "/":
                 ignored_dirs = {
-                    "opt", "home", "usr", "var", "bin", "sbin", "lib", "lib64",
-                    "etc", "proc", "sys", "dev", "run", "tmp", "boot", "mnt",
-                    "media", "srv", "root",
+                    "opt",
+                    "home",
+                    "usr",
+                    "var",
+                    "bin",
+                    "sbin",
+                    "lib",
+                    "lib64",
+                    "etc",
+                    "proc",
+                    "sys",
+                    "dev",
+                    "run",
+                    "tmp",
+                    "boot",
+                    "mnt",
+                    "media",
+                    "srv",
+                    "root",
                 }
                 directories = [d for d in directories if d["name"] not in ignored_dirs]
 
             return {"directories": directories}
-            
+
         except PathSecurityError as e:
             logger.warning(f"Path security violation: {e}")
             return {"directories": []}
@@ -430,9 +448,11 @@ async def import_repository(
             os.makedirs(keyfiles_dir, exist_ok=True)
 
             try:
-                safe_filename = create_secure_filename(name, keyfile.filename, add_uuid=True)
+                safe_filename = create_secure_filename(
+                    name, keyfile.filename, add_uuid=True
+                )
                 keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
-                
+
                 with open(keyfile_path, "wb") as f:
                     content = await keyfile.read()
                     f.write(content)
