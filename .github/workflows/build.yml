@@ -19,23 +19,26 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v5
     
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: '3.11'
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
     
-    - name: Install dependencies
+    - name: Build test image
       run: |
-        python -m pip install --upgrade pip
-        pip install -e .[dev]
+        docker build --target test --load -t borgitory-test .
     
-    - name: Run linting with ruff
+    - name: Run linting in container
       run: |
-        python lint.py check
+        docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test python lint.py check
     
-    - name: Run tests with coverage
+    - name: Run tests with coverage in container
       run: |
-        pytest tests/ --cov=app --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
+        docker run --rm \
+          --cap-add SYS_ADMIN \
+          --device /dev/fuse:/dev/fuse:rwm \
+          -v $(pwd):/workspace \
+          -w /workspace \
+          borgitory-test \
+          pytest tests/ --cov=app --cov-report=xml --cov-report=html --junitxml=junit.xml -o junit_family=legacy
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
