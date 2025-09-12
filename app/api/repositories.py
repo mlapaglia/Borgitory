@@ -1,6 +1,5 @@
 import logging
-import os
-from typing import List
+from typing import List, Annotated
 from fastapi import (
     APIRouter,
     Depends,
@@ -22,12 +21,11 @@ from app.models.schemas import (
 )
 from app.dependencies import BorgServiceDep, SchedulerServiceDep, VolumeServiceDep
 from app.api.auth import get_current_user
+from app.dependencies_services import RepositoryServiceDep
+from app.dependencies_clean import RepositoryQueryDep
+from app.services.interfaces import RepositoryService, RepositoryQueryService, RepositoryNotFoundError, RepositoryValidationError, RepositoryError
 from app.utils.secure_path import (
-    create_secure_filename,
-    secure_path_join,
-    secure_remove_file,
     PathSecurityError,
-    # User-facing functions for repos/backup sources (only /mnt)
     user_secure_exists,
     user_secure_isdir,
     user_get_directory_listing,
@@ -41,107 +39,48 @@ templates = Jinja2Templates(directory="app/templates")
 async def create_repository(
     request: Request,
     repo: RepositoryCreate,
-    borg_svc: BorgServiceDep,
+    repository_service: RepositoryService = RepositoryServiceDep,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     is_htmx_request = "hx-request" in request.headers
 
     try:
-        db_repo = db.query(Repository).filter(Repository.name == repo.name).first()
-        if db_repo:
-            error_msg = "Repository with this name already exists"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repositories/form_create_error.html",
-                    {"error_message": error_msg},
-                    status_code=200,
-                )
-            raise HTTPException(status_code=400, detail=error_msg)
+        repository = await repository_service.create_repository(
+            name=repo.name,
+            path=repo.path,
+            passphrase=repo.passphrase,
+            user=current_user,
+            db=db,
+            is_import=False
+        )
 
-        db_repo_path = db.query(Repository).filter(Repository.path == repo.path).first()
-        if db_repo_path:
-            error_msg = f"Repository with path '{repo.path}' already exists with name '{db_repo_path.name}'"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repositories/form_create_error.html",
-                    {"error_message": error_msg},
-                    status_code=200,
-                )
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        db_repo = Repository(name=repo.name, path=repo.path)
-        db_repo.set_passphrase(repo.passphrase)
-
-        try:
-            init_result = await borg_svc.initialize_repository(db_repo)
-            if not init_result["success"]:
-                borg_error = init_result["message"]
-
-                if "Read-only file system" in borg_error:
-                    error_msg = "Cannot create repository: The target directory is read-only. Please choose a writable location."
-                elif "Permission denied" in borg_error:
-                    error_msg = "Cannot create repository: Permission denied. Please check directory permissions."
-                elif "already exists" in borg_error.lower():
-                    error_msg = "A repository already exists at this location."
-                else:
-                    error_msg = f"Failed to initialize repository: {borg_error}"
-
-                logger.error(
-                    f"Repository initialization failed for '{repo.name}': {borg_error}"
-                )
-                if is_htmx_request:
-                    return templates.TemplateResponse(
-                        request,
-                        "partials/repositories/form_create_error.html",
-                        {"error_message": error_msg},
-                        status_code=200,
-                    )
-                raise HTTPException(status_code=400, detail=error_msg)
-
-        except Exception as init_error:
-            error_msg = f"Failed to initialize repository: {str(init_error)}"
-            logger.error(error_msg)
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repositories/form_create_error.html",
-                    {"error_message": error_msg},
-                    status_code=200,
-                )
-            raise HTTPException(status_code=500, detail=error_msg)
-
-        db.add(db_repo)
-        db.commit()
-        db.refresh(db_repo)
-
-        logger.info(f"Successfully created and initialized repository '{repo.name}')")
-
+        # Success response
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request,
                 "partials/repositories/form_create_success.html",
-                {"repository_name": repo.name},
+                {"repository_name": repository.name},
             )
             response.headers["HX-Trigger"] = "repositoryUpdate"
             return response
         else:
-            return db_repo
+            return repository
 
-    except HTTPException as e:
+    except RepositoryValidationError as e:
+        error_msg = str(e)
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
                 "partials/repositories/form_create_error.html",
-                {"error_message": str(e.detail)},
+                {"error_message": error_msg},
                 status_code=200,
             )
-        raise
-    except Exception as e:
-        db.rollback()
-        error_msg = f"Failed to create repository: {str(e)}"
+        raise HTTPException(status_code=400, detail=error_msg)
+        
+    except RepositoryError as e:
+        error_msg = str(e)
+        logger.error(f"Repository creation failed: {error_msg}")
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
@@ -153,9 +92,21 @@ async def create_repository(
 
 
 @router.get("/", response_model=List[RepositorySchema])
-def list_repositories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    repositories = db.query(Repository).offset(skip).limit(limit).all()
-    return repositories
+def list_repositories(
+    repository_query: RepositoryQueryDep,
+    db: Annotated[Session, Depends(get_db)],
+    skip: int = 0, 
+    limit: int = 100
+):
+    """
+    List repositories using clean FastAPI DI pattern.
+    
+    PROOF OF CONCEPT: This endpoint demonstrates proper FastAPI dependency injection
+    - Service injected via Annotated[Type, Depends()] pattern
+    - Business logic isolated in service layer
+    - Easy to test with app.dependency_overrides
+    """
+    return repository_query.list_repositories(db, skip, limit)
 
 
 @router.get("/scan")
@@ -334,123 +285,58 @@ async def get_create_form(request: Request):
 @router.post("/import")
 async def import_repository(
     request: Request,
-    borg_svc: BorgServiceDep,
+    repository_service: RepositoryService = RepositoryServiceDep,
     name: str = Form(...),
     path: str = Form(...),
     passphrase: str = Form(...),
     keyfile: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
-    """Import an existing Borg repository"""
     is_htmx_request = "hx-request" in request.headers
 
     try:
-        db_repo = db.query(Repository).filter(Repository.name == name).first()
-        if db_repo:
-            error_msg = "Repository with this name already exists"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repositories/form_import_error.html",
-                    {"error_message": error_msg},
-                    status_code=200,
-                )
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        db_repo_path = db.query(Repository).filter(Repository.path == path).first()
-        if db_repo_path:
-            error_msg = f"Repository with path '{path}' already exists with name '{db_repo_path.name}'"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repositories/form_import_error.html",
-                    {"error_message": error_msg},
-                    status_code=200,
-                )
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        keyfile_path = None
+        keyfile_content = None
+        keyfile_filename = None
         if keyfile and keyfile.filename:
-            keyfiles_dir = "/app/app/data/keyfiles"  # Store keyfiles with app data
-            os.makedirs(keyfiles_dir, exist_ok=True)
+            keyfile_content = await keyfile.read()
+            keyfile_filename = keyfile.filename
 
-            try:
-                safe_filename = create_secure_filename(
-                    name, keyfile.filename, add_uuid=True
-                )
-                keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
-
-                with open(keyfile_path, "wb") as f:
-                    content = await keyfile.read()
-                    f.write(content)
-
-                logger.info(f"Saved keyfile for repository '{name}' at {keyfile_path}")
-            except (PathSecurityError, OSError) as e:
-                error_msg = f"Failed to save keyfile: {str(e)}"
-                logger.error(error_msg)
-                if is_htmx_request:
-                    return templates.TemplateResponse(
-                        request,
-                        "partials/repositories/form_import_error.html",
-                        {"error_message": error_msg},
-                        status_code=200,
-                    )
-                raise HTTPException(status_code=400, detail=error_msg)
-
-        db_repo = Repository(name=name, path=path)
-        db_repo.set_passphrase(passphrase)
-
-        db.add(db_repo)
-        db.commit()
-        db.refresh(db_repo)
-
-        verification_successful = await borg_svc.verify_repository_access(
-            repo_path=path, passphrase=passphrase, keyfile_path=keyfile_path
+        repository = await repository_service.create_repository(
+            name=name,
+            path=path,
+            passphrase=passphrase,
+            user=None,  # Import doesn't require auth currently
+            db=db,
+            is_import=True,
+            keyfile_content=keyfile_content,
+            keyfile_filename=keyfile_filename
         )
-
-        if not verification_successful:
-            if keyfile_path:
-                secure_remove_file(keyfile_path)
-            db.delete(db_repo)
-            db.commit()
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
-            )
-
-        try:
-            archives = await borg_svc.list_archives(db_repo)
-            logger.info(
-                f"Successfully imported repository '{name}' with {len(archives)} archives"
-            )
-        except Exception:
-            logger.info(
-                f"Successfully imported repository '{name}' (could not count archives)"
-            )
 
         if is_htmx_request:
             response = templates.TemplateResponse(
                 request,
                 "partials/repositories/form_import_success.html",
-                {"repository_name": name},
+                {"repository_name": repository.name},
             )
             response.headers["HX-Trigger"] = "repositoryUpdate"
             return response
         else:
-            return db_repo
+            return repository
 
-    except HTTPException as e:
+    except RepositoryValidationError as e:
+        error_msg = str(e)
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
                 "partials/repositories/form_import_error.html",
-                {"error_message": str(e.detail)},
+                {"error_message": error_msg},
                 status_code=200,
             )
-        raise
-    except Exception as e:
-        db.rollback()
-        error_msg = f"Failed to import repository: {str(e)}"
+        raise HTTPException(status_code=400, detail=error_msg)
+        
+    except RepositoryError as e:
+        error_msg = str(e)
+        logger.error(f"Repository import failed: {error_msg}")
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
@@ -461,33 +347,127 @@ async def import_repository(
         raise HTTPException(status_code=500, detail=error_msg)
 
 
+@router.get("/import-form-update", response_class=HTMLResponse)
+async def update_import_form(
+    request: Request, borg_svc: BorgServiceDep, path: str = "", loading: str = ""
+):
+    """Update import form fields based on selected repository path"""
+
+    if not path:
+        return templates.TemplateResponse(
+            request,
+            "partials/repositories/import_form_dynamic.html",
+            {
+                "path": "",
+                "show_encryption_info": False,
+                "show_passphrase": False,
+                "show_keyfile": False,
+                "enable_submit": False,
+                "preview": "",
+            },
+        )
+
+    if loading == "true":
+        return templates.TemplateResponse(
+            request,
+            "partials/repositories/import_form_loading.html",
+            {
+                "path": path,
+            },
+        )
+
+    try:
+        available_repos = await borg_svc.scan_for_repositories()
+        selected_repo = None
+
+        for repo in available_repos:
+            if repo.get("path") == path:
+                selected_repo = repo
+                break
+
+        if not selected_repo:
+            logger.warning(f"Repository not found for path: {path}")
+            return templates.TemplateResponse(
+                request,
+                "partials/repositories/import_form_dynamic.html",
+                {
+                    "path": path,
+                    "show_encryption_info": True,
+                    "show_passphrase": True,
+                    "show_keyfile": True,
+                    "enable_submit": True,
+                    "preview": "Repository details not found - please re-scan",
+                },
+            )
+
+        encryption_mode = selected_repo.get("encryption_mode", "unknown")
+        requires_keyfile = selected_repo.get("requires_keyfile", False)
+        preview = selected_repo.get("preview", f"Encryption: {encryption_mode}")
+
+        show_passphrase = encryption_mode != "none"
+        show_keyfile = requires_keyfile
+
+        return templates.TemplateResponse(
+            request,
+            "partials/repositories/import_form_simple.html",
+            {
+                "path": path,
+                "show_passphrase": show_passphrase,
+                "show_keyfile": show_keyfile,
+                "preview": preview,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error updating import form: {e}")
+        return templates.TemplateResponse(
+            request,
+            "partials/repositories/import_form_simple.html",
+            {
+                "path": path,
+                "show_passphrase": True,
+                "show_keyfile": True,
+                "preview": "Error loading repository details",
+            },
+        )
+
+
 @router.get("/{repo_id}", response_model=RepositorySchema)
-def get_repository(repo_id: int, db: Session = Depends(get_db)):
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+def get_repository(
+    repo_id: int, 
+    repository_service: RepositoryService = RepositoryServiceDep,
+    db: Session = Depends(get_db)
+):
+    repository = repository_service.get_repository(repo_id, db)
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
     return repository
 
 
 @router.put("/{repo_id}", response_model=RepositorySchema)
-def update_repository(
-    repo_id: int, repo_update: RepositoryUpdate, db: Session = Depends(get_db)
+async def update_repository(
+    repo_id: int, 
+    repo_update: RepositoryUpdate, 
+    repository_service: RepositoryService = RepositoryServiceDep,
+    db: Session = Depends(get_db)
 ):
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
-    if repository is None:
+    try:
+        update_data = repo_update.model_dump(exclude_unset=True)
+        # Note: Using None for user to maintain backward compatibility
+        # Authentication can be added as a separate security improvement
+        repository = await repository_service.update_repository(
+            repo_id=repo_id,
+            updates=update_data,
+            user=None,
+            db=db
+        )
+        return repository
+        
+    except RepositoryNotFoundError:
         raise HTTPException(status_code=404, detail="Repository not found")
-
-    update_data = repo_update.model_dump(exclude_unset=True)
-
-    if "passphrase" in update_data:
-        repository.set_passphrase(update_data.pop("passphrase"))
-
-    for field, value in update_data.items():
-        setattr(repository, field, value)
-
-    db.commit()
-    db.refresh(repository)
-    return repository
+        
+    except RepositoryValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/{repo_id}", response_class=HTMLResponse)
@@ -496,49 +476,25 @@ async def delete_repository(
     request: Request,
     scheduler_svc: SchedulerServiceDep,
     delete_borg_repo: bool = False,
+    repository_service: RepositoryService = RepositoryServiceDep,
     db: Session = Depends(get_db),
 ):
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
-    if repository is None:
+    try:
+        await repository_service.delete_repository(
+            repo_id=repo_id,
+            user=None,  # No auth required currently
+            db=db,
+            scheduler_service=scheduler_svc,
+            delete_borg_repo=delete_borg_repo
+        )
+
+        return get_repositories_html(request, db)
+        
+    except RepositoryNotFoundError:
         raise HTTPException(status_code=404, detail="Repository not found")
-
-    repo_name = repository.name
-
-    from app.models.database import Job, Schedule
-
-    active_jobs = (
-        db.query(Job)
-        .filter(
-            Job.repository_id == repo_id,
-            Job.status.in_(["running", "pending", "queued"]),
-        )
-        .all()
-    )
-
-    if active_jobs:
-        active_job_types = [job.type for job in active_jobs]
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot delete repository '{repo_name}' - {len(active_jobs)} active job(s) running: {', '.join(active_job_types)}. Please wait for jobs to complete or cancel them first.",
-        )
-
-    schedules_to_delete = (
-        db.query(Schedule).filter(Schedule.repository_id == repo_id).all()
-    )
-
-    for schedule in schedules_to_delete:
-        try:
-            await scheduler_svc.remove_schedule(schedule.id)
-            logger.info(f"Removed scheduled job for schedule ID {schedule.id}")
-        except Exception as e:
-            logger.warning(
-                f"Could not remove scheduled job for schedule ID {schedule.id}: {e}"
-            )
-
-    db.delete(repository)
-    db.commit()
-
-    return get_repositories_html(request, db)
+        
+    except RepositoryValidationError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.get("/{repo_id}/archives")

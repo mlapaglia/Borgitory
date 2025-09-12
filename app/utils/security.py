@@ -205,6 +205,58 @@ def validate_compression(compression: str) -> str:
     return compression
 
 
+def validate_repository_name(name: str) -> str:
+    """
+    Validate and sanitize a repository name for safe use in filesystem operations.
+
+    Args:
+        name: Repository name to validate
+
+    Returns:
+        Validated repository name
+
+    Raises:
+        ValueError: If name is invalid or contains dangerous characters
+    """
+    if not name or not isinstance(name, str):
+        raise ValueError("Repository name must be a non-empty string")
+
+    if len(name.strip()) == 0:
+        raise ValueError("Repository name cannot be empty or whitespace only")
+
+    if len(name) > 100:
+        raise ValueError("Repository name too long (max 100 characters)")
+
+    # Check for dangerous patterns that could be used for path traversal or injection
+    dangerous_patterns = [
+        r"\.\.+",  # Directory traversal sequences
+        r"[<>|&;`$]",  # Command injection characters (including semicolon)
+        r"\$\(",  # Command substitution
+        r"`",  # Backticks
+        r"\n|\r",  # Newlines
+        r"^[\.\-_\s]",  # Names starting with dots, dashes, underscores, or spaces
+        r"[\.\-_\s]$",  # Names ending with dots, dashes, underscores, or spaces
+    ]
+
+    for pattern in dangerous_patterns:
+        if re.search(pattern, name):
+            raise ValueError(f"Repository name contains invalid pattern: {pattern}")
+
+    # Check for reserved names on Windows
+    reserved_names = [
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    ]
+    if name.upper() in reserved_names:
+        raise ValueError(f"Repository name '{name}' is a reserved system name")
+
+    # Remove null bytes
+    name = name.replace("\x00", "")
+
+    return name
+
+
 def get_or_generate_secret_key(data_dir: str) -> str:
     """
     Get existing secret key or generate a new one and save it.

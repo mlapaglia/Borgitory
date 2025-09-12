@@ -61,8 +61,10 @@ class ArchiveMountManager:
 
     def _get_mount_point(self, repository: Repository, archive_name: str) -> Path:
         """Generate mount point path"""
-        safe_repo_name = repository.name.replace("/", "_").replace(" ", "_")
-        safe_archive_name = archive_name.replace("/", "_").replace(" ", "_")
+        from app.utils.secure_path import sanitize_filename
+        
+        safe_repo_name = sanitize_filename(repository.name, max_length=50)
+        safe_archive_name = sanitize_filename(archive_name, max_length=50)
         return self.base_mount_dir / f"{safe_repo_name}_{safe_archive_name}"
 
     async def mount_archive(self, repository: Repository, archive_name: str) -> Path:
