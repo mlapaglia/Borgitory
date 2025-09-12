@@ -51,22 +51,22 @@ class PushoverService:
                     if response.status == 200:
                         result = await response.json()
                         if result.get("status") == 1:
-                            logger.info(f"✅ Pushover notification sent: {title}")
+                            logger.info(f"Pushover notification sent: {title}")
                             return True
                         else:
                             logger.error(
-                                f"❌ Pushover API error: {result.get('errors', 'Unknown error')}"
+                                f"Pushover API error: {result.get('errors', 'Unknown error')}"
                             )
                             return False
                     else:
                         error_text = await response.text()
                         logger.error(
-                            f"❌ Pushover HTTP error {response.status}: {error_text}"
+                            f"Pushover HTTP error {response.status}: {error_text}"
                         )
                         return False
 
         except Exception as e:
-            logger.error(f"❌ Error sending Pushover notification: {e}")
+            logger.error(f"Error sending Pushover notification: {e}")
             return False
 
     async def send_backup_success_notification(

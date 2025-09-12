@@ -439,10 +439,10 @@ async def init_db():
 
 def reset_db():
     """Reset the entire database - USE WITH CAUTION"""
-    print("🔄 Resetting database...")
+    print("Resetting database...")
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    print("✅ Database reset complete")
+    print("Database reset complete")
 
 
 def get_db():

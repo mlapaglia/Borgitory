@@ -95,9 +95,9 @@ def get_notification_configs_html(request: Request, db: Session = Depends(get_db
             # Build notification description
             notify_types = []
             if config.notify_on_success:
-                notify_types.append("✅ Success")
+                notify_types.append("Success")
             if config.notify_on_failure:
-                notify_types.append("❌ Failures")
+                notify_types.append("Failures")
 
             notification_desc = (
                 ", ".join(notify_types) if notify_types else "No notifications"
