@@ -1,3 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "borgitory"
+version = "1.0.0"
+description = "A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities."
+authors = [
+    {name = "mlapaglia", email = "mlapaglia@users.noreply.github.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Archiving :: Backup",
+    "Topic :: System :: Systems Administration",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0.35",
+    "alembic>=1.16.5",
+    "pydantic>=2.9.0",
+    "python-multipart>=0.0.12",
+    "jinja2>=3.1.4",
+    "aiofiles>=24.1.0",
+    "apscheduler>=3.10.4",
+    "cryptography>=45.0.0",
+    "aiohttp>=3.9.0",
+    "docker>=7.1.0",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt>=4.0.0,<5.0.0",
+    "python-dotenv>=1.0.1",
+    "sse-starlette>=2.1.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.12.11",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "httpx>=0.25.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/mlapaglia/Borgitory"
+Repository = "https://github.com/mlapaglia/Borgitory"
+Issues = "https://github.com/mlapaglia/Borgitory/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 exclude = [

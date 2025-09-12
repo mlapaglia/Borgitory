@@ -1,26 +1,44 @@
+# Build stage
+FROM python:3.13-slim as builder
+
+WORKDIR /app
+
+COPY pyproject.toml .
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir .
+
 FROM python:3.13-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     rclone \
     borgbackup \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/data && \
+    chown -R appuser:appuser /app
 
-COPY app/ ./app/
-COPY alembic/ ./alembic/
-COPY alembic.ini ./alembic.ini
-COPY start.sh /app/start.sh
+COPY --from=builder /opt/venv /opt/venv
 
-# Create data directory in container (will be empty initially)
-RUN mkdir -p /app/data
+COPY --chown=appuser:appuser app/ ./app/
+COPY --chown=appuser:appuser alembic/ ./alembic/
+COPY --chown=appuser:appuser alembic.ini start.sh ./
 
-# Make script executable
-RUN chmod +x /app/start.sh
+RUN chmod +x start.sh
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+USER appuser
 
 EXPOSE 8000
 
-CMD ["/app/start.sh"]
+ENTRYPOINT ["/app/start.sh"]
