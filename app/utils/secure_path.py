@@ -44,7 +44,15 @@ def validate_path_within_base(
         if allow_equal and normalized_path == normalized_base:
             return normalized_path
 
-        if not normalized_path.startswith(normalized_base + os.sep):
+        # Check if path is within base directory (including direct children)
+        # Account for both subdirectories and direct children of base directory
+        is_subdirectory = normalized_path.startswith(normalized_base + os.sep)
+        is_direct_child = (
+            normalized_base == os.path.dirname(normalized_path) and 
+            normalized_path != normalized_base
+        )
+        
+        if not (is_subdirectory or is_direct_child):
             raise PathSecurityError(
                 f"Path '{path}' is outside allowed base directory '{base_dir}'"
             )

@@ -266,7 +266,7 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/repos"):
             )
 
             # For root directory, filter out system directories
-            if validated_path == "/":
+            if path == "/":
                 ignored_dirs = {
                     "opt",
                     "home",
