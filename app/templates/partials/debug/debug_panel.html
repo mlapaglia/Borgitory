@@ -198,14 +198,14 @@
                 {% endif %}
             </div>
 
-            <!-- Rclone -->
+            <!-- rclone -->
             <div>
                 <div class="flex justify-between items-center">
-                    <span class="text-gray-600 font-semibold">Rclone:</span>
+                    <span class="text-gray-600 font-semibold">rclone:</span>
                     {% if debug_info.tools.rclone.accessible %}
                         <span class="text-green-600 font-semibold">✓ Available</span>
                     {% else %}
-                        <span class="text-red-600 font-semibold">✗ Not Available</span>
+                        <span class="text-red-600 font-semibold">✗ Not available</span>
                     {% endif %}
                 </div>
                 {% if debug_info.tools.rclone.accessible %}

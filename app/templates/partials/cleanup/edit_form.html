@@ -1,4 +1,4 @@
-<!-- Edit Cleanup Policy -->
+<!-- Edit cleanup policy -->
 <form 
     hx-put="/api/cleanup/{{ config.id }}" 
     hx-ext="json-enc"
@@ -6,25 +6,25 @@
     class="space-y-3"
 >
     <div>
-        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Policy Name</label>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Policy name</label>
         <input type="text" name="name" required value="{{ config.name }}" class="input-modern mt-1">
     </div>
     
     <div class="grid grid-cols-2 gap-2">
         <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Daily</label>
+            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep daily</label>
             <input type="number" name="keep_daily" value="{{ config.keep_daily or '' }}" min="0" class="input-modern">
         </div>
         <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Weekly</label>
+            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep weekly</label>
             <input type="number" name="keep_weekly" value="{{ config.keep_weekly or '' }}" min="0" class="input-modern">
         </div>
         <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Monthly</label>
+            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep monthly</label>
             <input type="number" name="keep_monthly" value="{{ config.keep_monthly or '' }}" min="0" class="input-modern">
         </div>
         <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Yearly</label>
+            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep yearly</label>
             <input type="number" name="keep_yearly" value="{{ config.keep_yearly or '' }}" min="0" class="input-modern">
         </div>
     </div>
@@ -33,7 +33,7 @@
     
     <div class="flex space-x-2">
         <button type="submit" class="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 text-sm">
-            Update Cleanup Policy
+            Update cleanup policy
         </button>
         <button 
             type="button" 

@@ -1,9 +1,9 @@
 <!-- Create New Repository Form - Success State -->
 <div id="create-form-container" class="repository-form">
     <div id="create-form">
-        <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create New Repository</h3>
+        <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create a New Repository</h3>
         
-        <!-- Success Message -->
+        <!-- Success message -->
         <div class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
             <div class="flex items-center">
                 <svg class="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -13,7 +13,7 @@
             </div>
         </div>
         
-        <!-- Fresh Form -->
+        <!-- Fresh form -->
         <form 
             hx-post="/api/repositories/" 
             hx-ext="json-enc"
@@ -47,7 +47,7 @@
                 <!-- HTMX Loading Indicator -->
                 <div id="create-loading" class="[&.htmx-request]:flex hidden items-center justify-center text-sm text-gray-600 mt-2">
                     <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                    Creating repository...
+                    Creating the repository...
                 </div>
             </div>
         </form>

@@ -3,7 +3,7 @@
     <div id="create-form">
         <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create New Repository</h3>
         
-        <!-- Error Message -->
+        <!-- Error message -->
         <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
             <div class="flex items-center">
                 <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -13,7 +13,7 @@
             </div>
         </div>
         
-        <!-- Form with Previous Values (HTMX preserves form data on error) -->
+        <!-- Form with previous values (HTMX preserves form data on error) -->
         <form 
             hx-post="/api/repositories/" 
             hx-ext="json-enc"

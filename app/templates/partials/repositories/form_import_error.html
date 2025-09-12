@@ -3,7 +3,7 @@
     <div id="import-form">
         <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Import Existing Repository</h3>
         <div class="space-y-4">
-            <!-- Error Message -->
+            <!-- Error message -->
             <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
                 <div class="flex items-center">
                     <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -19,7 +19,7 @@
                         hx-swap="innerHTML"
                         hx-indicator="#scan-loading"
                         class="bg-gray-600 text-white px-3 py-2 rounded-md hover:bg-gray-700 text-sm">
-                    Scan for Repositories
+                    Scan for repositories
                 </button>
                 <div id="scan-loading" class="[&.htmx-request]:block hidden flex items-center text-sm text-gray-500">
                     <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div> Scanning...
@@ -30,7 +30,7 @@
                 <!-- Scan results will be populated here by HTMX -->
             </div>
             
-            <!-- Form with Previous Values (HTMX preserves form data on error) -->
+            <!-- Form with previous values (HTMX preserves form data on error) -->
             <form 
                 hx-post="/api/repositories/import" 
                 hx-encoding="multipart/form-data"
@@ -44,7 +44,7 @@
                         <input type="text" name="name" required class="input-modern mt-1">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository Path</label>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository path</label>
                         <div class="relative">
                             <input type="text" name="path" id="import-path" required 
                                    class="input-modern mt-1"
@@ -70,11 +70,11 @@
                         <input type="password" name="passphrase" class="input-modern mt-1">
                     </div>
                     
-                    <!-- Keyfile field -->
+                    <!-- Key file field -->
                     <div id="keyfile-field" class="hidden">
-                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Keyfile</label>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Key file</label>
                         <input type="file" name="keyfile" accept=".key" class="input-modern mt-1">
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Upload the Borg keyfile (usually has .key extension)</p>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Upload the Borg key file (usually has a .key extension)</p>
                     </div>
                     
                     <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
