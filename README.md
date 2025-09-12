@@ -25,12 +25,12 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 - **Composite Jobs**: Multi-step operations combining backup, pruning, and cloud sync tasks
 - **Automated Scheduling**: Set up cron-based backup schedules with integrated cleanup and notifications
 - **Archive Cleanup**: Configure automated pruning policies with simple or advanced retention strategies
-- **Cloud Sync**: Synchronize repositories to S3-compatible storage using Rclone
+- **Cloud Sync**: Synchronize repositories to S3-compatible storage using rclone
 - **Push Notifications**: Pushover integration for job completion alerts
-- **User Authentication**: Secure username/password authentication
+- **User Authentication**: Secure username and password authentication
 - **Docker Integration**: Manage Borg operations through isolated Docker containers
 - **Template System**: Modern Jinja2-based UI with reusable components
-- **Mobile Responsive**: HTMX + Alpine.js + Tailwind CSS interface
+- **Mobile-responsive**: HTMX + Alpine.js + Tailwind CSS interface
 
 ## Quick Start
 
@@ -81,7 +81,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 2. **Access the web interface**
    - Open <http://localhost:8000> in your browser
-   - Create your first admin account on initial setup
+   - Create your first admin account during initial setup
 
 **Docker Hub**: Available at [mlapaglia/borgitory](https://hub.docker.com/r/mlapaglia/borgitory)
 
@@ -93,7 +93,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
    pip install -r requirements.txt
    ```
 
-2. **Install Rclone** (for cloud sync)
+2. **Install rclone** (for cloud sync)
 
    ```bash
    # On Ubuntu/Debian
@@ -122,7 +122,7 @@ The application requires these volume mounts:
 ```yaml
 volumes:
   - ./data:/app/data # Persistent application data (required)
-  - /path/to/backup/sources:/backup/sources:ro # Source directories to backup (read-only)
+  - /path/to/backup/sources:/backup/sources:ro # Source directories to back up (read-only)
   - /path/to/borg/repos:/repos # Borg repository storage (read-write)
   - /additional/source:/additional:ro # Additional source directories as needed
   - /another/repo/location:/alt-repos # Additional repository locations as needed
@@ -158,8 +158,8 @@ volumes:
 
 **Scheduled Backup:**
 
-1. Go to Schedules section
-2. Create new schedule with cron expression
+1. Go to the Schedules section
+2. Create a new schedule with a cron expression
 3. Enable/disable schedules as needed
 
 ### 3. Archive Cleanup (Pruning)
@@ -180,7 +180,7 @@ volumes:
 1. Click "View Contents" on any archive to open the browser
 2. Navigate through directories by clicking folder names  
 3. View file details including size and modification dates
-4. Real-time directory exploration using FUSE-mounted archive filesystems
+4. Real-time directory exploration using FUSE-mounted archive file systems
 
 **Downloading Files:**
 
@@ -197,8 +197,8 @@ volumes:
 
 ### 5. Cloud Sync
 
-1. Configure S3 remote:
-   - Access Key ID and Secret
+1. Configure an S3 remote:
+   - Access Key ID and Secret Access Key
 2. Test connection
 3. Set up automatic sync after backups or manual sync
 
@@ -253,7 +253,7 @@ docker run -d \
 
 - FUSE mounting enables the interactive archive browser feature
 - Allows real-time exploration of backup archives without extraction
-- Supports direct file downloads from mounted archive filesystems
+- Supports direct file downloads from mounted archive file systems
 - Without FUSE support, archive browsing will be disabled
 
 ## Architecture
