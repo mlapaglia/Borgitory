@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     pkg-config \
     libfuse3-dev \
+    libfuse3-3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
