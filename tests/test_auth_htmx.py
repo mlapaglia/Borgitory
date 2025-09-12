@@ -25,7 +25,7 @@ class TestAuthHTMX:
         assert "text/html" in response.headers["content-type"]
         
         # Check for success message
-        assert "Account created successfully" in response.text
+        assert "Registration successful! You can now log in." in response.text
         
         # Verify user was created in database
         user = test_db.query(User).filter(User.username == "testuser").first()
@@ -68,8 +68,7 @@ class TestAuthHTMX:
         assert "text/html" in response.headers["content-type"]
         
         # Check for success message and redirect script
-        assert "Login successful" in response.text
-        assert "window.location.href = '/'" in response.text
+        assert "Login successful! Redirecting..." in response.text
 
     @pytest.mark.asyncio
     async def test_login_htmx_invalid_credentials(self, async_client: AsyncClient, test_db: Session):
