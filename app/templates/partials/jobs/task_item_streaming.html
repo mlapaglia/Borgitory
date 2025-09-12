@@ -32,7 +32,7 @@
          hx-swap="outerHTML">
         <div class="flex items-center space-x-3">
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ task_status_class }}" sse-swap="task-{{ task.task_order }}-status">
-                {{ task_status_icon }} {% if task.status == "skipped" %}Cancelled{% else %}{{ task.status.title() }}{% endif %}
+                {{ task_status_icon }} {% if task.status == "skipped" %}Skipped{% else %}{{ task.status.title() }}{% endif %}
             </span>
             <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ task.task_name }}</span>
             <span class="text-xs text-gray-500 dark:text-gray-400" sse-swap="task-{{ task.task_order }}-duration">{{ task_duration }}</span>
@@ -54,7 +54,7 @@
                      hx-ext="sse" 
                      sse-connect="/api/jobs/{{ job.id }}/tasks/{{ task.task_order }}/stream">
                     <div class="flex items-center justify-between mb-2">
-                        <h5 class="text-xs font-medium text-gray-700 dark:text-gray-300">Live Output:</h5>
+                        <h5 class="text-xs font-medium text-gray-700 dark:text-gray-300">Live output:</h5>
                         <div class="flex items-center">
                             <div class="animate-pulse w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                             <span class="text-xs text-green-600" sse-swap="status">Streaming</span>
@@ -96,7 +96,7 @@
                     </div>
                 {% else %}
                     <div class="mt-3 pt-3 border-t dark:border-gray-500">
-                        <div class="text-xs text-gray-500 dark:text-gray-400">No output available</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">No output available.</div>
                     </div>
                 {% endif %}
             {% endif %}

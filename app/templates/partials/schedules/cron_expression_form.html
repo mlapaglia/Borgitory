@@ -1,7 +1,7 @@
-<!-- Dynamic Cron Expression Form Elements -->
+<!-- Dynamic cron expression form elements -->
 {% if is_custom %}
 <div id="custom-cron">
-    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Custom Cron Expression</label>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Custom cron expression</label>
     <input 
         type="text" 
         id="custom-cron-input" 
@@ -10,7 +10,7 @@
         placeholder="0 2 * * *" 
         oninput="document.getElementById('cron-expression').value = this.value"
         class="input-modern mt-1">
-    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Format: minute hour day month weekday</p>
+    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Format: minute hour day month weekday.</p>
 </div>
 {% endif %}
 

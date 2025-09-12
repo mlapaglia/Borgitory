@@ -21,9 +21,9 @@
                 <div><strong>Type:</strong> {{ config.check_type|title }}</div>
                 <div>
                     <strong>Options:</strong>
-                    {% if config.verify_data %}<span class="text-blue-600">✓ Data Verify</span>{% endif %}
+                    {% if config.verify_data %}<span class="text-blue-600">✓ Verify data</span>{% endif %}
                     {% if config.repair_mode %}<span class="text-red-600 ml-2">⚠️ Repair</span>{% endif %}
-                    {% if config.save_space %}<span class="text-green-600 ml-2">💾 Save Space</span>{% endif %}
+                    {% if config.save_space %}<span class="text-green-600 ml-2">💾 Save space</span>{% endif %}
                     {% if not config.verify_data and not config.repair_mode and not config.save_space %}<span class="text-gray-500">None</span>{% endif %}
                 </div>
                 <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ config.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
