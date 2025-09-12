@@ -84,8 +84,12 @@ def register_user(
 
         # Return success response
         return templates.TemplateResponse(
-            request, "partials/shared/notification.html", 
-            {"type": "success", "message": "Registration successful! You can now log in."}
+            request,
+            "partials/shared/notification.html",
+            {
+                "type": "success",
+                "message": "Registration successful! You can now log in.",
+            },
         )
 
     except Exception as e:
@@ -157,8 +161,14 @@ def login_user(
 
         # Create success template response with redirect and set cookie
         success_response = templates.TemplateResponse(
-            request, "partials/shared/notification.html", 
-            {"type": "success", "message": "Login successful! Redirecting...", "redirect_url": "/", "redirect_delay": 1000}
+            request,
+            "partials/shared/notification.html",
+            {
+                "type": "success",
+                "message": "Login successful! Redirecting...",
+                "redirect_url": "/",
+                "redirect_delay": 1000,
+            },
         )
         success_response.set_cookie(
             key="auth_token",
