@@ -63,7 +63,7 @@ jobs:
           type=raw,value=alpha,enable=${{ steps.version.outputs.IS_PRERELEASE == 'true' }}
         labels: |
           org.opencontainers.image.title=Borgitory
-          org.opencontainers.image.description=Borg Backup Manager with Web UI
+          org.opencontainers.image.description=BorgBackup Manager with Web UI
           org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
           org.opencontainers.image.url=https://github.com/mlapaglia/borgitory
           org.opencontainers.image.source=https://github.com/mlapaglia/borgitory

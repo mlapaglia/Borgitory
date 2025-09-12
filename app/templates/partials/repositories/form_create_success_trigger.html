@@ -1,0 +1,13 @@
+<!-- HTMX Success Notification Trigger -->
+<div hx-get="/api/shared/notification?message=Repository '{{ repository_name }}' created successfully!&type=success"
+     hx-target="body"
+     hx-swap="beforeend"
+     hx-trigger="load">
+</div>
+
+<!-- Restore Create Form -->
+<div hx-get="/api/repositories/create-form"
+     hx-target="#create-form-container"
+     hx-swap="innerHTML"
+     hx-trigger="load delay:100ms">
+</div>

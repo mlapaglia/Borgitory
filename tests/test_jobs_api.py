@@ -76,7 +76,8 @@ class TestJobsAPI:
         assert "test-job-123" in result
         assert "Backup job #test-job-123 started" in result
         assert "bg-blue-50" in result  # Success styling
-        mock_job_service.create_backup_job.assert_called_once_with(backup_request, mock_db)
+        from app.models.enums import JobType
+        mock_job_service.create_backup_job.assert_called_once_with(backup_request, mock_db, JobType.MANUAL_BACKUP)
 
     @pytest.mark.asyncio
     async def test_create_backup_value_error(self, mock_request, mock_db, mock_job_service):

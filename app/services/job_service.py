@@ -19,7 +19,7 @@ class JobService:
         self.job_manager = job_manager or get_job_manager()
 
     async def create_backup_job(
-        self, backup_request: BackupRequest, db: Session
+        self, backup_request: BackupRequest, db: Session, job_type: JobType
     ) -> Dict[str, Any]:
         """Create a backup job with optional cleanup and check tasks"""
         repository = (
@@ -52,7 +52,7 @@ class JobService:
 
         # Create composite job using unified manager
         job_id = await self.job_manager.create_composite_job(
-            job_type=JobType.MANUAL_BACKUP,
+            job_type=job_type,
             task_definitions=task_definitions,
             repository=repository,
             schedule=None,  # No schedule for manual backups
@@ -79,11 +79,8 @@ class JobService:
         task_def = builder.build_prune_task_from_request(prune_request, repository.name)
         task_definitions = [task_def]
 
-        # Import here to avoid circular imports
-        from app.services.composite_job_manager import composite_job_manager
-
-        # Create composite job
-        job_id = await composite_job_manager.create_composite_job(
+        # Create composite job using unified manager
+        job_id = await self.job_manager.create_composite_job(
             job_type=JobType.PRUNE,
             task_definitions=task_definitions,
             repository=repository,
@@ -123,11 +120,8 @@ class JobService:
 
         task_definitions = [task_def]
 
-        # Import here to avoid circular imports
-        from app.services.composite_job_manager import composite_job_manager
-
-        # Start the composite job
-        job_id = await composite_job_manager.create_composite_job(
+        # Create composite job using unified manager
+        job_id = await self.job_manager.create_composite_job(
             job_type=JobType.CHECK,
             task_definitions=task_definitions,
             repository=repository,

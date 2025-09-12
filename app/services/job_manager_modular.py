@@ -338,9 +338,36 @@ class ModularBorgJobManager:
         """Execute a composite job with multiple tasks"""
         job.status = "running"
 
+        # Track if critical tasks have failed to determine notification behavior
+        critical_tasks_failed = False
+        
+        # Log task information for debugging
+        task_summary = [f"{task.task_type}:{task.task_name}" for task in job.tasks]
+        logger.info(f"📋 Job {job.id} has {len(job.tasks)} tasks: {', '.join(task_summary)}")
+
         try:
             for i, task in enumerate(job.tasks):
                 job.current_task_index = i
+                
+                # Skip critical tasks if previous critical tasks failed, but allow notification tasks
+                if critical_tasks_failed and task.task_type != "notification":
+                    task.status = "skipped"
+                    task.completed_at = datetime.now(UTC)
+                    logger.info(
+                        f"⏭️ Task {i + 1}/{len(job.tasks)} skipped: {task.task_name} (due to previous failures)"
+                    )
+                    continue
+                    
+                # Log when notification tasks are allowed to proceed despite failures
+                if critical_tasks_failed and task.task_type == "notification":
+                    logger.info(
+                        f"🔔 Task {i + 1}/{len(job.tasks)} proceeding despite failures: {task.task_name} (notification task)"
+                    )
+
+                logger.info(
+                    f"🔄 Starting task {i + 1}/{len(job.tasks)}: {task.task_name}"
+                )
+                
                 task.status = "running"
                 task.started_at = datetime.now(UTC)
 
@@ -355,21 +382,45 @@ class ModularBorgJobManager:
                     },
                 )
 
-                # Execute task based on type
-                success = await self._execute_task(job, task, i)
+                try:
+                    # Execute task based on type
+                    success = await self._execute_task(job, task, i)
 
-                task.completed_at = datetime.now(UTC)
-                task.status = "completed" if success else "failed"
+                    task.completed_at = datetime.now(UTC)
+                    task.status = "completed" if success else "failed"
 
-                if not success:
-                    # Task failed, stop execution
-                    job.status = "failed"
-                    job.completed_at = datetime.now(UTC)
-                    break
+                    if success:
+                        logger.info(
+                            f"✅ Task {i + 1}/{len(job.tasks)} completed: {task.task_name}"
+                        )
+                    else:
+                        logger.error(
+                            f"❌ Task {i + 1}/{len(job.tasks)} failed: {task.task_name}"
+                        )
+                        
+                        # Mark critical tasks as failed, but continue for notifications
+                        if task.task_type != "notification":
+                            critical_tasks_failed = True
+                            
+                except Exception as e:
+                    logger.error(f"❌ Exception in task {task.task_name}: {str(e)}")
+                    task.status = "failed"
+                    task.completed_at = datetime.now(UTC)
+                    task.error = str(e)
+                    
+                    # Mark critical tasks as failed, but continue for notifications
+                    if task.task_type != "notification":
+                        critical_tasks_failed = True
+
+            # Determine final job status based on whether critical tasks failed
+            if critical_tasks_failed:
+                job.status = "failed"
+                logger.info(f"💥 Composite job {job.id} completed with failures, but notifications were processed")
             else:
-                # All tasks completed successfully
                 job.status = "completed"
-                job.completed_at = datetime.now(UTC)
+                logger.info(f"🎉 Composite job {job.id} completed successfully")
+                
+            job.completed_at = datetime.now(UTC)
 
             # Update database
             if self.database_manager:
@@ -448,58 +499,96 @@ class ModularBorgJobManager:
     async def _execute_backup_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a backup task using composite job manager"""
-        if not hasattr(self, "_composite_manager") or self._composite_manager is None:
-            from app.services.composite_job_manager import CompositeJobManager
-
-            self._composite_manager = CompositeJobManager()
-            # Connect composite manager events to our event broadcaster
-            if self.event_broadcaster:
-                self._composite_manager.set_external_event_broadcaster(
-                    self.event_broadcaster
-                )
-
+        """Execute a backup task using job executor"""
         logger.info(f"Executing backup task: {task.task_name}")
 
-        # Convert BorgJob to CompositeJobInfo format for execution
-        from app.services.composite_job_manager import (
-            CompositeJobInfo,
-            CompositeJobTaskInfo,
+        # Get repository data
+        repo_data = await self._get_repository_data(job.repository_id)
+        if not repo_data:
+            logger.error(f"Repository {job.repository_id} not found")
+            task.error = "Repository not found"
+            task.return_code = 1
+            return False
+
+        # Create output callback for streaming
+        async def output_callback(line: str, progress_info: dict):
+            # Store output in task
+            task.output_lines.append(
+                {"timestamp": datetime.now().isoformat(), "text": line}
+            )
+
+            # Broadcast to SSE listeners
+            await self.output_manager.add_output_line(job.id, line, progress_info=progress_info)
+            if self.event_broadcaster:
+                from app.services.job_event_broadcaster import EventType
+
+                self.event_broadcaster.broadcast_event(
+                    EventType.JOB_OUTPUT,
+                    job_id=job.id,
+                    data={"line": line, "task_index": task_index},
+                )
+
+        # Build backup command
+        from app.utils.security import build_secure_borg_command, validate_compression, validate_archive_name
+        from datetime import datetime
+
+        source_path = task.parameters.get("source_path", "/data")
+        compression = task.parameters.get("compression", "zstd")
+        dry_run = task.parameters.get("dry_run", False)
+        
+        # Validate parameters
+        validate_compression(compression)
+        
+        # Create archive name
+        archive_name = f"backup-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        validate_archive_name(archive_name)
+
+        additional_args = [
+            "--compression", compression,
+            "--stats",
+            "--progress", 
+            "--json",
+            "--verbose",
+            "--list",
+            f"{repo_data['path']}::{archive_name}",
+            source_path,
+        ]
+
+        if dry_run:
+            additional_args.insert(0, "--dry-run")
+
+        command, env = build_secure_borg_command(
+            base_command="borg create",
+            repository_path="",
+            passphrase=repo_data["passphrase"],
+            additional_args=additional_args,
         )
 
-        # Create a composite task with the same parameters
-        composite_task = CompositeJobTaskInfo(
-            task_type=task.task_type,
-            task_name=task.task_name,
-            source_path=task.parameters.get("source_path", "/data"),
-            compression=task.parameters.get("compression", "zstd"),
-            dry_run=task.parameters.get("dry_run", False),
-        )
+        # Execute using job executor's process methods
+        try:
+            # Start the process
+            process = await self.executor.start_process(command, env)
+            
+            # Monitor output and wait for completion
+            result = await self.executor.monitor_process_output(
+                process=process,
+                output_callback=output_callback,
+            )
 
-        # Create temporary composite job for execution context
-        composite_job = CompositeJobInfo(
-            id=job.id,
-            job_type="Manual Backup",  # Set appropriate job type
-            repository_id=job.repository_id,
-            tasks=[composite_task],
-            schedule=job.schedule,
-            cloud_sync_config_id=job.cloud_sync_config_id,
-        )
+            if result.return_code == 0:
+                task.return_code = 0
+                return True
+            else:
+                task.error = f"Backup failed with return code {result.return_code}"
+                task.return_code = result.return_code
+                return False
 
-        # Execute the task
-        success = await self._composite_manager._execute_backup_task(
-            composite_job, composite_task, 0
-        )
-
-        # Copy output and status back to the modular job task
-        if hasattr(composite_task, "output_lines") and composite_task.output_lines:
-            task.output_lines = list(composite_task.output_lines)
-        if hasattr(composite_task, "error"):
-            task.error = composite_task.error
-        if hasattr(composite_task, "return_code"):
-            task.return_code = composite_task.return_code
-
-        return success
+        except Exception as e:
+            error_msg = f"Backup task failed: {str(e)}"
+            logger.error(error_msg)
+            task.error = error_msg
+            task.return_code = 1
+            return False
 
     async def _execute_prune_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
@@ -569,51 +658,104 @@ class ModularBorgJobManager:
     async def _execute_check_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a check task using composite job manager"""
-        if not hasattr(self, "_composite_manager") or self._composite_manager is None:
-            from app.services.composite_job_manager import CompositeJobManager
-
-            self._composite_manager = CompositeJobManager()
-
+        """Execute a check task using job executor"""
         logger.info(f"Executing check task: {task.task_name}")
 
-        # Convert to composite task format
-        from app.services.composite_job_manager import (
-            CompositeJobInfo,
-            CompositeJobTaskInfo,
+        # Get repository data
+        repo_data = await self._get_repository_data(job.repository_id)
+        if not repo_data:
+            logger.error(f"Repository {job.repository_id} not found")
+            task.error = "Repository not found"
+            task.return_code = 1
+            return False
+
+        # Create output callback for streaming
+        async def output_callback(line: str, progress_info: dict):
+            # Store output in task
+            task.output_lines.append(
+                {"timestamp": datetime.now().isoformat(), "text": line}
+            )
+
+            # Broadcast to SSE listeners
+            await self.output_manager.add_output_line(job.id, line, progress_info=progress_info)
+            if self.event_broadcaster:
+                from app.services.job_event_broadcaster import EventType
+
+                self.event_broadcaster.broadcast_event(
+                    EventType.JOB_OUTPUT,
+                    job_id=job.id,
+                    data={"line": line, "task_index": task_index},
+                )
+
+        # Build check command
+        from app.utils.security import build_secure_borg_command
+
+        check_type = task.parameters.get("check_type", "full")
+        verify_data = task.parameters.get("verify_data", False)
+        repair_mode = task.parameters.get("repair_mode", False)
+        save_space = task.parameters.get("save_space", False)
+        max_duration = task.parameters.get("max_duration")
+
+        additional_args = [
+            "--verbose",
+            "--progress",
+            "--show-rc",
+        ]
+
+        # Add check type specific flags
+        if check_type == "repository_only":
+            additional_args.append("--repository-only")
+        elif check_type == "archives_only":
+            additional_args.append("--archives-only")
+
+        # Add verification options
+        if verify_data and check_type != "repository_only":
+            additional_args.append("--verify-data")
+
+        if repair_mode:
+            additional_args.append("--repair")
+
+        if save_space:
+            additional_args.append("--save-space")
+
+        if max_duration and check_type == "repository_only":
+            additional_args.extend(["--max-duration", str(max_duration)])
+
+        # Add repository path
+        additional_args.append(repo_data["path"])
+
+        command, env = build_secure_borg_command(
+            base_command="borg check",
+            repository_path="",
+            passphrase=repo_data["passphrase"],
+            additional_args=additional_args,
         )
 
-        composite_task = CompositeJobTaskInfo(
-            task_type=task.task_type,
-            task_name=task.task_name,
-            check_type=task.parameters.get("check_type", "full"),
-            verify_data=task.parameters.get("verify_data", False),
-            repair_mode=task.parameters.get("repair_mode", False),
-            max_duration=task.parameters.get("max_duration"),
-        )
+        # Execute using job executor's process methods
+        try:
+            # Start the process
+            process = await self.executor.start_process(command, env)
+            
+            # Monitor output and wait for completion
+            result = await self.executor.monitor_process_output(
+                process=process,
+                output_callback=output_callback,
+            )
 
-        composite_job = CompositeJobInfo(
-            id=job.id,
-            job_type="Manual Backup",
-            repository_id=job.repository_id,
-            tasks=[composite_task],
-            schedule=job.schedule,
-            cloud_sync_config_id=job.cloud_sync_config_id,
-        )
+            if result.return_code == 0:
+                task.return_code = 0
+                return True
+            else:
+                task.error = f"Check failed with return code {result.return_code}"
+                task.return_code = result.return_code
+                return False
 
-        success = await self._composite_manager._execute_check_task(
-            composite_job, composite_task, 0
-        )
-
-        # Copy results back
-        if hasattr(composite_task, "output_lines") and composite_task.output_lines:
-            task.output_lines = list(composite_task.output_lines)
-        if hasattr(composite_task, "error"):
-            task.error = composite_task.error
-        if hasattr(composite_task, "return_code"):
-            task.return_code = composite_task.return_code
-
-        return success
+        except Exception as e:
+            error_msg = f"Check task failed: {str(e)}"
+            logger.error(error_msg)
+            task.error = error_msg
+            task.return_code = 1
+            return False
 
     async def _execute_cloud_sync_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
@@ -677,51 +819,145 @@ class ModularBorgJobManager:
     async def _execute_notification_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
-        """Execute a notification task using composite job manager"""
-        if not hasattr(self, "_composite_manager") or self._composite_manager is None:
-            from app.services.composite_job_manager import CompositeJobManager
-
-            self._composite_manager = CompositeJobManager()
-
+        """Execute a notification task"""
         logger.info(f"Executing notification task: {task.task_name}")
 
-        # Convert to composite task format
-        from app.services.composite_job_manager import (
-            CompositeJobInfo,
-            CompositeJobTaskInfo,
-        )
+        try:
+            # Get repository data
+            repo_data = await self._get_repository_data(job.repository_id)
+            if not repo_data:
+                logger.error(f"Repository {job.repository_id} not found")
+                task.error = "Repository not found"
+                task.return_code = 1
+                return False
 
-        composite_task = CompositeJobTaskInfo(
-            task_type=task.task_type,
-            task_name=task.task_name,
-            provider=task.parameters.get("provider"),
-            notify_on_success=task.parameters.get("notify_on_success", True),
-            notify_on_failure=task.parameters.get("notify_on_failure", True),
-            config_id=task.parameters.get("config_id"),
-        )
+            # Get notification configuration
+            config_id = task.parameters.get("config_id")
+            if not config_id:
+                logger.error("No notification configuration ID provided")
+                task.error = "No notification configuration"
+                task.return_code = 1
+                return False
 
-        composite_job = CompositeJobInfo(
-            id=job.id,
-            job_type="Manual Backup",
-            repository_id=job.repository_id,
-            tasks=[composite_task],
-            schedule=job.schedule,
-            cloud_sync_config_id=job.cloud_sync_config_id,
-        )
+            # Get config from database
+            from app.models.database import NotificationConfig
+            from app.utils.db_session import get_db_session
 
-        success = await self._composite_manager._execute_notification_task(
-            composite_job, composite_task, 0
-        )
+            with get_db_session() as db:
+                notification_config = (
+                    db.query(NotificationConfig)
+                    .filter(NotificationConfig.id == config_id)
+                    .first()
+                )
 
-        # Copy results back
-        if hasattr(composite_task, "output_lines") and composite_task.output_lines:
-            task.output_lines = list(composite_task.output_lines)
-        if hasattr(composite_task, "error"):
-            task.error = composite_task.error
-        if hasattr(composite_task, "return_code"):
-            task.return_code = composite_task.return_code
+                if not notification_config or not notification_config.enabled:
+                    logger.info("Notification configuration not found or disabled - skipping")
+                    task.status = "skipped"
+                    task.return_code = 0
+                    return True
 
-        return success
+                # Determine if we should send notification based on job status
+                previous_tasks = job.tasks[:task_index] if task_index > 0 else []
+                job_success = all(t.status == "completed" for t in previous_tasks if t.task_type != "notification")
+                
+                notify_on_success = task.parameters.get("notify_on_success", True)
+                notify_on_failure = task.parameters.get("notify_on_failure", True)
+                
+                should_notify = (
+                    job_success and notify_on_success
+                ) or (not job_success and notify_on_failure)
+
+                if not should_notify:
+                    logger.info("Notification not configured for current job status - skipping")
+                    task.status = "skipped"
+                    task.return_code = 0
+                    return True
+
+                # Add initial output
+                initial_output = f"Sending notification via {notification_config.provider}"
+                task.output_lines.append(
+                    {"timestamp": datetime.now().isoformat(), "text": initial_output}
+                )
+
+                # Send notification based on provider
+                if notification_config.provider == "pushover":
+                    success = await self._send_pushover_notification(
+                        notification_config, job, repo_data, task, job_success
+                    )
+                else:
+                    error_msg = f"Unsupported notification provider: {notification_config.provider}"
+                    logger.error(error_msg)
+                    task.error = error_msg
+                    task.return_code = 1
+                    return False
+
+                if success:
+                    success_msg = f"Notification sent successfully via {notification_config.provider}"
+                    task.output_lines.append(
+                        {"timestamp": datetime.now().isoformat(), "text": success_msg}
+                    )
+                    logger.info(success_msg)
+                    task.return_code = 0
+                    return True
+                else:
+                    task.return_code = 1
+                    return False
+
+        except Exception as e:
+            error_msg = f"Notification task failed: {str(e)}"
+            logger.error(error_msg)
+            task.error = error_msg
+            task.return_code = 1
+            return False
+
+    async def _send_pushover_notification(
+        self, config, job: BorgJob, repo_data: dict, task: BorgJobTask, job_success: bool
+    ) -> bool:
+        """Send notification via Pushover"""
+        try:
+            import httpx
+            from app.models.database import get_cipher_suite
+
+            # Decrypt credentials
+            cipher_suite = get_cipher_suite()
+            user_key = cipher_suite.decrypt(config.encrypted_user_key.encode()).decode()
+            app_token = cipher_suite.decrypt(config.encrypted_app_token.encode()).decode()
+
+            # Create message
+            status_emoji = "✅" if job_success else "❌"
+            status_text = "completed successfully" if job_success else "failed"
+            message = f"Backup {status_text} for repository '{repo_data['name']}'"
+            title = f"{status_emoji} Borgitory Backup"
+
+            # Send to Pushover API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.pushover.net/1/messages.json",
+                    data={
+                        "token": app_token,
+                        "user": user_key,
+                        "title": title,
+                        "message": message,
+                    },
+                )
+
+                if response.status_code == 200:
+                    return True
+                else:
+                    error_msg = f"Pushover API error: {response.status_code} - {response.text}"
+                    task.error = error_msg
+                    task.output_lines.append(
+                        {"timestamp": datetime.now().isoformat(), "text": error_msg}
+                    )
+                    return False
+
+        except Exception as e:
+            error_msg = f"Failed to send Pushover notification: {str(e)}"
+            task.error = error_msg
+            task.output_lines.append(
+                {"timestamp": datetime.now().isoformat(), "text": error_msg}
+            )
+            return False
 
     async def _get_repository_data(self, repository_id: int) -> Optional[Dict]:
         """Get repository data from database"""

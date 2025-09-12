@@ -38,7 +38,7 @@ class TestJobService:
             dry_run=False
         )
         
-        result = await self.job_service.create_backup_job(backup_request, test_db)
+        result = await self.job_service.create_backup_job(backup_request, test_db, JobType.MANUAL_BACKUP)
         
         assert result["job_id"] == "job-123"
         assert result["status"] == "started"
@@ -79,7 +79,7 @@ class TestJobService:
             cleanup_config_id=1
         )
         
-        result = await self.job_service.create_backup_job(backup_request, test_db)
+        result = await self.job_service.create_backup_job(backup_request, test_db, JobType.MANUAL_BACKUP)
         
         assert result["job_id"] == "job-123"
         
@@ -102,7 +102,7 @@ class TestJobService:
         )
         
         with pytest.raises(ValueError, match="Repository not found"):
-            await self.job_service.create_backup_job(backup_request, test_db)
+            await self.job_service.create_backup_job(backup_request, test_db, JobType.MANUAL_BACKUP)
 
     @pytest.mark.asyncio
     async def test_create_prune_job_simple_strategy(self, test_db):
@@ -112,8 +112,8 @@ class TestJobService:
         test_db.add(repository)
         test_db.commit()
         
-        with patch('app.services.composite_job_manager.composite_job_manager') as mock_composite_manager:
-            mock_composite_manager.create_composite_job = AsyncMock(return_value="prune-job-123")
+        with patch.object(self.job_service.job_manager, 'create_composite_job', new_callable=AsyncMock) as mock_create_job:
+            mock_create_job.return_value = "prune-job-123"
             
             prune_request = PruneRequest(
                 repository_id=1,
@@ -132,7 +132,7 @@ class TestJobService:
             assert result["status"] == "started"
             
             # Verify task definition
-            call_args = mock_composite_manager.create_composite_job.call_args
+            call_args = mock_create_job.call_args
             task_def = call_args.kwargs["task_definitions"][0]
             assert task_def["type"] == "prune"
             assert task_def["keep_within"] == "7d"
@@ -145,8 +145,8 @@ class TestJobService:
         test_db.add(repository)
         test_db.commit()
         
-        with patch('app.services.composite_job_manager.composite_job_manager') as mock_composite_manager:
-            mock_composite_manager.create_composite_job = AsyncMock(return_value="prune-job-123")
+        with patch.object(self.job_service.job_manager, 'create_composite_job', new_callable=AsyncMock) as mock_create_job:
+            mock_create_job.return_value = "prune-job-123"
             
             prune_request = PruneRequest(
                 repository_id=1,
@@ -167,7 +167,7 @@ class TestJobService:
             assert result["job_id"] == "prune-job-123"
             
             # Verify task definition includes all retention parameters
-            call_args = mock_composite_manager.create_composite_job.call_args
+            call_args = mock_create_job.call_args
             task_def = call_args.kwargs["task_definitions"][0]
             assert task_def["keep_daily"] == 7
             assert task_def["keep_weekly"] == 4
@@ -192,8 +192,8 @@ class TestJobService:
         test_db.add_all([repository, check_config])
         test_db.commit()
         
-        with patch('app.services.composite_job_manager.composite_job_manager') as mock_composite_manager:
-            mock_composite_manager.create_composite_job = AsyncMock(return_value="check-job-123")
+        with patch.object(self.job_service.job_manager, 'create_composite_job', new_callable=AsyncMock) as mock_create_job:
+            mock_create_job.return_value = "check-job-123"
             
             check_request = CheckRequest(
                 repository_id=1,
@@ -206,7 +206,7 @@ class TestJobService:
             assert result["status"] == "started"
             
             # Verify task definition uses config parameters
-            call_args = mock_composite_manager.create_composite_job.call_args
+            call_args = mock_create_job.call_args
             task_def = call_args.kwargs["task_definitions"][0]
             assert task_def["type"] == "check"
             assert task_def["check_type"] == "repository"
@@ -221,8 +221,8 @@ class TestJobService:
         test_db.add(repository)
         test_db.commit()
         
-        with patch('app.services.composite_job_manager.composite_job_manager') as mock_composite_manager:
-            mock_composite_manager.create_composite_job = AsyncMock(return_value="check-job-123")
+        with patch.object(self.job_service.job_manager, 'create_composite_job', new_callable=AsyncMock) as mock_create_job:
+            mock_create_job.return_value = "check-job-123"
             
             check_request = CheckRequest(
                 repository_id=1,
@@ -238,7 +238,7 @@ class TestJobService:
             assert result["job_id"] == "check-job-123"
             
             # Verify task definition uses custom parameters
-            call_args = mock_composite_manager.create_composite_job.call_args
+            call_args = mock_create_job.call_args
             task_def = call_args.kwargs["task_definitions"][0]
             assert task_def["check_type"] == "archives_only"
             assert task_def["verify_data"] is False

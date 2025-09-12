@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
@@ -28,7 +27,6 @@ from app.api import (
 )
 from app.dependencies import get_recovery_service, get_scheduler_service
 
-# Configure logging to show container output
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -43,7 +41,6 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("Starting Borgitory application...")
 
-        # Initialize SECRET_KEY before anything else that might need it
         from app.config import DATA_DIR
 
         if not os.getenv("SECRET_KEY"):
@@ -54,7 +51,6 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("Database initialized")
 
-        # Recover any interrupted backup jobs from previous shutdown/crash
         recovery_service = get_recovery_service()
         await recovery_service.recover_stale_jobs()
 
@@ -62,12 +58,10 @@ async def lifespan(app: FastAPI):
         await scheduler_service.start()
         logger.info("Scheduler started")
 
-        # Initialize mount cleanup task
         from app.services.archive_mount_manager import get_archive_mount_manager
 
         mount_manager = get_archive_mount_manager()
 
-        # Start background cleanup task
         import asyncio
 
         async def cleanup_task():
@@ -85,14 +79,12 @@ async def lifespan(app: FastAPI):
 
         logger.info("Shutting down...")
 
-        # Cancel cleanup task
         cleanup_task_handle.cancel()
         try:
             await cleanup_task_handle
         except asyncio.CancelledError:
             pass
 
-        # Unmount all archives
         await mount_manager.unmount_all()
         logger.info("All mounts cleaned up")
 
@@ -108,85 +100,86 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Borgitory - BorgBackup Web Manager", lifespan=lifespan)
 
 
-# Custom exception handler for validation errors (422)
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Check if this is an HTMX request
-    if "hx-request" in request.headers:
-        # Parse validation errors into user-friendly messages
-        error_messages = []
-        for error in exc.errors():
-            field = error.get("loc", [])[-1] if error.get("loc") else "field"
-            message = error.get("msg", "Invalid value")
-            error_messages.append(f"{field.title()}: {message}")
-
-        combined_message = "; ".join(error_messages)
-
-        # Determine the appropriate error template based on the request path
-        path = str(request.url.path)
-        if "/api/cloud-sync" in path:
-            template_path = "partials/cloud_sync/create_error.html"
-        elif "/api/repositories" in path:
-            template_path = "partials/repositories/form_create_error.html"
-        elif "/api/schedules" in path:
-            template_path = "partials/schedules/create_error.html"
-        elif "/api/notifications" in path:
-            template_path = "partials/notifications/create_error.html"
-        elif "/api/cleanup" in path:
-            template_path = "partials/cleanup/create_error.html"
-        else:
-            # Use the new shared notification system as fallback
-            return templates.TemplateResponse(
-                request,
-                "partials/shared/notification.html",
-                {"message": f"Validation Error: {combined_message}", "type": "error"},
-                status_code=200,
-            )
-
-        return templates.TemplateResponse(
-            request,
-            template_path,
-            {"error_message": combined_message},
-            status_code=200,  # Return 200 for HTMX so it processes the response
-        )
-    else:
-        # Return JSON for non-HTMX requests (default behavior)
-        return HTMLResponse(
-            content=f"Validation Error: {exc.errors()}", status_code=422
-        )
-
-
-# Mount static files if directory exists
 if os.path.exists("app/static"):
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
 else:
     logger.warning(
         "Static directory 'app/static' not found - static files will not be served"
     )
+
 templates = Jinja2Templates(directory="app/templates")
 
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(
-    repositories.router, prefix="/api/repositories", tags=["repositories"]
+    auth.router,
+    prefix="/auth",
+    tags=["auth"],
 )
+
 app.include_router(
-    repository_stats.router, prefix="/api/repositories", tags=["repository-stats"]
+    repositories.router,
+    prefix="/api/repositories",
+    tags=["repositories"],
 )
-app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
-app.include_router(schedules.router, prefix="/api/schedules", tags=["schedules"])
-app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
-app.include_router(cloud_sync.router, prefix="/api/cloud-sync", tags=["cloud-sync"])
-app.include_router(cleanup.router, prefix="/api/cleanup", tags=["cleanup"])
-app.include_router(backups.router, prefix="/api/backups", tags=["backups"])
+
+app.include_router(
+    repository_stats.router,
+    prefix="/api/repositories",
+    tags=["repository-stats"],
+)
+
+app.include_router(
+    jobs.router,
+    prefix="/api/jobs",
+    tags=["jobs"],
+)
+
+app.include_router(
+    schedules.router,
+    prefix="/api/schedules",
+    tags=["schedules"],
+)
+
+app.include_router(
+    sync.router,
+    prefix="/api/sync",
+    tags=["sync"],
+)
+
+app.include_router(
+    cloud_sync.router,
+    prefix="/api/cloud-sync",
+    tags=["cloud-sync"],
+)
+
+app.include_router(
+    cleanup.router,
+    prefix="/api/cleanup",
+    tags=["cleanup"],
+)
+
+app.include_router(
+    backups.router,
+    prefix="/api/backups",
+    tags=["backups"],
+)
+
 app.include_router(
     repository_check_configs.router,
     prefix="/api/repository-check-configs",
     tags=["repository-check-configs"],
 )
+
 app.include_router(
-    notifications.router, prefix="/api/notifications", tags=["notifications"]
+    notifications.router,
+    prefix="/api/notifications",
+    tags=["notifications"],
 )
-app.include_router(shared.router, prefix="/api/shared", tags=["shared"])
+
+app.include_router(
+    shared.router,
+    prefix="/api/shared",
+    tags=["shared"],
+)
 app.include_router(debug.router)
 
 
@@ -195,11 +188,9 @@ async def root(request: Request, db: Session = Depends(get_db)):
     from fastapi.responses import RedirectResponse
     from app.api.auth import get_current_user_optional
 
-    # Check if user is authenticated
     current_user = get_current_user_optional(request, db)
 
     if not current_user:
-        # Redirect to login if not authenticated
         return RedirectResponse(url="/login", status_code=302)
 
     return templates.TemplateResponse(
@@ -212,11 +203,9 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
     from fastapi.responses import RedirectResponse
     from app.api.auth import get_current_user_optional
 
-    # Check if user is already authenticated
     current_user = get_current_user_optional(request, db)
 
     if current_user:
-        # Redirect to main app if already logged in
         return RedirectResponse(url="/", status_code=302)
 
     return templates.TemplateResponse(request, "login.html", {})

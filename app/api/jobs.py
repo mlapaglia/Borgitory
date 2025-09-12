@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.database import get_db
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
+from app.models.enums import JobType
 from app.dependencies import JobServiceDep
 from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
@@ -31,7 +32,7 @@ async def create_backup(
     is_htmx_request = "hx-request" in request.headers
 
     try:
-        result = await job_svc.create_backup_job(backup_request, db)
+        result = await job_svc.create_backup_job(backup_request, db, JobType.MANUAL_BACKUP)
         job_id = result["job_id"]
 
         if is_htmx_request:

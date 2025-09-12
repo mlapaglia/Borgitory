@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import re
+import inspect
 from typing import Dict, List, Optional, Callable, Any
 from datetime import datetime
 from dataclasses import dataclass
@@ -82,12 +83,18 @@ class JobExecutor:
                 # Parse progress information
                 progress_info = self.parse_progress_line(line_text)
 
-                # Call callbacks if provided
+                # Call callbacks if provided (support both sync and async)
                 if output_callback:
-                    output_callback(line_text, progress_info)
+                    if inspect.iscoroutinefunction(output_callback):
+                        await output_callback(line_text, progress_info)
+                    else:
+                        output_callback(line_text, progress_info)
 
                 if progress_callback and progress_info:
-                    progress_callback(progress_info)
+                    if inspect.iscoroutinefunction(progress_callback):
+                        await progress_callback(progress_info)
+                    else:
+                        progress_callback(progress_info)
 
             # Wait for process completion
             return_code = await process.wait()

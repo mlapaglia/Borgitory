@@ -2,11 +2,15 @@
 <div id="create-form-container" class="repository-form">
     <div id="create-form">
         <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create New Repository</h3>
+        
+        <!-- Status div for trigger templates -->
+        <div id="create-form-status"></div>
+        
         <form 
             hx-post="/api/repositories/" 
             hx-ext="json-enc"
-            hx-target="#create-form-container" 
-            hx-swap="outerHTML"
+            hx-target="#create-form-status" 
+            hx-swap="innerHTML"
             hx-indicator="#create-loading"
         >
             <div class="space-y-4">
