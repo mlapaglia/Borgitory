@@ -98,29 +98,26 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
         
         # For each allowed root, check if normalized target path stays inside allowed root
         for allowed_root_str in allowed_prefixes:
-            allowed_root = Path(allowed_root_str).resolve(strict=False)
+            # Get the realpath of the allowed root
+            allowed_root_real = os.path.realpath(allowed_root_str)
             
-            # Handle absolute vs relative paths correctly
+            # Compose the target path (absolute or relative)
             if os.path.isabs(user_path) or user_path.startswith('/'):
-                # For absolute paths, use as-is (already validated by pre-check)
+                # Use user_path directly
                 target_path = user_path
             else:
-                # For relative paths, join with allowed root
                 target_path = os.path.join(allowed_root_str, user_path)
             
-            # Normalize the target path
-            normalized_path = os.path.normpath(target_path)
-            normalized_path_obj = Path(normalized_path)
+            # Normalize and resolve the target path to its real location
+            target_realpath = os.path.realpath(os.path.normpath(target_path))
             
             try:
-                # For cross-platform compatibility, resolve both paths and compare
-                normalized_resolved = normalized_path_obj.resolve(strict=False)
-                
-                # Check containment after resolution (handles symlinks)
-                normalized_resolved.relative_to(allowed_root)
-                logger.debug(f"Validated path: {user_path} -> {normalized_resolved}")
-                return normalized_resolved
-            except (ValueError, RuntimeError):
+                # Enforce containment: target_realpath starts with allowed_root_real and separator
+                normalized_root = os.path.join(allowed_root_real, '')
+                if target_realpath == allowed_root_real or target_realpath.startswith(normalized_root):
+                    logger.debug(f"Validated path: {user_path} -> {target_realpath}")
+                    return Path(target_realpath)
+            except Exception:
                 continue  # Not under this root, try next
 
         # Path not under any allowed root
