@@ -11,6 +11,6 @@ services:
       # Persistent data storage
       - ./data:/app/app/data
       # Mount your backup sources (adjust as needed)
-      - ./backup-sources:/backup-sources:ro
+      - ./backup-sources:/mnt/backup-sources:ro
       # Borg repository storage (where backups are stored)
-      - ./borg-repos:/my-repos:rw
+      - ./borg-repos:/mnt/my-repos:rw

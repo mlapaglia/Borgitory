@@ -31,6 +31,10 @@ from app.utils.secure_path import (
     get_directory_listing,
     validate_path_within_base,
     PathSecurityError,
+    # User-facing functions for repos/backup sources (only /mnt)
+    user_secure_exists,
+    user_secure_isdir,
+    user_get_directory_listing,
 )
 
 router = APIRouter()
@@ -227,68 +231,24 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/directories")
-async def list_directories(volume_svc: VolumeServiceDep, path: str = "/repos"):
-    """List directories at the given path for autocomplete functionality"""
+async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt"):
+    """List directories at the given path for autocomplete functionality. All paths must be under /mnt."""
     try:
-        mounted_volumes = await volume_svc.get_mounted_volumes()
+        # With /mnt-only security model, we don't need to check mounted volumes
+        # The secure_path utilities will handle validation
+        pass
 
-        allowed = path == "/"
-        if not allowed:
-            for volume in mounted_volumes:
-                if path.startswith(volume):
-                    allowed = True
-                    break
-
-        if not allowed:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Path must be root directory or under one of the mounted volumes: {', '.join(mounted_volumes)}",
-            )
-
-        # Use secure path operations
+        # Use user-facing secure path operations - /mnt only for repos/backup sources
         try:
-            # Validate path is within allowed directories
-            allowed_base_dirs = ["/"] + mounted_volumes if mounted_volumes else ["/"]
-
-            # Normalize the path using secure validation
-            validated_path = validate_path_within_base(path, "/")
-
-            # Check if path exists and is a directory using secure functions
-            if not secure_exists(validated_path, allowed_base_dirs):
+            # Check if path exists and is a directory using user functions (prevents /app/app/data)
+            if not user_secure_exists(path):
                 return {"directories": []}
 
-            if not secure_isdir(validated_path, allowed_base_dirs):
+            if not user_secure_isdir(path):
                 return {"directories": []}
 
-            # Get directory listing using secure function
-            directories = get_directory_listing(
-                validated_path, allowed_base_dirs, include_files=False
-            )
-
-            # For root directory, filter out system directories
-            if path == "/":
-                ignored_dirs = {
-                    "opt",
-                    "home",
-                    "usr",
-                    "var",
-                    "bin",
-                    "sbin",
-                    "lib",
-                    "lib64",
-                    "etc",
-                    "proc",
-                    "sys",
-                    "dev",
-                    "run",
-                    "tmp",
-                    "boot",
-                    "mnt",
-                    "media",
-                    "srv",
-                    "root",
-                }
-                directories = [d for d in directories if d["name"] not in ignored_dirs]
+            # Get directory listing using user function (prevents /app/app/data)
+            directories = user_get_directory_listing(path, include_files=False)
 
             return {"directories": directories}
 
@@ -444,7 +404,7 @@ async def import_repository(
 
         keyfile_path = None
         if keyfile and keyfile.filename:
-            keyfiles_dir = "/app/data/keyfiles"
+            keyfiles_dir = "/app/app/data/keyfiles"  # Store keyfiles with app data
             os.makedirs(keyfiles_dir, exist_ok=True)
 
             try:
@@ -483,7 +443,7 @@ async def import_repository(
 
         if not verification_successful:
             if keyfile_path:
-                secure_remove_file(keyfile_path, ["/app/data/keyfiles"])
+                secure_remove_file(keyfile_path)
             db.delete(db_repo)
             db.commit()
             raise HTTPException(

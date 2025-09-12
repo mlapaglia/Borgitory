@@ -196,8 +196,8 @@ class TestRepositoriesAPI:
 
     @pytest.mark.asyncio
     async def test_list_directories_root(self, async_client: AsyncClient):
-        """Test listing directories at root."""
-        mock_volumes = ["/data", "/backups"]
+        """Test listing directories at /mnt root."""
+        mock_volumes = ["/mnt/data", "/mnt/backups"]
         
         # Create mock service
         mock_volume_service = AsyncMock(spec=VolumeService)
@@ -207,22 +207,35 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
         
         try:
-            with patch('os.path.exists', return_value=True), \
-                 patch('os.path.isdir', return_value=True), \
-                 patch('os.listdir', return_value=["data", "backups", "bin", "etc"]), \
-                 patch('os.path.normpath', side_effect=lambda p: p):  # Keep path as-is
+            from pathlib import Path
+            from unittest.mock import Mock
+            
+            # Mock pathlib.Path methods
+            mock_data = Mock()
+            mock_data.name = "data"
+            mock_data.is_dir.return_value = True
+            mock_data.is_file.return_value = False
+            mock_data.__str__ = Mock(return_value="/mnt/data")
+            
+            mock_backups = Mock()
+            mock_backups.name = "backups"
+            mock_backups.is_dir.return_value = True
+            mock_backups.is_file.return_value = False
+            mock_backups.__str__ = Mock(return_value="/mnt/backups")
+            
+            with patch('pathlib.Path.exists', return_value=True), \
+                 patch('pathlib.Path.is_dir', return_value=True), \
+                 patch('pathlib.Path.iterdir', return_value=[mock_data, mock_backups]):
                 
-                response = await async_client.get("/api/repositories/directories?path=/")
+                response = await async_client.get("/api/repositories/directories?path=/mnt")
                 
                 assert response.status_code == 200
                 response_data = response.json()
                 directories = response_data["directories"]
-                # Should filter out system directories like bin, etc
+                # All directories under /mnt should be allowed
                 dir_names = [d["name"] for d in directories]
                 assert "data" in dir_names
                 assert "backups" in dir_names
-                assert "bin" not in dir_names
-                assert "etc" not in dir_names
         finally:
             # Clean up
             if get_volume_service in app.dependency_overrides:
@@ -230,8 +243,8 @@ class TestRepositoriesAPI:
 
     @pytest.mark.asyncio
     async def test_list_directories_valid_path(self, async_client: AsyncClient):
-        """Test listing directories at valid path."""
-        mock_volumes = ["/data"]
+        """Test listing directories at valid path under /mnt."""
+        mock_volumes = ["/mnt/data"]
         
         # Create mock service
         mock_volume_service = AsyncMock(spec=VolumeService)
@@ -241,11 +254,27 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
         
         try:
-            with patch('os.path.exists', return_value=True), \
-                 patch('os.path.isdir', return_value=True), \
-                 patch('os.listdir', return_value=["subdir1", "subdir2"]):
+            from pathlib import Path
+            from unittest.mock import Mock
+            
+            # Mock pathlib.Path methods
+            mock_subdir1 = Mock()
+            mock_subdir1.name = "subdir1"
+            mock_subdir1.is_dir.return_value = True
+            mock_subdir1.is_file.return_value = False
+            mock_subdir1.__str__ = Mock(return_value="/mnt/data/subdir1")
+            
+            mock_subdir2 = Mock()
+            mock_subdir2.name = "subdir2"
+            mock_subdir2.is_dir.return_value = True
+            mock_subdir2.is_file.return_value = False
+            mock_subdir2.__str__ = Mock(return_value="/mnt/data/subdir2")
+            
+            with patch('pathlib.Path.exists', return_value=True), \
+                 patch('pathlib.Path.is_dir', return_value=True), \
+                 patch('pathlib.Path.iterdir', return_value=[mock_subdir1, mock_subdir2]):
                 
-                response = await async_client.get("/api/repositories/directories?path=/data")
+                response = await async_client.get("/api/repositories/directories?path=/mnt/data")
                 
                 assert response.status_code == 200
                 response_data = response.json()
@@ -324,8 +353,9 @@ class TestRepositoriesAPI:
         try:
             response = await async_client.get("/api/repositories/directories?path=/invalid")
             
-            assert response.status_code == 500  # API catches HTTPException and converts to 500
-            assert "Path must be root directory or under one of the mounted volumes" in response.json()["detail"]
+            # With /mnt-only security model, invalid paths return empty directories
+            assert response.status_code == 200
+            assert response.json()["directories"] == []
         finally:
             # Clean up
             if get_volume_service in app.dependency_overrides:
