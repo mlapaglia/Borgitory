@@ -42,8 +42,8 @@ def register_user(
         if user_count > 0:
             return templates.TemplateResponse(
                 request,
-                "partials/auth/register_error.html",
-                {"error_message": "Registration is closed"},
+                "partials/shared/notification.html",
+                {"type": "error", "message": "Registration is closed"},
                 status_code=403,
             )
 
@@ -52,8 +52,8 @@ def register_user(
         if existing_user:
             return templates.TemplateResponse(
                 request,
-                "partials/auth/register_error.html",
-                {"error_message": "Username already exists"},
+                "partials/shared/notification.html",
+                {"type": "error", "message": "Username already exists"},
                 status_code=400,
             )
 
@@ -61,16 +61,16 @@ def register_user(
         if not username or len(username.strip()) < 3:
             return templates.TemplateResponse(
                 request,
-                "partials/auth/register_error.html",
-                {"error_message": "Username must be at least 3 characters"},
+                "partials/shared/notification.html",
+                {"type": "error", "message": "Username must be at least 3 characters"},
                 status_code=400,
             )
 
         if not password or len(password) < 6:
             return templates.TemplateResponse(
                 request,
-                "partials/auth/register_error.html",
-                {"error_message": "Password must be at least 6 characters"},
+                "partials/shared/notification.html",
+                {"type": "error", "message": "Password must be at least 6 characters"},
                 status_code=400,
             )
 
@@ -84,14 +84,15 @@ def register_user(
 
         # Return success response
         return templates.TemplateResponse(
-            request, "partials/auth/register_success.html", {}
+            request, "partials/shared/notification.html", 
+            {"type": "success", "message": "Registration successful! You can now log in."}
         )
 
     except Exception as e:
         return templates.TemplateResponse(
             request,
-            "partials/auth/register_error.html",
-            {"error_message": f"Registration failed: {str(e)}"},
+            "partials/shared/notification.html",
+            {"type": "error", "message": f"Registration failed: {str(e)}"},
             status_code=500,
         )
 
@@ -111,8 +112,8 @@ def login_user(
         if not user or not user.verify_password(password):
             return templates.TemplateResponse(
                 request,
-                "partials/auth/login_error.html",
-                {"error_message": "Invalid username or password"},
+                "partials/shared/notification.html",
+                {"type": "error", "message": "Invalid username or password"},
                 status_code=401,
             )
 
@@ -154,9 +155,10 @@ def login_user(
         user.last_login = current_time
         db.commit()
 
-        # Create success template response and set cookie
+        # Create success template response with redirect and set cookie
         success_response = templates.TemplateResponse(
-            request, "partials/auth/login_success.html", {}
+            request, "partials/shared/notification.html", 
+            {"type": "success", "message": "Login successful! Redirecting...", "redirect_url": "/", "redirect_delay": 1000}
         )
         success_response.set_cookie(
             key="auth_token",
@@ -171,8 +173,8 @@ def login_user(
     except Exception as e:
         return templates.TemplateResponse(
             request,
-            "partials/auth/login_error.html",
-            {"error_message": f"Login failed: {str(e)}"},
+            "partials/shared/notification.html",
+            {"type": "error", "message": f"Login failed: {str(e)}"},
             status_code=500,
         )
 
