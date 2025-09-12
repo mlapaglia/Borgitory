@@ -18,7 +18,6 @@ from app.utils.secure_path import (
     validate_secure_path,
     validate_mnt_path,
     _pre_validate_user_input,
-    PathSecurityError,
 )
 
 
