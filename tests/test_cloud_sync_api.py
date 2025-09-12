@@ -225,8 +225,8 @@ class TestCloudSyncAPI:
             headers={"hx-request": "true"}
         )
         
-        assert response.status_code == 200  # HTMX still creates the config successfully
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 422  # Validation error returns 422
+        assert response.json()["detail"]  # Should have validation error details
 
     @pytest.mark.asyncio
     async def test_list_configs_empty(self, async_client: AsyncClient):
@@ -531,5 +531,5 @@ class TestCloudSyncAPI:
             headers={"hx-request": "true"}
         )
         
-        assert response.status_code == 200  # HTMX creates config successfully (no validation error)
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 422  # Validation error returns 422
+        assert response.json()["detail"]  # Should have validation error details

@@ -32,7 +32,9 @@ async def create_backup(
     is_htmx_request = "hx-request" in request.headers
 
     try:
-        result = await job_svc.create_backup_job(backup_request, db, JobType.MANUAL_BACKUP)
+        result = await job_svc.create_backup_job(
+            backup_request, db, JobType.MANUAL_BACKUP
+        )
         job_id = result["job_id"]
 
         if is_htmx_request:

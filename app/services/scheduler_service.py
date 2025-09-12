@@ -10,7 +10,6 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 from app.config import DATABASE_URL
 from app.models.database import Schedule
-from app.models.enums import JobType
 from app.utils.db_session import get_db_session
 
 # Configure APScheduler logging only (don't override main basicConfig)
@@ -59,7 +58,7 @@ async def execute_scheduled_backup(schedule_id: int):
 
             # Create a backup request object to use with JobService
             from app.models.schemas import BackupRequest
-            
+
             backup_request = BackupRequest(
                 repository_id=repository.id,
                 source_path=schedule.source_path,
@@ -74,9 +73,11 @@ async def execute_scheduled_backup(schedule_id: int):
             # Use JobService to create the backup job (unified path)
             from app.services.job_service import JobService
             from app.models.enums import JobType
-            
+
             job_service = JobService()
-            result = await job_service.create_backup_job(backup_request, db, JobType.SCHEDULED_BACKUP)
+            result = await job_service.create_backup_job(
+                backup_request, db, JobType.SCHEDULED_BACKUP
+            )
             job_id = result["job_id"]
 
             logger.info(

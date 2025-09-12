@@ -53,19 +53,15 @@ class BorgJob:
     return_code: Optional[int] = None
     error: Optional[str] = None
 
-    # For backward compatibility - single command jobs
     command: Optional[List[str]] = None
 
-    # Multi-task job support
     job_type: str = "simple"  # 'simple' or 'composite'
     tasks: List[BorgJobTask] = field(default_factory=list)
     current_task_index: int = 0
 
-    # Repository context
     repository_id: Optional[int] = None
     schedule: Optional["Schedule"] = None
 
-    # Configuration IDs for composite jobs
     cloud_sync_config_id: Optional[int] = None
 
     def get_current_task(self) -> Optional[BorgJobTask]:
@@ -93,13 +89,11 @@ class ModularBorgJobManager:
     ):
         self.config = config or JobManagerConfig()
 
-        # Initialize dependencies
         if dependencies is None:
             dependencies = get_default_job_manager_dependencies()
 
         self.dependencies = dependencies
 
-        # Core modules
         self.executor = dependencies.job_executor
         self.output_manager = dependencies.output_manager
         self.queue_manager = dependencies.queue_manager
@@ -107,15 +101,12 @@ class ModularBorgJobManager:
         self.database_manager = dependencies.database_manager
         self.cloud_coordinator = dependencies.cloud_coordinator
 
-        # Job tracking
         self.jobs: Dict[str, BorgJob] = {}
         self._processes: Dict[str, asyncio.subprocess.Process] = {}
 
-        # State management
         self._initialized = False
         self._shutdown_requested = False
 
-        # Set up callbacks
         self._setup_callbacks()
 
     def _setup_callbacks(self):
@@ -131,7 +122,6 @@ class ModularBorgJobManager:
         if self._initialized:
             return
 
-        # Initialize all modules
         if self.queue_manager:
             await self.queue_manager.initialize()
 
@@ -149,7 +139,6 @@ class ModularBorgJobManager:
 
         job_id = str(uuid.uuid4())
 
-        # Create job
         job = BorgJob(
             id=job_id,
             command=command,
@@ -159,19 +148,15 @@ class ModularBorgJobManager:
         )
         self.jobs[job_id] = job
 
-        # Create output container
         self.output_manager.create_job_output(job_id)
 
         if is_backup:
-            # Queue backup job
             await self.queue_manager.enqueue_job(
                 job_id=job_id, job_type="backup", priority=JobPriority.NORMAL
             )
         else:
-            # Execute immediately for non-backup jobs
             await self._execute_simple_job(job, command, env)
 
-        # Broadcast job started event
         self.event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
@@ -187,32 +172,26 @@ class ModularBorgJobManager:
         job.status = "running"
 
         try:
-            # Start process
             process = await self.executor.start_process(command, env)
             self._processes[job.id] = process
 
-            # Monitor output
             def output_callback(line: str, progress: Dict):
-                # Add to output manager
                 asyncio.create_task(
                     self.output_manager.add_output_line(
                         job.id, line, "stdout", progress
                     )
                 )
 
-                # Broadcast output
                 self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={"line": line, "progress": progress},
                 )
 
-            # Execute and monitor
             result = await self.executor.monitor_process_output(
                 process, output_callback=output_callback
             )
 
-            # Update job with results
             job.status = "completed" if result.return_code == 0 else "failed"
             job.return_code = result.return_code
             job.completed_at = datetime.now(UTC)
@@ -220,7 +199,6 @@ class ModularBorgJobManager:
             if result.error:
                 job.error = result.error
 
-            # Broadcast completion
             self.event_broadcaster.broadcast_event(
                 EventType.JOB_COMPLETED
                 if job.status == "completed"
@@ -240,11 +218,9 @@ class ModularBorgJobManager:
             )
 
         finally:
-            # Clean up process
             if job.id in self._processes:
                 del self._processes[job.id]
 
-            # Schedule auto cleanup
             asyncio.create_task(
                 self._auto_cleanup_job(job.id, self.config.auto_cleanup_delay_seconds)
             )
@@ -253,7 +229,6 @@ class ModularBorgJobManager:
         """Callback when queue manager starts a job"""
         job = self.jobs.get(job_id)
         if job and job.command:
-            # Start executing the job
             asyncio.create_task(self._execute_simple_job(job, job.command))
 
     def _on_job_complete(self, job_id: str, success: bool):
@@ -275,7 +250,6 @@ class ModularBorgJobManager:
 
         job_id = str(uuid.uuid4())
 
-        # Create tasks
         tasks = []
         for task_def in task_definitions:
             task = BorgJobTask(
@@ -285,7 +259,6 @@ class ModularBorgJobManager:
             )
             tasks.append(task)
 
-        # Create job
         job = BorgJob(
             id=job_id,
             job_type="composite",
@@ -298,7 +271,6 @@ class ModularBorgJobManager:
         )
         self.jobs[job_id] = job
 
-        # Create database record
         if self.database_manager:
             db_job_data = DatabaseJobData(
                 job_uuid=job_id,
@@ -308,24 +280,19 @@ class ModularBorgJobManager:
                 started_at=job.started_at,
                 cloud_sync_config_id=cloud_sync_config_id,
             )
-            # Create database job record (UUID is already set as job.id)
+
             await self.database_manager.create_database_job(db_job_data)
 
-            # Save all tasks to database before starting execution
-            # This ensures task structure exists even if job is interrupted
             try:
                 await self.database_manager.save_job_tasks(job_id, job.tasks)
                 logger.info(f"Pre-saved {len(job.tasks)} tasks for job {job_id}")
             except Exception as e:
                 logger.error(f"Failed to pre-save tasks for job {job_id}: {e}")
 
-        # Create output container
         self.output_manager.create_job_output(job_id)
 
-        # Start executing composite job
         asyncio.create_task(self._execute_composite_job(job))
 
-        # Broadcast job started
         self.event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
@@ -338,18 +305,17 @@ class ModularBorgJobManager:
         """Execute a composite job with multiple tasks"""
         job.status = "running"
 
-        # Track if critical tasks have failed to determine notification behavior
         critical_tasks_failed = False
-        
-        # Log task information for debugging
+
         task_summary = [f"{task.task_type}:{task.task_name}" for task in job.tasks]
-        logger.info(f"📋 Job {job.id} has {len(job.tasks)} tasks: {', '.join(task_summary)}")
+        logger.info(
+            f"📋 Job {job.id} has {len(job.tasks)} tasks: {', '.join(task_summary)}"
+        )
 
         try:
             for i, task in enumerate(job.tasks):
                 job.current_task_index = i
-                
-                # Skip critical tasks if previous critical tasks failed, but allow notification tasks
+
                 if critical_tasks_failed and task.task_type != "notification":
                     task.status = "skipped"
                     task.completed_at = datetime.now(UTC)
@@ -357,8 +323,7 @@ class ModularBorgJobManager:
                         f"⏭️ Task {i + 1}/{len(job.tasks)} skipped: {task.task_name} (due to previous failures)"
                     )
                     continue
-                    
-                # Log when notification tasks are allowed to proceed despite failures
+
                 if critical_tasks_failed and task.task_type == "notification":
                     logger.info(
                         f"🔔 Task {i + 1}/{len(job.tasks)} proceeding despite failures: {task.task_name} (notification task)"
@@ -367,11 +332,10 @@ class ModularBorgJobManager:
                 logger.info(
                     f"🔄 Starting task {i + 1}/{len(job.tasks)}: {task.task_name}"
                 )
-                
+
                 task.status = "running"
                 task.started_at = datetime.now(UTC)
 
-                # Broadcast task started
                 self.event_broadcaster.broadcast_event(
                     EventType.JOB_PROGRESS,
                     job_id=job.id,
@@ -383,7 +347,6 @@ class ModularBorgJobManager:
                 )
 
                 try:
-                    # Execute task based on type
                     success = await self._execute_task(job, task, i)
 
                     task.completed_at = datetime.now(UTC)
@@ -391,23 +354,23 @@ class ModularBorgJobManager:
 
                     if success:
                         logger.info(
-                            f"✅ Task {i + 1}/{len(job.tasks)} completed: {task.task_name}"
+                            f"Task {i + 1}/{len(job.tasks)} completed: {task.task_name}"
                         )
                     else:
                         logger.error(
-                            f"❌ Task {i + 1}/{len(job.tasks)} failed: {task.task_name}"
+                            f"Task {i + 1}/{len(job.tasks)} failed: {task.task_name}"
                         )
-                        
+
                         # Mark critical tasks as failed, but continue for notifications
                         if task.task_type != "notification":
                             critical_tasks_failed = True
-                            
+
                 except Exception as e:
-                    logger.error(f"❌ Exception in task {task.task_name}: {str(e)}")
+                    logger.error(f"Exception in task {task.task_name}: {str(e)}")
                     task.status = "failed"
                     task.completed_at = datetime.now(UTC)
                     task.error = str(e)
-                    
+
                     # Mark critical tasks as failed, but continue for notifications
                     if task.task_type != "notification":
                         critical_tasks_failed = True
@@ -415,11 +378,13 @@ class ModularBorgJobManager:
             # Determine final job status based on whether critical tasks failed
             if critical_tasks_failed:
                 job.status = "failed"
-                logger.info(f"💥 Composite job {job.id} completed with failures, but notifications were processed")
+                logger.info(
+                    f"Composite job {job.id} completed with failures, but notifications were processed"
+                )
             else:
                 job.status = "completed"
-                logger.info(f"🎉 Composite job {job.id} completed successfully")
-                
+                logger.info(f"Composite job {job.id} completed successfully")
+
             job.completed_at = datetime.now(UTC)
 
             # Update database
@@ -518,7 +483,9 @@ class ModularBorgJobManager:
             )
 
             # Broadcast to SSE listeners
-            await self.output_manager.add_output_line(job.id, line, progress_info=progress_info)
+            await self.output_manager.add_output_line(
+                job.id, line, progress_info=progress_info
+            )
             if self.event_broadcaster:
                 from app.services.job_event_broadcaster import EventType
 
@@ -529,24 +496,29 @@ class ModularBorgJobManager:
                 )
 
         # Build backup command
-        from app.utils.security import build_secure_borg_command, validate_compression, validate_archive_name
+        from app.utils.security import (
+            build_secure_borg_command,
+            validate_compression,
+            validate_archive_name,
+        )
         from datetime import datetime
 
         source_path = task.parameters.get("source_path", "/data")
         compression = task.parameters.get("compression", "zstd")
         dry_run = task.parameters.get("dry_run", False)
-        
+
         # Validate parameters
         validate_compression(compression)
-        
+
         # Create archive name
         archive_name = f"backup-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         validate_archive_name(archive_name)
 
         additional_args = [
-            "--compression", compression,
+            "--compression",
+            compression,
             "--stats",
-            "--progress", 
+            "--progress",
             "--json",
             "--verbose",
             "--list",
@@ -568,7 +540,7 @@ class ModularBorgJobManager:
         try:
             # Start the process
             process = await self.executor.start_process(command, env)
-            
+
             # Monitor output and wait for completion
             result = await self.executor.monitor_process_output(
                 process=process,
@@ -677,7 +649,9 @@ class ModularBorgJobManager:
             )
 
             # Broadcast to SSE listeners
-            await self.output_manager.add_output_line(job.id, line, progress_info=progress_info)
+            await self.output_manager.add_output_line(
+                job.id, line, progress_info=progress_info
+            )
             if self.event_broadcaster:
                 from app.services.job_event_broadcaster import EventType
 
@@ -735,7 +709,7 @@ class ModularBorgJobManager:
         try:
             # Start the process
             process = await self.executor.start_process(command, env)
-            
+
             # Monitor output and wait for completion
             result = await self.executor.monitor_process_output(
                 process=process,
@@ -851,30 +825,40 @@ class ModularBorgJobManager:
                 )
 
                 if not notification_config or not notification_config.enabled:
-                    logger.info("Notification configuration not found or disabled - skipping")
+                    logger.info(
+                        "Notification configuration not found or disabled - skipping"
+                    )
                     task.status = "skipped"
                     task.return_code = 0
                     return True
 
                 # Determine if we should send notification based on job status
                 previous_tasks = job.tasks[:task_index] if task_index > 0 else []
-                job_success = all(t.status == "completed" for t in previous_tasks if t.task_type != "notification")
-                
+                job_success = all(
+                    t.status == "completed"
+                    for t in previous_tasks
+                    if t.task_type != "notification"
+                )
+
                 notify_on_success = task.parameters.get("notify_on_success", True)
                 notify_on_failure = task.parameters.get("notify_on_failure", True)
-                
-                should_notify = (
-                    job_success and notify_on_success
-                ) or (not job_success and notify_on_failure)
+
+                should_notify = (job_success and notify_on_success) or (
+                    not job_success and notify_on_failure
+                )
 
                 if not should_notify:
-                    logger.info("Notification not configured for current job status - skipping")
+                    logger.info(
+                        "Notification not configured for current job status - skipping"
+                    )
                     task.status = "skipped"
                     task.return_code = 0
                     return True
 
                 # Add initial output
-                initial_output = f"Sending notification via {notification_config.provider}"
+                initial_output = (
+                    f"Sending notification via {notification_config.provider}"
+                )
                 task.output_lines.append(
                     {"timestamp": datetime.now().isoformat(), "text": initial_output}
                 )
@@ -911,7 +895,12 @@ class ModularBorgJobManager:
             return False
 
     async def _send_pushover_notification(
-        self, config, job: BorgJob, repo_data: dict, task: BorgJobTask, job_success: bool
+        self,
+        config,
+        job: BorgJob,
+        repo_data: dict,
+        task: BorgJobTask,
+        job_success: bool,
     ) -> bool:
         """Send notification via Pushover"""
         try:
@@ -921,7 +910,9 @@ class ModularBorgJobManager:
             # Decrypt credentials
             cipher_suite = get_cipher_suite()
             user_key = cipher_suite.decrypt(config.encrypted_user_key.encode()).decode()
-            app_token = cipher_suite.decrypt(config.encrypted_app_token.encode()).decode()
+            app_token = cipher_suite.decrypt(
+                config.encrypted_app_token.encode()
+            ).decode()
 
             # Create message
             status_emoji = "✅" if job_success else "❌"
@@ -944,7 +935,9 @@ class ModularBorgJobManager:
                 if response.status_code == 200:
                     return True
                 else:
-                    error_msg = f"Pushover API error: {response.status_code} - {response.text}"
+                    error_msg = (
+                        f"Pushover API error: {response.status_code} - {response.text}"
+                    )
                     task.error = error_msg
                     task.output_lines.append(
                         {"timestamp": datetime.now().isoformat(), "text": error_msg}

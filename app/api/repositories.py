@@ -46,7 +46,7 @@ async def create_repository(
             if is_htmx_request:
                 return templates.TemplateResponse(
                     request,
-                    "partials/repositories/form_create_error_trigger.html",
+                    "partials/repositories/form_create_error.html",
                     {"error_message": error_msg},
                     status_code=200,
                 )
@@ -59,7 +59,7 @@ async def create_repository(
             if is_htmx_request:
                 return templates.TemplateResponse(
                     request,
-                    "partials/repositories/form_create_error_trigger.html",
+                    "partials/repositories/form_create_error.html",
                     {"error_message": error_msg},
                     status_code=200,
                 )
@@ -92,7 +92,7 @@ async def create_repository(
                 if is_htmx_request:
                     return templates.TemplateResponse(
                         request,
-                        "partials/repositories/form_create_error_trigger.html",
+                        "partials/repositories/form_create_error.html",
                         {"error_message": error_msg},
                         status_code=200,
                     )
@@ -105,7 +105,7 @@ async def create_repository(
             if is_htmx_request:
                 return templates.TemplateResponse(
                     request,
-                    "partials/repositories/form_create_error_trigger.html",
+                    "partials/repositories/form_create_error.html",
                     {"error_message": error_msg},
                     status_code=200,
                 )
@@ -123,7 +123,7 @@ async def create_repository(
             # Trigger repository list update and return success trigger
             response = templates.TemplateResponse(
                 request,
-                "partials/repositories/form_create_success_trigger.html",
+                "partials/repositories/form_create_success.html",
                 {"repository_name": repo.name},
             )
             response.headers["HX-Trigger"] = "repositoryUpdate"
@@ -136,7 +136,7 @@ async def create_repository(
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
-                "partials/repositories/form_create_error_trigger.html",
+                "partials/repositories/form_create_error.html",
                 {"error_message": str(e.detail)},
                 status_code=200,
             )
@@ -147,7 +147,7 @@ async def create_repository(
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
-                "partials/repositories/form_create_error_trigger.html",
+                "partials/repositories/form_create_error.html",
                 {"error_message": error_msg},
                 status_code=200,
             )
@@ -384,17 +384,13 @@ async def update_import_form(
 @router.get("/import-form", response_class=HTMLResponse)
 async def get_import_form(request: Request):
     """Get the import repository form"""
-    return templates.TemplateResponse(
-        request, "partials/repositories/form_import.html"
-    )
+    return templates.TemplateResponse(request, "partials/repositories/form_import.html")
 
 
 @router.get("/create-form", response_class=HTMLResponse)
 async def get_create_form(request: Request):
     """Get the create repository form"""
-    return templates.TemplateResponse(
-        request, "partials/repositories/form_create.html"
-    )
+    return templates.TemplateResponse(request, "partials/repositories/form_create.html")
 
 
 @router.post("/import")
@@ -418,7 +414,7 @@ async def import_repository(
             if is_htmx_request:
                 return templates.TemplateResponse(
                     request,
-                    "partials/repositories/form_import_error_trigger.html",
+                    "partials/repositories/form_import_error.html",
                     {"error_message": error_msg},
                     status_code=200,
                 )
@@ -431,7 +427,7 @@ async def import_repository(
             if is_htmx_request:
                 return templates.TemplateResponse(
                     request,
-                    "partials/repositories/form_import_error_trigger.html",
+                    "partials/repositories/form_import_error.html",
                     {"error_message": error_msg},
                     status_code=200,
                 )
@@ -498,7 +494,7 @@ async def import_repository(
             # Trigger repository list update and return success trigger
             response = templates.TemplateResponse(
                 request,
-                "partials/repositories/form_import_success_trigger.html",
+                "partials/repositories/form_import_success.html",
                 {"repository_name": name},
             )
             response.headers["HX-Trigger"] = "repositoryUpdate"
@@ -511,7 +507,7 @@ async def import_repository(
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
-                "partials/repositories/form_import_error_trigger.html",
+                "partials/repositories/form_import_error.html",
                 {"error_message": str(e.detail)},
                 status_code=200,
             )
@@ -522,7 +518,7 @@ async def import_repository(
         if is_htmx_request:
             return templates.TemplateResponse(
                 request,
-                "partials/repositories/form_import_error_trigger.html",
+                "partials/repositories/form_import_error.html",
                 {"error_message": error_msg},
                 status_code=200,
             )

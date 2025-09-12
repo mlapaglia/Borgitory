@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 from app.services.scheduler_service import SchedulerService, execute_scheduled_backup
 from app.models.database import Schedule, CleanupConfig, RepositoryCheckConfig
-from app.models.enums import JobType
 
 
 class TestSchedulerService:
@@ -319,7 +318,7 @@ class TestExecuteScheduledBackup:
             assert backup_request.repository_id == 1
             assert backup_request.source_path == "/test/source"
             assert backup_request.compression == "zstd"
-            assert backup_request.dry_run == False
+            assert not backup_request.dry_run
     
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_with_cleanup(self):

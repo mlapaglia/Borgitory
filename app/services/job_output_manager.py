@@ -57,7 +57,6 @@ class JobOutputManager:
         logger.debug(f"Created output container for job {job_id}")
         return job_output
 
-
     async def add_output_line(
         self,
         job_id: str,
