@@ -108,7 +108,7 @@ class TestJobsAPI:
         # Mock successful service response
         mock_job_service.create_backup_job.return_value = {"job_id": "test-job-123", "status": "started"}
 
-        result = await create_backup(
+        await create_backup(
             sample_backup_request, mock_request, mock_job_service, mock_templates
         )
 
@@ -170,7 +170,7 @@ class TestJobsAPI:
         # Mock successful service response
         mock_job_service.create_prune_job.return_value = {"job_id": "prune-job-456", "status": "started"}
 
-        result = await create_prune_job(
+        await create_prune_job(
             mock_request, sample_prune_request, mock_job_service, mock_templates
         )
 
@@ -232,7 +232,7 @@ class TestJobsAPI:
         # Mock successful service response
         mock_job_service.create_check_job.return_value = {"job_id": "check-job-789", "status": "started"}
 
-        result = await create_check_job(
+        await create_check_job(
             mock_request, sample_check_request, mock_job_service, mock_templates
         )
 
@@ -514,7 +514,7 @@ class TestJobsAPI:
         mock_job = {"id": "test-job", "expand_details": True}
         mock_render_service.get_job_for_render.return_value = mock_job
 
-        result = await toggle_job_details(
+        await toggle_job_details(
             "test-job", mock_request, mock_render_service, mock_templates, mock_job_service, expanded="false"
         )
 
