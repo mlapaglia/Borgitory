@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import List
 from fastapi import (
     APIRouter,
@@ -20,28 +19,19 @@ from app.models.schemas import (
     RepositoryCreate,
     RepositoryUpdate,
 )
-from app.dependencies import BorgServiceDep, SchedulerServiceDep, VolumeServiceDep, RepositoryServiceDep
+from app.dependencies import BorgServiceDep, VolumeServiceDep, RepositoryServiceDep
 from app.models.repository_dtos import (
     CreateRepositoryRequest,
     ImportRepositoryRequest,
     RepositoryScanRequest,
     DeleteRepositoryRequest,
-    ArchiveListingResult,
-    DirectoryListingRequest,
-    ArchiveContentsRequest,
-    RepositoryInfoRequest,
 )
 from app.utils.template_responses import (
     RepositoryResponseHandler,
     ArchiveResponseHandler,
-    DirectoryResponseHandler,
-    GeneralResponseHandler,
 )
 from app.api.auth import get_current_user
 from app.utils.secure_path import (
-    create_secure_filename,
-    secure_path_join,
-    secure_remove_file,
     PathSecurityError,
     # User-facing functions for repos/backup sources (only /mnt)
     user_secure_exists,

@@ -5,7 +5,7 @@ Handles all repository-related business operations independent of HTTP concerns.
 
 import logging
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
 

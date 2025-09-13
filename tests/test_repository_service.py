@@ -16,7 +16,6 @@ from app.models.repository_dtos import (
     RepositoryScanRequest,
     DeleteRepositoryRequest,
 )
-from app.models.database import Repository, Job, Schedule, User
 
 
 class TestRepositoryService:
