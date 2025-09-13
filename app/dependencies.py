@@ -2,7 +2,6 @@
 FastAPI dependency providers for the application.
 """
 
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -26,142 +25,186 @@ from app.services.repository_parser import RepositoryParser
 from app.services.borg_command_builder import BorgCommandBuilder
 from app.services.archive_manager import ArchiveManager
 from app.services.cloud_sync_manager import CloudSyncManager
+from app.services.repository_service import RepositoryService
 from app.services.job_event_broadcaster import (
     JobEventBroadcaster,
     get_job_event_broadcaster,
 )
 
 
-@lru_cache()
+# Global singleton instances
+_simple_command_runner_instance = None
+
 def get_simple_command_runner() -> SimpleCommandRunner:
     """
-    Provide a SimpleCommandRunner instance.
+    Provide a SimpleCommandRunner singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return SimpleCommandRunner()
+    global _simple_command_runner_instance
+    if _simple_command_runner_instance is None:
+        _simple_command_runner_instance = SimpleCommandRunner()
+    return _simple_command_runner_instance
 
 
-@lru_cache()
+_borg_service_instance = None
+
 def get_borg_service() -> BorgService:
     """
-    Provide a BorgService instance with proper dependency injection.
+    Provide a BorgService singleton instance with proper dependency injection.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern with dependency injection.
     """
-    return BorgService(command_runner=get_simple_command_runner())
+    global _borg_service_instance
+    if _borg_service_instance is None:
+        command_runner = get_simple_command_runner()
+        volume_service = get_volume_service()
+        _borg_service_instance = BorgService(
+            command_runner=command_runner,
+            volume_service=volume_service
+        )
+    return _borg_service_instance
 
 
-@lru_cache()
+_job_service_instance = None
+
 def get_job_service() -> JobService:
     """
-    Provide a JobService instance with proper dependency injection.
+    Provide a JobService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return JobService()
+    global _job_service_instance
+    if _job_service_instance is None:
+        _job_service_instance = JobService()
+    return _job_service_instance
 
 
-@lru_cache()
+_recovery_service_instance = None
+
 def get_recovery_service() -> RecoveryService:
     """
-    Provide a RecoveryService instance with proper dependency injection.
+    Provide a RecoveryService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return RecoveryService()
+    global _recovery_service_instance
+    if _recovery_service_instance is None:
+        _recovery_service_instance = RecoveryService()
+    return _recovery_service_instance
 
 
-@lru_cache()
+_pushover_service_instance = None
+
 def get_pushover_service() -> PushoverService:
     """
-    Provide a PushoverService instance with proper dependency injection.
+    Provide a PushoverService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return PushoverService()
+    global _pushover_service_instance
+    if _pushover_service_instance is None:
+        _pushover_service_instance = PushoverService()
+    return _pushover_service_instance
 
 
-@lru_cache()
+_job_stream_service_instance = None
+
 def get_job_stream_service() -> JobStreamService:
     """
-    Provide a JobStreamService instance with proper dependency injection.
+    Provide a JobStreamService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return JobStreamService()
+    global _job_stream_service_instance
+    if _job_stream_service_instance is None:
+        _job_stream_service_instance = JobStreamService()
+    return _job_stream_service_instance
 
 
-@lru_cache()
+_job_render_service_instance = None
+
 def get_job_render_service() -> JobRenderService:
     """
-    Provide a JobRenderService instance with proper dependency injection.
+    Provide a JobRenderService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return JobRenderService()
+    global _job_render_service_instance
+    if _job_render_service_instance is None:
+        _job_render_service_instance = JobRenderService()
+    return _job_render_service_instance
 
 
-@lru_cache()
+_debug_service_instance = None
+
 def get_debug_service() -> DebugService:
     """
-    Provide a DebugService instance with proper dependency injection.
+    Provide a DebugService singleton instance with proper dependency injection.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern with dependency injection.
     """
-    return DebugService()
+    global _debug_service_instance
+    if _debug_service_instance is None:
+        volume_service = get_volume_service()
+        _debug_service_instance = DebugService(volume_service=volume_service)
+    return _debug_service_instance
 
 
-@lru_cache()
+_rclone_service_instance = None
+
 def get_rclone_service() -> RcloneService:
     """
-    Provide a RcloneService instance with proper dependency injection.
+    Provide a RcloneService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return RcloneService()
+    global _rclone_service_instance
+    if _rclone_service_instance is None:
+        _rclone_service_instance = RcloneService()
+    return _rclone_service_instance
 
 
-@lru_cache()
+_repository_stats_service_instance = None
+
 def get_repository_stats_service() -> RepositoryStatsService:
     """
-    Provide a RepositoryStatsService instance with proper dependency injection.
+    Provide a RepositoryStatsService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return RepositoryStatsService()
+    global _repository_stats_service_instance
+    if _repository_stats_service_instance is None:
+        _repository_stats_service_instance = RepositoryStatsService()
+    return _repository_stats_service_instance
 
 
-@lru_cache()
+_scheduler_service_instance = None
+
 def get_scheduler_service() -> SchedulerService:
     """
-    Provide a SchedulerService instance with proper dependency injection.
+    Provide a SchedulerService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return SchedulerService()
+    global _scheduler_service_instance
+    if _scheduler_service_instance is None:
+        _scheduler_service_instance = SchedulerService()
+    return _scheduler_service_instance
 
 
-@lru_cache()
+_volume_service_instance = None
+
 def get_volume_service() -> VolumeService:
     """
-    Provide a VolumeService instance with proper dependency injection.
+    Provide a VolumeService singleton instance.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return VolumeService()
+    global _volume_service_instance
+    if _volume_service_instance is None:
+        _volume_service_instance = VolumeService()
+    return _volume_service_instance
 
 
 def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinitionBuilder:
@@ -173,50 +216,88 @@ def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinition
     return TaskDefinitionBuilder(db)
 
 
-@lru_cache()
+_repository_parser_instance = None
+
 def get_repository_parser() -> RepositoryParser:
     """
-    Provide a RepositoryParser instance with proper dependency injection.
+    Provide a RepositoryParser singleton instance with proper dependency injection.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern with dependency injection.
     """
-    return RepositoryParser(command_runner=get_simple_command_runner())
+    global _repository_parser_instance
+    if _repository_parser_instance is None:
+        command_runner = get_simple_command_runner()
+        _repository_parser_instance = RepositoryParser(command_runner=command_runner)
+    return _repository_parser_instance
 
 
-@lru_cache()
+_borg_command_builder_instance = None
+
 def get_borg_command_builder() -> BorgCommandBuilder:
     """
-    Provide a BorgCommandBuilder instance.
+    Provide a BorgCommandBuilder singleton instance.
 
-    Using lru_cache ensures we get a singleton instance.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return BorgCommandBuilder()
+    global _borg_command_builder_instance
+    if _borg_command_builder_instance is None:
+        _borg_command_builder_instance = BorgCommandBuilder()
+    return _borg_command_builder_instance
 
 
-@lru_cache()
+_archive_manager_instance = None
+
 def get_archive_manager() -> ArchiveManager:
     """
-    Provide an ArchiveManager instance with proper dependency injection.
+    Provide an ArchiveManager singleton instance with proper dependency injection.
 
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
+    Uses module-level singleton pattern with dependency injection.
     """
-    from app.services.job_executor import JobExecutor
+    global _archive_manager_instance
+    if _archive_manager_instance is None:
+        from app.services.job_executor import JobExecutor
 
-    return ArchiveManager(
-        job_executor=JobExecutor(), command_builder=get_borg_command_builder()
-    )
+        job_executor = JobExecutor()
+        command_builder = get_borg_command_builder()
+        _archive_manager_instance = ArchiveManager(
+            job_executor=job_executor, command_builder=command_builder
+        )
+    return _archive_manager_instance
 
 
-@lru_cache()
+_cloud_sync_manager_instance = None
+
 def get_cloud_sync_manager() -> CloudSyncManager:
     """
-    Provide a CloudSyncManager instance.
+    Provide a CloudSyncManager singleton instance.
 
-    Using lru_cache ensures we get a singleton instance.
+    Uses module-level singleton pattern for application-wide persistence.
     """
-    return CloudSyncManager()
+    global _cloud_sync_manager_instance
+    if _cloud_sync_manager_instance is None:
+        _cloud_sync_manager_instance = CloudSyncManager()
+    return _cloud_sync_manager_instance
+
+
+_repository_service_instance = None
+
+def get_repository_service() -> RepositoryService:
+    """
+    Provide a RepositoryService singleton instance with proper dependency injection.
+
+    Uses module-level singleton pattern with dependency injection.
+    """
+    global _repository_service_instance
+    if _repository_service_instance is None:
+        borg_service = get_borg_service()
+        scheduler_service = get_scheduler_service()
+        volume_service = get_volume_service()
+        _repository_service_instance = RepositoryService(
+            borg_service=borg_service,
+            scheduler_service=scheduler_service,
+            volume_service=volume_service
+        )
+    return _repository_service_instance
 
 
 def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
@@ -253,6 +334,7 @@ RepositoryParserDep = Annotated[RepositoryParser, Depends(get_repository_parser)
 BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
 ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
 CloudSyncManagerDep = Annotated[CloudSyncManager, Depends(get_cloud_sync_manager)]
+RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
 JobEventBroadcasterDep = Annotated[
     JobEventBroadcaster, Depends(get_job_event_broadcaster_dep)
 ]

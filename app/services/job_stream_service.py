@@ -308,13 +308,10 @@ class JobStreamService:
                         ):
                             event_data = event.get("data", {})
                             # Check if this is a task-specific event for our task
-                            if (
-                                event_data.get("task_type") == "task_output"
-                                and event_data.get("task_index") == task_order
-                            ):
+                            if event_data.get("task_index") == task_order:
                                 output_line = event_data.get("line", "")
                                 if output_line:
-                                    # Send individual line as div for beforeend appending
+                                    # Send individual line as div for hx-swap="beforeend"
                                     yield f"event: output\ndata: <div>{output_line}</div>\n\n"
 
                         elif (

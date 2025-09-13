@@ -167,7 +167,7 @@ class CloudSyncManager:
                     sync_success = event.get("status") == "success"
 
             if sync_success:
-                success_msg = "✅ Cloud sync completed successfully"
+                success_msg = "Cloud sync completed successfully"
                 logger.info(success_msg)
                 if output_callback:
                     output_callback(success_msg)
@@ -176,7 +176,7 @@ class CloudSyncManager:
                 return_code = (
                     final_result.get("return_code", -1) if final_result else -1
                 )
-                error_msg = f"❌ Cloud sync failed (return code: {return_code})"
+                error_msg = f"Cloud sync failed (return code: {return_code})"
                 logger.error(error_msg)
                 if output_callback:
                     output_callback(error_msg)

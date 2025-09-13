@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 from app.services.scheduler_service import SchedulerService, execute_scheduled_backup
 from app.models.database import Schedule, CleanupConfig, RepositoryCheckConfig
-from app.models.enums import JobType
 
 
 class TestSchedulerService:
@@ -284,6 +283,7 @@ class TestExecuteScheduledBackup:
         # Mock database objects
         mock_db = Mock()
         mock_repository = Mock()
+        mock_repository.id = 1  # Set proper integer ID
         mock_repository.name = "Test Repository"
         
         mock_schedule = Mock()
@@ -300,10 +300,10 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.job_service.JobService.create_backup_job', new_callable=AsyncMock) as mock_create_job:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
-            mock_create_job.return_value = "job-uuid-123"
+            mock_create_job.return_value = {"job_id": "job-uuid-123", "status": "started"}
             
             await execute_scheduled_backup(schedule_id)
             
@@ -311,12 +311,14 @@ class TestExecuteScheduledBackup:
             assert mock_schedule.last_run is not None
             mock_db.commit.assert_called_once()
             
-            # Verify composite job was created
+            # Verify backup job was created via JobService
             mock_create_job.assert_called_once()
             args = mock_create_job.call_args
-            assert args[1]["job_type"] == JobType.SCHEDULED_BACKUP
-            assert len(args[1]["task_definitions"]) == 1  # Only backup task
-            assert args[1]["task_definitions"][0]["type"] == "backup"
+            backup_request = args[0][0]  # First positional arg is BackupRequest
+            assert backup_request.repository_id == 1
+            assert backup_request.source_path == "/test/source"
+            assert backup_request.compression == "zstd"
+            assert not backup_request.dry_run
     
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_with_cleanup(self):
@@ -327,6 +329,7 @@ class TestExecuteScheduledBackup:
         mock_db = Mock()
         mock_repository = Mock()
         mock_repository.name = "Test Repository"
+        mock_repository.id = 1
         
         mock_cleanup_config = Mock()
         mock_cleanup_config.strategy = "simple"
@@ -357,19 +360,23 @@ class TestExecuteScheduledBackup:
         mock_db.query.side_effect = mock_query_side_effect
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.job_service.JobService') as mock_job_service_class:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
-            mock_create_job.return_value = "job-uuid-123"
+            
+            # Mock JobService instance and its create_backup_job method
+            mock_job_service = AsyncMock()
+            mock_job_service.create_backup_job.return_value = {"job_id": "job-uuid-123", "status": "started"}
+            mock_job_service_class.return_value = mock_job_service
             
             await execute_scheduled_backup(schedule_id)
             
-            # Verify composite job has both backup and prune tasks
-            args = mock_create_job.call_args
-            assert len(args[1]["task_definitions"]) == 2
-            assert args[1]["task_definitions"][0]["type"] == "backup"
-            assert args[1]["task_definitions"][1]["type"] == "prune"
-            assert args[1]["task_definitions"][1]["keep_within"] == "30d"
+            # Verify backup job was created with correct JobType
+            mock_job_service.create_backup_job.assert_called_once()
+            call_args = mock_job_service.create_backup_job.call_args
+            # Third argument should be JobType.SCHEDULED_BACKUP
+            from app.models.enums import JobType
+            assert call_args[0][2] == JobType.SCHEDULED_BACKUP
     
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_with_check(self):
@@ -380,6 +387,7 @@ class TestExecuteScheduledBackup:
         mock_db = Mock()
         mock_repository = Mock()
         mock_repository.name = "Test Repository"
+        mock_repository.id = 1
         
         mock_check_config = Mock()
         mock_check_config.name = "Full Check"
@@ -415,19 +423,23 @@ class TestExecuteScheduledBackup:
         mock_db.query.side_effect = mock_query_side_effect
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.job_service.JobService') as mock_job_service_class:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
-            mock_create_job.return_value = "job-uuid-123"
+            
+            # Mock JobService instance and its create_backup_job method
+            mock_job_service = AsyncMock()
+            mock_job_service.create_backup_job.return_value = {"job_id": "job-uuid-123", "status": "started"}
+            mock_job_service_class.return_value = mock_job_service
             
             await execute_scheduled_backup(schedule_id)
             
-            # Verify composite job has backup and check tasks
-            args = mock_create_job.call_args
-            assert len(args[1]["task_definitions"]) == 2
-            assert args[1]["task_definitions"][0]["type"] == "backup"
-            assert args[1]["task_definitions"][1]["type"] == "check"
-            assert args[1]["task_definitions"][1]["check_type"] == "full"
+            # Verify backup job was created with correct JobType
+            mock_job_service.create_backup_job.assert_called_once()
+            call_args = mock_job_service.create_backup_job.call_args
+            # Third argument should be JobType.SCHEDULED_BACKUP
+            from app.models.enums import JobType
+            assert call_args[0][2] == JobType.SCHEDULED_BACKUP
     
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_with_cloud_sync(self):
@@ -438,6 +450,7 @@ class TestExecuteScheduledBackup:
         mock_db = Mock()
         mock_repository = Mock()
         mock_repository.name = "Test Repository"
+        mock_repository.id = 1
         
         mock_schedule = Mock()
         mock_schedule.id = schedule_id
@@ -453,18 +466,23 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.job_service.JobService') as mock_job_service_class:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
-            mock_create_job.return_value = "job-uuid-123"
+            
+            # Mock JobService instance and its create_backup_job method
+            mock_job_service = AsyncMock()
+            mock_job_service.create_backup_job.return_value = {"job_id": "job-uuid-123", "status": "started"}
+            mock_job_service_class.return_value = mock_job_service
             
             await execute_scheduled_backup(schedule_id)
             
-            # Verify composite job has backup and cloud sync tasks
-            args = mock_create_job.call_args
-            assert len(args[1]["task_definitions"]) == 2
-            assert args[1]["task_definitions"][0]["type"] == "backup"
-            assert args[1]["task_definitions"][1]["type"] == "cloud_sync"
+            # Verify backup job was created with correct JobType
+            mock_job_service.create_backup_job.assert_called_once()
+            call_args = mock_job_service.create_backup_job.call_args
+            # Third argument should be JobType.SCHEDULED_BACKUP
+            from app.models.enums import JobType
+            assert call_args[0][2] == JobType.SCHEDULED_BACKUP
     
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_schedule_not_found(self):
@@ -506,6 +524,8 @@ class TestExecuteScheduledBackup:
         mock_db = Mock()
         mock_repository = Mock()
         mock_repository.name = "Test Repository"
+        mock_repository.id = 1
+        
         
         mock_schedule = Mock()
         mock_schedule.id = schedule_id
@@ -521,10 +541,14 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.composite_job_manager.composite_job_manager.create_composite_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.job_service.JobService') as mock_job_service_class:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
-            mock_create_job.side_effect = Exception("Job creation failed")
+            
+            # Mock JobService instance and its create_backup_job method
+            mock_job_service = AsyncMock()
+            mock_job_service.create_backup_job.side_effect = Exception("Job creation failed")
+            mock_job_service_class.return_value = mock_job_service
             
             # Should re-raise the exception
             with pytest.raises(Exception) as exc_info:

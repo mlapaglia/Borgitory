@@ -1,103 +1,86 @@
-import asyncio
 import logging
+import os
+from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
 
+class FileSystemInterface(ABC):
+    """Abstract interface for filesystem operations"""
+
+    @abstractmethod
+    def exists(self, path: str) -> bool:
+        """Check if path exists"""
+        pass
+
+    @abstractmethod
+    def is_dir(self, path: str) -> bool:
+        """Check if path is a directory"""
+        pass
+
+    @abstractmethod
+    def listdir(self, path: str) -> List[str]:
+        """List contents of directory"""
+        pass
+
+    @abstractmethod
+    def join(self, *paths: str) -> str:
+        """Join path components"""
+        pass
+
+
+class OsFileSystem(FileSystemInterface):
+    """Concrete filesystem implementation using os module"""
+
+    def exists(self, path: str) -> bool:
+        return os.path.exists(path)
+
+    def is_dir(self, path: str) -> bool:
+        return os.path.isdir(path)
+
+    def listdir(self, path: str) -> List[str]:
+        return os.listdir(path)
+
+    def join(self, *paths: str) -> str:
+        return os.path.join(*paths)
+
+
 class VolumeService:
-    """Service to discover and manage mounted volumes"""
+    """Service to discover mounted volumes under /mnt"""
+
+    def __init__(self, filesystem: FileSystemInterface = None):
+        self.filesystem = filesystem or OsFileSystem()
 
     async def get_mounted_volumes(self) -> List[str]:
-        """Get list of mounted volumes by parsing mount information"""
+        """Get list of directories under /mnt (user-mounted volumes)"""
         try:
-            # Get mounted volumes using the provided command from debug service
-            process = await asyncio.create_subprocess_shell(
-                'mount | grep -v "^overlay\\|^proc\\|^tmpfs\\|^sysfs\\|^cgroup\\|^mqueue\\|^shm\\|^devpts" | grep " on /" | grep -v "/etc/\\|/proc\\|/sys\\|on / type" | awk \'{print $3}\'',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            stdout, stderr = await process.communicate()
-
+            mnt_path = "/mnt"
             mounted_volumes = []
-            if process.returncode == 0 and stdout:
-                # Parse the output to get mounted volumes
-                volumes_output = stdout.decode().strip()
-                if volumes_output:
-                    mounted_volumes = [
-                        line.strip()
-                        for line in volumes_output.split("\n")
-                        if line.strip()
-                    ]
 
-            # Filter out system directories and include commonly used backup paths
-            filtered_volumes = []
+            # Check if /mnt exists
+            if not self.filesystem.exists(mnt_path) or not self.filesystem.is_dir(
+                mnt_path
+            ):
+                logger.info("No /mnt directory found")
+                return []
 
-            # Always include /repos if it exists (default backup location)
-            import os
+            # List all directories under /mnt
+            for item in self.filesystem.listdir(mnt_path):
+                item_path = self.filesystem.join(mnt_path, item)
+                if self.filesystem.is_dir(item_path):
+                    mounted_volumes.append(item_path)
 
-            if os.path.exists("/repos") and os.path.isdir("/repos"):
-                filtered_volumes.append("/repos")
-
-            # Add discovered volumes, filtering out system paths
-            system_paths = {
-                "/",
-                "/boot",
-                "/dev",
-                "/etc",
-                "/home",
-                "/lib",
-                "/lib64",
-                "/media",
-                "/mnt",
-                "/opt",
-                "/proc",
-                "/root",
-                "/run",
-                "/sbin",
-                "/srv",
-                "/sys",
-                "/tmp",
-                "/usr",
-                "/var",
-            }
-
-            for volume in mounted_volumes:
-                # Skip system directories
-                if volume in system_paths:
-                    continue
-
-                # Skip paths that are clearly system-related
-                if any(volume.startswith(f"{sys_path}/") for sys_path in system_paths):
-                    continue
-
-                # Skip if path doesn't exist or isn't a directory
-                if not os.path.exists(volume) or not os.path.isdir(volume):
-                    continue
-
-                filtered_volumes.append(volume)
-
-            # Remove duplicates while preserving order
-            seen = set()
-            unique_volumes = []
-            for volume in filtered_volumes:
-                if volume not in seen:
-                    seen.add(volume)
-                    unique_volumes.append(volume)
+            # Sort for consistent ordering
+            mounted_volumes.sort()
 
             logger.info(
-                f"Discovered {len(unique_volumes)} mounted volumes: {unique_volumes}"
+                f"Found {len(mounted_volumes)} mounted volumes under /mnt: {mounted_volumes}"
             )
-            return unique_volumes
+            return mounted_volumes
 
         except Exception as e:
-            logger.error(f"Error getting mounted volumes: {e}")
-            # Fallback to just /repos if volume discovery fails
-            import os
-
-            if os.path.exists("/repos"):
-                return ["/repos"]
+            logger.error(f"Error discovering mounted volumes under /mnt: {e}")
             return []
 
     async def get_volume_info(self) -> Dict[str, Any]:

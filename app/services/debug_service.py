@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 class DebugService:
     """Service to gather system and application debug information"""
 
+    def __init__(self, volume_service=None):
+        self.volume_service = volume_service
+
     async def get_debug_info(self, db: Session) -> Dict[str, Any]:
         """Gather comprehensive debug information"""
         debug_info = {}
@@ -146,11 +149,15 @@ class DebugService:
         """Get Docker and volume mount information"""
         try:
             # Use the shared volume service for volume discovery
-            from app.dependencies import get_volume_service
-
-            volume_service = get_volume_service()
-            volume_info = await volume_service.get_volume_info()
-            mounted_volumes = volume_info.get("mounted_volumes", [])
+            if self.volume_service:
+                volume_info = await self.volume_service.get_volume_info()
+                mounted_volumes = volume_info.get("mounted_volumes", [])
+            else:
+                # Fallback: use direct import (for backward compatibility)
+                from app.dependencies import get_volume_service
+                volume_service = get_volume_service()
+                volume_info = await volume_service.get_volume_info()
+                mounted_volumes = volume_info.get("mounted_volumes", [])
 
             # Try to get basic Docker info if available
             docker_info = {"accessible": False}

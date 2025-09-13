@@ -14,6 +14,11 @@ from app.utils.security import (
     validate_compression,
     get_or_generate_secret_key,
 )
+from app.utils.secure_path import (
+    validate_secure_path,
+    validate_mnt_path,
+    _pre_validate_user_input,
+)
 
 
 class TestSanitizePath:
@@ -566,3 +571,241 @@ class TestSecurityIntegration:
         
         assert len(sanitized_path) > 0
         assert sanitized_passphrase == long_valid_passphrase
+
+
+class TestSecurePathValidation:
+    """Test secure path validation utilities to prevent directory traversal and path injection."""
+    
+    def test_validate_secure_path_legitimate_paths(self):
+        """Test that legitimate paths are properly allowed."""
+        legitimate_paths = [
+            ('/mnt', 'Root mount directory'),
+            ('/mnt/backup', 'Backup directory'),
+            ('/mnt/data/repos', 'Nested repository path'),
+            ('relative/path', 'Relative path'),
+            ('test.txt', 'Simple filename'),
+            ('/app/app/data/config', 'App data path'),
+            ('/app/app/data/keyfiles/key.key', 'Keyfile path'),
+        ]
+        
+        for test_path, description in legitimate_paths:
+            result = validate_secure_path(test_path)
+            assert result is not None, f"Failed to allow {description}: '{test_path}'"
+            assert str(result).replace('\\', '/').endswith(test_path.replace('\\', '/')), f"Path resolution changed for {description}"
+    
+    def test_validate_secure_path_security_attacks(self):
+        """Test that security attack vectors are properly blocked."""
+        attack_vectors = [
+            ('../../etc/passwd', 'Directory traversal with relative path'),
+            ('/mnt/../etc/passwd', 'Directory traversal with absolute path'),  
+            ('/mnt/test/../../../etc/passwd', 'Complex directory traversal'),
+            ('test/../../../etc/passwd', 'Relative traversal'),
+            ('test\x00/../../etc/passwd', 'Null byte with traversal'),
+            ('/etc/passwd\x00ignored', 'Null byte termination attack'),
+            ('', 'Empty string'),
+            ('   ', 'Whitespace only'),
+            ('/tmp/test', 'Path outside allowed directories'),
+            ('/var/test', 'Another disallowed absolute path'),
+            ('/home/user/.ssh/id_rsa', 'SSH key path'),
+            ('/etc/shadow', 'Shadow password file'),
+            ('/proc/version', 'Proc filesystem'),
+            ('/dev/null', 'Device file'),
+        ]
+        
+        for test_path, description in attack_vectors:
+            result = validate_secure_path(test_path)
+            assert result is None, f"Failed to block {description}: '{test_path}'"
+    
+    def test_validate_mnt_path_only_allows_mnt(self):
+        """Test that validate_mnt_path only allows /mnt paths."""
+        # Should allow /mnt paths
+        mnt_paths = ['/mnt', '/mnt/backup', '/mnt/data/repos', 'relative/path']
+        for path in mnt_paths:
+            result = validate_mnt_path(path)
+            assert result is not None, f"validate_mnt_path should allow: '{path}'"
+        
+        # Should reject /app/app/data paths
+        app_data_paths = ['/app/app/data', '/app/app/data/config', '/app/app/data/keyfiles/key.key']
+        for path in app_data_paths:
+            result = validate_mnt_path(path)
+            assert result is None, f"validate_mnt_path should reject app data path: '{path}'"
+    
+    def test_pre_validate_user_input_type_validation(self):
+        """Test pre-validation input type checking."""
+        allowed_prefixes = ['/mnt', '/app/app/data']
+        
+        # Should reject non-strings
+        assert _pre_validate_user_input(None, allowed_prefixes) is False
+        assert _pre_validate_user_input(123, allowed_prefixes) is False
+        assert _pre_validate_user_input(['path'], allowed_prefixes) is False
+        
+        # Should accept valid strings
+        assert _pre_validate_user_input('/mnt/test', allowed_prefixes) is True
+        assert _pre_validate_user_input('relative/path', allowed_prefixes) is True
+    
+    def test_pre_validate_user_input_empty_and_whitespace(self):
+        """Test pre-validation empty and whitespace handling."""
+        allowed_prefixes = ['/mnt']
+        
+        # Should reject empty and whitespace-only strings
+        assert _pre_validate_user_input('', allowed_prefixes) is False
+        assert _pre_validate_user_input('   ', allowed_prefixes) is False
+        assert _pre_validate_user_input('\t\n', allowed_prefixes) is False
+        
+        # Should accept valid non-empty strings
+        assert _pre_validate_user_input('test', allowed_prefixes) is True
+        assert _pre_validate_user_input('/mnt/test', allowed_prefixes) is True
+    
+    def test_pre_validate_user_input_null_bytes(self):
+        """Test pre-validation null byte detection."""
+        allowed_prefixes = ['/mnt']
+        
+        # Should reject strings with null bytes
+        assert _pre_validate_user_input('/mnt/test\x00', allowed_prefixes) is False
+        assert _pre_validate_user_input('test\x00extra', allowed_prefixes) is False
+        assert _pre_validate_user_input('\x00start', allowed_prefixes) is False
+        
+        # Should accept strings without null bytes
+        assert _pre_validate_user_input('/mnt/test', allowed_prefixes) is True
+    
+    def test_pre_validate_user_input_absolute_path_restrictions(self):
+        """Test pre-validation absolute path restrictions."""
+        allowed_prefixes = ['/mnt', '/app/app/data']
+        
+        # Should allow absolute paths under allowed prefixes
+        assert _pre_validate_user_input('/mnt', allowed_prefixes) is True
+        assert _pre_validate_user_input('/mnt/test', allowed_prefixes) is True
+        assert _pre_validate_user_input('/app/app/data', allowed_prefixes) is True
+        assert _pre_validate_user_input('/app/app/data/config', allowed_prefixes) is True
+        
+        # Should reject absolute paths outside allowed prefixes
+        assert _pre_validate_user_input('/etc/passwd', allowed_prefixes) is False
+        assert _pre_validate_user_input('/tmp/test', allowed_prefixes) is False
+        assert _pre_validate_user_input('/var/log', allowed_prefixes) is False
+        assert _pre_validate_user_input('/home/user', allowed_prefixes) is False
+        
+        # Should always allow relative paths (to be joined with allowed roots)
+        assert _pre_validate_user_input('relative/path', allowed_prefixes) is True
+        assert _pre_validate_user_input('test.txt', allowed_prefixes) is True
+    
+    def test_cross_platform_path_handling(self):
+        """Test that path validation works across different platforms."""
+        # Test paths that should work on both Windows and Unix
+        cross_platform_paths = [
+            '/mnt/backup',
+            '/app/app/data/config',
+            'relative/path',
+            'test.txt',
+        ]
+        
+        for path in cross_platform_paths:
+            result = validate_secure_path(path)
+            assert result is not None, f"Cross-platform path failed: '{path}'"
+    
+    def test_path_normalization_security(self):
+        """Test that path normalization prevents traversal attacks."""
+        # These paths attempt traversal but should be blocked
+        traversal_attempts = [
+            '/mnt/../etc/passwd',
+            '/mnt/backup/../../../etc/passwd', 
+            '/mnt/./../../etc/passwd',
+            '/app/app/data/../../../etc/passwd',
+        ]
+        
+        for path in traversal_attempts:
+            result = validate_secure_path(path)
+            assert result is None, f"Failed to block traversal attempt: '{path}'"
+    
+    def test_symlink_security_handling(self):
+        """Test that symlink resolution maintains security boundaries."""
+        # Note: This test verifies the logic handles symlinks securely
+        # In a real environment, symlinks could potentially escape containment
+        # but our resolve() + relative_to() check should catch that
+        
+        # Test legitimate paths that might contain symlinks
+        legitimate_paths = ['/mnt/data', '/app/app/data/keyfiles']
+        
+        for path in legitimate_paths:
+            result = validate_secure_path(path)
+            # Should either succeed or fail safely (not raise exceptions)
+            assert result is None or isinstance(result, Path)
+    
+    def test_validate_secure_path_with_allow_app_data_flag(self):
+        """Test that the allow_app_data flag works correctly."""
+        app_data_path = '/app/app/data/test'
+        
+        # Should allow app data path when flag is True (default)
+        result_with_app_data = validate_secure_path(app_data_path, allow_app_data=True)
+        assert result_with_app_data is not None
+        
+        # Should reject app data path when flag is False  
+        result_without_app_data = validate_secure_path(app_data_path, allow_app_data=False)
+        assert result_without_app_data is None
+        
+        # /mnt paths should always work regardless of flag
+        mnt_path = '/mnt/test'
+        assert validate_secure_path(mnt_path, allow_app_data=True) is not None
+        assert validate_secure_path(mnt_path, allow_app_data=False) is not None
+    
+    def test_edge_case_path_combinations(self):
+        """Test edge cases and boundary conditions."""
+        edge_cases = [
+            # Unicode and international characters
+            ('/mnt/测试', 'Unicode characters'),
+            ('/mnt/café', 'Accented characters'),
+            
+            # Special but legitimate path components
+            ('/mnt/backup.tar.gz', 'Multiple dots in filename'),
+            ('/mnt/backup-2023-12-01', 'Hyphens in path'),
+            ('/mnt/backup_20231201', 'Underscores in path'),
+            
+            # Edge case relative paths
+            ('.', 'Current directory'),
+            ('./test', 'Explicit current directory'),
+        ]
+        
+        for test_path, description in edge_cases:
+            # These should either work or fail gracefully (not crash)
+            try:
+                result = validate_secure_path(test_path)
+                # If it succeeds, result should be a Path object
+                if result is not None:
+                    assert isinstance(result, Path), f"Invalid result type for {description}"
+            except Exception as e:
+                # If it fails, should be a controlled failure, not a crash
+                assert isinstance(e, (ValueError, RuntimeError)), f"Unexpected exception for {description}: {e}"
+    
+    def test_security_regression_prevention(self):
+        """Test specific attack patterns that have been seen in the wild."""
+        # These are real-world attack patterns that should be blocked
+        path_traversal_attacks = [
+            # Mixed separator attacks
+            ('..\\../etc/passwd', 'Mixed path separators'),
+            ('..\\..\\etc\\passwd', 'Windows-style traversal on Unix'),
+            
+            # Null byte truncation
+            ('/mnt/allowed\x00/../../../etc/passwd', 'Null byte truncation attack'),
+            
+            # Space and tab confusion
+            ('/mnt/../ /etc/passwd', 'Space confusion'),
+            ('/mnt/../\t/etc/passwd', 'Tab confusion'),
+        ]
+        
+        for attack_pattern, description in path_traversal_attacks:
+            result = validate_secure_path(attack_pattern)
+            assert result is None, f"Failed to block {description}: '{attack_pattern}'"
+        
+        # URL encoded patterns are treated as literal filenames (correct behavior)
+        # URL decoding should happen at the web framework layer, not path validation
+        url_encoded_patterns = [
+            ('%2e%2e%2f%2e%2e%2fetc%2fpasswd', 'URL encoded traversal as literal filename'),
+            ('..%c0%af..%c0%afetc%c0%afpasswd', 'Unicode normalization as literal filename'),
+            ('..%c0%ae%c0%ae/etc/passwd', 'Overlong UTF-8 sequence as literal filename'),
+        ]
+        
+        for pattern, description in url_encoded_patterns:
+            result = validate_secure_path(pattern)
+            # These should be treated as literal filenames under /mnt, which is safe
+            if result is not None:
+                # Verify they resolve to safe paths under /mnt
+                assert '/mnt' in str(result).replace('\\', '/'), f"URL encoded pattern not safely contained: '{pattern}'"

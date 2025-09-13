@@ -1,26 +1,71 @@
+FROM python:3.13-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    pkg-config \
+    libfuse3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml .
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir .[dev]
+
+FROM python:3.13-slim AS test
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    rclone \
+    borgbackup \
+    fuse3 \
+    python3-pyfuse3 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+COPY app/ ./app/
+COPY tests/ ./tests/
+COPY alembic/ ./alembic/
+COPY alembic.ini lint.py ./
+
+CMD ["pytest"]
+
 FROM python:3.13-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     rclone \
     borgbackup \
-    && rm -rf /var/lib/apt/lists/*
+    fuse3 \
+    python3-pyfuse3 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && mkdir -p /app/data
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /opt/venv /opt/venv
 
 COPY app/ ./app/
 COPY alembic/ ./alembic/
-COPY alembic.ini ./alembic.ini
-COPY start.sh /app/start.sh
+COPY alembic.ini start.sh ./
 
-# Create data directory in container (will be empty initially)
-RUN mkdir -p /app/data
+RUN chmod +x start.sh
 
-# Make script executable
-RUN chmod +x /app/start.sh
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 EXPOSE 8000
 
-CMD ["/app/start.sh"]
+ENTRYPOINT ["/app/start.sh"]

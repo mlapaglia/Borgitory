@@ -3,8 +3,14 @@
       method="post"
       action="/auth/login"
       hx-post="/auth/login"
-      hx-target="#login-status-message"
-      hx-swap="outerHTML">
+      hx-target="#global-notifications"
+      hx-swap="innerHTML"
+      hx-indicator="#login-loading"
+      hx-on::after-request="
+        if (event.detail.xhr.status >= 400) {
+          document.getElementById('global-notifications').innerHTML = event.detail.xhr.responseText;
+        }
+      ">
     <div class="mb-4">
         <label for="username" class="block text-sm font-medium text-gray-900 mb-2">Username</label>
         <input 
@@ -45,11 +51,7 @@
         type="submit"
         class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors"
     >
-        Sign In
+        <span class="htmx-indicator hidden" id="login-loading">Signing in...</span>
+        <span id="login-text">Sign In</span>
     </button>
 </form>
-
-<!-- Status messages -->
-<div id="login-status-message" class="mt-4">
-    <!-- HTMX login responses will be inserted here -->
-</div>

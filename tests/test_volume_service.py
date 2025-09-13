@@ -1,276 +1,156 @@
 """
-Tests for VolumeService - Service to discover and manage mounted volumes
+Tests for VolumeService - Service to discover directories under /mnt
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from app.services.volume_service import VolumeService
+from unittest.mock import patch
+from typing import List
+from app.services.volume_service import VolumeService, FileSystemInterface
+
+
+class MockFileSystem(FileSystemInterface):
+    """Mock filesystem for testing"""
+    
+    def __init__(self):
+        self.directories = set()
+        self.files = set()
+    
+    def add_directory(self, path: str):
+        """Add a directory to the mock filesystem"""
+        self.directories.add(path)
+    
+    def add_file(self, path: str):
+        """Add a file to the mock filesystem"""
+        self.files.add(path)
+    
+    def exists(self, path: str) -> bool:
+        return path in self.directories or path in self.files
+    
+    def is_dir(self, path: str) -> bool:
+        return path in self.directories
+    
+    def listdir(self, path: str) -> List[str]:
+        if path not in self.directories:
+            raise OSError(f"No such directory: {path}")
+        
+        # Find all items that are direct children of this path
+        items = []
+        for item_path in self.directories | self.files:
+            if item_path.startswith(path + "/") and "/" not in item_path[len(path) + 1:]:
+                items.append(item_path.split("/")[-1])
+        return items
+    
+    def join(self, *paths: str) -> str:
+        return "/".join(paths)
 
 
 @pytest.fixture
-def volume_service():
-    return VolumeService()
+def mock_filesystem():
+    return MockFileSystem()
+
+
+@pytest.fixture
+def volume_service(mock_filesystem):
+    return VolumeService(filesystem=mock_filesystem)
 
 
 class TestVolumeService:
     """Test the VolumeService class"""
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_success(self, volume_service):
-        """Test successful retrieval of mounted volumes"""
-        mock_process = MagicMock()
-        mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(
-            return_value=(
-                b"/data/backup\n/backup/volumes\n/storage/files\n",
-                b""
-            )
-        )
+    async def test_get_mounted_volumes_success(self, volume_service, mock_filesystem):
+        """Test successful discovery of volumes under /mnt"""
+        # Set up mock filesystem
+        mock_filesystem.add_directory("/mnt")
+        mock_filesystem.add_directory("/mnt/data")
+        mock_filesystem.add_directory("/mnt/repos")
+        mock_filesystem.add_directory("/mnt/backups")
 
-        with patch('asyncio.create_subprocess_shell', return_value=mock_process), \
-             patch('os.path.exists') as mock_exists, \
-             patch('os.path.isdir') as mock_isdir:
-            
-            # Mock os.path behavior - use paths that won't be filtered out by system paths
-            def exists_side_effect(path):
-                return path in ["/repos", "/data/backup", "/backup/volumes", "/storage/files"]
-            
-            def isdir_side_effect(path):
-                return path in ["/repos", "/data/backup", "/backup/volumes", "/storage/files"]
-            
-            mock_exists.side_effect = exists_side_effect
-            mock_isdir.side_effect = isdir_side_effect
+        volumes = await volume_service.get_mounted_volumes()
 
-            volumes = await volume_service.get_mounted_volumes()
-
-            assert "/repos" in volumes
-            assert "/data/backup" in volumes
-            assert "/backup/volumes" in volumes
-            assert "/storage/files" in volumes
-            assert len(volumes) >= 4
+        assert "/mnt/backups" in volumes
+        assert "/mnt/data" in volumes  
+        assert "/mnt/repos" in volumes
+        assert len(volumes) == 3
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_command_failure(self, volume_service):
-        """Test handling of command execution failure"""
-        mock_process = MagicMock()
-        mock_process.returncode = 1
-        mock_process.communicate = AsyncMock(
-            return_value=(b"", b"command failed")
-        )
-
-        with patch('asyncio.create_subprocess_shell', return_value=mock_process), \
-             patch('os.path.exists', return_value=True), \
-             patch('os.path.isdir', return_value=True):
-
-            volumes = await volume_service.get_mounted_volumes()
-
-            assert "/repos" in volumes
-            assert len(volumes) == 1
+    async def test_get_mounted_volumes_no_mnt_directory(self, volume_service, mock_filesystem):
+        """Test behavior when /mnt directory doesn't exist"""
+        # Don't add /mnt to mock filesystem (it doesn't exist)
+        volumes = await volume_service.get_mounted_volumes()
+        assert volumes == []
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_no_repos_fallback(self, volume_service):
-        """Test fallback when /repos doesn't exist"""
-        mock_process = MagicMock()
-        mock_process.returncode = 1
-        mock_process.communicate = AsyncMock(
-            return_value=(b"", b"command failed")
-        )
+    async def test_get_mounted_volumes_empty_mnt_directory(self, volume_service, mock_filesystem):
+        """Test behavior when /mnt directory is empty"""
+        # Add /mnt directory but no subdirectories
+        mock_filesystem.add_directory("/mnt")
 
-        with patch('asyncio.create_subprocess_shell', return_value=mock_process), \
-             patch('os.path.exists', return_value=False):
-
-            volumes = await volume_service.get_mounted_volumes()
-
-            assert volumes == []
+        volumes = await volume_service.get_mounted_volumes()
+        assert volumes == []
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_filters_system_paths(self, volume_service):
-        """Test that system paths are properly filtered out"""
-        mock_process = MagicMock()
-        mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(
-            return_value=(
-                b"/\n/home\n/var\n/tmp\n/mnt/backup\n/custom/data\n",
-                b""
-            )
-        )
+    async def test_get_mounted_volumes_filters_files(self, volume_service, mock_filesystem):
+        """Test that only directories are included, not files"""
+        # Set up mock filesystem with directories and files
+        mock_filesystem.add_directory("/mnt")
+        mock_filesystem.add_directory("/mnt/data")
+        mock_filesystem.add_directory("/mnt/backups")
+        mock_filesystem.add_file("/mnt/repos.txt")  # This is a file, not directory
 
-        with patch('asyncio.create_subprocess_shell', return_value=mock_process), \
-             patch('os.path.exists') as mock_exists, \
-             patch('os.path.isdir') as mock_isdir:
-            
-            def exists_side_effect(path):
-                return path in ["/repos", "/", "/home", "/var", "/tmp", "/mnt/backup", "/custom/data"]
-            
-            def isdir_side_effect(path):
-                return path in ["/repos", "/", "/home", "/var", "/tmp", "/mnt/backup", "/custom/data"]
-            
-            mock_exists.side_effect = exists_side_effect
-            mock_isdir.side_effect = isdir_side_effect
+        volumes = await volume_service.get_mounted_volumes()
 
-            volumes = await volume_service.get_mounted_volumes()
-
-            # System paths should be filtered out
-            assert "/" not in volumes
-            assert "/home" not in volumes
-            assert "/var" not in volumes
-            assert "/tmp" not in volumes
-            # /mnt is a system path, so /mnt/backup gets filtered out
-            assert "/mnt/backup" not in volumes
-            
-            # Valid volumes should be included
-            assert "/repos" in volumes
-            assert "/custom/data" in volumes
+        assert "/mnt/data" in volumes
+        assert "/mnt/backups" in volumes
+        assert "/mnt/repos.txt" not in volumes  # File should be excluded
+        assert len(volumes) == 2
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_filters_nonexistent_paths(self, volume_service):
-        """Test that non-existent paths are filtered out"""
-        mock_process = MagicMock()
-        mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(
-            return_value=(
-                b"/backup/exists\n/backup/nonexistent\n/custom/data\n",
-                b""
-            )
-        )
-
-        with patch('asyncio.create_subprocess_shell', return_value=mock_process), \
-             patch('os.path.exists') as mock_exists, \
-             patch('os.path.isdir') as mock_isdir:
-            
-            def exists_side_effect(path):
-                # Only some paths exist, note that /mnt paths get filtered out anyway
-                return path in ["/repos", "/backup/exists", "/custom/data"]
-            
-            def isdir_side_effect(path):
-                # Only some paths are directories
-                return path in ["/repos", "/backup/exists", "/custom/data"]
-            
-            mock_exists.side_effect = exists_side_effect
-            mock_isdir.side_effect = isdir_side_effect
-
-            volumes = await volume_service.get_mounted_volumes()
-
-            assert "/repos" in volumes
-            assert "/backup/exists" in volumes
-            assert "/custom/data" in volumes
-            assert "/backup/nonexistent" not in volumes
-
-    @pytest.mark.asyncio
-    async def test_get_mounted_volumes_removes_duplicates(self, volume_service):
-        """Test that duplicate volumes are removed while preserving order"""
-        mock_process = MagicMock()
-        mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(
-            return_value=(
-                b"/backup/data\n/custom/data\n/backup/data\n",
-                b""
-            )
-        )
-
-        with patch('asyncio.create_subprocess_shell', return_value=mock_process), \
-             patch('os.path.exists') as mock_exists, \
-             patch('os.path.isdir') as mock_isdir:
-            
-            def exists_side_effect(path):
-                return path in ["/repos", "/backup/data", "/custom/data"]
-            
-            def isdir_side_effect(path):
-                return path in ["/repos", "/backup/data", "/custom/data"]
-            
-            mock_exists.side_effect = exists_side_effect
-            mock_isdir.side_effect = isdir_side_effect
-
-            volumes = await volume_service.get_mounted_volumes()
-
-            # Should contain each volume only once
-            assert volumes.count("/backup/data") == 1
-            assert volumes.count("/custom/data") == 1
-            assert "/repos" in volumes
-
-    @pytest.mark.asyncio
-    async def test_get_mounted_volumes_exception_handling(self, volume_service):
-        """Test exception handling in get_mounted_volumes"""
-        with patch('asyncio.create_subprocess_shell', side_effect=Exception("Command failed")), \
-             patch('os.path.exists', return_value=True):
-
-            volumes = await volume_service.get_mounted_volumes()
-
-            # Should fallback to /repos when command fails
-            assert "/repos" in volumes
-
-    @pytest.mark.asyncio
-    async def test_get_mounted_volumes_empty_output(self, volume_service):
-        """Test handling of empty command output"""
-        mock_process = MagicMock()
-        mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(
-            return_value=(b"", b"")
-        )
-
-        with patch('asyncio.create_subprocess_shell', return_value=mock_process), \
-             patch('os.path.exists', return_value=True), \
-             patch('os.path.isdir', return_value=True):
-
-            volumes = await volume_service.get_mounted_volumes()
-
-            # Should still include /repos even with empty command output
-            assert "/repos" in volumes
+    async def test_get_mounted_volumes_exception_handling(self, mock_filesystem):
+        """Test handling of exceptions during directory listing"""
+        # Create a filesystem that throws exceptions
+        class ExceptionFileSystem(MockFileSystem):
+            def exists(self, path: str) -> bool:
+                raise OSError("Permission denied")
+        
+        exception_filesystem = ExceptionFileSystem()
+        volume_service = VolumeService(filesystem=exception_filesystem)
+        
+        volumes = await volume_service.get_mounted_volumes()
+        assert volumes == []
 
     @pytest.mark.asyncio
     async def test_get_volume_info_success(self, volume_service):
-        """Test successful get_volume_info"""
-        with patch.object(volume_service, 'get_mounted_volumes', return_value=["/repos", "/mnt/backup"]):
+        """Test successful volume info retrieval"""
+        with patch.object(volume_service, 'get_mounted_volumes', return_value=["/mnt/data", "/mnt/repos"]):
             info = await volume_service.get_volume_info()
-
-            assert info["mounted_volumes"] == ["/repos", "/mnt/backup"]
+            
+            assert info["mounted_volumes"] == ["/mnt/data", "/mnt/repos"]
             assert info["total_mounted_volumes"] == 2
             assert info["accessible"] is True
-            assert "error" not in info
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_exception_handling(self, volume_service):
-        """Test exception handling in get_volume_info"""
+    async def test_get_volume_info_exception(self, volume_service):
+        """Test volume info retrieval with exception"""
         with patch.object(volume_service, 'get_mounted_volumes', side_effect=Exception("Test error")):
             info = await volume_service.get_volume_info()
-
+            
+            assert "error" in info
             assert info["error"] == "Test error"
             assert info["mounted_volumes"] == []
             assert info["total_mounted_volumes"] == 0
             assert info["accessible"] is False
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_filters_system_subdirs(self, volume_service):
-        """Test that subdirectories of system paths are filtered out"""
-        mock_process = MagicMock()
-        mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(
-            return_value=(
-                b"/home/user\n/var/log\n/usr/local\n/backup/data\n",
-                b""
-            )
-        )
+    async def test_volumes_sorted_consistently(self, volume_service, mock_filesystem):
+        """Test that volumes are returned in sorted order"""
+        # Set up mock filesystem with unsorted directories
+        mock_filesystem.add_directory("/mnt")
+        mock_filesystem.add_directory("/mnt/zzz-volume")
+        mock_filesystem.add_directory("/mnt/aaa-volume")
+        mock_filesystem.add_directory("/mnt/mmm-volume")
 
-        with patch('asyncio.create_subprocess_shell', return_value=mock_process), \
-             patch('os.path.exists') as mock_exists, \
-             patch('os.path.isdir') as mock_isdir:
-            
-            def exists_side_effect(path):
-                return path in ["/repos", "/home/user", "/var/log", "/usr/local", "/backup/data"]
-            
-            def isdir_side_effect(path):
-                return path in ["/repos", "/home/user", "/var/log", "/usr/local", "/backup/data"]
-            
-            mock_exists.side_effect = exists_side_effect
-            mock_isdir.side_effect = isdir_side_effect
+        volumes = await volume_service.get_mounted_volumes()
 
-            volumes = await volume_service.get_mounted_volumes()
-
-            # System subdirectories should be filtered out
-            assert "/home/user" not in volumes
-            assert "/var/log" not in volumes  
-            assert "/usr/local" not in volumes
-            
-            # Valid volumes should be included
-            assert "/repos" in volumes
-            assert "/backup/data" in volumes
+        # Should be sorted alphabetically
+        assert volumes == ["/mnt/aaa-volume", "/mnt/mmm-volume", "/mnt/zzz-volume"]

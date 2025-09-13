@@ -10,8 +10,6 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 from app.config import DATABASE_URL
 from app.models.database import Schedule
-from app.models.enums import JobType
-from app.services.task_definition_builder import TaskDefinitionBuilder
 from app.utils.db_session import get_db_session
 
 # Configure APScheduler logging only (don't override main basicConfig)
@@ -52,50 +50,38 @@ async def execute_scheduled_backup(schedule_id: int):
         db.commit()
 
         try:
-            logger.info("SCHEDULER: Creating composite job for scheduled backup")
+            logger.info("SCHEDULER: Creating scheduled backup via JobService")
             logger.info(f"  - repository: {repository.name}")
             logger.info(f"  - schedule: {schedule.name}")
             logger.info(f"  - source_path: {schedule.source_path}")
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
-            # Use TaskDefinitionBuilder to create all task definitions
-            builder = TaskDefinitionBuilder(db)
+            # Create a backup request object to use with JobService
+            from app.models.schemas import BackupRequest
 
-            backup_params = {
-                "source_path": schedule.source_path,
-                "compression": "zstd",  # Default compression for scheduled backups
-                "dry_run": False,
-            }
-
-            task_definitions = builder.build_task_list(
-                repository_name=repository.name,
-                include_backup=True,
-                backup_params=backup_params,
+            backup_request = BackupRequest(
+                repository_id=repository.id,
+                source_path=schedule.source_path,
+                compression="zstd",  # Default compression for scheduled backups
+                dry_run=False,
                 cleanup_config_id=schedule.cleanup_config_id,
                 check_config_id=schedule.check_config_id,
-                include_cloud_sync=schedule.cloud_sync_config_id is not None,
+                cloud_sync_config_id=schedule.cloud_sync_config_id,
                 notification_config_id=schedule.notification_config_id,
             )
 
-            logger.info(
-                f"SCHEDULER: Built {len(task_definitions)} tasks using TaskDefinitionBuilder"
-            )
-            for task in task_definitions:
-                logger.info(f"  - {task['type']}: {task['name']}")
+            # Use JobService to create the backup job (unified path)
+            from app.services.job_service import JobService
+            from app.models.enums import JobType
 
-            # Create composite job
-            from app.services.composite_job_manager import composite_job_manager
-
-            job_id = await composite_job_manager.create_composite_job(
-                job_type=JobType.SCHEDULED_BACKUP,
-                task_definitions=task_definitions,
-                repository=repository,
-                schedule=schedule,
-                cloud_sync_config_id=schedule.cloud_sync_config_id,
+            job_service = JobService()
+            result = await job_service.create_backup_job(
+                backup_request, db, JobType.SCHEDULED_BACKUP
             )
+            job_id = result["job_id"]
 
             logger.info(
-                f"SCHEDULER: Created composite job {job_id} with {len(task_definitions)} tasks"
+                f"SCHEDULER: Created scheduled backup job {job_id} via JobService"
             )
 
         except Exception as e:

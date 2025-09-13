@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import re
+import inspect
 from typing import Dict, List, Optional, Callable, Any
 from datetime import datetime
 from dataclasses import dataclass
@@ -82,12 +83,18 @@ class JobExecutor:
                 # Parse progress information
                 progress_info = self.parse_progress_line(line_text)
 
-                # Call callbacks if provided
+                # Call callbacks if provided (support both sync and async)
                 if output_callback:
-                    output_callback(line_text, progress_info)
+                    if inspect.iscoroutinefunction(output_callback):
+                        await output_callback(line_text, progress_info)
+                    else:
+                        output_callback(line_text, progress_info)
 
                 if progress_callback and progress_info:
-                    progress_callback(progress_info)
+                    if inspect.iscoroutinefunction(progress_callback):
+                        await progress_callback(progress_info)
+                    else:
+                        progress_callback(progress_info)
 
             # Wait for process completion
             return_code = await process.wait()
@@ -284,16 +291,14 @@ class JobExecutor:
             result = await self.monitor_process_output(process, output_callback)
 
             if result.return_code == 0:
-                logger.info("✅ Prune task completed successfully")
+                logger.info("Prune task completed successfully")
             else:
-                logger.error(
-                    f"❌ Prune task failed with return code {result.return_code}"
-                )
+                logger.error(f"Prune task failed with return code {result.return_code}")
 
             return result
 
         except Exception as e:
-            logger.error(f"❌ Exception in prune task: {str(e)}")
+            logger.error(f"Exception in prune task: {str(e)}")
             return ProcessResult(
                 return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
             )
@@ -435,9 +440,9 @@ class JobExecutor:
 
                 else:
                     error_msg = f"Unsupported cloud backup provider: {config.provider}"
-                    logger.error(f"❌ {error_msg}")
+                    logger.error(f"{error_msg}")
                     if output_callback:
-                        output_callback(f"❌ {error_msg}", {})
+                        output_callback(f"{error_msg}", {})
                     return ProcessResult(
                         return_code=1,
                         stdout=b"",
@@ -445,7 +450,6 @@ class JobExecutor:
                         error=error_msg,
                     )
 
-                # Process progress from either S3 or SFTP sync
                 async for progress in progress_generator:
                     if progress.get("type") == "log":
                         log_line = f"[{progress['stream']}] {progress['message']}"
@@ -454,9 +458,9 @@ class JobExecutor:
 
                     elif progress.get("type") == "error":
                         error_msg = progress["message"]
-                        logger.error(f"❌ Cloud sync error: {error_msg}")
+                        logger.error(f"Cloud sync error: {error_msg}")
                         if output_callback:
-                            output_callback(f"❌ Cloud sync error: {error_msg}", {})
+                            output_callback(f"Cloud sync error: {error_msg}", {})
                         return ProcessResult(
                             return_code=1,
                             stdout=b"",
@@ -466,11 +470,9 @@ class JobExecutor:
 
                     elif progress.get("type") == "completed":
                         if progress["status"] == "success":
-                            logger.info("✅ Cloud sync completed successfully")
+                            logger.info("Cloud sync completed successfully")
                             if output_callback:
-                                output_callback(
-                                    "✅ Cloud sync completed successfully", {}
-                                )
+                                output_callback("Cloud sync completed successfully", {})
                             return ProcessResult(
                                 return_code=0,
                                 stdout=b"Cloud sync completed successfully",
@@ -479,9 +481,9 @@ class JobExecutor:
                             )
                         else:
                             error_msg = "Cloud sync failed"
-                            logger.error(f"❌ {error_msg}")
+                            logger.error(f"{error_msg}")
                             if output_callback:
-                                output_callback(f"❌ {error_msg}", {})
+                                output_callback(f"{error_msg}", {})
                             return ProcessResult(
                                 return_code=1,
                                 stdout=b"",
@@ -489,10 +491,9 @@ class JobExecutor:
                                 error=error_msg,
                             )
 
-                # If we get here, sync completed without explicit success/failure
-                logger.info("✅ Cloud sync completed")
+                logger.info("Cloud sync completed")
                 if output_callback:
-                    output_callback("✅ Cloud sync completed", {})
+                    output_callback("Cloud sync completed", {})
                 return ProcessResult(
                     return_code=0,
                     stdout=b"Cloud sync completed",
@@ -501,9 +502,9 @@ class JobExecutor:
                 )
 
         except Exception as e:
-            logger.error(f"❌ Exception in cloud sync task: {str(e)}")
+            logger.error(f"Exception in cloud sync task: {str(e)}")
             if output_callback:
-                output_callback(f"❌ Exception in cloud sync task: {str(e)}", {})
+                output_callback(f"Exception in cloud sync task: {str(e)}", {})
             return ProcessResult(
                 return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
             )

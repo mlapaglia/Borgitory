@@ -364,7 +364,7 @@ class NotificationConfig(NotificationConfigBase):
 class BackupRequest(BaseModel):
     repository_id: int = Field(gt=0)
     source_path: str = Field(
-        default="/data",
+        default="/",
         pattern=r"^/.*",
         description="Absolute path to source directory",
     )

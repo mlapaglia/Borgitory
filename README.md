@@ -87,13 +87,32 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ### Development Setup
 
-1. **Install Python dependencies**
+1. **Set up Python virtual environment**
 
    ```bash
-   pip install -r requirements.txt
+   # Create virtual environment
+   python -m venv .env_borg
+   
+   # Activate virtual environment
+   # On Windows:
+   .env_borg\Scripts\activate
+   # On macOS/Linux:
+   source .env_borg/bin/activate
    ```
 
-2. **Install Rclone** (for cloud sync)
+2. **Install Python dependencies**
+
+   ```bash
+   # Install runtime dependencies only
+   pip install -e .
+   
+   # Install with development dependencies (testing, linting, etc.)
+   pip install -e .[dev]
+   ```
+   
+   > **Note**: This project uses modern Python packaging with `pyproject.toml` following PEP 518 standards. All dependencies and project metadata are defined in a single configuration file.
+
+3. **Install Rclone** (for cloud sync)
 
    ```bash
    # On Ubuntu/Debian
@@ -103,13 +122,13 @@ A comprehensive web-based management interface for BorgBackup repositories with 
    brew install rclone
    ```
 
-3. **Run development server**
+4. **Run development server**
 
    ```bash
    python run.py
    ```
 
-4. **Run tests**
+5. **Run tests**
 
    ```bash
    pytest
@@ -255,6 +274,12 @@ docker run -d \
 - Allows real-time exploration of backup archives without extraction
 - Supports direct file downloads from mounted archive filesystems
 - Without FUSE support, archive browsing will be disabled
+
+## Project Dependencies
+
+This project uses modern Python packaging standards with all dependencies defined in `pyproject.toml`:
+
+> Install with `pip install -e .[dev]` to include development tools.
 
 ## Architecture
 
