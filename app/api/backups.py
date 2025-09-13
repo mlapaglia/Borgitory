@@ -12,15 +12,16 @@ from app.models.database import (
     RepositoryCheckConfig,
     get_db,
 )
-
+from app.dependencies import TemplatesDep
 logger = logging.getLogger(__name__)
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/form", response_class=HTMLResponse)
 async def get_backup_form(
-    request: Request, db: Session = Depends(get_db)
+    request: Request,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Get backup form with all dropdowns populated"""
     repositories = db.query(Repository).all()

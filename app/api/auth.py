@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, Response, Form
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 import secrets
 from datetime import datetime, timedelta, UTC
 from typing import Optional
 
 from app.models.database import User, UserSession, get_db
-
+from app.dependencies import TemplatesDep
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/check-users")
-def check_users_exist(request: Request, db: Session = Depends(get_db)):
+def check_users_exist(
+    request: Request,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db)
+):
     user_count = db.query(User).count()
     has_users = user_count > 0
     next_url = request.query_params.get("next", "/repositories")
@@ -30,6 +32,7 @@ def check_users_exist(request: Request, db: Session = Depends(get_db)):
 @router.post("/register")
 def register_user(
     request: Request,
+    templates: TemplatesDep,
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
@@ -97,7 +100,7 @@ def register_user(
 @router.post("/login")
 def login_user(
     request: Request,
-    response: Response,
+    templates: TemplatesDep,
     username: str = Form(...),
     password: str = Form(...),
     remember_me: bool = Form(False),
@@ -177,7 +180,11 @@ def login_user(
 
 
 @router.post("/logout")
-def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db)
+):
     auth_token = request.cookies.get("auth_token")
     if auth_token:
         db.query(UserSession).filter(UserSession.session_token == auth_token).delete()
@@ -219,7 +226,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
 
 def get_current_user_optional(
-    request: Request, db: Session = Depends(get_db)
+    request: Request,
+    db: Session = Depends(get_db)
 ) -> Optional[User]:
     try:
         return get_current_user(request, db)

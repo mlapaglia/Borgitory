@@ -1,5 +1,5 @@
 """
-Tests for JobService class
+Tests for JobService business logic - Database operations and service methods
 """
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
@@ -17,7 +17,8 @@ class TestJobService:
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_job_manager = Mock()
-        self.job_service = JobService(job_manager=self.mock_job_manager)
+        self.mock_db = Mock()
+        self.job_service = JobService(db=self.mock_db, job_manager=self.mock_job_manager)
 
     @pytest.mark.asyncio
     async def test_create_backup_job_simple(self, test_db):
@@ -38,7 +39,9 @@ class TestJobService:
             dry_run=False
         )
         
-        result = await self.job_service.create_backup_job(backup_request, test_db, JobType.MANUAL_BACKUP)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = await self.job_service.create_backup_job(backup_request, JobType.MANUAL_BACKUP)
         
         assert result["job_id"] == "job-123"
         assert result["status"] == "started"
@@ -79,7 +82,9 @@ class TestJobService:
             cleanup_config_id=1
         )
         
-        result = await self.job_service.create_backup_job(backup_request, test_db, JobType.MANUAL_BACKUP)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = await self.job_service.create_backup_job(backup_request, JobType.MANUAL_BACKUP)
         
         assert result["job_id"] == "job-123"
         
@@ -102,7 +107,9 @@ class TestJobService:
         )
         
         with pytest.raises(ValueError, match="Repository not found"):
-            await self.job_service.create_backup_job(backup_request, test_db, JobType.MANUAL_BACKUP)
+            # Override mock db with real test_db for this test
+            self.job_service.db = test_db
+            await self.job_service.create_backup_job(backup_request, JobType.MANUAL_BACKUP)
 
     @pytest.mark.asyncio
     async def test_create_prune_job_simple_strategy(self, test_db):
@@ -126,7 +133,9 @@ class TestJobService:
                 force_prune=False
             )
             
-            result = await self.job_service.create_prune_job(prune_request, test_db)
+            # Override mock db with real test_db for this test
+            self.job_service.db = test_db
+            result = await self.job_service.create_prune_job(prune_request)
             
             assert result["job_id"] == "prune-job-123"
             assert result["status"] == "started"
@@ -162,7 +171,9 @@ class TestJobService:
                 force_prune=False
             )
             
-            result = await self.job_service.create_prune_job(prune_request, test_db)
+            # Override mock db with real test_db for this test
+            self.job_service.db = test_db
+            result = await self.job_service.create_prune_job(prune_request)
             
             assert result["job_id"] == "prune-job-123"
             
@@ -200,7 +211,9 @@ class TestJobService:
                 check_config_id=1
             )
             
-            result = await self.job_service.create_check_job(check_request, test_db)
+            # Override mock db with real test_db for this test
+            self.job_service.db = test_db
+            result = await self.job_service.create_check_job(check_request)
             
             assert result["job_id"] == "check-job-123"
             assert result["status"] == "started"
@@ -233,7 +246,9 @@ class TestJobService:
                 first_n_archives=10
             )
             
-            result = await self.job_service.create_check_job(check_request, test_db)
+            # Override mock db with real test_db for this test
+            self.job_service.db = test_db
+            result = await self.job_service.create_check_job(check_request)
             
             assert result["job_id"] == "check-job-123"
             
@@ -258,7 +273,9 @@ class TestJobService:
         # Mock empty job manager
         self.mock_job_manager.jobs = {}
         
-        jobs = self.job_service.list_jobs(skip=0, limit=100, db=test_db)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        jobs = self.job_service.list_jobs(skip=0, limit=100)
         
         assert len(jobs) == 2
         assert jobs[0]["type"] == "prune"  # Ordered by ID desc
@@ -278,7 +295,9 @@ class TestJobService:
         
         self.mock_job_manager.jobs = {"job-uuid": mock_borg_job}
         
-        jobs = self.job_service.list_jobs(skip=0, limit=100, db=test_db)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        jobs = self.job_service.list_jobs(skip=0, limit=100)
         
         # Should include the JobManager job
         jm_job = next((j for j in jobs if j["source"] == "jobmanager"), None)
@@ -296,7 +315,9 @@ class TestJobService:
         
         self.mock_job_manager.get_job_status.return_value = None
         
-        result = self.job_service.get_job("1", test_db)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = self.job_service.get_job("1")
         
         assert result is not None
         assert result["type"] == "backup"
@@ -312,7 +333,7 @@ class TestJobService:
             "error": None
         }
         
-        result = self.job_service.get_job("uuid-long-string", test_db)
+        result = self.job_service.get_job("uuid-long-string")
         
         assert result is not None
         assert result["status"] == "running"
@@ -321,9 +342,11 @@ class TestJobService:
     def test_get_job_not_found(self, test_db):
         """Test getting a non-existent job."""
         self.mock_job_manager.get_job_status.return_value = None
-        
-        result = self.job_service.get_job("999", test_db)
-        
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+
+        result = self.job_service.get_job("999")
+
         assert result is None
 
     @pytest.mark.asyncio
@@ -342,7 +365,7 @@ class TestJobService:
         """Test cancelling a JobManager job."""
         self.mock_job_manager.cancel_job = AsyncMock(return_value=True)
         
-        result = await self.job_service.cancel_job("uuid-long-string", test_db)
+        result = await self.job_service.cancel_job("uuid-long-string")
         
         assert result is True
         self.mock_job_manager.cancel_job.assert_called_once_with("uuid-long-string")
@@ -358,7 +381,9 @@ class TestJobService:
         
         self.mock_job_manager.cancel_job = AsyncMock(return_value=False)
         
-        result = await self.job_service.cancel_job("1", test_db)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = await self.job_service.cancel_job("1")
         
         assert result is True
         

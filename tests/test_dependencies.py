@@ -71,12 +71,13 @@ class TestDependencies:
     def test_get_job_service(self):
         """Test JobService dependency provider."""
         service = get_job_service()
-        
+
         assert isinstance(service, JobService)
-        
-        # Should return same instance due to singleton pattern
+
+        # JobService creates new instances per request (not singleton)
         service2 = get_job_service()
-        assert service is service2
+        assert service is not service2  # Different instances
+        assert isinstance(service2, JobService)
 
     def test_get_recovery_service(self):
         """Test RecoveryService dependency provider."""
@@ -168,10 +169,13 @@ class TestDependencies:
 
     def test_default_initialization_still_works(self):
         """Test that services can still be initialized without dependency injection."""
+        from unittest.mock import Mock
+
         # This ensures backward compatibility
         runner = SimpleCommandRunner()
         service = BorgService()
-        job_service = JobService()
+        mock_db = Mock()  # JobService now requires a database session
+        job_service = JobService(db=mock_db)
         recovery_service = RecoveryService()
         pushover_service = PushoverService()
         job_stream_service = JobStreamService()

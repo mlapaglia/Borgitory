@@ -34,6 +34,7 @@ from app.services.schedule_service import ScheduleService
 from app.services.configuration_service import ConfigurationService
 from app.services.repository_check_config_service import RepositoryCheckConfigService
 from app.services.notification_config_service import NotificationConfigService
+from app.services.cleanup_service import CleanupService
 from fastapi.templating import Jinja2Templates
 
 
@@ -71,18 +72,13 @@ def get_borg_service() -> BorgService:
     return _borg_service_instance
 
 
-_job_service_instance = None
-
-def get_job_service() -> JobService:
+def get_job_service(db: Session = Depends(get_db)) -> JobService:
     """
-    Provide a JobService singleton instance.
+    Provide a JobService instance with database session injection.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Note: This creates a new instance per request since it depends on the database session.
     """
-    global _job_service_instance
-    if _job_service_instance is None:
-        _job_service_instance = JobService()
-    return _job_service_instance
+    return JobService(db)
 
 
 _recovery_service_instance = None
@@ -377,6 +373,17 @@ def get_notification_config_service(
     return NotificationConfigService(db=db)
 
 
+def get_cleanup_service(
+    db: Session = Depends(get_db)
+) -> CleanupService:
+    """
+    Provide a CleanupService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return CleanupService(db=db)
+
+
 # Type aliases for dependency injection
 SimpleCommandRunnerDep = Annotated[
     SimpleCommandRunner, Depends(get_simple_command_runner)
@@ -410,3 +417,4 @@ ScheduleServiceDep = Annotated[ScheduleService, Depends(get_schedule_service)]
 ConfigurationServiceDep = Annotated[ConfigurationService, Depends(get_configuration_service)]
 RepositoryCheckConfigServiceDep = Annotated[RepositoryCheckConfigService, Depends(get_repository_check_config_service)]
 NotificationConfigServiceDep = Annotated[NotificationConfigService, Depends(get_notification_config_service)]
+CleanupServiceDep = Annotated[CleanupService, Depends(get_cleanup_service)]

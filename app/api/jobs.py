@@ -1,19 +1,15 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-
-from app.models.database import get_db
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
 from app.dependencies import JobServiceDep
 from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
+from app.dependencies import TemplatesDep
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 
 def get_job_manager_dependency() -> ModularBorgJobManager:
@@ -26,62 +22,39 @@ async def create_backup(
     backup_request: BackupRequest,
     request: Request,
     job_svc: JobServiceDep,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
 ):
     """Start a backup job and return HTML status"""
-    is_htmx_request = "hx-request" in request.headers
 
     try:
         result = await job_svc.create_backup_job(
-            backup_request, db, JobType.MANUAL_BACKUP
+            backup_request, JobType.MANUAL_BACKUP
         )
         job_id = result["job_id"]
 
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/jobs/backup_success.html",
-                {"job_id": job_id},
-            )
-        else:
-            # Return HTML showing the backup started for non-HTMX requests
-            return f"""
-                <div id="backup-job-{job_id}" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div class="flex items-center">
-                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                        <span class="text-blue-700 text-sm">Backup job #{job_id} started...</span>
-                    </div>
-                </div>
-            """
+        return templates.TemplateResponse(
+            request,
+            "partials/jobs/backup_success.html",
+            {"job_id": job_id},
+        )
+        
     except ValueError as e:
         error_msg = f"Repository not found: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/jobs/backup_error.html",
-                {"error_message": error_msg},
-                status_code=400,
+        return templates.TemplateResponse(
+            request,
+            "partials/jobs/backup_error.html",
+            {"error_message": error_msg},
+            status_code=400,
             )
-        return f"""
-            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                <span class="text-red-700 text-sm">{error_msg}</span>
-            </div>
-        """
     except Exception as e:
         logger.error(f"Failed to start backup: {e}")
         error_msg = f"Failed to start backup: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/jobs/backup_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        return f"""
-            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                <span class="text-red-700 text-sm">{error_msg}</span>
-            </div>
-        """
+        return templates.TemplateResponse(
+            request,
+            "partials/jobs/backup_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
 
 
 @router.post("/prune")
@@ -89,43 +62,35 @@ async def create_prune_job(
     request: Request,
     prune_request: PruneRequest,
     job_svc: JobServiceDep,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
 ):
     """Start an archive pruning job and return job_id for tracking"""
-    is_htmx_request = "hx-request" in request.headers
 
     try:
-        result = await job_svc.create_prune_job(prune_request, db)
+        result = await job_svc.create_prune_job(prune_request)
 
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cleanup/prune_success.html",
-                {"job_id": result.get("job_id", "unknown")},
-            )
-        else:
-            return result
+        return templates.TemplateResponse(
+            request,
+            "partials/cleanup/prune_success.html",
+            {"job_id": result.get("job_id", "unknown")},
+        )
     except ValueError as e:
         error_msg = str(e)
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cleanup/prune_error.html",
-                {"error_message": error_msg},
-                status_code=400,
-            )
-        raise HTTPException(status_code=404, detail=error_msg)
+        return templates.TemplateResponse(
+            request,
+            "partials/cleanup/prune_error.html",
+            {"error_message": error_msg},
+            status_code=400,
+        )
     except Exception as e:
         logger.error(f"Failed to start prune job: {e}")
         error_msg = f"Failed to start prune job: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cleanup/prune_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
+        return templates.TemplateResponse(
+            request,
+            "partials/cleanup/prune_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
 
 
 @router.post("/check")
@@ -133,49 +98,36 @@ async def create_check_job(
     request: Request,
     check_request: CheckRequest,
     job_svc: JobServiceDep,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
 ):
     """Start a repository check job and return job_id for tracking"""
-    is_htmx_request = "hx-request" in request.headers
 
     try:
-        result = await job_svc.create_check_job(check_request, db)
+        result = await job_svc.create_check_job(check_request)
 
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/check_success.html",
-                {"job_id": result.get("job_id", "unknown")},
-            )
-        else:
-            return result
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_check/check_success.html",
+            {"job_id": result.get("job_id", "unknown")},
+        )
 
     except ValueError as e:
         error_msg = str(e)
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/check_error.html",
-                {"error_message": error_msg},
-                status_code=400,
-            )
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        elif "disabled" in error_msg.lower():
-            raise HTTPException(status_code=400, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_check/check_error.html",
+            {"error_message": error_msg},
+            status_code=400,
+        )
     except Exception as e:
         logger.error(f"Failed to start check job: {e}")
         error_msg = f"Failed to start check job: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/check_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_check/check_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
 
 
 @router.get("/stream")
@@ -192,25 +144,23 @@ def list_jobs(
     skip: int = 0,
     limit: int = 100,
     type: str = None,
-    db: Session = Depends(get_db),
 ):
     """List database job records (legacy jobs) and active JobManager jobs"""
-    return job_svc.list_jobs(skip, limit, type, db)
+    return job_svc.list_jobs(skip, limit, type)
 
 
 @router.get("/html", response_class=HTMLResponse)
 def get_jobs_html(
-    request: Request,
     render_svc: JobRenderServiceDep,
+    job_svc: JobServiceDep,
     expand: str = None,
-    db: Session = Depends(get_db),
 ):
     """Get job history as HTML"""
-    return render_svc.render_jobs_html(db, expand)
+    return render_svc.render_jobs_html(job_svc.db, expand)
 
 
 @router.get("/current/html", response_class=HTMLResponse)
-def get_current_jobs_html(request: Request, render_svc: JobRenderServiceDep):
+def get_current_jobs_html(render_svc: JobRenderServiceDep):
     """Get current running jobs as HTML"""
     html_content = render_svc.render_current_jobs_html()
     return HTMLResponse(content=html_content)
@@ -239,10 +189,9 @@ async def stream_current_jobs_html(
 def get_job(
     job_id: str,
     job_svc: JobServiceDep,
-    db: Session = Depends(get_db),
 ):
     """Get job details - supports both database IDs and JobManager IDs"""
-    job = job_svc.get_job(job_id, db)
+    job = job_svc.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
@@ -256,6 +205,8 @@ async def get_job_status(job_id: str, job_svc: JobServiceDep):
         if "error" in output:
             raise HTTPException(status_code=404, detail=output["error"])
         return output
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions without modification
     except Exception as e:
         logger.error(f"Error getting job status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -266,7 +217,6 @@ async def get_job_output(
     job_id: str,
     job_svc: JobServiceDep,
     last_n_lines: int = 100,
-    db: Session = Depends(get_db),
 ):
     """Get job output lines"""
     try:
@@ -274,6 +224,8 @@ async def get_job_output(
         if "error" in output:
             raise HTTPException(status_code=404, detail=output["error"])
         return output
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions without modification
     except Exception as e:
         logger.error(f"Error getting job output: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -283,7 +235,6 @@ async def get_job_output(
 async def stream_job_output(
     job_id: str,
     stream_svc: JobStreamServiceDep,
-    db: Session = Depends(get_db),
 ):
     """Stream real-time job output via Server-Sent Events"""
     return await stream_svc.stream_job_output(job_id)
@@ -294,11 +245,12 @@ async def toggle_job_details(
     job_id: str,
     request: Request,
     render_svc: JobRenderServiceDep,
+    templates: TemplatesDep,
+    job_svc: JobServiceDep,
     expanded: str = "false",
-    db: Session = Depends(get_db),
 ):
     """Toggle job details visibility and return refreshed job item"""
-    job = render_svc.get_job_for_render(job_id, db)
+    job = render_svc.get_job_for_render(job_id, job_svc.db)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -316,10 +268,11 @@ async def get_job_details_static(
     job_id: str,
     request: Request,
     render_svc: JobRenderServiceDep,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
+    job_svc: JobServiceDep,
 ):
     """Get static job details (used when job completes)"""
-    job = render_svc.get_job_for_render(job_id, db)
+    job = render_svc.get_job_for_render(job_id, job_svc.db)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -334,11 +287,12 @@ async def toggle_task_details(
     task_order: int,
     request: Request,
     render_svc: JobRenderServiceDep,
+    templates: TemplatesDep,
+    job_svc: JobServiceDep,
     expanded: str = "false",
-    db: Session = Depends(get_db),
 ):
     """Toggle task details visibility and return updated task item"""
-    job = render_svc.get_job_for_render(job_id, db)
+    job = render_svc.get_job_for_render(job_id, job_svc.db)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -376,9 +330,6 @@ async def toggle_task_details(
 
 @router.post("/{job_id}/copy-output")
 async def copy_job_output(
-    job_id: str,
-    job_svc: JobServiceDep,
-    db: Session = Depends(get_db),
 ):
     """Copy job output to clipboard (returns success message)"""
     return {"message": "Output copied to clipboard"}
@@ -396,10 +347,6 @@ async def stream_task_output(
 
 @router.post("/{job_id}/tasks/{task_order}/copy-output")
 async def copy_task_output(
-    job_id: str,
-    task_order: int,
-    job_svc: JobServiceDep,
-    db: Session = Depends(get_db),
 ):
     """Copy task output to clipboard (returns success message)"""
     return {"message": "Task output copied to clipboard"}
@@ -409,10 +356,9 @@ async def copy_task_output(
 async def cancel_job(
     job_id: str,
     job_svc: JobServiceDep,
-    db: Session = Depends(get_db),
 ):
     """Cancel a running job"""
-    success = await job_svc.cancel_job(job_id, db)
+    success = await job_svc.cancel_job(job_id)
     if success:
         return {"message": "Job cancelled successfully"}
     raise HTTPException(status_code=404, detail="Job not found")
@@ -466,13 +412,10 @@ def get_queue_stats(
 
 
 @router.post("/migrate")
-def run_database_migration(db: Session = Depends(get_db)):
+def run_database_migration(job_svc: JobServiceDep):
     """Manually trigger database migration for jobs table"""
     try:
-        from app.models.database import migrate_job_table
-
-        migrate_job_table()
-        return {"message": "Database migration completed successfully"}
+        return job_svc.run_database_migration()
     except Exception as e:
         logger.error(f"Migration failed: {e}")
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
