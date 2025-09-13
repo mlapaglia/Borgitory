@@ -28,11 +28,10 @@
 
             <!-- Main Content Container - tabs loaded here via HTMX -->
             <div id="main-content"
-                 hx-get="/api/tabs/repositories"
-                 hx-trigger="load"
-                 hx-indicator="#loading-indicator">
+                 hx-get="{{ initial_content_url or '/api/tabs/repositories' }}"
+                 hx-trigger="load">
                 <!-- Default loading state -->
-                <div class="text-gray-500 dark:text-gray-400 text-sm">Loading repositories...</div>
+                <div class="text-gray-500 dark:text-gray-400 text-sm">Loading {{ active_tab or 'repositories' }}...</div>
             </div>
         </div>
     </div>
@@ -47,17 +46,9 @@
     min-height: 500px;
 }
 
-/* HTMX Loading Indicator */
+/* HTMX Loading Indicator - Only shows when explicitly targeted */
 .htmx-indicator {
     display: none;
-}
-
-.htmx-request .htmx-indicator {
-    display: block;
-}
-
-.htmx-request.htmx-indicator {
-    display: block;
 }
 </style>
 

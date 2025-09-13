@@ -41,8 +41,3 @@ document.addEventListener('htmx:afterSwap', function(e) {
         htmxCloseMobileSidebar();
     }
 });
-
-// Legacy function stub for backward compatibility (deprecated)
-function initializeTabs() {
-    console.warn('initializeTabs() is deprecated - navigation now handled by HTMX');
-}
