@@ -18,17 +18,13 @@
     <!-- Main Content Area -->
     <div class="flex-1 overflow-hidden lg:ml-0">
         <div class="h-full overflow-y-auto p-6">
-            {% include "partials/repositories/tab.html" %}
-            {% include "partials/backups/tab.html" %}
-            {% include "partials/schedules/tab.html" %}
-            {% include "partials/cloud_sync/tab.html" %}
-            {% include "partials/archives/tab.html" %}
-            {% include "partials/statistics/tab.html" %}
-            {% include "partials/jobs/tab.html" %}
-            {% include "partials/notifications/tab.html" %}
-            {% include "partials/cleanup/tab.html" %}
-            {% include "partials/repository_check/tab.html" %}
-            {% include "partials/debug/tab.html" %}
+            <!-- Main Content Container - tabs loaded here via HTMX -->
+            <div id="main-content"
+                 hx-get="{{ initial_content_url or '/api/tabs/repositories' }}"
+                 hx-trigger="load">
+                <!-- Default loading state -->
+                <div class="text-gray-500 dark:text-gray-400 text-sm">Loading {{ active_tab or 'repositories' }}...</div>
+            </div>
         </div>
     </div>
 </div>
@@ -40,6 +36,11 @@
 
 .tab-content {
     min-height: 500px;
+}
+
+/* HTMX Loading Indicator - Only shows when explicitly targeted */
+.htmx-indicator {
+    display: none;
 }
 </style>
 

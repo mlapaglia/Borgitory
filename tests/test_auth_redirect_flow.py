@@ -49,13 +49,26 @@ class TestAuthRedirectFlow:
             headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
             follow_redirects=False
         )
-        
+
         print(f"Main page response status: {response2.status_code}")
         print(f"Main page response headers: {dict(response2.headers)}")
-        
-        # Should get 200 OK, not redirect back to login
-        assert response2.status_code == 200
-        assert "Borgitory" in response2.text
+
+        # Should get 302 redirect to repositories (not back to login)
+        assert response2.status_code == 302
+        assert response2.headers["location"] == "/repositories"
+
+        # Follow the redirect to make sure we get the repositories page
+        response3 = await async_client.get(
+            "/repositories",
+            headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+            follow_redirects=False
+        )
+
+        print(f"Repositories page response status: {response3.status_code}")
+
+        # Should get 200 OK for repositories page
+        assert response3.status_code == 200
+        assert "Borgitory" in response3.text
         
     @pytest.mark.asyncio
     async def test_login_sets_cookie_correctly(self, async_client: AsyncClient, test_db: Session):

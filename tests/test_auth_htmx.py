@@ -69,7 +69,7 @@ class TestAuthHTMX:
         
         # Check for success message and HX-Redirect header
         assert "Login successful! Redirecting..." in response.text
-        assert response.headers.get("HX-Redirect") == "/"
+        assert response.headers.get("HX-Redirect") == "/repositories"
 
     @pytest.mark.asyncio
     async def test_login_htmx_invalid_credentials(self, async_client: AsyncClient, test_db: Session):

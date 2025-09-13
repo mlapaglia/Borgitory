@@ -7,9 +7,6 @@ function borgitoryApp() {
         checkConfigs: [],
         
         initApp() {
-            initializeTabs();
-            // Store instance globally for form handler
-            window.borgitoryAppInstance = this;
         },
     };
 }
