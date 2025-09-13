@@ -1,116 +1,83 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-from typing import List
-
-from app.models.database import get_db, RepositoryCheckConfig
 from app.models.schemas import (
     RepositoryCheckConfigCreate,
     RepositoryCheckConfigUpdate,
-    RepositoryCheckConfig as RepositoryCheckConfigSchema,
+)
+
+from app.dependencies import (
+    TemplatesDep,
+    RepositoryCheckConfigServiceDep
 )
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 
-@router.post("/", response_model=RepositoryCheckConfigSchema)
+@router.post("/", response_class=HTMLResponse)
 async def create_repository_check_config(
-    request: Request, config: RepositoryCheckConfigCreate, db: Session = Depends(get_db)
+    request: Request,
+    config: RepositoryCheckConfigCreate,
+    templates: TemplatesDep,
+    service: RepositoryCheckConfigServiceDep,
 ):
     """Create a new repository check configuration"""
-    is_htmx_request = "hx-request" in request.headers
-
-    try:
-        # Check if name already exists
-        existing = (
-            db.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.name == config.name)
-            .first()
-        )
-        if existing:
-            error_msg = "A check policy with this name already exists"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repository_check/create_error.html",
-                    {"error_message": error_msg},
-                    status_code=400,
-                )
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        # Create the config
-        db_config = RepositoryCheckConfig(
-            name=config.name,
-            description=config.description,
-            check_type=config.check_type,
-            verify_data=config.verify_data,
-            repair_mode=config.repair_mode,
-            save_space=config.save_space,
-            max_duration=config.max_duration,
-            archive_prefix=config.archive_prefix,
-            archive_glob=config.archive_glob,
-            first_n_archives=config.first_n_archives,
-            last_n_archives=config.last_n_archives,
-        )
-
-        db.add(db_config)
-        db.commit()
-        db.refresh(db_config)
-
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/repository_check/create_success.html",
-                {"config_name": config.name},
-            )
-            response.headers["HX-Trigger"] = "checkConfigUpdate"
-            return response
-        else:
-            return db_config
-
-    except Exception as e:
-        error_msg = f"Failed to create check policy: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/create_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
-
-
-@router.get("/", response_model=List[RepositoryCheckConfigSchema])
-def get_repository_check_configs(db: Session = Depends(get_db)):
-    """Get all repository check configurations"""
-    return db.query(RepositoryCheckConfig).order_by(RepositoryCheckConfig.name).all()
-
-
-@router.get("/form")
-async def get_repository_check_form(request: Request, db: Session = Depends(get_db)):
-    """Get repository check form with all dropdowns populated"""
-    from app.models.database import Repository
-
-    repositories = db.query(Repository).all()
-    check_configs = (
-        db.query(RepositoryCheckConfig).filter(RepositoryCheckConfig.enabled).all()
+    success, created_config, error_msg = service.create_config(
+        name=config.name,
+        description=config.description,
+        check_type=config.check_type,
+        verify_data=config.verify_data,
+        repair_mode=config.repair_mode,
+        save_space=config.save_space,
+        max_duration=config.max_duration,
+        archive_prefix=config.archive_prefix,
+        archive_glob=config.archive_glob,
+        first_n_archives=config.first_n_archives,
+        last_n_archives=config.last_n_archives,
     )
+
+    if not success:
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_check/create_error.html",
+            {"error_message": error_msg},
+            status_code=500 if "Failed to" in error_msg else 400,
+        )
+
+    response = templates.TemplateResponse(
+        request,
+        "partials/repository_check/create_success.html",
+        {"config_name": created_config.name},
+    )
+    response.headers["HX-Trigger"] = "checkConfigUpdate"
+    return response
+
+
+@router.get("/", response_class=HTMLResponse)
+def get_repository_check_configs(service: RepositoryCheckConfigServiceDep):
+    """Get all repository check configurations"""
+    return service.get_all_configs()
+
+
+@router.get("/form", response_class=HTMLResponse)
+async def get_repository_check_form(
+    request: Request,
+    templates: TemplatesDep,
+    service: RepositoryCheckConfigServiceDep,
+):
+    """Get repository check form with all dropdowns populated"""
+    form_data = service.get_form_data()
 
     return templates.TemplateResponse(
         request,
         "partials/repository_check/form.html",
-        {
-            "repositories": repositories,
-            "check_configs": check_configs,
-        },
+        form_data,
     )
 
 
 @router.get("/policy-form", response_class=HTMLResponse)
 async def get_policy_form(
-    request: Request, db: Session = Depends(get_db)
+    request: Request,
+    templates: TemplatesDep,
 ) -> HTMLResponse:
     """Get policy creation form"""
     return templates.TemplateResponse(
@@ -121,12 +88,14 @@ async def get_policy_form(
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_repository_check_configs_html(request: Request, db: Session = Depends(get_db)):
+def get_repository_check_configs_html(
+    request: Request,
+    templates: TemplatesDep,
+    service: RepositoryCheckConfigServiceDep,
+):
     """Get repository check configurations as HTML"""
     try:
-        configs = (
-            db.query(RepositoryCheckConfig).order_by(RepositoryCheckConfig.name).all()
-        )
+        configs = service.get_all_configs()
         return templates.TemplateResponse(
             request,
             "partials/repository_check/config_list_content.html",
@@ -143,11 +112,13 @@ def get_repository_check_configs_html(request: Request, db: Session = Depends(ge
 
 
 @router.get("/toggle-custom-options", response_class=HTMLResponse)
-def toggle_custom_options(request: Request, check_config_id: str = ""):
+def toggle_custom_options(
+    request: Request,
+    templates: TemplatesDep,
+    check_config_id: str = "",
+):
     """Toggle custom check options visibility based on policy selection"""
 
-    # If a policy is selected (check_config_id has a value), hide custom options
-    # If no policy is selected (empty string), show custom options
     show_custom = check_config_id == ""
 
     return templates.TemplateResponse(
@@ -162,13 +133,13 @@ def toggle_custom_options(request: Request, check_config_id: str = ""):
 @router.get("/update-options", response_class=HTMLResponse)
 def update_check_options(
     request: Request,
+    templates: TemplatesDep,
     check_type: str = "full",
     max_duration: str = "",
     repair_mode: str = "",
 ):
     """Update check options based on check type selection"""
 
-    # Determine visibility and state based on check type
     if check_type == "repository_only":
         verify_data_disabled = True
         verify_data_opacity = "0.5"
@@ -180,12 +151,10 @@ def update_check_options(
         time_limit_display = "none"
         archive_filters_display = "block"
 
-    # Handle repair mode conflict with time limits
     repair_mode_checked = repair_mode and repair_mode.lower() in ["true", "on", "1"]
     repair_mode_disabled = bool(max_duration and max_duration.strip())
     if repair_mode_disabled and repair_mode_checked:
         repair_mode_checked = False
-        # Note: We can't show notifications in this context, but the conflict is resolved
 
     return templates.TemplateResponse(
         request,
@@ -202,14 +171,12 @@ def update_check_options(
     )
 
 
-@router.get("/{config_id}", response_model=RepositoryCheckConfigSchema)
-def get_repository_check_config(config_id: int, db: Session = Depends(get_db)):
+@router.get("/{config_id}", response_class=HTMLResponse)
+def get_repository_check_config(
+    config_id: int,
+    service: RepositoryCheckConfigServiceDep):
     """Get a specific repository check configuration"""
-    config = (
-        db.query(RepositoryCheckConfig)
-        .filter(RepositoryCheckConfig.id == config_id)
-        .first()
-    )
+    config = service.get_config_by_id(config_id)
     if not config:
         raise HTTPException(status_code=404, detail="Check policy not found")
     return config
@@ -219,15 +186,12 @@ def get_repository_check_config(config_id: int, db: Session = Depends(get_db)):
 async def get_repository_check_config_edit_form(
     request: Request,
     config_id: int,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
+    service: RepositoryCheckConfigServiceDep,
 ) -> HTMLResponse:
     """Get edit form for a specific repository check configuration"""
     try:
-        config = (
-            db.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.id == config_id)
-            .first()
-        )
+        config = service.get_config_by_id(config_id)
         if not config:
             raise HTTPException(status_code=404, detail="Check policy not found")
 
@@ -243,297 +207,130 @@ async def get_repository_check_config_edit_form(
         raise HTTPException(status_code=404, detail=f"Check policy not found: {str(e)}")
 
 
-@router.put("/{config_id}", response_model=RepositoryCheckConfigSchema)
+@router.put("/{config_id}", response_class=HTMLResponse)
 async def update_repository_check_config(
     request: Request,
     config_id: int,
     update_data: RepositoryCheckConfigUpdate,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
+    service: RepositoryCheckConfigServiceDep,
 ):
     """Update a repository check configuration"""
-    is_htmx_request = "hx-request" in request.headers
+    update_dict = update_data.model_dump(exclude_unset=True)
+    success, updated_config, error_msg = service.update_config(config_id, update_dict)
 
-    try:
-        config = (
-            db.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.id == config_id)
-            .first()
+    if not success:
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_check/update_error.html",
+            {"error_message": error_msg},
+            status_code=404 if "not found" in error_msg else 400,
         )
-        if not config:
-            error_msg = "Check policy not found"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repository_check/update_error.html",
-                    {"error_message": error_msg},
-                    status_code=404,
-                )
-            raise HTTPException(status_code=404, detail=error_msg)
 
-        # Check for name conflicts if name is being updated
-        if update_data.name and update_data.name != config.name:
-            existing = (
-                db.query(RepositoryCheckConfig)
-                .filter(
-                    RepositoryCheckConfig.name == update_data.name,
-                    RepositoryCheckConfig.id != config_id,
-                )
-                .first()
-            )
-            if existing:
-                error_msg = "A check policy with this name already exists"
-                if is_htmx_request:
-                    return templates.TemplateResponse(
-                        request,
-                        "partials/repository_check/update_error.html",
-                        {"error_message": error_msg},
-                        status_code=400,
-                    )
-                raise HTTPException(status_code=400, detail=error_msg)
-
-        # Update fields that were provided
-        update_dict = update_data.model_dump(exclude_unset=True)
-        for field, value in update_dict.items():
-            setattr(config, field, value)
-
-        db.commit()
-        db.refresh(config)
-
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/repository_check/update_success.html",
-                {"config_name": config.name},
-            )
-            response.headers["HX-Trigger"] = "checkConfigUpdate"
-            return response
-        else:
-            return config
-
-    except HTTPException as e:
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/update_error.html",
-                {"error_message": str(e.detail)},
-                status_code=e.status_code,
-            )
-        raise
-    except Exception as e:
-        error_msg = f"Failed to update check policy: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/update_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
+    response = templates.TemplateResponse(
+        request,
+        "partials/repository_check/update_success.html",
+        {"config_name": updated_config.name},
+    )
+    response.headers["HX-Trigger"] = "checkConfigUpdate"
+    return response
 
 
-@router.patch("/{config_id}", response_model=RepositoryCheckConfigSchema)
+@router.patch("/{config_id}", response_class=HTMLResponse)
 def patch_repository_check_config(
     config_id: int,
     update_data: RepositoryCheckConfigUpdate,
-    db: Session = Depends(get_db),
+    service: RepositoryCheckConfigServiceDep,
 ):
     """Update a repository check configuration (PATCH method for backwards compatibility)"""
-
-    config = (
-        db.query(RepositoryCheckConfig)
-        .filter(RepositoryCheckConfig.id == config_id)
-        .first()
-    )
-    if not config:
-        raise HTTPException(status_code=404, detail="Check policy not found")
-
-    # Check for name conflicts if name is being updated
-    if update_data.name and update_data.name != config.name:
-        existing = (
-            db.query(RepositoryCheckConfig)
-            .filter(
-                RepositoryCheckConfig.name == update_data.name,
-                RepositoryCheckConfig.id != config_id,
-            )
-            .first()
-        )
-        if existing:
-            raise HTTPException(
-                status_code=400, detail="A check policy with this name already exists"
-            )
-
-    # Update fields that were provided
     update_dict = update_data.model_dump(exclude_unset=True)
-    for field, value in update_dict.items():
-        setattr(config, field, value)
+    success, updated_config, error_msg = service.update_config(config_id, update_dict)
 
-    db.commit()
-    db.refresh(config)
+    if not success:
+        if "not found" in error_msg:
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
 
-    return config
+    return updated_config
 
 
-@router.post("/{config_id}/enable")
+@router.post("/{config_id}/enable", response_class=HTMLResponse)
 async def enable_repository_check_config(
     request: Request,
     config_id: int,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
+    service: RepositoryCheckConfigServiceDep,
 ):
     """Enable a repository check configuration"""
-    is_htmx_request = "hx-request" in request.headers
+    success, success_msg, error_msg = service.enable_config(config_id)
 
-    try:
-        config = (
-            db.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.id == config_id)
-            .first()
+    if not success:
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_check/action_error.html",
+            {"error_message": error_msg},
+            status_code=404 if "not found" in error_msg else 500,
         )
-        if not config:
-            error_msg = "Check policy not found"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repository_check/action_error.html",
-                    {"error_message": error_msg},
-                    status_code=404,
-                )
-            raise HTTPException(status_code=404, detail=error_msg)
 
-        config.enabled = True
-        db.commit()
-
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/repository_check/action_success.html",
-                {"message": f"Check policy '{config.name}' enabled successfully!"},
-            )
-            response.headers["HX-Trigger"] = "checkConfigUpdate"
-            return response
-        else:
-            return {"message": f"Check policy '{config.name}' enabled successfully!"}
-
-    except Exception as e:
-        error_msg = f"Failed to enable check policy: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/action_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
+    response = templates.TemplateResponse(
+        request,
+        "partials/repository_check/action_success.html",
+        {"message": success_msg},
+    )
+    response.headers["HX-Trigger"] = "checkConfigUpdate"
+    return response
 
 
-@router.post("/{config_id}/disable")
+@router.post("/{config_id}/disable", response_class=HTMLResponse)
 async def disable_repository_check_config(
     request: Request,
     config_id: int,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
+    service: RepositoryCheckConfigServiceDep,
 ):
     """Disable a repository check configuration"""
-    is_htmx_request = "hx-request" in request.headers
+    success, success_msg, error_msg = service.disable_config(config_id)
 
-    try:
-        config = (
-            db.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.id == config_id)
-            .first()
+    if not success:
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_check/action_error.html",
+            {"error_message": error_msg},
+            status_code=404 if "not found" in error_msg else 500,
         )
-        if not config:
-            error_msg = "Check policy not found"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repository_check/action_error.html",
-                    {"error_message": error_msg},
-                    status_code=404,
-                )
-            raise HTTPException(status_code=404, detail=error_msg)
 
-        config.enabled = False
-        db.commit()
-
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/repository_check/action_success.html",
-                {"message": f"Check policy '{config.name}' disabled successfully!"},
-            )
-            response.headers["HX-Trigger"] = "checkConfigUpdate"
-            return response
-        else:
-            return {"message": f"Check policy '{config.name}' disabled successfully!"}
-
-    except Exception as e:
-        error_msg = f"Failed to disable check policy: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/action_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
+    response = templates.TemplateResponse(
+        request,
+        "partials/repository_check/action_success.html",
+        {"message": success_msg},
+    )
+    response.headers["HX-Trigger"] = "checkConfigUpdate"
+    return response
 
 
-@router.delete("/{config_id}")
+@router.delete("/{config_id}", response_class=HTMLResponse)
 async def delete_repository_check_config(
     request: Request,
     config_id: int,
-    db: Session = Depends(get_db),
+    templates: TemplatesDep,
+    service: RepositoryCheckConfigServiceDep,
 ):
     """Delete a repository check configuration"""
-    is_htmx_request = "hx-request" in request.headers
+    success, config_name, error_msg = service.delete_config(config_id)
 
-    try:
-        config = (
-            db.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.id == config_id)
-            .first()
+    if not success:
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_check/delete_error.html",
+            {"error_message": error_msg},
+            status_code=404 if "not found" in error_msg else 500,
         )
-        if not config:
-            error_msg = "Check policy not found"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/repository_check/delete_error.html",
-                    {"error_message": error_msg},
-                    status_code=404,
-                )
-            raise HTTPException(status_code=404, detail=error_msg)
 
-        config_name = config.name
-        db.delete(config)
-        db.commit()
-
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/repository_check/delete_success.html",
-                {"config_name": config_name},
-            )
-            response.headers["HX-Trigger"] = "checkConfigUpdate"
-            return response
-        else:
-            return {"message": "Check policy deleted successfully"}
-
-    except HTTPException as e:
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/delete_error.html",
-                {"error_message": str(e.detail)},
-                status_code=e.status_code,
-            )
-        raise
-    except Exception as e:
-        error_msg = f"Failed to delete check policy: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/repository_check/delete_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
+    response = templates.TemplateResponse(
+        request,
+        "partials/repository_check/delete_success.html",
+        {"config_name": config_name},
+    )
+    response.headers["HX-Trigger"] = "checkConfigUpdate"
+    return response
