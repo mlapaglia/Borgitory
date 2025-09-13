@@ -15,17 +15,15 @@ templates = Jinja2Templates(directory="app/templates")
 def check_users_exist(request: Request, db: Session = Depends(get_db)):
     user_count = db.query(User).count()
     has_users = user_count > 0
+    next_url = request.query_params.get("next", "/repositories")
 
-    # Return the appropriate form template based on user existence
     if has_users:
-        # Show login form for existing users
         return templates.TemplateResponse(
-            request, "partials/auth/login_form_active.html", {}
+            request, "partials/auth/login_form_active.html", {"next": next_url}
         )
     else:
-        # Show welcome message and register form for first user
         return templates.TemplateResponse(
-            request, "partials/auth/register_form_active.html", {}
+            request, "partials/auth/register_form_active.html", {"next": next_url}
         )
 
 
@@ -37,7 +35,6 @@ def register_user(
     db: Session = Depends(get_db),
 ):
     try:
-        # Check if any users exist
         user_count = db.query(User).count()
         if user_count > 0:
             return templates.TemplateResponse(
@@ -47,7 +44,6 @@ def register_user(
                 status_code=403,
             )
 
-        # Check if username already exists
         existing_user = db.query(User).filter(User.username == username).first()
         if existing_user:
             return templates.TemplateResponse(
@@ -57,7 +53,6 @@ def register_user(
                 status_code=400,
             )
 
-        # Validate inputs
         if not username or len(username.strip()) < 3:
             return templates.TemplateResponse(
                 request,
@@ -74,7 +69,6 @@ def register_user(
                 status_code=400,
             )
 
-        # Create new user
         user = User(username=username.strip())
         user.set_password(password)
 
@@ -82,7 +76,6 @@ def register_user(
         db.commit()
         db.refresh(user)
 
-        # Return success response
         return templates.TemplateResponse(
             request,
             "partials/shared/notification.html",
@@ -108,10 +101,10 @@ def login_user(
     username: str = Form(...),
     password: str = Form(...),
     remember_me: bool = Form(False),
+    next: str = Form("/repositories"),
     db: Session = Depends(get_db),
 ):
     try:
-        # Find user
         user = db.query(User).filter(User.username == username).first()
         if not user or not user.verify_password(password):
             return templates.TemplateResponse(
@@ -121,7 +114,6 @@ def login_user(
                 status_code=401,
             )
 
-        # Create session token
         auth_token = secrets.token_urlsafe(32)
 
         if remember_me:
@@ -131,12 +123,10 @@ def login_user(
             expires_at = datetime.now(UTC) + timedelta(minutes=30)
             max_age = 30 * 60
 
-        # Clean up expired sessions
         db.query(UserSession).filter(
             UserSession.user_id == user.id, UserSession.expires_at < datetime.now(UTC)
         ).delete()
 
-        # Create new session
         user_agent = request.headers.get("user-agent") if request else None
         client_ip = (
             request.client.host if request and hasattr(request, "client") else None
@@ -155,11 +145,9 @@ def login_user(
         )
         db.add(db_session)
 
-        # Update user's last login
         user.last_login = current_time
         db.commit()
 
-        # Create success template response with HTMX redirect header and set cookie
         success_response = templates.TemplateResponse(
             request,
             "partials/shared/notification.html",
@@ -168,7 +156,7 @@ def login_user(
                 "message": "Login successful! Redirecting...",
             },
         )
-        success_response.headers["HX-Redirect"] = "/"
+        success_response.headers["HX-Redirect"] = next
         success_response.set_cookie(
             key="auth_token",
             value=auth_token,
@@ -192,11 +180,9 @@ def login_user(
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     auth_token = request.cookies.get("auth_token")
     if auth_token:
-        # Delete session from database
         db.query(UserSession).filter(UserSession.session_token == auth_token).delete()
         db.commit()
 
-    # Clear cookie
     response.delete_cookie("auth_token")
     return {"status": "logged out"}
 
@@ -218,7 +204,6 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=401, detail="Session expired")
 
-    # Update session activity for non-remember sessions
     if not session.remember_me:
         session.expires_at = datetime.now(UTC) + timedelta(minutes=30)
         session.last_activity = datetime.now(UTC)

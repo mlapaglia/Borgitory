@@ -11,6 +11,7 @@
           document.getElementById('global-notifications').innerHTML = event.detail.xhr.responseText;
         }
       ">
+    <input type="hidden" name="next" value="{{ next or '/repositories' }}">
     <div class="mb-4">
         <label for="username" class="block text-sm font-medium text-gray-900 mb-2">Username</label>
         <input 

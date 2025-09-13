@@ -18,14 +18,6 @@
     <!-- Main Content Area -->
     <div class="flex-1 overflow-hidden lg:ml-0">
         <div class="h-full overflow-y-auto p-6">
-            <!-- HTMX Loading Indicator -->
-            <div id="loading-indicator" class="htmx-indicator">
-                <div class="flex items-center justify-center p-8">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span class="ml-2 text-gray-600 dark:text-gray-300">Loading...</span>
-                </div>
-            </div>
-
             <!-- Main Content Container - tabs loaded here via HTMX -->
             <div id="main-content"
                  hx-get="{{ initial_content_url or '/api/tabs/repositories' }}"

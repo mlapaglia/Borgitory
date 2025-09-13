@@ -190,6 +190,22 @@ app.include_router(
 app.include_router(debug.router)
 
 
+# Valid tab pages and their corresponding API endpoints
+VALID_TABS = {
+    "repositories": "/api/tabs/repositories",
+    "backups": "/api/tabs/backups",
+    "schedules": "/api/tabs/schedules",
+    "cloud-sync": "/api/tabs/cloud-sync",
+    "archives": "/api/tabs/archives",
+    "statistics": "/api/tabs/statistics",
+    "jobs": "/api/tabs/jobs",
+    "notifications": "/api/tabs/notifications",
+    "cleanup": "/api/tabs/cleanup",
+    "repository-check": "/api/tabs/repository-check",
+    "debug": "/api/tabs/debug"
+}
+
+
 def _render_page_with_tab(request: Request, current_user, active_tab: str, initial_content_url: str):
     """Helper to render the main page with a specific tab active."""
     return templates.TemplateResponse(
@@ -211,142 +227,10 @@ async def root(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user_optional(request, db)
 
     if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url="/login?next=/repositories", status_code=302)
 
-    return _render_page_with_tab(request, current_user, "repositories", "/api/tabs/repositories")
-
-
-# Page routes for direct tab navigation
-@app.get("/repositories")
-async def repositories_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "repositories", "/api/tabs/repositories")
-
-
-@app.get("/backups")
-async def backups_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "backups", "/api/tabs/backups")
-
-
-@app.get("/schedules")
-async def schedules_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "schedules", "/api/tabs/schedules")
-
-
-@app.get("/cloud-sync")
-async def cloud_sync_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "cloud-sync", "/api/tabs/cloud-sync")
-
-
-@app.get("/archives")
-async def archives_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "archives", "/api/tabs/archives")
-
-
-@app.get("/statistics")
-async def statistics_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "statistics", "/api/tabs/statistics")
-
-
-@app.get("/jobs")
-async def jobs_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "jobs", "/api/tabs/jobs")
-
-
-@app.get("/notifications")
-async def notifications_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "notifications", "/api/tabs/notifications")
-
-
-@app.get("/cleanup")
-async def cleanup_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "cleanup", "/api/tabs/cleanup")
-
-
-@app.get("/repository-check")
-async def repository_check_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "repository-check", "/api/tabs/repository-check")
-
-
-@app.get("/debug")
-async def debug_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from app.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    return _render_page_with_tab(request, current_user, "debug", "/api/tabs/debug")
+    # Redirect to repositories tab
+    return RedirectResponse(url="/repositories", status_code=302)
 
 
 @app.get("/login")
@@ -355,8 +239,26 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
     from app.api.auth import get_current_user_optional
 
     current_user = get_current_user_optional(request, db)
+    next_url = request.query_params.get("next", "/repositories")
 
     if current_user:
-        return RedirectResponse(url="/", status_code=302)
+        return RedirectResponse(url=next_url, status_code=302)
 
-    return templates.TemplateResponse(request, "login.html", {})
+    return templates.TemplateResponse(request, "login.html", {"next": next_url})
+
+
+# Dynamic route for all tab pages
+@app.get("/{tab_name}")
+async def tab_page(tab_name: str, request: Request, db: Session = Depends(get_db)):
+    from fastapi.responses import RedirectResponse
+    from fastapi import HTTPException
+    from app.api.auth import get_current_user_optional
+
+    if tab_name not in VALID_TABS:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    current_user = get_current_user_optional(request, db)
+    if not current_user:
+        return RedirectResponse(url=f"/login?next=/{tab_name}", status_code=302)
+
+    return _render_page_with_tab(request, current_user, tab_name, VALID_TABS[tab_name])
