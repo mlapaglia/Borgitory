@@ -30,6 +30,12 @@ from app.services.job_event_broadcaster import (
     JobEventBroadcaster,
     get_job_event_broadcaster,
 )
+from app.services.schedule_service import ScheduleService
+from app.services.configuration_service import ConfigurationService
+from app.services.repository_check_config_service import RepositoryCheckConfigService
+from app.services.notification_config_service import NotificationConfigService
+from app.services.cleanup_service import CleanupService
+from fastapi.templating import Jinja2Templates
 
 
 # Global singleton instances
@@ -66,18 +72,13 @@ def get_borg_service() -> BorgService:
     return _borg_service_instance
 
 
-_job_service_instance = None
-
-def get_job_service() -> JobService:
+def get_job_service(db: Session = Depends(get_db)) -> JobService:
     """
-    Provide a JobService singleton instance.
+    Provide a JobService instance with database session injection.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Note: This creates a new instance per request since it depends on the database session.
     """
-    global _job_service_instance
-    if _job_service_instance is None:
-        _job_service_instance = JobService()
-    return _job_service_instance
+    return JobService(db)
 
 
 _recovery_service_instance = None
@@ -310,6 +311,79 @@ def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
     return get_job_event_broadcaster()
 
 
+_templates_instance = None
+
+def get_templates() -> Jinja2Templates:
+    """
+    Provide a Jinja2Templates singleton instance.
+
+    Uses module-level singleton pattern for application-wide persistence.
+    """
+    global _templates_instance
+    if _templates_instance is None:
+        _templates_instance = Jinja2Templates(directory="app/templates")
+    return _templates_instance
+
+
+def get_schedule_service(
+    db: Session = Depends(get_db),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service)
+) -> ScheduleService:
+    """
+    Provide a ScheduleService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return ScheduleService(db=db, scheduler_service=scheduler_service)
+
+
+_configuration_service_instance = None
+
+def get_configuration_service() -> ConfigurationService:
+    """
+    Provide a ConfigurationService singleton instance.
+
+    Uses module-level singleton pattern for application-wide persistence.
+    """
+    global _configuration_service_instance
+    if _configuration_service_instance is None:
+        _configuration_service_instance = ConfigurationService()
+    return _configuration_service_instance
+
+
+def get_repository_check_config_service(
+    db: Session = Depends(get_db)
+) -> RepositoryCheckConfigService:
+    """
+    Provide a RepositoryCheckConfigService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return RepositoryCheckConfigService(db=db)
+
+
+def get_notification_config_service(
+    db: Session = Depends(get_db)
+) -> NotificationConfigService:
+    """
+    Provide a NotificationConfigService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return NotificationConfigService(db=db)
+
+
+def get_cleanup_service(
+    db: Session = Depends(get_db)
+) -> CleanupService:
+    """
+    Provide a CleanupService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return CleanupService(db=db)
+
+
 # Type aliases for dependency injection
 SimpleCommandRunnerDep = Annotated[
     SimpleCommandRunner, Depends(get_simple_command_runner)
@@ -338,3 +412,9 @@ RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_servi
 JobEventBroadcasterDep = Annotated[
     JobEventBroadcaster, Depends(get_job_event_broadcaster_dep)
 ]
+TemplatesDep = Annotated[Jinja2Templates, Depends(get_templates)]
+ScheduleServiceDep = Annotated[ScheduleService, Depends(get_schedule_service)]
+ConfigurationServiceDep = Annotated[ConfigurationService, Depends(get_configuration_service)]
+RepositoryCheckConfigServiceDep = Annotated[RepositoryCheckConfigService, Depends(get_repository_check_config_service)]
+NotificationConfigServiceDep = Annotated[NotificationConfigService, Depends(get_notification_config_service)]
+CleanupServiceDep = Annotated[CleanupService, Depends(get_cleanup_service)]

@@ -374,9 +374,9 @@ class TestExecuteScheduledBackup:
             # Verify backup job was created with correct JobType
             mock_job_service.create_backup_job.assert_called_once()
             call_args = mock_job_service.create_backup_job.call_args
-            # Third argument should be JobType.SCHEDULED_BACKUP
+            # Second argument should be JobType.SCHEDULED_BACKUP
             from app.models.enums import JobType
-            assert call_args[0][2] == JobType.SCHEDULED_BACKUP
+            assert call_args[0][1] == JobType.SCHEDULED_BACKUP
     
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_with_check(self):
@@ -437,9 +437,9 @@ class TestExecuteScheduledBackup:
             # Verify backup job was created with correct JobType
             mock_job_service.create_backup_job.assert_called_once()
             call_args = mock_job_service.create_backup_job.call_args
-            # Third argument should be JobType.SCHEDULED_BACKUP
+            # Second argument should be JobType.SCHEDULED_BACKUP
             from app.models.enums import JobType
-            assert call_args[0][2] == JobType.SCHEDULED_BACKUP
+            assert call_args[0][1] == JobType.SCHEDULED_BACKUP
     
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_with_cloud_sync(self):
@@ -480,9 +480,9 @@ class TestExecuteScheduledBackup:
             # Verify backup job was created with correct JobType
             mock_job_service.create_backup_job.assert_called_once()
             call_args = mock_job_service.create_backup_job.call_args
-            # Third argument should be JobType.SCHEDULED_BACKUP
+            # Second argument should be JobType.SCHEDULED_BACKUP
             from app.models.enums import JobType
-            assert call_args[0][2] == JobType.SCHEDULED_BACKUP
+            assert call_args[0][1] == JobType.SCHEDULED_BACKUP
     
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_schedule_not_found(self):

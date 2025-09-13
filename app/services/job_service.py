@@ -15,15 +15,16 @@ logger = logging.getLogger(__name__)
 class JobService:
     """Service for managing job operations"""
 
-    def __init__(self, job_manager: Optional[ModularBorgJobManager] = None):
+    def __init__(self, db: Session, job_manager: Optional[ModularBorgJobManager] = None):
+        self.db = db
         self.job_manager = job_manager or get_job_manager()
 
     async def create_backup_job(
-        self, backup_request: BackupRequest, db: Session, job_type: JobType
+        self, backup_request: BackupRequest, job_type: JobType
     ) -> Dict[str, Any]:
         """Create a backup job with optional cleanup and check tasks"""
         repository = (
-            db.query(Repository)
+            self.db.query(Repository)
             .filter(Repository.id == backup_request.repository_id)
             .first()
         )
@@ -32,7 +33,7 @@ class JobService:
             raise ValueError("Repository not found")
 
         # Use TaskDefinitionBuilder to create all task definitions
-        builder = TaskDefinitionBuilder(db)
+        builder = TaskDefinitionBuilder(self.db)
 
         backup_params = {
             "source_path": backup_request.source_path,
@@ -62,11 +63,11 @@ class JobService:
         return {"job_id": job_id, "status": "started"}
 
     async def create_prune_job(
-        self, prune_request: PruneRequest, db: Session
+        self, prune_request: PruneRequest
     ) -> Dict[str, Any]:
         """Create a standalone prune job"""
         repository = (
-            db.query(Repository)
+            self.db.query(Repository)
             .filter(Repository.id == prune_request.repository_id)
             .first()
         )
@@ -75,7 +76,7 @@ class JobService:
             raise ValueError("Repository not found")
 
         # Use TaskDefinitionBuilder to create prune task
-        builder = TaskDefinitionBuilder(db)
+        builder = TaskDefinitionBuilder(self.db)
         task_def = builder.build_prune_task_from_request(prune_request, repository.name)
         task_definitions = [task_def]
 
@@ -90,11 +91,11 @@ class JobService:
         return {"job_id": job_id, "status": "started"}
 
     async def create_check_job(
-        self, check_request: CheckRequest, db: Session
+        self, check_request: CheckRequest
     ) -> Dict[str, Any]:
         """Create a repository check job"""
         repository = (
-            db.query(Repository)
+            self.db.query(Repository)
             .filter(Repository.id == check_request.repository_id)
             .first()
         )
@@ -103,7 +104,7 @@ class JobService:
             raise ValueError("Repository not found")
 
         # Use TaskDefinitionBuilder to create check task
-        builder = TaskDefinitionBuilder(db)
+        builder = TaskDefinitionBuilder(self.db)
 
         # Determine check parameters - either from config or request
         if check_request.check_config_id:
@@ -131,11 +132,11 @@ class JobService:
         return {"job_id": job_id, "status": "started"}
 
     def list_jobs(
-        self, skip: int = 0, limit: int = 100, job_type: str = None, db: Session = None
+        self, skip: int = 0, limit: int = 100, job_type: str = None
     ) -> List[Dict[str, Any]]:
         """List database job records and active JobManager jobs"""
         # Get database jobs (legacy) with repository relationship loaded
-        query = db.query(Job).options(joinedload(Job.repository))
+        query = self.db.query(Job).options(joinedload(Job.repository))
 
         # Filter by type if provided
         if job_type:
@@ -205,7 +206,7 @@ class JobService:
 
         return jobs_list
 
-    def get_job(self, job_id: str, db: Session) -> Optional[Dict[str, Any]]:
+    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get job details - supports both database IDs and JobManager IDs"""
         # Try to get from JobManager first (if it's a UUID format)
         if len(job_id) > 10:  # Probably a UUID
@@ -226,7 +227,7 @@ class JobService:
         # Try database lookup
         try:
             job = (
-                db.query(Job)
+                self.db.query(Job)
                 .options(joinedload(Job.repository))
                 .filter(Job.id == job_id)
                 .first()
@@ -299,7 +300,7 @@ class JobService:
             )
             return output
 
-    async def cancel_job(self, job_id: str, db: Session) -> bool:
+    async def cancel_job(self, job_id: str) -> bool:
         """Cancel a running job"""
         # Try to cancel in JobManager first
         if len(job_id) > 10:  # Probably a UUID
@@ -310,7 +311,7 @@ class JobService:
         # Try database job
         try:
             job = (
-                db.query(Job)
+                self.db.query(Job)
                 .options(joinedload(Job.repository))
                 .filter(Job.id == job_id)
                 .first()
@@ -319,7 +320,7 @@ class JobService:
                 # Update database status
                 job.status = "cancelled"
                 job.finished_at = datetime.now(UTC)
-                db.commit()
+                self.db.commit()
                 return True
         except ValueError:
             pass
@@ -360,3 +361,13 @@ class JobService:
     def get_queue_stats(self) -> Dict[str, Any]:
         """Get backup queue statistics"""
         return self.job_manager.get_queue_stats()
+
+    def run_database_migration(self) -> Dict[str, str]:
+        """Run database migration for jobs table"""
+        try:
+            from app.models.database import migrate_job_table
+
+            migrate_job_table()
+            return {"message": "Database migration completed successfully"}
+        except Exception as e:
+            raise Exception(f"Migration failed: {str(e)}")

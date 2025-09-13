@@ -1,347 +1,403 @@
 """
-Tests for cleanup API endpoints
+Tests for cleanup API endpoints - HTMX and response validation focused
 """
-import pytest
-from httpx import AsyncClient
-from sqlalchemy.orm import Session
 
-from app.models.database import Repository, CleanupConfig
+import pytest
+from unittest.mock import MagicMock
+from fastapi import Request
+from fastapi.responses import HTMLResponse
+
+from app.models.schemas import CleanupConfigCreate, CleanupConfigUpdate
+
+
+@pytest.fixture
+def mock_request():
+    """Mock FastAPI request"""
+    request = MagicMock(spec=Request)
+    request.headers = {}
+    return request
+
+
+@pytest.fixture
+def mock_templates():
+    """Mock templates dependency"""
+    templates = MagicMock()
+    mock_response = MagicMock(spec=HTMLResponse)
+    mock_response.headers = {}
+    templates.TemplateResponse.return_value = mock_response
+    templates.get_template.return_value.render.return_value = "mocked html content"
+    return templates
+
+
+@pytest.fixture
+def mock_service():
+    """Mock CleanupService"""
+    service = MagicMock()
+    return service
+
+
+@pytest.fixture
+def sample_config_create():
+    """Sample config creation data"""
+    return CleanupConfigCreate(
+        name="test-config",
+        strategy="simple",
+        keep_within_days=30
+    )
+
+
+@pytest.fixture
+def sample_config_update():
+    """Sample config update data"""
+    return CleanupConfigUpdate(
+        name="updated-config",
+        keep_within_days=60
+    )
 
 
 class TestCleanupAPI:
-    """Test class for cleanup API endpoints."""
+    """Test class for API endpoints focusing on HTMX responses."""
 
     @pytest.mark.asyncio
-    async def test_get_cleanup_form(self, async_client: AsyncClient, test_db: Session):
-        """Test getting cleanup configuration form."""
-        # Create test repository
-        repository = Repository(
-            name="test-repo",
-            path="/tmp/test-repo",
+    async def test_get_cleanup_form_success(self, mock_request, mock_templates, mock_service):
+        """Test getting cleanup form returns correct template response."""
+        from app.api.cleanup import get_cleanup_form
+
+        mock_form_data = {"repositories": []}
+        mock_service.get_form_data.return_value = mock_form_data
+
+        await get_cleanup_form(mock_request, mock_templates, mock_service)
+
+        # Verify service was called
+        mock_service.get_form_data.assert_called_once()
+
+        # Verify template was rendered
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/config_form.html",
+            mock_form_data,
         )
-        repository.set_passphrase("test-passphrase")
-        test_db.add(repository)
-        test_db.commit()
-        
-        response = await async_client.get("/api/cleanup/form")
-        
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        
-        content = response.text
-        assert "test-repo" in content
 
     @pytest.mark.asyncio
-    async def test_get_cleanup_form_empty_database(self, async_client: AsyncClient, test_db: Session):
-        """Test getting cleanup form when no repositories exist."""
-        response = await async_client.get("/api/cleanup/form")
-        
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+    async def test_get_policy_form_success(self, mock_request, mock_templates):
+        """Test getting policy form returns correct template response."""
+        from app.api.cleanup import get_policy_form
 
-    @pytest.mark.asyncio
-    async def test_get_strategy_fields_simple(self, async_client: AsyncClient):
-        """Test getting strategy fields for simple strategy."""
-        response = await async_client.get("/api/cleanup/strategy-fields?strategy=simple")
-        
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        
-        # The response should contain strategy-specific fields
-        content = response.text
-        assert len(content) > 0
+        await get_policy_form(mock_request, mock_templates)
 
-    @pytest.mark.asyncio
-    async def test_get_strategy_fields_advanced(self, async_client: AsyncClient):
-        """Test getting strategy fields for advanced strategy."""
-        response = await async_client.get("/api/cleanup/strategy-fields?strategy=advanced")
-        
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-
-    @pytest.mark.asyncio
-    async def test_get_strategy_fields_default(self, async_client: AsyncClient):
-        """Test getting strategy fields with default strategy."""
-        response = await async_client.get("/api/cleanup/strategy-fields")
-        
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-
-    @pytest.mark.asyncio
-    async def test_create_cleanup_config_success(self, async_client: AsyncClient, test_db: Session):
-        """Test successful cleanup config creation via API."""
-        config_data = {
-            "name": "test-cleanup",
-            "strategy": "simple",
-            "keep_within_days": 30,
-            "show_list": True,
-            "show_stats": True,
-            "save_space": False
-        }
-        
-        response = await async_client.post("/api/cleanup/", json=config_data)
-        
-        assert response.status_code == 201
-        response_data = response.json()
-        assert response_data["name"] == "test-cleanup"
-        assert response_data["strategy"] == "simple"
-        assert response_data["keep_within_days"] == 30
-
-    @pytest.mark.asyncio
-    async def test_create_cleanup_config_htmx_success(self, async_client: AsyncClient, test_db: Session):
-        """Test successful cleanup config creation via HTMX."""
-        config_data = {
-            "name": "test-cleanup-htmx",
-            "strategy": "simple",
-            "keep_within_days": 30,
-            "show_list": True,
-            "show_stats": True,
-            "save_space": False
-        }
-        
-        response = await async_client.post(
-            "/api/cleanup/", 
-            json=config_data,
-            headers={"hx-request": "true"}
+        # Verify template was rendered
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/create_form.html",
+            {},
         )
-        
-        assert response.status_code == 200  # HTMX responses return 200 with HTML
-        assert "text/html" in response.headers["content-type"]
-        assert "HX-Trigger" in response.headers
-        assert response.headers["HX-Trigger"] == "cleanupConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_create_cleanup_config_validation_error(self, async_client: AsyncClient):
-        """Test cleanup config creation with validation error."""
-        config_data = {
-            "name": "test-cleanup",
-            "strategy": "simple",
-            # Missing keep_within_days
-            "show_list": True,
-            "show_stats": True,
-            "save_space": False
-        }
-        
-        response = await async_client.post("/api/cleanup/", json=config_data)
-        
-        assert response.status_code == 400
-        assert "Simple strategy requires keep_within_days" in response.json()["detail"]
+    async def test_get_strategy_fields_success(self, mock_request, mock_templates):
+        """Test getting strategy fields returns correct template response."""
+        from app.api.cleanup import get_strategy_fields
 
-    @pytest.mark.asyncio
-    async def test_create_cleanup_config_advanced_success(self, async_client: AsyncClient, test_db: Session):
-        """Test creating advanced strategy cleanup config."""
-        config_data = {
-            "name": "advanced-cleanup",
-            "strategy": "advanced",
-            "keep_daily": 7,
-            "keep_weekly": 4,
-            "keep_monthly": 6,
-            "keep_yearly": 1,
-            "show_list": True,
-            "show_stats": True,
-            "save_space": False
-        }
-        
-        response = await async_client.post("/api/cleanup/", json=config_data)
-        
-        assert response.status_code == 201
-        response_data = response.json()
-        assert response_data["name"] == "advanced-cleanup"
-        assert response_data["strategy"] == "advanced"
-        assert response_data["keep_daily"] == 7
+        await get_strategy_fields(mock_request, mock_templates, strategy="advanced")
 
-    @pytest.mark.asyncio
-    async def test_create_cleanup_config_advanced_validation_error(self, async_client: AsyncClient):
-        """Test advanced strategy cleanup config without retention rules."""
-        config_data = {
-            "name": "bad-advanced-cleanup",
-            "strategy": "advanced",
-            # Missing all keep_* parameters
-            "show_list": True,
-            "show_stats": True,
-            "save_space": False
-        }
-        
-        response = await async_client.post("/api/cleanup/", json=config_data)
-        
-        assert response.status_code == 400
-        assert "Advanced strategy requires at least one keep_* parameter" in response.json()["detail"]
-
-    @pytest.mark.asyncio
-    async def test_list_cleanup_configs_empty(self, async_client: AsyncClient):
-        """Test listing cleanup configurations when empty."""
-        response = await async_client.get("/api/cleanup/")
-        
-        assert response.status_code == 200
-        response_data = response.json()
-        assert isinstance(response_data, list)
-        assert len(response_data) == 0
-
-    @pytest.mark.asyncio
-    async def test_list_cleanup_configs_with_data(self, async_client: AsyncClient, test_db: Session):
-        """Test listing cleanup configurations with data."""
-        # Create test configs
-        config1 = CleanupConfig(
-            name="config-1",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+        # Verify template was rendered
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/strategy_fields.html",
+            {"strategy": "advanced"},
         )
-        config2 = CleanupConfig(
-            name="config-2",
-            strategy="advanced",
-            keep_daily=7,
-            enabled=False
+
+    @pytest.mark.asyncio
+    async def test_create_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
+        """Test successful config creation returns correct HTMX response."""
+        from app.api.cleanup import create_cleanup_config
+
+        # Mock successful service response
+        mock_config = MagicMock()
+        mock_config.name = "test-config"
+        mock_service.create_cleanup_config.return_value = (True, mock_config, None)
+
+        result = await create_cleanup_config(
+            mock_request, sample_config_create, mock_templates, mock_service
         )
-        
-        test_db.add(config1)
-        test_db.add(config2)
-        test_db.commit()
-        
-        response = await async_client.get("/api/cleanup/")
-        
-        assert response.status_code == 200
-        response_data = response.json()
-        assert len(response_data) == 2
-        assert response_data[0]["name"] == "config-1"
-        assert response_data[1]["name"] == "config-2"
 
-    @pytest.mark.asyncio
-    async def test_list_cleanup_configs_with_pagination(self, async_client: AsyncClient):
-        """Test listing cleanup configurations with pagination."""
-        response = await async_client.get("/api/cleanup/?skip=10&limit=5")
-        
-        assert response.status_code == 200
-        # Should return empty list since no data
-        assert response.json() == []
+        # Verify service was called with correct parameters
+        mock_service.create_cleanup_config.assert_called_once_with(sample_config_create)
 
-    @pytest.mark.asyncio
-    async def test_get_cleanup_configs_html_empty(self, async_client: AsyncClient):
-        """Test getting cleanup configs as HTML when empty."""
-        response = await async_client.get("/api/cleanup/html")
-        
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-
-    @pytest.mark.asyncio
-    async def test_get_cleanup_configs_html_with_data(self, async_client: AsyncClient, test_db: Session):
-        """Test getting cleanup configs as HTML with data."""
-        # Create test configs
-        config = CleanupConfig(
-            name="html-test-config",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+        # Verify HTMX success template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/create_success.html",
+            {"config_name": "test-config"},
         )
-        test_db.add(config)
-        test_db.commit()
-        
-        response = await async_client.get("/api/cleanup/html")
-        
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        
-        content = response.text
-        # Should contain the config name
-        assert "html-test-config" in content
+
+        # Verify HX-Trigger header is set
+        assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_enable_disable_delete_config_lifecycle(self, async_client: AsyncClient, test_db: Session):
-        """Test complete lifecycle: create, enable, disable, delete."""
-        # First create a config
-        config_data = {
-            "name": "lifecycle-test",
-            "strategy": "simple",
-            "keep_within_days": 15,
-            "show_list": True,
-            "show_stats": True,
-            "save_space": False
-        }
-        
-        create_response = await async_client.post("/api/cleanup/", json=config_data)
-        assert create_response.status_code == 201
-        
-        config_id = create_response.json()["id"]
-        
-        # Test enable
-        enable_response = await async_client.post(f"/api/cleanup/{config_id}/enable")
-        assert enable_response.status_code == 200
-        assert "enabled successfully" in enable_response.json()["message"]
-        
-        # Test disable
-        disable_response = await async_client.post(f"/api/cleanup/{config_id}/disable")
-        assert disable_response.status_code == 200
-        assert "disabled successfully" in disable_response.json()["message"]
-        
-        # Test delete
-        delete_response = await async_client.delete(f"/api/cleanup/{config_id}")
-        assert delete_response.status_code == 200
-        assert "deleted successfully" in delete_response.json()["message"]
+    async def test_create_cleanup_config_failure_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
+        """Test failed config creation returns correct HTMX error response."""
+        from app.api.cleanup import create_cleanup_config
 
-    @pytest.mark.asyncio
-    async def test_enable_config_not_found(self, async_client: AsyncClient):
-        """Test enabling non-existent config."""
-        response = await async_client.post("/api/cleanup/999/enable")
-        
-        assert response.status_code == 500  # Service throws generic error
-        assert "Failed to enable cleanup configuration" in response.json()["detail"]
+        # Mock service failure
+        mock_service.create_cleanup_config.return_value = (False, None, "Failed to create cleanup configuration")
 
-    @pytest.mark.asyncio
-    async def test_disable_config_not_found(self, async_client: AsyncClient):
-        """Test disabling non-existent config."""
-        response = await async_client.post("/api/cleanup/999/disable")
-        
-        assert response.status_code == 500  # Service throws generic error
-        assert "Failed to disable cleanup configuration" in response.json()["detail"]
-
-    @pytest.mark.asyncio
-    async def test_delete_config_not_found(self, async_client: AsyncClient):
-        """Test deleting non-existent config."""
-        response = await async_client.delete("/api/cleanup/999")
-        
-        assert response.status_code == 404  # Not found error
-        assert "Cleanup configuration not found" in response.json()["detail"]
-
-    @pytest.mark.asyncio
-    async def test_htmx_responses_have_correct_headers(self, async_client: AsyncClient, test_db: Session):
-        """Test that HTMX requests return proper response headers."""
-        # Create a config first
-        config = CleanupConfig(
-            name="htmx-test",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+        await create_cleanup_config(
+            mock_request, sample_config_create, mock_templates, mock_service
         )
-        test_db.add(config)
-        test_db.commit()
-        
-        # Test enable with HTMX
-        response = await async_client.post(
-            f"/api/cleanup/{config.id}/enable",
-            headers={"hx-request": "true"}
+
+        # Verify error template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/create_error.html",
+            {"error_message": "Failed to create cleanup configuration"},
+            status_code=400,
         )
-        
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        assert "HX-Trigger" in response.headers
-        assert response.headers["HX-Trigger"] == "cleanupConfigUpdate"
+
+    def test_list_cleanup_configs_success(self, mock_service):
+        """Test listing configs returns service result."""
+        from app.api.cleanup import list_cleanup_configs
+
+        mock_configs = [MagicMock(), MagicMock()]
+        mock_service.get_cleanup_configs.return_value = mock_configs
+
+        result = list_cleanup_configs(mock_service, skip=0, limit=100)
+
+        # Verify service was called with correct parameters
+        mock_service.get_cleanup_configs.assert_called_once_with(0, 100)
+
+        # Verify result is returned
+        assert result == mock_configs
+
+    def test_get_cleanup_configs_html_success(self, mock_request, mock_templates, mock_service):
+        """Test getting configs HTML returns correct template response."""
+        from app.api.cleanup import get_cleanup_configs_html
+
+        mock_configs_data = [
+            {"name": "config1", "description": "Keep archives within 30 days"},
+            {"name": "config2", "description": "7 daily, 4 weekly"}
+        ]
+        mock_service.get_configs_with_descriptions.return_value = mock_configs_data
+
+        get_cleanup_configs_html(mock_request, mock_templates, mock_service)
+
+        # Verify service was called
+        mock_service.get_configs_with_descriptions.assert_called_once()
+
+        # Verify template was rendered
+        mock_templates.get_template.assert_called_once_with(
+            "partials/cleanup/config_list_content.html"
+        )
+
+    def test_get_cleanup_configs_html_exception(self, mock_request, mock_templates, mock_service):
+        """Test getting configs HTML with exception returns error template."""
+        from app.api.cleanup import get_cleanup_configs_html
+
+        mock_service.get_configs_with_descriptions.side_effect = Exception("Service error")
+
+        get_cleanup_configs_html(mock_request, mock_templates, mock_service)
+
+        # Verify error template response
+        mock_templates.get_template.assert_called_with("partials/jobs/error_state.html")
 
     @pytest.mark.asyncio
-    async def test_create_duplicate_name(self, async_client: AsyncClient, test_db: Session):
-        """Test creating cleanup config with duplicate name."""
-        # Create first config
-        config_data = {
-            "name": "duplicate-test",
-            "strategy": "simple",
-            "keep_within_days": 30,
-            "show_list": True,
-            "show_stats": True,
-            "save_space": False
-        }
-        
-        first_response = await async_client.post("/api/cleanup/", json=config_data)
-        assert first_response.status_code == 201
-        
-        # Try to create duplicate (should succeed as there's no unique constraint in the model)
-        second_response = await async_client.post("/api/cleanup/", json=config_data)
-        assert second_response.status_code == 201  # Model allows duplicates
+    async def test_enable_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+        """Test successful config enable returns correct HTMX response."""
+        from app.api.cleanup import enable_cleanup_config
+
+        mock_config = MagicMock()
+        mock_config.name = "test-config"
+        mock_service.enable_cleanup_config.return_value = (True, mock_config, None)
+
+        result = await enable_cleanup_config(mock_request, 1, mock_templates, mock_service)
+
+        # Verify service was called
+        mock_service.enable_cleanup_config.assert_called_once_with(1)
+
+        # Verify HTMX success template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/action_success.html",
+            {"message": "Cleanup policy 'test-config' enabled successfully!"},
+        )
+
+        # Verify HX-Trigger header is set
+        assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
+
+    @pytest.mark.asyncio
+    async def test_enable_cleanup_config_not_found_htmx_response(self, mock_request, mock_templates, mock_service):
+        """Test enabling non-existent config returns correct HTMX error response."""
+        from app.api.cleanup import enable_cleanup_config
+
+        mock_service.enable_cleanup_config.return_value = (False, None, "Cleanup configuration not found")
+
+        await enable_cleanup_config(mock_request, 999, mock_templates, mock_service)
+
+        # Verify error template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/action_error.html",
+            {"error_message": "Cleanup configuration not found"},
+            status_code=404,
+        )
+
+    @pytest.mark.asyncio
+    async def test_disable_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+        """Test successful config disable returns correct HTMX response."""
+        from app.api.cleanup import disable_cleanup_config
+
+        mock_config = MagicMock()
+        mock_config.name = "test-config"
+        mock_service.disable_cleanup_config.return_value = (True, mock_config, None)
+
+        result = await disable_cleanup_config(mock_request, 1, mock_templates, mock_service)
+
+        # Verify service was called
+        mock_service.disable_cleanup_config.assert_called_once_with(1)
+
+        # Verify HTMX success template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/action_success.html",
+            {"message": "Cleanup policy 'test-config' disabled successfully!"},
+        )
+
+        # Verify HX-Trigger header is set
+        assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
+
+    @pytest.mark.asyncio
+    async def test_disable_cleanup_config_not_found_htmx_response(self, mock_request, mock_templates, mock_service):
+        """Test disabling non-existent config returns correct HTMX error response."""
+        from app.api.cleanup import disable_cleanup_config
+
+        mock_service.disable_cleanup_config.return_value = (False, None, "Cleanup configuration not found")
+
+        await disable_cleanup_config(mock_request, 999, mock_templates, mock_service)
+
+        # Verify error template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/action_error.html",
+            {"error_message": "Cleanup configuration not found"},
+            status_code=404,
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_cleanup_config_edit_form_success(self, mock_request, mock_templates, mock_service):
+        """Test getting edit form returns correct template response."""
+        from app.api.cleanup import get_cleanup_config_edit_form
+
+        mock_config = MagicMock()
+        mock_service.get_cleanup_config_by_id.return_value = mock_config
+
+        await get_cleanup_config_edit_form(mock_request, 1, mock_templates, mock_service)
+
+        # Verify service was called
+        mock_service.get_cleanup_config_by_id.assert_called_once_with(1)
+
+        # Verify correct template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/edit_form.html",
+            {
+                "config": mock_config,
+                "is_edit_mode": True,
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_cleanup_config_edit_form_not_found(self, mock_request, mock_templates, mock_service):
+        """Test getting edit form for non-existent config raises HTTPException."""
+        from app.api.cleanup import get_cleanup_config_edit_form
+        from fastapi import HTTPException
+
+        mock_service.get_cleanup_config_by_id.return_value = None
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_cleanup_config_edit_form(mock_request, 999, mock_templates, mock_service)
+
+        assert exc_info.value.status_code == 404
+        assert "Cleanup configuration not found" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_update_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_update):
+        """Test successful config update returns correct HTMX response."""
+        from app.api.cleanup import update_cleanup_config
+
+        mock_config = MagicMock()
+        mock_config.name = "updated-config"
+        mock_service.update_cleanup_config.return_value = (True, mock_config, None)
+
+        result = await update_cleanup_config(
+            mock_request, 1, sample_config_update, mock_templates, mock_service
+        )
+
+        # Verify service was called with correct parameters
+        mock_service.update_cleanup_config.assert_called_once_with(1, sample_config_update)
+
+        # Verify HTMX success template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/update_success.html",
+            {"config_name": "updated-config"},
+        )
+
+        # Verify HX-Trigger header is set
+        assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
+
+    @pytest.mark.asyncio
+    async def test_update_cleanup_config_failure_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_update):
+        """Test failed config update returns correct HTMX error response."""
+        from app.api.cleanup import update_cleanup_config
+
+        mock_service.update_cleanup_config.return_value = (False, None, "Cleanup configuration not found")
+
+        await update_cleanup_config(
+            mock_request, 999, sample_config_update, mock_templates, mock_service
+        )
+
+        # Verify error template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/update_error.html",
+            {"error_message": "Cleanup configuration not found"},
+            status_code=404,
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+        """Test successful config deletion returns correct HTMX response."""
+        from app.api.cleanup import delete_cleanup_config
+
+        mock_service.delete_cleanup_config.return_value = (True, "test-config", None)
+
+        result = await delete_cleanup_config(mock_request, 1, mock_templates, mock_service)
+
+        # Verify service was called
+        mock_service.delete_cleanup_config.assert_called_once_with(1)
+
+        # Verify HTMX success template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/action_success.html",
+            {"message": "Cleanup configuration 'test-config' deleted successfully!"},
+        )
+
+        # Verify HX-Trigger header is set
+        assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
+
+    @pytest.mark.asyncio
+    async def test_delete_cleanup_config_failure_htmx_response(self, mock_request, mock_templates, mock_service):
+        """Test failed config deletion returns correct HTMX error response."""
+        from app.api.cleanup import delete_cleanup_config
+
+        mock_service.delete_cleanup_config.return_value = (False, None, "Cleanup configuration not found")
+
+        await delete_cleanup_config(mock_request, 999, mock_templates, mock_service)
+
+        # Verify error template response
+        mock_templates.TemplateResponse.assert_called_once_with(
+            mock_request,
+            "partials/cleanup/action_error.html",
+            {"error_message": "Cleanup configuration not found"},
+            status_code=404,
+        )

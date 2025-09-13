@@ -15,8 +15,11 @@ from app.services.cloud_sync_service import CloudSyncService
 from app.dependencies import RcloneServiceDep
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 logger = logging.getLogger(__name__)
+
+
+def get_templates() -> Jinja2Templates:
+    return Jinja2Templates(directory="app/templates")
 
 
 def get_cloud_sync_service(db: Session = Depends(get_db)) -> CloudSyncService:
@@ -25,13 +28,18 @@ def get_cloud_sync_service(db: Session = Depends(get_db)) -> CloudSyncService:
 
 
 @router.get("/add-form", response_class=HTMLResponse)
-async def get_add_form(request: Request) -> HTMLResponse:
+async def get_add_form(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates)) -> HTMLResponse:
     """Get the add form (for cancel functionality)"""
     return templates.TemplateResponse(request, "partials/cloud_sync/add_form.html", {})
 
 
 @router.get("/provider-fields", response_class=HTMLResponse)
-async def get_provider_fields(request: Request, provider: str = "") -> HTMLResponse:
+async def get_provider_fields(
+    request: Request,
+    provider: str = "",
+    templates: Jinja2Templates = Depends(get_templates)) -> HTMLResponse:
     """Get dynamic provider fields based on selection"""
     context = {
         "provider": provider,
@@ -59,54 +67,46 @@ async def get_provider_fields(request: Request, provider: str = "") -> HTMLRespo
     )
 
 
-@router.post("/", response_model=CloudSyncConfigSchema)
+@router.post("/", response_class=HTMLResponse)
 async def create_cloud_sync_config(
     request: Request,
     config: CloudSyncConfigCreate,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    templates: Jinja2Templates = Depends(get_templates),
 ):
     """Create a new cloud sync configuration"""
-    is_htmx_request = "hx-request" in request.headers
-
     try:
-        result = cloud_sync_service.create_cloud_sync_config(config)
+        cloud_sync_service.create_cloud_sync_config(config)
 
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/create_success.html",
-                {"config_name": config.name},
-            )
-            response.headers["HX-Trigger"] = "cloudSyncUpdate"
-            return response
-        else:
-            return result
+        response = templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/create_success.html",
+            {"config_name": config.name},
+        )
+        response.headers["HX-Trigger"] = "cloudSyncUpdate"
+        return response
 
     except HTTPException as e:
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/create_error.html",
-                {"error_message": str(e.detail)},
-                status_code=e.status_code,
-            )
-        raise
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/create_error.html",
+            {"error_message": str(e.detail)},
+            status_code=e.status_code,
+        )
     except Exception as e:
         error_msg = f"Failed to create cloud sync configuration: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/create_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/create_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
 
 
 @router.get("/html", response_class=HTMLResponse)
 def get_cloud_sync_configs_html(
-    request: Request,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    templates: Jinja2Templates = Depends(get_templates),
 ) -> str:
     """Get cloud sync configurations as HTML"""
     try:
@@ -174,6 +174,7 @@ async def get_cloud_sync_edit_form(
     request: Request,
     config_id: int,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Get edit form for a specific cloud sync configuration"""
     try:
@@ -241,59 +242,52 @@ async def get_cloud_sync_edit_form(
         )
 
 
-@router.put("/{config_id}", response_model=CloudSyncConfigSchema)
+@router.put("/{config_id}", response_class=HTMLResponse)
 async def update_cloud_sync_config(
     request: Request,
     config_id: int,
     config_update: CloudSyncConfigUpdate,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    templates: Jinja2Templates = Depends(get_templates),
 ):
     """Update a cloud sync configuration"""
-    is_htmx_request = "hx-request" in request.headers
-
     try:
         result = cloud_sync_service.update_cloud_sync_config(config_id, config_update)
 
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/update_success.html",
-                {"config_name": result.name},
-            )
-            response.headers["HX-Trigger"] = "cloudSyncUpdate"
-            return response
-        else:
-            return result
+        response = templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/update_success.html",
+            {"config_name": result.name},
+        )
+        response.headers["HX-Trigger"] = "cloudSyncUpdate"
+        return response
 
     except HTTPException as e:
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/update_error.html",
-                {"error_message": str(e.detail)},
-                status_code=e.status_code,
-            )
-        raise
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/update_error.html",
+            {"error_message": str(e.detail)},
+            status_code=e.status_code,
+        )
     except Exception as e:
         error_msg = f"Failed to update cloud sync configuration: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/update_error.html",
-                {"error_message": error_msg},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_msg)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/update_error.html",
+            {"error_message": error_msg},
+            status_code=500,
+        )
 
 
-@router.delete("/{config_id}", response_model=None)
+@router.delete("/{config_id}", response_class=HTMLResponse)
 def delete_cloud_sync_config(
     request: Request,
     config_id: int,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    templates: Jinja2Templates = Depends(get_templates),
 ):
     """Delete a cloud sync configuration"""
-    is_htmx_request = "hx-request" in request.headers
 
     try:
         config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
@@ -301,38 +295,33 @@ def delete_cloud_sync_config(
         cloud_sync_service.delete_cloud_sync_config(config_id)
         message = f"Cloud sync configuration '{config_name}' deleted successfully!"
 
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/action_success.html",
-                {"message": message},
-            )
-            response.headers["HX-Trigger"] = "cloudSyncUpdate"
-            return response
-        else:
-            return {"message": message}
+        response = templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/action_success.html",
+            {"message": message},
+        )
+        response.headers["HX-Trigger"] = "cloudSyncUpdate"
+        return response
 
     except Exception as e:
         error_message = f"Failed to delete cloud sync configuration: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/action_error.html",
-                {"error_message": error_message},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_message)
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/action_error.html",
+            {"error_message": error_message},
+            status_code=500,
+        )
 
 
-@router.post("/{config_id}/test", response_model=None)
+@router.post("/{config_id}/test", response_class=HTMLResponse)
 async def test_cloud_sync_config(
     request: Request,
     config_id: int,
     rclone: RcloneServiceDep,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    templates: Jinja2Templates = Depends(get_templates),
 ):
     """Test a cloud sync configuration"""
-    is_htmx_request = "hx-request" in request.headers
 
     try:
         result = await cloud_sync_service.test_cloud_sync_config(config_id, rclone)
@@ -343,126 +332,96 @@ async def test_cloud_sync_config(
             if result.get("details"):
                 message += f" (Read: {result['details'].get('read_test', 'N/A')}, Write: {result['details'].get('write_test', 'N/A')})"
 
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/cloud_sync/test_success.html",
-                    {"message": message},
-                )
-            else:
-                return {
-                    "status": "success",
-                    "message": message,
-                    "details": result.get("details", {}),
-                    "output": result.get("output", ""),
-                }
+            return templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/test_success.html",
+                {"message": message},
+            )
         elif result["status"] == "warning":
             message = f"Connection to {config.name} has issues: {result['message']}"
 
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/cloud_sync/test_warning.html",
-                    {"message": message},
-                )
-            else:
-                return {
-                    "status": "warning",
-                    "message": message,
-                    "details": result.get("details", {}),
-                    "output": result.get("output", ""),
-                }
+            return templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/test_warning.html",
+                {"message": message},
+            )
         else:
             error_message = f"Connection test failed: {result['message']}"
-            if is_htmx_request:
-                return templates.TemplateResponse(
-                    request,
-                    "partials/cloud_sync/test_error.html",
-                    {"error_message": error_message},
-                    status_code=400,
-                )
-            else:
-                raise HTTPException(status_code=400, detail=error_message)
 
-    except Exception as e:
-        error_message = f"Connection test failed: {str(e)}"
-        if is_htmx_request:
             return templates.TemplateResponse(
                 request,
                 "partials/cloud_sync/test_error.html",
                 {"error_message": error_message},
-                status_code=500,
+                status_code=400,
             )
-        raise HTTPException(status_code=500, detail=error_message)
+
+    except Exception as e:
+        error_message = f"Connection test failed: {str(e)}"
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/test_error.html",
+            {"error_message": error_message},
+            status_code=500,
+        )
 
 
-@router.post("/{config_id}/enable", response_model=None)
+@router.post("/{config_id}/enable", response_class=HTMLResponse)
 def enable_cloud_sync_config(
     request: Request,
     config_id: int,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    templates: Jinja2Templates = Depends(get_templates),
 ):
     """Enable a cloud sync configuration"""
-    is_htmx_request = "hx-request" in request.headers
 
     try:
         config = cloud_sync_service.enable_cloud_sync_config(config_id)
         message = f"Cloud sync configuration '{config.name}' enabled successfully!"
 
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/action_success.html",
-                {"message": message},
-            )
-            response.headers["HX-Trigger"] = "cloudSyncUpdate"
-            return response
-        else:
-            return {"message": message}
+        response = templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/action_success.html",
+            {"message": message},
+        )
+        response.headers["HX-Trigger"] = "cloudSyncUpdate"
+        return response
 
     except Exception as e:
         error_message = f"Failed to enable cloud sync: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/action_error.html",
-                {"error_message": error_message},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_message)
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/action_error.html",
+            {"error_message": error_message},
+            status_code=500,
+        )
 
 
-@router.post("/{config_id}/disable", response_model=None)
+@router.post("/{config_id}/disable", response_class=HTMLResponse)
 def disable_cloud_sync_config(
     request: Request,
     config_id: int,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    templates: Jinja2Templates = Depends(get_templates),
 ):
     """Disable a cloud sync configuration"""
-    is_htmx_request = "hx-request" in request.headers
 
     try:
         config = cloud_sync_service.disable_cloud_sync_config(config_id)
         message = f"Cloud sync configuration '{config.name}' disabled successfully!"
 
-        if is_htmx_request:
-            response = templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/action_success.html",
-                {"message": message},
-            )
-            response.headers["HX-Trigger"] = "cloudSyncUpdate"
-            return response
-        else:
-            return {"message": message}
+        response = templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/action_success.html",
+            {"message": message},
+        )
+        response.headers["HX-Trigger"] = "cloudSyncUpdate"
+        return response
 
     except Exception as e:
         error_message = f"Failed to disable cloud sync: {str(e)}"
-        if is_htmx_request:
-            return templates.TemplateResponse(
-                request,
-                "partials/cloud_sync/action_error.html",
-                {"error_message": error_message},
-                status_code=500,
-            )
-        raise HTTPException(status_code=500, detail=error_message)
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/action_error.html",
+            {"error_message": error_message},
+            status_code=500,
+        )

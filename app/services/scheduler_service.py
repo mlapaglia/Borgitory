@@ -74,9 +74,9 @@ async def execute_scheduled_backup(schedule_id: int):
             from app.services.job_service import JobService
             from app.models.enums import JobType
 
-            job_service = JobService()
+            job_service = JobService(db)
             result = await job_service.create_backup_job(
-                backup_request, db, JobType.SCHEDULED_BACKUP
+                backup_request, JobType.SCHEDULED_BACKUP
             )
             job_id = result["job_id"]
 
