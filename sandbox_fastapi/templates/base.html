@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Repository Manager Sandbox{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+</head>
+<body class="h-full bg-gray-100 dark:bg-gray-900">
+    <div class="min-h-full">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-800 shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
+                            Repository Manager - Clean Architecture Sandbox
+                        </h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-green-600 dark:text-green-400 font-medium">
+                            🎯 Clean FastAPI DI + SQLAlchemy 2.0 + Alembic
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            {% block content %}
+            <div class="px-4 py-6 sm:px-0">
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+                        Welcome to the Clean Architecture Sandbox
+                    </h2>
+                    <p class="mt-2 text-gray-600 dark:text-gray-300">
+                        Demonstrating proper FastAPI dependency injection and service layer architecture.
+                    </p>
+                </div>
+            </div>
+            {% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white dark:bg-gray-800 border-t dark:border-gray-700 mt-auto">
+            <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+                <div class="text-center text-sm text-gray-500 dark:text-gray-400">
+                    <p>Clean Architecture Proof of Concept | 
+                       <a href="/api/repositories/architecture" class="text-blue-600 dark:text-blue-400 hover:underline">
+                           View Architecture Details
+                       </a>
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

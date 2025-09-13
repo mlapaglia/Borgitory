@@ -21,8 +21,7 @@ from app.models.schemas import (
 )
 from app.dependencies import BorgServiceDep, SchedulerServiceDep, VolumeServiceDep
 from app.api.auth import get_current_user
-from app.dependencies_services import RepositoryServiceDep
-from app.dependencies_clean import RepositoryQueryDep
+from app.dependencies_clean import RepositoryQueryDep, CleanRepositoryServiceDep
 from app.services.interfaces import RepositoryService, RepositoryQueryService, RepositoryNotFoundError, RepositoryValidationError, RepositoryError
 from app.utils.secure_path import (
     PathSecurityError,
@@ -39,7 +38,7 @@ templates = Jinja2Templates(directory="app/templates")
 async def create_repository(
     request: Request,
     repo: RepositoryCreate,
-    repository_service: RepositoryService = RepositoryServiceDep,
+    repository_service: RepositoryService = CleanRepositoryServiceDep,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -285,7 +284,7 @@ async def get_create_form(request: Request):
 @router.post("/import")
 async def import_repository(
     request: Request,
-    repository_service: RepositoryService = RepositoryServiceDep,
+    repository_service: RepositoryService = CleanRepositoryServiceDep,
     name: str = Form(...),
     path: str = Form(...),
     passphrase: str = Form(...),
@@ -435,7 +434,7 @@ async def update_import_form(
 @router.get("/{repo_id}", response_model=RepositorySchema)
 def get_repository(
     repo_id: int, 
-    repository_service: RepositoryService = RepositoryServiceDep,
+    repository_service: RepositoryService = CleanRepositoryServiceDep,
     db: Session = Depends(get_db)
 ):
     repository = repository_service.get_repository(repo_id, db)
@@ -448,7 +447,7 @@ def get_repository(
 async def update_repository(
     repo_id: int, 
     repo_update: RepositoryUpdate, 
-    repository_service: RepositoryService = RepositoryServiceDep,
+    repository_service: RepositoryService = CleanRepositoryServiceDep,
     db: Session = Depends(get_db)
 ):
     try:
@@ -476,7 +475,7 @@ async def delete_repository(
     request: Request,
     scheduler_svc: SchedulerServiceDep,
     delete_borg_repo: bool = False,
-    repository_service: RepositoryService = RepositoryServiceDep,
+    repository_service: RepositoryService = CleanRepositoryServiceDep,
     db: Session = Depends(get_db),
 ):
     try:

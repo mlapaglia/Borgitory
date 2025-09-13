@@ -1,0 +1,6 @@
+<!-- Path Update Template - returns JavaScript to update input value -->
+<script>
+document.querySelector('input[name="path"]').value = '{{ selected_path }}';
+document.getElementById('create-path-suggestions').classList.add('hidden');
+document.querySelector('input[name="path"]').focus();
+</script>

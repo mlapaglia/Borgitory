@@ -31,8 +31,8 @@ class TestFixedImportWithCleanDI:
         # Arrange: Create fake Borg service that will succeed
         fake_borg = FakeBorgService(should_verify_success=True)
         
-        # Use FastAPI's official dependency override system
-        app.dependency_overrides[get_borg_service] = lambda: fake_borg
+        # Use FastAPI's official dependency override system - now works with no caching!
+        app.dependency_overrides[get_borg_service] = lambda command_runner: fake_borg
         
         client = TestClient(app)
         
@@ -48,7 +48,7 @@ class TestFixedImportWithCleanDI:
         # Assert: Should succeed
         assert response.status_code == 200
         
-        # Verify fake Borg service was called correctly
+        # Verify fake Borg service was called correctly  
         assert len(fake_borg.verification_calls) == 1
         verify_call = fake_borg.verification_calls[0]
         assert verify_call['repo_path'] == "/mnt/test-import"

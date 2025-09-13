@@ -1,0 +1,91 @@
+<!-- Job List Component -->
+{% if jobs %}
+<div class="space-y-3">
+    {% for job in jobs %}
+    <div class="border dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700 
+                {% if job.status == 'running' %}border-blue-300 dark:border-blue-600{% endif %}
+                {% if job.status == 'completed' %}border-green-300 dark:border-green-600{% endif %}
+                {% if job.status == 'failed' %}border-red-300 dark:border-red-600{% endif %}">
+        
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <div class="flex items-center space-x-2">
+                    <h4 class="font-medium text-gray-900 dark:text-gray-100">
+                        Job #{{ job.id }} - {{ job.job_type.title() }}
+                    </h4>
+                    <span class="px-2 py-1 text-xs rounded-full
+                               {% if job.status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100{% endif %}
+                               {% if job.status == 'running' %}bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100{% endif %}
+                               {% if job.status == 'completed' %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100{% endif %}
+                               {% if job.status == 'failed' %}bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100{% endif %}">
+                        {{ job.status.upper() }}
+                    </span>
+                </div>
+                
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                    Source: {{ job.source_path or "N/A" }} | Compression: {{ job.compression or "N/A" }}
+                </p>
+                
+                {% if job.current_step %}
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {{ job.current_step }}
+                </p>
+                {% endif %}
+                
+                {% if job.progress_percentage is not none %}
+                <div class="mt-2">
+                    <div class="bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                        <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                             style="width: {{ job.progress_percentage }}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {{ job.progress_percentage }}% complete
+                    </p>
+                </div>
+                {% endif %}
+                
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Created: {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }}
+                    {% if job.completed_at %}
+                    | Completed: {{ job.completed_at.strftime("%Y-%m-%d %H:%M:%S") }}
+                    {% endif %}
+                </p>
+            </div>
+            
+            <div class="flex flex-col space-y-2">
+                {% if job.status in ['pending', 'running'] %}
+                <button hx-delete="/api/jobs/{{ job.id }}"
+                        hx-confirm="Cancel job #{{ job.id }}?"
+                        hx-target="#job-list"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 text-sm bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-700">
+                    Cancel
+                </button>
+                {% endif %}
+                
+                {% if job.status in ['completed', 'failed'] %}
+                <button hx-get="/api/jobs/{{ job.id }}/output"
+                        hx-target="#job-output-{{ job.id }}"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-200 dark:hover:bg-gray-500">
+                    View Output
+                </button>
+                <div id="job-output-{{ job.id }}" class="mt-2"></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-8">
+    <div class="bg-blue-50 dark:bg-blue-900 rounded-lg p-6">
+        <h4 class="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
+            🎯 No Jobs Running
+        </h4>
+        <p class="text-blue-700 dark:text-blue-200">
+            Start a backup job to see real-time progress updates here.
+        </p>
+    </div>
+</div>
+{% endif %}

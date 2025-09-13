@@ -1,0 +1,174 @@
+<!-- Pre-filled Import Repository Form -->
+<div class="border dark:border-gray-600 rounded-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+            📥 Import Repository: {{ name }}
+        </h3>
+        <button 
+            hx-get="/api/repositories/import-form"
+            hx-target="#import-form-container"
+            hx-swap="innerHTML"
+            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            title="Clear form"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+        </button>
+    </div>
+    
+    <p class="text-sm text-gray-600 dark:text-gray-300 mb-6">
+        Repository detected from scan. Verify the details below and provide credentials to import.
+    </p>
+    
+    {% if show_encryption_info %}
+    <!-- Encryption Info Display -->
+    <div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-600 rounded-md p-3 mb-4">
+        <div class="flex">
+            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+            </svg>
+            <div>
+                <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Repository Encryption</h4>
+                <p class="text-sm text-blue-700 dark:text-blue-400">
+                    This repository uses {{ encryption_mode }} encryption.
+                    {% if preview %}{{ preview }}{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <form 
+        hx-post="/api/repositories/import"
+        hx-target="#import-form-result"
+        hx-swap="innerHTML"
+        hx-indicator="#import-loading"
+        hx-encoding="multipart/form-data"
+        class="space-y-4"
+    >
+        <!-- Repository Name -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Repository Name (for this app)
+            </label>
+            <input 
+                type="text" 
+                name="name" 
+                required 
+                value="{{ name }}"
+                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="My Imported Repository"
+            >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Choose a name to identify this repository in the app
+            </p>
+        </div>
+        
+        <!-- Repository Path -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Repository Path
+            </label>
+            <input 
+                type="text" 
+                name="path" 
+                required 
+                value="{{ path }}"
+                readonly
+                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-100 dark:bg-gray-800 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 bg-gray-50"
+                placeholder="/mnt/existing-repo"
+            >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Path from repository scan (read-only)
+            </p>
+        </div>
+        
+        {% if show_passphrase %}
+        <!-- Passphrase -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Repository Passphrase <span class="text-red-500">*</span>
+            </label>
+            <input 
+                type="password" 
+                name="passphrase" 
+                required 
+                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter repository passphrase"
+            >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                The passphrase used when the repository was created
+            </p>
+        </div>
+        {% endif %}
+        
+        {% if show_keyfile %}
+        <!-- Keyfile Upload -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Keyfile <span class="text-red-500">*</span>
+            </label>
+            <input 
+                type="file" 
+                name="keyfile" 
+                accept=".key"
+                required
+                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-3 file:py-1 file:px-3 file:border-0 file:text-sm file:font-medium file:bg-blue-50 dark:file:bg-blue-900 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-800"
+            >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                This repository requires a keyfile for access
+            </p>
+        </div>
+        {% elif show_passphrase %}
+        <!-- Optional Keyfile for passphrase-encrypted repos -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Keyfile (Optional)
+            </label>
+            <input 
+                type="file" 
+                name="keyfile" 
+                accept=".key"
+                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-3 file:py-1 file:px-3 file:border-0 file:text-sm file:font-medium file:bg-blue-50 dark:file:bg-blue-900 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-800"
+            >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Upload keyfile if the repository also uses keyfile encryption
+            </p>
+        </div>
+        {% endif %}
+        
+        <!-- Submit Button -->
+        <div class="flex justify-end space-x-3">
+            <button 
+                type="button"
+                hx-get="/api/repositories/import-form"
+                hx-target="#import-form-container"
+                hx-swap="innerHTML"
+                class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-200"
+            >
+                Back to Manual Entry
+            </button>
+            <button 
+                type="submit" 
+                class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition duration-200 flex items-center"
+            >
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                </svg>
+                Import Repository
+            </button>
+        </div>
+        
+        <!-- Loading Indicator -->
+        <div id="import-loading" class="htmx-indicator mt-4">
+            <div class="flex items-center justify-center text-sm text-green-600 dark:text-green-400">
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                Validating and importing repository... This may take a moment.
+            </div>
+        </div>
+    </form>
+    
+    <!-- Result Display -->
+    <div id="import-form-result" class="mt-4"></div>
+</div>

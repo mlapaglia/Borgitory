@@ -1,0 +1,183 @@
+<!-- Import Repository Form Container -->
+<div id="import-form-container">
+<div class="border dark:border-gray-600 rounded-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+            📥 Import Existing Repository
+        </h3>
+    </div>
+    
+    <p class="text-sm text-gray-600 dark:text-gray-300 mb-6">
+        Import an existing Borg repository to manage it with this application.
+    </p>
+    
+    <!-- Step 1: Scan for Repositories -->
+    <div class="mb-6">
+        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+            Step 1: Scan for Existing Repositories (Optional)
+        </h4>
+        <div class="flex space-x-3 items-center">
+            <button 
+                hx-get="/api/repositories/scan?path=/mnt"
+                hx-target="#scan-results"
+                hx-swap="innerHTML"
+                hx-indicator="#scan-loading"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition duration-200 flex items-center"
+            >
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Scan /mnt for Repositories
+            </button>
+            <div id="scan-loading" class="htmx-indicator hidden">
+                <div class="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Scanning...
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scan Results -->
+        <div id="scan-results" class="mt-4"></div>
+    </div>
+    
+    <!-- Step 2: Manual Import Form -->
+    <div>
+        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+            Step 2: Repository Details
+        </h4>
+        
+        <form 
+            hx-post="/api/repositories/import"
+            hx-target="#import-form-result"
+            hx-swap="innerHTML"
+            hx-indicator="#import-loading"
+            hx-encoding="multipart/form-data"
+            class="space-y-4"
+        >
+            <div id="import-form-fields">
+            <!-- Repository Name -->
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Repository Name (for this app)
+                </label>
+                <input 
+                    type="text" 
+                    name="name" 
+                    required 
+                    class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="My Imported Repository"
+                >
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Choose a name to identify this repository in the app
+                </p>
+            </div>
+            
+            <!-- Repository Path -->
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Repository Path
+                </label>
+                <input 
+                    type="text" 
+                    name="path" 
+                    required 
+                    class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="/mnt/existing-repo"
+                    id="import-path-input"
+                >
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Full path to the existing Borg repository
+                </p>
+            </div>
+            
+            <!-- Encryption Info Display -->
+            <div id="encryption-info" class="hidden bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-600 rounded-md p-3">
+                <div class="flex">
+                    <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    <div>
+                        <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Repository Encryption</h4>
+                        <p id="encryption-text" class="text-sm text-blue-700 dark:text-blue-400"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passphrase -->
+            <div id="passphrase-field">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Repository Passphrase
+                </label>
+                <input 
+                    type="password" 
+                    name="passphrase" 
+                    required 
+                    class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter repository passphrase"
+                >
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    The passphrase used when the repository was created
+                </p>
+            </div>
+            
+            <!-- Keyfile Upload -->
+            <div id="keyfile-field" class="hidden">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Keyfile <span class="text-red-500">*</span>
+                </label>
+                <input 
+                    type="file" 
+                    name="keyfile" 
+                    accept=".key"
+                    class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-3 file:py-1 file:px-3 file:border-0 file:text-sm file:font-medium file:bg-blue-50 dark:file:bg-blue-900 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-800"
+                >
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    This repository requires a keyfile for access
+                </p>
+            </div>
+            
+            <!-- Info Box -->
+            <div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-600 rounded-md p-3">
+                <div class="flex">
+                    <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                    </svg>
+                    <div>
+                        <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Repository Validation</h4>
+                        <p class="text-sm text-blue-700 dark:text-blue-400">
+                            The repository will be validated before import to ensure it's accessible and properly encrypted.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            </div>
+            
+            <!-- Submit Button -->
+            <div class="flex justify-end">
+                <button 
+                    type="submit" 
+                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition duration-200 flex items-center"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                    </svg>
+                    Import Repository
+                </button>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div id="import-loading" class="htmx-indicator mt-4">
+                <div class="flex items-center justify-center text-sm text-green-600 dark:text-green-400">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                    Validating and importing repository... This may take a moment.
+                </div>
+            </div>
+        </form>
+        
+        <!-- Result Display -->
+        <div id="import-form-result" class="mt-4"></div>
+    </div>
+</div>
+</div>
+

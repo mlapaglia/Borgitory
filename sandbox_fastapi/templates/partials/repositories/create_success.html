@@ -1,0 +1,32 @@
+<!-- Create Success Template -->
+<div class="bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-600 rounded-md p-4">
+    <div class="flex items-start">
+        <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+        </svg>
+        <div>
+            <h4 class="text-sm font-medium text-green-800 dark:text-green-300">
+                Repository created successfully!
+            </h4>
+            <p class="text-sm text-green-700 dark:text-green-400 mt-1">
+                {{ message }}
+            </p>
+            {% if repository %}
+            <div class="mt-3 p-2 bg-green-100 dark:bg-green-800 rounded border border-green-200 dark:border-green-600">
+                <p class="text-xs font-medium text-green-800 dark:text-green-200">Repository Details:</p>
+                <p class="text-xs text-green-700 dark:text-green-300">Name: {{ repository.name }}</p>
+                <p class="text-xs text-green-700 dark:text-green-300">Path: {{ repository.path }}</p>
+                <p class="text-xs text-green-700 dark:text-green-300">ID: {{ repository.id }}</p>
+            </div>
+            {% endif %}
+            <div class="mt-3">
+                <button 
+                    onclick="document.getElementById('repository-create-modal').close()"
+                    class="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition duration-200"
+                >
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

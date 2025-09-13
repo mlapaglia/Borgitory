@@ -32,7 +32,6 @@ from app.services.job_event_broadcaster import (
 )
 
 
-@lru_cache()
 def get_simple_command_runner() -> SimpleCommandRunner:
     """
     Provide a SimpleCommandRunner instance.
@@ -43,73 +42,40 @@ def get_simple_command_runner() -> SimpleCommandRunner:
     return SimpleCommandRunner()
 
 
-@lru_cache()
-def get_borg_service() -> BorgService:
-    """
-    Provide a BorgService instance with proper dependency injection.
-
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
-    """
-    return BorgService(command_runner=get_simple_command_runner())
+def get_borg_service(
+    command_runner: Annotated[SimpleCommandRunner, Depends(get_simple_command_runner)]
+) -> BorgService:
+    """Provide a BorgService instance with clean FastAPI dependency injection."""
+    from app.services.simple_borg_service import SimpleBorgService
+    simple_borg = SimpleBorgService(command_runner)
+    return BorgService(command_runner=command_runner, simple_borg_service=simple_borg)
 
 
-@lru_cache()
 def get_job_service() -> JobService:
-    """
-    Provide a JobService instance with proper dependency injection.
-
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
-    """
+    """Provide a JobService instance using clean FastAPI DI."""
     return JobService()
 
 
-@lru_cache()
 def get_recovery_service() -> RecoveryService:
-    """
-    Provide a RecoveryService instance with proper dependency injection.
-
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
-    """
+    """Provide a RecoveryService instance using clean FastAPI DI."""
     return RecoveryService()
 
 
-@lru_cache()
 def get_pushover_service() -> PushoverService:
-    """
-    Provide a PushoverService instance with proper dependency injection.
-
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
-    """
+    """Provide a PushoverService instance using clean FastAPI DI."""
     return PushoverService()
 
 
-@lru_cache()
 def get_job_stream_service() -> JobStreamService:
-    """
-    Provide a JobStreamService instance with proper dependency injection.
-
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
-    """
+    """Provide a JobStreamService instance using clean FastAPI DI."""
     return JobStreamService()
 
 
-@lru_cache()
 def get_job_render_service() -> JobRenderService:
-    """
-    Provide a JobRenderService instance with proper dependency injection.
-
-    Using lru_cache ensures we get a singleton instance while
-    still allowing for proper dependency injection and testing.
-    """
+    """Provide a JobRenderService instance using clean FastAPI DI."""
     return JobRenderService()
 
 
-@lru_cache()
 def get_debug_service() -> DebugService:
     """
     Provide a DebugService instance with proper dependency injection.
@@ -120,7 +86,6 @@ def get_debug_service() -> DebugService:
     return DebugService()
 
 
-@lru_cache()
 def get_rclone_service() -> RcloneService:
     """
     Provide a RcloneService instance with proper dependency injection.
@@ -131,7 +96,6 @@ def get_rclone_service() -> RcloneService:
     return RcloneService()
 
 
-@lru_cache()
 def get_repository_stats_service() -> RepositoryStatsService:
     """
     Provide a RepositoryStatsService instance with proper dependency injection.
@@ -142,7 +106,6 @@ def get_repository_stats_service() -> RepositoryStatsService:
     return RepositoryStatsService()
 
 
-@lru_cache()
 def get_scheduler_service() -> SchedulerService:
     """
     Provide a SchedulerService instance with proper dependency injection.
@@ -153,7 +116,6 @@ def get_scheduler_service() -> SchedulerService:
     return SchedulerService()
 
 
-@lru_cache()
 def get_volume_service() -> VolumeService:
     """
     Provide a VolumeService instance with proper dependency injection.
@@ -173,18 +135,18 @@ def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinition
     return TaskDefinitionBuilder(db)
 
 
-@lru_cache()
-def get_repository_parser() -> RepositoryParser:
+def get_repository_parser(
+    command_runner: Annotated[SimpleCommandRunner, Depends(get_simple_command_runner)]
+) -> RepositoryParser:
     """
     Provide a RepositoryParser instance with proper dependency injection.
 
     Using lru_cache ensures we get a singleton instance while
     still allowing for proper dependency injection and testing.
     """
-    return RepositoryParser(command_runner=get_simple_command_runner())
+    return RepositoryParser(command_runner=command_runner)
 
 
-@lru_cache()
 def get_borg_command_builder() -> BorgCommandBuilder:
     """
     Provide a BorgCommandBuilder instance.
@@ -194,8 +156,9 @@ def get_borg_command_builder() -> BorgCommandBuilder:
     return BorgCommandBuilder()
 
 
-@lru_cache()
-def get_archive_manager() -> ArchiveManager:
+def get_archive_manager(
+    command_builder: Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
+) -> ArchiveManager:
     """
     Provide an ArchiveManager instance with proper dependency injection.
 
@@ -205,11 +168,10 @@ def get_archive_manager() -> ArchiveManager:
     from app.services.job_executor import JobExecutor
 
     return ArchiveManager(
-        job_executor=JobExecutor(), command_builder=get_borg_command_builder()
+        job_executor=JobExecutor(), command_builder=command_builder
     )
 
 
-@lru_cache()
 def get_cloud_sync_manager() -> CloudSyncManager:
     """
     Provide a CloudSyncManager instance.

@@ -1,0 +1,92 @@
+<!-- Clean Architecture Backup Form -->
+<div class="border dark:border-gray-600 rounded-lg p-4">
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-4">
+        🎯 Create Backup Job
+    </h3>
+    <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+        Using clean architecture with FastAPI BackgroundTasks
+    </p>
+    
+    <form 
+        hx-post="/api/jobs/backup"
+        hx-target="#backup-status"
+        hx-swap="innerHTML"
+        class="space-y-4"
+    >
+        <!-- Repository Selection -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Repository
+            </label>
+            <select name="repository_id" required 
+                    class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Select Repository...</option>
+                {% for repo in repositories %}
+                <option value="{{ repo.id }}">{{ repo.name }} ({{ repo.path }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <!-- Source Path -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Source Path
+            </label>
+            <input type="text" name="source_path" value="/mnt/" required
+                   class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="/mnt/my-data">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Path to backup (must start with /mnt/)
+            </p>
+        </div>
+        
+        <!-- Compression -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Compression
+            </label>
+            <select name="compression" 
+                    class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="zstd">ZSTD (Recommended)</option>
+                <option value="lz4">LZ4 (Fast)</option>
+                <option value="lzma">LZMA (High compression)</option>
+                <option value="none">None</option>
+            </select>
+        </div>
+        
+        <!-- Notification Configuration (Optional) -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Notification (Optional)
+            </label>
+            <select name="notification_config_id" 
+                    class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">No notification</option>
+                {% for config in notification_configs %}
+                <option value="{{ config.id }}">{{ config.name }} ({{ config.provider.value.title() }})</option>
+                {% endfor %}
+            </select>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Get notified when backup completes or fails
+            </p>
+        </div>
+        
+        <!-- Dry Run Option -->
+        <div class="flex items-center">
+            <input type="checkbox" name="dry_run" value="true" 
+                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded">
+            <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">
+                Dry Run (test without creating archive)
+            </label>
+        </div>
+        
+        <!-- Submit Button -->
+        <button type="submit" 
+                class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">
+            Start Backup Job
+        </button>
+    </form>
+    
+    <!-- Status Display -->
+    <div id="backup-status" class="mt-4"></div>
+</div>

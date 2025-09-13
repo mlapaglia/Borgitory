@@ -1,0 +1,37 @@
+<!-- Import Error Template -->
+<div class="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-600 rounded-md p-4">
+    <div class="flex items-start">
+        <svg class="w-5 h-5 text-red-600 dark:text-red-400 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+        </svg>
+        <div class="flex-1">
+            <h4 class="text-sm font-medium text-red-800 dark:text-red-300">
+                Repository import failed
+            </h4>
+            <p class="text-sm text-red-700 dark:text-red-400 mt-1">
+                {{ error_message }}
+            </p>
+            
+            <!-- Common Solutions -->
+            <div class="mt-3 p-3 bg-red-100 dark:bg-red-800 rounded border border-red-200 dark:border-red-600">
+                <p class="text-xs font-medium text-red-800 dark:text-red-200 mb-2">Common solutions:</p>
+                <ul class="text-xs text-red-700 dark:text-red-300 space-y-1">
+                    <li>• Check that the repository path exists and is accessible</li>
+                    <li>• Verify the passphrase is correct</li>
+                    <li>• If using keyfile encryption, ensure the keyfile is uploaded</li>
+                    <li>• Make sure the path points to a valid Borg repository</li>
+                    <li>• Check file permissions on the repository directory</li>
+                </ul>
+            </div>
+            
+            <div class="mt-3">
+                <button 
+                    onclick="document.querySelector('#import-form-result').innerHTML = ''"
+                    class="text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition duration-200"
+                >
+                    Try Again
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

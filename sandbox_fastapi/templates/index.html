@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Welcome Section -->
+    <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+            Repository Manager
+        </h2>
+        <p class="text-lg text-gray-600 dark:text-gray-300 mb-2">
+            Clean Architecture Proof of Concept
+        </p>
+        <div class="flex justify-center space-x-4 text-sm">
+            <span class="bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-3 py-1 rounded-full">
+                ✅ SQLAlchemy 2.0
+            </span>
+            <span class="bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full">
+                ✅ Alembic Migrations
+            </span>
+            <span class="bg-purple-100 dark:bg-purple-800 text-purple-800 dark:text-purple-200 px-3 py-1 rounded-full">
+                ✅ Clean FastAPI DI
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Repository Management Section -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Repository Management
+                </h3>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    HTMX + FastAPI DI
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex space-x-3 mb-6">
+                <button 
+                    onclick="document.getElementById('repository-create-modal').showModal()"
+                    class="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition duration-200"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Create Repository
+                </button>
+                
+                <button 
+                    onclick="document.getElementById('repository-import-modal').showModal()"
+                    class="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition duration-200"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                    </svg>
+                    Import Repository
+                </button>
+                
+                <button 
+                    hx-get="/api/repositories/"
+                    hx-target="#repository-list"
+                    hx-swap="innerHTML"
+                    hx-indicator="#refresh-loading"
+                    class="flex items-center px-3 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 text-sm transition duration-200"
+                >
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                </button>
+                
+                <div id="refresh-loading" class="htmx-indicator flex items-center text-sm text-gray-600 dark:text-gray-300">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Loading...
+                </div>
+            </div>
+            
+            <!-- Repository List -->
+            <div 
+                id="repository-list"
+                hx-get="/api/repositories/"
+                hx-trigger="repositoryCreated from:body, repositoryImported from:body, load"
+                hx-swap="innerHTML"
+            >
+                {% include "partials/repositories/list_content.html" %}
+            </div>
+        </div>
+        
+        <!-- Backup Operations Section -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Backup Operations
+                </h3>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    FastAPI BackgroundTasks
+                </div>
+            </div>
+            
+            <!-- Backup Form -->
+            <div hx-get="/api/backups/form" hx-trigger="load" hx-swap="innerHTML">
+                <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-64 rounded"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification & Jobs Section -->
+    <div class="max-w-6xl mx-auto mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Notification Management Section -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Notifications
+                </h3>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    Multi-task Workflows
+                </div>
+            </div>
+            
+            <!-- Notification Config List -->
+            <div id="notification-list" hx-get="/api/notifications/" hx-trigger="load" hx-swap="innerHTML">
+                <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-32 rounded"></div>
+            </div>
+            
+            <!-- Notification Form Container -->
+            <div id="notification-form-container" class="mt-4"></div>
+        </div>
+        
+        <!-- Current Jobs Section -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Current Jobs
+                </h3>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    Real-time Status Updates
+                </div>
+            </div>
+            
+            <!-- Job List -->
+            <div id="job-list" hx-get="/api/jobs/" hx-trigger="load, every 3s" hx-swap="innerHTML">
+                <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-32 rounded"></div>
+            </div>
+        </div>
+    </div>
+            
+            <!-- API Testing Section -->
+            <div class="mt-8 border-t dark:border-gray-600 pt-6">
+                <h4 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                    Test the Clean API
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded p-4">
+                        <h5 class="font-medium text-gray-900 dark:text-gray-100 mb-2">Create Repository</h5>
+                        <pre class="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto"><code>curl -X POST http://localhost:8001/api/repositories/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-backup",
+    "path": "/mnt/my-backup", 
+    "passphrase": "secret123"
+  }'</code></pre>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded p-4">
+                        <h5 class="font-medium text-gray-900 dark:text-gray-100 mb-2">List Repositories</h5>
+                        <pre class="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto"><code>curl http://localhost:8001/api/repositories/</code></pre>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                            Refresh this page to see new repositories
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Repository Create Modal -->
+<dialog id="repository-create-modal" class="p-0 m-0 max-w-2xl w-full bg-transparent backdrop:bg-black/50">
+    <div 
+        hx-get="/api/repositories/create-form"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-xl"
+    >
+        <!-- Loading placeholder -->
+        <div class="p-6">
+            <div class="animate-pulse">
+                <div class="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                <div class="space-y-3">
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<!-- Repository Import Modal -->
+<dialog id="repository-import-modal" class="p-0 m-0 max-w-3xl w-full bg-transparent backdrop:bg-black/50">
+    <div 
+        hx-get="/api/repositories/import-form"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-h-screen overflow-y-auto"
+    >
+        <!-- Loading placeholder -->
+        <div class="p-6">
+            <div class="animate-pulse">
+                <div class="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                <div class="space-y-3">
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                    <div class="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+{% endblock %}

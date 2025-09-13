@@ -1,0 +1,41 @@
+<!-- Job Output Display -->
+<div class="bg-gray-50 dark:bg-gray-800 border rounded-lg p-4 mt-2">
+    <div class="flex items-center justify-between mb-3">
+        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">
+            Job #{{ job_id }} Output
+        </h4>
+        <span class="px-2 py-1 text-xs rounded-full
+                   {% if status.value == 'COMPLETED' %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100{% endif %}
+                   {% if status.value == 'FAILED' %}bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100{% endif %}">
+            {{ status.value }}
+        </span>
+    </div>
+    
+    {% if return_code is not none %}
+    <div class="mb-3">
+        <span class="text-xs text-gray-500 dark:text-gray-400">Return Code:</span>
+        <span class="text-sm font-mono {% if return_code == 0 %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+            {{ return_code }}
+        </span>
+    </div>
+    {% endif %}
+    
+    {% if output_log %}
+    <div class="mb-3">
+        <h5 class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Command Output:</h5>
+        <pre class="bg-gray-100 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto max-h-64 overflow-y-auto"><code>{{ output_log }}</code></pre>
+    </div>
+    {% endif %}
+    
+    {% if error_message %}
+    <div class="mb-3">
+        <h5 class="text-xs font-medium text-red-700 dark:text-red-300 mb-2">Error Details:</h5>
+        <pre class="bg-red-50 dark:bg-red-900 p-3 rounded text-xs text-red-800 dark:text-red-200 overflow-x-auto"><code>{{ error_message }}</code></pre>
+    </div>
+    {% endif %}
+    
+    <button onclick="this.parentElement.style.display='none'" 
+            class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+        Close Output
+    </button>
+</div>

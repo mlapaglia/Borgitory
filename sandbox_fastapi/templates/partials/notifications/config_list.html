@@ -1,0 +1,52 @@
+<!-- Notification Config List -->
+{% if configs %}
+<div class="space-y-3">
+    {% for config in configs %}
+    <div class="border dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <div class="flex items-center space-x-2">
+                    <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ config.name }}</h4>
+                    <span class="px-2 py-1 text-xs rounded-full {% if config.enabled %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100{% else %}bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100{% endif %}">
+                        {{ "ENABLED" if config.enabled else "DISABLED" }}
+                    </span>
+                    <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
+                        {{ config.provider.value.upper() }}
+                    </span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Created: {{ config.created_at.strftime("%Y-%m-%d %H:%M") }}
+                </p>
+            </div>
+            <div class="flex space-x-2">
+                <button hx-post="/api/notifications/test/{{ config.id }}"
+                        hx-target="#notification-test-result"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 rounded hover:bg-blue-200 dark:hover:bg-blue-700">
+                    Test
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="notification-test-result" class="mt-4"></div>
+{% else %}
+<div class="text-center py-8">
+    <div class="bg-blue-50 dark:bg-blue-900 rounded-lg p-6">
+        <h4 class="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
+            📱 No Notification Configurations
+        </h4>
+        <p class="text-blue-700 dark:text-blue-200 mb-4">
+            Create a notification configuration to get notified when backups complete.
+        </p>
+        <button hx-get="/api/notifications/form"
+                hx-target="#notification-form-container"
+                hx-swap="innerHTML"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
+            Create Configuration
+        </button>
+    </div>
+</div>
+{% endif %}

@@ -28,9 +28,16 @@ class BorgService:
         self,
         job_executor: Optional[JobExecutor] = None,
         command_runner: Optional[SimpleCommandRunner] = None,
+        simple_borg_service: Optional = None,
     ):
         self.job_executor = job_executor or JobExecutor()
         self.command_runner = command_runner or SimpleCommandRunner()
+        
+        # Use SimpleBorgService for basic operations (better for testing)
+        if simple_borg_service is None:
+            from app.services.simple_borg_service import SimpleBorgService
+            simple_borg_service = SimpleBorgService(self.command_runner)
+        self.simple_borg_service = simple_borg_service
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
@@ -737,52 +744,15 @@ class BorgService:
     async def verify_repository_access(
         self, repo_path: str, passphrase: str, keyfile_path: str = None
     ) -> bool:
-        """Verify we can access a repository with given credentials"""
-        try:
-            # Build environment overrides for keyfile if needed
-            env_overrides = {}
-            if keyfile_path:
-                env_overrides["BORG_KEY_FILE"] = keyfile_path
-
-            command, env = build_secure_borg_command(
-                base_command="borg info",
-                repository_path=repo_path,
-                passphrase=passphrase,
-                additional_args=["--json"],
-                environment_overrides=env_overrides,
-            )
-        except Exception as e:
-            logger.error(f"Security validation failed: {e}")
-            return False
-
-        try:
-            job_manager = get_job_manager()
-            job_id = await job_manager.start_borg_command(command, env=env)
-
-            # Wait for completion
-            max_wait = 30
-            wait_time = 0
-
-            while wait_time < max_wait:
-                status = job_manager.get_job_status(job_id)
-
-                if not status:
-                    return False
-
-                if status["completed"] or status["status"] == "failed":
-                    success = status["return_code"] == 0
-                    # Clean up job
-                    get_job_manager().cleanup_job(job_id)
-                    return success
-
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            return False
-
-        except Exception as e:
-            logger.error(f"Failed to verify repository access: {e}")
-            return False
+        """
+        Verify repository access using SimpleBorgService for better testability.
+        
+        This now uses direct command execution instead of the job management system,
+        making it much easier to test and mock.
+        """
+        return await self.simple_borg_service.verify_repository_access(
+            repo_path, passphrase, keyfile_path
+        )
 
     async def scan_for_repositories(self, scan_path: str = None) -> List[Dict]:
         """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""

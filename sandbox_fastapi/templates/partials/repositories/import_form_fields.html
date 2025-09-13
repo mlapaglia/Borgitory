@@ -1,0 +1,138 @@
+<!-- Repository Name -->
+<div>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+        Repository Name (for this app)
+    </label>
+    <input 
+        type="text" 
+        name="name" 
+        required 
+        value="{{ name if name else '' }}"
+        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="My Imported Repository"
+    >
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        Choose a name to identify this repository in the app
+    </p>
+</div>
+
+<!-- Repository Path -->
+<div>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+        Repository Path
+    </label>
+    <input 
+        type="text" 
+        name="path" 
+        required 
+        value="{{ path if path else '' }}"
+        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="/mnt/existing-repo"
+        id="import-path-input"
+    >
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        Full path to the existing Borg repository
+    </p>
+</div>
+
+{% if encryption_mode and encryption_mode != "none" and encryption_mode != "unknown" %}
+<!-- Encryption Info Display -->
+<div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-600 rounded-md p-3">
+    <div class="flex">
+        <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+        </svg>
+        <div>
+            <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Repository Encryption</h4>
+            <p class="text-sm text-blue-700 dark:text-blue-400">
+                This repository uses {{ encryption_mode }} encryption.
+                {% if preview %}{{ preview }}{% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if requires_keyfile == "true" %}
+<!-- Keyfile Upload -->
+<div>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+        Keyfile <span class="text-red-500">*</span>
+    </label>
+    <input 
+        type="file" 
+        name="keyfile" 
+        accept=".key"
+        required
+        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-3 file:py-1 file:px-3 file:border-0 file:text-sm file:font-medium file:bg-blue-50 dark:file:bg-blue-900 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-800"
+    >
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        This repository requires a keyfile for access
+    </p>
+</div>
+{% elif encryption_mode and encryption_mode != "none" and encryption_mode != "unknown" %}
+<!-- Passphrase -->
+<div>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+        Repository Passphrase <span class="text-red-500">*</span>
+    </label>
+    <input 
+        type="password" 
+        name="passphrase" 
+        required 
+        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Enter repository passphrase"
+    >
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        The passphrase used when the repository was created
+    </p>
+</div>
+
+<!-- Optional Keyfile -->
+<div>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+        Keyfile (Optional)
+    </label>
+    <input 
+        type="file" 
+        name="keyfile" 
+        accept=".key"
+        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-3 file:py-1 file:px-3 file:border-0 file:text-sm file:font-medium file:bg-blue-50 dark:file:bg-blue-900 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-800"
+    >
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        Upload keyfile if the repository also uses keyfile encryption
+    </p>
+</div>
+{% else %}
+<!-- Passphrase (fallback) -->
+<div>
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+        Repository Passphrase
+    </label>
+    <input 
+        type="password" 
+        name="passphrase" 
+        required 
+        class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Enter repository passphrase"
+    >
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        The passphrase used when the repository was created
+    </p>
+</div>
+{% endif %}
+
+<!-- Info Box -->
+<div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-600 rounded-md p-3">
+    <div class="flex">
+        <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+        </svg>
+        <div>
+            <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Repository Validation</h4>
+            <p class="text-sm text-blue-700 dark:text-blue-400">
+                The repository will be validated before import to ensure it's accessible and properly encrypted.
+            </p>
+        </div>
+    </div>
+</div>

@@ -10,9 +10,15 @@ from fastapi import Depends
 
 from app.services.interfaces import RepositoryQueryService, BorgServiceInterface, RepositoryService, SecurityValidator
 from app.services.implementations import DefaultRepositoryQueryService, DefaultBorgService, DefaultRepositoryService, DefaultSecurityValidator
+from app.services.simple_command_runner import SimpleCommandRunner
 
 
 # Simple dependency functions (official FastAPI pattern)
+def get_simple_command_runner() -> SimpleCommandRunner:
+    """Get command runner instance."""
+    return SimpleCommandRunner()
+
+
 def get_repository_query_service() -> RepositoryQueryService:
     """Get repository query service instance."""
     return DefaultRepositoryQueryService()
@@ -23,11 +29,12 @@ def get_clean_security_validator() -> SecurityValidator:
     return DefaultSecurityValidator()
 
 
-def get_clean_borg_service() -> BorgServiceInterface:
+def get_clean_borg_service(
+    command_runner: Annotated[SimpleCommandRunner, Depends(get_simple_command_runner)]
+) -> BorgServiceInterface:
     """Get Borg service instance using clean DI pattern."""
-    # Use the existing dependency system to respect test overrides
-    from app.dependencies import get_borg_service
-    return DefaultBorgService(get_borg_service())
+    from app.services.borg_service import BorgService
+    return BorgService(command_runner=command_runner)
 
 
 def get_clean_repository_service(

@@ -1,0 +1,142 @@
+<!-- Create Repository Form -->
+<div class="border dark:border-gray-600 rounded-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+            🏗️ Create New Repository
+        </h3>
+        <button 
+            onclick="document.getElementById('repository-create-modal').close()"
+            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+    
+    <p class="text-sm text-gray-600 dark:text-gray-300 mb-6">
+        Create a new Borg repository for backup storage. The repository will be initialized at the specified path.
+    </p>
+    
+    <form 
+        hx-post="/api/repositories/create"
+        hx-target="#create-form-result"
+        hx-swap="innerHTML"
+        hx-indicator="#create-loading"
+        class="space-y-4"
+    >
+        <!-- Repository Name -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Repository Name
+            </label>
+            <input 
+                type="text" 
+                name="name" 
+                required 
+                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="my-backup-repo"
+            >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Choose a descriptive name for your repository
+            </p>
+        </div>
+        
+        <!-- Repository Path -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Repository Path
+            </label>
+            <div class="relative">
+                <input 
+                    type="text" 
+                    name="path" 
+                    required 
+                    value="/mnt/"
+                    class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="/mnt/my-backup-repo"
+                    hx-post="/api/repositories/directories"
+                    hx-trigger="keyup changed delay:500ms"
+                    hx-target="#create-path-suggestions"
+                    hx-swap="innerHTML"
+                    hx-include="this"
+                    onfocus="document.getElementById('create-path-suggestions').classList.remove('hidden')"
+                    onblur="setTimeout(() => document.getElementById('create-path-suggestions').classList.add('hidden'), 200)"
+                >
+                <!-- Directory autocomplete dropdown -->
+                <div id="create-path-suggestions" class="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg mt-1 hidden max-h-48 overflow-y-auto">
+                </div>
+            </div>
+            <!-- Hidden area for path update script injection -->
+            <div id="path-update-area" style="display: none;"></div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Path where the repository will be created (must start with /mnt/)
+            </p>
+        </div>
+        
+        <!-- Passphrase -->
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                Repository Passphrase
+            </label>
+            <input 
+                type="password" 
+                name="passphrase" 
+                required 
+                minlength="8"
+                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter a strong passphrase"
+            >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Minimum 8 characters. This will encrypt your repository.
+            </p>
+        </div>
+        
+        <!-- Security Warning -->
+        <div class="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-600 rounded-md p-3">
+            <div class="flex">
+                <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+                <div>
+                    <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-300">Important</h4>
+                    <p class="text-sm text-yellow-700 dark:text-yellow-400">
+                        Store your passphrase safely! It cannot be recovered if lost, and all backups will be inaccessible.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Submit Button -->
+        <div class="flex justify-end space-x-3">
+            <button 
+                type="button"
+                onclick="document.getElementById('repository-create-modal').close()"
+                class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-200"
+            >
+                Cancel
+            </button>
+            <button 
+                type="submit" 
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition duration-200 flex items-center"
+            >
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Create Repository
+            </button>
+        </div>
+        
+        <!-- Loading Indicator -->
+        <div id="create-loading" class="htmx-indicator mt-4">
+            <div class="flex items-center justify-center text-sm text-blue-600 dark:text-blue-400">
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                Creating repository... This may take a moment.
+            </div>
+        </div>
+    </form>
+    
+    <!-- Result Display -->
+    <div id="create-form-result" class="mt-4"></div>
+</div>
+

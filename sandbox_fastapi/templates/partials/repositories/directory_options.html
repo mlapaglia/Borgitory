@@ -1,0 +1,30 @@
+<!-- Directory Options Template for Autocomplete -->
+{% if show_dropdown %}
+    {% if directories %}
+    <div class="max-h-48 overflow-y-auto">
+        {% for dir in directories %}
+        <div 
+            class="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900 cursor-pointer text-sm text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-gray-600 last:border-b-0"
+            hx-post="/api/repositories/set-path"
+            hx-vals='{"path": "{{ dir.path }}/"}'
+            hx-target="#path-update-area"
+            hx-swap="innerHTML"
+        >
+            <div class="flex items-center space-x-2">
+                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H7l-2-2H3a2 2 0 00-2 2z"></path>
+                </svg>
+                <span>{{ dir.name }}</span>
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {{ dir.path }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+        No directories found in {{ current_path }}
+    </div>
+    {% endif %}
+{% endif %}

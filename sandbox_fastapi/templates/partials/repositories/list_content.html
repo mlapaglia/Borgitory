@@ -1,0 +1,61 @@
+<!-- Repository List Content Template -->
+{% if repositories %}
+<div class="space-y-3">
+    {% for repo in repositories %}
+    <div class="border dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ repo.name }}</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-300">{{ repo.path }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Created: {{ repo.created_at.strftime("%Y-%m-%d %H:%M") if repo.created_at else "Unknown" }}
+                </p>
+                <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                    🎯 Powered by Clean Architecture
+                </p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="px-2 py-1 text-xs bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200 rounded">
+                    ID: {{ repo.id }}
+                </span>
+                <button 
+                    class="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 rounded hover:bg-blue-200 dark:hover:bg-blue-700 transition duration-200"
+                    title="View Details"
+                >
+                    📊 Details
+                </button>
+                <button 
+                    class="px-2 py-1 text-xs bg-orange-100 dark:bg-orange-800 text-orange-700 dark:text-orange-200 rounded hover:bg-orange-200 dark:hover:bg-orange-700 transition duration-200"
+                    title="Create Backup"
+                >
+                    💾 Backup
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-gray-600 dark:text-gray-300 text-center py-8">
+    <div class="max-w-md mx-auto">
+        <div class="bg-blue-50 dark:bg-blue-900 rounded-lg p-6">
+            <h3 class="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
+                🎯 Clean Architecture Sandbox
+            </h3>
+            <p class="text-blue-700 dark:text-blue-200 mb-4">
+                No repositories configured yet.
+            </p>
+            <div class="text-sm text-blue-600 dark:text-blue-300">
+                <p><strong>To add repositories:</strong></p>
+                <p>POST /api/repositories/</p>
+                <pre class="mt-2 bg-blue-100 dark:bg-blue-800 p-2 rounded text-xs">
+{
+  "name": "my-repo",
+  "path": "/mnt/backup",
+  "passphrase": "secret123"
+}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
