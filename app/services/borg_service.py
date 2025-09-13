@@ -28,9 +28,11 @@ class BorgService:
         self,
         job_executor: Optional[JobExecutor] = None,
         command_runner: Optional[SimpleCommandRunner] = None,
+        volume_service=None,
     ):
         self.job_executor = job_executor or JobExecutor()
         self.command_runner = command_runner or SimpleCommandRunner()
+        self.volume_service = volume_service
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
@@ -583,10 +585,13 @@ class BorgService:
 
         # If no specific path provided, scan all mounted volumes
         if scan_path is None:
-            from app.dependencies import get_volume_service
-
-            volume_service = get_volume_service()
-            mounted_volumes = await volume_service.get_mounted_volumes()
+            if self.volume_service:
+                mounted_volumes = await self.volume_service.get_mounted_volumes()
+            else:
+                # Fallback: use direct import (for backward compatibility)
+                from app.dependencies import get_volume_service
+                volume_service = get_volume_service()
+                mounted_volumes = await volume_service.get_mounted_volumes()
 
             if not mounted_volumes:
                 logger.warning("No mounted volumes found, falling back to /repos")

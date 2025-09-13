@@ -2,7 +2,7 @@
 Tests for FastAPI dependency providers
 """
 
-from app.dependencies import get_simple_command_runner, get_borg_service, get_job_service, get_recovery_service, get_pushover_service, get_job_stream_service, get_job_render_service, get_debug_service, get_rclone_service, get_repository_stats_service
+from app.dependencies import get_simple_command_runner, get_borg_service, get_job_service, get_recovery_service, get_pushover_service, get_job_stream_service, get_job_render_service, get_debug_service, get_rclone_service, get_repository_stats_service, get_volume_service
 from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
 from app.services.job_service import JobService
@@ -13,6 +13,7 @@ from app.services.job_render_service import JobRenderService
 from app.services.debug_service import DebugService
 from app.services.rclone_service import RcloneService
 from app.services.repository_stats_service import RepositoryStatsService
+from app.services.volume_service import VolumeService
 
 
 class TestDependencies:
@@ -25,7 +26,7 @@ class TestDependencies:
         assert isinstance(runner, SimpleCommandRunner)
         assert runner.timeout == 300  # Default timeout
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         runner2 = get_simple_command_runner()
         assert runner is runner2
 
@@ -36,7 +37,7 @@ class TestDependencies:
         assert isinstance(service, BorgService)
         assert isinstance(service.command_runner, SimpleCommandRunner)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_borg_service()
         assert service is service2
 
@@ -44,9 +45,17 @@ class TestDependencies:
         """Test that BorgService receives the proper command runner dependency."""
         service = get_borg_service()
         command_runner = get_simple_command_runner()
-        
+
         # The command runner should be the same instance (singleton pattern)
         assert service.command_runner is command_runner
+
+    def test_borg_service_has_injected_volume_service(self):
+        """Test that BorgService receives the proper volume service dependency."""
+        service = get_borg_service()
+        volume_service = get_volume_service()
+
+        # The volume service should be the same instance (singleton pattern)
+        assert service.volume_service is volume_service
 
     def test_dependency_isolation_in_tests(self):
         """Test that dependencies can be properly mocked in tests."""
@@ -65,7 +74,7 @@ class TestDependencies:
         
         assert isinstance(service, JobService)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_job_service()
         assert service is service2
 
@@ -75,7 +84,7 @@ class TestDependencies:
         
         assert isinstance(service, RecoveryService)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_recovery_service()
         assert service is service2
 
@@ -85,7 +94,7 @@ class TestDependencies:
         
         assert isinstance(service, PushoverService)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_pushover_service()
         assert service is service2
 
@@ -95,7 +104,7 @@ class TestDependencies:
         
         assert isinstance(service, JobStreamService)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_job_stream_service()
         assert service is service2
 
@@ -105,7 +114,7 @@ class TestDependencies:
         
         assert isinstance(service, JobRenderService)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_job_render_service()
         assert service is service2
 
@@ -115,9 +124,17 @@ class TestDependencies:
         
         assert isinstance(service, DebugService)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_debug_service()
         assert service is service2
+
+    def test_debug_service_has_injected_volume_service(self):
+        """Test that DebugService receives the proper volume service dependency."""
+        service = get_debug_service()
+        volume_service = get_volume_service()
+
+        # The volume service should be the same instance (singleton pattern)
+        assert service.volume_service is volume_service
 
     def test_get_rclone_service(self):
         """Test RcloneService dependency provider."""
@@ -125,7 +142,7 @@ class TestDependencies:
         
         assert isinstance(service, RcloneService)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_rclone_service()
         assert service is service2
 
@@ -135,8 +152,18 @@ class TestDependencies:
         
         assert isinstance(service, RepositoryStatsService)
         
-        # Should return same instance due to lru_cache
+        # Should return same instance due to singleton pattern
         service2 = get_repository_stats_service()
+        assert service is service2
+
+    def test_get_volume_service(self):
+        """Test VolumeService dependency provider."""
+        service = get_volume_service()
+
+        assert isinstance(service, VolumeService)
+
+        # Should return same instance due to singleton pattern
+        service2 = get_volume_service()
         assert service is service2
 
     def test_default_initialization_still_works(self):
