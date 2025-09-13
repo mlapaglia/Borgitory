@@ -237,14 +237,19 @@ async def root(request: Request, db: Session = Depends(get_db)):
 async def login_page(request: Request, db: Session = Depends(get_db)):
     from fastapi.responses import RedirectResponse
     from app.api.auth import get_current_user_optional
+    from urllib.parse import urlparse
 
     current_user = get_current_user_optional(request, db)
     next_url = request.query_params.get("next", "/repositories")
+    # Strip backslashes, and validate redirect target is internal
+    cleaned_next_url = next_url.replace('\\', '')
+    parsed_url = urlparse(cleaned_next_url)
+    safe_next_url = cleaned_next_url if not parsed_url.scheme and not parsed_url.netloc else "/repositories"
 
     if current_user:
-        return RedirectResponse(url=next_url, status_code=302)
+        return RedirectResponse(url=safe_next_url, status_code=302)
 
-    return templates.TemplateResponse(request, "login.html", {"next": next_url})
+    return templates.TemplateResponse(request, "login.html", {"next": safe_next_url})
 
 
 # Dynamic route for all tab pages
