@@ -18,17 +18,22 @@
     <!-- Main Content Area -->
     <div class="flex-1 overflow-hidden lg:ml-0">
         <div class="h-full overflow-y-auto p-6">
-            {% include "partials/repositories/tab.html" %}
-            {% include "partials/backups/tab.html" %}
-            {% include "partials/schedules/tab.html" %}
-            {% include "partials/cloud_sync/tab.html" %}
-            {% include "partials/archives/tab.html" %}
-            {% include "partials/statistics/tab.html" %}
-            {% include "partials/jobs/tab.html" %}
-            {% include "partials/notifications/tab.html" %}
-            {% include "partials/cleanup/tab.html" %}
-            {% include "partials/repository_check/tab.html" %}
-            {% include "partials/debug/tab.html" %}
+            <!-- HTMX Loading Indicator -->
+            <div id="loading-indicator" class="htmx-indicator">
+                <div class="flex items-center justify-center p-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span class="ml-2 text-gray-600 dark:text-gray-300">Loading...</span>
+                </div>
+            </div>
+
+            <!-- Main Content Container - tabs loaded here via HTMX -->
+            <div id="main-content"
+                 hx-get="/api/tabs/repositories"
+                 hx-trigger="load"
+                 hx-indicator="#loading-indicator">
+                <!-- Default loading state -->
+                <div class="text-gray-500 dark:text-gray-400 text-sm">Loading repositories...</div>
+            </div>
         </div>
     </div>
 </div>
@@ -40,6 +45,19 @@
 
 .tab-content {
     min-height: 500px;
+}
+
+/* HTMX Loading Indicator */
+.htmx-indicator {
+    display: none;
+}
+
+.htmx-request .htmx-indicator {
+    display: block;
+}
+
+.htmx-request.htmx-indicator {
+    display: block;
 }
 </style>
 

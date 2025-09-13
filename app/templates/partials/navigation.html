@@ -27,10 +27,15 @@
     
     <nav class="mt-4">
         <div class="px-4 space-y-2">
-            <button 
-                onclick="switchTab('repositories'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/repositories"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/repositories"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-repositories"
-                class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
+                class="nav-item active w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2V7z"></path>
@@ -38,8 +43,13 @@
                 <span>Repositories</span>
             </button>
             
-            <button 
-                onclick="switchTab('backups'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/backups"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/backups"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-backups"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -49,8 +59,13 @@
                 <span>Backups</span>
             </button>
             
-            <button 
-                onclick="switchTab('schedules'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/schedules"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/schedules"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-schedules"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -60,8 +75,13 @@
                 <span>Schedules</span>
             </button>
             
-            <button 
-                onclick="switchTab('cloud-sync'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/cloud-sync"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/cloud-sync"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-cloud-sync"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -71,8 +91,13 @@
                 <span>Cloud Sync</span>
             </button>
             
-            <button 
-                onclick="switchTab('archives'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/archives"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/archives"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-archives"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -82,8 +107,13 @@
                 <span>Archives</span>
             </button>
             
-            <button 
-                onclick="switchTab('statistics'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/statistics"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/statistics"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-statistics"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -93,8 +123,13 @@
                 <span>Statistics</span>
             </button>
             
-            <button 
-                onclick="switchTab('cleanup'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/cleanup"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/cleanup"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-cleanup"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -104,8 +139,13 @@
                 <span>Archive Cleanup</span>
             </button>
             
-            <button 
-                onclick="switchTab('notifications'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/notifications"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/notifications"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-notifications"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -115,8 +155,13 @@
                 <span>Notifications</span>
             </button>
             
-            <button 
-                onclick="switchTab('jobs'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/jobs"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/jobs"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-jobs"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -126,8 +171,13 @@
                 <span>Job History</span>
             </button>
             
-            <button 
-                onclick="switchTab('repository-check'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/repository-check"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/repository-check"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-repository-check"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >
@@ -137,8 +187,13 @@
                 <span>Repository Check</span>
             </button>
             
-            <button 
-                onclick="switchTab('debug'); if (window.innerWidth < 1024) htmxCloseMobileSidebar();"
+            <button
+                hx-get="/api/tabs/debug"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator"
+                hx-push-url="/debug"
+                hx-on="htmx:beforeRequest: document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); this.classList.add('active')"
                 id="nav-debug"
                 class="nav-item w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-3"
             >

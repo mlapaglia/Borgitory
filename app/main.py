@@ -23,6 +23,7 @@ from app.api import (
     repository_stats,
     repository_check_configs,
     shared,
+    tabs,
 )
 from app.dependencies import get_recovery_service, get_scheduler_service
 
@@ -179,6 +180,13 @@ app.include_router(
     prefix="/api/shared",
     tags=["shared"],
 )
+
+app.include_router(
+    tabs.router,
+    prefix="/api/tabs",
+    tags=["tabs"],
+)
+
 app.include_router(debug.router)
 
 
