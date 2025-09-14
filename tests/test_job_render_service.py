@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 from app.services.jobs.job_render_service import JobRenderService
 from tests.fixtures.job_fixtures import (
-    create_mock_job_context
+    create_mock_job_context,
 )
 
 

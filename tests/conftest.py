@@ -1,6 +1,7 @@
 """
 Test configuration and fixtures
 """
+
 import asyncio
 import os
 from typing import AsyncGenerator, Generator
@@ -21,7 +22,20 @@ from app.main import app
 from app.models.database import Base, get_db
 
 # Import all models to ensure they're registered with Base
-# Import job fixtures to make them available to all tests
+# Import job fixtures to make them available to all tests - noqa prevents removal
+from tests.fixtures.job_fixtures import (  # noqa: F401
+    mock_job_manager,
+    job_manager_config,
+    sample_repository,
+    sample_database_job,
+    sample_database_job_with_tasks,
+    mock_job_executor,
+    sample_borg_job,
+    sample_composite_job,
+    mock_event_broadcaster,
+    mock_job_dependencies,
+    mock_subprocess_process,
+)
 
 
 @pytest.fixture(scope="session")
@@ -40,20 +54,20 @@ def test_db():
     """Create a test database with proper isolation."""
     # Use in-memory SQLite for testing
     SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-    
+
     engine = create_engine(
-        SQLALCHEMY_DATABASE_URL, 
+        SQLALCHEMY_DATABASE_URL,
         connect_args={"check_same_thread": False},
-        poolclass=StaticPool
+        poolclass=StaticPool,
     )
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    
+
     # Create ALL tables at once
     Base.metadata.create_all(bind=engine)
-    
+
     # Create a session for the test
     db_session = TestingSessionLocal()
-    
+
     def override_get_db():
         try:
             # Use the same session for the entire test
@@ -61,10 +75,10 @@ def test_db():
         finally:
             # Don't close during the test
             pass
-    
+
     # Set up the dependency override
     app.dependency_overrides[get_db] = override_get_db
-    
+
     try:
         yield db_session
     finally:
@@ -78,31 +92,30 @@ def test_db():
 def mock_rclone_service():
     """Create a mock RcloneService."""
     mock = Mock()
-    
+
     # Set up default return values for common methods
     mock.get_configured_remotes.return_value = ["test-remote"]
     mock.test_s3_connection.return_value = {
         "status": "success",
-        "message": "Connection successful"
+        "message": "Connection successful",
     }
-    
+
     async def mock_sync_generator():
         """Mock async generator for sync progress."""
         yield {"type": "log", "stream": "stdout", "message": "Starting sync"}
         yield {"type": "log", "stream": "stdout", "message": "Syncing files"}
         yield {"type": "completed", "status": "success", "message": "Sync completed"}
-    
+
     mock.sync_repository_to_s3.return_value = mock_sync_generator()
-    
+
     return mock
 
 
 @pytest_asyncio.fixture
 async def async_client(test_db) -> AsyncGenerator[AsyncClient, None]:
-    """Create an async test client with proper resource management.""" 
+    """Create an async test client with proper resource management."""
     async with AsyncClient(
-        transport=ASGITransport(app=app), 
-        base_url="http://testserver"
+        transport=ASGITransport(app=app), base_url="http://testserver"
     ) as client:
         yield client
 
@@ -112,8 +125,8 @@ def sample_repository_data():
     """Sample repository data for testing."""
     return {
         "name": "test-repo",
-        "path": "/tmp/test-repo", 
-        "passphrase": "test-passphrase"
+        "path": "/tmp/test-repo",
+        "passphrase": "test-passphrase",
     }
 
 
@@ -124,15 +137,15 @@ def sample_sync_request():
         "repository_id": 1,
         "remote_name": "test-config",
         "bucket_name": "test-bucket",
-        "path_prefix": "backups/"
+        "path_prefix": "backups/",
     }
 
 
-@pytest.fixture 
+@pytest.fixture
 def sample_s3_config():
     """Sample S3 configuration for testing."""
     return {
         "remote_name": "test-s3",
         "access_key_id": "AKIAIOSFODNN7EXAMPLE",
-        "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
     }
