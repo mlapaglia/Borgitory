@@ -1036,7 +1036,7 @@ class JobManager:
 
                     # Add result output
                     if success:
-                        result_message = f"✓ Notification sent successfully"
+                        result_message = "✓ Notification sent successfully"
                         task.output_lines.append({"text": result_message})
                         if response_message:
                             task.output_lines.append({"text": f"Response: {response_message}"})

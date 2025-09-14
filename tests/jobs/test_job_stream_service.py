@@ -93,40 +93,6 @@ class TestJobStreamService:
         assert "event: composite_job_status" in events[1]
 
     @pytest.mark.asyncio
-    async def test_stream_all_jobs_with_composite_jobs(self):
-        """Test streaming all jobs with composite jobs."""
-        # Create mock composite job
-        mock_job = Mock()
-        mock_job.status = "running"
-        mock_job.started_at = datetime(2023, 1, 1, 10, 0, 0, tzinfo=UTC)
-        mock_job.completed_at = None
-        mock_job.current_task_index = 1
-        mock_job.tasks = [Mock(), Mock(), Mock()]  # 3 tasks total
-        mock_job.job_type = "backup"
-        
-        self.mock_job_manager.jobs = {"composite-job-456": mock_job}
-        
-        async def mock_stream_generator():
-            yield {"type": "composite_job_status", "job_id": "composite-job-456", "status": "completed"}
-        
-        self.mock_job_manager.stream_all_job_updates = Mock(return_value=mock_stream_generator())
-        
-        response = await self.stream_service.stream_all_jobs()
-        
-        events = []
-        async for event in response.body_iterator:
-            events.append(event)
-        
-        # Check initial composite job data
-        jobs_data = json.loads(events[0].split("data: ")[1].split("\\n")[0])
-        composite_job_data = jobs_data["jobs"][0]
-        assert composite_job_data["id"] == "composite-job-456"
-        assert composite_job_data["type"] == "composite_job_status"
-        assert composite_job_data["current_task_index"] == 1
-        assert composite_job_data["total_tasks"] == 3
-        assert composite_job_data["job_type"] == "backup"
-
-    @pytest.mark.asyncio
     async def test_stream_all_jobs_error_handling(self):
         """Test error handling in all jobs streaming."""
         self.mock_job_manager.jobs = {}

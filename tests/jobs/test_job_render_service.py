@@ -128,7 +128,7 @@ class TestJobRenderService:
         )["job"]
 
         service = JobRenderService(job_manager=mock_job_manager)
-        result = service._format_database_job_for_render(job_with_tasks)
+        service._format_database_job_for_render(job_with_tasks)
 
         # Test job without tasks
         job_without_tasks = create_mock_job_context(
@@ -136,7 +136,7 @@ class TestJobRenderService:
             tasks=[]
         )["job"]
 
-        result = service._format_database_job_for_render(job_without_tasks)
+        service._format_database_job_for_render(job_without_tasks)
 
     def test_dependency_injection_service(self):
         """Test that dependency injection service works"""
