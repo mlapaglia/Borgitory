@@ -71,7 +71,7 @@ async def execute_scheduled_backup(schedule_id: int):
             )
 
             # Use BackupService to create the backup job (simplified path)
-            from app.services.backup_service import BackupService
+            from app.services.backups.backup_service import BackupService
             from app.models.enums import JobType
 
             backup_service = BackupService(db)
@@ -85,7 +85,7 @@ async def execute_scheduled_backup(schedule_id: int):
 
         except Exception as e:
             logger.error(
-                f"SCHEDULER: Error creating composite job for schedule {schedule_id}: {str(e)}"
+                f"SCHEDULER: Error creating job for schedule {schedule_id}: {str(e)}"
             )
             import traceback
 

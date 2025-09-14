@@ -39,10 +39,9 @@ class BorgService:
         )
 
     def _get_job_manager(self) -> JobManager:
-        """Get job manager instance, lazy load if needed"""
+        """Get job manager instance - must be injected via DI"""
         if self.job_manager is None:
-            from app.services.jobs.job_manager import get_job_manager
-            self.job_manager = get_job_manager()
+            raise RuntimeError("JobManager not provided - must be injected via dependency injection")
         return self.job_manager
 
     def _parse_borg_config(self, repo_path: str) -> Dict[str, any]:
@@ -846,6 +845,3 @@ class BorgService:
             logger.error(f"Error during cleanup: {cleanup_error}")
 
         return []
-
-
-# borg_service = BorgService()

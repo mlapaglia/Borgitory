@@ -65,8 +65,8 @@ class JobRenderService:
             # Get current jobs from unified manager
             for job_id, job in self.job_manager.jobs.items():
                 if job.status == "running":
-                    # Check if this is a composite job
-                    if hasattr(job, "is_composite") and job.is_composite():
+                    # All jobs are composite now, check if they have tasks
+                    if job.tasks:
                         # Handle composite job (like Manual Backup)
                         current_task = job.get_current_task()
                         progress_info = f"Task: {current_task.task_name if current_task else 'Unknown'} ({job.current_task_index + 1}/{len(job.tasks)})"
@@ -144,8 +144,7 @@ class JobRenderService:
         # assume simple borg jobs are their children
         for other_job_id, other_job in self.job_manager.jobs.items():
             if (
-                hasattr(other_job, "is_composite")
-                and other_job.is_composite()
+                other_job.tasks  # All jobs are composite now
                 and other_job.status == "running"
                 and other_job_id != job_id
             ):
@@ -184,28 +183,24 @@ class JobRenderService:
             job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "N/A"
         )
 
-        # Check if this job has tasks (regardless of job_type for backward compatibility)
-        is_composite = bool(job.tasks and len(job.tasks) > 0)
-
         # Debug logging
-        logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks, is_composite={is_composite}")
+        logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks")
         if job.tasks:
             for i, task in enumerate(job.tasks):
                 logger.info(f"  Task {i}: {task.task_name} ({task.task_type}) - {task.status}")
 
         # Job header
         job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
-        if is_composite:
-            progress_text = f"({job.completed_tasks}/{job.total_tasks} tasks)"
-            job_title += f" {progress_text}"
+        progress_text = f"({job.completed_tasks}/{job.total_tasks} tasks)"
+        job_title += f" {progress_text}"
 
         # Sort tasks by order if composite
         sorted_tasks = (
-            sorted(job.tasks, key=lambda t: t.task_order) if is_composite else []
+            sorted(job.tasks, key=lambda t: t.task_order)
         )
 
         # Fix task statuses for failed jobs
-        if is_composite and job.status == "failed":
+        if job.status == "failed":
             sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
 
         # Create a job context object that uses UUID as the primary ID
@@ -233,7 +228,6 @@ class JobRenderService:
             started_at=started_at,
             finished_at=finished_at,
             job_title=job_title,
-            is_composite=is_composite,
             sorted_tasks=sorted_tasks,
             expand_details=expand_details,
         )
@@ -302,30 +296,30 @@ class JobRenderService:
                 job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "N/A"
             )
 
-            # Check if this job has tasks (regardless of job_type for backward compatibility)
-            is_composite = bool(job.tasks and len(job.tasks) > 0)
+            # All jobs are now composite with tasks
+            has_tasks = bool(job.tasks and len(job.tasks) > 0)
 
             # Debug logging
-            logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks, is_composite={is_composite}")
+            logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks")
             if job.tasks:
                 for i, task in enumerate(job.tasks):
                     logger.info(f"  Task {i}: {task.task_name} ({task.task_type}) - {task.status}")
 
             # Job header
             job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
-            if is_composite:
+            if has_tasks:
                 progress_text = (
                     f"({job.completed_tasks or 0}/{job.total_tasks or 0} tasks)"
                 )
                 job_title += f" {progress_text}"
 
-            # Sort tasks by order if composite
+            # Sort tasks by order (all jobs have tasks now)
             sorted_tasks = (
-                sorted(job.tasks, key=lambda t: t.task_order) if is_composite else []
+                sorted(job.tasks, key=lambda t: t.task_order) if has_tasks else []
             )
 
             # Fix task statuses for failed jobs
-            if is_composite and job.status == "failed":
+            if has_tasks and job.status == "failed":
                 sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
 
             # Create a job context object that uses UUID as the primary ID
@@ -352,7 +346,6 @@ class JobRenderService:
                 "started_at": started_at,
                 "finished_at": finished_at,
                 "job_title": job_title,
-                "is_composite": is_composite,
                 "sorted_tasks": sorted_tasks,
             }
         except Exception as e:
@@ -407,14 +400,12 @@ class JobRenderService:
                 else "N/A"
             )
 
-            # Check if composite job
-            is_composite = (
-                hasattr(manager_job, "is_composite") and manager_job.is_composite()
-            )
+            # All jobs are now composite - check if they have tasks
+            has_tasks = hasattr(manager_job, "tasks") and manager_job.tasks and len(manager_job.tasks) > 0
 
             # Job title
             job_title = f"{job_type.replace('_', ' ').title()} - {repository_name}"
-            if is_composite:
+            if has_tasks:
                 # Use appropriate task count based on data source
                 if db_job and db_job.status in ["completed", "failed"]:
                     # Use database task counts for completed/failed jobs
@@ -436,7 +427,7 @@ class JobRenderService:
 
             # Convert manager job tasks to format expected by templates
             sorted_tasks = []
-            if is_composite:
+            if has_tasks:
                 # If we're using database status for completed/failed jobs, use database tasks too
                 if db_job and db_job.status in ["completed", "failed"] and db_job.tasks:
                     # Use database tasks for consistency
@@ -487,7 +478,6 @@ class JobRenderService:
                 "started_at": started_at,
                 "finished_at": finished_at if job_status != "running" else None,
                 "repository_name": repository_name,
-                "is_composite": is_composite,
                 "sorted_tasks": sorted_tasks,
                 "expand_details": False,  # Will be set by the caller
             }

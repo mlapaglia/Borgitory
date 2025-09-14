@@ -6,54 +6,11 @@ import asyncio
 import logging
 from typing import Dict, List, AsyncGenerator, Any, Optional
 from datetime import datetime
-from dataclasses import dataclass
-from enum import Enum
+
+from app.services.jobs.broadcaster.event_type import EventType
+from app.services.jobs.broadcaster.job_event import JobEvent
 
 logger = logging.getLogger(__name__)
-
-
-class EventType(Enum):
-    """Types of job events"""
-
-    JOB_STARTED = "job_started"
-    JOB_PROGRESS = "job_progress"
-    JOB_COMPLETED = "job_completed"
-    JOB_FAILED = "job_failed"
-    JOB_CANCELLED = "job_cancelled"
-    JOB_STATUS_CHANGED = "job_status_changed"
-    JOB_OUTPUT = "job_output"
-    TASK_STARTED = "task_started"
-    TASK_COMPLETED = "task_completed"
-    TASK_FAILED = "task_failed"
-    JOBS_UPDATE = "jobs_update"
-    QUEUE_UPDATE = "queue_update"
-    KEEPALIVE = "keepalive"
-
-
-@dataclass
-class JobEvent:
-    """Represents a job event"""
-
-    event_type: EventType
-    job_id: Optional[str] = None
-    data: Dict[str, Any] = None
-    timestamp: datetime = None
-
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = datetime.now()
-        if self.data is None:
-            self.data = {}
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert event to dictionary format"""
-        return {
-            "type": self.event_type.value,
-            "job_id": self.job_id,
-            "data": self.data,
-            "timestamp": self.timestamp.isoformat(),
-        }
-
 
 class JobEventBroadcaster:
     """Handles SSE streaming and event distribution to clients"""

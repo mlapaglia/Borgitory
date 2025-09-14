@@ -8,8 +8,7 @@ from app.services.jobs.job_manager import (
     JobManagerConfig,
     BorgJob,
     BorgJobTask,
-    get_job_manager,
-    reset_job_manager,
+    create_job_manager,
 )
 from app.models.database import Repository
 
@@ -22,7 +21,6 @@ class TestJobManagerConfig:
         config = JobManagerConfig()
 
         assert config.max_concurrent_backups == 5
-        assert config.auto_cleanup_delay_seconds == 30
         assert config.max_output_lines_per_job == 1000
         assert config.queue_poll_interval == 0.1
         assert config.sse_keepalive_timeout == 30.0
@@ -31,14 +29,12 @@ class TestJobManagerConfig:
         """Test custom configuration values"""
         config = JobManagerConfig(
             max_concurrent_backups=10,
-            auto_cleanup_delay_seconds=60,
             max_output_lines_per_job=2000,
             queue_poll_interval=0.5,
             sse_keepalive_timeout=45.0,
         )
 
         assert config.max_concurrent_backups == 10
-        assert config.auto_cleanup_delay_seconds == 60
         assert config.max_output_lines_per_job == 2000
         assert config.queue_poll_interval == 0.5
         assert config.sse_keepalive_timeout == 45.0
@@ -153,31 +149,30 @@ class TestBorgJob:
         simple_job = BorgJob(id="simple", status="running", started_at=datetime.now())
         assert simple_job.get_current_task() is None
 
-    def test_is_composite(self):
-        """Test is_composite method"""
-        # Simple job
-        simple_job = BorgJob(id="simple", status="running", started_at=datetime.now())
-        assert not simple_job.is_composite()
-        
-        # Composite job with tasks
+    def test_unified_composite_jobs(self):
+        """Test unified composite job approach - all jobs are now composite"""
+        # All jobs are now composite with job_type="composite"
         task = BorgJobTask(task_type="backup", task_name="Backup")
-        composite_job = BorgJob(
-            id="composite",
+        job_with_tasks = BorgJob(
+            id="job1",
             status="running",
             started_at=datetime.now(),
             job_type="composite",
             tasks=[task],
         )
-        assert composite_job.is_composite()
-        
-        # Composite job type but no tasks
-        empty_composite = BorgJob(
-            id="empty",
+        # All jobs should have composite type and may have tasks
+        assert job_with_tasks.job_type == "composite"
+        assert len(job_with_tasks.tasks) == 1
+
+        # Even jobs without tasks are composite type
+        job_without_tasks = BorgJob(
+            id="job2",
             status="running",
             started_at=datetime.now(),
             job_type="composite",
         )
-        assert not empty_composite.is_composite()
+        assert job_without_tasks.job_type == "composite"
+        assert len(job_without_tasks.tasks) == 0
 
 
 class TestJobManager:
@@ -268,7 +263,7 @@ class TestJobManager:
         """Test starting non-backup borg command"""
         mock_uuid.return_value = "test-job-id"
         
-        with patch.object(job_manager, "_execute_simple_job", new=AsyncMock()) as mock_run:
+        with patch.object(job_manager, "_execute_composite_task", new=AsyncMock()) as mock_run:
             job_id = await job_manager.start_borg_command(
                 command=["borg", "list", "repo"],
                 env={"TEST": "value"},
@@ -280,6 +275,10 @@ class TestJobManager:
         job = job_manager.jobs["test-job-id"]
         assert job.status == "running"
         assert job.command == ["borg", "list", "repo"]
+        assert job.job_type == "composite"  # All jobs are now composite
+        assert len(job.tasks) == 1  # Should have one task
+        assert job.tasks[0].task_name == "Execute: borg list repo"
+        assert job.tasks[0].status == "running"
         mock_run.assert_called_once()
 
     @pytest.mark.asyncio
@@ -355,8 +354,7 @@ class TestJobManager:
         job.error = None
         job.job_type = "simple"
         job.current_task_index = 0
-        job.tasks = []  # Empty list for simple job
-        job.is_composite.return_value = False
+        job.tasks = []
 
         job_manager.jobs["test"] = job
 
@@ -426,36 +424,25 @@ class TestJobManager:
 class TestJobManagerFactory:
     """Test job manager factory functions"""
 
-    def teardown_method(self):
-        """Reset job manager after each test"""
-        reset_job_manager()
+    def test_create_job_manager_default(self):
+        """Test that create_job_manager creates instances with default config"""
+        manager = create_job_manager()
 
-    def test_get_job_manager_singleton(self):
-        """Test that get_job_manager returns same instance"""
-        manager1 = get_job_manager()
-        manager2 = get_job_manager()
-        
-        assert manager1 is manager2
+        assert isinstance(manager, JobManager)
+        assert manager.config.max_concurrent_backups == 5  # default value
 
-    def test_get_job_manager_with_config(self):
-        """Test get_job_manager with custom config"""
+    def test_create_job_manager_with_config(self):
+        """Test create_job_manager with custom config"""
         config = JobManagerConfig(max_concurrent_backups=10)
-        manager = get_job_manager(config)
+        manager = create_job_manager(config)
 
         assert manager.config.max_concurrent_backups == 10
 
-    @patch.dict("os.environ", {"BORG_MAX_CONCURRENT_BACKUPS": "8", "BORG_AUTO_CLEANUP_DELAY": "45"})
-    def test_get_job_manager_with_env_vars(self):
-        """Test get_job_manager with environment variables"""
-        manager = get_job_manager()
-        
-        assert manager.config.max_concurrent_backups == 8
-        assert manager.config.auto_cleanup_delay_seconds == 45
+    def test_create_job_manager_separate_instances(self):
+        """Test that create_job_manager creates separate instances (no singleton)"""
+        manager1 = create_job_manager()
+        manager2 = create_job_manager()
 
-    def test_reset_job_manager(self):
-        """Test resetting job manager"""
-        manager1 = get_job_manager()
-        reset_job_manager()
-        manager2 = get_job_manager()
-        
         assert manager1 is not manager2
+        assert isinstance(manager1, JobManager)
+        assert isinstance(manager2, JobManager)

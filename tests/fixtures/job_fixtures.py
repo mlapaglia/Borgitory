@@ -168,7 +168,6 @@ def job_manager_config():
     """Standard JobManagerConfig for testing."""
     return JobManagerConfig(
         max_concurrent_backups=2,
-        auto_cleanup_delay_seconds=30,
         max_output_lines_per_job=100,
         queue_poll_interval=0.1,
         sse_keepalive_timeout=30.0,
@@ -223,7 +222,6 @@ def create_mock_job_context(job_id: str = None, status: str = "completed",
     return {
         "job": mock_job,
         "templates_dir": "app/templates",
-        "is_composite": bool(tasks and len(tasks) > 0),
         "current_task": tasks[0] if tasks else None,
         "show_output": False,
     }

@@ -42,9 +42,5 @@ def main():
             else:
                 print("  No tasks attribute found")
 
-            # Test is_composite logic
-            is_composite = job.tasks and len(job.tasks) > 0
-            print(f"  is_composite would be: {is_composite}")
-
 if __name__ == "__main__":
     main()

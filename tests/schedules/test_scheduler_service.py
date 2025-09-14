@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
 
-from app.services.scheduler_service import SchedulerService
+from app.services.scheduling.scheduler_service import SchedulerService
 
 
 class TestSchedulerService:
@@ -217,7 +217,7 @@ class TestSchedulerService:
         
         mock_db.query.return_value.filter.return_value.all.return_value = [mock_schedule1, mock_schedule2]
         
-        with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
+        with patch('app.services.scheduling.scheduler_service.get_db_session') as mock_get_db, \
              patch.object(self.scheduler_service, '_add_schedule_internal', new_callable=AsyncMock) as mock_add:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
@@ -243,7 +243,7 @@ class TestSchedulerService:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch.object(self.scheduler_service.scheduler, 'get_job') as mock_get_job, \
-             patch('app.services.scheduler_service.get_db_session') as mock_get_db:
+             patch('app.services.scheduling.scheduler_service.get_db_session') as mock_get_db:
             
             mock_get_job.return_value = mock_job
             mock_get_db.return_value.__enter__.return_value = mock_db

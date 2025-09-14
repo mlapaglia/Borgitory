@@ -11,7 +11,7 @@ from app.main import app
 from app.models.database import Repository, Job
 from app.dependencies import get_borg_service, get_volume_service
 from app.services.borg_service import BorgService
-from app.services.volume_service import VolumeService
+from app.services.volumes.volume_service import VolumeService
 
 
 class TestRepositoriesAPI:

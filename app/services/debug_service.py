@@ -290,8 +290,8 @@ class DebugService:
         """Get job manager information"""
         try:
             if not self.job_manager:
-                from app.services.jobs.job_manager import get_job_manager
-                self.job_manager = get_job_manager()
+                # Return minimal info if no job manager injected
+                return {"status": "No job manager available", "active_jobs": 0, "total_jobs": 0}
 
             # Count active jobs by checking job statuses
             active_jobs_count = 0

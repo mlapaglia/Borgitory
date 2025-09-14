@@ -154,3 +154,56 @@ class PushoverService:
 
         except Exception as e:
             return {"status": "error", "message": f"Connection test failed: {str(e)}"}
+
+    async def send_notification_with_response(
+        self,
+        user_key: str,
+        app_token: str,
+        title: str,
+        message: str,
+        priority: int = 0,
+        sound: str = "default",
+    ) -> tuple[bool, str]:
+        """
+        Send a notification via Pushover and return detailed response
+
+        Returns:
+            tuple[bool, str]: (success, response_details)
+        """
+        try:
+            payload = {
+                "token": app_token,
+                "user": user_key,
+                "title": title,
+                "message": message,
+                "priority": priority,
+                "sound": sound,
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    self.PUSHOVER_API_URL, data=payload
+                ) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            result = await response.json()
+                            if result.get("status") == 1:
+                                logger.info(f"Pushover notification sent: {title}")
+                                return True, f"HTTP {response.status}: {response_text}"
+                            else:
+                                error_msg = result.get('errors', ['Unknown error'])
+                                logger.error(f"Pushover API error: {error_msg}")
+                                return False, f"HTTP {response.status}: {response_text}"
+                        except:
+                            # Fallback if JSON parsing fails
+                            logger.info(f"Pushover notification sent: {title}")
+                            return True, f"HTTP {response.status}: {response_text}"
+                    else:
+                        logger.error(f"Pushover HTTP error {response.status}: {response_text}")
+                        return False, f"HTTP {response.status}: {response_text}"
+
+        except Exception as e:
+            logger.error(f"Error sending Pushover notification: {e}")
+            return False, str(e)

@@ -91,8 +91,7 @@ class TestJobRenderService:
 
         assert result is not None
         assert result["job"].id == mock_job.id
-        assert result["job"].job_uuid == mock_job.id  # Legacy compatibility
-        assert result["is_composite"] is True  # Should detect tasks
+        assert result["job"].job_uuid == mock_job.id
 
     def test_format_database_job_handles_simple_jobs(self, mock_job_manager):
         """Test formatting simple jobs without tasks"""
@@ -102,8 +101,7 @@ class TestJobRenderService:
         service = JobRenderService(job_manager=mock_job_manager)
         result = service._format_database_job_for_render(mock_job)
 
-        assert result is not None
-        assert result["is_composite"] is False
+        assert result is not None # All jobs are now composite
         assert "sorted_tasks" in result
 
     def test_job_context_maintains_backward_compatibility(self, mock_job_manager):
@@ -119,7 +117,6 @@ class TestJobRenderService:
         assert result["job"].job_uuid == mock_job.id
 
     def test_composite_job_detection_logic(self, mock_job_manager):
-        """Test the improved is_composite logic"""
         # Test job with tasks
         mock_task = Mock()
         mock_task.task_name = "backup"
@@ -133,8 +130,6 @@ class TestJobRenderService:
         service = JobRenderService(job_manager=mock_job_manager)
         result = service._format_database_job_for_render(job_with_tasks)
 
-        assert result["is_composite"] is True
-
         # Test job without tasks
         job_without_tasks = create_mock_job_context(
             job_type="composite",
@@ -142,7 +137,6 @@ class TestJobRenderService:
         )["job"]
 
         result = service._format_database_job_for_render(job_without_tasks)
-        assert result["is_composite"] is False
 
     def test_dependency_injection_service(self):
         """Test that dependency injection service works"""
@@ -188,7 +182,6 @@ class TestJobRenderServiceIntegration:
 
         # Verify structure expected by the endpoint
         assert "job" in result
-        assert "is_composite" in result
         assert "sorted_tasks" in result
         assert result["job"].id == sample_database_job_with_tasks.id
 

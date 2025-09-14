@@ -22,26 +22,16 @@
                 <span class="ml-2 text-gray-900 dark:text-gray-100" sse-swap="status">{{ job.status.title() }}</span>
             </div>
         </div>
-
-        {% if is_composite %}
-            {# Composite job with streaming tasks #}
-            <div class="mt-4">
-                <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Tasks:</h4>
-                <div class="space-y-2" id="tasks-container-{{ job.id }}" sse-swap="tasks">
-                    {% for task in sorted_tasks %}
-                        {% set task_expanded = false %}
-                        {% include 'partials/jobs/task_item_streaming.html' %}
-                    {% endfor %}
-                </div>
+        {# Composite job with streaming tasks #}
+        <div class="mt-4">
+            <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Tasks:</h4>
+            <div class="space-y-2" id="tasks-container-{{ job.id }}" sse-swap="tasks">
+                {% for task in sorted_tasks %}
+                    {% set task_expanded = false %}
+                    {% include 'partials/jobs/task_item_streaming.html' %}
+                {% endfor %}
             </div>
-        {% else %}
-            {# Simple job - no streaming at job level, individual tasks handle their own streaming #}
-            <div class="mt-4">
-                <div class="text-sm text-gray-600 dark:text-gray-400">
-                    Simple job - expand individual tasks to see their output.
-                </div>
-            </div>
-        {% endif %}
+        </div>
     </div>
     
     {# Auto-refresh to static view when job completes #}

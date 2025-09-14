@@ -3,7 +3,7 @@ Tests for DebugService - Service to gather system and application debug informat
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock, AsyncMock, Mock
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.services.debug_service import DebugService
@@ -372,13 +372,17 @@ class TestDebugService:
 
     def test_get_job_manager_info_exception_handling(self, debug_service):
         """Test job manager info exception handling"""
-        # Simulate job manager error by setting to None
-        debug_service.job_manager = None
-        with patch('app.services.jobs.job_manager.get_job_manager', side_effect=Exception("Job manager error")):
-            result = debug_service._get_job_manager_info()
+        # Simulate job manager error by making jobs attribute missing
+        mock_job_manager = Mock()
+        # Don't set jobs attribute to simulate AttributeError
+        del mock_job_manager.jobs
+        debug_service.job_manager = mock_job_manager
 
-        assert "error" in result
-        assert result["job_manager_running"] is False
+        result = debug_service._get_job_manager_info()
+
+        # Should handle missing jobs attribute gracefully
+        assert "active_jobs" in result
+        assert result["total_jobs"] == 0  # Due to missing jobs attribute
 
     def test_get_job_manager_info_jobs_without_status(self, debug_service):
         """Test job manager info when jobs don't have status attribute"""

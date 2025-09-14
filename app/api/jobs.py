@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
-from app.dependencies import JobServiceDep, BackupServiceDep
+from app.dependencies import JobServiceDep
 from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from app.services.jobs.job_manager import JobManager
 from app.dependencies import TemplatesDep
@@ -22,15 +22,16 @@ def get_job_manager_dependency() -> JobManager:
 async def create_backup(
     backup_request: BackupRequest,
     request: Request,
-    backup_svc: BackupServiceDep,
+    job_svc: JobServiceDep,
     templates: TemplatesDep,
 ):
-    """Start a backup job using the simplified backup service"""
+    """Start a backup job using JobService"""
 
     try:
-        job_id = await backup_svc.create_and_run_backup(
+        result = await job_svc.create_backup_job(
             backup_request, JobType.MANUAL_BACKUP
         )
+        job_id = result["job_id"]
 
         return templates.TemplateResponse(
             request,
@@ -61,13 +62,14 @@ async def create_backup(
 async def create_prune_job(
     request: Request,
     prune_request: PruneRequest,
-    backup_svc: BackupServiceDep,
+    job_svc: JobServiceDep,
     templates: TemplatesDep,
 ):
-    """Start an archive pruning job using the simplified backup service"""
+    """Start an archive pruning job using JobService"""
 
     try:
-        job_id = await backup_svc.create_and_run_prune(prune_request)
+        result = await job_svc.create_prune_job(prune_request)
+        job_id = result["job_id"]
 
         return templates.TemplateResponse(
             request,
@@ -298,7 +300,7 @@ async def toggle_task_details(
 
     # Find the specific task
     task = None
-    if job.get("is_composite") and job.get("sorted_tasks"):
+    if job.get("sorted_tasks"):
         for t in job["sorted_tasks"]:
             if t.task_order == task_order:
                 task = t

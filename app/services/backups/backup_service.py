@@ -11,23 +11,23 @@ the complex job orchestration system. It handles:
 
 import logging
 from datetime import datetime, UTC
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Callable
 from sqlalchemy.orm import Session
 
 from app.models.database import Repository, Job, JobTask, Schedule
 from app.models.schemas import BackupRequest, PruneRequest
 from app.models.enums import JobType
-from app.services.backup_executor import BackupExecutor, BackupConfig, PruneConfig, BackupResult
+from app.services.backups.backup_executor import BackupExecutor, BackupConfig, PruneConfig, BackupResult
 
 logger = logging.getLogger(__name__)
 
 
 class BackupService:
     """
-    Simplified backup service that provides direct backup operations.
+    Pure backup execution service.
 
-    Replaces the complex JobManager + JobService architecture with a single,
-    straightforward service that handles backup operations from start to finish.
+    Handles backup, prune, and check operations execution only.
+    Job creation and management is handled by JobService.
     """
 
     def __init__(self, db_session: Session, backup_executor: Optional[BackupExecutor] = None):
@@ -41,20 +41,22 @@ class BackupService:
         self.db = db_session
         self.executor = backup_executor or BackupExecutor()
 
-    async def create_and_run_backup(
+    async def execute_backup(
         self,
+        job: Job,
         backup_request: BackupRequest,
-        job_type: JobType = JobType.BACKUP
-    ) -> str:
+        output_callback: Optional[Callable[[str], None]] = None
+    ) -> BackupResult:
         """
-        Create and execute a backup job directly.
+        Execute a backup for an existing job.
 
         Args:
+            job: Existing job record to execute backup for
             backup_request: Backup request with configuration
-            job_type: Type of job (backup, scheduled_backup, etc.)
+            output_callback: Optional callback for output lines
 
         Returns:
-            Job ID of the created backup job
+            BackupResult with execution details
 
         Raises:
             ValueError: If repository not found or configuration invalid
@@ -64,10 +66,7 @@ class BackupService:
         if not repository:
             raise ValueError(f"Repository {backup_request.repository_id} not found")
 
-        # Create job record in database
-        job = self._create_job_record(repository, job_type, backup_request)
-
-        logger.info(f"Starting backup job {job.id} for repository {repository.name}")
+        logger.info(f"Executing backup job {job.id} for repository {repository.name}")
 
         try:
             # Create backup configuration
@@ -81,12 +80,18 @@ class BackupService:
             # Create backup task record
             backup_task = self._create_backup_task(job)
 
+            # Prepare output callback that updates task and passes to external callback
+            def combined_output_callback(line: str):
+                self._handle_output_line(backup_task, line)
+                if output_callback:
+                    output_callback(line)
+
             # Execute backup
             result = await self.executor.execute_backup(
                 repository=repository,
                 config=backup_config,
                 operation_id=job.id,
-                output_callback=lambda line: self._handle_output_line(backup_task, line)
+                output_callback=combined_output_callback
             )
 
             # Update task with results
@@ -100,8 +105,9 @@ class BackupService:
             # Update final job status
             self._finalize_job(job)
 
+
             logger.info(f"Backup job {job.id} completed with status: {job.status}")
-            return job.id
+            return result
 
         except Exception as e:
             # Update job as failed
@@ -109,6 +115,8 @@ class BackupService:
             job.error = str(e)
             job.finished_at = datetime.now(UTC)
             self.db.commit()
+
+            # Note: JobManager status updates are now handled by JobService
 
             logger.error(f"Backup job {job.id} failed: {e}")
             raise
@@ -161,6 +169,8 @@ class BackupService:
 
         logger.info(f"Starting prune job {job.id} for repository {repository.name}")
 
+        # Note: JobManager registration is now handled by JobService
+
         try:
             # Create prune configuration
             prune_config = PruneConfig(
@@ -189,6 +199,7 @@ class BackupService:
             # Update final job status
             self._finalize_job(job)
 
+
             logger.info(f"Prune job {job.id} completed with status: {job.status}")
             return job.id
 
@@ -198,6 +209,8 @@ class BackupService:
             job.error = str(e)
             job.finished_at = datetime.now(UTC)
             self.db.commit()
+
+            # Note: JobManager status updates are now handled by JobService
 
             logger.error(f"Prune job {job.id} failed: {e}")
             raise
@@ -374,6 +387,8 @@ class BackupService:
             task.output = line
         else:
             task.output += "\n" + line
+
+        # Note: Output forwarding to JobManager is now handled by JobService via output_callback
 
         # Commit periodically (every 10 lines to avoid too many commits)
         if task.output.count("\n") % 10 == 0:

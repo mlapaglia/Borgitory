@@ -16,13 +16,14 @@ from dataclasses import dataclass, field
 from app.services.jobs.job_executor import JobExecutor
 from app.services.jobs.job_output_manager import JobOutputManager
 from app.services.jobs.job_queue_manager import JobQueueManager, JobPriority
-from app.services.jobs.job_event_broadcaster import JobEventBroadcaster, EventType
+from app.services.jobs.broadcaster.job_event_broadcaster import JobEventBroadcaster, EventType
 from app.services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
 from app.services.cloud_backup_coordinator import CloudBackupCoordinator
 from app.utils.db_session import get_db_session
 
 if TYPE_CHECKING:
     from app.models.database import Repository, Schedule
+    from app.services.notifications.pushover_service import PushoverService
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,6 @@ class JobManagerConfig:
 
     # Output and storage settings
     max_output_lines_per_job: int = 1000
-    auto_cleanup_delay_seconds: int = 30
 
     # Queue settings
     queue_poll_interval: float = 0.1
@@ -61,6 +61,7 @@ class JobManagerDependencies:
     event_broadcaster: Optional[JobEventBroadcaster] = None
     database_manager: Optional[JobDatabaseManager] = None
     cloud_coordinator: Optional[CloudBackupCoordinator] = None
+    pushover_service: Optional["PushoverService"] = None
 
     # External dependencies (for testing/customization)
     subprocess_executor: Optional[Callable] = field(
@@ -125,9 +126,6 @@ class BorgJob:
             return self.tasks[self.current_task_index]
         return None
 
-    def is_composite(self) -> bool:
-        """Check if this is a multi-task composite job"""
-        return self.job_type == "composite" and len(self.tasks) > 0
 
 
 class JobManagerFactory:
@@ -201,6 +199,13 @@ class JobManagerFactory:
                 http_client_factory=deps.http_client_factory,
             )
 
+        # PushoverService
+        if custom_dependencies.pushover_service:
+            deps.pushover_service = custom_dependencies.pushover_service
+        else:
+            from app.services.notifications.pushover_service import PushoverService
+            deps.pushover_service = PushoverService()
+
         # Job Database Manager
         if custom_dependencies.database_manager:
             deps.database_manager = custom_dependencies.database_manager
@@ -269,6 +274,7 @@ class JobManager:
         self.event_broadcaster = dependencies.event_broadcaster
         self.database_manager = dependencies.database_manager
         self.cloud_coordinator = dependencies.cloud_coordinator
+        self.pushover_service = dependencies.pushover_service
 
         self.jobs: Dict[str, BorgJob] = {}
         self._processes: Dict[str, asyncio.subprocess.Process] = {}
@@ -303,17 +309,28 @@ class JobManager:
     async def start_borg_command(
         self, command: List[str], env: Optional[Dict] = None, is_backup: bool = False
     ) -> str:
-        """Start a Borg command (backward compatibility interface)"""
+        """Start a Borg command (now always creates composite job with one task)"""
         await self.initialize()
 
         job_id = str(uuid.uuid4())
 
+        # Create the main task for this command
+        command_str = " ".join(command[:3]) + ("..." if len(command) > 3 else "")
+        main_task = BorgJobTask(
+            task_type="command",
+            task_name=f"Execute: {command_str}",
+            status="queued" if is_backup else "running",
+            started_at=datetime.now(UTC)
+        )
+
+        # Create composite job (all jobs are now composite)
         job = BorgJob(
             id=job_id,
             command=command,
-            job_type="simple",
+            job_type="composite",  # All jobs are now composite
             status="queued" if is_backup else "running",
             started_at=datetime.now(UTC),
+            tasks=[main_task]  # Always has at least one task
         )
         self.jobs[job_id] = job
 
@@ -324,27 +341,30 @@ class JobManager:
                 job_id=job_id, job_type="backup", priority=JobPriority.NORMAL
             )
         else:
-            await self._execute_simple_job(job, command, env)
+            await self._execute_composite_task(job, main_task, command, env)
 
         self.event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
-            data={"command": " ".join(command[:3]) + "...", "is_backup": is_backup},
+            data={"command": command_str, "is_backup": is_backup},
         )
 
         return job_id
 
-    async def _execute_simple_job(
-        self, job: BorgJob, command: List[str], env: Optional[Dict] = None
+    async def _execute_composite_task(
+        self, job: BorgJob, task: BorgJobTask, command: List[str], env: Optional[Dict] = None
     ):
-        """Execute a simple single-command job"""
+        """Execute a single task within a composite job"""
         job.status = "running"
+        task.status = "running"
 
         try:
             process = await self.executor.start_process(command, env)
             self._processes[job.id] = process
 
             def output_callback(line: str, progress: Dict):
+                # Add output to both the task and the output manager
+                task.output_lines.append(line)
                 asyncio.create_task(
                     self.output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -361,11 +381,24 @@ class JobManager:
                 process, output_callback=output_callback
             )
 
-            job.status = "completed" if result.return_code == 0 else "failed"
+            # Update task and job based on process result
+            task.completed_at = datetime.now(UTC)
+            task.return_code = result.return_code
+
+            if result.return_code == 0:
+                task.status = "completed"
+                job.status = "completed"
+            else:
+                task.status = "failed"
+                task.error = result.error or f"Process failed with return code {result.return_code}"
+                job.status = "failed"
+                job.error = task.error
+
             job.return_code = result.return_code
             job.completed_at = datetime.now(UTC)
 
             if result.error:
+                task.error = result.error
                 job.error = result.error
 
             self.event_broadcaster.broadcast_event(
@@ -377,10 +410,13 @@ class JobManager:
             )
 
         except Exception as e:
+            task.status = "failed"
+            task.error = str(e)
+            task.completed_at = datetime.now(UTC)
             job.status = "failed"
             job.error = str(e)
             job.completed_at = datetime.now(UTC)
-            logger.error(f"Job {job.id} execution failed: {e}")
+            logger.error(f"Composite job task {job.id} execution failed: {e}")
 
             self.event_broadcaster.broadcast_event(
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
@@ -389,10 +425,6 @@ class JobManager:
         finally:
             if job.id in self._processes:
                 del self._processes[job.id]
-
-            asyncio.create_task(
-                self._auto_cleanup_job(job.id, self.config.auto_cleanup_delay_seconds)
-            )
 
     def _on_job_start(self, job_id: str, queued_job):
         """Callback when queue manager starts a job"""
@@ -601,6 +633,7 @@ class JobManager:
                 data={"status": job.status, "completed_at": job.completed_at.isoformat()},
             )
 
+
         except Exception as e:
             job.status = "failed"
             job.error = str(e)
@@ -616,10 +649,6 @@ class JobManager:
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
             )
 
-        finally:
-            asyncio.create_task(
-                self._auto_cleanup_job(job.id, self.config.auto_cleanup_delay_seconds)
-            )
 
     async def _execute_simple_job(self, job: BorgJob, command: List[str], env: Optional[Dict] = None):
         """Execute a simple single-command job (for test compatibility)"""
@@ -975,19 +1004,57 @@ class JobManager:
                     # Get decrypted credentials
                     user_key, app_token = config.get_pushover_credentials()
 
-                    # Send Pushover notification
-                    success = await self._send_pushover_notification(
-                        app_token,
-                        user_key,
-                        params.get("title", "Borgitory Notification"),
-                        params.get("message", "Job completed"),
-                        params.get("priority", 0)
+                    title = params.get("title", "Borgitory Notification")
+                    message = params.get("message", "Job completed")
+                    priority = params.get("priority", 0)
+
+                    # Add output showing notification attempt
+                    task.output_lines.append({"text": f"Sending Pushover notification to {config.name}"})
+                    task.output_lines.append({"text": f"Title: {title}"})
+                    task.output_lines.append({"text": f"Message: {message}"})
+                    task.output_lines.append({"text": f"Priority: {priority}"})
+
+                    # Broadcast initial output
+                    self.event_broadcaster.broadcast_event(
+                        EventType.JOB_OUTPUT,
+                        job_id=job.id,
+                        data={"line": f"Sending Pushover notification to {config.name}", "task_index": task_index},
+                    )
+
+                    # Send Pushover notification using injected service
+                    if self.pushover_service:
+                        success, response_message = await self.pushover_service.send_notification_with_response(
+                            user_key=user_key,
+                            app_token=app_token,
+                            title=title,
+                            message=message,
+                            priority=priority
+                        )
+                    else:
+                        success = False
+                        response_message = "PushoverService not available"
+
+                    # Add result output
+                    if success:
+                        result_message = f"✓ Notification sent successfully"
+                        task.output_lines.append({"text": result_message})
+                        if response_message:
+                            task.output_lines.append({"text": f"Response: {response_message}"})
+                    else:
+                        result_message = f"✗ Failed to send notification: {response_message}"
+                        task.output_lines.append({"text": result_message})
+
+                    # Broadcast result output
+                    self.event_broadcaster.broadcast_event(
+                        EventType.JOB_OUTPUT,
+                        job_id=job.id,
+                        data={"line": result_message, "task_index": task_index},
                     )
 
                     task.status = "completed" if success else "failed"
                     task.return_code = 0 if success else 1
                     if not success:
-                        task.error = "Failed to send Pushover notification"
+                        task.error = response_message or "Failed to send Pushover notification"
                     return success
                 else:
                     logger.warning(f"Unsupported notification provider: {config.provider}")
@@ -1001,43 +1068,6 @@ class JobManager:
             task.error = str(e)
             return False
 
-    async def _send_pushover_notification(self, api_token: str, user_key: str, title: str, message: str, priority: int = 0) -> bool:
-        """Send a Pushover notification"""
-        try:
-            import aiohttp
-
-            data = {
-                "token": api_token,
-                "user": user_key,
-                "title": title,
-                "message": message,
-                "priority": priority
-            }
-
-            http_client_factory = self.dependencies.http_client_factory
-            if http_client_factory:
-                async with http_client_factory() as session:
-                    async with session.post("https://api.pushover.net/1/messages.json", data=data) as response:
-                        if response.status == 200:
-                            logger.info("Pushover notification sent successfully")
-                            return True
-                        else:
-                            logger.error(f"Pushover API error: {response.status}")
-                            return False
-            else:
-                # Fallback to basic aiohttp session
-                async with aiohttp.ClientSession() as session:
-                    async with session.post("https://api.pushover.net/1/messages.json", data=data) as response:
-                        if response.status == 200:
-                            logger.info("Pushover notification sent successfully")
-                            return True
-                        else:
-                            logger.error(f"Pushover API error: {response.status}")
-                            return False
-
-        except Exception as e:
-            logger.error(f"Error sending Pushover notification: {e}")
-            return False
 
 
 
@@ -1153,10 +1183,6 @@ class JobManager:
             return True
         return False
 
-    async def _auto_cleanup_job(self, job_id: str, delay_seconds: int):
-        """Automatically cleanup job after delay"""
-        await asyncio.sleep(delay_seconds)
-        self.cleanup_job(job_id)
 
     def get_queue_status(self):
         """Get queue manager status"""
@@ -1195,7 +1221,7 @@ class JobManager:
             "return_code": job.return_code,
             "error": job.error,
             "job_type": job.job_type,
-            "current_task_index": job.current_task_index if job.is_composite() else None,
+            "current_task_index": job.current_task_index if job.tasks else None,
             "tasks": len(job.tasks) if job.tasks else 0,
         }
 
@@ -1294,49 +1320,189 @@ class JobManager:
 
         logger.info("Job manager shutdown complete")
 
+    # Bridge methods for external job registration (BackupService integration)
 
-# Factory function and singleton for backward compatibility
-_job_manager_instance: Optional[JobManager] = None
+    def register_external_job(self, job_id: str, job_type: str = "backup", job_name: str = "External Backup") -> None:
+        """
+        Register an external job (from BackupService) for monitoring purposes.
+        All jobs are now composite jobs with at least one task.
 
+        Args:
+            job_id: Unique job identifier
+            job_type: Type of job (backup, prune, check, etc.)
+            job_name: Human-readable job name
+        """
+        if job_id in self.jobs:
+            logger.warning(f"Job {job_id} already registered, updating status")
 
-def get_job_manager(config=None) -> JobManager:
-    """Factory function for job manager with singleton behavior"""
-    global _job_manager_instance
-    if _job_manager_instance is None:
-        if config is None:
-            # Use environment variables or defaults
-            internal_config = JobManagerConfig(
-                max_concurrent_backups=int(
-                    os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")
-                ),
-                auto_cleanup_delay_seconds=int(
-                    os.getenv("BORG_AUTO_CLEANUP_DELAY", "30")
-                ),
-                max_output_lines_per_job=int(
-                    os.getenv("BORG_MAX_OUTPUT_LINES", "1000")
-                ),
-            )
-        elif hasattr(config, "to_internal_config"):
-            # Backward compatible config wrapper
-            internal_config = config.to_internal_config()
-        else:
-            # Assume it's already a JobManagerConfig
-            internal_config = config
-
-        _job_manager_instance = JobManager(internal_config)
-        logger.info(
-            f"Created new job manager with config: max_concurrent={internal_config.max_concurrent_backups}"
+        # Create the main task for this job
+        main_task = BorgJobTask(
+            task_type=job_type,
+            task_name=job_name,
+            status="running",
+            started_at=datetime.now(UTC)
         )
 
-    return _job_manager_instance
+        # Create a composite BorgJob (all jobs are now composite)
+        job = BorgJob(
+            id=job_id,
+            command=[],  # External jobs don't have direct commands
+            job_type="composite",  # All jobs are now composite
+            status="running",
+            started_at=datetime.now(UTC),
+            repository_id=None,  # Can be set later if needed
+            schedule=None,
+            tasks=[main_task]  # Always has at least one task
+        )
+
+        self.jobs[job_id] = job
+
+        # Initialize output tracking
+        self.output_manager.create_job_output(job_id)
+
+        # Broadcast job started event
+        self.event_broadcaster.broadcast_event(
+            EventType.JOB_STARTED,
+            job_id=job_id,
+            data={"job_type": job_type, "job_name": job_name, "external": True}
+        )
+
+        logger.info(f"Registered external composite job {job_id} ({job_type}) with 1 task for monitoring")
+
+    def update_external_job_status(self, job_id: str, status: str, error: Optional[str] = None, return_code: Optional[int] = None) -> None:
+        """
+        Update the status of an external job and its main task.
+
+        Args:
+            job_id: Job identifier
+            status: New status (running, completed, failed, etc.)
+            error: Error message if failed
+            return_code: Process return code
+        """
+        if job_id not in self.jobs:
+            logger.warning(f"Cannot update external job {job_id} - not registered")
+            return
+
+        job = self.jobs[job_id]
+        old_status = job.status
+        job.status = status
+
+        if error:
+            job.error = error
+
+        if return_code is not None:
+            job.return_code = return_code
+
+        if status in ["completed", "failed"]:
+            job.completed_at = datetime.now(UTC)
+
+        # Update the main task status as well
+        if job.tasks:
+            main_task = job.tasks[0]  # First task is the main task
+            main_task.status = status
+            if error:
+                main_task.error = error
+            if return_code is not None:
+                main_task.return_code = return_code
+            if status in ["completed", "failed"]:
+                main_task.completed_at = datetime.now(UTC)
+
+        # Broadcast status change event
+        if old_status != status:
+            if status == "completed":
+                event_type = EventType.JOB_COMPLETED
+            elif status == "failed":
+                event_type = EventType.JOB_FAILED
+            else:
+                event_type = EventType.JOB_UPDATED
+
+            self.event_broadcaster.broadcast_event(
+                event_type,
+                job_id=job_id,
+                data={"old_status": old_status, "new_status": status, "external": True}
+            )
+
+        logger.debug(f"Updated external job {job_id} and main task status: {old_status} -> {status}")
+
+    def add_external_job_output(self, job_id: str, output_line: str) -> None:
+        """
+        Add output line to an external job's main task.
+
+        Args:
+            job_id: Job identifier
+            output_line: Output line to add
+        """
+        if job_id not in self.jobs:
+            logger.warning(f"Cannot add output to external job {job_id} - not registered")
+            return
+
+        job = self.jobs[job_id]
+
+        # Add output to the main task
+        if job.tasks:
+            main_task = job.tasks[0]
+            # Store output in dictionary format for consistency with task streaming
+            main_task.output_lines.append({"text": output_line})
+
+        # Also add output through output manager for streaming
+        asyncio.create_task(
+            self.output_manager.add_output_line(job_id, output_line)
+        )
+
+        # Broadcast output event for real-time streaming
+        self.event_broadcaster.broadcast_event(
+            EventType.JOB_OUTPUT,
+            job_id=job_id,
+            data={
+                "line": output_line,
+                "task_index": 0,  # External jobs use main task (index 0)
+                "progress": None
+            },
+        )
+
+    def unregister_external_job(self, job_id: str) -> None:
+        """
+        Unregister an external job (cleanup after completion).
+
+        Args:
+            job_id: Job identifier to unregister
+        """
+        if job_id in self.jobs:
+            job = self.jobs[job_id]
+            logger.info(f"Unregistering external job {job_id} (final status: {job.status})")
+
+            # Use existing cleanup method
+            self.cleanup_job(job_id)
+        else:
+            logger.warning(f"Cannot unregister external job {job_id} - not found")
 
 
-def reset_job_manager():
-    """Reset job manager for testing"""
-    global _job_manager_instance
-    if _job_manager_instance:
-        logger.warning("Resetting job manager instance")
-    _job_manager_instance = None
+# Factory function for creating JobManager instances (no singleton)
+def create_job_manager(config=None) -> JobManager:
+    """Factory function for creating JobManager instances"""
+    if config is None:
+        # Use environment variables or defaults
+        internal_config = JobManagerConfig(
+            max_concurrent_backups=int(
+                os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")
+            ),
+            max_output_lines_per_job=int(
+                os.getenv("BORG_MAX_OUTPUT_LINES", "1000")
+            ),
+        )
+    elif hasattr(config, "to_internal_config"):
+        # Backward compatible config wrapper
+        internal_config = config.to_internal_config()
+    else:
+        # Assume it's already a JobManagerConfig
+        internal_config = config
+
+    job_manager = JobManager(internal_config)
+    logger.info(
+        f"Created new job manager with config: max_concurrent={internal_config.max_concurrent_backups}"
+    )
+
+    return job_manager
 
 
 def get_default_job_manager_dependencies() -> JobManagerDependencies:
@@ -1373,8 +1539,7 @@ __all__ = [
     "JobManagerFactory",
     "BorgJob",
     "BorgJobTask",
-    "get_job_manager",
-    "reset_job_manager",
+    "create_job_manager",
     "get_default_job_manager_dependencies",
     "get_test_job_manager_dependencies",
     # Backward compatibility

@@ -11,31 +11,31 @@ from app.models.database import get_db
 from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
 from app.services.jobs.job_service import JobService
-from app.services.backup_service import BackupService
+from app.services.backups.backup_service import BackupService
 from app.services.jobs.job_manager import JobManager
 from app.services.recovery_service import RecoveryService
-from app.services.pushover_service import PushoverService
+from app.services.notifications.pushover_service import PushoverService
 from app.services.jobs.job_stream_service import JobStreamService
 from app.services.jobs.job_render_service import JobRenderService
 from app.services.debug_service import DebugService
 from app.services.rclone_service import RcloneService
 from app.services.repositories.repository_stats_service import RepositoryStatsService
-from app.services.scheduler_service import SchedulerService
+from app.services.scheduling.scheduler_service import SchedulerService
 from app.services.task_definition_builder import TaskDefinitionBuilder
-from app.services.volume_service import VolumeService
+from app.services.volumes.volume_service import VolumeService
 from app.services.repositories.repository_parser import RepositoryParser
 from app.services.borg_command_builder import BorgCommandBuilder
 from app.services.archives.archive_manager import ArchiveManager
 from app.services.cloud_sync_manager import CloudSyncManager
 from app.services.repositories.repository_service import RepositoryService
-from app.services.jobs.job_event_broadcaster import (
+from app.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
     get_job_event_broadcaster,
 )
-from app.services.schedule_service import ScheduleService
+from app.services.scheduling.schedule_service import ScheduleService
 from app.services.configuration_service import ConfigurationService
 from app.services.repositories.repository_check_config_service import RepositoryCheckConfigService
-from app.services.notification_config_service import NotificationConfigService
+from app.services.notifications.notification_config_service import NotificationConfigService
 from app.services.cleanup_service import CleanupService
 from fastapi.templating import Jinja2Templates
 
@@ -53,15 +53,14 @@ def get_job_manager_dependency() -> JobManager:
     global _job_manager_instance
     if _job_manager_instance is None:
         import os
-        from app.services.jobs.job_manager import JobManagerConfig, JobManager
+        from app.services.jobs.job_manager import create_job_manager, JobManagerConfig
 
         # Use environment variables or defaults
         config = JobManagerConfig(
             max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
-            auto_cleanup_delay_seconds=int(os.getenv("BORG_AUTO_CLEANUP_DELAY", "30")),
             max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
         )
-        _job_manager_instance = JobManager(config)
+        _job_manager_instance = create_job_manager(config)
     return _job_manager_instance
 
 # Define JobManagerDep here so it can be used in other dependency functions
@@ -112,11 +111,13 @@ def get_job_service(
     return JobService(db, job_manager)
 
 
-def get_backup_service(db: Session = Depends(get_db)) -> BackupService:
+def get_backup_service(
+    db: Session = Depends(get_db)
+) -> BackupService:
     """
-    Provide a BackupService instance with database session injection.
+    Provide a BackupService instance with database session.
 
-    This is the simplified backup service that replaces the complex JobManager system.
+    Pure backup execution service. Job creation is handled by JobService.
     Note: This creates a new instance per request since it depends on the database session.
     """
     return BackupService(db)
@@ -433,7 +434,7 @@ SimpleCommandRunnerDep = Annotated[
 ]
 BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
-BackupServiceDep = Annotated[BackupService, Depends(get_backup_service)]
+# Note: BackupService is now only used internally by JobService
 RecoveryServiceDep = Annotated[RecoveryService, Depends(get_recovery_service)]
 PushoverServiceDep = Annotated[PushoverService, Depends(get_pushover_service)]
 JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service)]

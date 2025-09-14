@@ -47,7 +47,7 @@ class JobStreamService:
 
             # Add all jobs from unified manager
             for job_id, job in self.job_manager.jobs.items():
-                if job.is_composite():
+                if job.tasks:  # All jobs are composite now, check if they have tasks
                     # Composite job
                     jobs_data.append(
                         {
@@ -116,7 +116,12 @@ class JobStreamService:
             # Check if this is a composite job first - look in unified manager
             job = self.job_manager.jobs.get(job_id)
 
-            if job and job.is_composite():
+            if not job:
+                logger.warning(f"Job {job_id} not found in memory - cannot stream")
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Job {job_id} not found or not active'})}\n\n"
+                return
+
+            if job.tasks:  # All jobs are composite now
                 # Stream composite job output from unified manager
                 event_queue = self.job_manager.subscribe_to_events()
 
@@ -150,7 +155,7 @@ class JobStreamService:
                                             # Build complete output from all lines
                                             full_output = "\n".join(
                                                 [
-                                                    line.get("text", "")
+                                                    line.get("text", "") if isinstance(line, dict) else str(line)
                                                     for line in task.output_lines
                                                 ]
                                             )
@@ -256,32 +261,33 @@ class JobStreamService:
                 f"Starting task SSE stream for job {job_id}, task {task_order}"
             )
 
-            # Get the job from manager first, then fallback to database
+            # Get the job from manager - only stream from memory
             job = self.job_manager.jobs.get(job_id)
             if not job:
-                # Try to get completed job from database
-                logger.info(
-                    f"Job {job_id} not in memory, checking database for completed job"
-                )
-                async for output in self._stream_completed_task_output(
-                    job_id, task_order
-                ):
-                    yield output
+                logger.warning(f"Job {job_id} not found in memory - cannot stream")
+                yield f"event: error\ndata: Job {job_id} not found or not active\n\n"
                 return
 
-            if not (hasattr(job, "is_composite") and job.is_composite()):
-                yield f"event: output\ndata: Job {job_id} is not a composite job\n\n"
+            # All jobs are now composite, just check if they have tasks
+            if not hasattr(job, "tasks") or not job.tasks:
+                yield f"event: error\ndata: Job {job_id} has no tasks to stream\n\n"
                 return
 
             # Find the specific task
             if not hasattr(job, "tasks") or task_order >= len(job.tasks):
-                yield f"event: output\ndata: Task {task_order} not found in job {job_id}\n\n"
+                yield f"event: error\ndata: Task {task_order} not found in job {job_id}\n\n"
                 return
 
             task = job.tasks[task_order]
             logger.info(
                 f"Found task {task_order} in job {job_id}: {task.task_name}, status: {task.status}"
             )
+
+            # Validate task status consistency with job
+            if task.status in ["completed", "failed"] and job.status == "running":
+                logger.warning(
+                    f"Task {task_order} is {task.status} but job {job_id} is still running - this may be normal during transitions"
+                )
 
             # Subscribe to events for this job
             event_queue = self.job_manager.subscribe_to_events()
@@ -291,7 +297,12 @@ class JobStreamService:
                 if hasattr(task, "output_lines") and task.output_lines:
                     # Send each existing line as individual output events
                     for line in task.output_lines:
-                        line_text = line.get("text", "")
+                        # Handle both dict format {"text": "content"} and plain string format
+                        if isinstance(line, dict):
+                            line_text = line.get("text", "")
+                        else:
+                            line_text = str(line)
+
                         if line_text.strip():
                             # Send individual line as div for beforeend appending
                             yield f"event: output\ndata: <div>{line_text}</div>\n\n"
@@ -300,6 +311,7 @@ class JobStreamService:
                 while task.status == "running":
                     try:
                         event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
+                        logger.debug(f"Task streaming received event: {event.get('type')} for job {event.get('job_id', 'unknown')}")
 
                         # Only process events for this specific job and task
                         if (
@@ -308,10 +320,14 @@ class JobStreamService:
                         ):
                             event_data = event.get("data", {})
                             # Check if this is a task-specific event for our task
-                            if event_data.get("task_index") == task_order:
+                            event_task_index = event_data.get("task_index")
+                            logger.debug(f"Event task_index: {event_task_index}, expected: {task_order}")
+
+                            if event_task_index == task_order:
                                 output_line = event_data.get("line", "")
                                 if output_line:
                                     # Send individual line as div for hx-swap="beforeend"
+                                    logger.debug(f"Sending output line for task {task_order}: {output_line[:50]}...")
                                     yield f"event: output\ndata: <div>{output_line}</div>\n\n"
 
                         elif (
@@ -340,9 +356,12 @@ class JobStreamService:
 
         except Exception as e:
             logger.error(
-                f"Error in task output stream for job {job_id}, task {task_order}: {e}"
+                f"Error in task output stream for job {job_id}, task {task_order}: {e}",
+                exc_info=True
             )
-            yield f"event: output\ndata: Error streaming task output: {e}\n\n"
+            # Send error event with more specific information
+            error_msg = f"Streaming error for job {job_id}, task {task_order}: {str(e)}"
+            yield f"event: error\ndata: {error_msg}\n\n"
 
     async def get_job_status(self, job_id: str) -> Dict[str, Any]:
         """Get current job status and progress for streaming"""
@@ -389,7 +408,7 @@ class JobStreamService:
 
         # Get current composite jobs from unified manager
         for job_id, job in self.job_manager.jobs.items():
-            if job.is_composite() and job.status == "running":
+            if job.tasks and job.status == "running":  # All jobs are composite now
                 # Get current task info
                 current_task = job.get_current_task()
 
@@ -413,48 +432,3 @@ class JobStreamService:
 
         return current_jobs
 
-    async def _stream_completed_task_output(
-        self, job_id: str, task_order: int
-    ) -> AsyncGenerator[str, None]:
-        """Stream output for completed tasks from database"""
-        try:
-            from app.models.database import Job, JobTask, SessionLocal
-
-            session = SessionLocal()
-            try:
-                # Get job from database
-                job = session.query(Job).filter(Job.id == job_id).first()
-                if not job:
-                    yield f"event: output\ndata: Job {job_id} not found in database\n\n"
-                    return
-
-                # Get the specific task
-                task = (
-                    session.query(JobTask)
-                    .filter(JobTask.job_id == job_id, JobTask.task_order == task_order)
-                    .first()
-                )
-
-                if not task:
-                    yield f"event: output\ndata: Task {task_order} not found for job {job_id}\n\n"
-                    return
-
-                logger.info(
-                    f"Streaming completed task output: {task.task_name} ({task.status})"
-                )
-
-                # Send task output if available
-                if task.output:
-                    yield f"event: output\ndata: {task.output}\n\n"
-                else:
-                    yield "event: output\ndata: No output available for this task\n\n"
-
-                # Send completion event
-                yield f"event: complete\ndata: Task completed with status: {task.status}\n\n"
-
-            finally:
-                session.close()
-
-        except Exception as e:
-            logger.error(f"Error streaming completed task output: {e}")
-            yield f"event: output\ndata: Error loading task output: {e}\n\n"

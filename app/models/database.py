@@ -98,7 +98,6 @@ class Job(Base):
         Integer, ForeignKey("notification_configs.id"), nullable=True
     )
 
-    # New composite job fields
     job_type = Column(String, nullable=False, default="simple")  # 'simple', 'composite'
     total_tasks = Column(Integer, default=1)
     completed_tasks = Column(Integer, default=0)

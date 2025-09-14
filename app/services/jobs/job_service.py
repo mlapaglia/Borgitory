@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import datetime, UTC
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session, joinedload
@@ -8,16 +9,24 @@ from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
 from app.services.jobs.job_manager import JobManager
 from app.services.task_definition_builder import TaskDefinitionBuilder
+from app.services.backups.backup_service import BackupService
 
 logger = logging.getLogger(__name__)
 
 
 class JobService:
-    """Service for managing job operations"""
+    """
+    Service for managing job operations.
 
-    def __init__(self, db: Session, job_manager: JobManager):
+    JobService is the single point of entry for all job creation and management.
+    It orchestrates between JobManager (for job execution and monitoring) and
+    specialized execution services like BackupService.
+    """
+
+    def __init__(self, db: Session, job_manager: JobManager, backup_service: BackupService = None):
         self.db = db
         self.job_manager = job_manager
+        self.backup_service = backup_service or BackupService(db)
 
     async def create_backup_job(
         self, backup_request: BackupRequest, job_type: JobType
@@ -270,7 +279,7 @@ class JobService:
         """Get job output lines"""
         # Check if this is a composite job first - look in unified manager
         job = self.job_manager.jobs.get(job_id)
-        if job and job.is_composite():
+        if job and job.tasks:  # All jobs are composite now
             # Get current task output if job is running
             current_task_output = []
             if job.status == "running":

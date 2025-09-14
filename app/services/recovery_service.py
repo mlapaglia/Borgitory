@@ -24,14 +24,12 @@ class RecoveryService:
         Find backup jobs that were running when the app was shut down and clean them up.
         This should be called on application startup.
 
-        All backup operations (manual and scheduled) use the composite job system.
+        All backup operations (manual and scheduled) use the job system.
         Legacy jobs are only used for utility operations (scan, list archives, etc.)
         which don't need recovery - they can simply be re-run if needed.
         """
         logger.info("Starting recovery: checking for interrupted jobs...")
 
-        # Only need to check database Job records - in-memory composite jobs
-        # are always empty on startup since they don't persist across restarts
         await self.recover_database_job_records()
 
         logger.info(
@@ -41,7 +39,7 @@ class RecoveryService:
     async def recover_database_job_records(self):
         """
         Find database Job records that are marked as 'running' and mark them as failed.
-        This handles the case where the app restarted and composite jobs are cleared from memory,
+        This handles the case where the app restarted and jobs are cleared from memory,
         but database records still show 'running' status.
         """
         try:
@@ -89,10 +87,10 @@ class RecoveryService:
                         task.error = "Task cancelled on startup - job was interrupted by application shutdown"
                         logger.info(f"  Task '{task.task_name}' marked as failed")
 
-                    # Release repository lock if this was a backup job (including composite jobs)
+                    # Release repository lock if this was a backup job
                     if (
                         job.job_type
-                        in ["manual_backup", "scheduled_backup", "backup", "composite"]
+                        in ["manual_backup", "scheduled_backup", "backup"]
                         and job.repository_id
                     ):
                         repository = (

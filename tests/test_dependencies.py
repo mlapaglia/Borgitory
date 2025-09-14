@@ -7,13 +7,13 @@ from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
 from app.services.jobs.job_service import JobService
 from app.services.recovery_service import RecoveryService
-from app.services.pushover_service import PushoverService
+from app.services.notifications.pushover_service import PushoverService
 from app.services.jobs.job_stream_service import JobStreamService
 from app.services.jobs.job_render_service import JobRenderService
 from app.services.debug_service import DebugService
 from app.services.rclone_service import RcloneService
 from app.services.repositories.repository_stats_service import RepositoryStatsService
-from app.services.volume_service import VolumeService
+from app.services.volumes.volume_service import VolumeService
 
 
 class TestDependencies:

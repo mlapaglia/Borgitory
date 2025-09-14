@@ -22,7 +22,6 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ### Advanced Features
 
-- **Composite Jobs**: Multi-step operations combining backup, pruning, and cloud sync tasks
 - **Automated Scheduling**: Set up cron-based backup schedules with integrated cleanup and notifications
 - **Archive Cleanup**: Configure automated pruning policies with simple or advanced retention strategies
 - **Cloud Sync**: Synchronize repositories to S3-compatible storage using Rclone
@@ -301,11 +300,10 @@ This project uses modern Python packaging standards with all dependencies define
 
 ### Job Management System
 
-- **Composite Jobs**: Multi-task operations with backup, pruning, and cloud sync stages
 - **Real-time Monitoring**: Live job output streaming with expandable task details
 - **Progress Tracking**: Detailed progress indicators for each job stage
 - **Job History**: Persistent storage of job results with searchable history
-- **Task Management**: Individual task tracking within composite jobs
+- **Task Management**: Individual task tracking within jobs
 
 ### Security Features
 
