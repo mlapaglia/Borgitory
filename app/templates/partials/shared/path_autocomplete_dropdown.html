@@ -11,7 +11,12 @@
         event.stopPropagation();
         const targetInput = document.getElementById('{{ target_input }}');
         if (targetInput) {
-            targetInput.value = this.dataset.path;
+            let path = this.dataset.path;
+            // Remove /mnt/ prefix if present
+            if (path.startsWith('/mnt/')) {
+                path = path.substring(5);
+            }
+            targetInput.value = path;
             // Trigger the autocomplete request manually with the new value
             htmx.trigger(targetInput, 'input');
         }
@@ -22,7 +27,7 @@
         </svg>
         <span class="text-sm text-gray-900 dark:text-gray-100">{{ dir.name }}</span>
     </div>
-    <div class="text-xs text-gray-500 dark:text-gray-400 ml-6">{{ dir.path }}</div>
+    <div class="text-xs text-gray-500 dark:text-gray-400 ml-6">{{ dir.path[5:] if dir.path.startswith('/mnt/') else dir.path }}</div>
 </div>
 {% endfor %}
 {% else %}

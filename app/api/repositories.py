@@ -150,9 +150,20 @@ async def list_directories_autocomplete(
             input_value = form_data.get(param_name, "")
             break
     
+    # Automatically prepend /mnt/ to the user input if not already present
+    if input_value and not input_value.startswith('/mnt/'):
+        # If user input starts with /, replace it with /mnt/
+        if input_value.startswith('/'):
+            input_value = '/mnt' + input_value
+        else:
+            # If user input doesn't start with /, prepend /mnt/
+            input_value = '/mnt/' + input_value
+    elif not input_value:
+        input_value = '/mnt/'
+    
     # Parse the input value to extract directory path and search term
     if not input_value or not input_value.startswith('/'):
-        dir_path = '/mnt'
+        dir_path = '/mnt/'
         search_term = ''
     else:
         last_slash_index = input_value.rfind('/')
@@ -161,11 +172,11 @@ async def list_directories_autocomplete(
             dir_path = '/'
             search_term = input_value[1:]
         elif last_slash_index > 0:
-            # Input like "/repos/my" - search in "/repos"
+            # Input like "/mnt/repos/my" - search in "/mnt/repos"
             dir_path = input_value[:last_slash_index]
             search_term = input_value[last_slash_index + 1:]
         else:
-            dir_path = '/mnt'
+            dir_path = '/mnt/'
             search_term = input_value
     
     try:
