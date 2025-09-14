@@ -304,11 +304,8 @@ async def delete_repository(
     # Call business service
     result = await repo_svc.delete_repository(delete_request, db)
 
-    # Handle response - if successful, return updated repository list
-    if result.success:
-        return get_repositories_html(request, db)
-    else:
-        return RepositoryResponseHandler.handle_delete_response(request, result)
+    # Handle response formatting
+    return RepositoryResponseHandler.handle_delete_response(request, result)
 
 
 @router.get("/{repo_id}/archives")

@@ -8,7 +8,7 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.models.database import Repository, get_db
-from app.services.repository_stats_service import RepositoryStatsService
+from app.services.repositories.repository_stats_service import RepositoryStatsService
 from app.dependencies import get_repository_stats_service
 
 

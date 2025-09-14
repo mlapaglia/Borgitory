@@ -19,33 +19,15 @@
                 <span class="ml-2 text-gray-900 dark:text-gray-100">{% if job.finished_at %}{{ finished_at }}{% else %}N/A{% endif %}</span>
             </div>
         </div>
-
-        {% if is_composite %}
-            {# Composite job with completed tasks #}
-            <div class="mt-4">
-                <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Tasks:</h4>
-                <div class="space-y-2">
-                    {% for task in sorted_tasks %}
-                        {% set task_expanded = false %}
-                        {% include 'partials/jobs/task_item_static.html' %}
-                    {% endfor %}
-                </div>
+        {# Composite job with completed tasks #}
+        <div class="mt-4">
+            <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Tasks:</h4>
+            <div class="space-y-2">
+                {% for task in sorted_tasks %}
+                    {% set task_expanded = false %}
+                    {% include 'partials/jobs/task_item_static.html' %}
+                {% endfor %}
             </div>
-        {% else %}
-            {# Simple job with final output #}
-            {% set has_output = job.log_output and job.log_output.strip() %}
-            {% if has_output %}
-                {% set escaped_output = job.log_output.strip() | e %}
-                <div class="mt-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">Output:</h4>
-                        <button hx-post="/api/jobs/{{ job.id }}/copy-output" 
-                                hx-swap="none"
-                                class="text-sm text-blue-600 hover:text-blue-800">Copy</button>
-                    </div>
-                    <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto">{{ escaped_output }}</div>
-                </div>
-            {% endif %}
-        {% endif %}
+        </div>
     </div>
 </div>

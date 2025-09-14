@@ -174,42 +174,42 @@ class TestRecoveryService:
     async def test_recover_database_job_records_multiple_job_types(self, recovery_service):
         """Test recovery with different backup job types"""
         mock_db = MagicMock()
-        
-        # Create different backup job types
+
+        # Create different backup job types (removed "composite" since it's no longer a separate type)
         manual_job = MagicMock(spec=Job)
         manual_job.job_type = "manual_backup"
         manual_job.repository_id = 1
-        
+
         scheduled_job = MagicMock(spec=Job)
         scheduled_job.job_type = "scheduled_backup"
         scheduled_job.repository_id = 2
-        
-        composite_job = MagicMock(spec=Job)
-        composite_job.job_type = "composite"
-        composite_job.repository_id = 3
-        
-        for job in [manual_job, scheduled_job, composite_job]:
+
+        prune_job = MagicMock(spec=Job)
+        prune_job.job_type = "prune"
+        prune_job.repository_id = 3
+
+        for job in [manual_job, scheduled_job, prune_job]:
             job.id = 123
             job.status = "running"
             job.started_at = datetime(2023, 1, 1, 12, 0, 0)
-        
+
         mock_repository = MagicMock(spec=Repository)
         mock_db.query.return_value.filter.return_value.all.side_effect = [
-            [manual_job, scheduled_job, composite_job],  # Interrupted jobs
+            [manual_job, scheduled_job, prune_job],  # Interrupted jobs
             [], [], []  # No running tasks for each job
         ]
         mock_db.query.return_value.filter.return_value.first.return_value = mock_repository
 
         with patch('app.services.recovery_service.get_db_session') as mock_get_session, \
              patch.object(recovery_service, '_release_repository_lock') as mock_release_lock:
-            
+
             mock_get_session.return_value.__enter__.return_value = mock_db
             mock_get_session.return_value.__exit__.return_value = None
-            
+
             await recovery_service.recover_database_job_records()
-            
-            # Should release locks for all backup job types
-            assert mock_release_lock.call_count == 3
+
+            # Should release locks for backup job types only (not prune)
+            assert mock_release_lock.call_count == 2
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_exception_handling(self, recovery_service):

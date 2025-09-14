@@ -10,36 +10,61 @@ from app.models.database import get_db
 
 from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
-from app.services.job_service import JobService
+from app.services.jobs.job_service import JobService
+from app.services.backups.backup_service import BackupService
+from app.services.jobs.job_manager import JobManager
 from app.services.recovery_service import RecoveryService
-from app.services.pushover_service import PushoverService
-from app.services.job_stream_service import JobStreamService
-from app.services.job_render_service import JobRenderService
+from app.services.notifications.pushover_service import PushoverService
+from app.services.jobs.job_stream_service import JobStreamService
+from app.services.jobs.job_render_service import JobRenderService
 from app.services.debug_service import DebugService
 from app.services.rclone_service import RcloneService
-from app.services.repository_stats_service import RepositoryStatsService
-from app.services.scheduler_service import SchedulerService
+from app.services.repositories.repository_stats_service import RepositoryStatsService
+from app.services.scheduling.scheduler_service import SchedulerService
 from app.services.task_definition_builder import TaskDefinitionBuilder
-from app.services.volume_service import VolumeService
-from app.services.repository_parser import RepositoryParser
+from app.services.volumes.volume_service import VolumeService
+from app.services.repositories.repository_parser import RepositoryParser
 from app.services.borg_command_builder import BorgCommandBuilder
-from app.services.archive_manager import ArchiveManager
+from app.services.archives.archive_manager import ArchiveManager
 from app.services.cloud_sync_manager import CloudSyncManager
-from app.services.repository_service import RepositoryService
-from app.services.job_event_broadcaster import (
+from app.services.repositories.repository_service import RepositoryService
+from app.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
     get_job_event_broadcaster,
 )
-from app.services.schedule_service import ScheduleService
+from app.services.scheduling.schedule_service import ScheduleService
 from app.services.configuration_service import ConfigurationService
-from app.services.repository_check_config_service import RepositoryCheckConfigService
-from app.services.notification_config_service import NotificationConfigService
+from app.services.repositories.repository_check_config_service import RepositoryCheckConfigService
+from app.services.notifications.notification_config_service import NotificationConfigService
 from app.services.cleanup_service import CleanupService
 from fastapi.templating import Jinja2Templates
 
 
 # Global singleton instances
 _simple_command_runner_instance = None
+_job_manager_instance = None
+
+def get_job_manager_dependency() -> JobManager:
+    """
+    Provide a JobManager singleton instance for FastAPI dependency injection.
+
+    Uses module-level singleton pattern with environment-based configuration.
+    """
+    global _job_manager_instance
+    if _job_manager_instance is None:
+        import os
+        from app.services.jobs.job_manager import create_job_manager, JobManagerConfig
+
+        # Use environment variables or defaults
+        config = JobManagerConfig(
+            max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
+            max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
+        )
+        _job_manager_instance = create_job_manager(config)
+    return _job_manager_instance
+
+# Define JobManagerDep here so it can be used in other dependency functions
+JobManagerDep = Annotated[JobManager, Depends(get_job_manager_dependency)]
 
 def get_simple_command_runner() -> SimpleCommandRunner:
     """
@@ -57,28 +82,45 @@ _borg_service_instance = None
 
 def get_borg_service() -> BorgService:
     """
-    Provide a BorgService singleton instance with proper dependency injection.
+    Provide a BorgService singleton instance with dependency injection.
 
-    Uses module-level singleton pattern with dependency injection.
+    Uses module-level singleton pattern for now to avoid circular dependency issues.
     """
     global _borg_service_instance
     if _borg_service_instance is None:
         command_runner = get_simple_command_runner()
         volume_service = get_volume_service()
+        job_manager = get_job_manager_dependency()
         _borg_service_instance = BorgService(
             command_runner=command_runner,
-            volume_service=volume_service
+            volume_service=volume_service,
+            job_manager=job_manager
         )
     return _borg_service_instance
 
 
-def get_job_service(db: Session = Depends(get_db)) -> JobService:
+def get_job_service(
+    db: Session = Depends(get_db),
+    job_manager: JobManager = Depends(get_job_manager_dependency),
+) -> JobService:
     """
     Provide a JobService instance with database session injection.
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return JobService(db)
+    return JobService(db, job_manager)
+
+
+def get_backup_service(
+    db: Session = Depends(get_db)
+) -> BackupService:
+    """
+    Provide a BackupService instance with database session.
+
+    Pure backup execution service. Job creation is handled by JobService.
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return BackupService(db)
 
 
 _recovery_service_instance = None
@@ -119,7 +161,8 @@ def get_job_stream_service() -> JobStreamService:
     """
     global _job_stream_service_instance
     if _job_stream_service_instance is None:
-        _job_stream_service_instance = JobStreamService()
+        job_manager = get_job_manager_dependency()
+        _job_stream_service_instance = JobStreamService(job_manager)
     return _job_stream_service_instance
 
 
@@ -133,7 +176,8 @@ def get_job_render_service() -> JobRenderService:
     """
     global _job_render_service_instance
     if _job_render_service_instance is None:
-        _job_render_service_instance = JobRenderService()
+        job_manager = get_job_manager_dependency()
+        _job_render_service_instance = JobRenderService(job_manager=job_manager)
     return _job_render_service_instance
 
 
@@ -256,7 +300,7 @@ def get_archive_manager() -> ArchiveManager:
     """
     global _archive_manager_instance
     if _archive_manager_instance is None:
-        from app.services.job_executor import JobExecutor
+        from app.services.jobs.job_executor import JobExecutor
 
         job_executor = JobExecutor()
         command_builder = get_borg_command_builder()
@@ -390,6 +434,7 @@ SimpleCommandRunnerDep = Annotated[
 ]
 BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
+# Note: BackupService is now only used internally by JobService
 RecoveryServiceDep = Annotated[RecoveryService, Depends(get_recovery_service)]
 PushoverServiceDep = Annotated[PushoverService, Depends(get_pushover_service)]
 JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service)]

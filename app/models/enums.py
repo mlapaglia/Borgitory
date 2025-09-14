@@ -13,9 +13,6 @@ class JobType(StrEnum):
     VERIFY = "Verify"
     UNKNOWN = "Unknown"
 
-    # Composite job types (for internal use)
-    COMPOSITE = "Composite"
-
     @classmethod
     def from_command(cls, command: list) -> "JobType":
         """Infer job type from borg command"""
@@ -44,7 +41,6 @@ class JobType(StrEnum):
             "backup": cls.BACKUP,
             "list": cls.LIST,
             "verify": cls.VERIFY,
-            "composite": cls.COMPOSITE,
             "unknown": cls.UNKNOWN,
         }
         return type_mapping.get(job_type.lower(), cls.UNKNOWN)

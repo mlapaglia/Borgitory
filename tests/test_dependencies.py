@@ -5,15 +5,15 @@ Tests for FastAPI dependency providers
 from app.dependencies import get_simple_command_runner, get_borg_service, get_job_service, get_recovery_service, get_pushover_service, get_job_stream_service, get_job_render_service, get_debug_service, get_rclone_service, get_repository_stats_service, get_volume_service
 from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
-from app.services.job_service import JobService
+from app.services.jobs.job_service import JobService
 from app.services.recovery_service import RecoveryService
-from app.services.pushover_service import PushoverService
-from app.services.job_stream_service import JobStreamService
-from app.services.job_render_service import JobRenderService
+from app.services.notifications.pushover_service import PushoverService
+from app.services.jobs.job_stream_service import JobStreamService
+from app.services.jobs.job_render_service import JobRenderService
 from app.services.debug_service import DebugService
 from app.services.rclone_service import RcloneService
-from app.services.repository_stats_service import RepositoryStatsService
-from app.services.volume_service import VolumeService
+from app.services.repositories.repository_stats_service import RepositoryStatsService
+from app.services.volumes.volume_service import VolumeService
 
 
 class TestDependencies:
@@ -175,11 +175,12 @@ class TestDependencies:
         runner = SimpleCommandRunner()
         service = BorgService()
         mock_db = Mock()  # JobService now requires a database session
-        job_service = JobService(db=mock_db)
+        mock_job_manager = Mock()
+        job_service = JobService(db=mock_db, job_manager=mock_job_manager)
         recovery_service = RecoveryService()
         pushover_service = PushoverService()
-        job_stream_service = JobStreamService()
-        job_render_service = JobRenderService()
+        job_stream_service = JobStreamService(mock_job_manager)
+        job_render_service = JobRenderService(job_manager=mock_job_manager)
         debug_service = DebugService()
         rclone_service = RcloneService()
         repository_stats_service = RepositoryStatsService()
