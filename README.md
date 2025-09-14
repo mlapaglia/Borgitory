@@ -27,7 +27,6 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 - **Cloud Sync**: Synchronize repositories to S3-compatible storage using Rclone
 - **Push Notifications**: Pushover integration for job completion alerts
 - **User Authentication**: Secure username/password authentication
-- **Docker Integration**: Manage Borg operations through isolated Docker containers
 - **Template System**: Modern Jinja2-based UI with reusable components
 - **Mobile Responsive**: HTMX + Alpine.js + Tailwind CSS interface
 
@@ -311,7 +310,6 @@ This project uses modern Python packaging standards with all dependencies define
 - Username/password authentication with bcrypt hashing
 - Secure session management
 - Encrypted credential storage (Fernet)
-- No network access for Borg containers
 
 ## Troubleshooting
 
