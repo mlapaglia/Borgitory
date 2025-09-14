@@ -87,7 +87,7 @@ class DebugService:
         """Get application information"""
 
         return {
-            "borgitory_version": "1.0.0",  # You can make this dynamic
+            "borgitory_version": os.getenv("BORGITORY_VERSION"),
             "debug_mode": os.getenv("DEBUG", "false").lower() == "true",
             "startup_time": datetime.now().isoformat(),
             "working_directory": os.getcwd(),

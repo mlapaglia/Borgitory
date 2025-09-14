@@ -49,6 +49,14 @@ jobs:
           echo "This is a stable release"
         fi
 
+    - name: Update pyproject.toml version
+      run: |
+        VERSION=${{ steps.version.outputs.VERSION }}
+        echo "Updating pyproject.toml version to: ${VERSION}"
+        sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+        echo "Updated pyproject.toml:"
+        grep "^version = " pyproject.toml
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -82,6 +90,7 @@ jobs:
         cache-to: type=gha,mode=max
         build-args: |
           VERSION=${{ steps.version.outputs.VERSION }}
+          BORGITORY_VERSION=${{ steps.version.outputs.VERSION }}
 
     - name: Update Docker Hub description
       uses: peter-evans/dockerhub-description@v4
