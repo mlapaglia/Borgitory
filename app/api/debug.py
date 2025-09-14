@@ -86,14 +86,14 @@ async def _generate_jobs_memory_stream(job_manager) -> AsyncGenerator[str, None]
 
                 except Exception as e:
                     logger.error(f"Error in jobs memory stream: {e}")
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    yield f"data: {json.dumps({'error': 'An internal error occurred.'})}\n\n"
 
         finally:
             job_manager.unsubscribe_from_events(event_queue)
 
     except Exception as e:
         logger.error(f"Fatal error in jobs memory stream: {e}")
-        yield f"data: {json.dumps({'error': f'Stream error: {str(e)}'})}\n\n"
+        yield f"data: {json.dumps({'error': 'A fatal stream error occurred.'})}\n\n"
 
 
 async def _format_jobs_list_event(job_manager) -> str:
