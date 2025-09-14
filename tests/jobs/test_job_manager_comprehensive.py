@@ -9,7 +9,6 @@ import asyncio
 import os
 from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any
 from contextlib import contextmanager
 
 from app.services.jobs.job_manager import (
@@ -24,8 +23,7 @@ from app.services.jobs.job_manager import (
     get_test_job_manager_dependencies,
 )
 from app.services.jobs.job_executor import ProcessResult
-from app.models.database import Repository, Job, NotificationConfig
-from app.services.jobs.broadcaster.job_event_broadcaster import EventType
+from app.models.database import NotificationConfig
 
 
 class TestJobManagerFactory:
