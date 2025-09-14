@@ -715,7 +715,7 @@ class TestRepositoriesAPI:
 
     @pytest.mark.asyncio
     async def test_delete_repository_success(self, async_client: AsyncClient, test_db: Session):
-        """Test deleting repository."""
+        """Test deleting repository returns HTMX success response."""
         from app.dependencies import get_repository_service
         from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import DeleteRepositoryResult
@@ -735,10 +735,22 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_repository_service] = lambda: mock_repo_service
 
         try:
-            response = await async_client.delete("/api/repositories/1")
+            response = await async_client.delete(
+                "/api/repositories/1",
+                headers={"hx-request": "true"}
+            )
 
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
+
+            content = response.text
+            assert "/api/shared/notification" in content
+            assert "delete-test-repo" in content
+            assert "deleted successfully" in content
+            assert "/api/repositories/html" in content
+            
+            # Verify service was called
+            mock_repo_service.delete_repository.assert_called_once()
         finally:
             # Clean up
             if get_repository_service in app.dependency_overrides:
@@ -799,7 +811,7 @@ class TestRepositoriesAPI:
 
     @pytest.mark.asyncio
     async def test_delete_repository_schedule_cleanup(self, async_client: AsyncClient, test_db: Session):
-        """Test repository deletion cleans up schedules."""
+        """Test repository deletion HTMX response includes schedule cleanup information."""
         from app.dependencies import get_repository_service
         from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import DeleteRepositoryResult
@@ -819,10 +831,23 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_repository_service] = lambda: mock_repo_service
 
         try:
-            response = await async_client.delete("/api/repositories/1")
+            # Make HTMX request
+            response = await async_client.delete(
+                "/api/repositories/1",
+                headers={"hx-request": "true"}
+            )
 
             assert response.status_code == 200
-            # Verify delete was called
+            assert "text/html" in response.headers["content-type"]
+            
+            # Verify HTMX response contains notification and repository list update
+            content = response.text
+            assert "/api/shared/notification" in content
+            assert "schedule-cleanup-repo" in content
+            assert "deleted successfully" in content
+            assert "/api/repositories/html" in content
+            
+            # Verify service was called
             mock_repo_service.delete_repository.assert_called_once()
         finally:
             # Clean up

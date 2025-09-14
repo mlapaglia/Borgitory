@@ -190,6 +190,7 @@ class DeleteRepositoryResult:
     success: bool
     repository_name: str
     deleted_schedules: int = 0
+    message: Optional[str] = None
     error_message: Optional[str] = None
     conflict_jobs: Optional[List[str]] = None  # Job types that are blocking deletion
 

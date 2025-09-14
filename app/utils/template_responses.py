@@ -148,8 +148,15 @@ class RepositoryResponseHandler:
     ) -> Union[HTMLResponse, Dict[str, Any], HTTPException]:
         """Handle repository deletion response."""
         if result.success:
-            # For delete operations, we typically return updated repository list
-            return {"success": True, "message": result.message or "Repository deleted successfully"}
+            if ResponseType.is_htmx_request(request):
+                return templates.TemplateResponse(
+                    request,
+                    "partials/repositories/delete_success.html",
+                    {"repository_name": result.repository_name},
+                    status_code=200,
+                )
+            else:
+                return {"success": True, "message": result.message or "Repository deleted successfully"}
         else:
             status_code = 409 if result.has_conflicts else 500
             if ResponseType.is_htmx_request(request):

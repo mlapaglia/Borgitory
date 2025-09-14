@@ -46,8 +46,8 @@ A comprehensive web-based management interface for BorgBackup repositories with 
    docker run -d \
      -p 8000:8000 \
      -v ./data:/app/data \
-     -v /path/to/backup/sources:/backup/sources:ro \
-     -v /path/to/borg/repos:/repos \
+     -v /path/to/backup/sources:/mnt/backup/sources:ro \
+     -v /path/to/borg/repos:/mnt/repos \
      --cap-add SYS_ADMIN \
      --device /dev/fuse \
      --name borgitory \
@@ -65,8 +65,8 @@ A comprehensive web-based management interface for BorgBackup repositories with 
          - "8000:8000"
        volumes:
          - ./data:/app/data
-         - /path/to/backup/sources:/backup/sources:ro
-         - /path/to/borg/repos:/repos
+         - /path/to/backup/sources:/mnt/backup/sources:ro
+         - /path/to/borg/repos:/mnt/repos
        cap_add:
          - SYS_ADMIN
        devices:
@@ -108,7 +108,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
    # Install with development dependencies (testing, linting, etc.)
    pip install -e .[dev]
    ```
-   
+
    > **Note**: This project uses modern Python packaging with `pyproject.toml` following PEP 518 standards. All dependencies and project metadata are defined in a single configuration file.
 
 3. **Install Rclone** (for cloud sync)
@@ -140,18 +140,19 @@ The application requires these volume mounts:
 ```yaml
 volumes:
   - ./data:/app/data # Persistent application data (required)
-  - /path/to/backup/sources:/backup/sources:ro # Source directories to backup (read-only)
-  - /path/to/borg/repos:/repos # Borg repository storage (read-write)
-  - /additional/source:/additional:ro # Additional source directories as needed
-  - /another/repo/location:/alt-repos # Additional repository locations as needed
+  - /path/to/backup/sources:/mnt/backup/sources:ro # Source directories to backup (read-only)
+  - /path/to/borg/repos:/mnt/repos # Borg repository storage (read-write)
+  - /additional/source:/mnt/additional:ro # Additional source directories as needed
+  - /another/repo/location:/mnt/alt-repos # Additional repository locations as needed
 ```
 
 **Volume Strategy:**
 
+- **Important**: All volumes must be mounted under `/mnt/` to be visible in the application
 - Mount as many volumes as necessary to access all your backup sources and repository locations
 - Source directories can be mounted read-only (`:ro`) for safety
 - Repository directories need read-write access for Borg operations
-- Each volume can be mapped to any convenient path inside the container
+- Each volume can be mapped to any convenient path under `/mnt/` inside the container
 - Supports distributed setups where repositories and sources are in different locations
 
 ## Usage
@@ -254,8 +255,8 @@ docker build -t borgitory .
 docker run -d \
   -p 8000:8000 \
   -v ./data:/app/data \
-  -v /path/to/backup/sources:/backup/sources:ro \
-  -v /path/to/borg/repos:/repos \
+  -v /path/to/backup/sources:/mnt/backup/sources:ro \
+  -v /path/to/borg/repos:/mnt/repos \
   --cap-add SYS_ADMIN \
   --device /dev/fuse \
   --name borgitory \
