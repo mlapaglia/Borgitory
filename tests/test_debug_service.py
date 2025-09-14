@@ -104,7 +104,9 @@ class TestDebugService:
 
             result = await debug_service._get_application_info()
 
-            assert result["borgitory_version"] == "1.0.0"
+            # Version should be read dynamically from pyproject.toml
+            assert "borgitory_version" in result
+            assert result["borgitory_version"] != ""
             assert result["debug_mode"] is False
             assert result["working_directory"] == "/test/dir"
             assert "startup_time" in result

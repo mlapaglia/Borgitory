@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.database import Repository, Job
 from app.services.jobs.job_manager import JobManager
+from app.utils.version import get_version
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ class DebugService:
         """Get application information"""
 
         return {
-            "borgitory_version": "1.0.0",  # You can make this dynamic
+            "borgitory_version": get_version(),
             "debug_mode": os.getenv("DEBUG", "false").lower() == "true",
             "startup_time": datetime.now().isoformat(),
             "working_directory": os.getcwd(),
