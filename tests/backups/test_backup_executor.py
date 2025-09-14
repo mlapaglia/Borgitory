@@ -4,14 +4,14 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
-from app.services.backups.backup_executor import (
+from services.backups.backup_executor import (
     BackupExecutor,
     BackupConfig,
     PruneConfig,
     BackupResult,
     BackupStatus,
 )
-from app.models.database import Repository
+from models.database import Repository
 
 
 class TestBackupStatus:
@@ -191,6 +191,7 @@ class TestBackupExecutor:
     @pytest.fixture
     def test_repository(self, test_db):
         """Create test repository using real database"""
+
         @contextmanager
         def db_session_factory():
             try:
@@ -202,7 +203,7 @@ class TestBackupExecutor:
             repo = Repository(
                 name="test-backup-repo",
                 path="/tmp/test-backup-repo",
-                encrypted_passphrase="dummy"  # Will be set properly
+                encrypted_passphrase="dummy",  # Will be set properly
             )
             repo.set_passphrase("test-passphrase-123")
             db.add(repo)
@@ -306,8 +307,12 @@ class TestBackupExecutor:
             show_list=True,
         )
 
-        with patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-            command, env = backup_executor._build_backup_command(test_repository, config)
+        with patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
+            command, env = backup_executor._build_backup_command(
+                test_repository, config
+            )
 
         assert isinstance(command, list)
         assert isinstance(env, dict)
@@ -321,8 +326,12 @@ class TestBackupExecutor:
             dry_run=True,
         )
 
-        with patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-            command, env = backup_executor._build_backup_command(test_repository, config)
+        with patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
+            command, env = backup_executor._build_backup_command(
+                test_repository, config
+            )
 
         # Should include --dry-run in additional args somewhere
         assert isinstance(command, list)
@@ -337,7 +346,9 @@ class TestBackupExecutor:
             show_stats=True,
         )
 
-        with patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+        with patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             command, env = backup_executor._build_prune_command(test_repository, config)
 
         assert isinstance(command, list)
@@ -345,7 +356,9 @@ class TestBackupExecutor:
         assert len(command) > 0
         assert "BORG_PASSPHRASE" in env
 
-    def test_build_prune_command_with_all_retention_options(self, backup_executor, test_repository):
+    def test_build_prune_command_with_all_retention_options(
+        self, backup_executor, test_repository
+    ):
         """Test _build_prune_command with all retention options"""
         config = PruneConfig(
             keep_within="7d",
@@ -357,14 +370,18 @@ class TestBackupExecutor:
             show_list=True,
         )
 
-        with patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+        with patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             command, env = backup_executor._build_prune_command(test_repository, config)
 
         assert isinstance(command, list)
         assert isinstance(env, dict)
 
     @pytest.mark.asyncio
-    async def test_execute_backup_validation_error(self, backup_executor, test_repository):
+    async def test_execute_backup_validation_error(
+        self, backup_executor, test_repository
+    ):
         """Test execute_backup with validation error"""
         config = BackupConfig(source_paths=[])  # Empty source paths
 
@@ -390,9 +407,11 @@ class TestBackupExecutor:
         mock_process.wait = AsyncMock(return_value=0)
         mock_process.stdout = mock_stdout()
 
-        with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-
+        with patch.object(
+            backup_executor, "_start_process", return_value=mock_process
+        ), patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             result = await backup_executor.execute_backup(test_repository, config)
 
         assert result.status == BackupStatus.COMPLETED
@@ -417,9 +436,11 @@ class TestBackupExecutor:
         mock_process.wait = AsyncMock(return_value=1)
         mock_process.stdout = mock_stdout()
 
-        with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-
+        with patch.object(
+            backup_executor, "_start_process", return_value=mock_process
+        ), patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             result = await backup_executor.execute_backup(test_repository, config)
 
         assert result.status == BackupStatus.FAILED
@@ -428,7 +449,9 @@ class TestBackupExecutor:
         assert "Backup failed (exit code 1)" in result.error_message
 
     @pytest.mark.asyncio
-    async def test_execute_backup_with_callbacks(self, backup_executor, test_repository):
+    async def test_execute_backup_with_callbacks(
+        self, backup_executor, test_repository
+    ):
         """Test backup execution with callbacks"""
         config = BackupConfig(source_paths=["/data"])
         output_lines = []
@@ -442,7 +465,10 @@ class TestBackupExecutor:
 
         # Create a proper async iterator
         async def mock_stdout():
-            for line in [b"1048576 524288 262144 10 /home/user\n", b"Archive name: test-archive\n"]:
+            for line in [
+                b"1048576 524288 262144 10 /home/user\n",
+                b"Archive name: test-archive\n",
+            ]:
                 yield line
 
         # Mock the subprocess execution
@@ -450,14 +476,16 @@ class TestBackupExecutor:
         mock_process.wait = AsyncMock(return_value=0)
         mock_process.stdout = mock_stdout()
 
-        with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-
+        with patch.object(
+            backup_executor, "_start_process", return_value=mock_process
+        ), patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             result = await backup_executor.execute_backup(
                 test_repository,
                 config,
                 output_callback=output_callback,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
             )
 
         assert result.status == BackupStatus.COMPLETED
@@ -465,13 +493,17 @@ class TestBackupExecutor:
         assert len(progress_data) >= 1  # At least one progress update
 
     @pytest.mark.asyncio
-    async def test_execute_backup_exception_handling(self, backup_executor, test_repository):
+    async def test_execute_backup_exception_handling(
+        self, backup_executor, test_repository
+    ):
         """Test backup execution exception handling"""
         config = BackupConfig(source_paths=["/data"])
 
-        with patch.object(backup_executor, '_start_process', side_effect=Exception("Process failed")), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-
+        with patch.object(
+            backup_executor, "_start_process", side_effect=Exception("Process failed")
+        ), patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             result = await backup_executor.execute_backup(test_repository, config)
 
         assert result.status == BackupStatus.FAILED
@@ -487,13 +519,19 @@ class TestBackupExecutor:
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=0)
         mock_process.stdout = AsyncMock()
-        mock_process.stdout.__aiter__ = AsyncMock(return_value=iter([
-            b"Prune completed successfully\n",
-        ]))
+        mock_process.stdout.__aiter__ = AsyncMock(
+            return_value=iter(
+                [
+                    b"Prune completed successfully\n",
+                ]
+            )
+        )
 
-        with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-
+        with patch.object(
+            backup_executor, "_start_process", return_value=mock_process
+        ), patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             result = await backup_executor.execute_prune(test_repository, config)
 
         assert result.status == BackupStatus.COMPLETED
@@ -515,9 +553,11 @@ class TestBackupExecutor:
         mock_process.wait = AsyncMock(return_value=2)
         mock_process.stdout = mock_stdout()
 
-        with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-
+        with patch.object(
+            backup_executor, "_start_process", return_value=mock_process
+        ), patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             result = await backup_executor.execute_prune(test_repository, config)
 
         assert result.status == BackupStatus.FAILED
@@ -533,7 +573,9 @@ class TestBackupExecutor:
         mock_process = Mock()
         mock_process.pid = 12345
 
-        with patch.object(backup_executor, 'subprocess_executor', return_value=mock_process) as mock_exec:
+        with patch.object(
+            backup_executor, "subprocess_executor", return_value=mock_process
+        ) as mock_exec:
             process = await backup_executor._start_process(command)
 
         assert process == mock_process
@@ -549,7 +591,9 @@ class TestBackupExecutor:
         mock_process = Mock()
         mock_process.pid = 12345
 
-        with patch.object(backup_executor, 'subprocess_executor', return_value=mock_process) as mock_exec:
+        with patch.object(
+            backup_executor, "subprocess_executor", return_value=mock_process
+        ) as mock_exec:
             process = await backup_executor._start_process(command, env, cwd)
 
         assert process == mock_process
@@ -560,13 +604,18 @@ class TestBackupExecutor:
         """Test _start_process exception handling"""
         command = ["nonexistent-command"]
 
-        with patch.object(backup_executor, 'subprocess_executor', side_effect=Exception("Failed to start")):
+        with patch.object(
+            backup_executor,
+            "subprocess_executor",
+            side_effect=Exception("Failed to start"),
+        ):
             with pytest.raises(Exception, match="Failed to start"):
                 await backup_executor._start_process(command)
 
     @pytest.mark.asyncio
     async def test_monitor_process_output(self, backup_executor):
         """Test _monitor_process_output method"""
+
         # Create a proper async iterator
         async def mock_stdout():
             for line in [b"Line 1\n", b"Line 2\n"]:
@@ -576,12 +625,12 @@ class TestBackupExecutor:
         mock_process.stdout = mock_stdout()
 
         result = BackupResult(
-            status=BackupStatus.RUNNING,
-            return_code=-1,
-            output_lines=[]
+            status=BackupStatus.RUNNING, return_code=-1, output_lines=[]
         )
 
-        output_data = await backup_executor._monitor_process_output(mock_process, result)
+        output_data = await backup_executor._monitor_process_output(
+            mock_process, result
+        )
 
         assert len(result.output_lines) == 2
         assert result.output_lines[0] == "Line 1"
@@ -591,6 +640,7 @@ class TestBackupExecutor:
     @pytest.mark.asyncio
     async def test_monitor_process_output_with_callbacks(self, backup_executor):
         """Test _monitor_process_output with callbacks"""
+
         # Create a proper async iterator
         async def mock_stdout():
             for line in [b"1048576 524288 262144 10 /data\n"]:
@@ -600,9 +650,7 @@ class TestBackupExecutor:
         mock_process.stdout = mock_stdout()
 
         result = BackupResult(
-            status=BackupStatus.RUNNING,
-            return_code=-1,
-            output_lines=[]
+            status=BackupStatus.RUNNING, return_code=-1, output_lines=[]
         )
 
         output_callback = Mock()
@@ -623,9 +671,7 @@ class TestBackupExecutor:
         mock_process.stdout.__aiter__ = AsyncMock(side_effect=Exception("Read error"))
 
         result = BackupResult(
-            status=BackupStatus.RUNNING,
-            return_code=-1,
-            output_lines=[]
+            status=BackupStatus.RUNNING, return_code=-1, output_lines=[]
         )
 
         await backup_executor._monitor_process_output(mock_process, result)
@@ -729,7 +775,9 @@ class TestBackupExecutor:
         assert backup_executor.is_operation_active("other") is False
 
     @pytest.mark.asyncio
-    async def test_full_backup_workflow_with_operation_tracking(self, backup_executor, test_repository):
+    async def test_full_backup_workflow_with_operation_tracking(
+        self, backup_executor, test_repository
+    ):
         """Test complete backup workflow with operation tracking"""
         config = BackupConfig(source_paths=["/data"])
         operation_id = "backup-workflow-test"
@@ -738,18 +786,22 @@ class TestBackupExecutor:
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=0)
         mock_process.stdout = AsyncMock()
-        mock_process.stdout.__aiter__ = AsyncMock(return_value=iter([
-            b"Archive created successfully\n",
-        ]))
+        mock_process.stdout.__aiter__ = AsyncMock(
+            return_value=iter(
+                [
+                    b"Archive created successfully\n",
+                ]
+            )
+        )
 
-        with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-
+        with patch.object(
+            backup_executor, "_start_process", return_value=mock_process
+        ), patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             # Start backup - should track operation
             result = await backup_executor.execute_backup(
-                test_repository,
-                config,
-                operation_id=operation_id
+                test_repository, config, operation_id=operation_id
             )
 
         # Operation should be removed after completion
@@ -757,7 +809,9 @@ class TestBackupExecutor:
         assert not backup_executor.is_operation_active(operation_id)
 
     @pytest.mark.asyncio
-    async def test_full_prune_workflow_with_operation_tracking(self, backup_executor, test_repository):
+    async def test_full_prune_workflow_with_operation_tracking(
+        self, backup_executor, test_repository
+    ):
         """Test complete prune workflow with operation tracking"""
         config = PruneConfig(keep_daily=7)
         operation_id = "prune-workflow-test"
@@ -766,18 +820,22 @@ class TestBackupExecutor:
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=0)
         mock_process.stdout = AsyncMock()
-        mock_process.stdout.__aiter__ = AsyncMock(return_value=iter([
-            b"Prune completed successfully\n",
-        ]))
+        mock_process.stdout.__aiter__ = AsyncMock(
+            return_value=iter(
+                [
+                    b"Prune completed successfully\n",
+                ]
+            )
+        )
 
-        with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
-
+        with patch.object(
+            backup_executor, "_start_process", return_value=mock_process
+        ), patch(
+            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+        ):
             # Start prune - should track operation
             result = await backup_executor.execute_prune(
-                test_repository,
-                config,
-                operation_id=operation_id
+                test_repository, config, operation_id=operation_id
             )
 
         # Operation should be removed after completion

@@ -6,8 +6,8 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
 
-from app.services.cloud_sync_manager import CloudSyncManager
-from app.models.database import Repository, CloudSyncConfig
+from services.cloud_sync_manager import CloudSyncManager
+from models.database import Repository, CloudSyncConfig
 
 
 @pytest.fixture
@@ -65,9 +65,7 @@ class TestCloudSyncManager:
 
     def test_init_with_defaults(self):
         """Test CloudSyncManager initialization with default dependencies."""
-        with patch(
-            "app.services.cloud_sync_manager.get_db_session"
-        ) as mock_get_session:
+        with patch("services.cloud_sync_manager.get_db_session") as mock_get_session:
             manager = CloudSyncManager()
             assert manager._db_session_factory is mock_get_session
 
@@ -232,7 +230,7 @@ class TestCloudSyncManager:
             output_messages.append(message)
 
         with patch(
-            "app.services.rclone_service.RcloneService",
+            "services.rclone_service.RcloneService",
             return_value=mock_rclone_service,
         ):
             result = await cloud_sync_manager._sync_to_s3(
@@ -265,7 +263,7 @@ class TestCloudSyncManager:
             output_messages.append(message)
 
         with patch(
-            "app.services.rclone_service.RcloneService",
+            "services.rclone_service.RcloneService",
             return_value=mock_rclone_service,
         ):
             result = await cloud_sync_manager._sync_to_s3(
@@ -288,7 +286,7 @@ class TestCloudSyncManager:
             output_messages.append(message)
 
         with patch(
-            "app.services.rclone_service.RcloneService",
+            "services.rclone_service.RcloneService",
             side_effect=ImportError("Module not found"),
         ):
             result = await cloud_sync_manager._sync_to_s3(

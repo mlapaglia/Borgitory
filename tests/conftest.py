@@ -4,6 +4,7 @@ Test configuration and fixtures
 
 import asyncio
 import os
+import sys
 from typing import AsyncGenerator, Generator
 from unittest.mock import Mock
 
@@ -14,12 +15,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+# Add src directory to Python path for tests
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
+
 # Set SECRET_KEY before importing the app to avoid RuntimeError
 if not os.getenv("SECRET_KEY"):
     os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
 
-from app.main import app
-from app.models.database import Base, get_db
+from main import app
+from models.database import Base, get_db
 
 # Import all models to ensure they're registered with Base
 # Import job fixtures to make them available to all tests - noqa prevents removal

@@ -3,18 +3,26 @@
 
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.utils.db_session import get_db_session
-from app.models.database import Job
+from utils.db_session import get_db_session
+from models.database import Job
 from sqlalchemy.orm import joinedload
+
 
 def main():
     with get_db_session() as db:
         print("=== Testing Job Tasks Loading ===")
 
         # Get recent jobs with tasks loaded
-        jobs = db.query(Job).options(joinedload(Job.tasks)).order_by(Job.started_at.desc()).limit(3).all()
+        jobs = (
+            db.query(Job)
+            .options(joinedload(Job.tasks))
+            .order_by(Job.started_at.desc())
+            .limit(3)
+            .all()
+        )
 
         if not jobs:
             print("No jobs found")
@@ -29,7 +37,7 @@ def main():
             print(f"  Tasks loaded: {len(job.tasks) if job.tasks else 0}")
 
             # Check if tasks relationship is working
-            if hasattr(job, 'tasks'):
+            if hasattr(job, "tasks"):
                 print(f"  Tasks attribute exists: {job.tasks}")
                 if job.tasks:
                     print("  Tasks details:")
@@ -41,6 +49,7 @@ def main():
                     print("  Tasks list is empty")
             else:
                 print("  No tasks attribute found")
+
 
 if __name__ == "__main__":
     main()

@@ -1,11 +1,12 @@
 """
 Tests for SimpleCommandRunner service
 """
+
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 
-from app.services.simple_command_runner import SimpleCommandRunner, CommandResult
+from services.simple_command_runner import SimpleCommandRunner, CommandResult
 
 
 class TestSimpleCommandRunner:
@@ -20,7 +21,7 @@ class TestSimpleCommandRunner:
         """Test SimpleCommandRunner initialization."""
         runner = SimpleCommandRunner()
         assert runner.timeout == 300  # Default timeout
-        
+
         runner_custom = SimpleCommandRunner(timeout=60)
         assert runner_custom.timeout == 60
 
@@ -30,15 +31,17 @@ class TestSimpleCommandRunner:
         mock_process = Mock()
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(b"output", b""))
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait:
-            
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait:
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"output", b"")
-            
+
             result = await runner.run_command(["echo", "test"])
-            
+
             assert isinstance(result, CommandResult)
             assert result.success is True
             assert result.return_code == 0
@@ -53,15 +56,17 @@ class TestSimpleCommandRunner:
         mock_process = Mock()
         mock_process.returncode = 1
         mock_process.communicate = AsyncMock(return_value=(b"", b"error message"))
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait:
-            
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait:
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"", b"error message")
-            
+
             result = await runner.run_command(["false"])
-            
+
             assert isinstance(result, CommandResult)
             assert result.success is False
             assert result.return_code == 1
@@ -76,15 +81,17 @@ class TestSimpleCommandRunner:
         mock_process = Mock()
         mock_process.kill = Mock()
         mock_process.wait = AsyncMock()
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait:
-            
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait:
             mock_create.return_value = mock_process
             mock_wait.side_effect = asyncio.TimeoutError()
-            
+
             result = await runner.run_command(["sleep", "60"], timeout=1)
-            
+
             assert isinstance(result, CommandResult)
             assert result.success is False
             assert result.return_code == -1
@@ -92,7 +99,7 @@ class TestSimpleCommandRunner:
             assert "timed out after 1 seconds" in result.stderr
             assert result.duration > 0
             assert "timed out after 1 seconds" in result.error
-            
+
             # Verify process was killed
             mock_process.kill.assert_called_once()
             mock_process.wait.assert_called_once()
@@ -103,20 +110,22 @@ class TestSimpleCommandRunner:
         mock_process = Mock()
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(b"test_value", b""))
-        
+
         env_vars = {"TEST_VAR": "test_value"}
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait:
-            
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait:
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"test_value", b"")
-            
+
             result = await runner.run_command(["env"], env=env_vars)
-            
+
             assert result.success is True
             assert result.stdout == "test_value"
-            
+
             # Verify subprocess was created with correct environment
             mock_create.assert_called_once()
             call_args = mock_create.call_args
@@ -128,17 +137,19 @@ class TestSimpleCommandRunner:
         mock_process = Mock()
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(b"output", b""))
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait:
-            
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait:
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"output", b"")
-            
+
             result = await runner.run_command(["echo", "test"], timeout=60)
-            
+
             assert result.success is True
-            
+
             # Verify wait_for was called with custom timeout
             mock_wait.assert_called_once()
             call_args = mock_wait.call_args
@@ -147,9 +158,11 @@ class TestSimpleCommandRunner:
     @pytest.mark.asyncio
     async def test_run_command_exception_during_creation(self, runner):
         """Test handling of exception during subprocess creation."""
-        with patch('asyncio.create_subprocess_exec', side_effect=OSError("Command not found")):
+        with patch(
+            "asyncio.create_subprocess_exec", side_effect=OSError("Command not found")
+        ):
             result = await runner.run_command(["nonexistent_command"])
-            
+
             assert isinstance(result, CommandResult)
             assert result.success is False
             assert result.return_code == -1
@@ -165,15 +178,17 @@ class TestSimpleCommandRunner:
         mock_process.returncode = 0
         # Simulate binary output with non-UTF8 bytes
         mock_process.communicate = AsyncMock(return_value=(b"\xff\xfe\x00", b""))
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait:
-            
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait:
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"\xff\xfe\x00", b"")
-            
+
             result = await runner.run_command(["binary_command"])
-            
+
             assert result.success is True
             # Should handle binary data gracefully with replacement characters
             assert isinstance(result.stdout, str)
@@ -185,15 +200,17 @@ class TestSimpleCommandRunner:
         mock_process = Mock()
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(None, None))
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait:
-            
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait:
             mock_create.return_value = mock_process
             mock_wait.return_value = (None, None)
-            
+
             result = await runner.run_command(["true"])
-            
+
             assert result.success is True
             assert result.stdout == ""
             assert result.stderr == ""
@@ -204,22 +221,27 @@ class TestSimpleCommandRunner:
         mock_process = Mock()
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(b"output", b""))
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait, \
-             patch('app.services.simple_command_runner.logger') as mock_logger:
-            
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait, patch("services.simple_command_runner.logger") as mock_logger:
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"output", b"")
-            
+
             result = await runner.run_command(["echo", "test", "command"])
-            
+
             assert result.success is True
-            
+
             # Verify logging calls
             mock_logger.info.assert_any_call("Executing command: echo test command...")
             # Should log completion with duration and return code
-            completion_calls = [call for call in mock_logger.info.call_args_list if "Command completed" in str(call)]
+            completion_calls = [
+                call
+                for call in mock_logger.info.call_args_list
+                if "Command completed" in str(call)
+            ]
             assert len(completion_calls) > 0
 
     @pytest.mark.asyncio
@@ -227,21 +249,28 @@ class TestSimpleCommandRunner:
         """Test that failed commands produce warning logs."""
         mock_process = Mock()
         mock_process.returncode = 1
-        mock_process.communicate = AsyncMock(return_value=(b"", b"command failed with error"))
-        
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
-             patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait, \
-             patch('app.services.simple_command_runner.logger') as mock_logger:
-            
+        mock_process.communicate = AsyncMock(
+            return_value=(b"", b"command failed with error")
+        )
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "asyncio.wait_for", new_callable=AsyncMock
+        ) as mock_wait, patch("services.simple_command_runner.logger") as mock_logger:
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"", b"command failed with error")
-            
+
             result = await runner.run_command(["false"])
-            
+
             assert result.success is False
-            
+
             # Verify warning is logged for failure
-            warning_calls = [call for call in mock_logger.warning.call_args_list if "Command failed" in str(call)]
+            warning_calls = [
+                call
+                for call in mock_logger.warning.call_args_list
+                if "Command failed" in str(call)
+            ]
             assert len(warning_calls) > 0
 
     def test_command_result_namedtuple(self):
@@ -252,9 +281,9 @@ class TestSimpleCommandRunner:
             stdout="output",
             stderr="",
             duration=1.5,
-            error=None
+            error=None,
         )
-        
+
         # Test field access
         assert result.success is True
         assert result.return_code == 0
@@ -262,7 +291,7 @@ class TestSimpleCommandRunner:
         assert result.stderr == ""
         assert result.duration == 1.5
         assert result.error is None
-        
+
         # Test immutability (NamedTuple should be immutable)
         with pytest.raises(AttributeError):
             result.success = False
@@ -275,9 +304,9 @@ class TestSimpleCommandRunner:
             stdout="",
             stderr="error occurred",
             duration=0.5,
-            error="error occurred"
+            error="error occurred",
         )
-        
+
         assert result.success is False
         assert result.return_code == 1
         assert result.error == "error occurred"

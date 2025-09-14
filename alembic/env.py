@@ -8,11 +8,11 @@ from sqlalchemy import pool
 from alembic import context
 
 # Add the project root to the Python path
-sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath("."))
 
 # Import the models and Base for autogenerate support
-from app.models.database import Base
-from app.config import DATABASE_URL
+from models.database import Base
+from config import DATABASE_URL
 
 # Import all models to ensure they're registered with Base
 
@@ -37,7 +37,7 @@ target_metadata = Base.metadata
 
 def get_database_url():
     """Get database URL, preferring environment variable over config."""
-    return os.getenv('DATABASE_URL', DATABASE_URL)
+    return os.getenv("DATABASE_URL", DATABASE_URL)
 
 
 def run_migrations_offline() -> None:
@@ -75,8 +75,8 @@ def run_migrations_online() -> None:
 
     """
     # Override the sqlalchemy.url in alembic.ini with our dynamic URL
-    config.set_main_option('sqlalchemy.url', get_database_url())
-    
+    config.set_main_option("sqlalchemy.url", get_database_url())
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -85,7 +85,7 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, 
+            connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,

@@ -1,6 +1,7 @@
 """
 Tests for JobStreamService class - Server-Sent Events functionality
 """
+
 import asyncio
 import json
 import pytest
@@ -8,12 +9,12 @@ from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi.responses import StreamingResponse
 
-from app.services.jobs.job_stream_service import JobStreamService
+from services.jobs.job_stream_service import JobStreamService
 
 
 class TestJobStreamService:
     """Test class for JobStreamService SSE functionality."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_job_manager = Mock()
@@ -24,28 +25,30 @@ class TestJobStreamService:
         """Test streaming all jobs when no jobs exist."""
         # Mock empty job manager
         self.mock_job_manager.jobs = {}
-        
+
         # Mock the streaming method to return empty async generator
         async def mock_stream_generator():
             return
             yield  # unreachable but needed for generator syntax
-        
-        self.mock_job_manager.stream_all_job_updates = Mock(return_value=mock_stream_generator())
-        
+
+        self.mock_job_manager.stream_all_job_updates = Mock(
+            return_value=mock_stream_generator()
+        )
+
         # Get the streaming response
         response = await self.stream_service.stream_all_jobs()
-        
+
         # Verify it's a StreamingResponse
         assert isinstance(response, StreamingResponse)
         assert response.media_type == "text/event-stream"
         assert response.headers["Cache-Control"] == "no-cache"
         assert response.headers["Connection"] == "keep-alive"
-        
+
         # Collect streamed events
         events = []
         async for event in response.body_iterator:
             events.append(event)
-        
+
         # Should have initial empty jobs update
         assert len(events) == 1
         assert "event: jobs_update" in events[0]
@@ -67,9 +70,15 @@ class TestJobStreamService:
 
         # Mock streaming generator that yields one update
         async def mock_stream_generator():
-            yield {"type": "composite_job_status", "job_id": "job-123", "status": "completed"}
+            yield {
+                "type": "composite_job_status",
+                "job_id": "job-123",
+                "status": "completed",
+            }
 
-        self.mock_job_manager.stream_all_job_updates = Mock(return_value=mock_stream_generator())
+        self.mock_job_manager.stream_all_job_updates = Mock(
+            return_value=mock_stream_generator()
+        )
 
         response = await self.stream_service.stream_all_jobs()
 
@@ -96,20 +105,22 @@ class TestJobStreamService:
     async def test_stream_all_jobs_error_handling(self):
         """Test error handling in all jobs streaming."""
         self.mock_job_manager.jobs = {}
-        
+
         # Mock streaming method to raise an exception
         async def mock_error_generator():
             raise RuntimeError("Test streaming error")
             yield  # unreachable but needed for generator syntax
-        
-        self.mock_job_manager.stream_all_job_updates = Mock(return_value=mock_error_generator())
-        
+
+        self.mock_job_manager.stream_all_job_updates = Mock(
+            return_value=mock_error_generator()
+        )
+
         response = await self.stream_service.stream_all_jobs()
-        
+
         events = []
         async for event in response.body_iterator:
             events.append(event)
-        
+
         # Should have initial empty jobs update and error event
         assert len(events) == 2
         assert '"jobs": []' in events[0]
@@ -129,11 +140,17 @@ class TestJobStreamService:
 
         # Mock job output stream that returns composite job events
         async def mock_output_generator():
-            yield {"type": "task_started", "task_name": "backup", "timestamp": "10:00:00"}
+            yield {
+                "type": "task_started",
+                "task_name": "backup",
+                "timestamp": "10:00:00",
+            }
             yield {"type": "task_progress", "task_name": "backup", "progress": 50}
             yield {"type": "task_completed", "task_name": "backup", "status": "success"}
 
-        self.mock_job_manager.stream_job_output = AsyncMock(return_value=mock_output_generator())
+        self.mock_job_manager.stream_job_output = AsyncMock(
+            return_value=mock_output_generator()
+        )
 
         response = await self.stream_service.stream_job_output(job_id)
 
@@ -155,23 +172,34 @@ class TestJobStreamService:
     async def test_stream_job_output_composite_job(self):
         """Test streaming output for a composite job."""
         job_id = "composite-job-101"
-        
+
         # Mock a composite job
         mock_job = Mock()
         mock_job.status = "running"
         self.mock_job_manager.jobs = {job_id: mock_job}
-        
+
         # Mock event queue for composite job
         mock_event_queue = AsyncMock()
         event_sequence = [
             {"job_id": job_id, "type": "task_started", "task_name": "backup"},
-            {"job_id": job_id, "type": "task_progress", "task_name": "backup", "progress": 50},
-            {"job_id": job_id, "type": "task_completed", "task_name": "backup", "status": "success"},
+            {
+                "job_id": job_id,
+                "type": "task_progress",
+                "task_name": "backup",
+                "progress": 50,
+            },
+            {
+                "job_id": job_id,
+                "type": "task_completed",
+                "task_name": "backup",
+                "status": "success",
+            },
         ]
-        
+
         # Create side effect that returns events in sequence, then timeout after first timeout
         call_count = 0
         timeout_count = 0
+
         async def mock_queue_get():
             nonlocal call_count, timeout_count
             if call_count < len(event_sequence):
@@ -185,14 +213,14 @@ class TestJobStreamService:
                     # Break the loop by raising a different exception
                     raise StopAsyncIteration()
                 raise asyncio.TimeoutError()
-        
+
         mock_event_queue.get = mock_queue_get
-        
+
         self.mock_job_manager.subscribe_to_events.return_value = mock_event_queue
         self.mock_job_manager.unsubscribe_from_events.return_value = None
-        
+
         response = await self.stream_service.stream_job_output(job_id)
-        
+
         events = []
         try:
             async for event in response.body_iterator:
@@ -202,10 +230,10 @@ class TestJobStreamService:
                     break
         except StopAsyncIteration:
             pass
-        
+
         # Should have initial state + task events + keepalive (timeout)
         assert len(events) >= 2
-        
+
         # Parse SSE events properly - they are now in proper SSE format
         parsed_events = []
         for event in events:
@@ -218,7 +246,7 @@ class TestJobStreamService:
                     pass
             elif "event: " in event and "data: " in event:
                 # Proper SSE event format
-                lines = event.strip().split('\n')
+                lines = event.strip().split("\n")
                 event_type = None
                 data = None
                 for line in lines:
@@ -228,16 +256,22 @@ class TestJobStreamService:
                         data = line[6:]
                 if event_type and data:
                     parsed_events.append((event_type, data))
-        
+
         # Check that we got some events
         assert len(parsed_events) >= 1
-        
+
         # Check initial state if present
-        initial_events = [e for e in parsed_events if e[0] == "data" and isinstance(e[1], dict) and e[1].get("type") == "initial_state"]
+        initial_events = [
+            e
+            for e in parsed_events
+            if e[0] == "data"
+            and isinstance(e[1], dict)
+            and e[1].get("type") == "initial_state"
+        ]
         if initial_events:
             initial_data = initial_events[0][1]
             assert initial_data["job_id"] == job_id
-        
+
         # Verify unsubscribe was called
         self.mock_job_manager.unsubscribe_from_events.assert_called_once()
 
@@ -245,21 +279,21 @@ class TestJobStreamService:
     async def test_stream_job_output_composite_job_error(self):
         """Test error handling in composite job streaming."""
         job_id = "composite-job-error"
-        
+
         # Mock a composite job
         mock_job = Mock()
         mock_job.status = "running"
         self.mock_job_manager.jobs = {job_id: mock_job}
-        
+
         # Mock event queue that raises an error
         mock_event_queue = AsyncMock()
         mock_event_queue.get.side_effect = RuntimeError("Queue error")
-        
+
         self.mock_job_manager.subscribe_to_events.return_value = mock_event_queue
         self.mock_job_manager.unsubscribe_from_events.return_value = None
-        
+
         response = await self.stream_service.stream_job_output(job_id)
-        
+
         events = []
         try:
             async for event in response.body_iterator:
@@ -269,10 +303,10 @@ class TestJobStreamService:
                     break
         except (StopAsyncIteration, RuntimeError):
             pass
-        
+
         # Should have initial state and error event
         assert len(events) >= 2
-        
+
         # Check error event
         error_data = json.loads(events[1].split("data: ")[1])
         assert error_data["type"] == "error"
@@ -283,20 +317,22 @@ class TestJobStreamService:
         """Test streaming output for a job that doesn't exist."""
         job_id = "nonexistent-job"
         self.mock_job_manager.jobs = {}
-        
+
         # Mock empty output stream
         async def mock_empty_generator():
             return
             yield  # unreachable but needed for generator syntax
-        
-        self.mock_job_manager.stream_job_output = Mock(return_value=mock_empty_generator())
-        
+
+        self.mock_job_manager.stream_job_output = Mock(
+            return_value=mock_empty_generator()
+        )
+
         response = await self.stream_service.stream_job_output(job_id)
-        
+
         events = []
         async for event in response.body_iterator:
             events.append(event)
-        
+
         # Should handle gracefully (may be empty or have error)
         # The exact behavior depends on job_manager implementation
         assert len(events) >= 0
@@ -308,15 +344,19 @@ class TestJobStreamService:
         expected_output = {
             "status": "running",
             "progress": {"files": 100, "transferred": "2.1 GB"},
-            "logs": ["Starting process", "Processing files..."]
+            "logs": ["Starting process", "Processing files..."],
         }
-        
-        self.mock_job_manager.get_job_output_stream = AsyncMock(return_value=expected_output)
-        
+
+        self.mock_job_manager.get_job_output_stream = AsyncMock(
+            return_value=expected_output
+        )
+
         result = await self.stream_service.get_job_status(job_id)
-        
+
         assert result == expected_output
-        self.mock_job_manager.get_job_output_stream.assert_called_once_with(job_id, last_n_lines=50)
+        self.mock_job_manager.get_job_output_stream.assert_called_once_with(
+            job_id, last_n_lines=50
+        )
 
     def test_get_current_jobs_data_composite_jobs_basic(self):
         """Test getting current running composite jobs data for rendering."""
@@ -341,10 +381,11 @@ class TestJobStreamService:
 
         # Find the composite job (may appear twice due to service implementation)
         composite_job = next(
-            job for job in current_jobs
-            if job["id"] == "running-job-1" and
-            isinstance(job.get("progress"), dict) and
-            "task_progress" in job.get("progress", {})
+            job
+            for job in current_jobs
+            if job["id"] == "running-job-1"
+            and isinstance(job.get("progress"), dict)
+            and "task_progress" in job.get("progress", {})
         )
         assert composite_job["type"] == "backup"
         assert composite_job["status"] == "running"
@@ -357,9 +398,9 @@ class TestJobStreamService:
         # Mock a running composite job
         mock_task = Mock()
         mock_task.task_name = "backup_task"
-        
+
         mock_job = Mock()
-        mock_job.status = "running" 
+        mock_job.status = "running"
         mock_job.started_at = datetime(2023, 1, 1, 15, 30, 0)
         mock_job.current_task_index = 0
         mock_job.tasks = [mock_task, Mock(), Mock()]  # 3 total tasks
@@ -368,21 +409,22 @@ class TestJobStreamService:
         # Composite jobs don't have command attribute or current_progress
         mock_job.command = None
         mock_job.current_progress = None
-        
+
         self.mock_job_manager.jobs = {"composite-running-1": mock_job}
-        
+
         current_jobs = self.stream_service.get_current_jobs_data()
-        
+
         # Note: Due to a bug in the service, composite jobs appear twice
         # (once in the general loop, once in the composite-specific loop)
         assert len(current_jobs) == 2
-        
+
         # Find the composite job with proper progress info (the second one)
         composite_job = next(
-            job for job in current_jobs 
-            if job["id"] == "composite-running-1" and 
-            isinstance(job.get("progress"), dict) and 
-            "task_progress" in job.get("progress", {})
+            job
+            for job in current_jobs
+            if job["id"] == "composite-running-1"
+            and isinstance(job.get("progress"), dict)
+            and "task_progress" in job.get("progress", {})
         )
         assert composite_job["type"] == "scheduled_backup"
         assert composite_job["status"] == "running"
@@ -416,7 +458,11 @@ class TestJobStreamService:
         mock_multi_task_job.status = "running"
         mock_multi_task_job.started_at = datetime(2023, 1, 1, 12, 15, 0)
         mock_multi_task_job.current_task_index = 2
-        mock_multi_task_job.tasks = [Mock(), Mock(), mock_multi_task]  # Multi-task composite job
+        mock_multi_task_job.tasks = [
+            Mock(),
+            Mock(),
+            mock_multi_task,
+        ]  # Multi-task composite job
         mock_multi_task_job.job_type = "verification"
         mock_multi_task_job.get_current_task.return_value = mock_multi_task
         # Composite jobs don't have command attribute or current_progress
@@ -425,7 +471,7 @@ class TestJobStreamService:
 
         self.mock_job_manager.jobs = {
             "single-task-job": mock_single_task_job,
-            "multi-task-job": mock_multi_task_job
+            "multi-task-job": mock_multi_task_job,
         }
 
         current_jobs = self.stream_service.get_current_jobs_data()
@@ -435,10 +481,14 @@ class TestJobStreamService:
         assert len(current_jobs) == 4
 
         # Find single-task composite job
-        single_task_jobs = [job for job in current_jobs if job["id"] == "single-task-job"]
+        single_task_jobs = [
+            job for job in current_jobs if job["id"] == "single-task-job"
+        ]
         single_task_job = next(
-            job for job in single_task_jobs
-            if isinstance(job.get("progress"), dict) and "task_progress" in job.get("progress", {})
+            job
+            for job in single_task_jobs
+            if isinstance(job.get("progress"), dict)
+            and "task_progress" in job.get("progress", {})
         )
         assert single_task_job["type"] == "check"
         assert single_task_job["status"] == "running"
@@ -447,8 +497,10 @@ class TestJobStreamService:
         # Find multi-task composite job
         multi_task_jobs = [job for job in current_jobs if job["id"] == "multi-task-job"]
         multi_task_job = next(
-            job for job in multi_task_jobs
-            if isinstance(job.get("progress"), dict) and "task_progress" in job.get("progress", {})
+            job
+            for job in multi_task_jobs
+            if isinstance(job.get("progress"), dict)
+            and "task_progress" in job.get("progress", {})
         )
         assert multi_task_job["type"] == "verification"
         assert multi_task_job["progress"]["task_progress"] == "3/3"
@@ -458,24 +510,24 @@ class TestJobStreamService:
         # Mock completed job (should not appear)
         mock_job = Mock()
         mock_job.status = "completed"
-        
+
         self.mock_job_manager.jobs = {"completed-job": mock_job}
-        
+
         current_jobs = self.stream_service.get_current_jobs_data()
-        
+
         # Should be empty since no jobs are running
         assert len(current_jobs) == 0
 
     def test_dependency_injection_service_instance(self):
         """Test that dependency injection provides proper service instance."""
-        from app.dependencies import get_job_stream_service
-        
+        from dependencies import get_job_stream_service
+
         # Test the dependency provider
         service = get_job_stream_service()
         assert service is not None
         assert isinstance(service, JobStreamService)
-        assert hasattr(service, 'job_manager')
-        
+        assert hasattr(service, "job_manager")
+
         # Test singleton behavior
         service2 = get_job_stream_service()
         assert service is service2

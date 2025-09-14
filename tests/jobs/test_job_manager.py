@@ -3,14 +3,14 @@ import uuid
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch
 
-from app.services.jobs.job_manager import (
+from services.jobs.job_manager import (
     JobManager,
     JobManagerConfig,
     BorgJob,
     BorgJobTask,
     create_job_manager,
 )
-from app.models.database import Repository
+from models.database import Repository
 
 
 class TestJobManagerConfig:
@@ -46,7 +46,7 @@ class TestBorgJobTask:
     def test_default_task(self):
         """Test default task creation"""
         task = BorgJobTask(task_type="backup", task_name="Test Backup")
-        
+
         assert task.task_type == "backup"
         assert task.task_name == "Test Backup"
         assert task.status == "pending"
@@ -64,7 +64,7 @@ class TestBorgJobTask:
             status="running",
             parameters={"keep_daily": 7, "keep_weekly": 4},
         )
-        
+
         assert task.task_type == "prune"
         assert task.task_name == "Test Prune"
         assert task.status == "running"
@@ -79,14 +79,14 @@ class TestBorgJob:
         """Test simple job creation"""
         job_id = str(uuid.uuid4())
         started_at = datetime.now()
-        
+
         job = BorgJob(
             id=job_id,
             status="running",
             started_at=started_at,
             command=["borg", "create", "repo::archive", "/data"],
         )
-        
+
         assert job.id == job_id
         assert job.status == "running"
         assert job.started_at == started_at
@@ -101,7 +101,7 @@ class TestBorgJob:
         started_at = datetime.now()
         task1 = BorgJobTask(task_type="backup", task_name="Backup")
         task2 = BorgJobTask(task_type="prune", task_name="Prune")
-        
+
         job = BorgJob(
             id=job_id,
             status="pending",
@@ -110,7 +110,7 @@ class TestBorgJob:
             tasks=[task1, task2],
             repository_id=1,
         )
-        
+
         assert job.id == job_id
         assert job.status == "pending"
         assert job.job_type == "composite"
@@ -121,7 +121,7 @@ class TestBorgJob:
         """Test getting current task from composite job"""
         task1 = BorgJobTask(task_type="backup", task_name="Backup")
         task2 = BorgJobTask(task_type="prune", task_name="Prune")
-        
+
         job = BorgJob(
             id="test",
             status="running",
@@ -130,21 +130,21 @@ class TestBorgJob:
             tasks=[task1, task2],
             current_task_index=0,
         )
-        
+
         # Test first task
         current_task = job.get_current_task()
         assert current_task == task1
-        
+
         # Test second task
         job.current_task_index = 1
         current_task = job.get_current_task()
         assert current_task == task2
-        
+
         # Test out of bounds
         job.current_task_index = 2
         current_task = job.get_current_task()
         assert current_task is None
-        
+
         # Test simple job
         simple_job = BorgJob(id="simple", status="running", started_at=datetime.now())
         assert simple_job.get_current_task() is None
@@ -187,23 +187,23 @@ class TestJobManager:
         """Test job manager initialization"""
         # The modular job manager uses dependency injection - test core functionality
         assert job_manager.jobs == {}
-        assert hasattr(job_manager, 'config')
+        assert hasattr(job_manager, "config")
         # Test that the job manager has the modular components
-        assert hasattr(job_manager, 'dependencies')
+        assert hasattr(job_manager, "dependencies")
         assert job_manager.dependencies is not None
 
     def test_initialization_with_default_config(self):
         """Test job manager with default config"""
         manager = JobManager()
         # The modular version uses JobManagerConfig internally
-        assert hasattr(manager, 'config')
+        assert hasattr(manager, "config")
         assert manager.config.max_concurrent_backups == 5
 
     @pytest.mark.asyncio
     async def test_initialize(self, job_manager):
         """Test async initialization"""
         await job_manager.initialize()
-        
+
         # The modular architecture handles initialization internally
         # Test that initialization completes without error
         assert job_manager.dependencies is not None
@@ -213,12 +213,12 @@ class TestJobManager:
         """Test graceful shutdown"""
         # Initialize first
         await job_manager.initialize()
-        
+
         # Add a test job
         job_manager.jobs["test"] = Mock()
-        
+
         await job_manager.shutdown()
-        
+
         # Test that shutdown clears jobs
         assert job_manager.jobs == {}
 
@@ -230,7 +230,7 @@ class TestJobManager:
             task_name="Test Backup",
             parameters={"source_path": "/data"},
         )
-        
+
         assert task.task_type == "backup"
         assert task.task_name == "Test Backup"
         assert task.parameters["source_path"] == "/data"
@@ -244,13 +244,17 @@ class TestJobManager:
             status="running",
             started_at=datetime.now(),
         )
-        
+
         assert job.id == job_id
         assert job.status == "running"
 
     def test_repository_integration(self, sample_repository, test_db):
         """Test repository database integration"""
-        repo = test_db.query(Repository).filter(Repository.id == sample_repository.id).first()
+        repo = (
+            test_db.query(Repository)
+            .filter(Repository.id == sample_repository.id)
+            .first()
+        )
 
         assert repo is not None
         assert repo.id == sample_repository.id
@@ -262,14 +266,16 @@ class TestJobManager:
     async def test_start_borg_command_non_backup(self, mock_uuid, job_manager):
         """Test starting non-backup borg command"""
         mock_uuid.return_value = "test-job-id"
-        
-        with patch.object(job_manager, "_execute_composite_task", new=AsyncMock()) as mock_run:
+
+        with patch.object(
+            job_manager, "_execute_composite_task", new=AsyncMock()
+        ) as mock_run:
             job_id = await job_manager.start_borg_command(
                 command=["borg", "list", "repo"],
                 env={"TEST": "value"},
                 is_backup=False,
             )
-        
+
         assert job_id == "test-job-id"
         assert "test-job-id" in job_manager.jobs
         job = job_manager.jobs["test-job-id"]
@@ -287,13 +293,13 @@ class TestJobManager:
         """Test starting backup borg command"""
         mock_uuid.return_value = "backup-job-id"
         await job_manager.initialize()
-        
+
         job_id = await job_manager.start_borg_command(
             command=["borg", "create", "repo::archive", "/data"],
             env={"TEST": "value"},
             is_backup=True,
         )
-        
+
         assert job_id == "backup-job-id"
         assert "backup-job-id" in job_manager.jobs
         job = job_manager.jobs["backup-job-id"]
@@ -305,7 +311,7 @@ class TestJobManager:
         """Test event broadcasting functionality"""
 
         # Test that the job manager has event broadcasting capabilities
-        assert hasattr(job_manager, 'dependencies')
+        assert hasattr(job_manager, "dependencies")
         assert job_manager.dependencies is not None
 
     @pytest.mark.asyncio
@@ -313,30 +319,30 @@ class TestJobManager:
         """Test getting queue statistics"""
         # Initialize the job manager to create the queue
         await job_manager.initialize()
-        
+
         # Add some mock jobs with proper job_type attribute
         running_backup = Mock()
         running_backup.status = "running"
         running_backup.command = ["borg", "create", "repo::archive", "/data"]
         running_backup.job_type = "backup"
-        
+
         running_other = Mock()
         running_other.status = "running"
         running_other.command = ["borg", "list", "repo"]
         running_other.job_type = "simple"
-        
+
         queued_backup = Mock()
         queued_backup.status = "queued"
         queued_backup.job_type = "backup"
-        
+
         job_manager.jobs = {
             "running_backup": running_backup,
             "running_other": running_other,
             "queued_backup": queued_backup,
         }
-        
+
         stats = job_manager.get_queue_stats()
-        
+
         # Test basic structure - exact values may differ in modular implementation
         assert "max_concurrent_backups" in stats
         assert "running_backups" in stats
@@ -374,11 +380,11 @@ class TestJobManager:
     def test_cleanup_job(self, job_manager):
         """Test cleaning up job"""
         job_manager.jobs["test"] = Mock()
-        
+
         result = job_manager.cleanup_job("test")
         assert result is True
         assert "test" not in job_manager.jobs
-        
+
         # Test cleanup of non-existent job
         result = job_manager.cleanup_job("nonexistent")
         assert result is False
@@ -389,15 +395,15 @@ class TestJobManager:
         assert job_manager.dependencies.event_broadcaster is not None
 
         # Test that the event broadcaster has the expected interface
-        assert hasattr(job_manager.dependencies.event_broadcaster, 'subscribe_client')
+        assert hasattr(job_manager.dependencies.event_broadcaster, "subscribe_client")
 
     @pytest.mark.asyncio
     async def test_stream_all_job_updates(self, job_manager):
         """Test streaming all job updates"""
         # Test that the streaming function exists and returns an async generator
         stream_gen = job_manager.stream_all_job_updates()
-        assert hasattr(stream_gen, '__anext__')
-        
+        assert hasattr(stream_gen, "__anext__")
+
         # Clean up
         await stream_gen.aclose()
 

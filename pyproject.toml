@@ -57,7 +57,7 @@ Repository = "https://github.com/mlapaglia/Borgitory"
 Issues = "https://github.com/mlapaglia/Borgitory/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app"]
+packages = ["src"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
@@ -121,8 +121,8 @@ indent-style = "space"
 # Like Black, respect magic trailing commas.
 skip-magic-trailing-comma = false
 
-# Like Black, automatically detect the appropriate line ending.
-line-ending = "auto"
+# Force LF line endings on all platforms.
+line-ending = "lf"
 
 [tool.pytest.ini_options]
 # Test discovery configuration

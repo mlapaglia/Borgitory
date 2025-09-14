@@ -5,9 +5,9 @@ Tests for RepositoryParser - Fixed version with proper DI patterns
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 
-from app.services.repositories.repository_parser import RepositoryParser
-from app.models.database import Repository
-from app.services.simple_command_runner import SimpleCommandRunner
+from services.repositories.repository_parser import RepositoryParser
+from models.database import Repository
+from services.simple_command_runner import SimpleCommandRunner
 
 
 @pytest.fixture
@@ -22,7 +22,9 @@ def mock_command_runner():
 def repository_parser(mock_command_runner):
     """RepositoryParser instance with mocked dependencies."""
     mock_job_manager = Mock()
-    return RepositoryParser(command_runner=mock_command_runner, job_manager=mock_job_manager)
+    return RepositoryParser(
+        command_runner=mock_command_runner, job_manager=mock_job_manager
+    )
 
 
 @pytest.fixture
@@ -32,7 +34,7 @@ def test_repository():
         id=1,
         name="test-repo",
         path="/path/to/repo",
-        encrypted_passphrase="encrypted_passphrase"
+        encrypted_passphrase="encrypted_passphrase",
     )
     repository.get_passphrase = Mock(return_value="test_passphrase")
     return repository
@@ -103,7 +105,9 @@ class TestRepositoryParserErrorHandling:
         """Test handling job manager errors during scan start."""
         # Set up mock job manager that raises exception
         mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(side_effect=Exception("Job manager error"))
+        mock_job_manager.start_borg_command = AsyncMock(
+            side_effect=Exception("Job manager error")
+        )
         repository_parser.job_manager = mock_job_manager
 
         with pytest.raises(Exception, match="Job manager error"):

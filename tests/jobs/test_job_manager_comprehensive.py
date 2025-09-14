@@ -11,7 +11,7 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
-from app.services.jobs.job_manager import (
+from services.jobs.job_manager import (
     JobManager,
     JobManagerConfig,
     JobManagerDependencies,
@@ -22,8 +22,8 @@ from app.services.jobs.job_manager import (
     get_default_job_manager_dependencies,
     get_test_job_manager_dependencies,
 )
-from app.services.jobs.job_executor import ProcessResult
-from app.models.database import NotificationConfig
+from services.jobs.job_executor import ProcessResult
+from models.database import NotificationConfig
 
 
 class TestJobManagerFactory:
@@ -124,6 +124,7 @@ class TestJobManagerTaskExecution:
     @pytest.fixture
     def job_manager_with_db(self, test_db):
         """Create job manager with real database session"""
+
         @contextmanager
         def db_session_factory():
             try:
@@ -155,7 +156,9 @@ class TestJobManagerTaskExecution:
         ]
 
         # Mock the execution so we don't actually run the job
-        with patch.object(job_manager_with_db, '_execute_composite_job', new=AsyncMock()):
+        with patch.object(
+            job_manager_with_db, "_execute_composite_job", new=AsyncMock()
+        ):
             job_id = await job_manager_with_db.create_composite_job(
                 job_type="scheduled_backup",
                 task_definitions=task_definitions,
@@ -176,7 +179,9 @@ class TestJobManagerTaskExecution:
         assert job.tasks[1].task_type == "prune"
 
     @pytest.mark.asyncio
-    async def test_execute_composite_job_success(self, job_manager_with_db, sample_repository):
+    async def test_execute_composite_job_success(
+        self, job_manager_with_db, sample_repository
+    ):
         """Test executing a composite job successfully"""
         # Create a simple composite job
         job_id = str(uuid.uuid4())
@@ -207,9 +212,11 @@ class TestJobManagerTaskExecution:
             task.completed_at = datetime.now(UTC)
             return True
 
-        with patch.object(job_manager_with_db, '_execute_backup_task', side_effect=mock_backup_task), \
-             patch.object(job_manager_with_db, '_execute_prune_task', side_effect=mock_prune_task):
-
+        with patch.object(
+            job_manager_with_db, "_execute_backup_task", side_effect=mock_backup_task
+        ), patch.object(
+            job_manager_with_db, "_execute_prune_task", side_effect=mock_prune_task
+        ):
             await job_manager_with_db._execute_composite_job(job)
 
         # Verify job completed successfully
@@ -219,10 +226,14 @@ class TestJobManagerTaskExecution:
         assert task2.status == "completed"
 
     @pytest.mark.asyncio
-    async def test_execute_composite_job_critical_failure(self, job_manager_with_db, sample_repository):
+    async def test_execute_composite_job_critical_failure(
+        self, job_manager_with_db, sample_repository
+    ):
         """Test composite job with critical task failure"""
         job_id = str(uuid.uuid4())
-        task1 = BorgJobTask(task_type="backup", task_name="Test Backup")  # Critical task
+        task1 = BorgJobTask(
+            task_type="backup", task_name="Test Backup"
+        )  # Critical task
         task2 = BorgJobTask(task_type="prune", task_name="Test Prune")
 
         job = BorgJob(
@@ -247,9 +258,9 @@ class TestJobManagerTaskExecution:
         # Prune should not be called due to critical failure
         mock_prune = AsyncMock()
 
-        with patch.object(job_manager_with_db, '_execute_backup_task', side_effect=mock_backup_fail), \
-             patch.object(job_manager_with_db, '_execute_prune_task', mock_prune):
-
+        with patch.object(
+            job_manager_with_db, "_execute_backup_task", side_effect=mock_backup_fail
+        ), patch.object(job_manager_with_db, "_execute_prune_task", mock_prune):
             await job_manager_with_db._execute_composite_job(job)
 
         # Verify job failed due to critical task failure
@@ -260,7 +271,9 @@ class TestJobManagerTaskExecution:
         mock_prune.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_execute_backup_task_success(self, job_manager_with_db, sample_repository):
+    async def test_execute_backup_task_success(
+        self, job_manager_with_db, sample_repository
+    ):
         """Test successful backup task execution"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
@@ -270,7 +283,7 @@ class TestJobManagerTaskExecution:
                 "paths": ["/tmp"],
                 "excludes": ["*.log"],
                 "archive_name": "test-archive",
-            }
+            },
         )
 
         job = BorgJob(
@@ -286,18 +299,32 @@ class TestJobManagerTaskExecution:
 
         # Mock process execution and repository data
         mock_process = Mock()
-        result = ProcessResult(return_code=0, stdout=b"Archive created successfully", stderr=b"", error=None)
+        result = ProcessResult(
+            return_code=0,
+            stdout=b"Archive created successfully",
+            stderr=b"",
+            error=None,
+        )
 
-        with patch('app.utils.security.build_secure_borg_command') as mock_build, \
-             patch.object(job_manager_with_db.executor, 'start_process', return_value=mock_process), \
-             patch.object(job_manager_with_db.executor, 'monitor_process_output', return_value=result), \
-             patch.object(job_manager_with_db, '_get_repository_data', return_value={
-                 "id": sample_repository.id,
-                 "path": "/tmp/test-repo",
-                 "passphrase": "test-passphrase"
-             }):
-
-            mock_build.return_value = (["borg", "create", "repo::test-archive", "/tmp"], {"BORG_PASSPHRASE": "test"})
+        with patch(
+            "utils.security.build_secure_borg_command"
+        ) as mock_build, patch.object(
+            job_manager_with_db.executor, "start_process", return_value=mock_process
+        ), patch.object(
+            job_manager_with_db.executor, "monitor_process_output", return_value=result
+        ), patch.object(
+            job_manager_with_db,
+            "_get_repository_data",
+            return_value={
+                "id": sample_repository.id,
+                "path": "/tmp/test-repo",
+                "passphrase": "test-passphrase",
+            },
+        ):
+            mock_build.return_value = (
+                ["borg", "create", "repo::test-archive", "/tmp"],
+                {"BORG_PASSPHRASE": "test"},
+            )
 
             success = await job_manager_with_db._execute_backup_task(job, task)
 
@@ -307,13 +334,13 @@ class TestJobManagerTaskExecution:
         # Task execution should complete successfully
 
     @pytest.mark.asyncio
-    async def test_execute_backup_task_failure(self, job_manager_with_db, sample_repository):
+    async def test_execute_backup_task_failure(
+        self, job_manager_with_db, sample_repository
+    ):
         """Test backup task failure handling"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="backup",
-            task_name="Test Backup",
-            parameters={"paths": ["/tmp"]}
+            task_type="backup", task_name="Test Backup", parameters={"paths": ["/tmp"]}
         )
 
         job = BorgJob(
@@ -329,18 +356,32 @@ class TestJobManagerTaskExecution:
 
         # Mock failed process and repository data
         mock_process = Mock()
-        result = ProcessResult(return_code=2, stdout=b"Repository locked", stderr=b"", error="Backup failed")
+        result = ProcessResult(
+            return_code=2,
+            stdout=b"Repository locked",
+            stderr=b"",
+            error="Backup failed",
+        )
 
-        with patch('app.utils.security.build_secure_borg_command') as mock_build, \
-             patch.object(job_manager_with_db.executor, 'start_process', return_value=mock_process), \
-             patch.object(job_manager_with_db.executor, 'monitor_process_output', return_value=result), \
-             patch.object(job_manager_with_db, '_get_repository_data', return_value={
-                 "id": sample_repository.id,
-                 "path": "/tmp/test-repo",
-                 "passphrase": "test-passphrase"
-             }):
-
-            mock_build.return_value = (["borg", "create", "repo::archive"], {"BORG_PASSPHRASE": "test"})
+        with patch(
+            "utils.security.build_secure_borg_command"
+        ) as mock_build, patch.object(
+            job_manager_with_db.executor, "start_process", return_value=mock_process
+        ), patch.object(
+            job_manager_with_db.executor, "monitor_process_output", return_value=result
+        ), patch.object(
+            job_manager_with_db,
+            "_get_repository_data",
+            return_value={
+                "id": sample_repository.id,
+                "path": "/tmp/test-repo",
+                "passphrase": "test-passphrase",
+            },
+        ):
+            mock_build.return_value = (
+                ["borg", "create", "repo::archive"],
+                {"BORG_PASSPHRASE": "test"},
+            )
 
             success = await job_manager_with_db._execute_backup_task(job, task)
 
@@ -362,7 +403,7 @@ class TestJobManagerTaskExecution:
                 "keep_daily": 7,
                 "keep_weekly": 4,
                 "show_stats": True,
-            }
+            },
         )
 
         job = BorgJob(
@@ -376,9 +417,13 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock successful prune
-        result = ProcessResult(return_code=0, stdout=b"Pruning complete", stderr=b"", error=None)
+        result = ProcessResult(
+            return_code=0, stdout=b"Pruning complete", stderr=b"", error=None
+        )
 
-        with patch.object(job_manager_with_db.executor, 'execute_prune_task', return_value=result):
+        with patch.object(
+            job_manager_with_db.executor, "execute_prune_task", return_value=result
+        ):
             success = await job_manager_with_db._execute_prune_task(job, task)
 
         assert success is True
@@ -386,13 +431,15 @@ class TestJobManagerTaskExecution:
         assert task.return_code == 0
 
     @pytest.mark.asyncio
-    async def test_execute_check_task_success(self, job_manager_with_db, sample_repository):
+    async def test_execute_check_task_success(
+        self, job_manager_with_db, sample_repository
+    ):
         """Test successful check task execution"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
             task_type="check",
             task_name="Test Check",
-            parameters={"repository_only": True}
+            parameters={"repository_only": True},
         )
 
         job = BorgJob(
@@ -408,18 +455,29 @@ class TestJobManagerTaskExecution:
 
         # Mock successful check and repository data
         mock_process = Mock()
-        result = ProcessResult(return_code=0, stdout=b"Repository check passed", stderr=b"", error=None)
+        result = ProcessResult(
+            return_code=0, stdout=b"Repository check passed", stderr=b"", error=None
+        )
 
-        with patch('app.utils.security.build_secure_borg_command') as mock_build, \
-             patch.object(job_manager_with_db.executor, 'start_process', return_value=mock_process), \
-             patch.object(job_manager_with_db.executor, 'monitor_process_output', return_value=result), \
-             patch.object(job_manager_with_db, '_get_repository_data', return_value={
-                 "id": sample_repository.id,
-                 "path": "/tmp/test-repo",
-                 "passphrase": "test-passphrase"
-             }):
-
-            mock_build.return_value = (["borg", "check", "--repository-only"], {"BORG_PASSPHRASE": "test"})
+        with patch(
+            "utils.security.build_secure_borg_command"
+        ) as mock_build, patch.object(
+            job_manager_with_db.executor, "start_process", return_value=mock_process
+        ), patch.object(
+            job_manager_with_db.executor, "monitor_process_output", return_value=result
+        ), patch.object(
+            job_manager_with_db,
+            "_get_repository_data",
+            return_value={
+                "id": sample_repository.id,
+                "path": "/tmp/test-repo",
+                "passphrase": "test-passphrase",
+            },
+        ):
+            mock_build.return_value = (
+                ["borg", "check", "--repository-only"],
+                {"BORG_PASSPHRASE": "test"},
+            )
 
             success = await job_manager_with_db._execute_check_task(job, task)
 
@@ -437,7 +495,7 @@ class TestJobManagerTaskExecution:
             parameters={
                 "repository_path": "/tmp/test-repo",
                 "cloud_sync_config_id": 1,
-            }
+            },
         )
 
         job = BorgJob(
@@ -451,9 +509,13 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock successful cloud sync
-        result = ProcessResult(return_code=0, stdout=b"Sync complete", stderr=b"", error=None)
+        result = ProcessResult(
+            return_code=0, stdout=b"Sync complete", stderr=b"", error=None
+        )
 
-        with patch.object(job_manager_with_db.executor, 'execute_cloud_sync_task', return_value=result):
+        with patch.object(
+            job_manager_with_db.executor, "execute_cloud_sync_task", return_value=result
+        ):
             success = await job_manager_with_db._execute_cloud_sync_task(job, task)
 
         assert success is True
@@ -461,7 +523,9 @@ class TestJobManagerTaskExecution:
         assert task.return_code == 0
 
     @pytest.mark.asyncio
-    async def test_execute_notification_task_success(self, job_manager_with_db, test_db):
+    async def test_execute_notification_task_success(
+        self, job_manager_with_db, test_db
+    ):
         """Test successful notification task execution"""
         # Create notification config in database
         notification_config = NotificationConfig(
@@ -483,7 +547,7 @@ class TestJobManagerTaskExecution:
                 "title": "Test Title",
                 "message": "Test Message",
                 "priority": 1,
-            }
+            },
         )
 
         job = BorgJob(
@@ -497,13 +561,17 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock successful notification with proper database access
-        with patch.object(notification_config, 'get_pushover_credentials', return_value=("user_key", "app_token")), \
-             patch('app.services.jobs.job_manager.get_db_session') as mock_get_db:
-
+        with patch.object(
+            notification_config,
+            "get_pushover_credentials",
+            return_value=("user_key", "app_token"),
+        ), patch("services.jobs.job_manager.get_db_session") as mock_get_db:
             # Set up the database session context manager
             mock_get_db.return_value.__enter__.return_value = test_db
 
-            job_manager_with_db.pushover_service.send_notification_with_response = AsyncMock(return_value=(True, "Message sent"))
+            job_manager_with_db.pushover_service.send_notification_with_response = (
+                AsyncMock(return_value=(True, "Message sent"))
+            )
 
             success = await job_manager_with_db._execute_notification_task(job, task)
 
@@ -517,9 +585,7 @@ class TestJobManagerTaskExecution:
         """Test notification task with missing config"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="notification",
-            task_name="Test Notification",
-            parameters={}
+            task_type="notification", task_name="Test Notification", parameters={}
         )
 
         job = BorgJob(
@@ -575,7 +641,9 @@ class TestJobManagerExternalIntegration:
         """Test registering an external job"""
         job_id = "external-job-123"
 
-        job_manager.register_external_job(job_id, job_type="backup", job_name="External Backup")
+        job_manager.register_external_job(
+            job_id, job_type="backup", job_name="External Backup"
+        )
 
         assert job_id in job_manager.jobs
         job = job_manager.jobs[job_id]
@@ -610,7 +678,9 @@ class TestJobManagerExternalIntegration:
         job_id = "external-job-error"
         job_manager.register_external_job(job_id, job_type="backup")
 
-        job_manager.update_external_job_status(job_id, "failed", error="Backup failed", return_code=1)
+        job_manager.update_external_job_status(
+            job_id, "failed", error="Backup failed", return_code=1
+        )
 
         job = job_manager.jobs[job_id]
         assert job.status == "failed"
@@ -674,6 +744,7 @@ class TestJobManagerDatabaseIntegration:
     @pytest.fixture
     def job_manager_with_db(self, test_db):
         """Create job manager with real database session"""
+
         @contextmanager
         def db_session_factory():
             try:
@@ -687,11 +758,17 @@ class TestJobManagerDatabaseIntegration:
         return manager
 
     @pytest.mark.asyncio
-    async def test_get_repository_data_success(self, job_manager_with_db, sample_repository):
+    async def test_get_repository_data_success(
+        self, job_manager_with_db, sample_repository
+    ):
         """Test getting repository data successfully"""
         # Mock the get_passphrase method to avoid encryption issues
-        with patch.object(sample_repository, 'get_passphrase', return_value="test-passphrase"):
-            result = await job_manager_with_db._get_repository_data(sample_repository.id)
+        with patch.object(
+            sample_repository, "get_passphrase", return_value="test-passphrase"
+        ):
+            result = await job_manager_with_db._get_repository_data(
+                sample_repository.id
+            )
 
         assert result is not None
         assert result["id"] == sample_repository.id
@@ -706,13 +783,21 @@ class TestJobManagerDatabaseIntegration:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_repository_data_fallback_mechanisms(self, job_manager_with_db, sample_repository):
+    async def test_get_repository_data_fallback_mechanisms(
+        self, job_manager_with_db, sample_repository
+    ):
         """Test repository data fallback when database manager fails"""
         # Mock database manager to fail and fix passphrase
-        job_manager_with_db.database_manager.get_repository_data = AsyncMock(side_effect=Exception("DB error"))
+        job_manager_with_db.database_manager.get_repository_data = AsyncMock(
+            side_effect=Exception("DB error")
+        )
 
-        with patch.object(sample_repository, 'get_passphrase', return_value="test-passphrase"):
-            result = await job_manager_with_db._get_repository_data(sample_repository.id)
+        with patch.object(
+            sample_repository, "get_passphrase", return_value="test-passphrase"
+        ):
+            result = await job_manager_with_db._get_repository_data(
+                sample_repository.id
+            )
 
         # Should fall back to direct database access
         assert result is not None
@@ -890,10 +975,13 @@ class TestJobManagerFactoryFunctions:
 
     def test_create_job_manager_with_environment_config(self):
         """Test creating job manager with environment variables"""
-        with patch.dict(os.environ, {
-            'BORG_MAX_CONCURRENT_BACKUPS': '8',
-            'BORG_MAX_OUTPUT_LINES': '1500',
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "BORG_MAX_CONCURRENT_BACKUPS": "8",
+                "BORG_MAX_OUTPUT_LINES": "1500",
+            },
+        ):
             manager = create_job_manager()
 
             assert manager.config.max_concurrent_backups == 8
@@ -902,7 +990,9 @@ class TestJobManagerFactoryFunctions:
     def test_create_job_manager_backward_compatible_config(self):
         """Test creating job manager with backward compatible config"""
         mock_config = Mock()
-        mock_config.to_internal_config.return_value = JobManagerConfig(max_concurrent_backups=15)
+        mock_config.to_internal_config.return_value = JobManagerConfig(
+            max_concurrent_backups=15
+        )
 
         manager = create_job_manager(mock_config)
 
