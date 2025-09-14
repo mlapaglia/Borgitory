@@ -211,7 +211,7 @@ backup-sources/
 borg-repos/
 .claude/
 data/
-local-data/
+local-data/**
 *.db
 *.sqlite
 *.sqlite3
