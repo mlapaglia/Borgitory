@@ -37,27 +37,3 @@ async def remove_notification(
 ) -> HTMLResponse:
     """Remove a notification (returns empty content)."""
     return HTMLResponse(content="", status_code=200)
-
-
-@router.get("/select-path", response_class=HTMLResponse)
-async def select_path(
-    request: Request,
-    path: str,
-    target_input: str,
-    templates: TemplatesDep,
-    current_user: User = Depends(get_current_user)
-) -> HTMLResponse:
-    """Handle path selection - updates input value and triggers new search if needed."""
-    
-    # Return a response that updates the input value and optionally triggers new search
-    return templates.TemplateResponse(
-        request,
-        "partials/shared/path_selection_response.html",
-        {
-            "path": path,
-            "target_input": target_input,
-            "should_search": path.endswith('/')  # Search again if it's a directory
-        }
-    )
-
-

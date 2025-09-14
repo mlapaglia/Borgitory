@@ -1,6 +1,8 @@
 <!-- HTMX Path Autocomplete Component -->
 <!-- Usage: Include this template with input_id, input_name, and optional input_value, placeholder -->
-<div class="relative" data-path-autocomplete>
+<div class="relative" 
+     data-path-autocomplete
+     hx-on:htmx:after-request="if (event.detail.target.id === '{{ input_id }}-dropdown') { event.detail.target.style.display = 'block'; }">
     <!-- Input field -->
     <input type="text" 
            id="{{ input_id }}"
@@ -9,7 +11,7 @@
            placeholder="{{ placeholder | default('Enter path starting with /mnt/...') }}"
            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white input-modern"
            hx-get="/api/repositories/directories/autocomplete"
-           hx-trigger="input changed delay:300ms, focus"
+           hx-trigger="input changed delay:300ms, focus delay:100ms"
            hx-target="#{{ input_id }}-dropdown"
            hx-include="this"
            hx-headers='{"hx-target-input": "{{ input_id }}"}'

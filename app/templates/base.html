@@ -116,6 +116,13 @@
     </main>
 
     <div id="notification-area" class="fixed top-4 right-4 z-50"></div>
+    
+    <!-- Global click handler to hide autocomplete dropdowns -->
+    <div hx-on:click="
+        document.querySelectorAll('[id$=\"-dropdown\"]').forEach(dropdown => {
+            dropdown.style.display = 'none';
+        });
+    "></div>
 
     <!-- Component JavaScript Files -->
     <script src="/static/js/app.js"></script>
@@ -208,6 +215,19 @@
                 htmxCloseMobileSidebar();
             }
         });
+        
+        // Global click handler to close autocomplete dropdowns
+        document.addEventListener('click', function(event) {
+            // Check if click is outside any autocomplete component
+            const clickedAutocomplete = event.target.closest('[data-path-autocomplete]');
+            if (!clickedAutocomplete) {
+                const autocompleteDropdowns = document.querySelectorAll('[data-path-autocomplete] [id$="-dropdown"]');
+                autocompleteDropdowns.forEach(dropdown => {
+                    dropdown.style.display = 'none';
+                });
+            }
+        });
+        
         
     </script>
 
