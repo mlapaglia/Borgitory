@@ -1,6 +1,5 @@
 import asyncio
 import pytest
-import uuid
 from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
@@ -629,7 +628,7 @@ class TestBackupExecutor:
             output_lines=[]
         )
 
-        output_data = await backup_executor._monitor_process_output(mock_process, result)
+        await backup_executor._monitor_process_output(mock_process, result)
 
         assert result.error_message is not None
         assert "Process monitoring error" in result.error_message
