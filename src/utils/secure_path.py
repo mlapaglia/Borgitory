@@ -22,7 +22,7 @@ def _pre_validate_user_input(user_path: str, allowed_prefixes: List[str]) -> boo
 
     Args:
         user_path: The user-provided path to validate
-        allowed_prefixes: List of allowed absolute path prefixes (e.g., ["/mnt", "/app/app/data"])
+        allowed_prefixes: List of allowed absolute path prefixes (e.g., ["/mnt", "/app/data"])
 
     Returns:
         True if input is safe to process, False otherwise
@@ -51,7 +51,7 @@ def _pre_validate_user_input(user_path: str, allowed_prefixes: List[str]) -> boo
             for prefix in allowed_prefixes:
                 if prefix == "/mnt":
                     windows_prefixes.append("C:\\mnt")
-                elif prefix == "/app/app/data":
+                elif prefix == "/app/data":
                     windows_prefixes.append("C:\\app\\app\\data")
             windows_match = any(
                 user_path.startswith(prefix + "\\")
@@ -81,14 +81,14 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
 
     Allowed paths:
     - /mnt/* - For user repos, backup sources, keyfiles, etc.
-    - /app/app/data/* - For application database, secret key, etc. (if allow_app_data=True)
+    - /app/data/* - For application database, secret key, etc. (if allow_app_data=True)
 
     This function uses pathlib.Path.resolve() to handle symlinks, relative paths,
     and normalization automatically, preventing path traversal attacks.
 
     Args:
         user_path: The user-provided path to validate
-        allow_app_data: Whether to allow /app/app/data paths (default: True)
+        allow_app_data: Whether to allow /app/data paths (default: True)
 
     Returns:
         Resolved Path object if valid and under allowed directories, None otherwise
@@ -96,7 +96,7 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
     try:
         allowed_prefixes = ["/mnt"]
         if allow_app_data:
-            allowed_prefixes.append("/app/app/data")
+            allowed_prefixes.append("/app/data")
 
         if not _pre_validate_user_input(user_path, allowed_prefixes):
             return None
@@ -129,7 +129,7 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
                         f"Path traversal attempt detected for '{user_path}' resolved as '{target_realpath}' relative '{rel_path}'"
                     )
                     return None
-        allowed_paths = ["/mnt"] + (["/app/app/data"] if allow_app_data else [])
+        allowed_paths = ["/mnt"] + (["/app/data"] if allow_app_data else [])
         logger.warning(
             f"Path validation failed for '{user_path}': not under allowed paths {allowed_paths}"
         )
@@ -142,7 +142,7 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
 def validate_mnt_path(user_path: str) -> Optional[Path]:
     """
     Validate that a path is under /mnt/ only - for user repos/backup sources.
-    Use this for user-facing operations to prevent repos in /app/app/data.
+    Use this for user-facing operations to prevent repos in /app/data.
     """
     return validate_secure_path(user_path, allow_app_data=False)
 
@@ -150,7 +150,7 @@ def validate_mnt_path(user_path: str) -> Optional[Path]:
 def validate_user_repository_path(user_path: str) -> Optional[Path]:
     """
     Validate paths for user repositories and backup sources - /mnt only.
-    This prevents users from putting repositories in /app/app/data.
+    This prevents users from putting repositories in /app/data.
     """
     return validate_mnt_path(user_path)
 
@@ -227,7 +227,7 @@ def secure_path_join(base_dir: str, *path_parts: str) -> str:
     Securely join path components and validate the result is under allowed directories.
 
     Args:
-        base_dir: Starting path (must be under /mnt or /app/app/data)
+        base_dir: Starting path (must be under /mnt or /app/data)
         path_parts: Path components to join
 
     Returns:
@@ -240,7 +240,7 @@ def secure_path_join(base_dir: str, *path_parts: str) -> str:
     validated_base = validate_secure_path(base_dir, allow_app_data=True)
     if validated_base is None:
         raise PathSecurityError(
-            f"Base directory '{base_dir}' must be under /mnt or /app/app/data"
+            f"Base directory '{base_dir}' must be under /mnt or /app/data"
         )
 
     # Clean and join path parts
@@ -278,7 +278,7 @@ def secure_exists(path: str, allowed_base_dirs: List[str] = None) -> bool:
         allowed_base_dirs: Ignored - kept for backward compatibility
 
     Returns:
-        True if path exists and is under /mnt or /app/app/data
+        True if path exists and is under /mnt or /app/data
     """
     validated_path = validate_secure_path(path, allow_app_data=True)
     if validated_path is None:
@@ -300,7 +300,7 @@ def secure_isdir(path: str, allowed_base_dirs: List[str] = None) -> bool:
         allowed_base_dirs: Ignored - kept for backward compatibility
 
     Returns:
-        True if path is a directory and is under /mnt or /app/app/data
+        True if path is a directory and is under /mnt or /app/data
     """
     validated_path = validate_secure_path(path, allow_app_data=True)
     if validated_path is None:

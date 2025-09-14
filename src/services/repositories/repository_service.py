@@ -585,7 +585,7 @@ class RepositoryService:
     async def _save_keyfile(self, repository_name: str, keyfile) -> Dict[str, Any]:
         """Save uploaded keyfile securely."""
         try:
-            keyfiles_dir = "/app/app/data/keyfiles"  # Store keyfiles with app data
+            keyfiles_dir = "/app/data/keyfiles"  # Store keyfiles with app data
             os.makedirs(keyfiles_dir, exist_ok=True)
 
             safe_filename = create_secure_filename(

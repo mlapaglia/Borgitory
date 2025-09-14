@@ -43,10 +43,9 @@ async def lifespan(app: FastAPI):
 
         from config import DATA_DIR
 
-        if not os.getenv("SECRET_KEY"):
-            secret_key = get_or_generate_secret_key(DATA_DIR)
-            os.environ["SECRET_KEY"] = secret_key
-            logger.info("SECRET_KEY initialized")
+        secret_key = get_or_generate_secret_key(DATA_DIR)
+        os.environ["SECRET_KEY"] = secret_key
+        logger.info("SECRET_KEY initialized")
 
         await init_db()
         logger.info("Database initialized")
