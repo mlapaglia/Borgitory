@@ -1,22 +1,22 @@
 """
-Tests for ModularBorgJobManager - integration tests for the refactored modular architecture
+Tests for JobManager - integration tests for the refactored modular architecture
 """
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from datetime import datetime, UTC
 
-from app.services.job_manager_modular import (
-    ModularBorgJobManager,
+from app.services.job_manager import (
+    JobManager,
     BorgJob
 )
-from app.services.job_manager_dependencies import (
+from app.services.job_manager import (
     JobManagerConfig,
     JobManagerFactory
 )
 
 
-class TestModularBorgJobManager:
-    """Test ModularBorgJobManager functionality"""
+class TestJobManager:
+    """Test JobManager functionality"""
     
     def setup_method(self):
         """Set up test fixtures with mocked dependencies"""
@@ -31,11 +31,12 @@ class TestModularBorgJobManager:
         self.mock_dependencies = JobManagerFactory.create_for_testing(
             mock_subprocess=AsyncMock(),
             mock_db_session=Mock(),
-            mock_rclone_service=Mock()
+            mock_rclone_service=Mock(),
+            config=self.config
         )
         
         # Create job manager with mocked dependencies
-        self.job_manager = ModularBorgJobManager(
+        self.job_manager = JobManager(
             config=self.config,
             dependencies=self.mock_dependencies
         )

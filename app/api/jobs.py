@@ -3,16 +3,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
-from app.dependencies import JobServiceDep
+from app.dependencies import JobServiceDep, BackupServiceDep
 from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
-from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
+from app.services.job_manager import JobManager, get_job_manager
 from app.dependencies import TemplatesDep
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def get_job_manager_dependency() -> ModularBorgJobManager:
+def get_job_manager_dependency() -> JobManager:
     """Dependency to get modular job manager instance."""
     return get_job_manager()
 
@@ -21,16 +21,15 @@ def get_job_manager_dependency() -> ModularBorgJobManager:
 async def create_backup(
     backup_request: BackupRequest,
     request: Request,
-    job_svc: JobServiceDep,
+    backup_svc: BackupServiceDep,
     templates: TemplatesDep,
 ):
-    """Start a backup job and return HTML status"""
+    """Start a backup job using the simplified backup service"""
 
     try:
-        result = await job_svc.create_backup_job(
+        job_id = await backup_svc.create_and_run_backup(
             backup_request, JobType.MANUAL_BACKUP
         )
-        job_id = result["job_id"]
 
         return templates.TemplateResponse(
             request,
@@ -61,18 +60,18 @@ async def create_backup(
 async def create_prune_job(
     request: Request,
     prune_request: PruneRequest,
-    job_svc: JobServiceDep,
+    backup_svc: BackupServiceDep,
     templates: TemplatesDep,
 ):
-    """Start an archive pruning job and return job_id for tracking"""
+    """Start an archive pruning job using the simplified backup service"""
 
     try:
-        result = await job_svc.create_prune_job(prune_request)
+        job_id = await backup_svc.create_and_run_prune(prune_request)
 
         return templates.TemplateResponse(
             request,
             "partials/cleanup/prune_success.html",
-            {"job_id": result.get("job_id", "unknown")},
+            {"job_id": job_id},
         )
     except ValueError as e:
         error_msg = str(e)
@@ -366,7 +365,7 @@ async def cancel_job(
 
 @router.get("/manager/stats")
 def get_job_manager_stats(
-    job_manager: ModularBorgJobManager = Depends(get_job_manager_dependency),
+    job_manager: JobManager = Depends(get_job_manager_dependency),
 ):
     """Get JobManager statistics"""
     jobs = job_manager.jobs
@@ -386,7 +385,7 @@ def get_job_manager_stats(
 
 @router.post("/manager/cleanup")
 def cleanup_completed_jobs(
-    job_manager: ModularBorgJobManager = Depends(get_job_manager_dependency),
+    job_manager: JobManager = Depends(get_job_manager_dependency),
 ):
     """Clean up completed jobs from JobManager memory"""
     cleaned = 0
@@ -405,7 +404,7 @@ def cleanup_completed_jobs(
 
 @router.get("/queue/stats")
 def get_queue_stats(
-    job_manager: ModularBorgJobManager = Depends(get_job_manager_dependency),
+    job_manager: JobManager = Depends(get_job_manager_dependency),
 ):
     """Get backup queue statistics"""
     return job_manager.get_queue_stats()

@@ -619,11 +619,11 @@ class TestJobRenderServiceSSE:
 
     def setup_method(self):
         """Set up test fixtures"""
-        from app.services.job_manager_modular import ModularBorgJobManager
+        from app.services.job_manager import JobManager
         from app.services.job_render_service import JobRenderService
         
         # Create mock job manager
-        self.mock_job_manager = Mock(spec=ModularBorgJobManager)
+        self.mock_job_manager = Mock(spec=JobManager)
         self.mock_job_manager.jobs = {}
         
         # Create service with mock manager

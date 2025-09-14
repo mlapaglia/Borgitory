@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.models.database import Job
 from app.models.enums import JobType
-from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
+from app.services.job_manager import JobManager, get_job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class JobRenderService:
     def __init__(
         self,
         templates_dir: str = "app/templates",
-        job_manager: Optional[ModularBorgJobManager] = None,
+        job_manager: Optional[JobManager] = None,
     ):
         self.templates = Jinja2Templates(directory=templates_dir)
         self.job_manager = job_manager or get_job_manager()

@@ -11,6 +11,7 @@ from app.models.database import get_db
 from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
 from app.services.job_service import JobService
+from app.services.backup_service import BackupService
 from app.services.recovery_service import RecoveryService
 from app.services.pushover_service import PushoverService
 from app.services.job_stream_service import JobStreamService
@@ -79,6 +80,16 @@ def get_job_service(db: Session = Depends(get_db)) -> JobService:
     Note: This creates a new instance per request since it depends on the database session.
     """
     return JobService(db)
+
+
+def get_backup_service(db: Session = Depends(get_db)) -> BackupService:
+    """
+    Provide a BackupService instance with database session injection.
+
+    This is the simplified backup service that replaces the complex JobManager system.
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return BackupService(db)
 
 
 _recovery_service_instance = None
@@ -390,6 +401,7 @@ SimpleCommandRunnerDep = Annotated[
 ]
 BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
+BackupServiceDep = Annotated[BackupService, Depends(get_backup_service)]
 RecoveryServiceDep = Annotated[RecoveryService, Depends(get_recovery_service)]
 PushoverServiceDep = Annotated[PushoverService, Depends(get_pushover_service)]
 JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service)]

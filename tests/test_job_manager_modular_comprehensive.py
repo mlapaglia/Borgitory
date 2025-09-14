@@ -1,5 +1,5 @@
 """
-Comprehensive tests for ModularBorgJobManager covering missing test coverage areas.
+Comprehensive tests for JobManager covering missing test coverage areas.
 Focuses on task execution, error handling, notifications, and edge cases.
 """
 import pytest
@@ -7,18 +7,68 @@ import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 from datetime import datetime, UTC
 
-from app.services.job_manager_modular import (
-    ModularBorgJobManager,
+from app.services.job_manager import (
+    JobManager,
     BorgJob,
     BorgJobTask,
     get_job_manager,
     reset_job_manager
 )
-from app.services.job_manager_dependencies import (
+from app.services.job_manager import (
     JobManagerConfig,
     JobManagerFactory
 )
 from app.services.job_executor import ProcessResult
+from app.models.database import Repository, NotificationConfig, CloudSyncConfig
+
+
+# Database fixtures for comprehensive tests
+@pytest.fixture
+def sample_repository(test_db):
+    """Create a sample repository for testing."""
+    repository = Repository(
+        name="test-repo",
+        path="/tmp/test-repo",
+        encrypted_passphrase="test-encrypted-passphrase"
+    )
+    test_db.add(repository)
+    test_db.commit()
+    test_db.refresh(repository)
+    return repository
+
+
+@pytest.fixture
+def sample_notification_config(test_db):
+    """Create a sample notification config for testing."""
+    config = NotificationConfig(
+        name="test-pushover",
+        provider="pushover",
+        enabled=True,
+        notify_on_success=True,
+        notify_on_failure=True
+    )
+    # Set encrypted credentials using the model method
+    config.set_pushover_credentials("test_user_key", "test_app_token")
+    test_db.add(config)
+    test_db.commit()
+    test_db.refresh(config)
+    return config
+
+
+@pytest.fixture
+def sample_cloud_sync_config(test_db):
+    """Create a sample cloud sync config for testing."""
+    config = CloudSyncConfig(
+        name="test-s3-sync",
+        provider="s3",
+        remote_name="test-remote",
+        bucket_name="test-bucket",
+        enabled=True
+    )
+    test_db.add(config)
+    test_db.commit()
+    test_db.refresh(config)
+    return config
 
 
 class TestBorgJobTask:
@@ -149,7 +199,7 @@ class TestBorgJob:
         assert job.is_composite() is True
 
 
-class TestModularBorgJobManagerErrorHandling:
+class TestJobManagerErrorHandling:
     """Test error handling and edge cases in job execution"""
     
     def setup_method(self):
@@ -159,7 +209,7 @@ class TestModularBorgJobManagerErrorHandling:
             auto_cleanup_delay_seconds=1
         )
         self.mock_dependencies = JobManagerFactory.create_for_testing()
-        self.job_manager = ModularBorgJobManager(
+        self.job_manager = JobManager(
             config=self.config,
             dependencies=self.mock_dependencies
         )
@@ -211,37 +261,30 @@ class TestModularBorgJobManagerErrorHandling:
             assert job.completed_at is not None
 
 
-class TestModularBorgJobManagerTaskExecution:
+class TestJobManagerTaskExecution:
     """Test individual task execution methods"""
-    
-    def setup_method(self):
-        """Set up test fixtures with repository data"""
-        self.config = JobManagerConfig()
-        self.mock_dependencies = JobManagerFactory.create_for_testing()
-        self.job_manager = ModularBorgJobManager(
-            config=self.config,
-            dependencies=self.mock_dependencies
+
+    @pytest.fixture
+    def job_manager(self):
+        """Create job manager for testing"""
+        config = JobManagerConfig()
+        mock_dependencies = JobManagerFactory.create_for_testing()
+        return JobManager(
+            config=config,
+            dependencies=mock_dependencies
         )
-        
-        # Mock repository data
-        self.repo_data = {
-            "id": 1,
-            "name": "test-repo",
-            "path": "/borg/repo",
-            "passphrase": "test-passphrase"
-        }
     
     @pytest.mark.asyncio
-    async def test_execute_backup_task_success(self):
+    async def test_execute_backup_task_success(self, job_manager, sample_repository):
         """Test successful backup task execution"""
         job = BorgJob(
             id="test-job",
             status="running",
             started_at=datetime.now(UTC),
             job_type="composite",
-            repository_id=1
+            repository_id=sample_repository.id
         )
-        
+
         task = BorgJobTask(
             task_type="backup",
             task_name="Test backup",
@@ -251,15 +294,14 @@ class TestModularBorgJobManagerTaskExecution:
                 "dry_run": False
             }
         )
-        
+
         mock_result = ProcessResult(return_code=0, stdout=b"", stderr=b"")
-        
-        with patch.object(self.job_manager, '_get_repository_data', return_value=self.repo_data), \
-             patch.object(self.job_manager.executor, 'start_process', return_value=AsyncMock()), \
-             patch.object(self.job_manager.executor, 'monitor_process_output', return_value=mock_result):
-            
-            success = await self.job_manager._execute_backup_task(job, task, 0)
-            
+
+        with patch.object(job_manager.executor, 'start_process', return_value=AsyncMock()), \
+             patch.object(job_manager.executor, 'monitor_process_output', return_value=mock_result):
+
+            success = await job_manager._execute_backup_task(job, task, 0)
+
             assert success is True
             assert task.return_code == 0
             assert task.error is None
@@ -463,319 +505,259 @@ class TestModularBorgJobManagerTaskExecution:
             assert task.return_code == 0
 
 
-class TestModularBorgJobManagerNotifications:
+class TestJobManagerNotifications:
     """Test notification task execution"""
-    
-    def setup_method(self):
-        """Set up test fixtures"""
-        self.config = JobManagerConfig()
-        self.mock_dependencies = JobManagerFactory.create_for_testing()
-        self.job_manager = ModularBorgJobManager(
-            config=self.config,
-            dependencies=self.mock_dependencies
+
+    @pytest.fixture
+    def job_manager(self):
+        """Create job manager for testing"""
+        config = JobManagerConfig()
+        mock_dependencies = JobManagerFactory.create_for_testing()
+        return JobManager(
+            config=config,
+            dependencies=mock_dependencies
         )
-        
-        self.repo_data = {
-            "id": 1,
-            "name": "test-repo",
-            "path": "/borg/repo",
-            "passphrase": "test-passphrase"
-        }
     
     @pytest.mark.asyncio
-    async def test_execute_notification_task_no_config_id(self):
+    async def test_execute_notification_task_no_config_id(self, job_manager, sample_repository):
         """Test notification task when no config ID provided"""
         job = BorgJob(
             id="test-job",
             status="running",
             started_at=datetime.now(UTC),
             job_type="composite",
-            repository_id=1
+            repository_id=sample_repository.id
         )
-        
+
         task = BorgJobTask(
             task_type="notification",
             task_name="Test notification",
             parameters={}  # No config_id
         )
-        
-        with patch.object(self.job_manager, '_get_repository_data', return_value=self.repo_data):
-            success = await self.job_manager._execute_notification_task(job, task, 0)
-            
-            assert success is False
-            assert task.return_code == 1
-            assert task.error == "No notification configuration"
+
+        success = await job_manager._execute_notification_task(job, task, 0)
+
+        assert success is False
+        assert task.return_code == 1
+        assert task.error == "No notification configuration"
     
     @pytest.mark.asyncio
-    async def test_execute_notification_task_config_not_found(self):
+    async def test_execute_notification_task_config_not_found(self, job_manager, sample_repository):
         """Test notification task when config not found"""
         job = BorgJob(
             id="test-job",
             status="running",
             started_at=datetime.now(UTC),
             job_type="composite",
-            repository_id=1
+            repository_id=sample_repository.id
         )
-        
+
         task = BorgJobTask(
             task_type="notification",
             task_name="Test notification",
-            parameters={"config_id": 999}
+            parameters={"config_id": 999}  # Non-existent config ID
         )
-        
-        mock_db = Mock()
-        mock_db.__enter__ = Mock(return_value=mock_db)
-        mock_db.__exit__ = Mock(return_value=None)
-        mock_query = Mock()
-        mock_query.filter.return_value.first.return_value = None
-        mock_db.query.return_value = mock_query
-        
-        with patch.object(self.job_manager, '_get_repository_data', return_value=self.repo_data), \
-             patch('app.utils.db_session.get_db_session', return_value=mock_db):
-            
-            success = await self.job_manager._execute_notification_task(job, task, 0)
-            
-            assert success is True  # Skipped notifications return True
-            assert task.status == "skipped"
-            assert task.return_code == 0
+
+        success = await job_manager._execute_notification_task(job, task, 0)
+
+        assert success is True  # Skipped notifications return True
+        assert task.status == "skipped"
+        assert task.return_code == 0
     
     @pytest.mark.asyncio
-    async def test_execute_notification_task_disabled(self):
+    async def test_execute_notification_task_disabled(self, job_manager, sample_repository, test_db):
         """Test notification task when config is disabled"""
+        # Create a disabled notification config
+        disabled_config = NotificationConfig(
+            name="disabled-pushover",
+            provider="pushover",
+            enabled=False,  # Disabled
+            notify_on_success=True,
+            notify_on_failure=True
+        )
+        disabled_config.set_pushover_credentials("test_user", "test_token")
+        test_db.add(disabled_config)
+        test_db.commit()
+        test_db.refresh(disabled_config)
+
         job = BorgJob(
             id="test-job",
             status="running",
             started_at=datetime.now(UTC),
             job_type="composite",
-            repository_id=1
+            repository_id=sample_repository.id
         )
-        
+
         task = BorgJobTask(
             task_type="notification",
             task_name="Test notification",
-            parameters={"config_id": 1}
+            parameters={"config_id": disabled_config.id}
         )
-        
-        mock_config = Mock()
-        mock_config.enabled = False
-        
-        mock_db = Mock()
-        mock_db.__enter__ = Mock(return_value=mock_db)
-        mock_db.__exit__ = Mock(return_value=None)
-        mock_query = Mock()
-        mock_query.filter.return_value.first.return_value = mock_config
-        mock_db.query.return_value = mock_query
-        
-        with patch.object(self.job_manager, '_get_repository_data', return_value=self.repo_data), \
-             patch('app.utils.db_session.get_db_session', return_value=mock_db):
-            
-            success = await self.job_manager._execute_notification_task(job, task, 0)
-            
-            assert success is True  # Skipped notifications return True
-            assert task.status == "skipped"
-            assert task.return_code == 0
+
+        success = await job_manager._execute_notification_task(job, task, 0)
+
+        assert success is True  # Skipped notifications return True
+        assert task.status == "skipped"
+        assert task.return_code == 0
     
     @pytest.mark.asyncio
-    async def test_execute_notification_task_pushover_success(self):
+    async def test_execute_notification_task_pushover_success(self, job_manager, sample_repository, sample_notification_config):
         """Test successful Pushover notification"""
         job = BorgJob(
             id="test-job",
             status="running",
             started_at=datetime.now(UTC),
             job_type="composite",
-            repository_id=1,
+            repository_id=sample_repository.id,
             tasks=[
                 BorgJobTask(task_type="backup", task_name="Backup", status="completed")
             ]
         )
-        
+
         task = BorgJobTask(
             task_type="notification",
             task_name="Test notification",
             parameters={
-                "config_id": 1,
+                "config_id": sample_notification_config.id,
                 "notify_on_success": True,
                 "notify_on_failure": True
             }
         )
-        
-        mock_config = Mock()
-        mock_config.enabled = True
-        mock_config.provider = "pushover"
-        mock_config.encrypted_user_key = b"encrypted_user"
-        mock_config.encrypted_app_token = b"encrypted_token"
-        
-        mock_db = Mock()
-        mock_db.__enter__ = Mock(return_value=mock_db)
-        mock_db.__exit__ = Mock(return_value=None)
-        mock_query = Mock()
-        mock_query.filter.return_value.first.return_value = mock_config
-        mock_db.query.return_value = mock_query
-        
-        with patch.object(self.job_manager, '_get_repository_data', return_value=self.repo_data), \
-             patch('app.utils.db_session.get_db_session', return_value=mock_db), \
-             patch.object(self.job_manager, '_send_pushover_notification', return_value=True) as mock_pushover:
-            
-            success = await self.job_manager._execute_notification_task(job, task, 1)
-            
+
+        with patch.object(job_manager, '_send_pushover_notification', return_value=True) as mock_pushover:
+            success = await job_manager._execute_notification_task(job, task, 1)
+
             assert success is True
             assert task.return_code == 0
             mock_pushover.assert_called_once()
     
     @pytest.mark.asyncio
-    async def test_send_pushover_notification_success(self):
+    async def test_send_pushover_notification_success(self, job_manager, sample_repository, sample_notification_config):
         """Test successful Pushover API call"""
         job = BorgJob(id="test", status="running", started_at=datetime.now(UTC))
         task = BorgJobTask(task_type="notification", task_name="Test")
-        
-        mock_config = Mock()
-        mock_config.encrypted_user_key = "encrypted_user"
-        mock_config.encrypted_app_token = "encrypted_token"
-        
-        mock_cipher = Mock()
-        mock_cipher.decrypt.side_effect = [b"user_key", b"app_token"]
-        
+
+        repo_data = {
+            "id": sample_repository.id,
+            "name": sample_repository.name,
+            "path": sample_repository.path,
+            "passphrase": sample_repository.get_passphrase()
+        }
+
         mock_response = Mock()
         mock_response.status_code = 200
-        
+
         mock_client = Mock()
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_async_client = Mock()
         mock_async_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_async_client.__aexit__ = AsyncMock(return_value=None)
-        
-        with patch('app.models.database.get_cipher_suite', return_value=mock_cipher), \
-             patch('httpx.AsyncClient', return_value=mock_async_client):
-            
-            success = await self.job_manager._send_pushover_notification(
-                mock_config, job, self.repo_data, task, True
+
+        with patch('httpx.AsyncClient', return_value=mock_async_client):
+            success = await job_manager._send_pushover_notification(
+                sample_notification_config, job, repo_data, task, True
             )
-            
+
             assert success is True
     
     @pytest.mark.asyncio
-    async def test_send_pushover_notification_api_error(self):
+    async def test_send_pushover_notification_api_error(self, job_manager, sample_repository, sample_notification_config):
         """Test Pushover API error handling"""
         job = BorgJob(id="test", status="running", started_at=datetime.now(UTC))
         task = BorgJobTask(task_type="notification", task_name="Test")
-        
-        mock_config = Mock()
-        mock_config.encrypted_user_key = "encrypted_user"
-        mock_config.encrypted_app_token = "encrypted_token"
-        
-        mock_cipher = Mock()
-        mock_cipher.decrypt.side_effect = [b"user_key", b"app_token"]
-        
+
+        repo_data = {
+            "id": sample_repository.id,
+            "name": sample_repository.name,
+            "path": sample_repository.path,
+            "passphrase": sample_repository.get_passphrase()
+        }
+
         mock_response = Mock()
         mock_response.status_code = 400
         mock_response.text = "Invalid token"
-        
+
         mock_client = Mock()
         mock_client.post = AsyncMock(return_value=mock_response)
         mock_async_client = Mock()
         mock_async_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_async_client.__aexit__ = AsyncMock(return_value=None)
-        
-        with patch('app.models.database.get_cipher_suite', return_value=mock_cipher), \
-             patch('httpx.AsyncClient', return_value=mock_async_client):
-            
-            success = await self.job_manager._send_pushover_notification(
-                mock_config, job, self.repo_data, task, True
+
+        with patch('httpx.AsyncClient', return_value=mock_async_client):
+            success = await job_manager._send_pushover_notification(
+                sample_notification_config, job, repo_data, task, True
             )
-            
+
             assert success is False
             assert "Pushover API error: 400" in task.error
             assert len(task.output_lines) > 0
 
 
-class TestModularBorgJobManagerRepositoryData:
+class TestJobManagerRepositoryData:
     """Test repository data access methods"""
-    
-    def setup_method(self):
-        """Set up test fixtures"""
-        self.config = JobManagerConfig()
-        self.mock_dependencies = JobManagerFactory.create_for_testing()
-        self.job_manager = ModularBorgJobManager(
-            config=self.config,
-            dependencies=self.mock_dependencies
+
+    @pytest.fixture
+    def job_manager(self):
+        """Create job manager for testing"""
+        config = JobManagerConfig()
+        mock_dependencies = JobManagerFactory.create_for_testing()
+        return JobManager(
+            config=config,
+            dependencies=mock_dependencies
         )
     
     @pytest.mark.asyncio
-    async def test_get_repository_data_with_database_manager(self):
+    async def test_get_repository_data_with_database_manager(self, job_manager, sample_repository):
         """Test _get_repository_data using database manager"""
         expected_data = {
-            "id": 1,
-            "name": "test-repo",
-            "path": "/borg/repo",
-            "passphrase": "secret"
+            "id": sample_repository.id,
+            "name": sample_repository.name,
+            "path": sample_repository.path,
+            "passphrase": sample_repository.get_passphrase()
         }
-        
+
         # Mock database manager
-        self.job_manager.database_manager = Mock()
-        self.job_manager.database_manager.get_repository_data = AsyncMock(return_value=expected_data)
-        
-        result = await self.job_manager._get_repository_data(1)
-        
+        job_manager.database_manager = Mock()
+        job_manager.database_manager.get_repository_data = AsyncMock(return_value=expected_data)
+
+        result = await job_manager._get_repository_data(sample_repository.id)
+
         assert result == expected_data
-        self.job_manager.database_manager.get_repository_data.assert_called_once_with(1)
+        job_manager.database_manager.get_repository_data.assert_called_once_with(sample_repository.id)
     
     @pytest.mark.asyncio
-    async def test_get_repository_data_fallback_success(self):
+    async def test_get_repository_data_fallback_success(self, job_manager, sample_repository):
         """Test _get_repository_data fallback to direct DB access"""
-        # Disable database manager
-        self.job_manager.database_manager = None
-        
-        mock_repository = Mock()
-        mock_repository.id = 1
-        mock_repository.name = "test-repo"
-        mock_repository.path = "/borg/repo"
-        mock_repository.get_passphrase.return_value = "secret"
-        
-        mock_db = Mock()
-        mock_db.__enter__ = Mock(return_value=mock_db)
-        mock_db.__exit__ = Mock(return_value=None)
-        mock_query = Mock()
-        mock_query.filter.return_value.first.return_value = mock_repository
-        mock_db.query.return_value = mock_query
-        
-        # Mock get_db_session to return the context manager directly
-        with patch('app.utils.db_session.get_db_session', return_value=mock_db):
-            result = await self.job_manager._get_repository_data(1)
-            
-            assert result is not None
-            assert result["id"] == 1
-            assert result["name"] == "test-repo"
-            assert result["path"] == "/borg/repo"
-            assert result["passphrase"] == "secret"
+        # Disable database manager to force fallback
+        job_manager.database_manager = None
+
+        result = await job_manager._get_repository_data(sample_repository.id)
+
+        assert result is not None
+        assert result["id"] == sample_repository.id
+        assert result["name"] == "test-repo"
+        assert result["path"] == "/tmp/test-repo"
+        assert result["passphrase"] == sample_repository.get_passphrase()
     
     @pytest.mark.asyncio
-    async def test_get_repository_data_fallback_not_found(self):
+    async def test_get_repository_data_fallback_not_found(self, job_manager):
         """Test _get_repository_data fallback when repository not found"""
         # Disable database manager
-        self.job_manager.database_manager = None
-        
-        mock_db = Mock()
-        mock_db.__enter__ = Mock(return_value=mock_db)
-        mock_db.__exit__ = Mock(return_value=None)
-        mock_query = Mock()
-        mock_query.filter.return_value.first.return_value = None
-        mock_db.query.return_value = mock_query
-        
-        # Mock get_db_session to return the context manager directly
-        with patch('app.utils.db_session.get_db_session', return_value=mock_db):
-            result = await self.job_manager._get_repository_data(999)
-            
-            assert result is None
+        job_manager.database_manager = None
+
+        result = await job_manager._get_repository_data(999)  # Non-existent ID
+
+        assert result is None
 
 
-class TestModularBorgJobManagerEventStreaming:
+class TestJobManagerEventStreaming:
     """Test event streaming and SSE functionality"""
     
     def setup_method(self):
         """Set up test fixtures"""
         self.config = JobManagerConfig()
         self.mock_dependencies = JobManagerFactory.create_for_testing()
-        self.job_manager = ModularBorgJobManager(
+        self.job_manager = JobManager(
             config=self.config,
             dependencies=self.mock_dependencies
         )
@@ -880,7 +862,7 @@ class TestJobManagerFactoryAndSingleton:
         """Test get_job_manager with default configuration"""
         manager = get_job_manager()
         
-        assert isinstance(manager, ModularBorgJobManager)
+        assert isinstance(manager, JobManager)
         assert manager.config.max_concurrent_backups == 5  # Default from env var or fallback
     
     def test_get_job_manager_singleton_behavior(self):
@@ -937,14 +919,14 @@ class TestJobManagerFactoryAndSingleton:
             assert manager.config.max_output_lines_per_job == 2000
 
 
-class TestModularBorgJobManagerCompositeJobExecution:
+class TestJobManagerCompositeJobExecution:
     """Test composite job execution with complex scenarios"""
     
     def setup_method(self):
         """Set up test fixtures"""
         self.config = JobManagerConfig()
         self.mock_dependencies = JobManagerFactory.create_for_testing()
-        self.job_manager = ModularBorgJobManager(
+        self.job_manager = JobManager(
             config=self.config,
             dependencies=self.mock_dependencies
         )

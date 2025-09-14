@@ -70,15 +70,14 @@ async def execute_scheduled_backup(schedule_id: int):
                 notification_config_id=schedule.notification_config_id,
             )
 
-            # Use JobService to create the backup job (unified path)
-            from app.services.job_service import JobService
+            # Use BackupService to create the backup job (simplified path)
+            from app.services.backup_service import BackupService
             from app.models.enums import JobType
 
-            job_service = JobService(db)
-            result = await job_service.create_backup_job(
+            backup_service = BackupService(db)
+            job_id = await backup_service.create_and_run_backup(
                 backup_request, JobType.SCHEDULED_BACKUP
             )
-            job_id = result["job_id"]
 
             logger.info(
                 f"SCHEDULER: Created scheduled backup job {job_id} via JobService"

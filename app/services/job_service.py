@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.database import Repository, Job
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
-from app.services.job_manager_modular import ModularBorgJobManager, get_job_manager
+from app.services.job_manager import JobManager, get_job_manager
 from app.services.task_definition_builder import TaskDefinitionBuilder
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class JobService:
     """Service for managing job operations"""
 
-    def __init__(self, db: Session, job_manager: Optional[ModularBorgJobManager] = None):
+    def __init__(self, db: Session, job_manager: Optional[JobManager] = None):
         self.db = db
         self.job_manager = job_manager or get_job_manager()
 

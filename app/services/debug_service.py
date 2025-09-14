@@ -8,7 +8,7 @@ from typing import Dict, Any
 from sqlalchemy.orm import Session
 
 from app.models.database import Repository, Job
-from app.services.job_manager_modular import get_job_manager
+from app.services.job_manager import get_job_manager
 
 logger = logging.getLogger(__name__)
 
