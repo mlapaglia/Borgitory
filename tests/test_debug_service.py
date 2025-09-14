@@ -11,7 +11,9 @@ from app.services.debug_service import DebugService
 
 @pytest.fixture
 def debug_service():
-    return DebugService()
+    from unittest.mock import Mock
+    mock_job_manager = Mock()
+    return DebugService(job_manager=mock_job_manager)
 
 
 @pytest.fixture
@@ -347,32 +349,36 @@ class TestDebugService:
             "job3": mock_job3
         }
 
-        with patch('app.services.debug_service.get_job_manager', return_value=mock_job_manager):
-            result = debug_service._get_job_manager_info()
+        # Using constructor-injected job manager
+        debug_service.job_manager = mock_job_manager
+        result = debug_service._get_job_manager_info()
 
-            assert result["active_jobs"] == 2  # 2 running jobs
-            assert result["total_jobs"] == 3   # 3 total jobs
-            assert result["job_manager_running"] is True
+        assert result["active_jobs"] == 2  # 2 running jobs
+        assert result["total_jobs"] == 3   # 3 total jobs
+        assert result["job_manager_running"] is True
 
     def test_get_job_manager_info_no_jobs_attribute(self, debug_service):
         """Test job manager info when job manager has no jobs attribute"""
         mock_job_manager = MagicMock()
         del mock_job_manager.jobs  # Remove jobs attribute
 
-        with patch('app.services.debug_service.get_job_manager', return_value=mock_job_manager):
-            result = debug_service._get_job_manager_info()
+        # Using constructor-injected job manager
+        debug_service.job_manager = mock_job_manager
+        result = debug_service._get_job_manager_info()
 
-            assert result["active_jobs"] == 0
-            assert result["total_jobs"] == 0
-            assert result["job_manager_running"] is True
+        assert result["active_jobs"] == 0
+        assert result["total_jobs"] == 0
+        assert result["job_manager_running"] is True
 
     def test_get_job_manager_info_exception_handling(self, debug_service):
         """Test job manager info exception handling"""
-        with patch('app.services.debug_service.get_job_manager', side_effect=Exception("Job manager error")):
+        # Simulate job manager error by setting to None
+        debug_service.job_manager = None
+        with patch('app.services.jobs.job_manager.get_job_manager', side_effect=Exception("Job manager error")):
             result = debug_service._get_job_manager_info()
 
-            assert "error" in result
-            assert result["job_manager_running"] is False
+        assert "error" in result
+        assert result["job_manager_running"] is False
 
     def test_get_job_manager_info_jobs_without_status(self, debug_service):
         """Test job manager info when jobs don't have status attribute"""
@@ -387,8 +393,9 @@ class TestDebugService:
             "job2": mock_job2
         }
 
-        with patch('app.services.debug_service.get_job_manager', return_value=mock_job_manager):
-            result = debug_service._get_job_manager_info()
+        # Using constructor-injected job manager
+        debug_service.job_manager = mock_job_manager
+        result = debug_service._get_job_manager_info()
 
-            assert result["active_jobs"] == 1  # Only job2 counts as running
-            assert result["total_jobs"] == 2   # Both jobs counted in total
+        assert result["active_jobs"] == 1  # Only job2 counts as running
+        assert result["total_jobs"] == 2   # Both jobs counted in total

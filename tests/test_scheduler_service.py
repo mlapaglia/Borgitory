@@ -2,8 +2,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
 
-from app.services.scheduler_service import SchedulerService, execute_scheduled_backup
-from app.models.database import Schedule, CleanupConfig, RepositoryCheckConfig
+from app.services.scheduler_service import SchedulerService
 
 
 class TestSchedulerService:

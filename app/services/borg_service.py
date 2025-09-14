@@ -9,9 +9,7 @@ from typing import Dict, List, Optional
 from app.models.database import Repository, Job
 from app.services.jobs.job_executor import JobExecutor
 from app.services.simple_command_runner import SimpleCommandRunner
-from app.services.jobs.job_manager import (
-    get_job_manager,
-)  # Keep for backup operations that need job tracking
+from app.services.jobs.job_manager import JobManager
 from app.utils.db_session import get_db_session
 from app.utils.security import (
     build_secure_borg_command,
@@ -28,15 +26,24 @@ class BorgService:
         self,
         job_executor: Optional[JobExecutor] = None,
         command_runner: Optional[SimpleCommandRunner] = None,
+        job_manager: Optional[JobManager] = None,
         volume_service=None,
     ):
         self.job_executor = job_executor or JobExecutor()
         self.command_runner = command_runner or SimpleCommandRunner()
+        self.job_manager = job_manager
         self.volume_service = volume_service
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
         )
+
+    def _get_job_manager(self) -> JobManager:
+        """Get job manager instance, lazy load if needed"""
+        if self.job_manager is None:
+            from app.services.jobs.job_manager import get_job_manager
+            self.job_manager = get_job_manager()
+        return self.job_manager
 
     def _parse_borg_config(self, repo_path: str) -> Dict[str, any]:
         """Parse a Borg repository config file to determine encryption mode"""
@@ -257,7 +264,7 @@ class BorgService:
             raise Exception(f"Security validation failed: {str(e)}")
 
         try:
-            job_id = await get_job_manager().start_borg_command(
+            job_id = await self._get_job_manager().start_borg_command(
                 command, env=env, is_backup=True
             )
 
@@ -297,7 +304,7 @@ class BorgService:
 
         try:
             # Start the borg list command
-            job_manager = get_job_manager()
+            job_manager = self._get_job_manager()
             job_id = await job_manager.start_borg_command(command, env=env)
 
             # Create database job record for tracking
@@ -361,7 +368,7 @@ class BorgService:
                 raise Exception(f"Borg list failed: {error_msg}")
 
             # Get and process the output
-            output = await get_job_manager().get_job_output_stream(job_id)
+            output = await self._get_job_manager().get_job_output_stream(job_id)
 
             # Parse JSON output - look for complete JSON structure
             json_lines = []
@@ -656,7 +663,7 @@ class BorgService:
 
         try:
             logger.info(f"Executing scan command: {' '.join(command)}")
-            job_id = await get_job_manager().start_borg_command(command, env={})
+            job_id = await self._get_job_manager().start_borg_command(command, env={})
             logger.info(f"Repository scan job {job_id} started")
             return job_id
 
@@ -666,14 +673,14 @@ class BorgService:
 
     async def check_scan_status(self, job_id: str) -> Dict[str, any]:
         """Check status of repository scan job"""
-        status = get_job_manager().get_job_status(job_id)
+        status = self._get_job_manager().get_job_status(job_id)
         if not status:
             return {"running": False, "completed": False, "error": "Job not found"}
 
         # Get job output for error debugging
         output = ""
         try:
-            job_output = await get_job_manager().get_job_output_stream(job_id)
+            job_output = await self._get_job_manager().get_job_output_stream(job_id)
             if "lines" in job_output:
                 output = "\n".join(
                     [line["text"] for line in job_output["lines"][-20:]]
@@ -695,7 +702,7 @@ class BorgService:
     async def get_scan_results(self, job_id: str) -> List[Dict]:
         """Get results of completed repository scan"""
         try:
-            status = get_job_manager().get_job_status(job_id)
+            status = self._get_job_manager().get_job_status(job_id)
             if not status or not status["completed"]:
                 return []
 
@@ -706,7 +713,7 @@ class BorgService:
                 return []
 
             # Get the output
-            output = await get_job_manager().get_job_output_stream(job_id)
+            output = await self._get_job_manager().get_job_output_stream(job_id)
 
             repo_paths = []
             for line in output.get("lines", []):
@@ -731,7 +738,7 @@ class BorgService:
                     )
 
             # Clean up job after getting results
-            get_job_manager().cleanup_job(job_id)
+            self._get_job_manager().cleanup_job(job_id)
 
             return repo_paths
 
@@ -761,7 +768,7 @@ class BorgService:
             return False
 
         try:
-            job_manager = get_job_manager()
+            job_manager = self._get_job_manager()
             job_id = await job_manager.start_borg_command(command, env=env)
 
             # Wait for completion
@@ -777,7 +784,7 @@ class BorgService:
                 if status["completed"] or status["status"] == "failed":
                     success = status["return_code"] == 0
                     # Clean up job
-                    get_job_manager().cleanup_job(job_id)
+                    self._get_job_manager().cleanup_job(job_id)
                     return success
 
                 await asyncio.sleep(0.5)

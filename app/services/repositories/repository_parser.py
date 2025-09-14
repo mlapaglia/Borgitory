@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 
 from app.models.database import Repository
 from app.services.simple_command_runner import SimpleCommandRunner
-from app.services.jobs.job_manager import get_job_manager
+from app.services.jobs.job_manager import JobManager
 from app.utils.security import build_secure_borg_command
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,9 @@ class RepositoryParser:
     - Extract repository metadata
     """
 
-    def __init__(self, command_runner: Optional[SimpleCommandRunner] = None):
+    def __init__(self, command_runner: Optional[SimpleCommandRunner] = None, job_manager: Optional[JobManager] = None):
         self.command_runner = command_runner or SimpleCommandRunner()
+        self.job_manager = job_manager
 
     def parse_borg_config(self, repo_path: str) -> Dict[str, any]:
         """Parse a Borg repository config file to determine encryption mode"""
@@ -178,7 +179,10 @@ class RepositoryParser:
         logger.info(f"Starting repository scan in {scan_path}")
 
         # Use the job manager to track the scan job
-        job_manager = get_job_manager()
+        if not self.job_manager:
+            from app.services.jobs.job_manager import get_job_manager
+            self.job_manager = get_job_manager()
+        job_manager = self.job_manager
 
         # Create a find command to look for Borg repositories
         # Look for directories containing 'config' and 'data' subdirectories (typical Borg structure)
@@ -227,7 +231,10 @@ class RepositoryParser:
     async def check_scan_status(self, job_id: str) -> Dict[str, any]:
         """Check the status of a running repository scan"""
         try:
-            job_manager = get_job_manager()
+            if not self.job_manager:
+                from app.services.jobs.job_manager import get_job_manager
+                self.job_manager = get_job_manager()
+            job_manager = self.job_manager
             status = job_manager.get_job_status(job_id)
 
             if not status:
@@ -257,7 +264,10 @@ class RepositoryParser:
     async def get_scan_results(self, job_id: str) -> List[Dict]:
         """Get the results of a completed repository scan"""
         try:
-            job_manager = get_job_manager()
+            if not self.job_manager:
+                from app.services.jobs.job_manager import get_job_manager
+                self.job_manager = get_job_manager()
+            job_manager = self.job_manager
             job_status = job_manager.get_job_status(job_id)
 
             if not job_status or not job_status.get("completed"):
@@ -398,7 +408,10 @@ class RepositoryParser:
 
         try:
             # Start the borg info command to test access
-            job_manager = get_job_manager()
+            if not self.job_manager:
+                from app.services.jobs.job_manager import get_job_manager
+                self.job_manager = get_job_manager()
+            job_manager = self.job_manager
             job_id = await job_manager.start_borg_command(command, env=env)
 
             # Wait for completion with a reasonable timeout

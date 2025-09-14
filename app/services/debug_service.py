@@ -4,11 +4,11 @@ import sys
 import os
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
 from app.models.database import Repository, Job
-from app.services.jobs.job_manager import get_job_manager
+from app.services.jobs.job_manager import JobManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 class DebugService:
     """Service to gather system and application debug information"""
 
-    def __init__(self, volume_service=None):
+    def __init__(self, volume_service=None, job_manager: Optional[JobManager] = None):
         self.volume_service = volume_service
+        self.job_manager = job_manager
 
     async def get_debug_info(self, db: Session) -> Dict[str, Any]:
         """Gather comprehensive debug information"""
@@ -288,14 +289,18 @@ class DebugService:
     def _get_job_manager_info(self) -> Dict[str, Any]:
         """Get job manager information"""
         try:
+            if not self.job_manager:
+                from app.services.jobs.job_manager import get_job_manager
+                self.job_manager = get_job_manager()
+
             # Count active jobs by checking job statuses
             active_jobs_count = 0
             total_jobs = (
-                len(get_job_manager().jobs) if hasattr(get_job_manager(), "jobs") else 0
+                len(self.job_manager.jobs) if hasattr(self.job_manager, "jobs") else 0
             )
 
-            if hasattr(get_job_manager(), "jobs"):
-                for job in get_job_manager().jobs.values():
+            if hasattr(self.job_manager, "jobs"):
+                for job in self.job_manager.jobs.values():
                     if hasattr(job, "status") and job.status == "running":
                         active_jobs_count += 1
 

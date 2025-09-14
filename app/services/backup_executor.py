@@ -148,7 +148,7 @@ class BackupExecutor:
                 self.active_operations[operation_id] = process
 
             # Monitor output with integrated callbacks
-            stdout_data = await self._monitor_process_output(
+            await self._monitor_process_output(
                 process, result, output_callback, progress_callback
             )
 
@@ -230,7 +230,7 @@ class BackupExecutor:
                 self.active_operations[operation_id] = process
 
             # Monitor output
-            stdout_data = await self._monitor_process_output(
+            await self._monitor_process_output(
                 process, result, output_callback, None
             )
 

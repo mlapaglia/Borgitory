@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.utils.db_session import get_db_session
-from app.models.database import Job, JobTask
+from app.models.database import Job
 from sqlalchemy.orm import joinedload
 
 def main():

@@ -12,6 +12,7 @@ from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
 from app.services.jobs.job_service import JobService
 from app.services.backup_service import BackupService
+from app.services.jobs.job_manager import JobManager
 from app.services.recovery_service import RecoveryService
 from app.services.pushover_service import PushoverService
 from app.services.jobs.job_stream_service import JobStreamService
@@ -41,6 +42,30 @@ from fastapi.templating import Jinja2Templates
 
 # Global singleton instances
 _simple_command_runner_instance = None
+_job_manager_instance = None
+
+def get_job_manager_dependency() -> JobManager:
+    """
+    Provide a JobManager singleton instance for FastAPI dependency injection.
+
+    Uses module-level singleton pattern with environment-based configuration.
+    """
+    global _job_manager_instance
+    if _job_manager_instance is None:
+        import os
+        from app.services.jobs.job_manager import JobManagerConfig, JobManager
+
+        # Use environment variables or defaults
+        config = JobManagerConfig(
+            max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
+            auto_cleanup_delay_seconds=int(os.getenv("BORG_AUTO_CLEANUP_DELAY", "30")),
+            max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
+        )
+        _job_manager_instance = JobManager(config)
+    return _job_manager_instance
+
+# Define JobManagerDep here so it can be used in other dependency functions
+JobManagerDep = Annotated[JobManager, Depends(get_job_manager_dependency)]
 
 def get_simple_command_runner() -> SimpleCommandRunner:
     """
@@ -58,28 +83,33 @@ _borg_service_instance = None
 
 def get_borg_service() -> BorgService:
     """
-    Provide a BorgService singleton instance with proper dependency injection.
+    Provide a BorgService singleton instance with dependency injection.
 
-    Uses module-level singleton pattern with dependency injection.
+    Uses module-level singleton pattern for now to avoid circular dependency issues.
     """
     global _borg_service_instance
     if _borg_service_instance is None:
         command_runner = get_simple_command_runner()
         volume_service = get_volume_service()
+        job_manager = get_job_manager_dependency()
         _borg_service_instance = BorgService(
             command_runner=command_runner,
-            volume_service=volume_service
+            volume_service=volume_service,
+            job_manager=job_manager
         )
     return _borg_service_instance
 
 
-def get_job_service(db: Session = Depends(get_db)) -> JobService:
+def get_job_service(
+    db: Session = Depends(get_db),
+    job_manager: JobManager = Depends(get_job_manager_dependency),
+) -> JobService:
     """
     Provide a JobService instance with database session injection.
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return JobService(db)
+    return JobService(db, job_manager)
 
 
 def get_backup_service(db: Session = Depends(get_db)) -> BackupService:
@@ -130,7 +160,8 @@ def get_job_stream_service() -> JobStreamService:
     """
     global _job_stream_service_instance
     if _job_stream_service_instance is None:
-        _job_stream_service_instance = JobStreamService()
+        job_manager = get_job_manager_dependency()
+        _job_stream_service_instance = JobStreamService(job_manager)
     return _job_stream_service_instance
 
 
@@ -144,7 +175,8 @@ def get_job_render_service() -> JobRenderService:
     """
     global _job_render_service_instance
     if _job_render_service_instance is None:
-        _job_render_service_instance = JobRenderService()
+        job_manager = get_job_manager_dependency()
+        _job_render_service_instance = JobRenderService(job_manager=job_manager)
     return _job_render_service_instance
 
 

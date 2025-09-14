@@ -1,10 +1,10 @@
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any, Optional
+from typing import AsyncGenerator, Dict, Any
 from fastapi.responses import StreamingResponse
 
-from app.services.jobs.job_manager import JobManager, get_job_manager
+from app.services.jobs.job_manager import JobManager
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class JobStreamService:
     """Service for handling Server-Sent Events streaming for jobs"""
 
-    def __init__(self, job_manager: Optional[JobManager] = None):
-        self.job_manager = job_manager or get_job_manager()
+    def __init__(self, job_manager: JobManager):
+        self.job_manager = job_manager
 
     async def stream_all_jobs(self) -> StreamingResponse:
         """Stream real-time updates for all jobs via Server-Sent Events"""

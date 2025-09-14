@@ -1,11 +1,11 @@
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 from sqlalchemy.orm import Session, joinedload
 from fastapi.templating import Jinja2Templates
 
 from app.models.database import Job
 from app.models.enums import JobType
-from app.services.jobs.job_manager import JobManager, get_job_manager
+from app.services.jobs.job_manager import JobManager
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +15,11 @@ class JobRenderService:
 
     def __init__(
         self,
+        job_manager: JobManager,
         templates_dir: str = "app/templates",
-        job_manager: Optional[JobManager] = None,
     ):
         self.templates = Jinja2Templates(directory=templates_dir)
-        self.job_manager = job_manager or get_job_manager()
+        self.job_manager = job_manager
 
     def render_jobs_html(self, db: Session, expand: str = None) -> str:
         """Render job history as HTML"""
@@ -185,7 +185,7 @@ class JobRenderService:
         )
 
         # Check if this job has tasks (regardless of job_type for backward compatibility)
-        is_composite = job.tasks and len(job.tasks) > 0
+        is_composite = bool(job.tasks and len(job.tasks) > 0)
 
         # Debug logging
         logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks, is_composite={is_composite}")
@@ -303,7 +303,7 @@ class JobRenderService:
             )
 
             # Check if this job has tasks (regardless of job_type for backward compatibility)
-            is_composite = job.tasks and len(job.tasks) > 0
+            is_composite = bool(job.tasks and len(job.tasks) > 0)
 
             # Debug logging
             logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks, is_composite={is_composite}")

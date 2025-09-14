@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.database import Repository, Job
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
-from app.services.jobs.job_manager import JobManager, get_job_manager
+from app.services.jobs.job_manager import JobManager
 from app.services.task_definition_builder import TaskDefinitionBuilder
 
 logger = logging.getLogger(__name__)
@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 class JobService:
     """Service for managing job operations"""
 
-    def __init__(self, db: Session, job_manager: Optional[JobManager] = None):
+    def __init__(self, db: Session, job_manager: JobManager):
         self.db = db
-        self.job_manager = job_manager or get_job_manager()
+        self.job_manager = job_manager
 
     async def create_backup_job(
         self, backup_request: BackupRequest, job_type: JobType

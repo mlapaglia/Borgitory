@@ -5,7 +5,7 @@ from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
 from app.dependencies import JobServiceDep, BackupServiceDep
 from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
-from app.services.jobs.job_manager import JobManager, get_job_manager
+from app.services.jobs.job_manager import JobManager
 from app.dependencies import TemplatesDep
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,8 @@ router = APIRouter()
 
 def get_job_manager_dependency() -> JobManager:
     """Dependency to get modular job manager instance."""
-    return get_job_manager()
+    from app.dependencies import get_job_manager_dependency as get_jm_dep
+    return get_jm_dep()
 
 
 @router.post("/backup", response_class=HTMLResponse)

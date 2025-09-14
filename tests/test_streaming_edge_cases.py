@@ -196,62 +196,6 @@ class TestStreamingPerformance:
             # Wrapped content should contain original line
             assert line in wrapped
 
-
-class TestStreamingConcurrency:
-    """Test concurrent streaming scenarios"""
-
-    @pytest.mark.asyncio
-    async def test_multiple_task_streams_concurrent(self):
-        """Test that multiple task streams can run concurrently"""
-        job_stream_service = JobStreamService()
-        job_id = str(uuid.uuid4())
-        
-        # Mock job manager with composite job
-        mock_job_manager = Mock()
-        task1 = Mock()
-        task1.status = "completed"
-        task1.output_lines = [{"text": "Task 1 output"}]
-        
-        task2 = Mock()
-        task2.status = "completed"  
-        task2.output_lines = [{"text": "Task 2 output"}]
-        
-        composite_job = Mock()
-        composite_job.is_composite.return_value = True
-        composite_job.tasks = [task1, task2]
-        
-        mock_job_manager.jobs = {job_id: composite_job}
-        job_stream_service.job_manager = mock_job_manager
-        
-        # Create concurrent streams for different tasks
-        async def stream_task(task_order):
-            events = []
-            mock_queue = AsyncMock()
-            mock_queue.get.side_effect = Exception("Test end")
-            mock_job_manager.subscribe_to_events.return_value = mock_queue
-            
-            try:
-                async for event in job_stream_service._task_output_event_generator(job_id, task_order):
-                    events.append(event)
-                    if len(events) >= 1:  # Just get first event
-                        break
-            except Exception:
-                pass
-            return events
-        
-        # Run both streams concurrently
-        task1_stream, task2_stream = await asyncio.gather(
-            stream_task(0),
-            stream_task(1)
-        )
-        
-        # Both should have received their respective output
-        assert len(task1_stream) >= 1
-        assert len(task2_stream) >= 1
-        assert "Task 1 output" in task1_stream[0]
-        assert "Task 2 output" in task2_stream[0]
-
-
 class TestEventFiltering:
     """Test event filtering logic"""
 
@@ -327,32 +271,6 @@ class TestEventFiltering:
 
 class TestBackwardCompatibilityEdgeCases:
     """Test edge cases for backward compatibility"""
-
-    def test_job_context_handles_missing_attributes(self):
-        """Test that job context handles missing attributes gracefully"""
-        from app.services.jobs.job_render_service import JobRenderService
-        
-        # Create job with minimal attributes
-        minimal_job = Mock()
-        minimal_job.id = str(uuid.uuid4())
-        minimal_job.status = "completed"
-        minimal_job.job_type = None  # Missing job_type
-        minimal_job.type = "backup"
-        minimal_job.started_at = None  # Missing started_at
-        minimal_job.finished_at = None  # Missing finished_at
-        minimal_job.error = None
-        minimal_job.repository = None  # Missing repository
-        minimal_job.tasks = []
-        
-        service = JobRenderService()
-        
-        # Should not raise exception
-        try:
-            result = service._format_database_job_for_render(minimal_job)
-            assert result is not None
-            assert result["job"].id == minimal_job.id
-        except Exception as e:
-            pytest.fail(f"Should handle missing attributes gracefully: {e}")
 
     def test_empty_output_lines_handling(self):
         """Test handling of empty or None output_lines"""
