@@ -49,13 +49,12 @@
                 <div id="import-form-dynamic">
                     <div>
                         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository Path</label>
-                        <div class="relative">
-                            <input type="text" name="path" id="import-path" required 
-                                   class="input-modern mt-1"
-                                   placeholder="/repos/" autocomplete="off">
-                            <div id="import-path-dropdown" class="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg mt-1 hidden">
-                            </div>
-                        </div>
+                        {% set input_id = "import-path" %}
+                        {% set input_name = "path" %}
+                        {% set input_value = "/repos/" %}
+                        {% set placeholder = "/repos/" %}
+                        {% set required = true %}
+                        {% include "partials/shared/path_autocomplete.html" %}
                     </div>
                     
                     <!-- Encryption info display (hidden by default) -->

@@ -121,7 +121,6 @@
     <script src="/static/js/app.js"></script>
     <script src="/static/js/components/navigation.js"></script>
     <script src="/static/js/components/jobs.js"></script>
-    <script src="/static/js/components/path-autocomplete.js"></script>
 
     <script>
         // HTMX notification helper function
@@ -209,6 +208,20 @@
                 htmxCloseMobileSidebar();
             }
         });
+        
+        // Global click handler to close autocomplete dropdowns
+        document.addEventListener('click', function(event) {
+            // Check if click is outside any autocomplete component
+            const clickedAutocomplete = event.target.closest('[data-path-autocomplete]');
+            if (!clickedAutocomplete) {
+                const autocompleteDropdowns = document.querySelectorAll('[data-path-autocomplete] [id$="-dropdown"]');
+                autocompleteDropdowns.forEach(dropdown => {
+                    dropdown.style.display = 'none';
+                });
+            }
+        });
+        
+        
     </script>
 
     <!-- Archive Contents Modal -->

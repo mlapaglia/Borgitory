@@ -1280,6 +1280,65 @@ class TestRepositoriesAPI:
             if get_repository_stats_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_stats_service]
 
+
+    @pytest.mark.asyncio
+    async def test_directories_autocomplete_htmx_response(self, async_client: AsyncClient, test_db: Session):
+        """Test that autocomplete endpoint returns proper HTMX HTML response."""
+        from app.api.auth import get_current_user
+        from app.models.database import User
+        
+        # Create a test user and mock authentication
+        test_user = User(username="testuser")
+        test_user.set_password("testpass")
+        test_db.add(test_user)
+        test_db.commit()
+        test_db.refresh(test_user)
+
+        def override_get_current_user():
+            return test_user
+
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        # Mock the secure path functions to return some test data
+        from app.api import repositories
+        original_exists = repositories.user_secure_exists
+        original_isdir = repositories.user_secure_isdir
+        original_listing = repositories.user_get_directory_listing
+        
+        repositories.user_secure_exists = lambda path: True
+        repositories.user_secure_isdir = lambda path: True
+        repositories.user_get_directory_listing = lambda path, include_files=True: [
+            {"name": "data", "path": "/mnt/data"},
+            {"name": "backup", "path": "/mnt/backup"}
+        ]
+        
+        try:
+            # Test basic HTMX response
+            response = await async_client.get("/api/repositories/directories/autocomplete?path=data")
+            
+            assert response.status_code == 200
+            assert "text/html" in response.headers["content-type"]
+            
+            # Check that response contains expected HTML structure
+            content = response.text
+            assert "data" in content
+            
+            # Test with HTMX target header
+            response = await async_client.get(
+                "/api/repositories/directories/autocomplete?path=data",
+                headers={"hx-target-input": "test-input-id"}
+            )
+            
+            assert response.status_code == 200
+            assert "test-input-id" in response.text
+            
+        finally:
+            # Restore original functions
+            repositories.user_secure_exists = original_exists
+            repositories.user_secure_isdir = original_isdir
+            repositories.user_get_directory_listing = original_listing
+
+
     @pytest.mark.asyncio
     async def test_stats_content_dependency_injection_regression(self, async_client: AsyncClient, test_db: Session):
         """

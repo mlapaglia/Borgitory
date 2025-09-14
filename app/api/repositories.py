@@ -38,6 +38,10 @@ from app.utils.secure_path import (
     user_secure_isdir,
     user_get_directory_listing,
 )
+from app.utils.path_prefix import (
+    normalize_path_with_mnt_prefix,
+    parse_path_for_autocomplete,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -129,6 +133,73 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt"):
         logger.error(f"Error listing directories at {path}: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to list directories: {str(e)}"
+        )
+
+
+@router.get("/directories/autocomplete", response_class=HTMLResponse)
+async def list_directories_autocomplete(
+    request: Request,
+    volume_svc: VolumeServiceDep, 
+    current_user=Depends(get_current_user)
+):
+    """List directories as HTML for autocomplete functionality."""
+    
+    # Get the input value from the form data
+    form_data = await request.form() if request.method == "POST" else request.query_params
+    input_value = ""
+    
+    # Try to get the input value from various possible parameter names
+    for param_name in form_data.keys():
+        if param_name in ['path', 'source_path', 'create-path', 'import-path', 'backup-source-path', 'schedule-source-path']:
+            input_value = form_data.get(param_name, "")
+            break
+    
+    # Normalize the path with /mnt/ prefix
+    normalized_path = normalize_path_with_mnt_prefix(input_value)
+    
+    # Parse the normalized path to get directory and search term
+    dir_path, search_term = parse_path_for_autocomplete(normalized_path)
+    
+    try:
+        if not user_secure_exists(dir_path):
+            directories = []
+        elif not user_secure_isdir(dir_path):
+            directories = []
+        else:
+            directories = user_get_directory_listing(dir_path, include_files=False)
+
+        # Filter directories based on search term
+        if search_term:
+            directories = [d for d in directories if search_term.lower() in d["name"].lower()]
+
+        # Get the target input ID from headers
+        target_input = request.headers.get('hx-target-input', '')
+
+        return templates.TemplateResponse(
+            request,
+            "partials/shared/path_autocomplete_dropdown.html",
+            {
+                "directories": directories, 
+                "search_term": search_term,
+                "target_input": target_input,
+                "input_value": normalized_path
+            }
+        )
+
+    except PathSecurityError as e:
+        logger.warning(f"Path security violation: {e}")
+        return templates.TemplateResponse(
+            request,
+            "partials/shared/path_autocomplete_dropdown.html",
+            {"directories": [], "search_term": search_term, "target_input": "", "error": str(e)}
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing directories at {dir_path}: {e}")
+        return templates.TemplateResponse(
+            request,
+            "partials/shared/path_autocomplete_dropdown.html",
+            {"directories": [], "search_term": search_term, "target_input": "", "error": str(e)}
         )
 
 
