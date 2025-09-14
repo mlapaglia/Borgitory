@@ -154,6 +154,12 @@ class ScheduleCreate(ScheduleBase):
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
 
+    @field_validator("source_path", mode="before")
+    @classmethod
+    def validate_source_path(cls, v):
+        from utils.path_prefix import normalize_path_with_mnt_prefix
+        return normalize_path_with_mnt_prefix(v)
+
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
     def validate_cloud_sync_config_id(cls, v):
@@ -201,6 +207,14 @@ class ScheduleUpdate(BaseModel):
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
     enabled: Optional[bool] = None
+
+    @field_validator("source_path", mode="before")
+    @classmethod
+    def validate_source_path(cls, v):
+        if v is None:
+            return v
+        from utils.path_prefix import normalize_path_with_mnt_prefix
+        return normalize_path_with_mnt_prefix(v)
 
     @field_validator("cron_expression")
     @classmethod
@@ -374,6 +388,12 @@ class BackupRequest(BaseModel):
     cleanup_config_id: Optional[int] = Field(None, gt=0)
     check_config_id: Optional[int] = Field(None, gt=0)
     notification_config_id: Optional[int] = Field(None, gt=0)
+
+    @field_validator("source_path", mode="before")
+    @classmethod
+    def validate_source_path(cls, v):
+        from utils.path_prefix import normalize_path_with_mnt_prefix
+        return normalize_path_with_mnt_prefix(v)
 
     @field_validator("dry_run", mode="before")
     @classmethod

@@ -1001,6 +1001,18 @@ class JobManager:
         """Execute a cloud sync task using JobExecutor"""
         params = task.parameters
 
+        # Get repository data
+        repo_data = await self._get_repository_data(job.repository_id)
+        if not repo_data:
+            task.status = "failed"
+            task.return_code = 1
+            task.error = "Repository not found"
+            task.completed_at = datetime.now(UTC)
+            return False
+
+        repository_path = repo_data.get("path") or params.get("repository_path")
+        passphrase = repo_data.get("passphrase") or params.get("passphrase")
+
         def task_output_callback(line: str, progress: Dict):
             task.output_lines.append(line)
             asyncio.create_task(
@@ -1008,8 +1020,8 @@ class JobManager:
             )
 
         result = await self.executor.execute_cloud_sync_task(
-            repository_path=params.get("repository_path"),
-            passphrase=params.get("passphrase"),  # Not used but kept for consistency
+            repository_path=repository_path,
+            passphrase=passphrase,  # Not used but kept for consistency
             cloud_sync_config_id=params.get("cloud_sync_config_id"),
             output_callback=task_output_callback,
             db_session_factory=self.dependencies.db_session_factory,
@@ -1607,7 +1619,19 @@ def create_job_manager(config=None) -> JobManager:
         # Assume it's already a JobManagerConfig
         internal_config = config
 
-    job_manager = JobManager(internal_config)
+    # Create dependencies with rclone service
+    from dependencies import get_rclone_service
+    
+    custom_deps = JobManagerDependencies(
+        rclone_service=get_rclone_service()
+    )
+    
+    dependencies = JobManagerFactory.create_dependencies(
+        config=internal_config,
+        custom_dependencies=custom_deps
+    )
+
+    job_manager = JobManager(config=internal_config, dependencies=dependencies)
     logger.info(
         f"Created new job manager with config: max_concurrent={internal_config.max_concurrent_backups}"
     )

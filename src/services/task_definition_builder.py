@@ -207,13 +207,14 @@ class TaskDefinitionBuilder:
         return task
 
     def build_cloud_sync_task(
-        self, repository_name: Optional[str] = None
+        self, repository_name: Optional[str] = None, cloud_sync_config_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Build a cloud sync task definition.
 
         Args:
             repository_name: Optional repository name for display
+            cloud_sync_config_id: ID of the cloud sync configuration
 
         Returns:
             Task definition dictionary
@@ -222,7 +223,11 @@ class TaskDefinitionBuilder:
             f"Sync {repository_name} to Cloud" if repository_name else "Sync to Cloud"
         )
 
-        return {"type": "cloud_sync", "name": name}
+        return {
+            "type": "cloud_sync", 
+            "name": name,
+            "cloud_sync_config_id": cloud_sync_config_id
+        }
 
     def build_notification_task(
         self, notification_config_id: int, repository_name: str
@@ -265,6 +270,7 @@ class TaskDefinitionBuilder:
         check_config_id: Optional[int] = None,
         check_request: Optional[CheckRequest] = None,
         include_cloud_sync: bool = False,
+        cloud_sync_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
     ) -> list[Dict[str, Any]]:
         """
@@ -320,7 +326,7 @@ class TaskDefinitionBuilder:
 
         # Add cloud sync task
         if include_cloud_sync:
-            tasks.append(self.build_cloud_sync_task(repository_name))
+            tasks.append(self.build_cloud_sync_task(repository_name, cloud_sync_config_id))
 
         # Add notification task
         if notification_config_id:

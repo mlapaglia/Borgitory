@@ -58,6 +58,7 @@ class JobService:
             cleanup_config_id=backup_request.cleanup_config_id,
             check_config_id=backup_request.check_config_id,
             include_cloud_sync=backup_request.cloud_sync_config_id is not None,
+            cloud_sync_config_id=backup_request.cloud_sync_config_id,
             notification_config_id=backup_request.notification_config_id,
         )
 

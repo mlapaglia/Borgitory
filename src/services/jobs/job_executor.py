@@ -349,7 +349,7 @@ class JobExecutor:
             logger.info(f"☁️ Starting cloud sync for repository {repository_path}")
 
             if output_callback:
-                output_callback("☁️ Starting cloud sync...", {})
+                output_callback("Starting cloud sync...", {})
 
             # Get cloud backup configuration
             with session_factory() as db:
@@ -361,11 +361,11 @@ class JobExecutor:
 
                 if not config or not config.enabled:
                     logger.info(
-                        "📋 Cloud backup configuration not found or disabled - skipping"
+                        "Cloud backup configuration not found or disabled - skipping"
                     )
                     if output_callback:
                         output_callback(
-                            "📋 Cloud backup configuration not found or disabled - skipping",
+                            "Cloud backup configuration not found or disabled - skipping",
                             {},
                         )
                     return ProcessResult(
@@ -381,11 +381,11 @@ class JobExecutor:
                     access_key, secret_key = config.get_credentials()
 
                     logger.info(
-                        f"☁️ Syncing to {config.name} (S3: {config.bucket_name})"
+                        f"Syncing to {config.name} (S3: {config.bucket_name})"
                     )
                     if output_callback:
                         output_callback(
-                            f"☁️ Syncing to {config.name} (S3: {config.bucket_name})", {}
+                            f"Syncing to {config.name} (S3: {config.bucket_name})", {}
                         )
 
                     # Create a simple repository object for rclone service
@@ -410,11 +410,11 @@ class JobExecutor:
                     password, private_key = config.get_sftp_credentials()
 
                     logger.info(
-                        f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})"
+                        f"Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})"
                     )
                     if output_callback:
                         output_callback(
-                            f"☁️ Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})",
+                            f"Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})",
                             {},
                         )
 

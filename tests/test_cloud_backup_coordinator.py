@@ -76,10 +76,13 @@ class TestCloudBackupCoordinator:
         return {
             "id": 1,
             "name": "Test Cloud Config",
-            "remote_name": "test-remote",
+            "provider": "s3",
             "remote_path": "backup/test-repo",
+            "path_prefix": "",
             "enabled": True,
-            "sync_options": {"bandwidth_limit": "10M"},
+            "bucket_name": "test-bucket",
+            "access_key_id": "AKIAIOSFODNN7EXAMPLE",
+            "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         }
 
     def test_coordinator_initialization(self):
@@ -218,10 +221,14 @@ class TestCloudBackupCoordinator:
         mock_config = Mock()
         mock_config.id = 1
         mock_config.name = "Test Config"
-        mock_config.remote_name = "test-remote"
+        mock_config.provider = "s3"
         mock_config.remote_path = "backup/test"
+        mock_config.path_prefix = ""
         mock_config.enabled = True
-        mock_config.sync_options = {"bandwidth_limit": "10M"}
+        mock_config.bucket_name = "test-bucket"
+        mock_config.encrypted_access_key = "encrypted_key"
+        mock_config.encrypted_secret_key = "encrypted_secret"
+        mock_config.get_credentials.return_value = ("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_config
         )
@@ -231,10 +238,13 @@ class TestCloudBackupCoordinator:
         assert result is not None
         assert result["id"] == 1
         assert result["name"] == "Test Config"
-        assert result["remote_name"] == "test-remote"
+        assert result["provider"] == "s3"
         assert result["remote_path"] == "backup/test"
+        assert result["path_prefix"] == ""
         assert result["enabled"] is True
-        assert result["sync_options"] == {"bandwidth_limit": "10M"}
+        assert result["bucket_name"] == "test-bucket"
+        assert result["access_key_id"] == "AKIAIOSFODNN7EXAMPLE"
+        assert result["secret_access_key"] == "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
     @pytest.mark.asyncio
     async def test_get_cloud_sync_config_not_found(self, coordinator, mock_db_session):
@@ -267,7 +277,7 @@ class TestCloudBackupCoordinator:
         call_args = mock_rclone_service.sync_repository.call_args
 
         assert call_args[1]["source_path"] == "/path/to/test-repo"
-        assert call_args[1]["remote_path"] == "test-remote:backup/test-repo"
+        assert call_args[1]["remote_path"] == ":s3:test-bucket/backup/test-repo"
         assert call_args[1]["config"] == sample_cloud_config
         assert "progress_callback" in call_args[1]
 

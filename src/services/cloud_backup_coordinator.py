@@ -209,7 +209,18 @@ class CloudBackupCoordinator:
         try:
             # Prepare rclone parameters
             source_path = repository_data["path"]
-            remote_path = f"{cloud_config['remote_name']}:{cloud_config['remote_path']}"
+            
+            # Build remote path based on provider
+            provider = cloud_config.get("provider", "").lower()
+            if provider == "s3":
+                bucket_name = cloud_config.get("bucket_name", "")
+                remote_path = f":s3:{bucket_name}"
+                if cloud_config.get("remote_path"):
+                    remote_path = f"{remote_path}/{cloud_config['remote_path'].strip('/')}"
+            elif provider == "sftp":
+                remote_path = cloud_config.get("remote_path", "/")
+            else:
+                raise Exception(f"Unsupported cloud provider: {provider}")
 
             # Progress callback to update task status
             def progress_callback(progress_info: Dict[str, Any]):
@@ -250,14 +261,40 @@ class CloudBackupCoordinator:
                 if not config:
                     return None
 
-                return {
+                config_dict = {
                     "id": config.id,
                     "name": config.name,
-                    "remote_name": config.remote_name,
+                    "provider": config.provider,
                     "remote_path": config.remote_path,
+                    "path_prefix": config.path_prefix or "",
                     "enabled": config.enabled,
-                    "sync_options": config.sync_options or {},
                 }
+
+                # Add provider-specific fields
+                if config.provider == "s3":
+                    if config.encrypted_access_key and config.encrypted_secret_key:
+                        access_key, secret_key = config.get_credentials()
+                        config_dict.update({
+                            "bucket_name": config.bucket_name,
+                            "access_key_id": access_key,
+                            "secret_access_key": secret_key,
+                        })
+                elif config.provider == "sftp":
+                    config_dict.update({
+                        "host": config.host,
+                        "port": config.port or 22,
+                        "username": config.username,
+                    })
+                    
+                    # Add SFTP credentials if available
+                    if config.encrypted_password:
+                        password = config.get_sftp_password()
+                        config_dict["password"] = password
+                    elif config.encrypted_private_key:
+                        private_key = config.get_sftp_private_key()
+                        config_dict["private_key"] = private_key
+
+                return config_dict
 
         except Exception as e:
             logger.error(f"Failed to get cloud sync config {config_id}: {e}")
