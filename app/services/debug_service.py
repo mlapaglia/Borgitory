@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.models.database import Repository, Job
 from app.services.jobs.job_manager import JobManager
-from app.utils.version import get_version
 
 logger = logging.getLogger(__name__)
 
