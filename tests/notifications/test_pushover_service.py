@@ -5,7 +5,7 @@ Tests for PushoverService - Service to send notifications via Pushover
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from aiohttp import ClientResponse, ClientSession
-from app.services.notifications.pushover_service import PushoverService
+from services.notifications.pushover_service import PushoverService
 
 
 @pytest.fixture

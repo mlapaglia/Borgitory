@@ -4,9 +4,9 @@ Tests for CloudSyncService - Business logic tests migrated from API tests
 import pytest
 from fastapi import HTTPException
 
-from app.services.cloud_sync_service import CloudSyncService
-from app.models.database import CloudSyncConfig
-from app.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
+from services.cloud_sync_service import CloudSyncService
+from models.database import CloudSyncConfig
+from models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
 
 
 @pytest.fixture

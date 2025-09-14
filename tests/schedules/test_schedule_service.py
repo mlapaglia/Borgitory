@@ -4,8 +4,8 @@ Tests for ScheduleService - Business logic tests
 import pytest
 from unittest.mock import AsyncMock
 
-from app.services.scheduling.schedule_service import ScheduleService
-from app.models.database import Schedule, Repository
+from services.scheduling.schedule_service import ScheduleService
+from models.database import Schedule, Repository
 
 
 @pytest.fixture

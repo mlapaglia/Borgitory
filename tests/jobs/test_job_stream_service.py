@@ -8,7 +8,7 @@ from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi.responses import StreamingResponse
 
-from app.services.jobs.job_stream_service import JobStreamService
+from services.jobs.job_stream_service import JobStreamService
 
 
 class TestJobStreamService:
@@ -468,7 +468,7 @@ class TestJobStreamService:
 
     def test_dependency_injection_service_instance(self):
         """Test that dependency injection provides proper service instance."""
-        from app.dependencies import get_job_stream_service
+        from dependencies import get_job_stream_service
         
         # Test the dependency provider
         service = get_job_stream_service()

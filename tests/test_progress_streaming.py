@@ -6,10 +6,10 @@ import asyncio
 from unittest.mock import Mock
 from httpx import AsyncClient, ASGITransport
 
-from app.main import app
-from app.models.database import Repository, get_db
-from app.services.repositories.repository_stats_service import RepositoryStatsService
-from app.dependencies import get_repository_stats_service
+from main import app
+from models.database import Repository, get_db
+from services.repositories.repository_stats_service import RepositoryStatsService
+from dependencies import get_repository_stats_service
 
 
 class TestProgressStreaming:
@@ -199,7 +199,7 @@ class TestProgressStreaming:
         from fastapi import Request
         from unittest.mock import MagicMock
         
-        templates = Jinja2Templates(directory="app/templates")
+        templates = Jinja2Templates(directory="src/templates")
         
         # Mock request object
         mock_request = MagicMock(spec=Request)

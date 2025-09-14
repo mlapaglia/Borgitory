@@ -2,8 +2,8 @@
 Tests for NotificationConfigService - Business logic tests
 """
 import pytest
-from app.services.notifications.notification_config_service import NotificationConfigService
-from app.models.database import NotificationConfig
+from services.notifications.notification_config_service import NotificationConfigService
+from models.database import NotificationConfig
 
 
 @pytest.fixture

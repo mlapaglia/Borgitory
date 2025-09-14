@@ -5,9 +5,9 @@ import pytest
 from httpx import AsyncClient
 from unittest.mock import Mock
 
-from app.main import app
-from app.models.database import Repository, Job, CloudSyncConfig
-from app.dependencies import get_rclone_service
+from main import app
+from models.database import Repository, Job, CloudSyncConfig
+from dependencies import get_rclone_service
 
 
 class TestSyncEndpoints:
@@ -107,7 +107,7 @@ class TestSyncRepositoryTask:
     @pytest.mark.asyncio
     async def test_sync_repository_task_success(self, test_db, mock_rclone_service):
         """Test successful sync repository task execution."""
-        from app.api.sync import sync_repository_task
+        from api.sync import sync_repository_task
         
         # Create test data
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
@@ -150,7 +150,7 @@ class TestSyncRepositoryTask:
     @pytest.mark.asyncio 
     async def test_sync_repository_task_missing_records(self, test_db, mock_rclone_service):
         """Test sync task with missing database records."""
-        from app.api.sync import sync_repository_task
+        from api.sync import sync_repository_task
         
         # Execute task without creating required records
         await sync_repository_task(
@@ -169,7 +169,7 @@ class TestSyncRepositoryTask:
     @pytest.mark.asyncio
     async def test_sync_repository_task_rclone_error(self, test_db, mock_rclone_service):
         """Test sync task handling rclone service errors."""
-        from app.api.sync import sync_repository_task
+        from api.sync import sync_repository_task
         
         # Create test data
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")

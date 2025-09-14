@@ -6,8 +6,8 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
 
-from app.services.cloud_sync_manager import CloudSyncManager
-from app.models.database import Repository, CloudSyncConfig
+from services.cloud_sync_manager import CloudSyncManager
+from models.database import Repository, CloudSyncConfig
 
 
 @pytest.fixture

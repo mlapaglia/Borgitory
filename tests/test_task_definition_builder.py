@@ -5,9 +5,9 @@ Tests for TaskDefinitionBuilder - Centralized task definition creation
 import pytest
 from unittest.mock import MagicMock
 from sqlalchemy.orm import Session
-from app.services.task_definition_builder import TaskDefinitionBuilder
-from app.models.database import CleanupConfig, RepositoryCheckConfig, NotificationConfig
-from app.models.schemas import PruneRequest, CheckRequest
+from services.task_definition_builder import TaskDefinitionBuilder
+from models.database import CleanupConfig, RepositoryCheckConfig, NotificationConfig
+from models.schemas import PruneRequest, CheckRequest
 
 
 @pytest.fixture

@@ -7,8 +7,8 @@ from httpx import AsyncClient
 from sqlalchemy.orm import Session
 from unittest.mock import patch, Mock
 
-from app.models.database import CloudSyncConfig
-from app.services.cloud_sync_service import CloudSyncService
+from models.database import CloudSyncConfig
+from services.cloud_sync_service import CloudSyncService
 
 
 class TestCloudSyncAPIHTMX:

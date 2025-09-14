@@ -5,9 +5,9 @@ Tests for RepositoryParser - Fixed version with proper DI patterns
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 
-from app.services.repositories.repository_parser import RepositoryParser
-from app.models.database import Repository
-from app.services.simple_command_runner import SimpleCommandRunner
+from services.repositories.repository_parser import RepositoryParser
+from models.database import Repository
+from services.simple_command_runner import SimpleCommandRunner
 
 
 @pytest.fixture

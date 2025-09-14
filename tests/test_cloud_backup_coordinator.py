@@ -6,7 +6,7 @@ from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC, timedelta
 from sqlalchemy.orm import Session
 
-from app.services.cloud_backup_coordinator import (
+from services.cloud_backup_coordinator import (
     CloudBackupCoordinator,
     CloudBackupTask,
     CloudBackupStatus,

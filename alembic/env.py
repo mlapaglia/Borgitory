@@ -11,8 +11,8 @@ from alembic import context
 sys.path.insert(0, os.path.abspath('.'))
 
 # Import the models and Base for autogenerate support
-from app.models.database import Base
-from app.config import DATABASE_URL
+from models.database import Base
+from config import DATABASE_URL
 
 # Import all models to ensure they're registered with Base
 

@@ -3,14 +3,14 @@ import uuid
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch
 
-from app.services.jobs.job_manager import (
+from services.jobs.job_manager import (
     JobManager,
     JobManagerConfig,
     BorgJob,
     BorgJobTask,
     create_job_manager,
 )
-from app.models.database import Repository
+from models.database import Repository
 
 
 class TestJobManagerConfig:

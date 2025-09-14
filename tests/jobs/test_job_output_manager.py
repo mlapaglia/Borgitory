@@ -4,7 +4,7 @@ Tests for JobOutputManager - job output collection, storage, and streaming
 import pytest
 from datetime import datetime, timedelta
 
-from app.services.jobs.job_output_manager import JobOutputManager
+from services.jobs.job_output_manager import JobOutputManager
 
 
 class TestJobOutputManager:

@@ -5,9 +5,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from app.main import app
-from app.api.auth import get_current_user
-from app.models.database import User
+from main import app
+from api.auth import get_current_user
+from models.database import User
 
 
 @pytest.fixture

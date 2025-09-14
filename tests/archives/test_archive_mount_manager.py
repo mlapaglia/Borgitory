@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 import tempfile
 import os
 
-from app.services.archives.archive_mount_manager import ArchiveMountManager, MountInfo, get_archive_mount_manager
-from app.models.database import Repository
-from app.services.jobs.job_executor import JobExecutor
+from services.archives.archive_mount_manager import ArchiveMountManager, MountInfo, get_archive_mount_manager
+from models.database import Repository
+from services.jobs.job_executor import JobExecutor
 
 
 class TestArchiveMountManager:
@@ -565,7 +565,7 @@ class TestGetArchiveMountManagerGlobal:
     def teardown_method(self):
         """Reset global state."""
         # Reset global instance
-        import app.services.archives.archive_mount_manager
+        import services.archives.archive_mount_manager
         app.services.archives.archive_mount_manager._mount_manager = None
 
     def test_get_archive_mount_manager_default(self):

@@ -7,10 +7,10 @@ import json
 from unittest.mock import Mock, AsyncMock, patch
 from types import SimpleNamespace
 
-from app.services.archives.archive_manager import ArchiveManager
-from app.models.database import Repository
-from app.services.jobs.job_executor import JobExecutor
-from app.services.borg_command_builder import BorgCommandBuilder
+from services.archives.archive_manager import ArchiveManager
+from models.database import Repository
+from services.jobs.job_executor import JobExecutor
+from services.borg_command_builder import BorgCommandBuilder
 
 
 @pytest.fixture

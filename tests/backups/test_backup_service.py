@@ -4,11 +4,11 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
-from app.services.backups.backup_service import BackupService
-from app.services.backups.backup_executor import BackupExecutor, BackupResult, BackupStatus
-from app.models.database import Repository, Job, JobTask, Schedule
-from app.models.schemas import BackupRequest, PruneRequest
-from app.models.enums import JobType
+from services.backups.backup_service import BackupService
+from services.backups.backup_executor import BackupExecutor, BackupResult, BackupStatus
+from models.database import Repository, Job, JobTask, Schedule
+from models.schemas import BackupRequest, PruneRequest
+from models.enums import JobType
 
 
 class TestBackupService:

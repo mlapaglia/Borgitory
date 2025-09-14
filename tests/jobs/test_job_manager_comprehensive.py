@@ -11,7 +11,7 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
-from app.services.jobs.job_manager import (
+from services.jobs.job_manager import (
     JobManager,
     JobManagerConfig,
     JobManagerDependencies,
@@ -22,8 +22,8 @@ from app.services.jobs.job_manager import (
     get_default_job_manager_dependencies,
     get_test_job_manager_dependencies,
 )
-from app.services.jobs.job_executor import ProcessResult
-from app.models.database import NotificationConfig
+from services.jobs.job_executor import ProcessResult
+from models.database import NotificationConfig
 
 
 class TestJobManagerFactory:

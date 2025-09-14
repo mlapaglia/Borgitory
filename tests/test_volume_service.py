@@ -5,7 +5,7 @@ Tests for VolumeService - Service to discover directories under /mnt
 import pytest
 from unittest.mock import patch
 from typing import List
-from app.services.volumes.volume_service import VolumeService, FileSystemInterface
+from services.volumes.volume_service import VolumeService, FileSystemInterface
 
 
 class MockFileSystem(FileSystemInterface):

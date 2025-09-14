@@ -57,7 +57,7 @@ Repository = "https://github.com/mlapaglia/Borgitory"
 Issues = "https://github.com/mlapaglia/Borgitory/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app"]
+packages = ["src"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.

@@ -5,10 +5,10 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
 
-from app.services.jobs.job_service import JobService
-from app.models.database import Repository, Job, CleanupConfig, RepositoryCheckConfig
-from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
-from app.models.enums import JobType
+from services.jobs.job_service import JobService
+from models.database import Repository, Job, CleanupConfig, RepositoryCheckConfig
+from models.schemas import BackupRequest, PruneRequest, CheckRequest
+from models.enums import JobType
 
 
 class TestJobService:

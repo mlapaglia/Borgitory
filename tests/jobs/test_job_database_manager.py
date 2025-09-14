@@ -9,7 +9,7 @@ import uuid
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, UTC
 
-from app.services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
+from services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
 
 
 class TestJobDatabaseManager:

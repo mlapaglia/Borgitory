@@ -3,12 +3,12 @@ from datetime import datetime
 from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.models.database import Schedule, Repository, CloudSyncConfig, CleanupConfig, NotificationConfig
-from app.dependencies import get_schedule_service, get_configuration_service, get_scheduler_service
-from app.services.scheduling.schedule_service import ScheduleService
-from app.services.configuration_service import ConfigurationService
-from app.api.schedules import (
+from main import app
+from models.database import Schedule, Repository, CloudSyncConfig, CleanupConfig, NotificationConfig
+from dependencies import get_schedule_service, get_configuration_service, get_scheduler_service
+from services.scheduling.schedule_service import ScheduleService
+from services.configuration_service import ConfigurationService
+from api.schedules import (
     format_cron_trigger,
     format_hour,
     get_day_name,

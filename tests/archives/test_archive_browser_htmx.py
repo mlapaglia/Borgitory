@@ -6,10 +6,10 @@ from httpx import AsyncClient
 from sqlalchemy.orm import Session
 from unittest.mock import Mock, AsyncMock
 
-from app.main import app
-from app.models.database import Repository
-from app.dependencies import get_borg_service
-from app.services.borg_service import BorgService
+from main import app
+from models.database import Repository
+from dependencies import get_borg_service
+from services.borg_service import BorgService
 
 
 class TestArchiveBrowserHTMX:
@@ -23,9 +23,9 @@ class TestArchiveBrowserHTMX:
         test_db.add(repo)
         test_db.commit()
 
-        from app.dependencies import get_repository_service
-        from app.services.repositories.repository_service import RepositoryService
-        from app.models.repository_dtos import ArchiveListingResult, ArchiveInfo
+        from dependencies import get_repository_service
+        from services.repositories.repository_service import RepositoryService
+        from models.repository_dtos import ArchiveListingResult, ArchiveInfo
 
         mock_archives = [
             ArchiveInfo(name="archive1", time="2023-01-01T10:00:00"),
@@ -78,9 +78,9 @@ class TestArchiveBrowserHTMX:
         test_db.add(repo)
         test_db.commit()
 
-        from app.dependencies import get_repository_service
-        from app.services.repositories.repository_service import RepositoryService
-        from app.models.repository_dtos import ArchiveListingResult
+        from dependencies import get_repository_service
+        from services.repositories.repository_service import RepositoryService
+        from models.repository_dtos import ArchiveListingResult
 
         # Create mock empty result
         mock_result = ArchiveListingResult(
@@ -121,9 +121,9 @@ class TestArchiveBrowserHTMX:
         test_db.add(repo)
         test_db.commit()
 
-        from app.dependencies import get_repository_service
-        from app.services.repositories.repository_service import RepositoryService
-        from app.models.repository_dtos import ArchiveListingResult
+        from dependencies import get_repository_service
+        from services.repositories.repository_service import RepositoryService
+        from models.repository_dtos import ArchiveListingResult
 
         # Create mock error result
         mock_result = ArchiveListingResult(
@@ -161,9 +161,9 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_list_archives_htmx_not_found(self, async_client: AsyncClient):
         """Test listing archives for non-existent repository."""
-        from app.dependencies import get_repository_service
-        from app.services.repositories.repository_service import RepositoryService
-        from app.models.repository_dtos import ArchiveListingResult
+        from dependencies import get_repository_service
+        from services.repositories.repository_service import RepositoryService
+        from models.repository_dtos import ArchiveListingResult
 
         # Create mock not found result
         mock_result = ArchiveListingResult(

@@ -5,7 +5,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from app.models.database import (
+from models.database import (
     Repository,
     CleanupConfig,
     CloudSyncConfig,

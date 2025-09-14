@@ -5,7 +5,7 @@ import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 
-from app.services.simple_command_runner import SimpleCommandRunner, CommandResult
+from services.simple_command_runner import SimpleCommandRunner, CommandResult
 
 
 class TestSimpleCommandRunner:

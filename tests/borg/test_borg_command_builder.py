@@ -4,8 +4,8 @@ Tests for BorgCommandBuilder - Borg command construction and validation
 import pytest
 from unittest.mock import patch, MagicMock
 
-from app.services.borg_command_builder import BorgCommandBuilder
-from app.models.database import Repository
+from services.borg_command_builder import BorgCommandBuilder
+from models.database import Repository
 
 
 class TestBorgCommandBuilder:

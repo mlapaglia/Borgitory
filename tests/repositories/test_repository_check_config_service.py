@@ -2,8 +2,8 @@
 Tests for RepositoryCheckConfigService - Business logic tests
 """
 import pytest
-from app.services.repositories.repository_check_config_service import RepositoryCheckConfigService
-from app.models.database import RepositoryCheckConfig, Repository
+from services.repositories.repository_check_config_service import RepositoryCheckConfigService
+from models.database import RepositoryCheckConfig, Repository
 
 
 @pytest.fixture

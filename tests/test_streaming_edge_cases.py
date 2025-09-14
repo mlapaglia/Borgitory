@@ -6,7 +6,7 @@ import uuid
 from unittest.mock import Mock, patch, AsyncMock
 import asyncio
 
-from app.services.jobs.job_stream_service import JobStreamService
+from services.jobs.job_stream_service import JobStreamService
 
 
 class TestStreamingErrorHandling:

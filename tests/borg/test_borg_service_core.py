@@ -3,8 +3,8 @@ Core tests for BorgService - focusing on critical security and functionality
 """
 from unittest.mock import Mock, patch, mock_open
 
-from app.services.borg_service import BorgService
-from app.models.database import Repository
+from services.borg_service import BorgService
+from models.database import Repository
 
 
 class TestBorgServiceCore:

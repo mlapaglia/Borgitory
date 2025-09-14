@@ -4,7 +4,7 @@ Tests for JobRenderService with clean dependency injection patterns.
 import pytest
 from unittest.mock import Mock
 
-from app.services.jobs.job_render_service import JobRenderService
+from services.jobs.job_render_service import JobRenderService
 from tests.fixtures.job_fixtures import (
     create_mock_job_context,
 )
@@ -140,7 +140,7 @@ class TestJobRenderService:
 
     def test_dependency_injection_service(self):
         """Test that dependency injection service works"""
-        from app.dependencies import get_job_render_service
+        from dependencies import get_job_render_service
 
         service = get_job_render_service()
         assert service is not None

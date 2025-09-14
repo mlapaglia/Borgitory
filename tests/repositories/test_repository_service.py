@@ -7,8 +7,8 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy.orm import Session
 
-from app.services.repositories.repository_service import RepositoryService
-from app.models.repository_dtos import (
+from services.repositories.repository_service import RepositoryService
+from models.repository_dtos import (
     CreateRepositoryRequest,
     ImportRepositoryRequest,
     RepositoryOperationResult,

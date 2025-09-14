@@ -3,7 +3,7 @@ Unit tests for path prefix utilities
 """
 import pytest
 
-from app.utils.path_prefix import (
+from utils.path_prefix import (
     normalize_path_with_mnt_prefix,
     parse_path_for_autocomplete,
     remove_mnt_prefix_for_display,

@@ -5,7 +5,7 @@ import pytest
 import asyncio
 from unittest.mock import patch
 
-from app.services.jobs.broadcaster.job_event_broadcaster import JobEventBroadcaster, EventType, JobEvent
+from services.jobs.broadcaster.job_event_broadcaster import JobEventBroadcaster, EventType, JobEvent
 
 
 class TestJobEventBroadcaster:

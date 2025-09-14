@@ -16,8 +16,8 @@ All tests use proper mocking to avoid external dependencies.
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, mock_open
 
-from app.services.borg_service import BorgService
-from app.models.database import Repository
+from services.borg_service import BorgService
+from models.database import Repository
 
 
 class TestBorgServiceCore:
@@ -197,7 +197,7 @@ class TestRepositoryOperations:
     @pytest.mark.asyncio
     async def test_initialize_repository_success(self):
         """Test successful repository initialization."""
-        from app.services.simple_command_runner import CommandResult
+        from services.simple_command_runner import CommandResult
         
         mock_command_result = CommandResult(
             success=True,
@@ -221,7 +221,7 @@ class TestRepositoryOperations:
     @pytest.mark.asyncio
     async def test_initialize_repository_already_exists(self):
         """Test repository initialization when repo already exists."""
-        from app.services.simple_command_runner import CommandResult
+        from services.simple_command_runner import CommandResult
         
         mock_command_result = CommandResult(
             success=False,
@@ -309,7 +309,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_success(self):
         """Test successful repository info retrieval."""
-        from app.services.jobs.job_executor import ProcessResult
+        from services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=0,
@@ -335,7 +335,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_command_failure(self):
         """Test repository info retrieval failure."""
-        from app.services.jobs.job_executor import ProcessResult
+        from services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=1,
@@ -361,7 +361,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_invalid_json(self):
         """Test handling of invalid JSON output."""
-        from app.services.jobs.job_executor import ProcessResult
+        from services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=0,
@@ -398,7 +398,7 @@ class TestListArchiveContents:
     @pytest.mark.asyncio
     async def test_list_archive_contents_success(self):
         """Test successful archive content listing."""
-        from app.services.jobs.job_executor import ProcessResult
+        from services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=0,
@@ -442,7 +442,7 @@ class TestListArchiveContents:
     @pytest.mark.asyncio
     async def test_list_archive_contents_command_failure(self):
         """Test archive content listing command failure."""
-        from app.services.jobs.job_executor import ProcessResult
+        from services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=1,

@@ -4,14 +4,14 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
-from app.services.backups.backup_executor import (
+from services.backups.backup_executor import (
     BackupExecutor,
     BackupConfig,
     PruneConfig,
     BackupResult,
     BackupStatus,
 )
-from app.models.database import Repository
+from models.database import Repository
 
 
 class TestBackupStatus:

@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock, Mock
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.services.debug_service import DebugService
+from services.debug_service import DebugService
 
 
 @pytest.fixture

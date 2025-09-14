@@ -4,8 +4,8 @@ Tests for RcloneService - Service for cloud backup synchronization using Rclone
 
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from app.services.rclone_service import RcloneService
-from app.models.database import Repository
+from services.rclone_service import RcloneService
+from models.database import Repository
 
 
 @pytest.fixture

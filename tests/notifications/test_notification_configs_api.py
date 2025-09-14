@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, AsyncMock
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 
-from app.models.schemas import NotificationConfigCreate
+from models.schemas import NotificationConfigCreate
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_create_config_success_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
         """Test successful config creation returns correct HTMX response."""
-        from app.api.notifications import create_notification_config
+        from api.notifications import create_notification_config
 
         # Mock successful service response
         mock_config = MagicMock()
@@ -96,7 +96,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_create_config_failure_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
         """Test failed config creation returns correct HTMX error response."""
-        from app.api.notifications import create_notification_config
+        from api.notifications import create_notification_config
 
         # Mock service failure
         mock_service.create_config.return_value = (False, None, "Failed to create notification configuration")
@@ -115,7 +115,7 @@ class TestNotificationConfigsAPI:
 
     def test_list_configs_success(self, mock_service):
         """Test listing configs returns service result."""
-        from app.api.notifications import list_notification_configs
+        from api.notifications import list_notification_configs
 
         mock_configs = [MagicMock(), MagicMock()]
         mock_service.get_all_configs.return_value = mock_configs
@@ -130,7 +130,7 @@ class TestNotificationConfigsAPI:
 
     def test_get_configs_html_success(self, mock_request, mock_templates, mock_service):
         """Test getting configs HTML returns correct template response."""
-        from app.api.notifications import get_notification_configs_html
+        from api.notifications import get_notification_configs_html
 
         mock_configs_data = [
             {"name": "config1", "notification_desc": "Success, Failures"},
@@ -150,7 +150,7 @@ class TestNotificationConfigsAPI:
 
     def test_get_configs_html_exception(self, mock_request, mock_templates, mock_service):
         """Test getting configs HTML with exception returns error template."""
-        from app.api.notifications import get_notification_configs_html
+        from api.notifications import get_notification_configs_html
 
         mock_service.get_configs_with_descriptions.side_effect = Exception("Service error")
 
@@ -162,7 +162,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_test_config_success_htmx_response(self, mock_request, mock_templates, mock_service, mock_pushover_service):
         """Test successful config test returns correct HTMX response."""
-        from app.api.notifications import test_notification_config
+        from api.notifications import test_notification_config
 
         # Mock successful service response
         mock_service.get_config_credentials.return_value = (True, "test-user", "test-token", None)
@@ -188,7 +188,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_test_config_not_found_htmx_response(self, mock_request, mock_templates, mock_service, mock_pushover_service):
         """Test testing non-existent config returns correct HTMX error response."""
-        from app.api.notifications import test_notification_config
+        from api.notifications import test_notification_config
 
         # Mock service failure
         mock_service.get_config_credentials.return_value = (False, None, None, "Notification configuration not found")
@@ -208,7 +208,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_test_config_pushover_failure_htmx_response(self, mock_request, mock_templates, mock_service, mock_pushover_service):
         """Test failed pushover test returns correct HTMX error response."""
-        from app.api.notifications import test_notification_config
+        from api.notifications import test_notification_config
 
         # Mock successful credential retrieval but failed test
         mock_service.get_config_credentials.return_value = (True, "test-user", "test-token", None)
@@ -229,7 +229,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_enable_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
         """Test successful config enable returns correct HTMX response."""
-        from app.api.notifications import enable_notification_config
+        from api.notifications import enable_notification_config
 
         mock_service.enable_config.return_value = (True, "Config enabled successfully!", None)
 
@@ -251,7 +251,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_enable_config_not_found_htmx_response(self, mock_request, mock_templates, mock_service):
         """Test enabling non-existent config returns correct HTMX error response."""
-        from app.api.notifications import enable_notification_config
+        from api.notifications import enable_notification_config
 
         mock_service.enable_config.return_value = (False, None, "Notification configuration not found")
 
@@ -268,7 +268,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_disable_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
         """Test successful config disable returns correct HTMX response."""
-        from app.api.notifications import disable_notification_config
+        from api.notifications import disable_notification_config
 
         mock_service.disable_config.return_value = (True, "Config disabled successfully!", None)
 
@@ -290,7 +290,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_get_edit_form_success_htmx_response(self, mock_request, mock_templates, mock_service):
         """Test getting edit form returns correct HTMX template response."""
-        from app.api.notifications import get_notification_config_edit_form
+        from api.notifications import get_notification_config_edit_form
 
         mock_config = MagicMock()
         mock_service.get_config_by_id.return_value = mock_config
@@ -317,7 +317,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_get_edit_form_not_found(self, mock_request, mock_templates, mock_service):
         """Test getting edit form for non-existent config raises HTTPException."""
-        from app.api.notifications import get_notification_config_edit_form
+        from api.notifications import get_notification_config_edit_form
         from fastapi import HTTPException
 
         mock_service.get_config_by_id.return_value = None
@@ -331,7 +331,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_update_config_success_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
         """Test successful config update returns correct HTMX response."""
-        from app.api.notifications import update_notification_config
+        from api.notifications import update_notification_config
 
         mock_config = MagicMock()
         mock_config.name = "updated-config"
@@ -365,7 +365,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_update_config_failure_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
         """Test failed config update returns correct HTMX error response."""
-        from app.api.notifications import update_notification_config
+        from api.notifications import update_notification_config
 
         mock_service.update_config.return_value = (False, None, "Notification configuration not found")
 
@@ -384,7 +384,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_get_notification_form_htmx_response(self, mock_request, mock_templates):
         """Test getting notification form returns correct HTMX template response."""
-        from app.api.notifications import get_notification_form
+        from api.notifications import get_notification_form
 
         await get_notification_form(mock_request, mock_templates)
 
@@ -398,7 +398,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_delete_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
         """Test successful config deletion returns correct HTMX response."""
-        from app.api.notifications import delete_notification_config
+        from api.notifications import delete_notification_config
 
         mock_service.delete_config.return_value = (True, "test-config", None)
 
@@ -420,7 +420,7 @@ class TestNotificationConfigsAPI:
     @pytest.mark.asyncio
     async def test_delete_config_failure_htmx_response(self, mock_request, mock_templates, mock_service):
         """Test failed config deletion returns correct HTMX error response."""
-        from app.api.notifications import delete_notification_config
+        from api.notifications import delete_notification_config
 
         mock_service.delete_config.return_value = (False, None, "Notification configuration not found")
 

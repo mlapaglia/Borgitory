@@ -6,8 +6,8 @@ import json
 from unittest.mock import Mock, AsyncMock, patch
 from typing import Dict, Any, List
 
-from app.services.repositories.repository_stats_service import RepositoryStatsService, CommandExecutorInterface
-from app.models.database import Repository
+from services.repositories.repository_stats_service import RepositoryStatsService, CommandExecutorInterface
+from models.database import Repository
 
 
 class MockCommandExecutor(CommandExecutorInterface):

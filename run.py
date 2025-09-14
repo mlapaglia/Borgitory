@@ -3,9 +3,13 @@
 Development server runner for Borgitory
 """
 import sys
+import os
 import subprocess
 import uvicorn
 from dotenv import load_dotenv
+
+# Add src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 def run_migrations():
     """Run database migrations before starting the app"""
@@ -44,7 +48,7 @@ if __name__ == "__main__":
     
     print("Starting Borgitory development server on port 8000")
     uvicorn.run(
-        "app.main:app",
+        "main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
 
-from app.services.scheduling.scheduler_service import SchedulerService
+from services.scheduling.scheduler_service import SchedulerService
 
 
 class TestSchedulerService:

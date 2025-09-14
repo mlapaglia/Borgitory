@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import Mock, patch
 from cryptography.fernet import Fernet, InvalidToken
 
-from app.models.database import (
+from models.database import (
     Repository, User, CloudSyncConfig, NotificationConfig,
     get_cipher_suite
 )
@@ -25,7 +25,7 @@ class TestCipherSuite:
         """Test that cipher suite is cached and reused."""
         with patch('app.config.get_secret_key', return_value='test_secret_key_32_characters_long!'):
             # Clear any existing cached instance
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             cipher1 = get_cipher_suite()
@@ -38,7 +38,7 @@ class TestCipherSuite:
         
         with patch('app.config.get_secret_key', return_value=test_secret):
             # Clear cached instance to force recreation
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             cipher = get_cipher_suite()
@@ -50,7 +50,7 @@ class TestCipherSuite:
         # Fernet keys must be 32 URL-safe base64-encoded bytes
         with patch('app.config.get_secret_key', return_value='short'):
             # Clear cached instance
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             # This should work because we hash the secret to get proper length
@@ -112,7 +112,7 @@ class TestRepositoryModel:
         # Use real cipher for full test
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
             # Clear cached cipher
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             repo = Repository(name="test", path="/test")
@@ -131,7 +131,7 @@ class TestRepositoryModel:
         unicode_passphrase = "pässwörd_with_ünicöde_çhars_日本語"
         
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             repo = Repository(name="test", path="/test")
@@ -143,7 +143,7 @@ class TestRepositoryModel:
     def test_passphrase_encryption_empty_string(self):
         """Test passphrase encryption with empty string."""
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             repo = Repository(name="test", path="/test")
@@ -169,7 +169,7 @@ class TestRepositoryModel:
         long_passphrase = "a" * 1000  # 1000 character passphrase
         
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             repo = Repository(name="test", path="/test")
@@ -372,7 +372,7 @@ class TestCloudSyncConfigModel:
         original_secret = "secretKeyExample123!@#"
         
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             config = CloudSyncConfig(name="test", provider="s3")
@@ -431,7 +431,7 @@ class TestNotificationConfigModel:
         original_app_token = "test_app_token_67890"
         
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             config = NotificationConfig(name="test", provider="pushover")
@@ -455,7 +455,7 @@ class TestEncryptionSecurity:
         test_data = "sensitive_information"
         
         with patch('app.config.get_secret_key', return_value='key1_32_chars_long_for_testing!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             repo1 = Repository(name="test1", path="/test1")
@@ -477,7 +477,7 @@ class TestEncryptionSecurity:
         test_data = "identical_data"
         
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             repo1 = Repository(name="test1", path="/test1")
@@ -498,7 +498,7 @@ class TestEncryptionSecurity:
         repo = Repository(name="test", path="/test")
         
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             # Set valid encrypted data first
@@ -516,7 +516,7 @@ class TestEncryptionSecurity:
         binary_like_data = "data_with_\x00_null_\xff_bytes"
         
         with patch('app.config.get_secret_key', return_value='test_key_32_chars_long_for_test!'):
-            import app.models.database
+            import models.database
             app.models.database._cipher_suite = None
             
             repo = Repository(name="test", path="/test")

@@ -6,8 +6,8 @@ import uuid
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, UTC
 
-from app.models.database import Job, JobTask
-from app.services.jobs.job_stream_service import JobStreamService
+from models.database import Job, JobTask
+from services.jobs.job_stream_service import JobStreamService
 
 
 class TestJobStreamingFixes:
@@ -167,7 +167,7 @@ class TestUUIDSystemFixes:
         """Test that Job model has UUID auto-generation configured"""
         # SQLAlchemy defaults only trigger during database operations
         # Test that the default is configured correctly
-        from app.models.database import Job
+        from models.database import Job
         
         # Check that the default function is set
         id_column = Job.__table__.columns['id']
@@ -235,7 +235,7 @@ class TestJobRenderServiceUUIDIntegration:
 
     def test_render_job_html_uses_uuid_as_primary_id(self, mock_job_with_uuid):
         """Test that job rendering uses UUID as primary identifier"""
-        from app.services.jobs.job_render_service import JobRenderService
+        from services.jobs.job_render_service import JobRenderService
         from unittest.mock import Mock
 
         mock_job_manager = Mock()
@@ -248,7 +248,7 @@ class TestJobRenderServiceUUIDIntegration:
 
     def test_render_job_html_skips_jobs_without_uuid(self):
         """Test that jobs without UUID are skipped"""
-        from app.services.jobs.job_render_service import JobRenderService
+        from services.jobs.job_render_service import JobRenderService
         from unittest.mock import Mock
 
         job_without_id = Mock()
@@ -262,7 +262,7 @@ class TestJobRenderServiceUUIDIntegration:
 
     def test_format_database_job_creates_context_with_uuid(self, mock_job_with_uuid):
         """Test that database job formatting creates context with UUID"""
-        from app.services.jobs.job_render_service import JobRenderService
+        from services.jobs.job_render_service import JobRenderService
         from unittest.mock import Mock
 
         mock_job_manager = Mock()

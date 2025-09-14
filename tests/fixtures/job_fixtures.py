@@ -10,8 +10,8 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock
 from typing import List
 
-from app.services.jobs.job_manager import BorgJob, BorgJobTask, JobManagerConfig
-from app.models.database import Repository, Job, JobTask
+from services.jobs.job_manager import BorgJob, BorgJobTask, JobManagerConfig
+from models.database import Repository, Job, JobTask
 
 
 @pytest.fixture
@@ -219,7 +219,7 @@ def create_mock_job_context(job_id: str = None, status: str = "completed",
 
     return {
         "job": mock_job,
-        "templates_dir": "app/templates",
+        "templates_dir": "src/templates",
         "current_task": tasks[0] if tasks else None,
         "show_output": False,
     }

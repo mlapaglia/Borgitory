@@ -6,8 +6,8 @@ import pytest
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime
-from app.services.recovery_service import RecoveryService
-from app.models.database import Repository, Job, JobTask
+from services.recovery_service import RecoveryService
+from models.database import Repository, Job, JobTask
 
 
 @pytest.fixture
