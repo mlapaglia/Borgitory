@@ -7,9 +7,9 @@ import json
 from unittest.mock import Mock, AsyncMock, patch
 from types import SimpleNamespace
 
-from app.services.archive_manager import ArchiveManager
+from app.services.archives.archive_manager import ArchiveManager
 from app.models.database import Repository
-from app.services.job_executor import JobExecutor
+from app.services.jobs.job_executor import JobExecutor
 from app.services.borg_command_builder import BorgCommandBuilder
 
 
@@ -173,7 +173,7 @@ class TestArchiveManager:
     ):
         """Test listing directory contents using FUSE mount."""
         with patch(
-            "app.services.archive_mount_manager.get_archive_mount_manager"
+            "app.services.archives.archive_mount_manager.get_archive_mount_manager"
         ) as mock_get_manager:
             mock_mount_manager = Mock()
             mock_mount_manager.mount_archive = AsyncMock()
@@ -505,10 +505,10 @@ class TestArchiveManager:
     def test_validate_archive_path_valid(self, archive_manager):
         """Test validation of valid archive name and path."""
         with patch(
-            "app.services.archive_manager.validate_archive_name"
+            "app.services.archives.archive_manager.validate_archive_name"
         ) as mock_validate_archive:
             with patch(
-                "app.services.archive_manager.sanitize_path"
+                "app.services.archives.archive_manager.sanitize_path"
             ) as mock_sanitize_path:
                 mock_validate_archive.return_value = None  # No exception means valid
                 mock_sanitize_path.return_value = "/safe/path"
@@ -524,10 +524,10 @@ class TestArchiveManager:
     def test_validate_archive_path_invalid(self, archive_manager):
         """Test validation with invalid archive name and path."""
         with patch(
-            "app.services.archive_manager.validate_archive_name"
+            "app.services.archives.archive_manager.validate_archive_name"
         ) as mock_validate_archive:
             with patch(
-                "app.services.archive_manager.sanitize_path"
+                "app.services.archives.archive_manager.sanitize_path"
             ) as mock_sanitize_path:
                 mock_validate_archive.side_effect = Exception("Invalid archive name")
                 mock_sanitize_path.side_effect = Exception("Unsafe path")

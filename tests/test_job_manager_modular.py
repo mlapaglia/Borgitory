@@ -5,11 +5,11 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from datetime import datetime, UTC
 
-from app.services.job_manager import (
+from app.services.jobs.job_manager import (
     JobManager,
     BorgJob
 )
-from app.services.job_manager import (
+from app.services.jobs.job_manager import (
     JobManagerConfig,
     JobManagerFactory
 )

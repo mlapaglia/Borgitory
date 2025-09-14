@@ -24,7 +24,7 @@ class TestArchiveBrowserHTMX:
         test_db.commit()
 
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import ArchiveListingResult, ArchiveInfo
 
         mock_archives = [
@@ -79,7 +79,7 @@ class TestArchiveBrowserHTMX:
         test_db.commit()
 
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import ArchiveListingResult
 
         # Create mock empty result
@@ -122,7 +122,7 @@ class TestArchiveBrowserHTMX:
         test_db.commit()
 
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import ArchiveListingResult
 
         # Create mock error result
@@ -162,7 +162,7 @@ class TestArchiveBrowserHTMX:
     async def test_list_archives_htmx_not_found(self, async_client: AsyncClient):
         """Test listing archives for non-existent repository."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import ArchiveListingResult
 
         # Create mock not found result

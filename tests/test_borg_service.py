@@ -303,7 +303,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_success(self):
         """Test successful repository info retrieval."""
-        from app.services.job_executor import ProcessResult
+        from app.services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=0,
@@ -329,7 +329,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_command_failure(self):
         """Test repository info retrieval failure."""
-        from app.services.job_executor import ProcessResult
+        from app.services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=1,
@@ -355,7 +355,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_invalid_json(self):
         """Test handling of invalid JSON output."""
-        from app.services.job_executor import ProcessResult
+        from app.services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=0,
@@ -392,7 +392,7 @@ class TestListArchiveContents:
     @pytest.mark.asyncio
     async def test_list_archive_contents_success(self):
         """Test successful archive content listing."""
-        from app.services.job_executor import ProcessResult
+        from app.services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=0,
@@ -436,7 +436,7 @@ class TestListArchiveContents:
     @pytest.mark.asyncio
     async def test_list_archive_contents_command_failure(self):
         """Test archive content listing command failure."""
-        from app.services.job_executor import ProcessResult
+        from app.services.jobs.job_executor import ProcessResult
         
         mock_process_result = ProcessResult(
             return_code=1,

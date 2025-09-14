@@ -7,9 +7,9 @@ from datetime import datetime, UTC
 from typing import Dict, List, Optional
 
 from app.models.database import Repository, Job
-from app.services.job_executor import JobExecutor
+from app.services.jobs.job_executor import JobExecutor
 from app.services.simple_command_runner import SimpleCommandRunner
-from app.services.job_manager import (
+from app.services.jobs.job_manager import (
     get_job_manager,
 )  # Keep for backup operations that need job tracking
 from app.utils.db_session import get_db_session
@@ -488,7 +488,7 @@ class BorgService:
         """List contents of a specific directory within an archive using FUSE mount"""
         # Use the archive manager which now uses FUSE mounting
         if not hasattr(self, "_archive_manager"):
-            from app.services.archive_manager import ArchiveManager
+            from app.services.archives.archive_manager import ArchiveManager
 
             self._archive_manager = ArchiveManager()
 

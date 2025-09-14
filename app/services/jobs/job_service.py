@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.database import Repository, Job
 from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
-from app.services.job_manager import JobManager, get_job_manager
+from app.services.jobs.job_manager import JobManager, get_job_manager
 from app.services.task_definition_builder import TaskDefinitionBuilder
 
 logger = logging.getLogger(__name__)

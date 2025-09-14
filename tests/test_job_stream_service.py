@@ -8,7 +8,7 @@ from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi.responses import StreamingResponse
 
-from app.services.job_stream_service import JobStreamService
+from app.services.jobs.job_stream_service import JobStreamService
 
 
 class TestJobStreamService:

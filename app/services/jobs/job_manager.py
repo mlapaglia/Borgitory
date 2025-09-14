@@ -13,11 +13,11 @@ from datetime import datetime, UTC
 from typing import Dict, Optional, List, AsyncGenerator, Any, Callable, TYPE_CHECKING
 from dataclasses import dataclass, field
 
-from app.services.job_executor import JobExecutor
-from app.services.job_output_manager import JobOutputManager
-from app.services.job_queue_manager import JobQueueManager, JobPriority
-from app.services.job_event_broadcaster import JobEventBroadcaster, EventType
-from app.services.job_database_manager import JobDatabaseManager, DatabaseJobData
+from app.services.jobs.job_executor import JobExecutor
+from app.services.jobs.job_output_manager import JobOutputManager
+from app.services.jobs.job_queue_manager import JobQueueManager, JobPriority
+from app.services.jobs.job_event_broadcaster import JobEventBroadcaster, EventType
+from app.services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
 from app.services.cloud_backup_coordinator import CloudBackupCoordinator
 from app.utils.db_session import get_db_session
 

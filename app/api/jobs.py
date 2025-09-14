@@ -5,7 +5,7 @@ from app.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from app.models.enums import JobType
 from app.dependencies import JobServiceDep, BackupServiceDep
 from app.dependencies import JobStreamServiceDep, JobRenderServiceDep
-from app.services.job_manager import JobManager, get_job_manager
+from app.services.jobs.job_manager import JobManager, get_job_manager
 from app.dependencies import TemplatesDep
 
 logger = logging.getLogger(__name__)

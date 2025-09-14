@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy.orm import Session
 
-from app.services.repository_service import RepositoryService
+from app.services.repositories.repository_service import RepositoryService
 from app.models.repository_dtos import (
     CreateRepositoryRequest,
     ImportRepositoryRequest,
@@ -89,7 +89,7 @@ class TestRepositoryService:
         mock_db_session.commit = Mock()
         mock_db_session.refresh = Mock(side_effect=lambda x: setattr(x, 'id', 123))
 
-        with patch('app.services.repository_service.Repository', return_value=mock_repo):
+        with patch('app.services.repositories.repository_service.Repository', return_value=mock_repo):
             # Act
             result = await repository_service.create_repository(request, mock_db_session)
 
@@ -153,7 +153,7 @@ class TestRepositoryService:
         mock_repo = Mock()
         mock_repo.name = "test-repo"
 
-        with patch('app.services.repository_service.Repository', return_value=mock_repo):
+        with patch('app.services.repositories.repository_service.Repository', return_value=mock_repo):
             # Act
             result = await repository_service.create_repository(request, mock_db_session)
 
@@ -230,7 +230,7 @@ class TestRepositoryService:
         mock_db_session.query.side_effect = [repo_query, jobs_query]
 
         with patch.multiple(
-            'app.services.repository_service',
+            'app.services.repositories.repository_service',
             Repository=Mock(),
             Job=Mock(),
         ):
@@ -268,7 +268,7 @@ class TestRepositoryService:
         mock_repo.id = 124
         mock_repo.name = "imported-repo"
 
-        with patch('app.services.repository_service.Repository', return_value=mock_repo):
+        with patch('app.services.repositories.repository_service.Repository', return_value=mock_repo):
             # Act
             result = await repository_service.import_repository(request, mock_db_session)
 

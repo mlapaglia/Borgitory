@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.models.database import Job
 from app.models.enums import JobType
-from app.services.job_manager import JobManager, get_job_manager
+from app.services.jobs.job_manager import JobManager, get_job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +187,12 @@ class JobRenderService:
         # Check if this job has tasks (regardless of job_type for backward compatibility)
         is_composite = job.tasks and len(job.tasks) > 0
 
+        # Debug logging
+        logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks, is_composite={is_composite}")
+        if job.tasks:
+            for i, task in enumerate(job.tasks):
+                logger.info(f"  Task {i}: {task.task_name} ({task.task_type}) - {task.status}")
+
         # Job header
         job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
         if is_composite:
@@ -296,8 +302,14 @@ class JobRenderService:
                 job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "N/A"
             )
 
-            # Check if this is a composite job
-            is_composite = job.job_type == "composite" and job.tasks
+            # Check if this job has tasks (regardless of job_type for backward compatibility)
+            is_composite = job.tasks and len(job.tasks) > 0
+
+            # Debug logging
+            logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks, is_composite={is_composite}")
+            if job.tasks:
+                for i, task in enumerate(job.tasks):
+                    logger.info(f"  Task {i}: {task.task_name} ({task.task_type}) - {task.status}")
 
             # Job header
             job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"

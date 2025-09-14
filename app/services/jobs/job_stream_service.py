@@ -4,7 +4,7 @@ import logging
 from typing import AsyncGenerator, Dict, Any, Optional
 from fastapi.responses import StreamingResponse
 
-from app.services.job_manager import JobManager, get_job_manager
+from app.services.jobs.job_manager import JobManager, get_job_manager
 
 logger = logging.getLogger(__name__)
 

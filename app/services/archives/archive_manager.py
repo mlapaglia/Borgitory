@@ -8,7 +8,7 @@ import logging
 from typing import Dict, List, Optional, AsyncGenerator
 
 from app.models.database import Repository
-from app.services.job_executor import JobExecutor
+from app.services.jobs.job_executor import JobExecutor
 from app.services.borg_command_builder import BorgCommandBuilder
 from app.utils.security import validate_archive_name, sanitize_path
 
@@ -87,7 +87,7 @@ class ArchiveManager:
             f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
         )
 
-        from app.services.archive_mount_manager import get_archive_mount_manager
+        from app.services.archives.archive_mount_manager import get_archive_mount_manager
 
         mount_manager = get_archive_mount_manager()
 

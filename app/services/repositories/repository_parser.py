@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 
 from app.models.database import Repository
 from app.services.simple_command_runner import SimpleCommandRunner
-from app.services.job_manager import get_job_manager
+from app.services.jobs.job_manager import get_job_manager
 from app.utils.security import build_secure_borg_command
 
 logger = logging.getLogger(__name__)

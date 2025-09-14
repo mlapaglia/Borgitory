@@ -300,7 +300,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.job_service.JobService.create_backup_job', new_callable=AsyncMock) as mock_create_job:
+             patch('app.services.jobs.job_service.JobService.create_backup_job', new_callable=AsyncMock) as mock_create_job:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             mock_create_job.return_value = {"job_id": "job-uuid-123", "status": "started"}
@@ -360,7 +360,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.side_effect = mock_query_side_effect
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.job_service.JobService') as mock_job_service_class:
+             patch('app.services.jobs.job_service.JobService') as mock_job_service_class:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             
@@ -423,7 +423,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.side_effect = mock_query_side_effect
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.job_service.JobService') as mock_job_service_class:
+             patch('app.services.jobs.job_service.JobService') as mock_job_service_class:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             
@@ -466,7 +466,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.job_service.JobService') as mock_job_service_class:
+             patch('app.services.jobs.job_service.JobService') as mock_job_service_class:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             
@@ -541,7 +541,7 @@ class TestExecuteScheduledBackup:
         mock_db.query.return_value.filter.return_value.first.return_value = mock_schedule
         
         with patch('app.services.scheduler_service.get_db_session') as mock_get_db, \
-             patch('app.services.job_service.JobService') as mock_job_service_class:
+             patch('app.services.jobs.job_service.JobService') as mock_job_service_class:
             
             mock_get_db.return_value.__enter__.return_value = mock_db
             

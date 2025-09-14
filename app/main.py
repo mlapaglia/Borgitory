@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
         await scheduler_service.start()
         logger.info("Scheduler started")
 
-        from app.services.archive_mount_manager import get_archive_mount_manager
+        from app.services.archives.archive_mount_manager import get_archive_mount_manager
 
         mount_manager = get_archive_mount_manager()
 

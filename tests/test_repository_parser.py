@@ -7,7 +7,7 @@ import os
 from unittest.mock import Mock, AsyncMock, patch, mock_open
 from types import SimpleNamespace
 
-from app.services.repository_parser import RepositoryParser
+from app.services.repositories.repository_parser import RepositoryParser
 from app.models.database import Repository
 from app.services.simple_command_runner import SimpleCommandRunner
 
@@ -196,7 +196,7 @@ class TestRepositoryParser:
     async def test_start_repository_scan_default_path(self, repository_parser):
         """Test starting repository scan with default path."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.start_borg_command = AsyncMock(return_value="job-123")
@@ -214,7 +214,7 @@ class TestRepositoryParser:
     async def test_start_repository_scan_custom_path(self, repository_parser):
         """Test starting repository scan with custom path."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.start_borg_command = AsyncMock(return_value="job-456")
@@ -231,7 +231,7 @@ class TestRepositoryParser:
     async def test_start_repository_scan_error(self, repository_parser):
         """Test repository scan startup error."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.start_borg_command = AsyncMock(
@@ -248,7 +248,7 @@ class TestRepositoryParser:
     async def test_check_scan_status_success(self, repository_parser):
         """Test checking scan status for existing job."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.get_job_status.return_value = {
@@ -270,7 +270,7 @@ class TestRepositoryParser:
     async def test_check_scan_status_not_found(self, repository_parser):
         """Test checking scan status for non-existent job."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.get_job_status.return_value = None
@@ -287,7 +287,7 @@ class TestRepositoryParser:
     async def test_check_scan_status_exception(self, repository_parser):
         """Test scan status check with exception."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_get_manager.side_effect = Exception("Job manager error")
 
@@ -301,7 +301,7 @@ class TestRepositoryParser:
     async def test_get_scan_results_success(self, repository_parser):
         """Test getting scan results for completed job."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.get_job_status.return_value = {
@@ -331,7 +331,7 @@ class TestRepositoryParser:
     async def test_get_scan_results_not_completed(self, repository_parser):
         """Test getting scan results for incomplete job."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.get_job_status.return_value = {
@@ -349,7 +349,7 @@ class TestRepositoryParser:
     async def test_get_scan_results_with_errors(self, repository_parser):
         """Test getting scan results for job with errors."""
         with patch(
-            "app.services.repository_parser.get_job_manager"
+            "app.services.repositories.repository_parser.get_job_manager"
         ) as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.get_job_status.return_value = {
@@ -519,7 +519,7 @@ class TestRepositoryParser:
     ):
         """Test successful repository access verification."""
         with patch(
-            "app.services.repository_parser.build_secure_borg_command"
+            "app.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info"],
@@ -527,7 +527,7 @@ class TestRepositoryParser:
             )
 
             with patch(
-                "app.services.repository_parser.get_job_manager"
+                "app.services.repositories.repository_parser.get_job_manager"
             ) as mock_get_manager:
                 mock_job_manager = Mock()
                 mock_job_manager.start_borg_command = AsyncMock(
@@ -555,7 +555,7 @@ class TestRepositoryParser:
     ):
         """Test repository access verification with wrong passphrase."""
         with patch(
-            "app.services.repository_parser.build_secure_borg_command"
+            "app.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info"],
@@ -563,7 +563,7 @@ class TestRepositoryParser:
             )
 
             with patch(
-                "app.services.repository_parser.get_job_manager"
+                "app.services.repositories.repository_parser.get_job_manager"
             ) as mock_get_manager:
                 mock_job_manager = Mock()
                 mock_job_manager.start_borg_command = AsyncMock(
@@ -591,7 +591,7 @@ class TestRepositoryParser:
     ):
         """Test repository access verification for non-existent repository."""
         with patch(
-            "app.services.repository_parser.build_secure_borg_command"
+            "app.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info"],
@@ -599,7 +599,7 @@ class TestRepositoryParser:
             )
 
             with patch(
-                "app.services.repository_parser.get_job_manager"
+                "app.services.repositories.repository_parser.get_job_manager"
             ) as mock_get_manager:
                 mock_job_manager = Mock()
                 mock_job_manager.start_borg_command = AsyncMock(
@@ -627,7 +627,7 @@ class TestRepositoryParser:
     ):
         """Test repository access verification timeout."""
         with patch(
-            "app.services.repository_parser.build_secure_borg_command"
+            "app.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info"],
@@ -635,7 +635,7 @@ class TestRepositoryParser:
             )
 
             with patch(
-                "app.services.repository_parser.get_job_manager"
+                "app.services.repositories.repository_parser.get_job_manager"
             ) as mock_get_manager:
                 mock_job_manager = Mock()
                 mock_job_manager.start_borg_command = AsyncMock(
@@ -664,7 +664,7 @@ class TestRepositoryParser:
     ):
         """Test repository access verification with security validation error."""
         with patch(
-            "app.services.repository_parser.build_secure_borg_command"
+            "app.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.side_effect = Exception("Security validation failed")
 
@@ -679,7 +679,7 @@ class TestRepositoryParser:
     ):
         """Test repository access verification when job is not found."""
         with patch(
-            "app.services.repository_parser.build_secure_borg_command"
+            "app.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info"],
@@ -687,7 +687,7 @@ class TestRepositoryParser:
             )
 
             with patch(
-                "app.services.repository_parser.get_job_manager"
+                "app.services.repositories.repository_parser.get_job_manager"
             ) as mock_get_manager:
                 mock_job_manager = Mock()
                 mock_job_manager.start_borg_command = AsyncMock(
@@ -758,7 +758,7 @@ class TestRepositoryParser:
     ):
         """Test repository verification with custom passphrase."""
         with patch(
-            "app.services.repository_parser.build_secure_borg_command"
+            "app.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info"],
@@ -766,7 +766,7 @@ class TestRepositoryParser:
             )
 
             with patch(
-                "app.services.repository_parser.get_job_manager"
+                "app.services.repositories.repository_parser.get_job_manager"
             ) as mock_get_manager:
                 mock_job_manager = Mock()
                 mock_job_manager.start_borg_command = AsyncMock(

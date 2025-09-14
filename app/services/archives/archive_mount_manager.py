@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from app.models.database import Repository
 from app.utils.security import build_secure_borg_command
-from app.services.job_executor import JobExecutor
+from app.services.jobs.job_executor import JobExecutor
 
 logger = logging.getLogger(__name__)
 

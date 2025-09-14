@@ -5,7 +5,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.services.job_executor import JobExecutor
+from app.services.jobs.job_executor import JobExecutor
 
 
 class TestJobExecutor:

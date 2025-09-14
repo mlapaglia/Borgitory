@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, UTC
 
-from app.services.job_render_service import JobRenderService
+from app.services.jobs.job_render_service import JobRenderService
 from app.models.database import Job, JobTask
 
 
@@ -11,7 +11,7 @@ class TestJobRenderService:
     
     def setup_method(self):
         """Set up test fixtures"""
-        with patch('app.services.job_render_service.get_job_manager') as mock_get_manager:
+        with patch('app.services.jobs.job_render_service.get_job_manager') as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.jobs = {}
             mock_get_manager.return_value = mock_job_manager
@@ -522,7 +522,7 @@ class TestJobRenderServiceStatusStyling:
     
     def setup_method(self):
         """Set up test fixtures"""
-        with patch('app.services.job_render_service.get_job_manager') as mock_get_manager:
+        with patch('app.services.jobs.job_render_service.get_job_manager') as mock_get_manager:
             mock_job_manager = Mock()
             mock_job_manager.jobs = {}
             mock_get_manager.return_value = mock_job_manager
@@ -619,8 +619,8 @@ class TestJobRenderServiceSSE:
 
     def setup_method(self):
         """Set up test fixtures"""
-        from app.services.job_manager import JobManager
-        from app.services.job_render_service import JobRenderService
+        from app.services.jobs.job_manager import JobManager
+        from app.services.jobs.job_render_service import JobRenderService
         
         # Create mock job manager
         self.mock_job_manager = Mock(spec=JobManager)

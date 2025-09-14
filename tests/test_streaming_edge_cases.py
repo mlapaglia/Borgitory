@@ -6,7 +6,7 @@ import uuid
 from unittest.mock import Mock, patch, AsyncMock
 import asyncio
 
-from app.services.job_stream_service import JobStreamService
+from app.services.jobs.job_stream_service import JobStreamService
 
 
 class TestStreamingErrorHandling:
@@ -330,7 +330,7 @@ class TestBackwardCompatibilityEdgeCases:
 
     def test_job_context_handles_missing_attributes(self):
         """Test that job context handles missing attributes gracefully"""
-        from app.services.job_render_service import JobRenderService
+        from app.services.jobs.job_render_service import JobRenderService
         
         # Create job with minimal attributes
         minimal_job = Mock()

@@ -10,30 +10,30 @@ from app.models.database import get_db
 
 from app.services.simple_command_runner import SimpleCommandRunner
 from app.services.borg_service import BorgService
-from app.services.job_service import JobService
+from app.services.jobs.job_service import JobService
 from app.services.backup_service import BackupService
 from app.services.recovery_service import RecoveryService
 from app.services.pushover_service import PushoverService
-from app.services.job_stream_service import JobStreamService
-from app.services.job_render_service import JobRenderService
+from app.services.jobs.job_stream_service import JobStreamService
+from app.services.jobs.job_render_service import JobRenderService
 from app.services.debug_service import DebugService
 from app.services.rclone_service import RcloneService
-from app.services.repository_stats_service import RepositoryStatsService
+from app.services.repositories.repository_stats_service import RepositoryStatsService
 from app.services.scheduler_service import SchedulerService
 from app.services.task_definition_builder import TaskDefinitionBuilder
 from app.services.volume_service import VolumeService
-from app.services.repository_parser import RepositoryParser
+from app.services.repositories.repository_parser import RepositoryParser
 from app.services.borg_command_builder import BorgCommandBuilder
-from app.services.archive_manager import ArchiveManager
+from app.services.archives.archive_manager import ArchiveManager
 from app.services.cloud_sync_manager import CloudSyncManager
-from app.services.repository_service import RepositoryService
-from app.services.job_event_broadcaster import (
+from app.services.repositories.repository_service import RepositoryService
+from app.services.jobs.job_event_broadcaster import (
     JobEventBroadcaster,
     get_job_event_broadcaster,
 )
 from app.services.schedule_service import ScheduleService
 from app.services.configuration_service import ConfigurationService
-from app.services.repository_check_config_service import RepositoryCheckConfigService
+from app.services.repositories.repository_check_config_service import RepositoryCheckConfigService
 from app.services.notification_config_service import NotificationConfigService
 from app.services.cleanup_service import CleanupService
 from fastapi.templating import Jinja2Templates
@@ -267,7 +267,7 @@ def get_archive_manager() -> ArchiveManager:
     """
     global _archive_manager_instance
     if _archive_manager_instance is None:
-        from app.services.job_executor import JobExecutor
+        from app.services.jobs.job_executor import JobExecutor
 
         job_executor = JobExecutor()
         command_builder = get_borg_command_builder()

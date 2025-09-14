@@ -68,7 +68,7 @@ class TestRepositoriesAPI:
     async def test_scan_repositories_success(self, async_client: AsyncClient):
         """Test successful repository scanning."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import RepositoryScanResult, ScannedRepository
 
         # Create mock result that matches the DTO structure
@@ -118,7 +118,7 @@ class TestRepositoriesAPI:
     async def test_scan_repositories_htmx_response(self, async_client: AsyncClient):
         """Test repository scanning with HTMX request."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import RepositoryScanResult, ScannedRepository
 
         # Create mock result
@@ -160,7 +160,7 @@ class TestRepositoriesAPI:
     async def test_scan_repositories_service_error(self, async_client: AsyncClient):
         """Test repository scanning with service error."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import RepositoryScanResult
 
         # Create mock result with error
@@ -191,7 +191,7 @@ class TestRepositoriesAPI:
     async def test_scan_repositories_htmx_error(self, async_client: AsyncClient):
         """Test repository scanning error with HTMX."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import RepositoryScanResult
 
         # Create mock result with error
@@ -486,7 +486,7 @@ class TestRepositoriesAPI:
     async def test_import_repository_success(self, async_client: AsyncClient, test_db: Session):
         """Test successful repository import."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import RepositoryOperationResult
 
         # Create mock success result
@@ -525,7 +525,7 @@ class TestRepositoriesAPI:
     async def test_import_repository_htmx_success(self, async_client: AsyncClient, test_db: Session):
         """Test successful repository import via HTMX."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import RepositoryOperationResult
 
         # Create mock success result
@@ -589,7 +589,7 @@ class TestRepositoriesAPI:
     async def test_import_repository_with_keyfile(self, async_client: AsyncClient, test_db: Session):
         """Test repository import with keyfile."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import RepositoryOperationResult
 
         keyfile_content = b"fake-keyfile-content"
@@ -629,7 +629,7 @@ class TestRepositoriesAPI:
     async def test_import_repository_verification_failure(self, async_client: AsyncClient, test_db: Session):
         """Test repository import with verification failure."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import RepositoryOperationResult
 
         # Create mock failure result
@@ -717,7 +717,7 @@ class TestRepositoriesAPI:
     async def test_delete_repository_success(self, async_client: AsyncClient, test_db: Session):
         """Test deleting repository."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import DeleteRepositoryResult
 
         # Create mock success result
@@ -748,7 +748,7 @@ class TestRepositoriesAPI:
     async def test_delete_repository_not_found(self, async_client: AsyncClient):
         """Test deleting non-existent repository."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import DeleteRepositoryResult
 
         # Create mock not found result
@@ -801,7 +801,7 @@ class TestRepositoriesAPI:
     async def test_delete_repository_schedule_cleanup(self, async_client: AsyncClient, test_db: Session):
         """Test repository deletion cleans up schedules."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import DeleteRepositoryResult
 
         # Create mock success result with schedule cleanup
@@ -834,7 +834,7 @@ class TestRepositoriesAPI:
     async def test_list_archives_repository_not_found(self, async_client: AsyncClient):
         """Test listing archives for non-existent repository."""
         from app.dependencies import get_repository_service
-        from app.services.repository_service import RepositoryService
+        from app.services.repositories.repository_service import RepositoryService
         from app.models.repository_dtos import ArchiveListingResult
 
         # Create mock not found result
@@ -1089,7 +1089,7 @@ class TestRepositoriesAPI:
     async def test_get_stats_content_no_repository(self, async_client: AsyncClient):
         """Test getting stats content without repository ID shows empty state."""
         from app.dependencies import get_repository_stats_service
-        from app.services.repository_stats_service import RepositoryStatsService
+        from app.services.repositories.repository_stats_service import RepositoryStatsService
         
         # Mock the stats service
         mock_stats_service = AsyncMock(spec=RepositoryStatsService)
@@ -1110,7 +1110,7 @@ class TestRepositoriesAPI:
     async def test_get_stats_content_with_repository(self, async_client: AsyncClient, test_db: Session):
         """Test getting stats content with valid repository ID."""
         from app.dependencies import get_repository_stats_service
-        from app.services.repository_stats_service import RepositoryStatsService
+        from app.services.repositories.repository_stats_service import RepositoryStatsService
         
         # Create test repository
         repo = Repository(name="stats-test-repo", path="/tmp/stats-test")
@@ -1162,7 +1162,7 @@ class TestRepositoriesAPI:
     async def test_get_stats_content_repository_not_found(self, async_client: AsyncClient):
         """Test getting stats content with non-existent repository ID."""
         from app.dependencies import get_repository_stats_service
-        from app.services.repository_stats_service import RepositoryStatsService
+        from app.services.repositories.repository_stats_service import RepositoryStatsService
         
         # Mock the stats service
         mock_stats_service = AsyncMock(spec=RepositoryStatsService)
@@ -1182,7 +1182,7 @@ class TestRepositoriesAPI:
     async def test_get_repository_statistics_direct(self, async_client: AsyncClient, test_db: Session):
         """Test the direct repository statistics endpoint."""
         from app.dependencies import get_repository_stats_service
-        from app.services.repository_stats_service import RepositoryStatsService
+        from app.services.repositories.repository_stats_service import RepositoryStatsService
         
         # Create test repository
         repo = Repository(name="direct-stats-repo", path="/tmp/direct-stats")
@@ -1240,7 +1240,7 @@ class TestRepositoriesAPI:
     async def test_get_repository_statistics_not_found(self, async_client: AsyncClient):
         """Test repository statistics endpoint with non-existent repository."""
         from app.dependencies import get_repository_stats_service
-        from app.services.repository_stats_service import RepositoryStatsService
+        from app.services.repositories.repository_stats_service import RepositoryStatsService
         
         # Mock the stats service
         mock_stats_service = AsyncMock(spec=RepositoryStatsService)
@@ -1265,7 +1265,7 @@ class TestRepositoriesAPI:
         was being passed instead of the actual database session.
         """
         from app.dependencies import get_repository_stats_service
-        from app.services.repository_stats_service import RepositoryStatsService
+        from app.services.repositories.repository_stats_service import RepositoryStatsService
         
         # Create test repository
         repo = Repository(name="regression-test-repo", path="/tmp/regression-test")

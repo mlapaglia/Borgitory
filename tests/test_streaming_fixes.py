@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, UTC
 
 from app.models.database import Job, JobTask
-from app.services.job_stream_service import JobStreamService
+from app.services.jobs.job_stream_service import JobStreamService
 
 
 class TestJobStreamingFixes:
@@ -233,7 +233,7 @@ class TestJobRenderServiceUUIDIntegration:
 
     def test_render_job_html_uses_uuid_as_primary_id(self, mock_job_with_uuid):
         """Test that job rendering uses UUID as primary identifier"""
-        from app.services.job_render_service import JobRenderService
+        from app.services.jobs.job_render_service import JobRenderService
         
         service = JobRenderService()
         html = service._render_job_html(mock_job_with_uuid)
@@ -244,7 +244,7 @@ class TestJobRenderServiceUUIDIntegration:
 
     def test_render_job_html_skips_jobs_without_uuid(self):
         """Test that jobs without UUID are skipped"""
-        from app.services.job_render_service import JobRenderService
+        from app.services.jobs.job_render_service import JobRenderService
         
         job_without_id = Mock()
         job_without_id.id = None
@@ -256,7 +256,7 @@ class TestJobRenderServiceUUIDIntegration:
 
     def test_format_database_job_creates_context_with_uuid(self, mock_job_with_uuid):
         """Test that database job formatting creates context with UUID"""
-        from app.services.job_render_service import JobRenderService
+        from app.services.jobs.job_render_service import JobRenderService
         
         service = JobRenderService()
         result = service._format_database_job_for_render(mock_job_with_uuid)
@@ -308,7 +308,7 @@ class TestBackwardCompatibility:
 
     def test_job_context_maintains_job_uuid_field(self):
         """Test that job context still provides job_uuid for template compatibility"""
-        from app.services.job_render_service import JobRenderService
+        from app.services.jobs.job_render_service import JobRenderService
         
         mock_job = Mock()
         mock_job.id = str(uuid.uuid4())
