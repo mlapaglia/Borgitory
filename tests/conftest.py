@@ -21,6 +21,7 @@ from app.main import app
 from app.models.database import Base, get_db
 
 # Import all models to ensure they're registered with Base
+# Import job fixtures to make them available to all tests
 
 
 @pytest.fixture(scope="session")
