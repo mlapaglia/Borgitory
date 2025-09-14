@@ -38,6 +38,10 @@ from app.utils.secure_path import (
     user_secure_isdir,
     user_get_directory_listing,
 )
+from app.utils.path_prefix import (
+    normalize_path_with_mnt_prefix,
+    parse_path_for_autocomplete,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -150,34 +154,11 @@ async def list_directories_autocomplete(
             input_value = form_data.get(param_name, "")
             break
     
-    # Automatically prepend /mnt/ to the user input if not already present
-    if input_value and not input_value.startswith('/mnt/'):
-        # If user input starts with /, replace it with /mnt/
-        if input_value.startswith('/'):
-            input_value = '/mnt' + input_value
-        else:
-            # If user input doesn't start with /, prepend /mnt/
-            input_value = '/mnt/' + input_value
-    elif not input_value:
-        input_value = '/mnt/'
+    # Normalize the path with /mnt/ prefix
+    normalized_path = normalize_path_with_mnt_prefix(input_value)
     
-    # Parse the input value to extract directory path and search term
-    if not input_value or not input_value.startswith('/'):
-        dir_path = '/mnt/'
-        search_term = ''
-    else:
-        last_slash_index = input_value.rfind('/')
-        if last_slash_index == 0:
-            # Input like "/re" - search in root directory
-            dir_path = '/'
-            search_term = input_value[1:]
-        elif last_slash_index > 0:
-            # Input like "/mnt/repos/my" - search in "/mnt/repos"
-            dir_path = input_value[:last_slash_index]
-            search_term = input_value[last_slash_index + 1:]
-        else:
-            dir_path = '/mnt/'
-            search_term = input_value
+    # Parse the normalized path to get directory and search term
+    dir_path, search_term = parse_path_for_autocomplete(normalized_path)
     
     try:
         if not user_secure_exists(dir_path):
@@ -201,7 +182,7 @@ async def list_directories_autocomplete(
                 "directories": directories, 
                 "search_term": search_term,
                 "target_input": target_input,
-                "input_value": input_value
+                "input_value": normalized_path
             }
         )
 
