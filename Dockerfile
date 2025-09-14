@@ -37,8 +37,6 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH=/app/src
 
 COPY src/ ./src/
-COPY src/static/ ./static/
-COPY src/templates/ ./templates/
 COPY tests/ ./tests/
 COPY alembic/ ./alembic/
 COPY alembic.ini lint.py ./
@@ -61,8 +59,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 
 COPY src/ ./src/
-COPY src/static/ ./static/
-COPY src/templates/ ./templates/
 COPY alembic/ ./alembic/
 COPY alembic.ini start.sh ./
 
