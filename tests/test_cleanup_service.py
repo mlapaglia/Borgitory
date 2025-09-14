@@ -1,6 +1,7 @@
 """
 Tests for CleanupService - Business logic tests
 """
+
 import pytest
 from unittest.mock import patch
 
@@ -21,7 +22,7 @@ def sample_repository(test_db):
     repository = Repository(
         name="test-repo",
         path="/tmp/test-repo",
-        encrypted_passphrase="test-encrypted-passphrase"
+        encrypted_passphrase="test-encrypted-passphrase",
     )
     test_db.add(repository)
     test_db.commit()
@@ -40,17 +41,14 @@ class TestCleanupService:
     def test_get_cleanup_configs_with_data(self, service, test_db):
         """Test getting cleanup configs with data."""
         config1 = CleanupConfig(
-            name="config-1",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+            name="config-1", strategy="simple", keep_within_days=30, enabled=True
         )
         config2 = CleanupConfig(
             name="config-2",
             strategy="advanced",
             keep_daily=7,
             keep_weekly=4,
-            enabled=False
+            enabled=False,
         )
         test_db.add_all([config1, config2])
         test_db.commit()
@@ -65,10 +63,7 @@ class TestCleanupService:
         """Test getting cleanup configs with pagination."""
         for i in range(5):
             config = CleanupConfig(
-                name=f"config-{i}",
-                strategy="simple",
-                keep_within_days=30,
-                enabled=True
+                name=f"config-{i}", strategy="simple", keep_within_days=30, enabled=True
             )
             test_db.add(config)
         test_db.commit()
@@ -79,10 +74,7 @@ class TestCleanupService:
     def test_get_cleanup_config_by_id_success(self, service, test_db):
         """Test getting cleanup config by ID successfully."""
         config = CleanupConfig(
-            name="test-config",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+            name="test-config", strategy="simple", keep_within_days=30, enabled=True
         )
         test_db.add(config)
         test_db.commit()
@@ -95,15 +87,15 @@ class TestCleanupService:
 
     def test_get_cleanup_config_by_id_not_found(self, service):
         """Test getting non-existent cleanup config raises exception."""
-        with pytest.raises(Exception, match="Cleanup configuration with id 999 not found"):
+        with pytest.raises(
+            Exception, match="Cleanup configuration with id 999 not found"
+        ):
             service.get_cleanup_config_by_id(999)
 
     def test_create_cleanup_config_success(self, service, test_db):
         """Test successful cleanup config creation."""
         config_data = CleanupConfigCreate(
-            name="new-config",
-            strategy="simple",
-            keep_within_days=30
+            name="new-config", strategy="simple", keep_within_days=30
         )
 
         success, config, error = service.create_cleanup_config(config_data)
@@ -116,27 +108,24 @@ class TestCleanupService:
         assert config.enabled is True
 
         # Verify saved to database
-        saved_config = test_db.query(CleanupConfig).filter(
-            CleanupConfig.name == "new-config"
-        ).first()
+        saved_config = (
+            test_db.query(CleanupConfig)
+            .filter(CleanupConfig.name == "new-config")
+            .first()
+        )
         assert saved_config is not None
         assert saved_config.strategy == "simple"
 
     def test_create_cleanup_config_duplicate_name(self, service, test_db):
         """Test cleanup config creation with duplicate name."""
         existing_config = CleanupConfig(
-            name="duplicate-name",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+            name="duplicate-name", strategy="simple", keep_within_days=30, enabled=True
         )
         test_db.add(existing_config)
         test_db.commit()
 
         config_data = CleanupConfigCreate(
-            name="duplicate-name",
-            strategy="advanced",
-            keep_daily=7
+            name="duplicate-name", strategy="advanced", keep_daily=7
         )
 
         success, config, error = service.create_cleanup_config(config_data)
@@ -148,12 +137,10 @@ class TestCleanupService:
     def test_create_cleanup_config_database_error(self, service, test_db):
         """Test cleanup config creation with database error."""
         config_data = CleanupConfigCreate(
-            name="error-config",
-            strategy="simple",
-            keep_within_days=30
+            name="error-config", strategy="simple", keep_within_days=30
         )
 
-        with patch.object(test_db, 'commit', side_effect=Exception("Database error")):
+        with patch.object(test_db, "commit", side_effect=Exception("Database error")):
             success, config, error = service.create_cleanup_config(config_data)
 
             assert success is False
@@ -163,21 +150,17 @@ class TestCleanupService:
     def test_update_cleanup_config_success(self, service, test_db):
         """Test successful cleanup config update."""
         config = CleanupConfig(
-            name="original-config",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+            name="original-config", strategy="simple", keep_within_days=30, enabled=True
         )
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
 
-        config_update = CleanupConfigUpdate(
-            name="updated-config",
-            keep_within_days=60
-        )
+        config_update = CleanupConfigUpdate(name="updated-config", keep_within_days=60)
 
-        success, updated_config, error = service.update_cleanup_config(config.id, config_update)
+        success, updated_config, error = service.update_cleanup_config(
+            config.id, config_update
+        )
 
         assert success is True
         assert error is None
@@ -197,23 +180,19 @@ class TestCleanupService:
     def test_update_cleanup_config_duplicate_name(self, service, test_db):
         """Test updating cleanup config with duplicate name."""
         config1 = CleanupConfig(
-            name="config-1",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+            name="config-1", strategy="simple", keep_within_days=30, enabled=True
         )
         config2 = CleanupConfig(
-            name="config-2",
-            strategy="advanced",
-            keep_daily=7,
-            enabled=True
+            name="config-2", strategy="advanced", keep_daily=7, enabled=True
         )
         test_db.add_all([config1, config2])
         test_db.commit()
 
         config_update = CleanupConfigUpdate(name="config-2")
 
-        success, config, error = service.update_cleanup_config(config1.id, config_update)
+        success, config, error = service.update_cleanup_config(
+            config1.id, config_update
+        )
 
         assert success is False
         assert config is None
@@ -222,10 +201,7 @@ class TestCleanupService:
     def test_enable_cleanup_config_success(self, service, test_db):
         """Test successfully enabling cleanup config."""
         config = CleanupConfig(
-            name="test-config",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=False
+            name="test-config", strategy="simple", keep_within_days=30, enabled=False
         )
         test_db.add(config)
         test_db.commit()
@@ -248,10 +224,7 @@ class TestCleanupService:
     def test_disable_cleanup_config_success(self, service, test_db):
         """Test successfully disabling cleanup config."""
         config = CleanupConfig(
-            name="test-config",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+            name="test-config", strategy="simple", keep_within_days=30, enabled=True
         )
         test_db.add(config)
         test_db.commit()
@@ -274,10 +247,7 @@ class TestCleanupService:
     def test_delete_cleanup_config_success(self, service, test_db):
         """Test successful cleanup config deletion."""
         config = CleanupConfig(
-            name="test-config",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+            name="test-config", strategy="simple", keep_within_days=30, enabled=True
         )
         test_db.add(config)
         test_db.commit()
@@ -291,9 +261,9 @@ class TestCleanupService:
         assert error is None
 
         # Verify removed from database
-        deleted_config = test_db.query(CleanupConfig).filter(
-            CleanupConfig.id == config_id
-        ).first()
+        deleted_config = (
+            test_db.query(CleanupConfig).filter(CleanupConfig.id == config_id).first()
+        )
         assert deleted_config is None
 
     def test_delete_cleanup_config_not_found(self, service):
@@ -307,10 +277,7 @@ class TestCleanupService:
     def test_get_configs_with_descriptions_simple_strategy(self, service, test_db):
         """Test getting configs with descriptions for simple strategy."""
         config = CleanupConfig(
-            name="simple-config",
-            strategy="simple",
-            keep_within_days=30,
-            enabled=True
+            name="simple-config", strategy="simple", keep_within_days=30, enabled=True
         )
         test_db.add(config)
         test_db.commit()
@@ -329,7 +296,7 @@ class TestCleanupService:
             keep_weekly=4,
             keep_monthly=12,
             keep_yearly=2,
-            enabled=True
+            enabled=True,
         )
         test_db.add(config)
         test_db.commit()
@@ -347,7 +314,7 @@ class TestCleanupService:
             strategy="advanced",
             keep_daily=7,
             keep_monthly=12,
-            enabled=True
+            enabled=True,
         )
         test_db.add(config)
         test_db.commit()
@@ -360,11 +327,7 @@ class TestCleanupService:
 
     def test_get_configs_with_descriptions_no_rules(self, service, test_db):
         """Test getting configs with descriptions for no retention rules."""
-        config = CleanupConfig(
-            name="empty-config",
-            strategy="advanced",
-            enabled=True
-        )
+        config = CleanupConfig(name="empty-config", strategy="advanced", enabled=True)
         test_db.add(config)
         test_db.commit()
 
@@ -375,7 +338,9 @@ class TestCleanupService:
 
     def test_get_configs_with_descriptions_error_handling(self, service):
         """Test error handling in get_configs_with_descriptions."""
-        with patch.object(service, 'get_cleanup_configs', side_effect=Exception("Database error")):
+        with patch.object(
+            service, "get_cleanup_configs", side_effect=Exception("Database error")
+        ):
             result = service.get_configs_with_descriptions()
             assert result == []
 
@@ -389,7 +354,7 @@ class TestCleanupService:
 
     def test_get_form_data_error_handling(self, service, test_db):
         """Test error handling in get_form_data."""
-        with patch.object(test_db, 'query', side_effect=Exception("Database error")):
+        with patch.object(test_db, "query", side_effect=Exception("Database error")):
             result = service.get_form_data()
             assert result == {"repositories": []}
 
@@ -397,19 +362,17 @@ class TestCleanupService:
         """Test complete cleanup config lifecycle: create, update, enable/disable, delete."""
         # Create
         config_data = CleanupConfigCreate(
-            name="lifecycle-test",
-            strategy="simple",
-            keep_within_days=30
+            name="lifecycle-test", strategy="simple", keep_within_days=30
         )
         success, created_config, error = service.create_cleanup_config(config_data)
         assert success is True
         config_id = created_config.id
 
         # Update
-        config_update = CleanupConfigUpdate(
-            keep_within_days=60
+        config_update = CleanupConfigUpdate(keep_within_days=60)
+        success, updated_config, error = service.update_cleanup_config(
+            config_id, config_update
         )
-        success, updated_config, error = service.update_cleanup_config(config_id, config_update)
         assert success is True
         assert updated_config.keep_within_days == 60
 
@@ -429,7 +392,7 @@ class TestCleanupService:
         assert config_name == "lifecycle-test"
 
         # Verify completely removed
-        deleted_config = test_db.query(CleanupConfig).filter(
-            CleanupConfig.id == config_id
-        ).first()
+        deleted_config = (
+            test_db.query(CleanupConfig).filter(CleanupConfig.id == config_id).first()
+        )
         assert deleted_config is None

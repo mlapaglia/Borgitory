@@ -1,8 +1,11 @@
 """
 Tests for RepositoryCheckConfigService - Business logic tests
 """
+
 import pytest
-from services.repositories.repository_check_config_service import RepositoryCheckConfigService
+from services.repositories.repository_check_config_service import (
+    RepositoryCheckConfigService,
+)
 from models.database import RepositoryCheckConfig, Repository
 
 
@@ -18,7 +21,7 @@ def sample_repository(test_db):
     repository = Repository(
         name="test-repo",
         path="/tmp/test-repo",
-        encrypted_passphrase="test-encrypted-passphrase"
+        encrypted_passphrase="test-encrypted-passphrase",
     )
     test_db.add(repository)
     test_db.commit()
@@ -36,7 +39,7 @@ def sample_config(test_db):
         verify_data=False,
         repair_mode=False,
         save_space=False,
-        enabled=True
+        enabled=True,
     )
     test_db.add(config)
     test_db.commit()
@@ -55,16 +58,13 @@ class TestRepositoryCheckConfigService:
     def test_get_all_configs_with_data(self, service, test_db):
         """Test getting configs with data."""
         config1 = RepositoryCheckConfig(
-            name="config-1",
-            description="First config",
-            check_type="full",
-            enabled=True
+            name="config-1", description="First config", check_type="full", enabled=True
         )
         config2 = RepositoryCheckConfig(
             name="config-2",
             description="Second config",
             check_type="repository_only",
-            enabled=False
+            enabled=False,
         )
         test_db.add(config1)
         test_db.add(config2)
@@ -94,14 +94,10 @@ class TestRepositoryCheckConfigService:
     def test_get_enabled_configs_only(self, service, test_db):
         """Test getting only enabled configs."""
         enabled_config = RepositoryCheckConfig(
-            name="enabled-config",
-            check_type="full",
-            enabled=True
+            name="enabled-config", check_type="full", enabled=True
         )
         disabled_config = RepositoryCheckConfig(
-            name="disabled-config",
-            check_type="full",
-            enabled=False
+            name="disabled-config", check_type="full", enabled=False
         )
         test_db.add(enabled_config)
         test_db.add(disabled_config)
@@ -149,7 +145,7 @@ class TestRepositoryCheckConfigService:
             archive_prefix="test-",
             archive_glob="*.tar",
             first_n_archives=5,
-            last_n_archives=10
+            last_n_archives=10,
         )
 
         assert success is True
@@ -168,9 +164,11 @@ class TestRepositoryCheckConfigService:
         assert config.enabled is True  # Default value
 
         # Verify saved to database
-        saved_config = test_db.query(RepositoryCheckConfig).filter(
-            RepositoryCheckConfig.name == "new-config"
-        ).first()
+        saved_config = (
+            test_db.query(RepositoryCheckConfig)
+            .filter(RepositoryCheckConfig.name == "new-config")
+            .first()
+        )
         assert saved_config is not None
         assert saved_config.check_type == "repository_only"
 
@@ -178,7 +176,7 @@ class TestRepositoryCheckConfigService:
         """Test config creation with duplicate name."""
         success, config, error = service.create_config(
             name="test-config",  # Same as sample_config
-            check_type="full"
+            check_type="full",
         )
 
         assert success is False
@@ -187,9 +185,7 @@ class TestRepositoryCheckConfigService:
 
     def test_create_config_minimal_data(self, service):
         """Test config creation with minimal required data."""
-        success, config, error = service.create_config(
-            name="minimal-config"
-        )
+        success, config, error = service.create_config(name="minimal-config")
 
         assert success is True
         assert error is None
@@ -204,7 +200,7 @@ class TestRepositoryCheckConfigService:
             "description": "Updated description",
             "check_type": "repository_only",
             "verify_data": True,
-            "max_duration": 7200
+            "max_duration": 7200,
         }
 
         success, updated_config, error = service.update_config(
@@ -222,9 +218,7 @@ class TestRepositoryCheckConfigService:
 
     def test_update_config_not_found(self, service):
         """Test updating non-existent config."""
-        success, config, error = service.update_config(
-            999, {"name": "new-name"}
-        )
+        success, config, error = service.update_config(999, {"name": "new-name"})
 
         assert success is False
         assert config is None
@@ -233,10 +227,7 @@ class TestRepositoryCheckConfigService:
     def test_update_config_name_conflict(self, service, test_db, sample_config):
         """Test updating config name to an existing name."""
         # Create another config
-        other_config = RepositoryCheckConfig(
-            name="other-config",
-            check_type="full"
-        )
+        other_config = RepositoryCheckConfig(name="other-config", check_type="full")
         test_db.add(other_config)
         test_db.commit()
 
@@ -263,9 +254,7 @@ class TestRepositoryCheckConfigService:
         """Test successful config enabling."""
         # Create disabled config
         config = RepositoryCheckConfig(
-            name="disabled-config",
-            check_type="full",
-            enabled=False
+            name="disabled-config", check_type="full", enabled=False
         )
         test_db.add(config)
         test_db.commit()
@@ -294,9 +283,7 @@ class TestRepositoryCheckConfigService:
         """Test successful config disabling."""
         # Create enabled config
         config = RepositoryCheckConfig(
-            name="enabled-config",
-            check_type="full",
-            enabled=True
+            name="enabled-config", check_type="full", enabled=True
         )
         test_db.add(config)
         test_db.commit()
@@ -333,9 +320,11 @@ class TestRepositoryCheckConfigService:
         assert error is None
 
         # Verify removed from database
-        deleted_config = test_db.query(RepositoryCheckConfig).filter(
-            RepositoryCheckConfig.id == config_id
-        ).first()
+        deleted_config = (
+            test_db.query(RepositoryCheckConfig)
+            .filter(RepositoryCheckConfig.id == config_id)
+            .first()
+        )
         assert deleted_config is None
 
     def test_delete_config_not_found(self, service):
@@ -350,14 +339,10 @@ class TestRepositoryCheckConfigService:
         """Test getting form data successfully."""
         # Create some configs
         enabled_config = RepositoryCheckConfig(
-            name="enabled-config",
-            check_type="full",
-            enabled=True
+            name="enabled-config", check_type="full", enabled=True
         )
         disabled_config = RepositoryCheckConfig(
-            name="disabled-config",
-            check_type="full",
-            enabled=False
+            name="disabled-config", check_type="full", enabled=False
         )
         test_db.add(enabled_config)
         test_db.add(disabled_config)
@@ -391,7 +376,7 @@ class TestRepositoryCheckConfigService:
         success, created_config, error = service.create_config(
             name="lifecycle-test",
             description="Test config lifecycle",
-            check_type="full"
+            check_type="full",
         )
         assert success is True
         config_id = created_config.id
@@ -418,7 +403,9 @@ class TestRepositoryCheckConfigService:
         assert config_name == "lifecycle-test"
 
         # Verify completely removed
-        deleted_config = test_db.query(RepositoryCheckConfig).filter(
-            RepositoryCheckConfig.id == config_id
-        ).first()
+        deleted_config = (
+            test_db.query(RepositoryCheckConfig)
+            .filter(RepositoryCheckConfig.id == config_id)
+            .first()
+        )
         assert deleted_config is None

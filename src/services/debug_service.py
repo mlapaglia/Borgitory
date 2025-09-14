@@ -156,6 +156,7 @@ class DebugService:
             else:
                 # Fallback: use direct import (for backward compatibility)
                 from dependencies import get_volume_service
+
                 volume_service = get_volume_service()
                 volume_info = await volume_service.get_volume_info()
                 mounted_volumes = volume_info.get("mounted_volumes", [])
@@ -291,7 +292,11 @@ class DebugService:
         try:
             if not self.job_manager:
                 # Return minimal info if no job manager injected
-                return {"status": "No job manager available", "active_jobs": 0, "total_jobs": 0}
+                return {
+                    "status": "No job manager available",
+                    "active_jobs": 0,
+                    "total_jobs": 0,
+                }
 
             # Count active jobs by checking job statuses
             active_jobs_count = 0

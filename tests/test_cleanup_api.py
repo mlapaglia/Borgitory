@@ -40,26 +40,23 @@ def mock_service():
 def sample_config_create():
     """Sample config creation data"""
     return CleanupConfigCreate(
-        name="test-config",
-        strategy="simple",
-        keep_within_days=30
+        name="test-config", strategy="simple", keep_within_days=30
     )
 
 
 @pytest.fixture
 def sample_config_update():
     """Sample config update data"""
-    return CleanupConfigUpdate(
-        name="updated-config",
-        keep_within_days=60
-    )
+    return CleanupConfigUpdate(name="updated-config", keep_within_days=60)
 
 
 class TestCleanupAPI:
     """Test class for API endpoints focusing on HTMX responses."""
 
     @pytest.mark.asyncio
-    async def test_get_cleanup_form_success(self, mock_request, mock_templates, mock_service):
+    async def test_get_cleanup_form_success(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting cleanup form returns correct template response."""
         from api.cleanup import get_cleanup_form
 
@@ -107,7 +104,9 @@ class TestCleanupAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_create_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
+    async def test_create_cleanup_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_create
+    ):
         """Test successful config creation returns correct HTMX response."""
         from api.cleanup import create_cleanup_config
 
@@ -134,12 +133,18 @@ class TestCleanupAPI:
         assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_create_cleanup_config_failure_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
+    async def test_create_cleanup_config_failure_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_create
+    ):
         """Test failed config creation returns correct HTMX error response."""
         from api.cleanup import create_cleanup_config
 
         # Mock service failure
-        mock_service.create_cleanup_config.return_value = (False, None, "Failed to create cleanup configuration")
+        mock_service.create_cleanup_config.return_value = (
+            False,
+            None,
+            "Failed to create cleanup configuration",
+        )
 
         await create_cleanup_config(
             mock_request, sample_config_create, mock_templates, mock_service
@@ -168,13 +173,15 @@ class TestCleanupAPI:
         # Verify result is returned
         assert result == mock_configs
 
-    def test_get_cleanup_configs_html_success(self, mock_request, mock_templates, mock_service):
+    def test_get_cleanup_configs_html_success(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting configs HTML returns correct template response."""
         from api.cleanup import get_cleanup_configs_html
 
         mock_configs_data = [
             {"name": "config1", "description": "Keep archives within 30 days"},
-            {"name": "config2", "description": "7 daily, 4 weekly"}
+            {"name": "config2", "description": "7 daily, 4 weekly"},
         ]
         mock_service.get_configs_with_descriptions.return_value = mock_configs_data
 
@@ -188,11 +195,15 @@ class TestCleanupAPI:
             "partials/cleanup/config_list_content.html"
         )
 
-    def test_get_cleanup_configs_html_exception(self, mock_request, mock_templates, mock_service):
+    def test_get_cleanup_configs_html_exception(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting configs HTML with exception returns error template."""
         from api.cleanup import get_cleanup_configs_html
 
-        mock_service.get_configs_with_descriptions.side_effect = Exception("Service error")
+        mock_service.get_configs_with_descriptions.side_effect = Exception(
+            "Service error"
+        )
 
         get_cleanup_configs_html(mock_request, mock_templates, mock_service)
 
@@ -200,7 +211,9 @@ class TestCleanupAPI:
         mock_templates.get_template.assert_called_with("partials/jobs/error_state.html")
 
     @pytest.mark.asyncio
-    async def test_enable_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_enable_cleanup_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test successful config enable returns correct HTMX response."""
         from api.cleanup import enable_cleanup_config
 
@@ -208,7 +221,9 @@ class TestCleanupAPI:
         mock_config.name = "test-config"
         mock_service.enable_cleanup_config.return_value = (True, mock_config, None)
 
-        result = await enable_cleanup_config(mock_request, 1, mock_templates, mock_service)
+        result = await enable_cleanup_config(
+            mock_request, 1, mock_templates, mock_service
+        )
 
         # Verify service was called
         mock_service.enable_cleanup_config.assert_called_once_with(1)
@@ -224,11 +239,17 @@ class TestCleanupAPI:
         assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_enable_cleanup_config_not_found_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_enable_cleanup_config_not_found_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test enabling non-existent config returns correct HTMX error response."""
         from api.cleanup import enable_cleanup_config
 
-        mock_service.enable_cleanup_config.return_value = (False, None, "Cleanup configuration not found")
+        mock_service.enable_cleanup_config.return_value = (
+            False,
+            None,
+            "Cleanup configuration not found",
+        )
 
         await enable_cleanup_config(mock_request, 999, mock_templates, mock_service)
 
@@ -241,7 +262,9 @@ class TestCleanupAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_disable_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_disable_cleanup_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test successful config disable returns correct HTMX response."""
         from api.cleanup import disable_cleanup_config
 
@@ -249,7 +272,9 @@ class TestCleanupAPI:
         mock_config.name = "test-config"
         mock_service.disable_cleanup_config.return_value = (True, mock_config, None)
 
-        result = await disable_cleanup_config(mock_request, 1, mock_templates, mock_service)
+        result = await disable_cleanup_config(
+            mock_request, 1, mock_templates, mock_service
+        )
 
         # Verify service was called
         mock_service.disable_cleanup_config.assert_called_once_with(1)
@@ -265,11 +290,17 @@ class TestCleanupAPI:
         assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_disable_cleanup_config_not_found_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_disable_cleanup_config_not_found_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test disabling non-existent config returns correct HTMX error response."""
         from api.cleanup import disable_cleanup_config
 
-        mock_service.disable_cleanup_config.return_value = (False, None, "Cleanup configuration not found")
+        mock_service.disable_cleanup_config.return_value = (
+            False,
+            None,
+            "Cleanup configuration not found",
+        )
 
         await disable_cleanup_config(mock_request, 999, mock_templates, mock_service)
 
@@ -282,14 +313,18 @@ class TestCleanupAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_cleanup_config_edit_form_success(self, mock_request, mock_templates, mock_service):
+    async def test_get_cleanup_config_edit_form_success(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting edit form returns correct template response."""
         from api.cleanup import get_cleanup_config_edit_form
 
         mock_config = MagicMock()
         mock_service.get_cleanup_config_by_id.return_value = mock_config
 
-        await get_cleanup_config_edit_form(mock_request, 1, mock_templates, mock_service)
+        await get_cleanup_config_edit_form(
+            mock_request, 1, mock_templates, mock_service
+        )
 
         # Verify service was called
         mock_service.get_cleanup_config_by_id.assert_called_once_with(1)
@@ -305,7 +340,9 @@ class TestCleanupAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_cleanup_config_edit_form_not_found(self, mock_request, mock_templates, mock_service):
+    async def test_get_cleanup_config_edit_form_not_found(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting edit form for non-existent config raises HTTPException."""
         from api.cleanup import get_cleanup_config_edit_form
         from fastapi import HTTPException
@@ -313,13 +350,17 @@ class TestCleanupAPI:
         mock_service.get_cleanup_config_by_id.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_cleanup_config_edit_form(mock_request, 999, mock_templates, mock_service)
+            await get_cleanup_config_edit_form(
+                mock_request, 999, mock_templates, mock_service
+            )
 
         assert exc_info.value.status_code == 404
         assert "Cleanup configuration not found" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
-    async def test_update_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_update):
+    async def test_update_cleanup_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_update
+    ):
         """Test successful config update returns correct HTMX response."""
         from api.cleanup import update_cleanup_config
 
@@ -332,7 +373,9 @@ class TestCleanupAPI:
         )
 
         # Verify service was called with correct parameters
-        mock_service.update_cleanup_config.assert_called_once_with(1, sample_config_update)
+        mock_service.update_cleanup_config.assert_called_once_with(
+            1, sample_config_update
+        )
 
         # Verify HTMX success template response
         mock_templates.TemplateResponse.assert_called_once_with(
@@ -345,11 +388,17 @@ class TestCleanupAPI:
         assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_update_cleanup_config_failure_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_update):
+    async def test_update_cleanup_config_failure_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_update
+    ):
         """Test failed config update returns correct HTMX error response."""
         from api.cleanup import update_cleanup_config
 
-        mock_service.update_cleanup_config.return_value = (False, None, "Cleanup configuration not found")
+        mock_service.update_cleanup_config.return_value = (
+            False,
+            None,
+            "Cleanup configuration not found",
+        )
 
         await update_cleanup_config(
             mock_request, 999, sample_config_update, mock_templates, mock_service
@@ -364,13 +413,17 @@ class TestCleanupAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_delete_cleanup_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_delete_cleanup_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test successful config deletion returns correct HTMX response."""
         from api.cleanup import delete_cleanup_config
 
         mock_service.delete_cleanup_config.return_value = (True, "test-config", None)
 
-        result = await delete_cleanup_config(mock_request, 1, mock_templates, mock_service)
+        result = await delete_cleanup_config(
+            mock_request, 1, mock_templates, mock_service
+        )
 
         # Verify service was called
         mock_service.delete_cleanup_config.assert_called_once_with(1)
@@ -386,11 +439,17 @@ class TestCleanupAPI:
         assert result.headers["HX-Trigger"] == "cleanupConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_delete_cleanup_config_failure_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_delete_cleanup_config_failure_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test failed config deletion returns correct HTMX error response."""
         from api.cleanup import delete_cleanup_config
 
-        mock_service.delete_cleanup_config.return_value = (False, None, "Cleanup configuration not found")
+        mock_service.delete_cleanup_config.return_value = (
+            False,
+            None,
+            "Cleanup configuration not found",
+        )
 
         await delete_cleanup_config(mock_request, 999, mock_templates, mock_service)
 

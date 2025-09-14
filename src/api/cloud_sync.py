@@ -29,8 +29,8 @@ def get_cloud_sync_service(db: Session = Depends(get_db)) -> CloudSyncService:
 
 @router.get("/add-form", response_class=HTMLResponse)
 async def get_add_form(
-    request: Request,
-    templates: Jinja2Templates = Depends(get_templates)) -> HTMLResponse:
+    request: Request, templates: Jinja2Templates = Depends(get_templates)
+) -> HTMLResponse:
     """Get the add form (for cancel functionality)"""
     return templates.TemplateResponse(request, "partials/cloud_sync/add_form.html", {})
 
@@ -39,7 +39,8 @@ async def get_add_form(
 async def get_provider_fields(
     request: Request,
     provider: str = "",
-    templates: Jinja2Templates = Depends(get_templates)) -> HTMLResponse:
+    templates: Jinja2Templates = Depends(get_templates),
+) -> HTMLResponse:
     """Get dynamic provider fields based on selection"""
     context = {
         "provider": provider,

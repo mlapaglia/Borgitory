@@ -16,7 +16,10 @@ from dataclasses import dataclass, field
 from services.jobs.job_executor import JobExecutor
 from services.jobs.job_output_manager import JobOutputManager
 from services.jobs.job_queue_manager import JobQueueManager, JobPriority
-from services.jobs.broadcaster.job_event_broadcaster import JobEventBroadcaster, EventType
+from services.jobs.broadcaster.job_event_broadcaster import (
+    JobEventBroadcaster,
+    EventType,
+)
 from services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
 from services.cloud_backup_coordinator import CloudBackupCoordinator
 from utils.db_session import get_db_session
@@ -127,7 +130,6 @@ class BorgJob:
         return None
 
 
-
 class JobManagerFactory:
     """Factory for creating job manager instances with proper dependency injection"""
 
@@ -204,6 +206,7 @@ class JobManagerFactory:
             deps.pushover_service = custom_dependencies.pushover_service
         else:
             from services.notifications.pushover_service import PushoverService
+
             deps.pushover_service = PushoverService()
 
         # Job Database Manager
@@ -320,7 +323,7 @@ class JobManager:
             task_type="command",
             task_name=f"Execute: {command_str}",
             status="queued" if is_backup else "running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
 
         # Create composite job (all jobs are now composite)
@@ -330,7 +333,7 @@ class JobManager:
             job_type="composite",  # All jobs are now composite
             status="queued" if is_backup else "running",
             started_at=datetime.now(UTC),
-            tasks=[main_task]  # Always has at least one task
+            tasks=[main_task],  # Always has at least one task
         )
         self.jobs[job_id] = job
 
@@ -352,7 +355,11 @@ class JobManager:
         return job_id
 
     async def _execute_composite_task(
-        self, job: BorgJob, task: BorgJobTask, command: List[str], env: Optional[Dict] = None
+        self,
+        job: BorgJob,
+        task: BorgJobTask,
+        command: List[str],
+        env: Optional[Dict] = None,
     ):
         """Execute a single task within a composite job"""
         job.status = "running"
@@ -390,7 +397,10 @@ class JobManager:
                 job.status = "completed"
             else:
                 task.status = "failed"
-                task.error = result.error or f"Process failed with return code {result.return_code}"
+                task.error = (
+                    result.error
+                    or f"Process failed with return code {result.return_code}"
+                )
                 job.status = "failed"
                 job.error = task.error
 
@@ -568,15 +578,23 @@ class JobManager:
                     # Update task in database BEFORE checking if we should break
                     if self.database_manager:
                         try:
-                            logger.info(f"Saving task {task.task_type} to database - Status: {task.status}, Return Code: {task.return_code}, Output Lines: {len(task.output_lines)}")
-                            await self.database_manager.save_job_tasks(job.id, job.tasks)
-                            logger.info(f"Successfully saved task {task.task_type} to database")
+                            logger.info(
+                                f"Saving task {task.task_type} to database - Status: {task.status}, Return Code: {task.return_code}, Output Lines: {len(task.output_lines)}"
+                            )
+                            await self.database_manager.save_job_tasks(
+                                job.id, job.tasks
+                            )
+                            logger.info(
+                                f"Successfully saved task {task.task_type} to database"
+                            )
                         except Exception as e:
                             logger.error(f"Failed to update tasks in database: {e}")
 
                     # If task failed and it's critical, stop the job
                     if task.status == "failed" and task.task_type in ["backup"]:
-                        logger.error(f"Critical task {task.task_type} failed, stopping job")
+                        logger.error(
+                            f"Critical task {task.task_type} failed, stopping job"
+                        )
                         break
 
                 except Exception as e:
@@ -594,9 +612,15 @@ class JobManager:
                     # Update task in database for exception case too
                     if self.database_manager:
                         try:
-                            logger.info(f"Saving exception task {task.task_type} to database - Status: {task.status}, Return Code: {task.return_code}, Output Lines: {len(task.output_lines)}")
-                            await self.database_manager.save_job_tasks(job.id, job.tasks)
-                            logger.info(f"Successfully saved exception task {task.task_type} to database")
+                            logger.info(
+                                f"Saving exception task {task.task_type} to database - Status: {task.status}, Return Code: {task.return_code}, Output Lines: {len(task.output_lines)}"
+                            )
+                            await self.database_manager.save_job_tasks(
+                                job.id, job.tasks
+                            )
+                            logger.info(
+                                f"Successfully saved exception task {task.task_type} to database"
+                            )
                         except Exception as db_e:
                             logger.error(f"Failed to update tasks in database: {db_e}")
 
@@ -630,9 +654,11 @@ class JobManager:
                 if job.status == "completed"
                 else EventType.JOB_FAILED,
                 job_id=job.id,
-                data={"status": job.status, "completed_at": job.completed_at.isoformat()},
+                data={
+                    "status": job.status,
+                    "completed_at": job.completed_at.isoformat(),
+                },
             )
-
 
         except Exception as e:
             job.status = "failed"
@@ -649,8 +675,9 @@ class JobManager:
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
             )
 
-
-    async def _execute_simple_job(self, job: BorgJob, command: List[str], env: Optional[Dict] = None):
+    async def _execute_simple_job(
+        self, job: BorgJob, command: List[str], env: Optional[Dict] = None
+    ):
         """Execute a simple single-command job (for test compatibility)"""
         job.status = "running"
 
@@ -704,7 +731,9 @@ class JobManager:
             if job.id in self._processes:
                 del self._processes[job.id]
 
-    async def _execute_backup_task(self, job: BorgJob, task: BorgJobTask, task_index: int = 0) -> bool:
+    async def _execute_backup_task(
+        self, job: BorgJob, task: BorgJobTask, task_index: int = 0
+    ) -> bool:
         """Execute a backup task using JobExecutor"""
         try:
             from utils.security import build_secure_borg_command
@@ -726,21 +755,31 @@ class JobManager:
             def task_output_callback(line: str, progress: Dict):
                 task.output_lines.append(line)
                 asyncio.create_task(
-                    self.output_manager.add_output_line(job.id, line, "stdout", progress)
+                    self.output_manager.add_output_line(
+                        job.id, line, "stdout", progress
+                    )
                 )
 
                 self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
-                    data={"line": line, "progress": progress, "task_index": job.current_task_index},
+                    data={
+                        "line": line,
+                        "progress": progress,
+                        "task_index": job.current_task_index,
+                    },
                 )
 
             # Build backup command
             paths = params.get("paths", [])
             excludes = params.get("excludes", [])
-            archive_name = params.get("archive_name", f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}")
+            archive_name = params.get(
+                "archive_name", f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+            )
 
-            logger.info(f"Backup task parameters - paths: {paths}, excludes: {excludes}, archive_name: {archive_name}")
+            logger.info(
+                f"Backup task parameters - paths: {paths}, excludes: {excludes}, archive_name: {archive_name}"
+            )
             logger.info(f"All task parameters: {params}")
 
             additional_args = []
@@ -754,7 +793,9 @@ class JobManager:
 
             # Add paths - if empty, add a default path for testing
             if not paths:
-                logger.warning("No source paths specified for backup, using default test path")
+                logger.warning(
+                    "No source paths specified for backup, using default test path"
+                )
                 paths = ["/tmp"]  # Add a default path for testing
 
             additional_args.extend(paths)
@@ -778,7 +819,9 @@ class JobManager:
             )
 
             # Log the result for debugging
-            logger.info(f"Backup process completed with return code: {result.return_code}")
+            logger.info(
+                f"Backup process completed with return code: {result.return_code}"
+            )
             if result.stdout:
                 logger.info(f"Backup process stdout length: {len(result.stdout)} bytes")
             if result.stderr:
@@ -799,12 +842,14 @@ class JobManager:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()
                 if full_output and result.return_code != 0:
                     # Add the captured output to the task output lines for visibility
-                    for line in full_output.split('\n'):
+                    for line in full_output.split("\n"):
                         if line.strip():
                             task.output_lines.append(line)
                             # Also add to output manager for real-time display
                             asyncio.create_task(
-                                self.output_manager.add_output_line(job.id, line, "stdout", {})
+                                self.output_manager.add_output_line(
+                                    job.id, line, "stdout", {}
+                                )
                             )
 
             if result.error:
@@ -813,10 +858,14 @@ class JobManager:
                 # Set a default error message if none provided by result
                 # Since stderr is redirected to stdout, check stdout for error messages
                 if result.stdout:
-                    output_text = result.stdout.decode("utf-8", errors="replace").strip()
+                    output_text = result.stdout.decode(
+                        "utf-8", errors="replace"
+                    ).strip()
                     # Get the last few lines which likely contain the error
-                    error_lines = output_text.split('\n')[-5:] if output_text else []
-                    stderr_text = '\n'.join(error_lines) if error_lines else "No output captured"
+                    error_lines = output_text.split("\n")[-5:] if output_text else []
+                    stderr_text = (
+                        "\n".join(error_lines) if error_lines else "No output captured"
+                    )
                 else:
                     stderr_text = "No output captured"
                 task.error = f"Backup failed with return code {result.return_code}: {stderr_text}"
@@ -831,7 +880,9 @@ class JobManager:
             task.completed_at = datetime.now(UTC)
             return False
 
-    async def _execute_prune_task(self, job: BorgJob, task: BorgJobTask, task_index: int = 0) -> bool:
+    async def _execute_prune_task(
+        self, job: BorgJob, task: BorgJobTask, task_index: int = 0
+    ) -> bool:
         """Execute a prune task using JobExecutor"""
         params = task.parameters
 
@@ -865,7 +916,9 @@ class JobManager:
 
         return result.return_code == 0
 
-    async def _execute_check_task(self, job: BorgJob, task: BorgJobTask, task_index: int = 0) -> bool:
+    async def _execute_check_task(
+        self, job: BorgJob, task: BorgJobTask, task_index: int = 0
+    ) -> bool:
         """Execute a repository check task"""
         try:
             from utils.security import build_secure_borg_command
@@ -887,7 +940,9 @@ class JobManager:
             def task_output_callback(line: str, progress: Dict):
                 task.output_lines.append(line)
                 asyncio.create_task(
-                    self.output_manager.add_output_line(job.id, line, "stdout", progress)
+                    self.output_manager.add_output_line(
+                        job.id, line, "stdout", progress
+                    )
                 )
 
             additional_args = []
@@ -940,7 +995,9 @@ class JobManager:
             task.completed_at = datetime.now(UTC)
             return False
 
-    async def _execute_cloud_sync_task(self, job: BorgJob, task: BorgJobTask, task_index: int = 0) -> bool:
+    async def _execute_cloud_sync_task(
+        self, job: BorgJob, task: BorgJobTask, task_index: int = 0
+    ) -> bool:
         """Execute a cloud sync task using JobExecutor"""
         params = task.parameters
 
@@ -968,13 +1025,19 @@ class JobManager:
 
         return result.return_code == 0
 
-    async def _execute_notification_task(self, job: BorgJob, task: BorgJobTask, task_index: int = 0) -> bool:
+    async def _execute_notification_task(
+        self, job: BorgJob, task: BorgJobTask, task_index: int = 0
+    ) -> bool:
         """Execute a notification task"""
         params = task.parameters
 
-        notification_config_id = params.get("notification_config_id") or params.get("config_id")
+        notification_config_id = params.get("notification_config_id") or params.get(
+            "config_id"
+        )
         if not notification_config_id:
-            logger.info("No notification configuration provided - skipping notification")
+            logger.info(
+                "No notification configuration provided - skipping notification"
+            )
             task.status = "failed"
             task.return_code = 1
             task.error = "No notification configuration"
@@ -984,9 +1047,12 @@ class JobManager:
         try:
             with get_db_session() as db:
                 from models.database import NotificationConfig
-                config = db.query(NotificationConfig).filter(
-                    NotificationConfig.id == notification_config_id
-                ).first()
+
+                config = (
+                    db.query(NotificationConfig)
+                    .filter(NotificationConfig.id == notification_config_id)
+                    .first()
+                )
 
                 if not config:
                     logger.info("Notification configuration not found - skipping")
@@ -1009,7 +1075,9 @@ class JobManager:
                     priority = params.get("priority", 0)
 
                     # Add output showing notification attempt
-                    task.output_lines.append({"text": f"Sending Pushover notification to {config.name}"})
+                    task.output_lines.append(
+                        {"text": f"Sending Pushover notification to {config.name}"}
+                    )
                     task.output_lines.append({"text": f"Title: {title}"})
                     task.output_lines.append({"text": f"Message: {message}"})
                     task.output_lines.append({"text": f"Priority: {priority}"})
@@ -1018,17 +1086,23 @@ class JobManager:
                     self.event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
                         job_id=job.id,
-                        data={"line": f"Sending Pushover notification to {config.name}", "task_index": task_index},
+                        data={
+                            "line": f"Sending Pushover notification to {config.name}",
+                            "task_index": task_index,
+                        },
                     )
 
                     # Send Pushover notification using injected service
                     if self.pushover_service:
-                        success, response_message = await self.pushover_service.send_notification_with_response(
+                        (
+                            success,
+                            response_message,
+                        ) = await self.pushover_service.send_notification_with_response(
                             user_key=user_key,
                             app_token=app_token,
                             title=title,
                             message=message,
-                            priority=priority
+                            priority=priority,
                         )
                     else:
                         success = False
@@ -1039,9 +1113,13 @@ class JobManager:
                         result_message = "✓ Notification sent successfully"
                         task.output_lines.append({"text": result_message})
                         if response_message:
-                            task.output_lines.append({"text": f"Response: {response_message}"})
+                            task.output_lines.append(
+                                {"text": f"Response: {response_message}"}
+                            )
                     else:
-                        result_message = f"✗ Failed to send notification: {response_message}"
+                        result_message = (
+                            f"✗ Failed to send notification: {response_message}"
+                        )
                         task.output_lines.append({"text": result_message})
 
                     # Broadcast result output
@@ -1054,10 +1132,14 @@ class JobManager:
                     task.status = "completed" if success else "failed"
                     task.return_code = 0 if success else 1
                     if not success:
-                        task.error = response_message or "Failed to send Pushover notification"
+                        task.error = (
+                            response_message or "Failed to send Pushover notification"
+                        )
                     return success
                 else:
-                    logger.warning(f"Unsupported notification provider: {config.provider}")
+                    logger.warning(
+                        f"Unsupported notification provider: {config.provider}"
+                    )
                     task.status = "failed"
                     task.error = f"Unsupported provider: {config.provider}"
                     return False
@@ -1068,10 +1150,9 @@ class JobManager:
             task.error = str(e)
             return False
 
-
-
-
-    async def _execute_task(self, job: BorgJob, task: BorgJobTask, task_index: int = 0) -> bool:
+    async def _execute_task(
+        self, job: BorgJob, task: BorgJobTask, task_index: int = 0
+    ) -> bool:
         """Execute a task based on its type"""
         try:
             if task.task_type == "backup":
@@ -1109,7 +1190,9 @@ class JobManager:
             return self.dependencies.event_broadcaster.unsubscribe_client(client_id)
         return False
 
-    async def stream_job_output(self, job_id: str) -> AsyncGenerator[Dict[str, Any], None]:
+    async def stream_job_output(
+        self, job_id: str
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream job output"""
         if self.output_manager:
             async for output in self.output_manager.stream_job_output(job_id):
@@ -1159,7 +1242,9 @@ class JobManager:
 
         # Broadcast cancellation
         self.event_broadcaster.broadcast_event(
-            EventType.JOB_CANCELLED, job_id=job_id, data={"cancelled_at": job.completed_at.isoformat()}
+            EventType.JOB_CANCELLED,
+            job_id=job_id,
+            data={"cancelled_at": job.completed_at.isoformat()},
         )
 
         return True
@@ -1182,7 +1267,6 @@ class JobManager:
 
             return True
         return False
-
 
     def get_queue_status(self):
         """Get queue manager status"""
@@ -1242,27 +1326,38 @@ class JobManager:
         """Get queue statistics (alias for get_queue_status)"""
         return self.get_queue_status()
 
-    async def _get_repository_data(self, repository_id: int) -> Optional[Dict[str, Any]]:
+    async def _get_repository_data(
+        self, repository_id: int
+    ) -> Optional[Dict[str, Any]]:
         """Get repository data by ID"""
         # First try using database manager if available
-        if hasattr(self, 'database_manager') and self.database_manager:
+        if hasattr(self, "database_manager") and self.database_manager:
             try:
                 return await self.database_manager.get_repository_data(repository_id)
             except Exception as e:
-                logger.error(f"Error getting repository data from database manager: {e}")
+                logger.error(
+                    f"Error getting repository data from database manager: {e}"
+                )
 
         # Fallback to direct database access
         if self.dependencies.db_session_factory:
             try:
                 with self.dependencies.db_session_factory() as db:
                     from models.database import Repository
-                    repo = db.query(Repository).filter(Repository.id == repository_id).first()
+
+                    repo = (
+                        db.query(Repository)
+                        .filter(Repository.id == repository_id)
+                        .first()
+                    )
                     if repo:
                         return {
                             "id": repo.id,
                             "name": repo.name,
                             "path": repo.path,
-                            "passphrase": repo.get_passphrase() if hasattr(repo, 'get_passphrase') else None,
+                            "passphrase": repo.get_passphrase()
+                            if hasattr(repo, "get_passphrase")
+                            else None,
                         }
             except Exception as e:
                 logger.debug(f"Error getting repository data: {e}")
@@ -1271,13 +1366,18 @@ class JobManager:
         try:
             with get_db_session() as db:
                 from models.database import Repository
-                repo = db.query(Repository).filter(Repository.id == repository_id).first()
+
+                repo = (
+                    db.query(Repository).filter(Repository.id == repository_id).first()
+                )
                 if repo:
                     return {
                         "id": repo.id,
                         "name": repo.name,
                         "path": repo.path,
-                        "passphrase": repo.get_passphrase() if hasattr(repo, 'get_passphrase') else None,
+                        "passphrase": repo.get_passphrase()
+                        if hasattr(repo, "get_passphrase")
+                        else None,
                     }
         except Exception as e:
             logger.debug(f"Error getting repository data from fallback: {e}")
@@ -1322,7 +1422,9 @@ class JobManager:
 
     # Bridge methods for external job registration (BackupService integration)
 
-    def register_external_job(self, job_id: str, job_type: str = "backup", job_name: str = "External Backup") -> None:
+    def register_external_job(
+        self, job_id: str, job_type: str = "backup", job_name: str = "External Backup"
+    ) -> None:
         """
         Register an external job (from BackupService) for monitoring purposes.
         All jobs are now composite jobs with at least one task.
@@ -1340,7 +1442,7 @@ class JobManager:
             task_type=job_type,
             task_name=job_name,
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
 
         # Create a composite BorgJob (all jobs are now composite)
@@ -1352,7 +1454,7 @@ class JobManager:
             started_at=datetime.now(UTC),
             repository_id=None,  # Can be set later if needed
             schedule=None,
-            tasks=[main_task]  # Always has at least one task
+            tasks=[main_task],  # Always has at least one task
         )
 
         self.jobs[job_id] = job
@@ -1364,12 +1466,20 @@ class JobManager:
         self.event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
-            data={"job_type": job_type, "job_name": job_name, "external": True}
+            data={"job_type": job_type, "job_name": job_name, "external": True},
         )
 
-        logger.info(f"Registered external composite job {job_id} ({job_type}) with 1 task for monitoring")
+        logger.info(
+            f"Registered external composite job {job_id} ({job_type}) with 1 task for monitoring"
+        )
 
-    def update_external_job_status(self, job_id: str, status: str, error: Optional[str] = None, return_code: Optional[int] = None) -> None:
+    def update_external_job_status(
+        self,
+        job_id: str,
+        status: str,
+        error: Optional[str] = None,
+        return_code: Optional[int] = None,
+    ) -> None:
         """
         Update the status of an external job and its main task.
 
@@ -1419,10 +1529,12 @@ class JobManager:
             self.event_broadcaster.broadcast_event(
                 event_type,
                 job_id=job_id,
-                data={"old_status": old_status, "new_status": status, "external": True}
+                data={"old_status": old_status, "new_status": status, "external": True},
             )
 
-        logger.debug(f"Updated external job {job_id} and main task status: {old_status} -> {status}")
+        logger.debug(
+            f"Updated external job {job_id} and main task status: {old_status} -> {status}"
+        )
 
     def add_external_job_output(self, job_id: str, output_line: str) -> None:
         """
@@ -1433,7 +1545,9 @@ class JobManager:
             output_line: Output line to add
         """
         if job_id not in self.jobs:
-            logger.warning(f"Cannot add output to external job {job_id} - not registered")
+            logger.warning(
+                f"Cannot add output to external job {job_id} - not registered"
+            )
             return
 
         job = self.jobs[job_id]
@@ -1445,9 +1559,7 @@ class JobManager:
             main_task.output_lines.append({"text": output_line})
 
         # Also add output through output manager for streaming
-        asyncio.create_task(
-            self.output_manager.add_output_line(job_id, output_line)
-        )
+        asyncio.create_task(self.output_manager.add_output_line(job_id, output_line))
 
         # Broadcast output event for real-time streaming
         self.event_broadcaster.broadcast_event(
@@ -1456,7 +1568,7 @@ class JobManager:
             data={
                 "line": output_line,
                 "task_index": 0,  # External jobs use main task (index 0)
-                "progress": None
+                "progress": None,
             },
         )
 
@@ -1469,7 +1581,9 @@ class JobManager:
         """
         if job_id in self.jobs:
             job = self.jobs[job_id]
-            logger.info(f"Unregistering external job {job_id} (final status: {job.status})")
+            logger.info(
+                f"Unregistering external job {job_id} (final status: {job.status})"
+            )
 
             # Use existing cleanup method
             self.cleanup_job(job_id)
@@ -1483,12 +1597,8 @@ def create_job_manager(config=None) -> JobManager:
     if config is None:
         # Use environment variables or defaults
         internal_config = JobManagerConfig(
-            max_concurrent_backups=int(
-                os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")
-            ),
-            max_output_lines_per_job=int(
-                os.getenv("BORG_MAX_OUTPUT_LINES", "1000")
-            ),
+            max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
+            max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
         )
     elif hasattr(config, "to_internal_config"):
         # Backward compatible config wrapper
@@ -1527,8 +1637,6 @@ def get_test_job_manager_dependencies(
 BorgJobManager = JobManager
 ModularBorgJobManager = JobManager  # For transitional compatibility
 BorgJobManagerConfig = JobManagerConfig
-
-
 
 
 # Export all public classes and functions

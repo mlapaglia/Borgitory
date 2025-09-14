@@ -10,36 +10,39 @@ from services.volumes.volume_service import VolumeService, FileSystemInterface
 
 class MockFileSystem(FileSystemInterface):
     """Mock filesystem for testing"""
-    
+
     def __init__(self):
         self.directories = set()
         self.files = set()
-    
+
     def add_directory(self, path: str):
         """Add a directory to the mock filesystem"""
         self.directories.add(path)
-    
+
     def add_file(self, path: str):
         """Add a file to the mock filesystem"""
         self.files.add(path)
-    
+
     def exists(self, path: str) -> bool:
         return path in self.directories or path in self.files
-    
+
     def is_dir(self, path: str) -> bool:
         return path in self.directories
-    
+
     def listdir(self, path: str) -> List[str]:
         if path not in self.directories:
             raise OSError(f"No such directory: {path}")
-        
+
         # Find all items that are direct children of this path
         items = []
         for item_path in self.directories | self.files:
-            if item_path.startswith(path + "/") and "/" not in item_path[len(path) + 1:]:
+            if (
+                item_path.startswith(path + "/")
+                and "/" not in item_path[len(path) + 1 :]
+            ):
                 items.append(item_path.split("/")[-1])
         return items
-    
+
     def join(self, *paths: str) -> str:
         return "/".join(paths)
 
@@ -69,19 +72,23 @@ class TestVolumeService:
         volumes = await volume_service.get_mounted_volumes()
 
         assert "/mnt/backups" in volumes
-        assert "/mnt/data" in volumes  
+        assert "/mnt/data" in volumes
         assert "/mnt/repos" in volumes
         assert len(volumes) == 3
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_no_mnt_directory(self, volume_service, mock_filesystem):
+    async def test_get_mounted_volumes_no_mnt_directory(
+        self, volume_service, mock_filesystem
+    ):
         """Test behavior when /mnt directory doesn't exist"""
         # Don't add /mnt to mock filesystem (it doesn't exist)
         volumes = await volume_service.get_mounted_volumes()
         assert volumes == []
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_empty_mnt_directory(self, volume_service, mock_filesystem):
+    async def test_get_mounted_volumes_empty_mnt_directory(
+        self, volume_service, mock_filesystem
+    ):
         """Test behavior when /mnt directory is empty"""
         # Add /mnt directory but no subdirectories
         mock_filesystem.add_directory("/mnt")
@@ -90,7 +97,9 @@ class TestVolumeService:
         assert volumes == []
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_filters_files(self, volume_service, mock_filesystem):
+    async def test_get_mounted_volumes_filters_files(
+        self, volume_service, mock_filesystem
+    ):
         """Test that only directories are included, not files"""
         # Set up mock filesystem with directories and files
         mock_filesystem.add_directory("/mnt")
@@ -108,23 +117,28 @@ class TestVolumeService:
     @pytest.mark.asyncio
     async def test_get_mounted_volumes_exception_handling(self, mock_filesystem):
         """Test handling of exceptions during directory listing"""
+
         # Create a filesystem that throws exceptions
         class ExceptionFileSystem(MockFileSystem):
             def exists(self, path: str) -> bool:
                 raise OSError("Permission denied")
-        
+
         exception_filesystem = ExceptionFileSystem()
         volume_service = VolumeService(filesystem=exception_filesystem)
-        
+
         volumes = await volume_service.get_mounted_volumes()
         assert volumes == []
 
     @pytest.mark.asyncio
     async def test_get_volume_info_success(self, volume_service):
         """Test successful volume info retrieval"""
-        with patch.object(volume_service, 'get_mounted_volumes', return_value=["/mnt/data", "/mnt/repos"]):
+        with patch.object(
+            volume_service,
+            "get_mounted_volumes",
+            return_value=["/mnt/data", "/mnt/repos"],
+        ):
             info = await volume_service.get_volume_info()
-            
+
             assert info["mounted_volumes"] == ["/mnt/data", "/mnt/repos"]
             assert info["total_mounted_volumes"] == 2
             assert info["accessible"] is True
@@ -132,9 +146,11 @@ class TestVolumeService:
     @pytest.mark.asyncio
     async def test_get_volume_info_exception(self, volume_service):
         """Test volume info retrieval with exception"""
-        with patch.object(volume_service, 'get_mounted_volumes', side_effect=Exception("Test error")):
+        with patch.object(
+            volume_service, "get_mounted_volumes", side_effect=Exception("Test error")
+        ):
             info = await volume_service.get_volume_info()
-            
+
             assert "error" in info
             assert info["error"] == "Test error"
             assert info["mounted_volumes"] == []

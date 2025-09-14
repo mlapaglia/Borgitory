@@ -34,7 +34,9 @@ class ResponseType:
     def expects_json(request: Request) -> bool:
         """Check if request expects JSON response."""
         accept_header = request.headers.get("Accept", "")
-        return "application/json" in accept_header and not ResponseType.is_htmx_request(request)
+        return "application/json" in accept_header and not ResponseType.is_htmx_request(
+            request
+        )
 
 
 class RepositoryResponseHandler:
@@ -74,7 +76,9 @@ class RepositoryResponseHandler:
                     status_code=200,
                 )
             else:
-                status_code = 400 if result.is_validation_error or result.is_borg_error else 500
+                status_code = (
+                    400 if result.is_validation_error or result.is_borg_error else 500
+                )
                 raise HTTPException(status_code=status_code, detail=error_message)
 
     @staticmethod
@@ -111,7 +115,9 @@ class RepositoryResponseHandler:
                     status_code=200,
                 )
             else:
-                status_code = 400 if result.is_validation_error or result.is_borg_error else 500
+                status_code = (
+                    400 if result.is_validation_error or result.is_borg_error else 500
+                )
                 raise HTTPException(status_code=status_code, detail=error_message)
 
     @staticmethod
@@ -127,9 +133,7 @@ class RepositoryResponseHandler:
                     {"repositories": [repo.__dict__ for repo in result.repositories]},
                 )
             else:
-                return {
-                    "repositories": [repo.__dict__ for repo in result.repositories]
-                }
+                return {"repositories": [repo.__dict__ for repo in result.repositories]}
         else:
             if ResponseType.is_htmx_request(request):
                 return templates.TemplateResponse(
@@ -139,7 +143,8 @@ class RepositoryResponseHandler:
                 )
             else:
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to scan repositories: {result.error_message}"
+                    status_code=500,
+                    detail=f"Failed to scan repositories: {result.error_message}",
                 )
 
     @staticmethod
@@ -156,7 +161,10 @@ class RepositoryResponseHandler:
                     status_code=200,
                 )
             else:
-                return {"success": True, "message": result.message or "Repository deleted successfully"}
+                return {
+                    "success": True,
+                    "message": result.message or "Repository deleted successfully",
+                }
         else:
             status_code = 409 if result.has_conflicts else 500
             if ResponseType.is_htmx_request(request):
@@ -167,7 +175,9 @@ class RepositoryResponseHandler:
                     status_code=200,
                 )
             else:
-                raise HTTPException(status_code=status_code, detail=result.error_message)
+                raise HTTPException(
+                    status_code=status_code, detail=result.error_message
+                )
 
 
 class ArchiveResponseHandler:
@@ -182,13 +192,18 @@ class ArchiveResponseHandler:
             if ResponseType.is_htmx_request(request):
                 # Convert DTOs to dicts for template
                 archives_data = [archive.__dict__ for archive in result.archives]
-                recent_archives_data = [archive.__dict__ for archive in result.recent_archives]
+                recent_archives_data = [
+                    archive.__dict__ for archive in result.recent_archives
+                ]
 
                 return templates.TemplateResponse(
                     request,
                     "partials/archives/list_content.html",
                     {
-                        "repository": {"id": result.repository_id, "name": result.repository_name},
+                        "repository": {
+                            "id": result.repository_id,
+                            "name": result.repository_name,
+                        },
                         "archives": archives_data,
                         "recent_archives": recent_archives_data,
                     },

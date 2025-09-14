@@ -87,7 +87,9 @@ class RepositoryService:
             db.commit()
             db.refresh(db_repo)
 
-            logger.info(f"Successfully created and initialized repository '{request.name}'")
+            logger.info(
+                f"Successfully created and initialized repository '{request.name}'"
+            )
 
             return RepositoryOperationResult(
                 success=True,
@@ -218,7 +220,9 @@ class RepositoryService:
     ) -> ArchiveListingResult:
         """List archives in a repository."""
         try:
-            repository = db.query(Repository).filter(Repository.id == repository_id).first()
+            repository = (
+                db.query(Repository).filter(Repository.id == repository_id).first()
+            )
             if not repository:
                 return ArchiveListingResult(
                     success=False,
@@ -264,7 +268,9 @@ class RepositoryService:
             # Get recent archives (last 10)
             recent_archives = []
             if archive_infos:
-                recent_list = archive_infos[-10:] if len(archive_infos) > 10 else archive_infos
+                recent_list = (
+                    archive_infos[-10:] if len(archive_infos) > 10 else archive_infos
+                )
                 recent_archives = list(reversed(recent_list))
 
             return ArchiveListingResult(
@@ -332,9 +338,11 @@ class RepositoryService:
     ) -> ArchiveContentsResult:
         """Get contents of an archive at specified path."""
         try:
-            repository = db.query(Repository).filter(
-                Repository.id == request.repository_id
-            ).first()
+            repository = (
+                db.query(Repository)
+                .filter(Repository.id == request.repository_id)
+                .first()
+            )
             if not repository:
                 return ArchiveContentsResult(
                     success=False,
@@ -392,9 +400,11 @@ class RepositoryService:
     ) -> RepositoryInfoResult:
         """Get repository information."""
         try:
-            repository = db.query(Repository).filter(
-                Repository.id == request.repository_id
-            ).first()
+            repository = (
+                db.query(Repository)
+                .filter(Repository.id == request.repository_id)
+                .first()
+            )
             if not repository:
                 return RepositoryInfoResult(
                     success=False,
@@ -409,7 +419,9 @@ class RepositoryService:
             )
 
         except Exception as e:
-            logger.error(f"Error getting repository info for {request.repository_id}: {e}")
+            logger.error(
+                f"Error getting repository info for {request.repository_id}: {e}"
+            )
             return RepositoryInfoResult(
                 success=False,
                 repository_id=request.repository_id,
@@ -421,9 +433,11 @@ class RepositoryService:
     ) -> DeleteRepositoryResult:
         """Delete a repository and its associated data."""
         try:
-            repository = db.query(Repository).filter(
-                Repository.id == request.repository_id
-            ).first()
+            repository = (
+                db.query(Repository)
+                .filter(Repository.id == request.repository_id)
+                .first()
+            )
             if not repository:
                 return DeleteRepositoryResult(
                     success=False,
@@ -454,7 +468,9 @@ class RepositoryService:
 
             # Remove associated schedules
             schedules_to_delete = (
-                db.query(Schedule).filter(Schedule.repository_id == request.repository_id).all()
+                db.query(Schedule)
+                .filter(Schedule.repository_id == request.repository_id)
+                .all()
             )
 
             deleted_schedules = 0
@@ -581,7 +597,9 @@ class RepositoryService:
                 content = await keyfile.read()
                 f.write(content)
 
-            logger.info(f"Saved keyfile for repository '{repository_name}' at {keyfile_path}")
+            logger.info(
+                f"Saved keyfile for repository '{repository_name}' at {keyfile_path}"
+            )
 
             return {"success": True, "path": keyfile_path}
 

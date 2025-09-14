@@ -54,9 +54,7 @@ async def get_policy_form(
 
 @router.get("/strategy-fields", response_class=HTMLResponse)
 async def get_strategy_fields(
-    request: Request,
-    templates: TemplatesDep,
-    strategy: str = "simple"
+    request: Request, templates: TemplatesDep, strategy: str = "simple"
 ) -> HTMLResponse:
     """Get dynamic strategy fields based on selection"""
     return templates.TemplateResponse(
@@ -189,9 +187,8 @@ async def get_cleanup_config_edit_form(
 
     if not config:
         from fastapi import HTTPException
-        raise HTTPException(
-            status_code=404, detail="Cleanup configuration not found"
-        )
+
+        raise HTTPException(status_code=404, detail="Cleanup configuration not found")
 
     context = {
         "config": config,
@@ -212,7 +209,9 @@ async def update_cleanup_config(
     service: CleanupServiceDep,
 ):
     """Update a cleanup configuration"""
-    success, updated_config, error_message = service.update_cleanup_config(config_id, config_update)
+    success, updated_config, error_message = service.update_cleanup_config(
+        config_id, config_update
+    )
 
     if success:
         response = templates.TemplateResponse(

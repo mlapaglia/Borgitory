@@ -5,10 +5,7 @@ from models.schemas import (
     RepositoryCheckConfigUpdate,
 )
 
-from dependencies import (
-    TemplatesDep,
-    RepositoryCheckConfigServiceDep
-)
+from dependencies import TemplatesDep, RepositoryCheckConfigServiceDep
 
 router = APIRouter()
 
@@ -173,8 +170,8 @@ def update_check_options(
 
 @router.get("/{config_id}", response_class=HTMLResponse)
 def get_repository_check_config(
-    config_id: int,
-    service: RepositoryCheckConfigServiceDep):
+    config_id: int, service: RepositoryCheckConfigServiceDep
+):
     """Get a specific repository check configuration"""
     config = service.get_config_by_id(config_id)
     if not config:

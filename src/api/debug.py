@@ -76,7 +76,12 @@ async def _generate_jobs_memory_stream(job_manager) -> AsyncGenerator[str, None]
                     event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
 
                     # Handle different event types
-                    if event.get("type") in ["job_started", "job_completed", "job_failed", "job_cancelled"]:
+                    if event.get("type") in [
+                        "job_started",
+                        "job_completed",
+                        "job_failed",
+                        "job_cancelled",
+                    ]:
                         # Send updated job list when job status changes
                         yield await _format_jobs_list_event(job_manager)
 
@@ -108,13 +113,19 @@ async def _format_jobs_list_event(job_manager) -> str:
                 "short_id": job_id[:8] + "..." if len(job_id) > 11 else job_id,
                 "status": job.status,
                 "job_type": getattr(job, "job_type", "unknown"),
-                "started_at": job.started_at.strftime("%H:%M:%S") if job.started_at else "N/A",
+                "started_at": job.started_at.strftime("%H:%M:%S")
+                if job.started_at
+                else "N/A",
                 "duration": _calculate_duration(job.started_at, job.completed_at),
-                "tasks_info": ""
+                "tasks_info": "",
             }
 
             if hasattr(job, "tasks"):
-                current_task = job.current_task_index + 1 if hasattr(job, "current_task_index") else 1
+                current_task = (
+                    job.current_task_index + 1
+                    if hasattr(job, "current_task_index")
+                    else 1
+                )
                 total_tasks = len(job.tasks) if hasattr(job, "tasks") else 0
                 job_data["tasks_info"] = f"{current_task}/{total_tasks}"
 
@@ -130,14 +141,14 @@ async def _format_jobs_list_event(job_manager) -> str:
         if jobs_data:
             html_content = _generate_jobs_table_html(jobs_data)
         else:
-            html_content = '''
+            html_content = """
                 <div class="flex items-center justify-center py-8 text-gray-500 dark:text-gray-400">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8V4a1 1 0 00-1-1H7a1 1 0 00-1 1v1m8 0V4.5"></path>
                     </svg>
                     No jobs currently in memory
                 </div>
-            '''
+            """
 
         return f"event: jobs-list\ndata: {html_content}\n\n"
 
@@ -148,7 +159,7 @@ async def _format_jobs_list_event(job_manager) -> str:
 
 def _generate_jobs_table_html(jobs_data) -> str:
     """Generate HTML table for jobs data"""
-    html = '''
+    html = """
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
             <thead class="bg-gray-50 dark:bg-gray-600">
@@ -162,11 +173,11 @@ def _generate_jobs_table_html(jobs_data) -> str:
                 </tr>
             </thead>
             <tbody class="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600">
-    '''
+    """
 
     for job in jobs_data:
         status_color = _get_status_color(job["status"])
-        html += f'''
+        html += f"""
                 <tr>
                     <td class="px-3 py-2 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100">{job["short_id"]}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{job["job_type"]}</td>
@@ -177,13 +188,13 @@ def _generate_jobs_table_html(jobs_data) -> str:
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{job["duration"]}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{job["tasks_info"]}</td>
                 </tr>
-        '''
+        """
 
-    html += '''
+    html += """
             </tbody>
         </table>
     </div>
-    '''
+    """
 
     return html
 
@@ -198,7 +209,9 @@ def _get_status_color(status: str) -> str:
         "queued": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
         "pending": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
     }
-    return status_colors.get(status, "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200")
+    return status_colors.get(
+        status, "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+    )
 
 
 def _calculate_duration(started_at, completed_at) -> str:

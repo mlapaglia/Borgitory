@@ -12,6 +12,7 @@ from services.jobs.broadcaster.job_event import JobEvent
 
 logger = logging.getLogger(__name__)
 
+
 class JobEventBroadcaster:
     """Handles SSE streaming and event distribution to clients"""
 

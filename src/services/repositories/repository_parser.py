@@ -28,7 +28,11 @@ class RepositoryParser:
     - Extract repository metadata
     """
 
-    def __init__(self, command_runner: Optional[SimpleCommandRunner] = None, job_manager: Optional[JobManager] = None):
+    def __init__(
+        self,
+        command_runner: Optional[SimpleCommandRunner] = None,
+        job_manager: Optional[JobManager] = None,
+    ):
         self.command_runner = command_runner or SimpleCommandRunner()
         self.job_manager = job_manager
 
@@ -180,7 +184,9 @@ class RepositoryParser:
 
         # Use the job manager to track the scan job
         if not self.job_manager:
-            raise RuntimeError("JobManager not provided - must be injected via dependency injection")
+            raise RuntimeError(
+                "JobManager not provided - must be injected via dependency injection"
+            )
         job_manager = self.job_manager
 
         # Create a find command to look for Borg repositories
@@ -231,7 +237,9 @@ class RepositoryParser:
         """Check the status of a running repository scan"""
         try:
             if not self.job_manager:
-                raise RuntimeError("JobManager not provided - must be injected via dependency injection")
+                raise RuntimeError(
+                    "JobManager not provided - must be injected via dependency injection"
+                )
             job_manager = self.job_manager
             status = job_manager.get_job_status(job_id)
 
@@ -263,7 +271,9 @@ class RepositoryParser:
         """Get the results of a completed repository scan"""
         try:
             if not self.job_manager:
-                raise RuntimeError("JobManager not provided - must be injected via dependency injection")
+                raise RuntimeError(
+                    "JobManager not provided - must be injected via dependency injection"
+                )
             job_manager = self.job_manager
             job_status = job_manager.get_job_status(job_id)
 
@@ -406,7 +416,9 @@ class RepositoryParser:
         try:
             # Start the borg info command to test access
             if not self.job_manager:
-                raise RuntimeError("JobManager not provided - must be injected via dependency injection")
+                raise RuntimeError(
+                    "JobManager not provided - must be injected via dependency injection"
+                )
             job_manager = self.job_manager
             job_id = await job_manager.start_borg_command(command, env=env)
 

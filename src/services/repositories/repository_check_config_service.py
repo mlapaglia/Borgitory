@@ -18,7 +18,9 @@ class RepositoryCheckConfigService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all_configs(self, order_by_name: bool = True) -> List[RepositoryCheckConfig]:
+    def get_all_configs(
+        self, order_by_name: bool = True
+    ) -> List[RepositoryCheckConfig]:
         """Get all repository check configurations."""
         query = self.db.query(RepositoryCheckConfig)
         if order_by_name:
@@ -142,7 +144,9 @@ class RepositoryCheckConfigService:
             self.db.rollback()
             return False, None, f"Failed to update check policy: {str(e)}"
 
-    def enable_config(self, config_id: int) -> Tuple[bool, Optional[str], Optional[str]]:
+    def enable_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Enable a repository check configuration.
 
@@ -163,7 +167,9 @@ class RepositoryCheckConfigService:
             self.db.rollback()
             return False, None, f"Failed to enable check policy: {str(e)}"
 
-    def disable_config(self, config_id: int) -> Tuple[bool, Optional[str], Optional[str]]:
+    def disable_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Disable a repository check configuration.
 
@@ -184,7 +190,9 @@ class RepositoryCheckConfigService:
             self.db.rollback()
             return False, None, f"Failed to disable check policy: {str(e)}"
 
-    def delete_config(self, config_id: int) -> Tuple[bool, Optional[str], Optional[str]]:
+    def delete_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Delete a repository check configuration.
 

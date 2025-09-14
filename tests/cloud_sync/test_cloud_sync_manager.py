@@ -65,9 +65,7 @@ class TestCloudSyncManager:
 
     def test_init_with_defaults(self):
         """Test CloudSyncManager initialization with default dependencies."""
-        with patch(
-            "services.cloud_sync_manager.get_db_session"
-        ) as mock_get_session:
+        with patch("services.cloud_sync_manager.get_db_session") as mock_get_session:
             manager = CloudSyncManager()
             assert manager._db_session_factory is mock_get_session
 

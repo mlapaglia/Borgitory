@@ -193,14 +193,16 @@ class PushoverService:
                                 logger.info(f"Pushover notification sent: {title}")
                                 return True, f"HTTP {response.status}: {response_text}"
                             else:
-                                error_msg = result.get('errors', ['Unknown error'])
+                                error_msg = result.get("errors", ["Unknown error"])
                                 logger.error(f"Pushover API error: {error_msg}")
                                 return False, f"HTTP {response.status}: {response_text}"
                         except Exception as e:
                             logger.info(f"Pushover notification sent: {title} - {e}")
                             return True, f"HTTP {response.status}: {response_text}"
                     else:
-                        logger.error(f"Pushover HTTP error {response.status}: {response_text}")
+                        logger.error(
+                            f"Pushover HTTP error {response.status}: {response_text}"
+                        )
                         return False, f"HTTP {response.status}: {response_text}"
 
         except Exception as e:

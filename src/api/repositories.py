@@ -47,6 +47,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="src/templates")
 
+
 @router.post("/")
 async def create_repository(
     request: Request,
@@ -61,7 +62,7 @@ async def create_repository(
         name=repo.name,
         path=repo.path,
         passphrase=repo.passphrase,
-        user_id=current_user.id
+        user_id=current_user.id,
     )
 
     # Call business service
@@ -139,27 +140,36 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt"):
 @router.get("/directories/autocomplete", response_class=HTMLResponse)
 async def list_directories_autocomplete(
     request: Request,
-    volume_svc: VolumeServiceDep, 
-    current_user=Depends(get_current_user)
+    volume_svc: VolumeServiceDep,
+    current_user=Depends(get_current_user),
 ):
     """List directories as HTML for autocomplete functionality."""
-    
+
     # Get the input value from the form data
-    form_data = await request.form() if request.method == "POST" else request.query_params
+    form_data = (
+        await request.form() if request.method == "POST" else request.query_params
+    )
     input_value = ""
-    
+
     # Try to get the input value from various possible parameter names
     for param_name in form_data.keys():
-        if param_name in ['path', 'source_path', 'create-path', 'import-path', 'backup-source-path', 'schedule-source-path']:
+        if param_name in [
+            "path",
+            "source_path",
+            "create-path",
+            "import-path",
+            "backup-source-path",
+            "schedule-source-path",
+        ]:
             input_value = form_data.get(param_name, "")
             break
-    
+
     # Normalize the path with /mnt/ prefix
     normalized_path = normalize_path_with_mnt_prefix(input_value)
-    
+
     # Parse the normalized path to get directory and search term
     dir_path, search_term = parse_path_for_autocomplete(normalized_path)
-    
+
     try:
         if not user_secure_exists(dir_path):
             directories = []
@@ -170,20 +180,22 @@ async def list_directories_autocomplete(
 
         # Filter directories based on search term
         if search_term:
-            directories = [d for d in directories if search_term.lower() in d["name"].lower()]
+            directories = [
+                d for d in directories if search_term.lower() in d["name"].lower()
+            ]
 
         # Get the target input ID from headers
-        target_input = request.headers.get('hx-target-input', '')
+        target_input = request.headers.get("hx-target-input", "")
 
         return templates.TemplateResponse(
             request,
             "partials/shared/path_autocomplete_dropdown.html",
             {
-                "directories": directories, 
+                "directories": directories,
                 "search_term": search_term,
                 "target_input": target_input,
-                "input_value": normalized_path
-            }
+                "input_value": normalized_path,
+            },
         )
 
     except PathSecurityError as e:
@@ -191,7 +203,12 @@ async def list_directories_autocomplete(
         return templates.TemplateResponse(
             request,
             "partials/shared/path_autocomplete_dropdown.html",
-            {"directories": [], "search_term": search_term, "target_input": "", "error": str(e)}
+            {
+                "directories": [],
+                "search_term": search_term,
+                "target_input": "",
+                "error": str(e),
+            },
         )
 
     except Exception as e:
@@ -199,7 +216,12 @@ async def list_directories_autocomplete(
         return templates.TemplateResponse(
             request,
             "partials/shared/path_autocomplete_dropdown.html",
-            {"directories": [], "search_term": search_term, "target_input": "", "error": str(e)}
+            {
+                "directories": [],
+                "search_term": search_term,
+                "target_input": "",
+                "error": str(e),
+            },
         )
 
 
@@ -317,7 +339,7 @@ async def import_repository(
         path=path,
         passphrase=passphrase,
         keyfile=keyfile,
-        user_id=None  # Import doesn't require user ID currently
+        user_id=None,  # Import doesn't require user ID currently
     )
 
     # Call business service
@@ -369,7 +391,7 @@ async def delete_repository(
     delete_request = DeleteRepositoryRequest(
         repository_id=repo_id,
         delete_borg_repo=delete_borg_repo,
-        user_id=None  # Delete doesn't require user ID currently
+        user_id=None,  # Delete doesn't require user ID currently
     )
 
     # Call business service

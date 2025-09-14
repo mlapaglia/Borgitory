@@ -18,14 +18,11 @@ class NotificationConfigService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all_configs(self, skip: int = 0, limit: int = 100) -> List[NotificationConfig]:
+    def get_all_configs(
+        self, skip: int = 0, limit: int = 100
+    ) -> List[NotificationConfig]:
         """Get all notification configurations with pagination."""
-        return (
-            self.db.query(NotificationConfig)
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        return self.db.query(NotificationConfig).offset(skip).limit(limit).all()
 
     def get_config_by_id(self, config_id: int) -> Optional[NotificationConfig]:
         """Get a notification configuration by ID."""
@@ -111,7 +108,9 @@ class NotificationConfigService:
             self.db.rollback()
             return False, None, f"Failed to update notification configuration: {str(e)}"
 
-    def enable_config(self, config_id: int) -> Tuple[bool, Optional[str], Optional[str]]:
+    def enable_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Enable a notification configuration.
 
@@ -132,7 +131,9 @@ class NotificationConfigService:
             self.db.rollback()
             return False, None, f"Failed to enable notification: {str(e)}"
 
-    def disable_config(self, config_id: int) -> Tuple[bool, Optional[str], Optional[str]]:
+    def disable_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Disable a notification configuration.
 
@@ -153,7 +154,9 @@ class NotificationConfigService:
             self.db.rollback()
             return False, None, f"Failed to disable notification: {str(e)}"
 
-    def delete_config(self, config_id: int) -> Tuple[bool, Optional[str], Optional[str]]:
+    def delete_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Delete a notification configuration.
 
@@ -210,7 +213,9 @@ class NotificationConfigService:
             logger.error(f"Error getting configs with descriptions: {str(e)}")
             return []
 
-    def get_config_credentials(self, config_id: int) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
+    def get_config_credentials(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:
         """
         Get decrypted credentials for a notification configuration.
 

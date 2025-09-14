@@ -11,6 +11,7 @@ from fastapi import UploadFile
 @dataclass
 class CreateRepositoryRequest:
     """Request data for creating a new repository."""
+
     name: str
     path: str
     passphrase: str
@@ -20,6 +21,7 @@ class CreateRepositoryRequest:
 @dataclass
 class ImportRepositoryRequest:
     """Request data for importing an existing repository."""
+
     name: str
     path: str
     passphrase: str
@@ -30,6 +32,7 @@ class ImportRepositoryRequest:
 @dataclass
 class RepositoryValidationError:
     """Validation error details."""
+
     field: str
     message: str
 
@@ -37,6 +40,7 @@ class RepositoryValidationError:
 @dataclass
 class RepositoryOperationResult:
     """Result of a repository operation."""
+
     success: bool
     repository_id: Optional[int] = None
     repository_name: Optional[str] = None
@@ -59,6 +63,7 @@ class RepositoryOperationResult:
 @dataclass
 class ArchiveInfo:
     """Information about a repository archive."""
+
     name: str
     time: str
     formatted_time: Optional[str] = None
@@ -69,6 +74,7 @@ class ArchiveInfo:
 @dataclass
 class ArchiveListingResult:
     """Result of listing repository archives."""
+
     success: bool
     repository_id: int
     repository_name: str
@@ -85,6 +91,7 @@ class ArchiveListingResult:
 @dataclass
 class DirectoryItem:
     """Item in a directory listing."""
+
     name: str
     type: str  # 'directory' or 'file'
     path: str
@@ -95,6 +102,7 @@ class DirectoryItem:
 @dataclass
 class DirectoryListingRequest:
     """Request for directory listing."""
+
     path: str
     include_files: bool = False
     max_items: int = 1000
@@ -103,6 +111,7 @@ class DirectoryListingRequest:
 @dataclass
 class DirectoryListingResult:
     """Result of directory listing operation."""
+
     success: bool
     path: str
     directories: List[str]
@@ -112,6 +121,7 @@ class DirectoryListingResult:
 @dataclass
 class ArchiveContentsRequest:
     """Request for archive contents."""
+
     repository_id: int
     archive_name: str
     path: str = ""
@@ -120,6 +130,7 @@ class ArchiveContentsRequest:
 @dataclass
 class ArchiveContentsResult:
     """Result of archive contents listing."""
+
     success: bool
     repository_id: int
     archive_name: str
@@ -132,6 +143,7 @@ class ArchiveContentsResult:
 @dataclass
 class RepositoryScanRequest:
     """Request for repository scanning."""
+
     scan_path: Optional[str] = None
     include_existing: bool = True
 
@@ -139,6 +151,7 @@ class RepositoryScanRequest:
 @dataclass
 class ScannedRepository:
     """Information about a scanned repository."""
+
     name: str
     path: str
     encryption_mode: str
@@ -150,6 +163,7 @@ class ScannedRepository:
 @dataclass
 class RepositoryScanResult:
     """Result of repository scanning operation."""
+
     success: bool
     repositories: List[ScannedRepository]
     scan_path: Optional[str] = None
@@ -164,12 +178,14 @@ class RepositoryScanResult:
 @dataclass
 class RepositoryInfoRequest:
     """Request for repository information."""
+
     repository_id: int
 
 
 @dataclass
 class RepositoryInfoResult:
     """Result of repository info operation."""
+
     success: bool
     repository_id: int
     info: Optional[Dict[str, Any]] = None
@@ -179,6 +195,7 @@ class RepositoryInfoResult:
 @dataclass
 class DeleteRepositoryRequest:
     """Request for repository deletion."""
+
     repository_id: int
     delete_borg_repo: bool = False
     user_id: Optional[int] = None
@@ -187,6 +204,7 @@ class DeleteRepositoryRequest:
 @dataclass
 class DeleteRepositoryResult:
     """Result of repository deletion."""
+
     success: bool
     repository_name: str
     deleted_schedules: int = 0

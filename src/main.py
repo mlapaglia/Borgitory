@@ -110,7 +110,9 @@ template_path = f"{base_path}templates"
 if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 else:
-    logger.warning(f"Static directory '{static_path}' not found - static files will not be served")
+    logger.warning(
+        f"Static directory '{static_path}' not found - static files will not be served"
+    )
 
 templates = Jinja2Templates(directory=template_path)
 
@@ -207,11 +209,13 @@ VALID_TABS = {
     "notifications": "/api/tabs/notifications",
     "cleanup": "/api/tabs/cleanup",
     "repository-check": "/api/tabs/repository-check",
-    "debug": "/api/tabs/debug"
+    "debug": "/api/tabs/debug",
 }
 
 
-def _render_page_with_tab(request: Request, current_user, active_tab: str, initial_content_url: str):
+def _render_page_with_tab(
+    request: Request, current_user, active_tab: str, initial_content_url: str
+):
     """Helper to render the main page with a specific tab active."""
     return templates.TemplateResponse(
         request,
@@ -219,8 +223,8 @@ def _render_page_with_tab(request: Request, current_user, active_tab: str, initi
         {
             "current_user": current_user,
             "active_tab": active_tab,
-            "initial_content_url": initial_content_url
-        }
+            "initial_content_url": initial_content_url,
+        },
     )
 
 
@@ -247,9 +251,13 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user_optional(request, db)
     next_url = request.query_params.get("next", "/repositories")
     # Strip backslashes, and validate redirect target is internal
-    cleaned_next_url = next_url.replace('\\', '')
+    cleaned_next_url = next_url.replace("\\", "")
     parsed_url = urlparse(cleaned_next_url)
-    safe_next_url = cleaned_next_url if not parsed_url.scheme and not parsed_url.netloc else "/repositories"
+    safe_next_url = (
+        cleaned_next_url
+        if not parsed_url.scheme and not parsed_url.netloc
+        else "/repositories"
+    )
 
     if current_user:
         return RedirectResponse(url=safe_next_url, status_code=302)

@@ -19,7 +19,9 @@ class ScheduleService:
         self.db = db
         self.scheduler_service = scheduler_service
 
-    def validate_cron_expression(self, cron_expression: str) -> tuple[bool, Optional[str]]:
+    def validate_cron_expression(
+        self, cron_expression: str
+    ) -> tuple[bool, Optional[str]]:
         """
         Validate a cron expression using APScheduler.
 
@@ -28,6 +30,7 @@ class ScheduleService:
         """
         try:
             from apscheduler.triggers.cron import CronTrigger
+
             CronTrigger.from_crontab(cron_expression)
             return True, None
         except ValueError as e:
@@ -63,7 +66,9 @@ class ScheduleService:
         """
         try:
             # Validate repository exists
-            repository = self.db.query(Repository).filter(Repository.id == repository_id).first()
+            repository = (
+                self.db.query(Repository).filter(Repository.id == repository_id).first()
+            )
             if not repository:
                 return False, None, "Repository not found"
 
@@ -163,7 +168,10 @@ class ScheduleService:
             # Update scheduler
             try:
                 await self.scheduler_service.update_schedule(
-                    schedule.id, schedule.name, schedule.cron_expression, schedule.enabled
+                    schedule.id,
+                    schedule.name,
+                    schedule.cron_expression,
+                    schedule.enabled,
                 )
                 return True, schedule, None
             except Exception as e:
@@ -193,7 +201,11 @@ class ScheduleService:
             try:
                 await self.scheduler_service.remove_schedule(schedule_id)
             except Exception as e:
-                return False, None, f"Failed to remove schedule from scheduler: {str(e)}"
+                return (
+                    False,
+                    None,
+                    f"Failed to remove schedule from scheduler: {str(e)}",
+                )
 
             # Delete from database
             self.db.delete(schedule)

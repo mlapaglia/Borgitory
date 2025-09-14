@@ -33,10 +33,18 @@ class ConfigurationService:
         """
         return {
             "repositories": db.query(Repository).all(),
-            "cleanup_configs": db.query(CleanupConfig).filter(CleanupConfig.enabled).all(),
-            "cloud_sync_configs": db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled).all(),
-            "notification_configs": db.query(NotificationConfig).filter(NotificationConfig.enabled).all(),
-            "check_configs": db.query(RepositoryCheckConfig).filter(RepositoryCheckConfig.enabled).all(),
+            "cleanup_configs": db.query(CleanupConfig)
+            .filter(CleanupConfig.enabled)
+            .all(),
+            "cloud_sync_configs": db.query(CloudSyncConfig)
+            .filter(CloudSyncConfig.enabled)
+            .all(),
+            "notification_configs": db.query(NotificationConfig)
+            .filter(NotificationConfig.enabled)
+            .all(),
+            "check_configs": db.query(RepositoryCheckConfig)
+            .filter(RepositoryCheckConfig.enabled)
+            .all(),
         }
 
     def get_cron_preset_descriptions(self) -> Dict[str, str]:

@@ -18,11 +18,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post(
-    "/",
-    response_class=HTMLResponse,
-    status_code=status.HTTP_201_CREATED
-)
+@router.post("/", response_class=HTMLResponse, status_code=status.HTTP_201_CREATED)
 async def create_notification_config(
     request: Request,
     templates: TemplatesDep,
@@ -101,7 +97,9 @@ async def test_notification_config(
 ):
     """Test a notification configuration"""
     try:
-        success, user_key, app_token, error_msg = service.get_config_credentials(config_id)
+        success, user_key, app_token, error_msg = service.get_config_credentials(
+            config_id
+        )
 
         if not success:
             status_code = 404 if "not found" in error_msg else 400
@@ -221,7 +219,9 @@ async def get_notification_config_edit_form(
             )
 
         # Get decrypted credentials for edit form
-        success, user_key, app_token, error_msg = service.get_config_credentials(config_id)
+        success, user_key, app_token, error_msg = service.get_config_credentials(
+            config_id
+        )
         if not success:
             user_key, app_token = "", ""
 
@@ -279,8 +279,8 @@ async def update_notification_config(
 
 @router.get("/form", response_class=HTMLResponse)
 async def get_notification_form(
-    request: Request,
-    templates: TemplatesDep) -> HTMLResponse:
+    request: Request, templates: TemplatesDep
+) -> HTMLResponse:
     """Get notification creation form"""
     return templates.TemplateResponse(
         request,

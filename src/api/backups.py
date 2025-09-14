@@ -12,6 +12,7 @@ from models.database import (
     get_db,
 )
 from dependencies import TemplatesDep
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 

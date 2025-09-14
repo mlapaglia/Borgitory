@@ -6,14 +6,13 @@ from typing import Optional
 
 from models.database import User, UserSession, get_db
 from dependencies import TemplatesDep
+
 router = APIRouter()
 
 
 @router.get("/check-users")
 def check_users_exist(
-    request: Request,
-    templates: TemplatesDep,
-    db: Session = Depends(get_db)
+    request: Request, templates: TemplatesDep, db: Session = Depends(get_db)
 ):
     user_count = db.query(User).count()
     has_users = user_count > 0
@@ -180,11 +179,7 @@ def login_user(
 
 
 @router.post("/logout")
-def logout(
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db)
-):
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     auth_token = request.cookies.get("auth_token")
     if auth_token:
         db.query(UserSession).filter(UserSession.session_token == auth_token).delete()
@@ -226,8 +221,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
 
 def get_current_user_optional(
-    request: Request,
-    db: Session = Depends(get_db)
+    request: Request, db: Session = Depends(get_db)
 ) -> Optional[User]:
     try:
         return get_current_user(request, db)

@@ -34,7 +34,9 @@ from services.jobs.broadcaster.job_event_broadcaster import (
 )
 from services.scheduling.schedule_service import ScheduleService
 from services.configuration_service import ConfigurationService
-from services.repositories.repository_check_config_service import RepositoryCheckConfigService
+from services.repositories.repository_check_config_service import (
+    RepositoryCheckConfigService,
+)
 from services.notifications.notification_config_service import NotificationConfigService
 from services.cleanup_service import CleanupService
 from fastapi.templating import Jinja2Templates
@@ -43,6 +45,7 @@ from fastapi.templating import Jinja2Templates
 # Global singleton instances
 _simple_command_runner_instance = None
 _job_manager_instance = None
+
 
 def get_job_manager_dependency() -> JobManager:
     """
@@ -63,8 +66,10 @@ def get_job_manager_dependency() -> JobManager:
         _job_manager_instance = create_job_manager(config)
     return _job_manager_instance
 
+
 # Define JobManagerDep here so it can be used in other dependency functions
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager_dependency)]
+
 
 def get_simple_command_runner() -> SimpleCommandRunner:
     """
@@ -80,6 +85,7 @@ def get_simple_command_runner() -> SimpleCommandRunner:
 
 _borg_service_instance = None
 
+
 def get_borg_service() -> BorgService:
     """
     Provide a BorgService singleton instance with dependency injection.
@@ -94,7 +100,7 @@ def get_borg_service() -> BorgService:
         _borg_service_instance = BorgService(
             command_runner=command_runner,
             volume_service=volume_service,
-            job_manager=job_manager
+            job_manager=job_manager,
         )
     return _borg_service_instance
 
@@ -111,9 +117,7 @@ def get_job_service(
     return JobService(db, job_manager)
 
 
-def get_backup_service(
-    db: Session = Depends(get_db)
-) -> BackupService:
+def get_backup_service(db: Session = Depends(get_db)) -> BackupService:
     """
     Provide a BackupService instance with database session.
 
@@ -124,6 +128,7 @@ def get_backup_service(
 
 
 _recovery_service_instance = None
+
 
 def get_recovery_service() -> RecoveryService:
     """
@@ -139,6 +144,7 @@ def get_recovery_service() -> RecoveryService:
 
 _pushover_service_instance = None
 
+
 def get_pushover_service() -> PushoverService:
     """
     Provide a PushoverService singleton instance.
@@ -152,6 +158,7 @@ def get_pushover_service() -> PushoverService:
 
 
 _job_stream_service_instance = None
+
 
 def get_job_stream_service() -> JobStreamService:
     """
@@ -168,6 +175,7 @@ def get_job_stream_service() -> JobStreamService:
 
 _job_render_service_instance = None
 
+
 def get_job_render_service() -> JobRenderService:
     """
     Provide a JobRenderService singleton instance.
@@ -182,6 +190,7 @@ def get_job_render_service() -> JobRenderService:
 
 
 _debug_service_instance = None
+
 
 def get_debug_service() -> DebugService:
     """
@@ -198,6 +207,7 @@ def get_debug_service() -> DebugService:
 
 _rclone_service_instance = None
 
+
 def get_rclone_service() -> RcloneService:
     """
     Provide a RcloneService singleton instance.
@@ -211,6 +221,7 @@ def get_rclone_service() -> RcloneService:
 
 
 _repository_stats_service_instance = None
+
 
 def get_repository_stats_service() -> RepositoryStatsService:
     """
@@ -226,6 +237,7 @@ def get_repository_stats_service() -> RepositoryStatsService:
 
 _scheduler_service_instance = None
 
+
 def get_scheduler_service() -> SchedulerService:
     """
     Provide a SchedulerService singleton instance.
@@ -239,6 +251,7 @@ def get_scheduler_service() -> SchedulerService:
 
 
 _volume_service_instance = None
+
 
 def get_volume_service() -> VolumeService:
     """
@@ -263,6 +276,7 @@ def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinition
 
 _repository_parser_instance = None
 
+
 def get_repository_parser() -> RepositoryParser:
     """
     Provide a RepositoryParser singleton instance with proper dependency injection.
@@ -278,6 +292,7 @@ def get_repository_parser() -> RepositoryParser:
 
 _borg_command_builder_instance = None
 
+
 def get_borg_command_builder() -> BorgCommandBuilder:
     """
     Provide a BorgCommandBuilder singleton instance.
@@ -291,6 +306,7 @@ def get_borg_command_builder() -> BorgCommandBuilder:
 
 
 _archive_manager_instance = None
+
 
 def get_archive_manager() -> ArchiveManager:
     """
@@ -312,6 +328,7 @@ def get_archive_manager() -> ArchiveManager:
 
 _cloud_sync_manager_instance = None
 
+
 def get_cloud_sync_manager() -> CloudSyncManager:
     """
     Provide a CloudSyncManager singleton instance.
@@ -325,6 +342,7 @@ def get_cloud_sync_manager() -> CloudSyncManager:
 
 
 _repository_service_instance = None
+
 
 def get_repository_service() -> RepositoryService:
     """
@@ -340,7 +358,7 @@ def get_repository_service() -> RepositoryService:
         _repository_service_instance = RepositoryService(
             borg_service=borg_service,
             scheduler_service=scheduler_service,
-            volume_service=volume_service
+            volume_service=volume_service,
         )
     return _repository_service_instance
 
@@ -357,6 +375,7 @@ def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
 
 _templates_instance = None
 
+
 def get_templates() -> Jinja2Templates:
     """
     Provide a Jinja2Templates singleton instance.
@@ -371,7 +390,7 @@ def get_templates() -> Jinja2Templates:
 
 def get_schedule_service(
     db: Session = Depends(get_db),
-    scheduler_service: SchedulerService = Depends(get_scheduler_service)
+    scheduler_service: SchedulerService = Depends(get_scheduler_service),
 ) -> ScheduleService:
     """
     Provide a ScheduleService instance with database session injection.
@@ -382,6 +401,7 @@ def get_schedule_service(
 
 
 _configuration_service_instance = None
+
 
 def get_configuration_service() -> ConfigurationService:
     """
@@ -396,7 +416,7 @@ def get_configuration_service() -> ConfigurationService:
 
 
 def get_repository_check_config_service(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> RepositoryCheckConfigService:
     """
     Provide a RepositoryCheckConfigService instance with database session injection.
@@ -407,7 +427,7 @@ def get_repository_check_config_service(
 
 
 def get_notification_config_service(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> NotificationConfigService:
     """
     Provide a NotificationConfigService instance with database session injection.
@@ -417,9 +437,7 @@ def get_notification_config_service(
     return NotificationConfigService(db=db)
 
 
-def get_cleanup_service(
-    db: Session = Depends(get_db)
-) -> CleanupService:
+def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
     """
     Provide a CleanupService instance with database session injection.
 
@@ -459,7 +477,13 @@ JobEventBroadcasterDep = Annotated[
 ]
 TemplatesDep = Annotated[Jinja2Templates, Depends(get_templates)]
 ScheduleServiceDep = Annotated[ScheduleService, Depends(get_schedule_service)]
-ConfigurationServiceDep = Annotated[ConfigurationService, Depends(get_configuration_service)]
-RepositoryCheckConfigServiceDep = Annotated[RepositoryCheckConfigService, Depends(get_repository_check_config_service)]
-NotificationConfigServiceDep = Annotated[NotificationConfigService, Depends(get_notification_config_service)]
+ConfigurationServiceDep = Annotated[
+    ConfigurationService, Depends(get_configuration_service)
+]
+RepositoryCheckConfigServiceDep = Annotated[
+    RepositoryCheckConfigService, Depends(get_repository_check_config_service)
+]
+NotificationConfigServiceDep = Annotated[
+    NotificationConfigService, Depends(get_notification_config_service)
+]
 CleanupServiceDep = Annotated[CleanupService, Depends(get_cleanup_service)]

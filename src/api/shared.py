@@ -11,10 +11,10 @@ templates = Jinja2Templates(directory="src/templates")
 
 @router.get("/notification", response_class=HTMLResponse)
 async def get_notification(
-    request: Request, 
-    message: str, 
+    request: Request,
+    message: str,
     type: str = "info",
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get a notification with specified message and type.
 
@@ -31,8 +31,7 @@ async def get_notification(
 
 @router.get("/notification-remove", response_class=HTMLResponse)
 async def remove_notification(
-    request: Request,
-    current_user: User = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     """Remove a notification (returns empty content)."""
     return HTMLResponse(content="", status_code=200)

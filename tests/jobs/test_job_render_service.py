@@ -1,6 +1,7 @@
 """
 Tests for JobRenderService with clean dependency injection patterns.
 """
+
 import pytest
 from unittest.mock import Mock
 
@@ -25,8 +26,7 @@ class TestJobRenderService:
         """Test initialization with custom templates directory"""
         custom_dir = "/custom/templates"
         service = JobRenderService(
-            job_manager=mock_job_manager,
-            templates_dir=custom_dir
+            job_manager=mock_job_manager, templates_dir=custom_dir
         )
 
         # Service creates templates object but doesn't store templates_dir
@@ -43,7 +43,9 @@ class TestJobRenderService:
 
         assert "No job history available" in result
 
-    def test_render_jobs_html_with_database_jobs(self, mock_job_manager, sample_database_job_with_tasks):
+    def test_render_jobs_html_with_database_jobs(
+        self, mock_job_manager, sample_database_job_with_tasks
+    ):
         """Test rendering HTML with database jobs containing tasks"""
         service = JobRenderService(job_manager=mock_job_manager)
         mock_db = Mock()
@@ -81,8 +83,7 @@ class TestJobRenderService:
     def test_format_database_job_creates_context_with_uuid(self, mock_job_manager):
         """Test that database job formatting creates context with UUID"""
         job_context = create_mock_job_context(
-            job_type="composite",
-            tasks=[Mock(task_name="backup", status="completed")]
+            job_type="composite", tasks=[Mock(task_name="backup", status="completed")]
         )
         mock_job = job_context["job"]
 
@@ -101,7 +102,7 @@ class TestJobRenderService:
         service = JobRenderService(job_manager=mock_job_manager)
         result = service._format_database_job_for_render(mock_job)
 
-        assert result is not None # All jobs are now composite
+        assert result is not None  # All jobs are now composite
         assert "sorted_tasks" in result
 
     def test_job_context_maintains_backward_compatibility(self, mock_job_manager):
@@ -123,18 +124,16 @@ class TestJobRenderService:
         mock_task.status = "completed"
 
         job_with_tasks = create_mock_job_context(
-            job_type="composite",
-            tasks=[mock_task]
+            job_type="composite", tasks=[mock_task]
         )["job"]
 
         service = JobRenderService(job_manager=mock_job_manager)
         service._format_database_job_for_render(job_with_tasks)
 
         # Test job without tasks
-        job_without_tasks = create_mock_job_context(
-            job_type="composite",
-            tasks=[]
-        )["job"]
+        job_without_tasks = create_mock_job_context(job_type="composite", tasks=[])[
+            "job"
+        ]
 
         service._format_database_job_for_render(job_without_tasks)
 
@@ -154,7 +153,9 @@ class TestJobRenderService:
 class TestJobRenderServiceIntegration:
     """Integration tests for JobRenderService with real database operations"""
 
-    def test_render_with_real_database_job(self, mock_job_manager, sample_database_job_with_tasks):
+    def test_render_with_real_database_job(
+        self, mock_job_manager, sample_database_job_with_tasks
+    ):
         """Test rendering with actual database job and tasks"""
         service = JobRenderService(job_manager=mock_job_manager)
 
@@ -173,7 +174,9 @@ class TestJobRenderServiceIntegration:
         # Verify database query was constructed properly
         mock_db.query.assert_called_once()
 
-    def test_toggle_details_endpoint_compatibility(self, mock_job_manager, sample_database_job_with_tasks):
+    def test_toggle_details_endpoint_compatibility(
+        self, mock_job_manager, sample_database_job_with_tasks
+    ):
         """Test compatibility with toggle-details endpoint"""
         service = JobRenderService(job_manager=mock_job_manager)
 

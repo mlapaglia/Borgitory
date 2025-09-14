@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 class BackupStatus(Enum):
     """Status of backup operations"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -36,6 +37,7 @@ class BackupStatus(Enum):
 @dataclass
 class BackupConfig:
     """Configuration for backup operations"""
+
     source_paths: List[str]
     archive_name: Optional[str] = None
     compression: str = "zstd"
@@ -54,6 +56,7 @@ class BackupConfig:
 @dataclass
 class PruneConfig:
     """Configuration for prune operations"""
+
     keep_within: Optional[str] = None
     keep_daily: Optional[int] = None
     keep_weekly: Optional[int] = None
@@ -67,6 +70,7 @@ class PruneConfig:
 @dataclass
 class BackupResult:
     """Result of a backup operation"""
+
     status: BackupStatus
     return_code: int
     output_lines: List[str]
@@ -103,7 +107,7 @@ class BackupExecutor:
         config: BackupConfig,
         operation_id: Optional[str] = None,
         output_callback: Optional[Callable[[str], None]] = None,
-        progress_callback: Optional[Callable[[Dict], None]] = None
+        progress_callback: Optional[Callable[[Dict], None]] = None,
     ) -> BackupResult:
         """
         Execute a backup operation with integrated output handling.
@@ -122,13 +126,15 @@ class BackupExecutor:
             status=BackupStatus.RUNNING,
             return_code=-1,
             output_lines=[],
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
 
         if not operation_id:
             operation_id = f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
 
-        logger.info(f"Starting backup operation {operation_id} for repository {repository.name}")
+        logger.info(
+            f"Starting backup operation {operation_id} for repository {repository.name}"
+        )
 
         try:
             # Validate inputs
@@ -164,12 +170,19 @@ class BackupExecutor:
                 result.status = BackupStatus.FAILED
                 # Extract error from output
                 if result.output_lines:
-                    error_lines = result.output_lines[-5:]  # Last 5 lines likely contain error
-                    result.error_message = f"Backup failed (exit code {return_code}): " + "\n".join(error_lines)
+                    error_lines = result.output_lines[
+                        -5:
+                    ]  # Last 5 lines likely contain error
+                    result.error_message = (
+                        f"Backup failed (exit code {return_code}): "
+                        + "\n".join(error_lines)
+                    )
                 else:
                     result.error_message = f"Backup failed with exit code {return_code}"
 
-                logger.error(f"Backup operation {operation_id} failed: {result.error_message}")
+                logger.error(
+                    f"Backup operation {operation_id} failed: {result.error_message}"
+                )
 
             return result
 
@@ -191,7 +204,7 @@ class BackupExecutor:
         repository: Repository,
         config: PruneConfig,
         operation_id: Optional[str] = None,
-        output_callback: Optional[Callable[[str], None]] = None
+        output_callback: Optional[Callable[[str], None]] = None,
     ) -> BackupResult:
         """
         Execute a prune operation with integrated output handling.
@@ -209,13 +222,15 @@ class BackupExecutor:
             status=BackupStatus.RUNNING,
             return_code=-1,
             output_lines=[],
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
 
         if not operation_id:
             operation_id = f"prune-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
 
-        logger.info(f"Starting prune operation {operation_id} for repository {repository.name}")
+        logger.info(
+            f"Starting prune operation {operation_id} for repository {repository.name}"
+        )
 
         try:
             # Build Borg prune command
@@ -230,9 +245,7 @@ class BackupExecutor:
                 self.active_operations[operation_id] = process
 
             # Monitor output
-            await self._monitor_process_output(
-                process, result, output_callback, None
-            )
+            await self._monitor_process_output(process, result, output_callback, None)
 
             # Wait for completion
             return_code = await process.wait()
@@ -247,11 +260,16 @@ class BackupExecutor:
                 # Extract error from output
                 if result.output_lines:
                     error_lines = result.output_lines[-5:]
-                    result.error_message = f"Prune failed (exit code {return_code}): " + "\n".join(error_lines)
+                    result.error_message = (
+                        f"Prune failed (exit code {return_code}): "
+                        + "\n".join(error_lines)
+                    )
                 else:
                     result.error_message = f"Prune failed with exit code {return_code}"
 
-                logger.error(f"Prune operation {operation_id} failed: {result.error_message}")
+                logger.error(
+                    f"Prune operation {operation_id} failed: {result.error_message}"
+                )
 
             return result
 
@@ -272,7 +290,7 @@ class BackupExecutor:
         self,
         command: List[str],
         env: Optional[Dict[str, str]] = None,
-        cwd: Optional[str] = None
+        cwd: Optional[str] = None,
     ) -> asyncio.subprocess.Process:
         """Start a subprocess with the given command"""
         try:
@@ -362,7 +380,9 @@ class BackupExecutor:
             elif "Archive name:" in line:
                 progress_info["archive_name"] = line.split("Archive name:")[-1].strip()
             elif "Archive fingerprint:" in line:
-                progress_info["fingerprint"] = line.split("Archive fingerprint:")[-1].strip()
+                progress_info["fingerprint"] = line.split("Archive fingerprint:")[
+                    -1
+                ].strip()
             elif "Time (start):" in line:
                 progress_info["start_time"] = line.split("Time (start):")[-1].strip()
             elif "Time (end):" in line:
@@ -373,7 +393,9 @@ class BackupExecutor:
 
         return progress_info
 
-    def _build_backup_command(self, repository: Repository, config: BackupConfig) -> tuple[List[str], Dict[str, str]]:
+    def _build_backup_command(
+        self, repository: Repository, config: BackupConfig
+    ) -> tuple[List[str], Dict[str, str]]:
         """Build Borg backup command with arguments"""
         additional_args = []
 
@@ -410,7 +432,9 @@ class BackupExecutor:
             additional_args=additional_args,
         )
 
-    def _build_prune_command(self, repository: Repository, config: PruneConfig) -> tuple[List[str], Dict[str, str]]:
+    def _build_prune_command(
+        self, repository: Repository, config: PruneConfig
+    ) -> tuple[List[str], Dict[str, str]]:
         """Build Borg prune command with arguments"""
         additional_args = []
 
@@ -446,7 +470,9 @@ class BackupExecutor:
             additional_args=additional_args,
         )
 
-    async def terminate_operation(self, operation_id: str, timeout: float = 5.0) -> bool:
+    async def terminate_operation(
+        self, operation_id: str, timeout: float = 5.0
+    ) -> bool:
         """Terminate an active operation gracefully"""
         if operation_id not in self.active_operations:
             logger.warning(f"Operation {operation_id} not found in active operations")
@@ -461,7 +487,9 @@ class BackupExecutor:
                     await asyncio.wait_for(process.wait(), timeout=timeout)
                     logger.info(f"Operation {operation_id} terminated gracefully")
                 except asyncio.TimeoutError:
-                    logger.warning(f"Operation {operation_id} did not terminate gracefully, force killing")
+                    logger.warning(
+                        f"Operation {operation_id} did not terminate gracefully, force killing"
+                    )
                     process.kill()
                     await process.wait()
                     logger.info(f"Operation {operation_id} force killed")

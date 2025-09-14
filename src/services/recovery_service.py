@@ -89,8 +89,7 @@ class RecoveryService:
 
                     # Release repository lock if this was a backup job
                     if (
-                        job.job_type
-                        in ["manual_backup", "scheduled_backup", "backup"]
+                        job.job_type in ["manual_backup", "scheduled_backup", "backup"]
                         and job.repository_id
                     ):
                         repository = (

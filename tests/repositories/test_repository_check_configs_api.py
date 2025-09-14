@@ -54,7 +54,7 @@ def sample_config_update():
     return RepositoryCheckConfigUpdate(
         name="updated-config",
         description="Updated configuration",
-        check_type="repository_only"
+        check_type="repository_only",
     )
 
 
@@ -62,7 +62,9 @@ class TestRepositoryCheckConfigsAPI:
     """Test class for API endpoints focusing on HTMX responses."""
 
     @pytest.mark.asyncio
-    async def test_create_config_success_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
+    async def test_create_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_create
+    ):
         """Test successful config creation returns correct HTMX response."""
         from api.repository_check_configs import create_repository_check_config
 
@@ -101,12 +103,18 @@ class TestRepositoryCheckConfigsAPI:
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_create_config_failure_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
+    async def test_create_config_failure_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_create
+    ):
         """Test failed config creation returns correct HTMX error response."""
         from api.repository_check_configs import create_repository_check_config
 
         # Mock service failure
-        mock_service.create_config.return_value = (False, None, "Config name already exists")
+        mock_service.create_config.return_value = (
+            False,
+            None,
+            "Config name already exists",
+        )
 
         await create_repository_check_config(
             mock_request, sample_config_create, mock_templates, mock_service
@@ -121,12 +129,18 @@ class TestRepositoryCheckConfigsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_create_config_server_error_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_create):
+    async def test_create_config_server_error_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_create
+    ):
         """Test server error during creation returns correct status code."""
         from api.repository_check_configs import create_repository_check_config
 
         # Mock service failure with "Failed to" error
-        mock_service.create_config.return_value = (False, None, "Failed to create config")
+        mock_service.create_config.return_value = (
+            False,
+            None,
+            "Failed to create config",
+        )
 
         await create_repository_check_config(
             mock_request, sample_config_create, mock_templates, mock_service
@@ -159,7 +173,9 @@ class TestRepositoryCheckConfigsAPI:
             {"configs": mock_configs},
         )
 
-    def test_get_configs_html_exception(self, mock_request, mock_templates, mock_service):
+    def test_get_configs_html_exception(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting configs HTML with exception returns error template."""
         from api.repository_check_configs import get_repository_check_configs_html
 
@@ -175,14 +191,13 @@ class TestRepositoryCheckConfigsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_form_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_get_form_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting form returns correct HTMX template response."""
         from api.repository_check_configs import get_repository_check_form
 
-        mock_form_data = {
-            "repositories": [MagicMock()],
-            "check_configs": [MagicMock()]
-        }
+        mock_form_data = {"repositories": [MagicMock()], "check_configs": [MagicMock()]}
         mock_service.get_form_data.return_value = mock_form_data
 
         await get_repository_check_form(mock_request, mock_templates, mock_service)
@@ -212,14 +227,18 @@ class TestRepositoryCheckConfigsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_config_edit_form_success(self, mock_request, mock_templates, mock_service):
+    async def test_get_config_edit_form_success(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting edit form returns correct HTMX template response."""
         from api.repository_check_configs import get_repository_check_config_edit_form
 
         mock_config = MagicMock()
         mock_service.get_config_by_id.return_value = mock_config
 
-        await get_repository_check_config_edit_form(mock_request, 1, mock_templates, mock_service)
+        await get_repository_check_config_edit_form(
+            mock_request, 1, mock_templates, mock_service
+        )
 
         # Verify service was called
         mock_service.get_config_by_id.assert_called_once_with(1)
@@ -232,7 +251,9 @@ class TestRepositoryCheckConfigsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_config_edit_form_not_found(self, mock_request, mock_templates, mock_service):
+    async def test_get_config_edit_form_not_found(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test getting edit form for non-existent config raises HTTPException."""
         from api.repository_check_configs import get_repository_check_config_edit_form
         from fastapi import HTTPException
@@ -240,13 +261,17 @@ class TestRepositoryCheckConfigsAPI:
         mock_service.get_config_by_id.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_repository_check_config_edit_form(mock_request, 999, mock_templates, mock_service)
+            await get_repository_check_config_edit_form(
+                mock_request, 999, mock_templates, mock_service
+            )
 
         assert exc_info.value.status_code == 404
         assert "Check policy not found" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
-    async def test_update_config_success_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_update):
+    async def test_update_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_update
+    ):
         """Test successful config update returns correct HTMX response."""
         from api.repository_check_configs import update_repository_check_config
 
@@ -273,7 +298,9 @@ class TestRepositoryCheckConfigsAPI:
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_update_config_failure_htmx_response(self, mock_request, mock_templates, mock_service, sample_config_update):
+    async def test_update_config_failure_htmx_response(
+        self, mock_request, mock_templates, mock_service, sample_config_update
+    ):
         """Test failed config update returns correct HTMX error response."""
         from api.repository_check_configs import update_repository_check_config
 
@@ -292,13 +319,21 @@ class TestRepositoryCheckConfigsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_enable_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_enable_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test successful config enable returns correct HTMX response."""
         from api.repository_check_configs import enable_repository_check_config
 
-        mock_service.enable_config.return_value = (True, "Config enabled successfully!", None)
+        mock_service.enable_config.return_value = (
+            True,
+            "Config enabled successfully!",
+            None,
+        )
 
-        result = await enable_repository_check_config(mock_request, 1, mock_templates, mock_service)
+        result = await enable_repository_check_config(
+            mock_request, 1, mock_templates, mock_service
+        )
 
         # Verify service was called
         mock_service.enable_config.assert_called_once_with(1)
@@ -314,13 +349,21 @@ class TestRepositoryCheckConfigsAPI:
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_disable_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_disable_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test successful config disable returns correct HTMX response."""
         from api.repository_check_configs import disable_repository_check_config
 
-        mock_service.disable_config.return_value = (True, "Config disabled successfully!", None)
+        mock_service.disable_config.return_value = (
+            True,
+            "Config disabled successfully!",
+            None,
+        )
 
-        result = await disable_repository_check_config(mock_request, 1, mock_templates, mock_service)
+        result = await disable_repository_check_config(
+            mock_request, 1, mock_templates, mock_service
+        )
 
         # Verify service was called
         mock_service.disable_config.assert_called_once_with(1)
@@ -336,13 +379,17 @@ class TestRepositoryCheckConfigsAPI:
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_delete_config_success_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_delete_config_success_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test successful config deletion returns correct HTMX response."""
         from api.repository_check_configs import delete_repository_check_config
 
         mock_service.delete_config.return_value = (True, "test-config", None)
 
-        result = await delete_repository_check_config(mock_request, 1, mock_templates, mock_service)
+        result = await delete_repository_check_config(
+            mock_request, 1, mock_templates, mock_service
+        )
 
         # Verify service was called
         mock_service.delete_config.assert_called_once_with(1)
@@ -358,13 +405,17 @@ class TestRepositoryCheckConfigsAPI:
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
     @pytest.mark.asyncio
-    async def test_delete_config_failure_htmx_response(self, mock_request, mock_templates, mock_service):
+    async def test_delete_config_failure_htmx_response(
+        self, mock_request, mock_templates, mock_service
+    ):
         """Test failed config deletion returns correct HTMX error response."""
         from api.repository_check_configs import delete_repository_check_config
 
         mock_service.delete_config.return_value = (False, None, "Config not found")
 
-        await delete_repository_check_config(mock_request, 999, mock_templates, mock_service)
+        await delete_repository_check_config(
+            mock_request, 999, mock_templates, mock_service
+        )
 
         # Verify error template response
         mock_templates.TemplateResponse.assert_called_once_with(
@@ -428,7 +479,9 @@ class TestRepositoryCheckConfigsAPI:
             {"show_custom": False},
         )
 
-    def test_update_check_options_repository_only_type(self, mock_request, mock_templates):
+    def test_update_check_options_repository_only_type(
+        self, mock_request, mock_templates
+    ):
         """Test update check options for repository_only check type."""
         from api.repository_check_configs import update_check_options
 
@@ -437,7 +490,7 @@ class TestRepositoryCheckConfigsAPI:
             mock_templates,
             check_type="repository_only",
             max_duration="3600",
-            repair_mode="false"
+            repair_mode="false",
         )
 
         # Verify correct template response with expected context
@@ -459,7 +512,7 @@ class TestRepositoryCheckConfigsAPI:
             mock_templates,
             check_type="full",
             max_duration="",
-            repair_mode="true"
+            repair_mode="true",
         )
 
         # Verify correct template response with expected context

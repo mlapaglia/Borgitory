@@ -41,7 +41,9 @@ class BorgService:
     def _get_job_manager(self) -> JobManager:
         """Get job manager instance - must be injected via DI"""
         if self.job_manager is None:
-            raise RuntimeError("JobManager not provided - must be injected via dependency injection")
+            raise RuntimeError(
+                "JobManager not provided - must be injected via dependency injection"
+            )
         return self.job_manager
 
     def _parse_borg_config(self, repo_path: str) -> Dict[str, any]:
@@ -596,6 +598,7 @@ class BorgService:
             else:
                 # Fallback: use direct import (for backward compatibility)
                 from dependencies import get_volume_service
+
                 volume_service = get_volume_service()
                 mounted_volumes = await volume_service.get_mounted_volumes()
 

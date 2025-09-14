@@ -22,7 +22,9 @@ class JobService:
     specialized execution services like BackupService.
     """
 
-    def __init__(self, db: Session, job_manager: JobManager, backup_service: BackupService = None):
+    def __init__(
+        self, db: Session, job_manager: JobManager, backup_service: BackupService = None
+    ):
         self.db = db
         self.job_manager = job_manager
         self.backup_service = backup_service or BackupService(db)
@@ -70,9 +72,7 @@ class JobService:
 
         return {"job_id": job_id, "status": "started"}
 
-    async def create_prune_job(
-        self, prune_request: PruneRequest
-    ) -> Dict[str, Any]:
+    async def create_prune_job(self, prune_request: PruneRequest) -> Dict[str, Any]:
         """Create a standalone prune job"""
         repository = (
             self.db.query(Repository)
@@ -98,9 +98,7 @@ class JobService:
 
         return {"job_id": job_id, "status": "started"}
 
-    async def create_check_job(
-        self, check_request: CheckRequest
-    ) -> Dict[str, Any]:
+    async def create_check_job(self, check_request: CheckRequest) -> Dict[str, Any]:
         """Create a repository check job"""
         repository = (
             self.db.query(Repository)

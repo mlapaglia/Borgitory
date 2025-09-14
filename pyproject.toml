@@ -121,8 +121,8 @@ indent-style = "space"
 # Like Black, respect magic trailing commas.
 skip-magic-trailing-comma = false
 
-# Like Black, automatically detect the appropriate line ending.
-line-ending = "auto"
+# Force LF line endings on all platforms.
+line-ending = "lf"
 
 [tool.pytest.ini_options]
 # Test discovery configuration

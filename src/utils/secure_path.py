@@ -19,31 +19,33 @@ logger = logging.getLogger(__name__)
 def _pre_validate_user_input(user_path: str, allowed_prefixes: List[str]) -> bool:
     """
     Pre-validate user input before Path operations to prevent security issues.
-    
+
     Args:
         user_path: The user-provided path to validate
         allowed_prefixes: List of allowed absolute path prefixes (e.g., ["/mnt", "/app/app/data"])
-    
+
     Returns:
         True if input is safe to process, False otherwise
     """
     # Check if input is a proper non-empty string without null bytes
     if not isinstance(user_path, str) or user_path.strip() == "" or "\x00" in user_path:
-        logger.warning(f"Path validation failed for '{user_path}': empty or invalid path string")
+        logger.warning(
+            f"Path validation failed for '{user_path}': empty or invalid path string"
+        )
         return False
-    
+
     # Only permit absolute paths if they start with allowed prefixes
     # Check both OS-specific absolute paths and Unix-style paths (for Docker containers)
-    is_absolute = os.path.isabs(user_path) or user_path.startswith('/')
+    is_absolute = os.path.isabs(user_path) or user_path.startswith("/")
     if is_absolute:
         # For Unix-style paths, check with forward slash
         unix_match = any(
-            user_path.startswith(prefix + "/") or user_path == prefix 
+            user_path.startswith(prefix + "/") or user_path == prefix
             for prefix in allowed_prefixes
         )
         # For Windows-style paths, convert allowed prefixes to Windows format and check
         windows_match = False
-        if os.name == 'nt' and os.path.isabs(user_path):
+        if os.name == "nt" and os.path.isabs(user_path):
             # Convert Unix prefixes to Windows format for local development
             windows_prefixes = []
             for prefix in allowed_prefixes:
@@ -52,14 +54,18 @@ def _pre_validate_user_input(user_path: str, allowed_prefixes: List[str]) -> boo
                 elif prefix == "/app/app/data":
                     windows_prefixes.append("C:\\app\\app\\data")
             windows_match = any(
-                user_path.startswith(prefix + "\\") or user_path.startswith(prefix + "/") or user_path == prefix
+                user_path.startswith(prefix + "\\")
+                or user_path.startswith(prefix + "/")
+                or user_path == prefix
                 for prefix in windows_prefixes
             )
-        
+
         if not (unix_match or windows_match):
-            logger.warning(f"Path validation failed for '{user_path}': absolute path not under allowed roots")
+            logger.warning(
+                f"Path validation failed for '{user_path}': absolute path not under allowed roots"
+            )
             return False
-    
+
     return True
 
 
@@ -109,7 +115,9 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
 
             # Hardened containment check: must be strictly inside allowed_root_real
             normalized_root = os.path.join(allowed_root_real, "")
-            if target_realpath == allowed_root_real or target_realpath.startswith(normalized_root):
+            if target_realpath == allowed_root_real or target_realpath.startswith(
+                normalized_root
+            ):
                 # Disallow symlinks that point outside, ensure target_realpath is inside root
                 # Additional defense: verify relpath does not start with ../
                 rel_path = os.path.relpath(target_realpath, allowed_root_real)
@@ -117,7 +125,9 @@ def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optiona
                     logger.debug(f"Validated path: {user_path} -> {target_realpath}")
                     return Path(target_realpath)
                 else:
-                    logger.warning(f"Path traversal attempt detected for '{user_path}' resolved as '{target_realpath}' relative '{rel_path}'")
+                    logger.warning(
+                        f"Path traversal attempt detected for '{user_path}' resolved as '{target_realpath}' relative '{rel_path}'"
+                    )
                     return None
         allowed_paths = ["/mnt"] + (["/app/app/data"] if allow_app_data else [])
         logger.warning(
@@ -143,6 +153,7 @@ def validate_user_repository_path(user_path: str) -> Optional[Path]:
     This prevents users from putting repositories in /app/app/data.
     """
     return validate_mnt_path(user_path)
+
 
 def sanitize_filename(filename: str, max_length: int = 100) -> str:
     """
@@ -300,7 +311,7 @@ def secure_isdir(path: str, allowed_base_dirs: List[str] = None) -> bool:
     except (PermissionError, OSError) as e:
         logger.warning(f"Cannot access path '{path}': {e}")
         return False
-        
+
 
 def secure_remove_file(file_path: str, allowed_base_dirs: List[str] = None) -> bool:
     """
@@ -394,6 +405,7 @@ def user_secure_isdir(path: str) -> bool:
     except (PermissionError, OSError) as e:
         logger.warning(f"Cannot access path '{path}': {e}")
         return False
+
 
 def user_get_directory_listing(
     path: str, include_files: bool = False

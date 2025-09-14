@@ -6,6 +6,7 @@ from services.volumes.os_file_system import OsFileSystem
 
 logger = logging.getLogger(__name__)
 
+
 class VolumeService:
     """Service to discover mounted volumes under /mnt"""
 

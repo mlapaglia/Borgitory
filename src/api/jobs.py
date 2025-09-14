@@ -15,6 +15,7 @@ router = APIRouter()
 def get_job_manager_dependency() -> JobManager:
     """Dependency to get modular job manager instance."""
     from dependencies import get_job_manager_dependency as get_jm_dep
+
     return get_jm_dep()
 
 
@@ -28,9 +29,7 @@ async def create_backup(
     """Start a backup job using JobService"""
 
     try:
-        result = await job_svc.create_backup_job(
-            backup_request, JobType.MANUAL_BACKUP
-        )
+        result = await job_svc.create_backup_job(backup_request, JobType.MANUAL_BACKUP)
         job_id = result["job_id"]
 
         return templates.TemplateResponse(
@@ -38,7 +37,7 @@ async def create_backup(
             "partials/jobs/backup_success.html",
             {"job_id": job_id},
         )
-        
+
     except ValueError as e:
         error_msg = f"Repository not found: {str(e)}"
         return templates.TemplateResponse(
@@ -46,7 +45,7 @@ async def create_backup(
             "partials/jobs/backup_error.html",
             {"error_message": error_msg},
             status_code=400,
-            )
+        )
     except Exception as e:
         logger.error(f"Failed to start backup: {e}")
         error_msg = f"Failed to start backup: {str(e)}"
@@ -331,8 +330,7 @@ async def toggle_task_details(
 
 
 @router.post("/{job_id}/copy-output")
-async def copy_job_output(
-):
+async def copy_job_output():
     """Copy job output to clipboard (returns success message)"""
     return {"message": "Output copied to clipboard"}
 
@@ -348,8 +346,7 @@ async def stream_task_output(
 
 
 @router.post("/{job_id}/tasks/{task_order}/copy-output")
-async def copy_task_output(
-):
+async def copy_task_output():
     """Copy task output to clipboard (returns success message)"""
     return {"message": "Task output copied to clipboard"}
 

@@ -3,6 +3,7 @@ Tests for Job SSE API endpoint - Unit tests only
 Note: Full SSE streaming tests are handled in test_job_render_service.py
 Integration testing of SSE endpoints requires specialized tools due to streaming nature.
 """
+
 from fastapi.testclient import TestClient
 
 from main import app
@@ -20,7 +21,7 @@ class TestJobsAPISSEEndpoint:
         # This test just verifies the endpoint exists and can be called
         # without actually consuming the stream
         from api.jobs import router
-        
+
         # Check that the route is registered
         routes = [route.path for route in router.routes]
         assert "/current/stream" in routes
@@ -29,11 +30,11 @@ class TestJobsAPISSEEndpoint:
         """Test that SSE endpoint function has correct signature"""
         from api.jobs import stream_current_jobs_html
         import inspect
-        
+
         # Check function signature
         sig = inspect.signature(stream_current_jobs_html)
-        assert 'render_svc' in sig.parameters
-        
+        assert "render_svc" in sig.parameters
+
         # Check that it's an async function
         assert inspect.iscoroutinefunction(stream_current_jobs_html)
 
@@ -41,10 +42,10 @@ class TestJobsAPISSEEndpoint:
         """Test that SSE endpoint has all necessary imports"""
         from api.jobs import stream_current_jobs_html
         import inspect
-        
+
         # Get the source code to verify it uses StreamingResponse
         source = inspect.getsource(stream_current_jobs_html)
-        
+
         assert "StreamingResponse" in source
         assert "text/event-stream" in source
         assert "Cache-Control" in source

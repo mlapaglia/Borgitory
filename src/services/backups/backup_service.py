@@ -17,7 +17,12 @@ from sqlalchemy.orm import Session
 from models.database import Repository, Job, JobTask, Schedule
 from models.schemas import BackupRequest, PruneRequest
 from models.enums import JobType
-from services.backups.backup_executor import BackupExecutor, BackupConfig, PruneConfig, BackupResult
+from services.backups.backup_executor import (
+    BackupExecutor,
+    BackupConfig,
+    PruneConfig,
+    BackupResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +35,9 @@ class BackupService:
     Job creation and management is handled by JobService.
     """
 
-    def __init__(self, db_session: Session, backup_executor: Optional[BackupExecutor] = None):
+    def __init__(
+        self, db_session: Session, backup_executor: Optional[BackupExecutor] = None
+    ):
         """
         Initialize the backup service.
 
@@ -45,7 +52,7 @@ class BackupService:
         self,
         job: Job,
         backup_request: BackupRequest,
-        output_callback: Optional[Callable[[str], None]] = None
+        output_callback: Optional[Callable[[str], None]] = None,
     ) -> BackupResult:
         """
         Execute a backup for an existing job.
@@ -71,10 +78,12 @@ class BackupService:
         try:
             # Create backup configuration
             backup_config = BackupConfig(
-                source_paths=[backup_request.source_path] if backup_request.source_path else ["/tmp"],
+                source_paths=[backup_request.source_path]
+                if backup_request.source_path
+                else ["/tmp"],
                 compression=backup_request.compression or "zstd",
                 dry_run=backup_request.dry_run or False,
-                excludes=[]  # Can be extended from backup_request in the future
+                excludes=[],  # Can be extended from backup_request in the future
             )
 
             # Create backup task record
@@ -91,7 +100,7 @@ class BackupService:
                 repository=repository,
                 config=backup_config,
                 operation_id=job.id,
-                output_callback=combined_output_callback
+                output_callback=combined_output_callback,
             )
 
             # Update task with results
@@ -104,7 +113,6 @@ class BackupService:
 
             # Update final job status
             self._finalize_job(job)
-
 
             logger.info(f"Backup job {job.id} completed with status: {job.status}")
             return result
@@ -143,11 +151,13 @@ class BackupService:
             repository_id=repository.id,
             source_path="/data",  # Default source path for scheduled backups
             compression="zstd",
-            dry_run=False
+            dry_run=False,
         )
 
         # Execute backup
-        return await self.create_and_run_backup(backup_request, JobType.SCHEDULED_BACKUP)
+        return await self.create_and_run_backup(
+            backup_request, JobType.SCHEDULED_BACKUP
+        )
 
     async def create_and_run_prune(self, prune_request: PruneRequest) -> str:
         """
@@ -174,12 +184,12 @@ class BackupService:
         try:
             # Create prune configuration
             prune_config = PruneConfig(
-                keep_within=getattr(prune_request, 'keep_within', None),
-                keep_daily=getattr(prune_request, 'keep_daily', None),
-                keep_weekly=getattr(prune_request, 'keep_weekly', None),
-                keep_monthly=getattr(prune_request, 'keep_monthly', None),
-                keep_yearly=getattr(prune_request, 'keep_yearly', None),
-                dry_run=getattr(prune_request, 'dry_run', False)
+                keep_within=getattr(prune_request, "keep_within", None),
+                keep_daily=getattr(prune_request, "keep_daily", None),
+                keep_weekly=getattr(prune_request, "keep_weekly", None),
+                keep_monthly=getattr(prune_request, "keep_monthly", None),
+                keep_yearly=getattr(prune_request, "keep_yearly", None),
+                dry_run=getattr(prune_request, "dry_run", False),
             )
 
             # Create prune task record
@@ -190,7 +200,7 @@ class BackupService:
                 repository=repository,
                 config=prune_config,
                 operation_id=job.id,
-                output_callback=lambda line: self._handle_output_line(prune_task, line)
+                output_callback=lambda line: self._handle_output_line(prune_task, line),
             )
 
             # Update task with results
@@ -198,7 +208,6 @@ class BackupService:
 
             # Update final job status
             self._finalize_job(job)
-
 
             logger.info(f"Prune job {job.id} completed with status: {job.status}")
             return job.id
@@ -230,7 +239,12 @@ class BackupService:
             return None
 
         # Get tasks for this job
-        tasks = self.db.query(JobTask).filter(JobTask.job_id == job_id).order_by(JobTask.task_order).all()
+        tasks = (
+            self.db.query(JobTask)
+            .filter(JobTask.job_id == job_id)
+            .order_by(JobTask.task_order)
+            .all()
+        )
 
         return {
             "id": job.id,
@@ -245,14 +259,18 @@ class BackupService:
                     "type": task.task_type,
                     "name": task.task_name,
                     "status": task.status,
-                    "started_at": task.started_at.isoformat() if task.started_at else None,
-                    "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+                    "started_at": task.started_at.isoformat()
+                    if task.started_at
+                    else None,
+                    "completed_at": task.completed_at.isoformat()
+                    if task.completed_at
+                    else None,
                     "output": task.output,
                     "error": task.error,
-                    "return_code": task.return_code
+                    "return_code": task.return_code,
                 }
                 for task in tasks
-            ]
+            ],
         }
 
     def list_recent_jobs(self, limit: int = 50) -> List[Dict[str, Any]]:
@@ -265,12 +283,7 @@ class BackupService:
         Returns:
             List of job dictionaries
         """
-        jobs = (
-            self.db.query(Job)
-            .order_by(Job.started_at.desc())
-            .limit(limit)
-            .all()
-        )
+        jobs = self.db.query(Job).order_by(Job.started_at.desc()).limit(limit).all()
 
         return [
             {
@@ -280,7 +293,7 @@ class BackupService:
                 "started_at": job.started_at.isoformat() if job.started_at else None,
                 "finished_at": job.finished_at.isoformat() if job.finished_at else None,
                 "repository_id": job.repository_id,
-                "repository_name": job.repository.name if job.repository else "Unknown"
+                "repository_name": job.repository.name if job.repository else "Unknown",
             }
             for job in jobs
         ]
@@ -314,7 +327,9 @@ class BackupService:
         """Get repository by ID"""
         return self.db.query(Repository).filter(Repository.id == repository_id).first()
 
-    def _create_job_record(self, repository: Repository, job_type: JobType, request) -> Job:
+    def _create_job_record(
+        self, repository: Repository, job_type: JobType, request
+    ) -> Job:
         """Create a new job record in the database"""
         import uuid
 
@@ -326,17 +341,17 @@ class BackupService:
             started_at=datetime.now(UTC),
             job_type=job_type.value,  # For compatibility
             total_tasks=1,  # Will be updated if more tasks are added
-            completed_tasks=0
+            completed_tasks=0,
         )
 
         # Add optional configurations
-        if hasattr(request, 'cloud_sync_config_id'):
+        if hasattr(request, "cloud_sync_config_id"):
             job.cloud_sync_config_id = request.cloud_sync_config_id
-        if hasattr(request, 'cleanup_config_id'):
+        if hasattr(request, "cleanup_config_id"):
             job.cleanup_config_id = request.cleanup_config_id
-        if hasattr(request, 'check_config_id'):
+        if hasattr(request, "check_config_id"):
             job.check_config_id = request.check_config_id
-        if hasattr(request, 'notification_config_id'):
+        if hasattr(request, "notification_config_id"):
             job.notification_config_id = request.notification_config_id
 
         self.db.add(job)
@@ -354,7 +369,7 @@ class BackupService:
             task_name=f"Backup {job.repository.name}",
             status="running",
             started_at=datetime.now(UTC),
-            task_order=0
+            task_order=0,
         )
 
         self.db.add(task)
@@ -371,7 +386,7 @@ class BackupService:
             task_name=f"Prune {job.repository.name}",
             status="running",
             started_at=datetime.now(UTC),
-            task_order=0
+            task_order=0,
         )
 
         self.db.add(task)
@@ -414,12 +429,14 @@ class BackupService:
         job: Job,
         repository: Repository,
         backup_request: BackupRequest,
-        backup_success: bool
+        backup_success: bool,
     ):
         """Handle post-backup operations like prune, check, cloud sync, notifications"""
         # Only run post-backup operations if backup succeeded
         if not backup_success:
-            logger.info(f"Skipping post-backup operations for job {job.id} due to backup failure")
+            logger.info(
+                f"Skipping post-backup operations for job {job.id} due to backup failure"
+            )
             return
 
         tasks_added = 0

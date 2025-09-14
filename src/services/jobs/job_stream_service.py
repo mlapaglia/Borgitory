@@ -155,7 +155,9 @@ class JobStreamService:
                                             # Build complete output from all lines
                                             full_output = "\n".join(
                                                 [
-                                                    line.get("text", "") if isinstance(line, dict) else str(line)
+                                                    line.get("text", "")
+                                                    if isinstance(line, dict)
+                                                    else str(line)
                                                     for line in task.output_lines
                                                 ]
                                             )
@@ -311,7 +313,9 @@ class JobStreamService:
                 while task.status == "running":
                     try:
                         event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
-                        logger.debug(f"Task streaming received event: {event.get('type')} for job {event.get('job_id', 'unknown')}")
+                        logger.debug(
+                            f"Task streaming received event: {event.get('type')} for job {event.get('job_id', 'unknown')}"
+                        )
 
                         # Only process events for this specific job and task
                         if (
@@ -321,13 +325,17 @@ class JobStreamService:
                             event_data = event.get("data", {})
                             # Check if this is a task-specific event for our task
                             event_task_index = event_data.get("task_index")
-                            logger.debug(f"Event task_index: {event_task_index}, expected: {task_order}")
+                            logger.debug(
+                                f"Event task_index: {event_task_index}, expected: {task_order}"
+                            )
 
                             if event_task_index == task_order:
                                 output_line = event_data.get("line", "")
                                 if output_line:
                                     # Send individual line as div for hx-swap="beforeend"
-                                    logger.debug(f"Sending output line for task {task_order}: {output_line[:50]}...")
+                                    logger.debug(
+                                        f"Sending output line for task {task_order}: {output_line[:50]}..."
+                                    )
                                     yield f"event: output\ndata: <div>{output_line}</div>\n\n"
 
                         elif (
@@ -357,7 +365,7 @@ class JobStreamService:
         except Exception as e:
             logger.error(
                 f"Error in task output stream for job {job_id}, task {task_order}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             # Send error event with more specific information
             error_msg = f"Streaming error for job {job_id}, task {task_order}: {str(e)}"
@@ -431,4 +439,3 @@ class JobStreamService:
                 )
 
         return current_jobs
-

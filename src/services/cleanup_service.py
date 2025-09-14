@@ -19,27 +19,24 @@ class CleanupService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_cleanup_configs(self, skip: int = 0, limit: int = 100) -> List[CleanupConfig]:
+    def get_cleanup_configs(
+        self, skip: int = 0, limit: int = 100
+    ) -> List[CleanupConfig]:
         """Get all cleanup configurations with pagination."""
-        return (
-            self.db.query(CleanupConfig)
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        return self.db.query(CleanupConfig).offset(skip).limit(limit).all()
 
     def get_cleanup_config_by_id(self, config_id: int) -> Optional[CleanupConfig]:
         """Get a cleanup configuration by ID."""
         config = (
-            self.db.query(CleanupConfig)
-            .filter(CleanupConfig.id == config_id)
-            .first()
+            self.db.query(CleanupConfig).filter(CleanupConfig.id == config_id).first()
         )
         if not config:
             raise Exception(f"Cleanup configuration with id {config_id} not found")
         return config
 
-    def create_cleanup_config(self, cleanup_config: CleanupConfigCreate) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
+    def create_cleanup_config(
+        self, cleanup_config: CleanupConfigCreate
+    ) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
         """
         Create a new cleanup configuration.
 
@@ -81,7 +78,9 @@ class CleanupService:
             self.db.rollback()
             return False, None, f"Failed to create cleanup configuration: {str(e)}"
 
-    def update_cleanup_config(self, config_id: int, config_update: CleanupConfigUpdate) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
+    def update_cleanup_config(
+        self, config_id: int, config_update: CleanupConfigUpdate
+    ) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
         """
         Update an existing cleanup configuration.
 
@@ -125,7 +124,9 @@ class CleanupService:
             self.db.rollback()
             return False, None, f"Failed to update cleanup configuration: {str(e)}"
 
-    def enable_cleanup_config(self, config_id: int) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
+    def enable_cleanup_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
         """
         Enable a cleanup configuration.
 
@@ -151,7 +152,9 @@ class CleanupService:
             self.db.rollback()
             return False, None, f"Failed to enable cleanup configuration: {str(e)}"
 
-    def disable_cleanup_config(self, config_id: int) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
+    def disable_cleanup_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
         """
         Disable a cleanup configuration.
 
@@ -177,7 +180,9 @@ class CleanupService:
             self.db.rollback()
             return False, None, f"Failed to disable cleanup configuration: {str(e)}"
 
-    def delete_cleanup_config(self, config_id: int) -> Tuple[bool, Optional[str], Optional[str]]:
+    def delete_cleanup_config(
+        self, config_id: int
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Delete a cleanup configuration.
 

@@ -1,6 +1,7 @@
 """
 Tests for NotificationConfigService - Business logic tests
 """
+
 import pytest
 from services.notifications.notification_config_service import NotificationConfigService
 from models.database import NotificationConfig
@@ -20,7 +21,7 @@ def sample_config(test_db):
         provider="pushover",
         notify_on_success=True,
         notify_on_failure=False,
-        enabled=True
+        enabled=True,
     )
     config.set_pushover_credentials("test-user", "test-token")
     test_db.add(config)
@@ -44,7 +45,7 @@ class TestNotificationConfigService:
             provider="pushover",
             notify_on_success=True,
             notify_on_failure=False,
-            enabled=True
+            enabled=True,
         )
         config1.set_pushover_credentials("user1", "token1")
 
@@ -53,7 +54,7 @@ class TestNotificationConfigService:
             provider="pushover",
             notify_on_success=False,
             notify_on_failure=True,
-            enabled=False
+            enabled=False,
         )
         config2.set_pushover_credentials("user2", "token2")
 
@@ -75,7 +76,7 @@ class TestNotificationConfigService:
                 provider="pushover",
                 notify_on_success=True,
                 notify_on_failure=False,
-                enabled=True
+                enabled=True,
             )
             config.set_pushover_credentials(f"user{i}", f"token{i}")
             test_db.add(config)
@@ -104,7 +105,7 @@ class TestNotificationConfigService:
             notify_on_success=True,
             notify_on_failure=False,
             user_key="new-user",
-            app_token="new-token"
+            app_token="new-token",
         )
 
         assert success is True
@@ -116,9 +117,11 @@ class TestNotificationConfigService:
         assert config.enabled is True  # Default value
 
         # Verify saved to database
-        saved_config = test_db.query(NotificationConfig).filter(
-            NotificationConfig.name == "new-config"
-        ).first()
+        saved_config = (
+            test_db.query(NotificationConfig)
+            .filter(NotificationConfig.name == "new-config")
+            .first()
+        )
         assert saved_config is not None
         assert saved_config.provider == "pushover"
 
@@ -132,14 +135,14 @@ class TestNotificationConfigService:
         from unittest.mock import patch
 
         # Mock the database commit to raise an exception
-        with patch.object(test_db, 'commit', side_effect=Exception("Database error")):
+        with patch.object(test_db, "commit", side_effect=Exception("Database error")):
             success, config, error = service.create_config(
                 name="error-config",
                 provider="pushover",
                 notify_on_success=True,
                 notify_on_failure=False,
                 user_key="user",
-                app_token="token"
+                app_token="token",
             )
 
             assert success is False
@@ -155,7 +158,7 @@ class TestNotificationConfigService:
             notify_on_success=False,
             notify_on_failure=True,
             user_key="updated-user",
-            app_token="updated-token"
+            app_token="updated-token",
         )
 
         assert success is True
@@ -178,7 +181,7 @@ class TestNotificationConfigService:
             notify_on_success=True,
             notify_on_failure=False,
             user_key="user",
-            app_token="token"
+            app_token="token",
         )
 
         assert success is False
@@ -193,7 +196,7 @@ class TestNotificationConfigService:
             provider="pushover",
             notify_on_success=True,
             notify_on_failure=False,
-            enabled=False
+            enabled=False,
         )
         config.set_pushover_credentials("user", "token")
         test_db.add(config)
@@ -227,7 +230,7 @@ class TestNotificationConfigService:
             provider="pushover",
             notify_on_success=True,
             notify_on_failure=False,
-            enabled=True
+            enabled=True,
         )
         config.set_pushover_credentials("user", "token")
         test_db.add(config)
@@ -265,9 +268,11 @@ class TestNotificationConfigService:
         assert error is None
 
         # Verify removed from database
-        deleted_config = test_db.query(NotificationConfig).filter(
-            NotificationConfig.id == config_id
-        ).first()
+        deleted_config = (
+            test_db.query(NotificationConfig)
+            .filter(NotificationConfig.id == config_id)
+            .first()
+        )
         assert deleted_config is None
 
     def test_delete_config_not_found(self, service):
@@ -286,7 +291,7 @@ class TestNotificationConfigService:
             provider="pushover",
             notify_on_success=True,
             notify_on_failure=True,
-            enabled=True
+            enabled=True,
         )
         config1.set_pushover_credentials("user1", "token1")
 
@@ -296,7 +301,7 @@ class TestNotificationConfigService:
             provider="pushover",
             notify_on_success=False,
             notify_on_failure=True,
-            enabled=True
+            enabled=True,
         )
         config2.set_pushover_credentials("user2", "token2")
 
@@ -306,7 +311,7 @@ class TestNotificationConfigService:
             provider="pushover",
             notify_on_success=False,
             notify_on_failure=False,
-            enabled=True
+            enabled=True,
         )
         config3.set_pushover_credentials("user3", "token3")
 
@@ -334,7 +339,9 @@ class TestNotificationConfigService:
 
     def test_get_config_credentials_success(self, service, sample_config):
         """Test getting config credentials successfully."""
-        success, user_key, app_token, error = service.get_config_credentials(sample_config.id)
+        success, user_key, app_token, error = service.get_config_credentials(
+            sample_config.id
+        )
 
         assert success is True
         assert user_key == "test-user"
@@ -358,7 +365,7 @@ class TestNotificationConfigService:
             provider="unsupported",
             notify_on_success=True,
             notify_on_failure=False,
-            enabled=True
+            enabled=True,
         )
         test_db.add(config)
         test_db.commit()
@@ -380,7 +387,7 @@ class TestNotificationConfigService:
             notify_on_success=True,
             notify_on_failure=False,
             user_key="lifecycle-user",
-            app_token="lifecycle-token"
+            app_token="lifecycle-token",
         )
         assert success is True
         config_id = created_config.id
@@ -393,7 +400,7 @@ class TestNotificationConfigService:
             notify_on_success=False,
             notify_on_failure=True,
             user_key="updated-user",
-            app_token="updated-token"
+            app_token="updated-token",
         )
         assert success is True
         assert updated_config.name == "updated-lifecycle-test"
@@ -420,7 +427,9 @@ class TestNotificationConfigService:
         assert config_name == "updated-lifecycle-test"
 
         # Verify completely removed
-        deleted_config = test_db.query(NotificationConfig).filter(
-            NotificationConfig.id == config_id
-        ).first()
+        deleted_config = (
+            test_db.query(NotificationConfig)
+            .filter(NotificationConfig.id == config_id)
+            .first()
+        )
         assert deleted_config is None

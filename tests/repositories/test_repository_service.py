@@ -59,7 +59,9 @@ class TestRepositoryService:
         return mock
 
     @pytest.fixture
-    def repository_service(self, mock_borg_service, mock_scheduler_service, mock_volume_service):
+    def repository_service(
+        self, mock_borg_service, mock_scheduler_service, mock_volume_service
+    ):
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
@@ -68,7 +70,9 @@ class TestRepositoryService:
         )
 
     @pytest.mark.asyncio
-    async def test_create_repository_success(self, repository_service, mock_borg_service, mock_db_session):
+    async def test_create_repository_success(
+        self, repository_service, mock_borg_service, mock_db_session
+    ):
         """Test successful repository creation."""
         # Arrange
         request = CreateRepositoryRequest(
@@ -87,11 +91,16 @@ class TestRepositoryService:
         mock_repo.name = "test-repo"
         mock_db_session.add = Mock()
         mock_db_session.commit = Mock()
-        mock_db_session.refresh = Mock(side_effect=lambda x: setattr(x, 'id', 123))
+        mock_db_session.refresh = Mock(side_effect=lambda x: setattr(x, "id", 123))
 
-        with patch('services.repositories.repository_service.Repository', return_value=mock_repo):
+        with patch(
+            "services.repositories.repository_service.Repository",
+            return_value=mock_repo,
+        ):
             # Act
-            result = await repository_service.create_repository(request, mock_db_session)
+            result = await repository_service.create_repository(
+                request, mock_db_session
+            )
 
             # Assert
             assert result.success is True
@@ -103,7 +112,9 @@ class TestRepositoryService:
             mock_db_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_repository_name_already_exists(self, repository_service, mock_db_session):
+    async def test_create_repository_name_already_exists(
+        self, repository_service, mock_db_session
+    ):
         """Test repository creation fails when name already exists."""
         # Arrange
         request = CreateRepositoryRequest(
@@ -119,7 +130,10 @@ class TestRepositoryService:
 
         # Set up mock to return existing repo for name check, None for path check
         # The service checks name first, then path, so we use side_effect
-        mock_db_session.query.return_value.filter.return_value.first.side_effect = [existing_repo, None]
+        mock_db_session.query.return_value.filter.return_value.first.side_effect = [
+            existing_repo,
+            None,
+        ]
 
         # Act
         result = await repository_service.create_repository(request, mock_db_session)
@@ -147,15 +161,20 @@ class TestRepositoryService:
         # Mock failed initialization
         mock_borg_service.initialize_repository.return_value = {
             "success": False,
-            "message": "Permission denied"
+            "message": "Permission denied",
         }
 
         mock_repo = Mock()
         mock_repo.name = "test-repo"
 
-        with patch('services.repositories.repository_service.Repository', return_value=mock_repo):
+        with patch(
+            "services.repositories.repository_service.Repository",
+            return_value=mock_repo,
+        ):
             # Act
-            result = await repository_service.create_repository(request, mock_db_session)
+            result = await repository_service.create_repository(
+                request, mock_db_session
+            )
 
             # Assert
             assert result.success is False
@@ -165,7 +184,9 @@ class TestRepositoryService:
             mock_db_session.rollback.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_scan_repositories_success(self, repository_service, mock_borg_service):
+    async def test_scan_repositories_success(
+        self, repository_service, mock_borg_service
+    ):
         """Test successful repository scanning."""
         # Arrange
         request = RepositoryScanRequest()
@@ -200,7 +221,6 @@ class TestRepositoryService:
         assert result.repositories[1].name == "repo2"
         assert result.repositories[1].encryption_mode == "none"
 
-
     @pytest.mark.asyncio
     async def test_delete_repository_blocked_by_active_jobs(
         self, repository_service, mock_db_session
@@ -230,12 +250,14 @@ class TestRepositoryService:
         mock_db_session.query.side_effect = [repo_query, jobs_query]
 
         with patch.multiple(
-            'services.repositories.repository_service',
+            "services.repositories.repository_service",
             Repository=Mock(),
             Job=Mock(),
         ):
             # Act
-            result = await repository_service.delete_repository(request, mock_db_session)
+            result = await repository_service.delete_repository(
+                request, mock_db_session
+            )
 
             # Assert
             assert result.success is False
@@ -260,7 +282,8 @@ class TestRepositoryService:
         # Mock successful verification
         mock_borg_service.verify_repository_access.return_value = True
         mock_borg_service.list_archives.return_value = [
-            {"name": "archive1"}, {"name": "archive2"}
+            {"name": "archive1"},
+            {"name": "archive2"},
         ]
 
         # Mock repository object
@@ -268,9 +291,14 @@ class TestRepositoryService:
         mock_repo.id = 124
         mock_repo.name = "imported-repo"
 
-        with patch('services.repositories.repository_service.Repository', return_value=mock_repo):
+        with patch(
+            "services.repositories.repository_service.Repository",
+            return_value=mock_repo,
+        ):
             # Act
-            result = await repository_service.import_repository(request, mock_db_session)
+            result = await repository_service.import_repository(
+                request, mock_db_session
+            )
 
             # Assert
             assert result.success is True
@@ -288,10 +316,7 @@ class TestRepositoryService:
             RepositoryValidationError(field="path", message="Path invalid"),
         ]
 
-        result = RepositoryOperationResult(
-            success=False,
-            validation_errors=errors
-        )
+        result = RepositoryOperationResult(success=False, validation_errors=errors)
 
         # Assert
         assert result.is_validation_error is True
@@ -302,8 +327,7 @@ class TestRepositoryService:
         """Test RepositoryOperationResult Borg error properties."""
         # Arrange
         result = RepositoryOperationResult(
-            success=False,
-            borg_error="Repository already exists"
+            success=False, borg_error="Repository already exists"
         )
 
         # Assert

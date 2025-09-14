@@ -17,6 +17,7 @@ class TestBackupService:
     @pytest.fixture
     def test_repository(self, test_db):
         """Create test repository using real database"""
+
         @contextmanager
         def db_session_factory():
             try:
@@ -28,7 +29,7 @@ class TestBackupService:
             repo = Repository(
                 name="test-service-repo",
                 path="/tmp/test-service-repo",
-                encrypted_passphrase="dummy"
+                encrypted_passphrase="dummy",
             )
             repo.set_passphrase("test-service-passphrase")
             db.add(repo)
@@ -63,7 +64,9 @@ class TestBackupService:
         assert service.executor == mock_executor
 
     @pytest.mark.asyncio
-    async def test_execute_backup_success(self, backup_service_with_mock_executor, test_repository):
+    async def test_execute_backup_success(
+        self, backup_service_with_mock_executor, test_repository
+    ):
         """Test successful backup execution"""
         # Create a job record
         job = Job(
@@ -72,7 +75,7 @@ class TestBackupService:
             type="backup",
             status="running",
             started_at=datetime.now(UTC),
-            job_type="backup"
+            job_type="backup",
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
@@ -82,7 +85,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             source_path="/data",
             compression="zstd",
-            dry_run=False
+            dry_run=False,
         )
 
         # Mock successful backup result
@@ -90,13 +93,19 @@ class TestBackupService:
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Backup completed successfully"],
-            completed_at=datetime.now(UTC)
+            completed_at=datetime.now(UTC),
         )
-        backup_service_with_mock_executor.executor.execute_backup = AsyncMock(return_value=mock_result)
+        backup_service_with_mock_executor.executor.execute_backup = AsyncMock(
+            return_value=mock_result
+        )
 
         # Mock post-backup operations
-        with patch.object(backup_service_with_mock_executor, '_handle_post_backup_operations') as mock_post_ops:
-            result = await backup_service_with_mock_executor.execute_backup(job, backup_request)
+        with patch.object(
+            backup_service_with_mock_executor, "_handle_post_backup_operations"
+        ) as mock_post_ops:
+            result = await backup_service_with_mock_executor.execute_backup(
+                job, backup_request
+            )
 
         assert result.status == BackupStatus.COMPLETED
         assert result.success is True
@@ -104,7 +113,11 @@ class TestBackupService:
         mock_post_ops.assert_called_once()
 
         # Verify job was updated
-        updated_job = backup_service_with_mock_executor.db.query(Job).filter(Job.id == job.id).first()
+        updated_job = (
+            backup_service_with_mock_executor.db.query(Job)
+            .filter(Job.id == job.id)
+            .first()
+        )
         assert updated_job is not None
 
     @pytest.mark.asyncio
@@ -115,33 +128,31 @@ class TestBackupService:
             repository_id=999,  # Non-existent repository
             type="backup",
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
 
-        backup_request = BackupRequest(
-            repository_id=999,
-            source_path="/data"
-        )
+        backup_request = BackupRequest(repository_id=999, source_path="/data")
 
         with pytest.raises(ValueError, match="Repository 999 not found"):
             await backup_service.execute_backup(job, backup_request)
 
     @pytest.mark.asyncio
-    async def test_execute_backup_with_output_callback(self, backup_service_with_mock_executor, test_repository):
+    async def test_execute_backup_with_output_callback(
+        self, backup_service_with_mock_executor, test_repository
+    ):
         """Test backup execution with output callback"""
         job = Job(
             id=str(uuid.uuid4()),
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
 
         backup_request = BackupRequest(
-            repository_id=test_repository.id,
-            source_path="/data"
+            repository_id=test_repository.id, source_path="/data"
         )
 
         output_lines = []
@@ -154,18 +165,20 @@ class TestBackupService:
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Test output line"],
-            completed_at=datetime.now(UTC)
+            completed_at=datetime.now(UTC),
         )
 
         # Mock executor to call output callback
         async def mock_execute_backup(*args, **kwargs):
-            if 'output_callback' in kwargs and kwargs['output_callback']:
-                kwargs['output_callback']("Test output line")
+            if "output_callback" in kwargs and kwargs["output_callback"]:
+                kwargs["output_callback"]("Test output line")
             return mock_result
 
         backup_service_with_mock_executor.executor.execute_backup = mock_execute_backup
 
-        with patch.object(backup_service_with_mock_executor, '_handle_post_backup_operations'):
+        with patch.object(
+            backup_service_with_mock_executor, "_handle_post_backup_operations"
+        ):
             result = await backup_service_with_mock_executor.execute_backup(
                 job, backup_request, output_callback=output_callback
             )
@@ -175,21 +188,22 @@ class TestBackupService:
         assert output_lines[0] == "Test output line"
 
     @pytest.mark.asyncio
-    async def test_execute_backup_failure_exception(self, backup_service_with_mock_executor, test_repository):
+    async def test_execute_backup_failure_exception(
+        self, backup_service_with_mock_executor, test_repository
+    ):
         """Test backup execution with exception handling"""
         job = Job(
             id=str(uuid.uuid4()),
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
 
         backup_request = BackupRequest(
-            repository_id=test_repository.id,
-            source_path="/data"
+            repository_id=test_repository.id, source_path="/data"
         )
 
         # Mock executor to raise exception
@@ -201,13 +215,19 @@ class TestBackupService:
             await backup_service_with_mock_executor.execute_backup(job, backup_request)
 
         # Verify job status was updated to failed
-        updated_job = backup_service_with_mock_executor.db.query(Job).filter(Job.id == job.id).first()
+        updated_job = (
+            backup_service_with_mock_executor.db.query(Job)
+            .filter(Job.id == job.id)
+            .first()
+        )
         assert updated_job.status == "failed"
         assert updated_job.error == "Backup failed"
         assert updated_job.finished_at is not None
 
     @pytest.mark.asyncio
-    async def test_run_scheduled_backup(self, backup_service_with_mock_executor, test_repository):
+    async def test_run_scheduled_backup(
+        self, backup_service_with_mock_executor, test_repository
+    ):
         """Test running a scheduled backup"""
         # Create schedule
         schedule = Schedule(
@@ -215,7 +235,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             name="Test Schedule",
             cron_expression="0 2 * * *",
-            enabled=True
+            enabled=True,
         )
         backup_service_with_mock_executor.db.add(schedule)
         backup_service_with_mock_executor.db.commit()
@@ -223,7 +243,9 @@ class TestBackupService:
 
         # The run_scheduled_backup method should call create_and_run_prune or similar
         # Since create_and_run_backup doesn't exist, let's test that it raises AttributeError
-        with pytest.raises(AttributeError, match="has no attribute 'create_and_run_backup'"):
+        with pytest.raises(
+            AttributeError, match="has no attribute 'create_and_run_backup'"
+        ):
             await backup_service_with_mock_executor.run_scheduled_backup(schedule)
 
     @pytest.mark.asyncio
@@ -231,23 +253,19 @@ class TestBackupService:
         """Test running scheduled backup with no repository"""
         # Create schedule with non-existent repository
         schedule = Schedule(
-            id=1,
-            repository_id=999,
-            name="Test Schedule",
-            cron_expression="0 2 * * *"
+            id=1, repository_id=999, name="Test Schedule", cron_expression="0 2 * * *"
         )
 
         with pytest.raises(ValueError, match="No repository found for schedule 1"):
             await backup_service.run_scheduled_backup(schedule)
 
     @pytest.mark.asyncio
-    async def test_create_and_run_prune_success(self, backup_service_with_mock_executor, test_repository):
+    async def test_create_and_run_prune_success(
+        self, backup_service_with_mock_executor, test_repository
+    ):
         """Test successful prune creation and execution"""
         prune_request = PruneRequest(
-            repository_id=test_repository.id,
-            keep_daily=7,
-            keep_weekly=4,
-            dry_run=False
+            repository_id=test_repository.id, keep_daily=7, keep_weekly=4, dry_run=False
         )
 
         # Mock successful prune result
@@ -255,17 +273,25 @@ class TestBackupService:
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Prune completed successfully"],
-            completed_at=datetime.now(UTC)
+            completed_at=datetime.now(UTC),
         )
-        backup_service_with_mock_executor.executor.execute_prune = AsyncMock(return_value=mock_result)
+        backup_service_with_mock_executor.executor.execute_prune = AsyncMock(
+            return_value=mock_result
+        )
 
-        job_id = await backup_service_with_mock_executor.create_and_run_prune(prune_request)
+        job_id = await backup_service_with_mock_executor.create_and_run_prune(
+            prune_request
+        )
 
         assert job_id is not None
         backup_service_with_mock_executor.executor.execute_prune.assert_called_once()
 
         # Verify job was created
-        job = backup_service_with_mock_executor.db.query(Job).filter(Job.id == job_id).first()
+        job = (
+            backup_service_with_mock_executor.db.query(Job)
+            .filter(Job.id == job_id)
+            .first()
+        )
         assert job is not None
         assert job.repository_id == test_repository.id
         assert job.type == JobType.PRUNE.value
@@ -273,21 +299,17 @@ class TestBackupService:
     @pytest.mark.asyncio
     async def test_create_and_run_prune_repository_not_found(self, backup_service):
         """Test prune with non-existent repository"""
-        prune_request = PruneRequest(
-            repository_id=999,
-            keep_daily=7
-        )
+        prune_request = PruneRequest(repository_id=999, keep_daily=7)
 
         with pytest.raises(ValueError, match="Repository 999 not found"):
             await backup_service.create_and_run_prune(prune_request)
 
     @pytest.mark.asyncio
-    async def test_create_and_run_prune_failure(self, backup_service_with_mock_executor, test_repository):
+    async def test_create_and_run_prune_failure(
+        self, backup_service_with_mock_executor, test_repository
+    ):
         """Test prune execution failure"""
-        prune_request = PruneRequest(
-            repository_id=test_repository.id,
-            keep_daily=7
-        )
+        prune_request = PruneRequest(repository_id=test_repository.id, keep_daily=7)
 
         # Mock executor to raise exception
         backup_service_with_mock_executor.executor.execute_prune = AsyncMock(
@@ -306,7 +328,7 @@ class TestBackupService:
             type="backup",
             status="completed",
             started_at=datetime.now(UTC),
-            finished_at=datetime.now(UTC)
+            finished_at=datetime.now(UTC),
         )
         backup_service.db.add(job)
         backup_service.db.commit()
@@ -319,7 +341,7 @@ class TestBackupService:
             started_at=datetime.now(UTC),
             completed_at=datetime.now(UTC),
             return_code=0,
-            task_order=1
+            task_order=1,
         )
         backup_service.db.add(task)
         backup_service.db.commit()
@@ -351,7 +373,7 @@ class TestBackupService:
                 type="backup",
                 status="completed",
                 started_at=datetime.now(UTC),
-                finished_at=datetime.now(UTC)
+                finished_at=datetime.now(UTC),
             )
             jobs.append(job)
             backup_service.db.add(job)
@@ -377,7 +399,7 @@ class TestBackupService:
                 repository_id=test_repository.id,
                 type="backup",
                 status="completed",
-                started_at=datetime.now(UTC)
+                started_at=datetime.now(UTC),
             )
             backup_service.db.add(job)
 
@@ -397,32 +419,44 @@ class TestBackupService:
             repository_id=1,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
 
         # Mock successful termination
-        backup_service_with_mock_executor.executor.terminate_operation = AsyncMock(return_value=True)
+        backup_service_with_mock_executor.executor.terminate_operation = AsyncMock(
+            return_value=True
+        )
 
         success = await backup_service_with_mock_executor.cancel_job(job_id)
 
         assert success is True
-        backup_service_with_mock_executor.executor.terminate_operation.assert_called_once_with(job_id)
+        backup_service_with_mock_executor.executor.terminate_operation.assert_called_once_with(
+            job_id
+        )
 
         # Verify job status was updated
-        updated_job = backup_service_with_mock_executor.db.query(Job).filter(Job.id == job_id).first()
+        updated_job = (
+            backup_service_with_mock_executor.db.query(Job)
+            .filter(Job.id == job_id)
+            .first()
+        )
         assert updated_job.status == "cancelled"
         assert updated_job.error == "Job was cancelled by user"
         assert updated_job.finished_at is not None
 
     @pytest.mark.asyncio
-    async def test_cancel_job_termination_failed(self, backup_service_with_mock_executor):
+    async def test_cancel_job_termination_failed(
+        self, backup_service_with_mock_executor
+    ):
         """Test job cancellation when termination fails"""
         job_id = "cancel-fail-test"
 
         # Mock failed termination
-        backup_service_with_mock_executor.executor.terminate_operation = AsyncMock(return_value=False)
+        backup_service_with_mock_executor.executor.terminate_operation = AsyncMock(
+            return_value=False
+        )
 
         success = await backup_service_with_mock_executor.cancel_job(job_id)
 
@@ -440,19 +474,25 @@ class TestBackupService:
             type="backup",
             status="completed",
             started_at=datetime.now(UTC),
-            finished_at=datetime.now(UTC)
+            finished_at=datetime.now(UTC),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
 
         # Mock successful termination
-        backup_service_with_mock_executor.executor.terminate_operation = AsyncMock(return_value=True)
+        backup_service_with_mock_executor.executor.terminate_operation = AsyncMock(
+            return_value=True
+        )
 
         success = await backup_service_with_mock_executor.cancel_job(job_id)
 
         assert success is True
         # Job status should not change since it wasn't running
-        updated_job = backup_service_with_mock_executor.db.query(Job).filter(Job.id == job_id).first()
+        updated_job = (
+            backup_service_with_mock_executor.db.query(Job)
+            .filter(Job.id == job_id)
+            .first()
+        )
         assert updated_job.status == "completed"
 
     def test_get_repository_success(self, backup_service, test_repository):
@@ -475,10 +515,12 @@ class TestBackupService:
             cloud_sync_config_id=1,
             cleanup_config_id=2,
             check_config_id=3,
-            notification_config_id=4
+            notification_config_id=4,
         )
 
-        job = backup_service._create_job_record(test_repository, JobType.MANUAL_BACKUP, backup_request)
+        job = backup_service._create_job_record(
+            test_repository, JobType.MANUAL_BACKUP, backup_request
+        )
 
         assert job is not None
         assert job.repository_id == test_repository.id
@@ -497,11 +539,12 @@ class TestBackupService:
     def test_create_job_record_minimal(self, backup_service, test_repository):
         """Test _create_job_record with minimal request"""
         backup_request = BackupRequest(
-            repository_id=test_repository.id,
-            source_path="/data"
+            repository_id=test_repository.id, source_path="/data"
         )
 
-        job = backup_service._create_job_record(test_repository, JobType.BACKUP, backup_request)
+        job = backup_service._create_job_record(
+            test_repository, JobType.BACKUP, backup_request
+        )
 
         assert job is not None
         assert job.repository_id == test_repository.id
@@ -516,7 +559,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service.db.add(job)
         backup_service.db.commit()
@@ -532,7 +575,9 @@ class TestBackupService:
         assert task.task_order == 0
 
         # Verify task was saved to database
-        saved_task = backup_service.db.query(JobTask).filter(JobTask.id == task.id).first()
+        saved_task = (
+            backup_service.db.query(JobTask).filter(JobTask.id == task.id).first()
+        )
         assert saved_task is not None
 
     def test_create_prune_task(self, backup_service, test_repository):
@@ -542,7 +587,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="prune",
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service.db.add(job)
         backup_service.db.commit()
@@ -563,7 +608,7 @@ class TestBackupService:
             task_type="backup",
             task_name="Test",
             status="running",
-            task_order=0
+            task_order=0,
         )
 
         backup_service._handle_output_line(task, "First line")
@@ -578,7 +623,7 @@ class TestBackupService:
             task_name="Test",
             status="running",
             output="First line",
-            task_order=0
+            task_order=0,
         )
 
         backup_service._handle_output_line(task, "Second line")
@@ -592,7 +637,7 @@ class TestBackupService:
             task_type="backup",
             task_name="Test",
             status="running",
-            task_order=0
+            task_order=0,
         )
         backup_service.db.add(task)
 
@@ -610,14 +655,14 @@ class TestBackupService:
             task_type="backup",
             task_name="Test",
             status="running",
-            task_order=0
+            task_order=0,
         )
 
         result = BackupResult(
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Line 1", "Line 2"],
-            completed_at=datetime.now(UTC)
+            completed_at=datetime.now(UTC),
         )
 
         backup_service._update_task_from_result(task, result)
@@ -635,7 +680,7 @@ class TestBackupService:
             task_type="backup",
             task_name="Test",
             status="running",
-            task_order=0
+            task_order=0,
         )
 
         result = BackupResult(
@@ -643,7 +688,7 @@ class TestBackupService:
             return_code=1,
             output_lines=["Error occurred"],
             error_message="Backup failed",
-            completed_at=datetime.now(UTC)
+            completed_at=datetime.now(UTC),
         )
 
         backup_service._update_task_from_result(task, result)
@@ -654,23 +699,35 @@ class TestBackupService:
         assert task.output == "Error occurred"
 
     @pytest.mark.asyncio
-    async def test_handle_post_backup_operations_backup_failed(self, backup_service, test_repository):
+    async def test_handle_post_backup_operations_backup_failed(
+        self, backup_service, test_repository
+    ):
         """Test _handle_post_backup_operations when backup failed"""
         job = Job(id="test-job", repository_id=test_repository.id, total_tasks=1)
-        backup_request = BackupRequest(repository_id=test_repository.id, source_path="/data")
+        backup_request = BackupRequest(
+            repository_id=test_repository.id, source_path="/data"
+        )
 
-        await backup_service._handle_post_backup_operations(job, test_repository, backup_request, False)
+        await backup_service._handle_post_backup_operations(
+            job, test_repository, backup_request, False
+        )
 
         # Should not add any tasks when backup failed
         assert job.total_tasks == 1
 
     @pytest.mark.asyncio
-    async def test_handle_post_backup_operations_backup_success(self, backup_service, test_repository):
+    async def test_handle_post_backup_operations_backup_success(
+        self, backup_service, test_repository
+    ):
         """Test _handle_post_backup_operations when backup succeeded"""
         job = Job(id="test-job", repository_id=test_repository.id, total_tasks=1)
-        backup_request = BackupRequest(repository_id=test_repository.id, source_path="/data")
+        backup_request = BackupRequest(
+            repository_id=test_repository.id, source_path="/data"
+        )
 
-        await backup_service._handle_post_backup_operations(job, test_repository, backup_request, True)
+        await backup_service._handle_post_backup_operations(
+            job, test_repository, backup_request, True
+        )
 
         # Currently no tasks are added (all are TODO in the implementation)
         assert job.total_tasks == 1
@@ -684,13 +741,25 @@ class TestBackupService:
             total_tasks=2,
             completed_tasks=0,
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service.db.add(job)
 
         # Add completed tasks
-        task1 = JobTask(job_id=job.id, task_type="backup", task_name="Task 1", status="completed", task_order=0)
-        task2 = JobTask(job_id=job.id, task_type="prune", task_name="Task 2", status="completed", task_order=1)
+        task1 = JobTask(
+            job_id=job.id,
+            task_type="backup",
+            task_name="Task 1",
+            status="completed",
+            task_order=0,
+        )
+        task2 = JobTask(
+            job_id=job.id,
+            task_type="prune",
+            task_name="Task 2",
+            status="completed",
+            task_order=1,
+        )
         backup_service.db.add(task1)
         backup_service.db.add(task2)
         backup_service.db.commit()
@@ -711,13 +780,25 @@ class TestBackupService:
             total_tasks=2,
             completed_tasks=0,
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service.db.add(job)
 
         # Add mixed tasks
-        task1 = JobTask(job_id=job.id, task_type="backup", task_name="Task 1", status="completed", task_order=0)
-        task2 = JobTask(job_id=job.id, task_type="prune", task_name="Task 2", status="failed", task_order=1)
+        task1 = JobTask(
+            job_id=job.id,
+            task_type="backup",
+            task_name="Task 1",
+            status="completed",
+            task_order=0,
+        )
+        task2 = JobTask(
+            job_id=job.id,
+            task_type="prune",
+            task_name="Task 2",
+            status="failed",
+            task_order=1,
+        )
         backup_service.db.add(task1)
         backup_service.db.add(task2)
         backup_service.db.commit()
@@ -737,13 +818,25 @@ class TestBackupService:
             total_tasks=3,
             completed_tasks=0,
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service.db.add(job)
 
         # Add only 2 completed tasks out of 3 total
-        task1 = JobTask(job_id=job.id, task_type="backup", task_name="Task 1", status="completed", task_order=0)
-        task2 = JobTask(job_id=job.id, task_type="check", task_name="Task 2", status="completed", task_order=1)
+        task1 = JobTask(
+            job_id=job.id,
+            task_type="backup",
+            task_name="Task 1",
+            status="completed",
+            task_order=0,
+        )
+        task2 = JobTask(
+            job_id=job.id,
+            task_type="check",
+            task_name="Task 2",
+            status="completed",
+            task_order=1,
+        )
         backup_service.db.add(task1)
         backup_service.db.add(task2)
         backup_service.db.commit()
@@ -754,24 +847,30 @@ class TestBackupService:
         assert job.completed_tasks == 2
 
     @pytest.mark.asyncio
-    async def test_backup_service_integration_workflow(self, backup_service_with_mock_executor, test_repository):
+    async def test_backup_service_integration_workflow(
+        self, backup_service_with_mock_executor, test_repository
+    ):
         """Test complete backup service workflow integration"""
         # Mock successful backup and prune
         backup_result = BackupResult(
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Backup completed"],
-            completed_at=datetime.now(UTC)
+            completed_at=datetime.now(UTC),
         )
         prune_result = BackupResult(
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Prune completed"],
-            completed_at=datetime.now(UTC)
+            completed_at=datetime.now(UTC),
         )
 
-        backup_service_with_mock_executor.executor.execute_backup = AsyncMock(return_value=backup_result)
-        backup_service_with_mock_executor.executor.execute_prune = AsyncMock(return_value=prune_result)
+        backup_service_with_mock_executor.executor.execute_backup = AsyncMock(
+            return_value=backup_result
+        )
+        backup_service_with_mock_executor.executor.execute_prune = AsyncMock(
+            return_value=prune_result
+        )
 
         # 1. Execute backup
         job = Job(
@@ -779,22 +878,32 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC)
+            started_at=datetime.now(UTC),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
 
-        backup_request = BackupRequest(repository_id=test_repository.id, source_path="/data")
+        backup_request = BackupRequest(
+            repository_id=test_repository.id, source_path="/data"
+        )
 
-        with patch.object(backup_service_with_mock_executor, '_handle_post_backup_operations'):
-            backup_result = await backup_service_with_mock_executor.execute_backup(job, backup_request)
+        with patch.object(
+            backup_service_with_mock_executor, "_handle_post_backup_operations"
+        ):
+            backup_result = await backup_service_with_mock_executor.execute_backup(
+                job, backup_request
+            )
 
         # 2. Execute prune
         prune_request = PruneRequest(repository_id=test_repository.id, keep_daily=7)
-        prune_job_id = await backup_service_with_mock_executor.create_and_run_prune(prune_request)
+        prune_job_id = await backup_service_with_mock_executor.create_and_run_prune(
+            prune_request
+        )
 
         # 3. Check job status
-        backup_status = backup_service_with_mock_executor.get_job_status("integration-job")
+        backup_status = backup_service_with_mock_executor.get_job_status(
+            "integration-job"
+        )
         prune_status = backup_service_with_mock_executor.get_job_status(prune_job_id)
 
         # 4. List recent jobs
@@ -813,8 +922,12 @@ class TestBackupService:
         assert repo.name == test_repository.name
 
         # Test job creation
-        backup_request = BackupRequest(repository_id=test_repository.id, source_path="/test")
-        job = backup_service._create_job_record(test_repository, JobType.BACKUP, backup_request)
+        backup_request = BackupRequest(
+            repository_id=test_repository.id, source_path="/test"
+        )
+        job = backup_service._create_job_record(
+            test_repository, JobType.BACKUP, backup_request
+        )
 
         # Test job retrieval
         status = backup_service.get_job_status(job.id)

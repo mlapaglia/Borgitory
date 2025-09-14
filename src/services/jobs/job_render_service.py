@@ -184,10 +184,14 @@ class JobRenderService:
         )
 
         # Debug logging
-        logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks")
+        logger.info(
+            f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks"
+        )
         if job.tasks:
             for i, task in enumerate(job.tasks):
-                logger.info(f"  Task {i}: {task.task_name} ({task.task_type}) - {task.status}")
+                logger.info(
+                    f"  Task {i}: {task.task_name} ({task.task_type}) - {task.status}"
+                )
 
         # Job header
         job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
@@ -195,9 +199,7 @@ class JobRenderService:
         job_title += f" {progress_text}"
 
         # Sort tasks by order if composite
-        sorted_tasks = (
-            sorted(job.tasks, key=lambda t: t.task_order)
-        )
+        sorted_tasks = sorted(job.tasks, key=lambda t: t.task_order)
 
         # Fix task statuses for failed jobs
         if job.status == "failed":
@@ -300,10 +302,14 @@ class JobRenderService:
             has_tasks = bool(job.tasks and len(job.tasks) > 0)
 
             # Debug logging
-            logger.info(f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks")
+            logger.info(
+                f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks"
+            )
             if job.tasks:
                 for i, task in enumerate(job.tasks):
-                    logger.info(f"  Task {i}: {task.task_name} ({task.task_type}) - {task.status}")
+                    logger.info(
+                        f"  Task {i}: {task.task_name} ({task.task_type}) - {task.status}"
+                    )
 
             # Job header
             job_title = f"{job.type.replace('_', ' ').title()} - {repository_name}"
@@ -401,7 +407,11 @@ class JobRenderService:
             )
 
             # All jobs are now composite - check if they have tasks
-            has_tasks = hasattr(manager_job, "tasks") and manager_job.tasks and len(manager_job.tasks) > 0
+            has_tasks = (
+                hasattr(manager_job, "tasks")
+                and manager_job.tasks
+                and len(manager_job.tasks) > 0
+            )
 
             # Job title
             job_title = f"{job_type.replace('_', ' ').title()} - {repository_name}"

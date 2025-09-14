@@ -4,6 +4,7 @@ Shared test fixtures for job-related testing.
 This module provides standardized pytest fixtures and factories for testing
 job services with clean dependency injection patterns.
 """
+
 import pytest
 import uuid
 from datetime import datetime, UTC
@@ -23,12 +24,14 @@ def mock_job_manager():
     manager.get_job_status = Mock(return_value=None)
     manager.cleanup_job = Mock(return_value=True)
     manager.cancel_job = AsyncMock(return_value=True)
-    manager.get_queue_stats = Mock(return_value={
-        "max_concurrent_backups": 5,
-        "running_backups": 0,
-        "queued_backups": 0,
-        "available_slots": 5,
-    })
+    manager.get_queue_stats = Mock(
+        return_value={
+            "max_concurrent_backups": 5,
+            "running_backups": 0,
+            "queued_backups": 0,
+            "available_slots": 5,
+        }
+    )
     manager.subscribe_to_events = Mock(return_value=AsyncMock())
     manager.unsubscribe_from_events = Mock()
     manager.broadcast_job_event = Mock()
@@ -71,13 +74,13 @@ def sample_composite_job():
         task_type="backup",
         task_name="Backup Task",
         status="completed",
-        parameters={"source_path": "/data"}
+        parameters={"source_path": "/data"},
     )
     task2 = BorgJobTask(
         task_type="prune",
         task_name="Prune Task",
         status="completed",
-        parameters={"keep_daily": 7}
+        parameters={"keep_daily": 7},
     )
 
     return BorgJob(
@@ -97,7 +100,7 @@ def sample_repository(test_db):
     repository = Repository(
         name="test-repo",
         path="/tmp/test-repo",
-        encrypted_passphrase="test-encrypted-passphrase"
+        encrypted_passphrase="test-encrypted-passphrase",
     )
     test_db.add(repository)
     test_db.commit()
@@ -143,7 +146,7 @@ def sample_database_job_with_tasks(test_db, sample_repository):
         task_order=0,
         status="completed",
         return_code=0,
-        output="Backup completed successfully\nFiles processed: 100"
+        output="Backup completed successfully\nFiles processed: 100",
     )
     task2 = JobTask(
         job_id=job.id,
@@ -152,7 +155,7 @@ def sample_database_job_with_tasks(test_db, sample_repository):
         task_order=1,
         status="completed",
         return_code=0,
-        output="Prune completed\nRemoved 5 archives"
+        output="Prune completed\nRemoved 5 archives",
     )
 
     test_db.add_all([task1, task2])
@@ -192,8 +195,12 @@ def mock_subprocess_process():
     return process
 
 
-def create_mock_job_context(job_id: str = None, status: str = "completed",
-                          job_type: str = "simple", tasks: List = None) -> dict:
+def create_mock_job_context(
+    job_id: str = None,
+    status: str = "completed",
+    job_type: str = "simple",
+    tasks: List = None,
+) -> dict:
     """Factory function to create mock job context for rendering tests."""
     if job_id is None:
         job_id = str(uuid.uuid4())
