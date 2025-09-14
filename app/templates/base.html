@@ -209,16 +209,6 @@
             }
         });
         
-        // Global click handler to hide autocomplete dropdowns
-        document.addEventListener('click', function(event) {
-            const dropdowns = document.querySelectorAll('[id$="-dropdown"]');
-            dropdowns.forEach(dropdown => {
-                const input = dropdown.previousElementSibling;
-                if (!dropdown.contains(event.target) && !input.contains(event.target)) {
-                    dropdown.style.display = 'none';
-                }
-            });
-        });
     </script>
 
     <!-- Archive Contents Modal -->
