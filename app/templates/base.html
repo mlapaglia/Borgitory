@@ -121,7 +121,6 @@
     <script src="/static/js/app.js"></script>
     <script src="/static/js/components/navigation.js"></script>
     <script src="/static/js/components/jobs.js"></script>
-    <script src="/static/js/components/path-autocomplete.js"></script>
 
     <script>
         // HTMX notification helper function
@@ -208,6 +207,17 @@
             if (event.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
                 htmxCloseMobileSidebar();
             }
+        });
+        
+        // Global click handler to hide autocomplete dropdowns
+        document.addEventListener('click', function(event) {
+            const dropdowns = document.querySelectorAll('[id$="-dropdown"]');
+            dropdowns.forEach(dropdown => {
+                const input = dropdown.previousElementSibling;
+                if (!dropdown.contains(event.target) && !input.contains(event.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
         });
     </script>
 

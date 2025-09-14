@@ -1,0 +1,47 @@
+{% if error %}
+<div class="px-3 py-2 text-sm text-red-600">
+    Error loading directories: {{ error }}
+</div>
+{% elif directories %}
+{% for dir in directories %}
+<div class="autocomplete-item px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-100 dark:border-gray-600 last:border-b-0" 
+     hx-on:click="
+        const input = document.getElementById('{{ target_input }}');
+        const dropdown = document.getElementById('{{ target_input }}-dropdown');
+        input.value = '{{ dir.path }}/';
+        dropdown.style.display = 'none';
+        input.focus();
+        
+        // Trigger new autocomplete search after a short delay
+        setTimeout(() => {
+            htmx.trigger(input, 'input');
+        }, 100);
+     ">
+    <div class="flex items-center space-x-2">
+        <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+        </svg>
+        <span class="text-sm text-gray-900 dark:text-gray-100">{{ dir.name }}</span>
+    </div>
+    <div class="text-xs text-gray-500 dark:text-gray-400 ml-6">{{ dir.path }}</div>
+</div>
+{% endfor %}
+{% else %}
+<div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+    {% if search_term %}
+        No directories found matching "{{ search_term }}"
+    {% else %}
+        No directories found
+    {% endif %}
+</div>
+{% endif %}
+
+<script>
+// Show the dropdown after content is loaded
+(function() {
+    const dropdown = document.getElementById('{{ target_input }}-dropdown');
+    if (dropdown) {
+        dropdown.style.display = 'block';
+    }
+})();
+</script>

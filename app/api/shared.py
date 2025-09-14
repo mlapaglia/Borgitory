@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 
 from app.api.auth import get_current_user
 from app.models.database import User
+from app.dependencies import TemplatesDep
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -36,3 +37,5 @@ async def remove_notification(
 ) -> HTMLResponse:
     """Remove a notification (returns empty content)."""
     return HTMLResponse(content="", status_code=200)
+
+
