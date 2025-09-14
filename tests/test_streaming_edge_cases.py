@@ -34,7 +34,7 @@ class TestStreamingErrorHandling:
         mock_job_manager.jobs = {}
         
         # Should fall back to database lookup
-        with patch('app.models.database.SessionLocal') as mock_session_local:
+        with patch('models.database.SessionLocal') as mock_session_local:
             mock_session = Mock()
             mock_session_local.return_value = mock_session
             mock_session.query().filter().first.return_value = None  # No job in DB either
@@ -130,7 +130,7 @@ class TestStreamingErrorHandling:
         # Job not found in manager, should try database
         mock_job_manager.jobs = {}
 
-        with patch('app.models.database.SessionLocal') as mock_session_local:
+        with patch('models.database.SessionLocal') as mock_session_local:
             mock_session_local.side_effect = Exception("Database connection failed")
 
             events = []

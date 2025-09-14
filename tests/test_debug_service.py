@@ -96,7 +96,7 @@ class TestDebugService:
         test_time = datetime(2023, 1, 1, 12, 0, 0)
         
         with patch('os.getenv') as mock_getenv, \
-             patch('app.services.debug_service.datetime') as mock_datetime, \
+             patch('services.debug_service.datetime') as mock_datetime, \
              patch('os.getcwd', return_value="/test/dir"):
             
             mock_getenv.return_value = "false"
@@ -115,7 +115,7 @@ class TestDebugService:
     async def test_get_application_info_debug_mode_true(self, debug_service):
         """Test application info with debug mode enabled"""
         with patch('os.getenv', return_value="TRUE"), \
-             patch('app.services.debug_service.datetime') as mock_datetime, \
+             patch('services.debug_service.datetime') as mock_datetime, \
              patch('os.getcwd', return_value="/test/dir"):
             
             mock_datetime.now.return_value = datetime(2023, 1, 1, 12, 0, 0)
@@ -143,7 +143,7 @@ class TestDebugService:
         filtered_job_query_mock.filter = MagicMock(return_value=filtered_job_query_mock)
         mock_db_session.query.return_value.filter = MagicMock(return_value=filtered_job_query_mock)
 
-        with patch('app.config.DATABASE_URL', 'sqlite:///test.db'), \
+        with patch('config.DATABASE_URL', 'sqlite:///test.db'), \
              patch('os.path.exists', return_value=True), \
              patch('os.path.getsize', return_value=1024 * 1024):  # 1MB
 
@@ -163,7 +163,7 @@ class TestDebugService:
         mock_db_session.query.return_value.count.return_value = 1
 
         # Test bytes
-        with patch('app.config.DATABASE_URL', 'sqlite:///test.db'), \
+        with patch('config.DATABASE_URL', 'sqlite:///test.db'), \
              patch('os.path.exists', return_value=True), \
              patch('os.path.getsize', return_value=512):
             
@@ -171,7 +171,7 @@ class TestDebugService:
             assert result["database_size"] == "512 B"
 
         # Test KB
-        with patch('app.config.DATABASE_URL', 'sqlite:///test.db'), \
+        with patch('config.DATABASE_URL', 'sqlite:///test.db'), \
              patch('os.path.exists', return_value=True), \
              patch('os.path.getsize', return_value=2048):
             
@@ -179,7 +179,7 @@ class TestDebugService:
             assert result["database_size"] == "2.0 KB"
 
         # Test GB
-        with patch('app.config.DATABASE_URL', 'sqlite:///test.db'), \
+        with patch('config.DATABASE_URL', 'sqlite:///test.db'), \
              patch('os.path.exists', return_value=True), \
              patch('os.path.getsize', return_value=2 * 1024 * 1024 * 1024):
             
@@ -208,7 +208,7 @@ class TestDebugService:
         mock_docker_client.version.return_value = {"Version": "20.10.0", "ApiVersion": "1.41"}
         mock_docker_client.containers.list.return_value = [MagicMock(), MagicMock()]  # 2 containers
 
-        with patch('app.dependencies.get_volume_service', return_value=mock_volume_service), \
+        with patch('dependencies.get_volume_service', return_value=mock_volume_service), \
              patch('docker.from_env', return_value=mock_docker_client):
 
             result = await debug_service._get_docker_info()
@@ -229,7 +229,7 @@ class TestDebugService:
             "total_mounted_volumes": 1
         })
 
-        with patch('app.dependencies.get_volume_service', return_value=mock_volume_service), \
+        with patch('dependencies.get_volume_service', return_value=mock_volume_service), \
              patch('docker.from_env', side_effect=Exception("Docker not available")):
 
             result = await debug_service._get_docker_info()
@@ -242,7 +242,7 @@ class TestDebugService:
     @pytest.mark.asyncio
     async def test_get_docker_info_volume_service_failure(self, debug_service):
         """Test Docker info when volume service fails"""
-        with patch('app.dependencies.get_volume_service', side_effect=Exception("Volume service error")):
+        with patch('dependencies.get_volume_service', side_effect=Exception("Volume service error")):
 
             result = await debug_service._get_docker_info()
 

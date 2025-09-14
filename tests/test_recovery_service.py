@@ -68,7 +68,7 @@ class TestRecoveryService:
         # Mock query to return no interrupted jobs
         mock_db.query.return_value.filter.return_value.all.return_value = []
 
-        with patch('app.services.recovery_service.get_db_session') as mock_get_session:
+        with patch('services.recovery_service.get_db_session') as mock_get_session:
             mock_get_session.return_value.__enter__.return_value = mock_db
             mock_get_session.return_value.__exit__.return_value = None
             
@@ -89,7 +89,7 @@ class TestRecoveryService:
         ]
         mock_db.query.return_value.filter.return_value.first.return_value = mock_repository
 
-        with patch('app.services.recovery_service.get_db_session') as mock_get_session, \
+        with patch('services.recovery_service.get_db_session') as mock_get_session, \
              patch.object(recovery_service, '_release_repository_lock') as mock_release_lock:
             
             mock_get_session.return_value.__enter__.return_value = mock_db
@@ -128,7 +128,7 @@ class TestRecoveryService:
             []                 # No running tasks
         ]
 
-        with patch('app.services.recovery_service.get_db_session') as mock_get_session, \
+        with patch('services.recovery_service.get_db_session') as mock_get_session, \
              patch.object(recovery_service, '_release_repository_lock') as mock_release_lock:
             
             mock_get_session.return_value.__enter__.return_value = mock_db
@@ -158,7 +158,7 @@ class TestRecoveryService:
         ]
         mock_db.query.return_value.filter.return_value.first.return_value = None  # Repository not found
 
-        with patch('app.services.recovery_service.get_db_session') as mock_get_session, \
+        with patch('services.recovery_service.get_db_session') as mock_get_session, \
              patch.object(recovery_service, '_release_repository_lock') as mock_release_lock:
             
             mock_get_session.return_value.__enter__.return_value = mock_db
@@ -200,7 +200,7 @@ class TestRecoveryService:
         ]
         mock_db.query.return_value.filter.return_value.first.return_value = mock_repository
 
-        with patch('app.services.recovery_service.get_db_session') as mock_get_session, \
+        with patch('services.recovery_service.get_db_session') as mock_get_session, \
              patch.object(recovery_service, '_release_repository_lock') as mock_release_lock:
 
             mock_get_session.return_value.__enter__.return_value = mock_db
@@ -214,7 +214,7 @@ class TestRecoveryService:
     @pytest.mark.asyncio
     async def test_recover_database_job_records_exception_handling(self, recovery_service):
         """Test exception handling in database job recovery"""
-        with patch('app.services.recovery_service.get_db_session', side_effect=Exception("Database error")):
+        with patch('services.recovery_service.get_db_session', side_effect=Exception("Database error")):
             # Should not raise exception
             await recovery_service.recover_database_job_records()
 
@@ -225,7 +225,7 @@ class TestRecoveryService:
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(b"Lock released", b""))
 
-        with patch('app.utils.security.build_secure_borg_command', 
+        with patch('utils.security.build_secure_borg_command', 
                   return_value=(["borg", "break-lock", "/repo/path"], {"BORG_PASSPHRASE": "test"})), \
              patch('asyncio.create_subprocess_exec', return_value=mock_process), \
              patch('asyncio.wait_for', return_value=(b"Lock released", b"")):
@@ -242,7 +242,7 @@ class TestRecoveryService:
         mock_process.returncode = 1
         mock_process.communicate = AsyncMock(return_value=(b"", b"Lock not found"))
 
-        with patch('app.utils.security.build_secure_borg_command', 
+        with patch('utils.security.build_secure_borg_command', 
                   return_value=(["borg", "break-lock", "/repo/path"], {"BORG_PASSPHRASE": "test"})), \
              patch('asyncio.create_subprocess_exec', return_value=mock_process), \
              patch('asyncio.wait_for', return_value=(b"", b"Lock not found")):
@@ -256,7 +256,7 @@ class TestRecoveryService:
         mock_process = MagicMock()
         mock_process.kill = MagicMock()
 
-        with patch('app.utils.security.build_secure_borg_command', 
+        with patch('utils.security.build_secure_borg_command', 
                   return_value=(["borg", "break-lock", "/repo/path"], {"BORG_PASSPHRASE": "test"})), \
              patch('asyncio.create_subprocess_exec', return_value=mock_process), \
              patch('asyncio.wait_for', side_effect=asyncio.TimeoutError()):
@@ -270,7 +270,7 @@ class TestRecoveryService:
     @pytest.mark.asyncio
     async def test_release_repository_lock_exception(self, recovery_service, mock_repository):
         """Test repository lock release with exception"""
-        with patch('app.utils.security.build_secure_borg_command', side_effect=Exception("Command build failed")):
+        with patch('utils.security.build_secure_borg_command', side_effect=Exception("Command build failed")):
             
             # Should handle exception gracefully
             await recovery_service._release_repository_lock(mock_repository)
@@ -282,7 +282,7 @@ class TestRecoveryService:
         mock_process.returncode = 1
         mock_process.communicate = AsyncMock(return_value=(b"", None))  # No stderr
 
-        with patch('app.utils.security.build_secure_borg_command', 
+        with patch('utils.security.build_secure_borg_command', 
                   return_value=(["borg", "break-lock", "/repo/path"], {"BORG_PASSPHRASE": "test"})), \
              patch('asyncio.create_subprocess_exec', return_value=mock_process), \
              patch('asyncio.wait_for', return_value=(b"", None)):
@@ -306,7 +306,7 @@ class TestRecoveryService:
             []             # No running tasks
         ]
 
-        with patch('app.services.recovery_service.get_db_session') as mock_get_session, \
+        with patch('services.recovery_service.get_db_session') as mock_get_session, \
              patch.object(recovery_service, '_release_repository_lock') as mock_release_lock:
             
             mock_get_session.return_value.__enter__.return_value = mock_db
@@ -351,7 +351,7 @@ class TestRecoveryService:
             [pending_task, running_task, in_progress_task]  # Only incomplete tasks returned by query
         ]
 
-        with patch('app.services.recovery_service.get_db_session') as mock_get_session:
+        with patch('services.recovery_service.get_db_session') as mock_get_session:
             mock_get_session.return_value.__enter__.return_value = mock_db
             mock_get_session.return_value.__exit__.return_value = None
             await recovery_service.recover_database_job_records()

@@ -63,7 +63,7 @@ class TestCloudSyncAPIHTMX:
         }
 
         # Mock the service to avoid actual database operations
-        with patch('app.dependencies.get_db') as mock_get_db, \
+        with patch('dependencies.get_db') as mock_get_db, \
              patch.object(CloudSyncService, 'create_cloud_sync_config') as mock_create:
 
             mock_db = Mock()
@@ -110,7 +110,7 @@ class TestCloudSyncAPIHTMX:
         # Mock service to throw HTTPException
         from fastapi import HTTPException
 
-        with patch('app.dependencies.get_db') as mock_get_db, \
+        with patch('dependencies.get_db') as mock_get_db, \
              patch.object(CloudSyncService, 'create_cloud_sync_config') as mock_create:
 
             mock_db = Mock()
@@ -239,7 +239,7 @@ class TestCloudSyncAPIHTMX:
         test_db.commit()
 
         # Mock the rclone service and cloud sync service
-        with patch('app.services.cloud_sync_service.CloudSyncService.test_cloud_sync_config') as mock_test:
+        with patch('services.cloud_sync_service.CloudSyncService.test_cloud_sync_config') as mock_test:
             mock_test.return_value = {"status": "success", "message": "Connection successful"}
 
             response = await async_client.post(f"/api/cloud-sync/{config.id}/test")

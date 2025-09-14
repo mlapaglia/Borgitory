@@ -134,7 +134,7 @@ class TestJobStreamingFixes:
         mock_job_manager.jobs = {}
 
         # Mock database session and task - patch the import inside the function
-        with patch('app.models.database.SessionLocal') as mock_session_local:
+        with patch('models.database.SessionLocal') as mock_session_local:
             mock_session = Mock()
             mock_session_local.return_value = mock_session
 

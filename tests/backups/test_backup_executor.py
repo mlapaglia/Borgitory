@@ -306,7 +306,7 @@ class TestBackupExecutor:
             show_list=True,
         )
 
-        with patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+        with patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
             command, env = backup_executor._build_backup_command(test_repository, config)
 
         assert isinstance(command, list)
@@ -321,7 +321,7 @@ class TestBackupExecutor:
             dry_run=True,
         )
 
-        with patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+        with patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
             command, env = backup_executor._build_backup_command(test_repository, config)
 
         # Should include --dry-run in additional args somewhere
@@ -337,7 +337,7 @@ class TestBackupExecutor:
             show_stats=True,
         )
 
-        with patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+        with patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
             command, env = backup_executor._build_prune_command(test_repository, config)
 
         assert isinstance(command, list)
@@ -357,7 +357,7 @@ class TestBackupExecutor:
             show_list=True,
         )
 
-        with patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+        with patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
             command, env = backup_executor._build_prune_command(test_repository, config)
 
         assert isinstance(command, list)
@@ -391,7 +391,7 @@ class TestBackupExecutor:
         mock_process.stdout = mock_stdout()
 
         with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+             patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
 
             result = await backup_executor.execute_backup(test_repository, config)
 
@@ -418,7 +418,7 @@ class TestBackupExecutor:
         mock_process.stdout = mock_stdout()
 
         with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+             patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
 
             result = await backup_executor.execute_backup(test_repository, config)
 
@@ -451,7 +451,7 @@ class TestBackupExecutor:
         mock_process.stdout = mock_stdout()
 
         with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+             patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
 
             result = await backup_executor.execute_backup(
                 test_repository,
@@ -470,7 +470,7 @@ class TestBackupExecutor:
         config = BackupConfig(source_paths=["/data"])
 
         with patch.object(backup_executor, '_start_process', side_effect=Exception("Process failed")), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+             patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
 
             result = await backup_executor.execute_backup(test_repository, config)
 
@@ -492,7 +492,7 @@ class TestBackupExecutor:
         ]))
 
         with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+             patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
 
             result = await backup_executor.execute_prune(test_repository, config)
 
@@ -516,7 +516,7 @@ class TestBackupExecutor:
         mock_process.stdout = mock_stdout()
 
         with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+             patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
 
             result = await backup_executor.execute_prune(test_repository, config)
 
@@ -743,7 +743,7 @@ class TestBackupExecutor:
         ]))
 
         with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+             patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
 
             # Start backup - should track operation
             result = await backup_executor.execute_backup(
@@ -771,7 +771,7 @@ class TestBackupExecutor:
         ]))
 
         with patch.object(backup_executor, '_start_process', return_value=mock_process), \
-             patch('app.models.database.Repository.get_passphrase', return_value="test-passphrase"):
+             patch('models.database.Repository.get_passphrase', return_value="test-passphrase"):
 
             # Start prune - should track operation
             result = await backup_executor.execute_prune(

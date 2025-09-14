@@ -207,7 +207,7 @@ class TestSimpleCommandRunner:
         
         with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
              patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait, \
-             patch('app.services.simple_command_runner.logger') as mock_logger:
+             patch('services.simple_command_runner.logger') as mock_logger:
             
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"output", b"")
@@ -231,7 +231,7 @@ class TestSimpleCommandRunner:
         
         with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_create, \
              patch('asyncio.wait_for', new_callable=AsyncMock) as mock_wait, \
-             patch('app.services.simple_command_runner.logger') as mock_logger:
+             patch('services.simple_command_runner.logger') as mock_logger:
             
             mock_create.return_value = mock_process
             mock_wait.return_value = (b"", b"command failed with error")

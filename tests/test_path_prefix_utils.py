@@ -1,7 +1,6 @@
 """
 Unit tests for path prefix utilities
 """
-import pytest
 
 from utils.path_prefix import (
     normalize_path_with_mnt_prefix,

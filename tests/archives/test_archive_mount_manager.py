@@ -13,6 +13,7 @@ import os
 from services.archives.archive_mount_manager import ArchiveMountManager, MountInfo, get_archive_mount_manager
 from models.database import Repository
 from services.jobs.job_executor import JobExecutor
+import services.archives.archive_mount_manager
 
 
 class TestArchiveMountManager:
@@ -137,7 +138,7 @@ class TestArchiveMountManager:
         mock_process.stderr.read = AsyncMock(return_value=b"")
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process), \
-             patch('app.utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
+             patch('utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
              patch.object(self.manager, '_wait_for_mount_ready', return_value=True):
             
             mount_point = await self.manager.mount_archive(self.mock_repository, "test-archive")
@@ -186,7 +187,7 @@ class TestArchiveMountManager:
         mock_process.stderr.read = AsyncMock(return_value=b"Archive not found")
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process), \
-             patch('app.utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
+             patch('utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
              patch.object(self.manager, '_wait_for_mount_ready', return_value=False), \
              patch.object(self.manager, "_unmount_path"):
             
@@ -206,7 +207,7 @@ class TestArchiveMountManager:
         mock_process.stderr.read = AsyncMock(return_value=b"Timeout error")
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process), \
-             patch('app.utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
+             patch('utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
              patch.object(self.manager, '_wait_for_mount_ready', return_value=False), \
              patch.object(self.manager, '_unmount_path'):
             
@@ -565,8 +566,7 @@ class TestGetArchiveMountManagerGlobal:
     def teardown_method(self):
         """Reset global state."""
         # Reset global instance
-        import services.archives.archive_mount_manager
-        app.services.archives.archive_mount_manager._mount_manager = None
+        services.archives.archive_mount_manager._mount_manager = None
 
     def test_get_archive_mount_manager_default(self):
         """Test getting default global instance."""
@@ -689,7 +689,7 @@ class TestArchiveMountManagerIntegration:
         mock_process.stderr.read = AsyncMock(return_value=b"")
         
         with patch('asyncio.create_subprocess_exec', return_value=mock_process), \
-             patch('app.utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
+             patch('utils.security.build_secure_borg_command', return_value=(["borg", "mount"], {})), \
              patch.object(manager, '_wait_for_mount_ready', return_value=True):
             
             # Mount archive

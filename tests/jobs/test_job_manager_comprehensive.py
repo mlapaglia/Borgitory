@@ -288,7 +288,7 @@ class TestJobManagerTaskExecution:
         mock_process = Mock()
         result = ProcessResult(return_code=0, stdout=b"Archive created successfully", stderr=b"", error=None)
 
-        with patch('app.utils.security.build_secure_borg_command') as mock_build, \
+        with patch('utils.security.build_secure_borg_command') as mock_build, \
              patch.object(job_manager_with_db.executor, 'start_process', return_value=mock_process), \
              patch.object(job_manager_with_db.executor, 'monitor_process_output', return_value=result), \
              patch.object(job_manager_with_db, '_get_repository_data', return_value={
@@ -331,7 +331,7 @@ class TestJobManagerTaskExecution:
         mock_process = Mock()
         result = ProcessResult(return_code=2, stdout=b"Repository locked", stderr=b"", error="Backup failed")
 
-        with patch('app.utils.security.build_secure_borg_command') as mock_build, \
+        with patch('utils.security.build_secure_borg_command') as mock_build, \
              patch.object(job_manager_with_db.executor, 'start_process', return_value=mock_process), \
              patch.object(job_manager_with_db.executor, 'monitor_process_output', return_value=result), \
              patch.object(job_manager_with_db, '_get_repository_data', return_value={
@@ -410,7 +410,7 @@ class TestJobManagerTaskExecution:
         mock_process = Mock()
         result = ProcessResult(return_code=0, stdout=b"Repository check passed", stderr=b"", error=None)
 
-        with patch('app.utils.security.build_secure_borg_command') as mock_build, \
+        with patch('utils.security.build_secure_borg_command') as mock_build, \
              patch.object(job_manager_with_db.executor, 'start_process', return_value=mock_process), \
              patch.object(job_manager_with_db.executor, 'monitor_process_output', return_value=result), \
              patch.object(job_manager_with_db, '_get_repository_data', return_value={
@@ -498,7 +498,7 @@ class TestJobManagerTaskExecution:
 
         # Mock successful notification with proper database access
         with patch.object(notification_config, 'get_pushover_credentials', return_value=("user_key", "app_token")), \
-             patch('app.services.jobs.job_manager.get_db_session') as mock_get_db:
+             patch('services.jobs.job_manager.get_db_session') as mock_get_db:
 
             # Set up the database session context manager
             mock_get_db.return_value.__enter__.return_value = test_db
