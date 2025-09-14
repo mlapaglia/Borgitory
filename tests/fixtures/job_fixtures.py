@@ -71,14 +71,12 @@ def sample_composite_job():
         task_type="backup",
         task_name="Backup Task",
         status="completed",
-        task_order=0,
         parameters={"source_path": "/data"}
     )
     task2 = BorgJobTask(
         task_type="prune",
         task_name="Prune Task",
         status="completed",
-        task_order=1,
         parameters={"keep_daily": 7}
     )
 
