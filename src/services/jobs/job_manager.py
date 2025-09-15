@@ -776,13 +776,6 @@ class JobManager:
 
             additional_args.append(f"{repository_path}::{archive_name}")
 
-            # Add source path - if empty, add a default path for testing
-            if not source_path:
-                logger.warning(
-                    "No source path specified for backup, using default test path"
-                )
-                source_path = "/tmp"  # Add a default path for testing
-
             additional_args.append(source_path)
 
             logger.info(f"Final additional_args for Borg command: {additional_args}")

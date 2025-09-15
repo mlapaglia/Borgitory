@@ -566,28 +566,3 @@ class JobRenderService:
                 "partials/jobs/error_state.html"
             ).render(message=f"Error streaming jobs: {str(e)}", padding="4")
             yield f"data: {error_html}\n\n"
-
-    def get_task_status_html(self, status: str) -> str:
-        """Generate HTML for task status badge with proper styling"""
-        if status == "completed":
-            status_class = "bg-green-100 text-green-800"
-            status_icon = "✓"
-            status_text = "Completed"
-        elif status == "failed":
-            status_class = "bg-red-100 text-red-800"
-            status_icon = "✗"
-            status_text = "Failed"
-        elif status == "running":
-            status_class = "bg-blue-100 text-blue-800"
-            status_icon = "⟳"
-            status_text = "Running"
-        elif status == "skipped":
-            status_class = "bg-yellow-100 text-yellow-800"
-            status_icon = "⏸"
-            status_text = "Cancelled"
-        else:
-            status_class = "bg-gray-100 text-gray-800"
-            status_icon = "◦"
-            status_text = status.title()
-
-        return f'<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {status_class}">{status_icon} {status_text}</span>'

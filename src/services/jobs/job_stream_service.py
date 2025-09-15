@@ -172,12 +172,10 @@ class JobStreamService:
 
                                 elif event.get("type") == "task_started":
                                     task_index = event.get("task_index", 0)
-                                    # Send formatted status to match template expectation
                                     yield f"event: task-{task_index}-status\ndata: ⟳ Running\n\n"
 
                                 elif event.get("type") == "task_completed":
                                     task_index = event.get("task_index", 0)
-                                    # Send formatted status to match template expectation
                                     yield f"event: task-{task_index}-status\ndata: ✓ Completed\n\n"
 
                                 elif event.get("type") == "task_failed":
