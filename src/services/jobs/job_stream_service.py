@@ -172,17 +172,16 @@ class JobStreamService:
 
                                 elif event.get("type") == "task_started":
                                     task_index = event.get("task_index", 0)
-                                    # Update task status
+                                    # Send formatted status to match template expectation
                                     yield f"event: task-{task_index}-status\ndata: ⟳ Running\n\n"
 
                                 elif event.get("type") == "task_completed":
                                     task_index = event.get("task_index", 0)
-                                    # Update task status
+                                    # Send formatted status to match template expectation
                                     yield f"event: task-{task_index}-status\ndata: ✓ Completed\n\n"
 
                                 elif event.get("type") == "task_failed":
                                     task_index = event.get("task_index", 0)
-                                    # Update task status
                                     yield f"event: task-{task_index}-status\ndata: ✗ Failed\n\n"
 
                                 elif event.get("type") == "job_completed":
@@ -190,7 +189,6 @@ class JobStreamService:
                                     yield "event: complete\ndata: completed\n\n"
 
                                 else:
-                                    # Send generic event
                                     yield f"data: {json.dumps(event)}\n\n"
                         except asyncio.TimeoutError:
                             yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"

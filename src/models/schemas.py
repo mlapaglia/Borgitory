@@ -68,6 +68,13 @@ class RepositoryBase(BaseModel):
         description="Absolute path to repository (must start with /)",
     )
 
+    @field_validator("path", mode="before")
+    @classmethod
+    def validate_path(cls, v):
+        from utils.path_prefix import normalize_path_with_mnt_prefix
+
+        return normalize_path_with_mnt_prefix(v)
+
 
 class RepositoryCreate(RepositoryBase):
     passphrase: str = Field(
@@ -81,6 +88,15 @@ class RepositoryUpdate(BaseModel):
     )
     path: Optional[str] = Field(None, min_length=1, pattern=r"^/.*")
     passphrase: Optional[str] = Field(None, min_length=8)
+
+    @field_validator("path", mode="before")
+    @classmethod
+    def validate_path(cls, v):
+        if v is None:
+            return v
+        from utils.path_prefix import normalize_path_with_mnt_prefix
+
+        return normalize_path_with_mnt_prefix(v)
 
 
 class Repository(RepositoryBase):

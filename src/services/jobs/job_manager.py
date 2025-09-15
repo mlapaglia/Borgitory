@@ -756,14 +756,14 @@ class JobManager:
                 )
 
             # Build backup command
-            paths = params.get("paths", [])
+            source_path = params.get("source_path")
             excludes = params.get("excludes", [])
             archive_name = params.get(
                 "archive_name", f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
             )
 
             logger.info(
-                f"Backup task parameters - paths: {paths}, excludes: {excludes}, archive_name: {archive_name}"
+                f"Backup task parameters - source_path: {source_path}, excludes: {excludes}, archive_name: {archive_name}"
             )
             logger.info(f"All task parameters: {params}")
 
@@ -776,14 +776,14 @@ class JobManager:
 
             additional_args.append(f"{repository_path}::{archive_name}")
 
-            # Add paths - if empty, add a default path for testing
-            if not paths:
+            # Add source path - if empty, add a default path for testing
+            if not source_path:
                 logger.warning(
-                    "No source paths specified for backup, using default test path"
+                    "No source path specified for backup, using default test path"
                 )
-                paths = ["/tmp"]  # Add a default path for testing
+                source_path = "/tmp"  # Add a default path for testing
 
-            additional_args.extend(paths)
+            additional_args.append(source_path)
 
             logger.info(f"Final additional_args for Borg command: {additional_args}")
 
