@@ -172,25 +172,24 @@ class JobStreamService:
 
                                 elif event.get("type") == "task_started":
                                     task_index = event.get("task_index", 0)
-                                    # Update task status
-                                    yield f"event: task-{task_index}-status\ndata: ⟳ Running\n\n"
+                                    status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">⟳ Running</span>'
+                                    yield f"event: task-{task_index}-status\ndata: {status_badge}\n\n"
 
                                 elif event.get("type") == "task_completed":
                                     task_index = event.get("task_index", 0)
-                                    # Update task status
-                                    yield f"event: task-{task_index}-status\ndata: ✓ Completed\n\n"
+                                    status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✓ Completed</span>'
+                                    yield f"event: task-{task_index}-status\ndata: {status_badge}\n\n"
 
                                 elif event.get("type") == "task_failed":
                                     task_index = event.get("task_index", 0)
-                                    # Update task status
-                                    yield f"event: task-{task_index}-status\ndata: ✗ Failed\n\n"
+                                    status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">✗ Failed</span>'
+                                    yield f"event: task-{task_index}-status\ndata: {status_badge}\n\n"
 
                                 elif event.get("type") == "job_completed":
                                     # Send complete event to trigger switch to static view
                                     yield "event: complete\ndata: completed\n\n"
 
                                 else:
-                                    # Send generic event
                                     yield f"data: {json.dumps(event)}\n\n"
                         except asyncio.TimeoutError:
                             yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"

@@ -78,7 +78,7 @@ def register_user(
         db.commit()
         db.refresh(user)
 
-        return templates.TemplateResponse(
+        success_response = templates.TemplateResponse(
             request,
             "partials/shared/notification.html",
             {
@@ -86,6 +86,8 @@ def register_user(
                 "message": "Registration successful! You can now log in.",
             },
         )
+        success_response.headers["HX-Trigger"] = "reload-auth-form"
+        return success_response
 
     except Exception as e:
         return templates.TemplateResponse(

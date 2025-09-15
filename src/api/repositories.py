@@ -316,6 +316,22 @@ async def get_import_form(request: Request):
     return templates.TemplateResponse(request, "partials/repositories/form_import.html")
 
 
+@router.get("/import-form-inner", response_class=HTMLResponse)
+async def get_import_form_inner(request: Request):
+    """Get the import repository form inner content (preserves tab state)"""
+    return templates.TemplateResponse(
+        request, "partials/repositories/form_import_inner.html"
+    )
+
+
+@router.get("/import-form-clear", response_class=HTMLResponse)
+async def get_import_form_clear(request: Request):
+    """Clear the selected repository form after successful import"""
+    return templates.TemplateResponse(
+        request, "partials/repositories/import_form_clear.html"
+    )
+
+
 @router.get("/create-form", response_class=HTMLResponse)
 async def get_create_form(request: Request):
     """Get the create repository form"""

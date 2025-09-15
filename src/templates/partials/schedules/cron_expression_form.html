@@ -8,16 +8,24 @@
         name="custom_cron_input"
         value="{{ cron_expression if is_custom else '' }}"
         placeholder="0 2 * * *" 
+        hx-get="/api/schedules/cron/describe"
+        hx-trigger="input changed delay:500ms"
+        hx-target="#cron-description"
+        hx-include="this"
+        hx-swap="innerHTML"
         oninput="document.getElementById('cron-expression').value = this.value"
         class="input-modern mt-1">
-    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Format: minute hour day month weekday</p>
 </div>
 {% endif %}
 
 <input type="hidden" name="cron_expression" id="cron-expression" value="{{ cron_expression }}" required>
 
-{% if description %}
-<div id="cron-description" class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-gray-800 p-2 rounded">
-    {{ description }}
+<div id="cron-description" class="mt-2">
+    {% if description %}
+    <div class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+        <span class="font-medium text-blue-800 dark:text-blue-200">Schedule:</span>
+        <span class="text-blue-700 dark:text-blue-300">{{ description }}</span>
+    </div>
+    {% endif %}
+    <!-- This div will be replaced by HTMX -->
 </div>
-{% endif %}

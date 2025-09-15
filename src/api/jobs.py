@@ -72,14 +72,14 @@ async def create_prune_job(
 
         return templates.TemplateResponse(
             request,
-            "partials/cleanup/prune_success.html",
+            "partials/prune/prune_success.html",
             {"job_id": job_id},
         )
     except ValueError as e:
         error_msg = str(e)
         return templates.TemplateResponse(
             request,
-            "partials/cleanup/prune_error.html",
+            "partials/prune/prune_error.html",
             {"error_message": error_msg},
             status_code=400,
         )
@@ -88,7 +88,7 @@ async def create_prune_job(
         error_msg = f"Failed to start prune job: {str(e)}"
         return templates.TemplateResponse(
             request,
-            "partials/cleanup/prune_error.html",
+            "partials/prune/prune_error.html",
             {"error_message": error_msg},
             status_code=500,
         )
@@ -383,7 +383,7 @@ def get_job_manager_stats(
     }
 
 
-@router.post("/manager/cleanup")
+@router.post("/manager/prune")
 def cleanup_completed_jobs(
     job_manager: JobManager = Depends(get_job_manager_dependency),
 ):

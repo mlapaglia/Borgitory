@@ -22,7 +22,7 @@
         </div>
         <div class="flex flex-col space-y-2 ml-4">
             <button 
-                hx-get="/api/cleanup/{{ config.id }}/edit"
+                hx-get="/api/prune/{{ config.id }}/edit"
                 hx-target="#cleanup-policy-form-container"
                 hx-swap="innerHTML"
                 class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500"
@@ -30,7 +30,7 @@
                 Edit
             </button>
             <button 
-                hx-post="/api/cleanup/{{ config.id }}/{{ 'disable' if config.enabled else 'enable' }}"
+                hx-post="/api/prune/{{ config.id }}/{{ 'disable' if config.enabled else 'enable' }}"
                 hx-target="#cleanup-policy-status"
                 hx-swap="innerHTML"
                 hx-indicator="this"
@@ -40,11 +40,11 @@
                 <span class="hidden [.htmx-request_&]:inline">{{ 'Disabling...' if config.enabled else 'Enabling...' }}</span>
             </button>
             <button 
-                hx-delete="/api/cleanup/{{ config.id }}"
+                hx-delete="/api/prune/{{ config.id }}"
                 hx-target="#cleanup-policy-status"
                 hx-swap="innerHTML"
                 hx-indicator="this"
-                hx-confirm="Are you sure you want to delete the cleanup policy '{{ config.name }}'?"
+                hx-confirm="Are you sure you want to delete the prune policy '{{ config.name }}'?"
                 class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500 [&.htmx-request]:opacity-50"
             >
                 <span class="[.htmx-request_&]:hidden">Delete</span>

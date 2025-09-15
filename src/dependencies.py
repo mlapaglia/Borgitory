@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from models.database import get_db
+import os
 
 from services.simple_command_runner import SimpleCommandRunner
 from services.borg_service import BorgService
@@ -39,6 +40,8 @@ from services.repositories.repository_check_config_service import (
 )
 from services.notifications.notification_config_service import NotificationConfigService
 from services.cleanup_service import CleanupService
+from services.cron_description_service import CronDescriptionService
+from services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
 
 
@@ -63,7 +66,7 @@ def get_job_manager_dependency() -> JobManager:
             max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
             max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
         )
-        _job_manager_instance = create_job_manager(config)
+        _job_manager_instance = create_job_manager(config, get_rclone_service())
     return _job_manager_instance
 
 
@@ -240,13 +243,19 @@ _scheduler_service_instance = None
 
 def get_scheduler_service() -> SchedulerService:
     """
-    Provide a SchedulerService singleton instance.
+    Provide a SchedulerService singleton instance with proper dependency injection.
 
     Uses module-level singleton pattern for application-wide persistence.
     """
     global _scheduler_service_instance
     if _scheduler_service_instance is None:
-        _scheduler_service_instance = SchedulerService()
+        job_manager = get_job_manager_dependency()
+
+        from services.jobs.job_service import JobService
+
+        _scheduler_service_instance = SchedulerService(
+            job_manager=job_manager, job_service_factory=JobService
+        )
     return _scheduler_service_instance
 
 
@@ -384,7 +393,9 @@ def get_templates() -> Jinja2Templates:
     """
     global _templates_instance
     if _templates_instance is None:
-        _templates_instance = Jinja2Templates(directory="src/templates")
+        base_path = "" if os.path.exists("templates") else "src/"
+        template_path = f"{base_path}templates"
+        _templates_instance = Jinja2Templates(directory=template_path)
     return _templates_instance
 
 
@@ -446,13 +457,36 @@ def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
     return CleanupService(db=db)
 
 
+_cron_description_service_instance = None
+
+
+def get_cron_description_service() -> CronDescriptionService:
+    """
+    Provide a CronDescriptionService singleton instance.
+
+    Uses module-level singleton pattern for application-wide persistence.
+    """
+    global _cron_description_service_instance
+    if _cron_description_service_instance is None:
+        _cron_description_service_instance = CronDescriptionService()
+    return _cron_description_service_instance
+
+
+def get_upcoming_backups_service(
+    cron_description_service: CronDescriptionService = Depends(
+        get_cron_description_service
+    ),
+) -> UpcomingBackupsService:
+    """Provide UpcomingBackupsService instance."""
+    return UpcomingBackupsService(cron_description_service)
+
+
 # Type aliases for dependency injection
 SimpleCommandRunnerDep = Annotated[
     SimpleCommandRunner, Depends(get_simple_command_runner)
 ]
 BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
-# Note: BackupService is now only used internally by JobService
 RecoveryServiceDep = Annotated[RecoveryService, Depends(get_recovery_service)]
 PushoverServiceDep = Annotated[PushoverService, Depends(get_pushover_service)]
 JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service)]
@@ -487,3 +521,9 @@ NotificationConfigServiceDep = Annotated[
     NotificationConfigService, Depends(get_notification_config_service)
 ]
 CleanupServiceDep = Annotated[CleanupService, Depends(get_cleanup_service)]
+CronDescriptionServiceDep = Annotated[
+    CronDescriptionService, Depends(get_cron_description_service)
+]
+UpcomingBackupsServiceDep = Annotated[
+    UpcomingBackupsService, Depends(get_upcoming_backups_service)
+]

@@ -100,7 +100,7 @@ class TestTabsAPI:
     @pytest.mark.asyncio
     async def test_get_cleanup_tab(self, async_client: AsyncClient, mock_current_user):
         """Test getting cleanup tab content."""
-        response = await async_client.get("/api/tabs/cleanup")
+        response = await async_client.get("/api/tabs/prune")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
@@ -141,7 +141,7 @@ class TestTabsAPI:
             "/api/tabs/statistics",
             "/api/tabs/jobs",
             "/api/tabs/notifications",
-            "/api/tabs/cleanup",
+            "/api/tabs/prune",
             "/api/tabs/repository-check",
             "/api/tabs/debug",
         ]

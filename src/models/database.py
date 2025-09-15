@@ -1,6 +1,8 @@
 import base64
 import hashlib
+import logging
 import uuid
+import os
 from datetime import datetime, UTC
 
 from cryptography.fernet import Fernet
@@ -19,6 +21,8 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
 from config import DATABASE_URL, get_secret_key, DATA_DIR
+
+logger = logging.getLogger(__name__)
 
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -382,20 +386,14 @@ class RepositoryCheckConfig(Base):
 
 async def init_db():
     """Initialize database - assumes migrations have already been run"""
-    import logging
-    import os
-
-    logger = logging.getLogger(__name__)
 
     try:
         logger.info(f"Initializing database at: {DATABASE_URL}")
         logger.info(f"Data directory: {DATA_DIR}")
 
-        # Ensure data directory exists
         os.makedirs(DATA_DIR, exist_ok=True)
         logger.info("Data directory ensured")
 
-        # Simple database connection test and table creation
         from sqlalchemy import text
 
         with engine.connect() as connection:
@@ -403,7 +401,6 @@ async def init_db():
             result.fetchone()
             logger.info("Database connection test successful")
 
-            # Check if tables exist, create them if they don't
             try:
                 result = connection.execute(
                     text(
@@ -419,7 +416,6 @@ async def init_db():
             except Exception as e:
                 logger.warning(f"Could not check/create tables: {e}")
 
-        # Optional: Log current migration status (non-blocking)
         try:
             from utils.migrations import get_current_revision
 
@@ -438,10 +434,10 @@ async def init_db():
 
 def reset_db():
     """Reset the entire database - USE WITH CAUTION"""
-    print("Resetting database...")
+    logger.info("Resetting database...")
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    print("Database reset complete")
+    logger.info("Database reset complete")
 
 
 def get_db():

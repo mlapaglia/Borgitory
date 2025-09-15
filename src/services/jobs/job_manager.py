@@ -21,7 +21,6 @@ from services.jobs.broadcaster.job_event_broadcaster import (
     EventType,
 )
 from services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
-from services.cloud_backup_coordinator import CloudBackupCoordinator
 from utils.db_session import get_db_session
 
 if TYPE_CHECKING:
@@ -63,7 +62,6 @@ class JobManagerDependencies:
     queue_manager: Optional[JobQueueManager] = None
     event_broadcaster: Optional[JobEventBroadcaster] = None
     database_manager: Optional[JobDatabaseManager] = None
-    cloud_coordinator: Optional[CloudBackupCoordinator] = None
     pushover_service: Optional["PushoverService"] = None
 
     # External dependencies (for testing/customization)
@@ -191,16 +189,6 @@ class JobManagerFactory:
                 keepalive_timeout=config.sse_keepalive_timeout,
             )
 
-        # Cloud Backup Coordinator
-        if custom_dependencies.cloud_coordinator:
-            deps.cloud_coordinator = custom_dependencies.cloud_coordinator
-        else:
-            deps.cloud_coordinator = CloudBackupCoordinator(
-                db_session_factory=deps.db_session_factory,
-                rclone_service=deps.rclone_service,
-                http_client_factory=deps.http_client_factory,
-            )
-
         # PushoverService
         if custom_dependencies.pushover_service:
             deps.pushover_service = custom_dependencies.pushover_service
@@ -215,7 +203,6 @@ class JobManagerFactory:
         else:
             deps.database_manager = JobDatabaseManager(
                 db_session_factory=deps.db_session_factory,
-                cloud_backup_coordinator=deps.cloud_coordinator,
             )
 
         return deps
@@ -276,7 +263,6 @@ class JobManager:
         self.queue_manager = dependencies.queue_manager
         self.event_broadcaster = dependencies.event_broadcaster
         self.database_manager = dependencies.database_manager
-        self.cloud_coordinator = dependencies.cloud_coordinator
         self.pushover_service = dependencies.pushover_service
 
         self.jobs: Dict[str, BorgJob] = {}
@@ -740,7 +726,6 @@ class JobManager:
 
             params = task.parameters
 
-            # Get repository data
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
                 task.status = "failed"
@@ -771,14 +756,14 @@ class JobManager:
                 )
 
             # Build backup command
-            paths = params.get("paths", [])
+            source_path = params.get("source_path")
             excludes = params.get("excludes", [])
             archive_name = params.get(
                 "archive_name", f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
             )
 
             logger.info(
-                f"Backup task parameters - paths: {paths}, excludes: {excludes}, archive_name: {archive_name}"
+                f"Backup task parameters - source_path: {source_path}, excludes: {excludes}, archive_name: {archive_name}"
             )
             logger.info(f"All task parameters: {params}")
 
@@ -791,14 +776,7 @@ class JobManager:
 
             additional_args.append(f"{repository_path}::{archive_name}")
 
-            # Add paths - if empty, add a default path for testing
-            if not paths:
-                logger.warning(
-                    "No source paths specified for backup, using default test path"
-                )
-                paths = ["/tmp"]  # Add a default path for testing
-
-            additional_args.extend(paths)
+            additional_args.append(source_path)
 
             logger.info(f"Final additional_args for Borg command: {additional_args}")
 
@@ -884,37 +862,59 @@ class JobManager:
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
     ) -> bool:
         """Execute a prune task using JobExecutor"""
-        params = task.parameters
+        try:
+            params = task.parameters
 
-        def task_output_callback(line: str, progress: Dict):
-            task.output_lines.append(line)
-            asyncio.create_task(
-                self.output_manager.add_output_line(job.id, line, "stdout", progress)
+            repo_data = await self._get_repository_data(job.repository_id)
+            if not repo_data:
+                task.status = "failed"
+                task.return_code = 1
+                task.error = "Repository not found"
+                task.completed_at = datetime.now(UTC)
+                return False
+
+            repository_path = repo_data.get("path") or params.get("repository_path")
+            passphrase = repo_data.get("passphrase") or params.get("passphrase")
+
+            def task_output_callback(line: str, progress: Dict):
+                task.output_lines.append(line)
+                asyncio.create_task(
+                    self.output_manager.add_output_line(
+                        job.id, line, "stdout", progress
+                    )
+                )
+
+            result = await self.executor.execute_prune_task(
+                repository_path=repository_path,
+                passphrase=passphrase,
+                keep_within=params.get("keep_within"),
+                keep_daily=params.get("keep_daily"),
+                keep_weekly=params.get("keep_weekly"),
+                keep_monthly=params.get("keep_monthly"),
+                keep_yearly=params.get("keep_yearly"),
+                show_stats=params.get("show_stats", True),
+                show_list=params.get("show_list", False),
+                save_space=params.get("save_space", False),
+                force_prune=params.get("force_prune", False),
+                dry_run=params.get("dry_run", False),
+                output_callback=task_output_callback,
             )
 
-        result = await self.executor.execute_prune_task(
-            repository_path=params.get("repository_path"),
-            passphrase=params.get("passphrase"),
-            keep_within=params.get("keep_within"),
-            keep_daily=params.get("keep_daily"),
-            keep_weekly=params.get("keep_weekly"),
-            keep_monthly=params.get("keep_monthly"),
-            keep_yearly=params.get("keep_yearly"),
-            show_stats=params.get("show_stats", True),
-            show_list=params.get("show_list", False),
-            save_space=params.get("save_space", False),
-            force_prune=params.get("force_prune", False),
-            dry_run=params.get("dry_run", False),
-            output_callback=task_output_callback,
-        )
+            # Set task status based on result
+            task.return_code = result.return_code
+            task.status = "completed" if result.return_code == 0 else "failed"
+            if result.error:
+                task.error = result.error
 
-        # Set task status based on result
-        task.return_code = result.return_code
-        task.status = "completed" if result.return_code == 0 else "failed"
-        if result.error:
-            task.error = result.error
+            return result.return_code == 0
 
-        return result.return_code == 0
+        except Exception as e:
+            logger.error(f"Exception in prune task: {str(e)}")
+            task.status = "failed"
+            task.return_code = -1
+            task.error = f"Prune task failed: {str(e)}"
+            task.completed_at = datetime.now(UTC)
+            return False
 
     async def _execute_check_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
@@ -925,7 +925,6 @@ class JobManager:
 
             params = task.parameters
 
-            # Get repository data
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
                 task.status = "failed"
@@ -947,7 +946,6 @@ class JobManager:
 
             additional_args = []
 
-            # Add check options
             if params.get("repository_only", False):
                 additional_args.append("--repository-only")
             if params.get("archives_only", False):
@@ -966,24 +964,48 @@ class JobManager:
                 additional_args=additional_args,
             )
 
-            # Start the check process
             process = await self.executor.start_process(command, env)
             self._processes[job.id] = process
 
-            # Monitor the process
             result = await self.executor.monitor_process_output(
                 process, output_callback=task_output_callback
             )
 
-            # Clean up process tracking
             if job.id in self._processes:
                 del self._processes[job.id]
 
-            # Set task status based on result
             task.return_code = result.return_code
             task.status = "completed" if result.return_code == 0 else "failed"
+            task.completed_at = datetime.now(UTC)
+
+            if result.stdout:
+                full_output = result.stdout.decode("utf-8", errors="replace").strip()
+                if full_output:
+                    for line in full_output.split("\n"):
+                        if line.strip():
+                            task.output_lines.append(line)
+                            asyncio.create_task(
+                                self.output_manager.add_output_line(
+                                    job.id, line, "stdout", {}
+                                )
+                            )
+
             if result.error:
                 task.error = result.error
+            elif result.return_code != 0:
+                if result.stdout:
+                    output_text = result.stdout.decode(
+                        "utf-8", errors="replace"
+                    ).strip()
+                    error_lines = output_text.split("\n")[-5:] if output_text else []
+                    stderr_text = (
+                        "\n".join(error_lines) if error_lines else "No output captured"
+                    )
+                else:
+                    stderr_text = "No output captured"
+                task.error = (
+                    f"Check failed with return code {result.return_code}: {stderr_text}"
+                )
 
             return result.return_code == 0
 
@@ -1001,6 +1023,17 @@ class JobManager:
         """Execute a cloud sync task using JobExecutor"""
         params = task.parameters
 
+        repo_data = await self._get_repository_data(job.repository_id)
+        if not repo_data:
+            task.status = "failed"
+            task.return_code = 1
+            task.error = "Repository not found"
+            task.completed_at = datetime.now(UTC)
+            return False
+
+        repository_path = repo_data.get("path") or params.get("repository_path")
+        passphrase = repo_data.get("passphrase") or params.get("passphrase")
+
         def task_output_callback(line: str, progress: Dict):
             task.output_lines.append(line)
             asyncio.create_task(
@@ -1008,8 +1041,8 @@ class JobManager:
             )
 
         result = await self.executor.execute_cloud_sync_task(
-            repository_path=params.get("repository_path"),
-            passphrase=params.get("passphrase"),  # Not used but kept for consistency
+            repository_path=repository_path,
+            passphrase=passphrase,  # Not used but kept for consistency
             cloud_sync_config_id=params.get("cloud_sync_config_id"),
             output_callback=task_output_callback,
             db_session_factory=self.dependencies.db_session_factory,
@@ -1017,7 +1050,6 @@ class JobManager:
             http_client_factory=self.dependencies.http_client_factory,
         )
 
-        # Set task status based on result
         task.return_code = result.return_code
         task.status = "completed" if result.return_code == 0 else "failed"
         if result.error:
@@ -1043,7 +1075,6 @@ class JobManager:
             task.error = "No notification configuration"
             return False
 
-        # Get notification configuration
         try:
             with get_db_session() as db:
                 from models.database import NotificationConfig
@@ -1067,14 +1098,12 @@ class JobManager:
                     return True
 
                 if config.provider == "pushover":
-                    # Get decrypted credentials
                     user_key, app_token = config.get_pushover_credentials()
 
                     title = params.get("title", "Borgitory Notification")
                     message = params.get("message", "Job completed")
                     priority = params.get("priority", 0)
 
-                    # Add output showing notification attempt
                     task.output_lines.append(
                         {"text": f"Sending Pushover notification to {config.name}"}
                     )
@@ -1082,7 +1111,6 @@ class JobManager:
                     task.output_lines.append({"text": f"Message: {message}"})
                     task.output_lines.append({"text": f"Priority: {priority}"})
 
-                    # Broadcast initial output
                     self.event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
                         job_id=job.id,
@@ -1092,7 +1120,6 @@ class JobManager:
                         },
                     )
 
-                    # Send Pushover notification using injected service
                     if self.pushover_service:
                         (
                             success,
@@ -1108,7 +1135,6 @@ class JobManager:
                         success = False
                         response_message = "PushoverService not available"
 
-                    # Add result output
                     if success:
                         result_message = "✓ Notification sent successfully"
                         task.output_lines.append({"text": result_message})
@@ -1122,7 +1148,6 @@ class JobManager:
                         )
                         task.output_lines.append({"text": result_message})
 
-                    # Broadcast result output
                     self.event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
                         job_id=job.id,
@@ -1198,7 +1223,6 @@ class JobManager:
             async for output in self.output_manager.stream_job_output(job_id):
                 yield output
         else:
-            # Empty async generator
             return
             yield
 
@@ -1223,24 +1247,20 @@ class JobManager:
         if job.status not in ["running", "queued"]:
             return False
 
-        # Cancel the process if running
         if job_id in self._processes:
             process = self._processes[job_id]
             success = await self.executor.terminate_process(process)
             if success:
                 del self._processes[job_id]
 
-        # Update job status
         job.status = "cancelled"
         job.completed_at = datetime.now(UTC)
 
-        # Update database
         if self.database_manager:
             await self.database_manager.update_job_status(
                 job_id, "cancelled", job.completed_at
             )
 
-        # Broadcast cancellation
         self.event_broadcaster.broadcast_event(
             EventType.JOB_CANCELLED,
             job_id=job_id,
@@ -1255,13 +1275,10 @@ class JobManager:
             job = self.jobs[job_id]
             logger.debug(f"Cleaning up job {job_id} (status: {job.status})")
 
-            # Remove from active jobs
             del self.jobs[job_id]
 
-            # Clean up output
             self.output_manager.clear_job_output(job_id)
 
-            # Remove process if still tracked
             if job_id in self._processes:
                 del self._processes[job_id]
 
@@ -1410,9 +1427,6 @@ class JobManager:
 
         if self.event_broadcaster:
             await self.event_broadcaster.shutdown()
-
-        if self.cloud_coordinator:
-            await self.cloud_coordinator.shutdown()
 
         # Clear data
         self.jobs.clear()
@@ -1592,7 +1606,7 @@ class JobManager:
 
 
 # Factory function for creating JobManager instances (no singleton)
-def create_job_manager(config=None) -> JobManager:
+def create_job_manager(config=None, rclone_service=None) -> JobManager:
     """Factory function for creating JobManager instances"""
     if config is None:
         # Use environment variables or defaults
@@ -1607,7 +1621,14 @@ def create_job_manager(config=None) -> JobManager:
         # Assume it's already a JobManagerConfig
         internal_config = config
 
-    job_manager = JobManager(internal_config)
+    # Create dependencies with rclone service
+    custom_deps = JobManagerDependencies(rclone_service=rclone_service)
+
+    dependencies = JobManagerFactory.create_dependencies(
+        config=internal_config, custom_dependencies=custom_deps
+    )
+
+    job_manager = JobManager(config=internal_config, dependencies=dependencies)
     logger.info(
         f"Created new job manager with config: max_concurrent={internal_config.max_concurrent_backups}"
     )

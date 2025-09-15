@@ -1,6 +1,5 @@
 """
 Tests for Job SSE API endpoint - Unit tests only
-Note: Full SSE streaming tests are handled in test_job_render_service.py
 Integration testing of SSE endpoints requires specialized tools due to streaming nature.
 """
 

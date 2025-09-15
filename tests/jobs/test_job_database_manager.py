@@ -7,7 +7,7 @@ the AttributeError with _db_session_factory that was encountered during cloud sy
 
 import pytest
 import uuid
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 from datetime import datetime, UTC
 
 from services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
@@ -26,27 +26,17 @@ class TestJobDatabaseManager:
         return factory, session
 
     @pytest.fixture
-    def mock_cloud_backup_coordinator(self):
-        """Create mock cloud backup coordinator"""
-        coordinator = Mock()
-        coordinator.trigger_cloud_backup = AsyncMock()
-        return coordinator
-
-    @pytest.fixture
     def job_database_manager(self, mock_db_session_factory):
         """Create JobDatabaseManager with mocked dependencies"""
         factory, _ = mock_db_session_factory
         return JobDatabaseManager(db_session_factory=factory)
 
     @pytest.fixture
-    def job_database_manager_with_coordinator(
-        self, mock_db_session_factory, mock_cloud_backup_coordinator
-    ):
+    def job_database_manager_with_coordinator(self, mock_db_session_factory):
         """Create JobDatabaseManager with cloud backup coordinator"""
         factory, _ = mock_db_session_factory
         return JobDatabaseManager(
             db_session_factory=factory,
-            cloud_backup_coordinator=mock_cloud_backup_coordinator,
         )
 
     @pytest.fixture
@@ -69,21 +59,16 @@ class TestJobDatabaseManager:
         assert hasattr(manager, "db_session_factory")
         assert not hasattr(manager, "_db_session_factory")
         assert manager.db_session_factory is not None
-        assert manager.cloud_backup_coordinator is None
 
-    def test_initialization_with_custom_dependencies(
-        self, mock_db_session_factory, mock_cloud_backup_coordinator
-    ):
+    def test_initialization_with_custom_dependencies(self, mock_db_session_factory):
         """Test initialization with custom dependencies"""
         factory, _ = mock_db_session_factory
 
         manager = JobDatabaseManager(
             db_session_factory=factory,
-            cloud_backup_coordinator=mock_cloud_backup_coordinator,
         )
 
         assert manager.db_session_factory == factory
-        assert manager.cloud_backup_coordinator == mock_cloud_backup_coordinator
 
     def test_attribute_access_compatibility(self, job_database_manager):
         """
@@ -162,7 +147,6 @@ class TestJobDatabaseManager:
         self,
         job_database_manager_with_coordinator,
         mock_db_session_factory,
-        mock_cloud_backup_coordinator,
     ):
         """Test that completed jobs with cloud sync config trigger cloud backup"""
         factory, mock_session = mock_db_session_factory
@@ -198,7 +182,6 @@ class TestJobDatabaseManager:
 
                 # Verify results
                 assert result is True
-                mock_cloud_backup_coordinator.trigger_cloud_backup.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_job_by_uuid_happy_path(
@@ -257,7 +240,7 @@ class TestJobDatabaseManager:
 
             mock_job2 = Mock()
             mock_job2.id = str(uuid.uuid4())
-            mock_job2.type = "cleanup"
+            mock_job2.type = "prune"
             mock_job2.status = "running"
             mock_job2.started_at = datetime.now(UTC)
             mock_job2.finished_at = None

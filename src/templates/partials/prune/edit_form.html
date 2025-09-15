@@ -1,6 +1,6 @@
-<!-- Edit Cleanup Policy -->
+<!-- Edit Prune Policy -->
 <form 
-    hx-put="/api/cleanup/{{ config.id }}" 
+    hx-put="/api/prune/{{ config.id }}" 
     hx-ext="json-enc"
     hx-target="#cleanup-policy-status"
     class="space-y-3"
@@ -33,11 +33,11 @@
     
     <div class="flex space-x-2">
         <button type="submit" class="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 text-sm">
-            Update Cleanup Policy
+            Update Prune Policy
         </button>
         <button 
             type="button" 
-            hx-get="/api/cleanup/policy-form"
+            hx-get="/api/prune/policy-form"
             hx-target="#cleanup-policy-form-container"
             hx-swap="innerHTML"
             class="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm">

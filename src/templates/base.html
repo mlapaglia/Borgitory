@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Borgitory - BorgBackup Manager{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="/static/favicon/favicon.ico">
+    <link rel="manifest" href="/static/favicon/site.webmanifest">
+    
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
@@ -95,7 +103,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </button>
-                    <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Borgitory</h1>
+                    <div class="flex items-center">
+                        <img src="/static/favicon/favicon-32x32.png" alt="Borgitory Logo" class="w-8 h-8 mr-3">
+                        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Borgitory</h1>
+                    </div>
                 </div>
                 <div class="flex items-center space-x-4">
                     {% if current_user %}

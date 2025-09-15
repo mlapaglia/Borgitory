@@ -1,14 +1,13 @@
-# Borgitory [![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
+# Borgitory
+
+[![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
+[![build](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/release.yml)](https://github.com/mlapaglia/Borgitory/actions/workflows/release.yml)
+[![sponsors](https://img.shields.io/github/sponsors/mlapaglia)](https://github.com/sponsors/mlapaglia)
+[![sponsors](https://img.shields.io/docker/pulls/mlapaglia/borgitory)](https://hub.docker.com/r/mlapaglia/borgitory)
 
 <img alt="borgitory logo" src="./assets/logo.png" width="400">
 
 A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities.
-
-## System Status
-
-✅ **Archive Browsing**: Interactive exploration with FUSE mounting
-✅ **Multi-Task Jobs**: Backup, prune, check, and cloud sync operations
-✅ **User Interface**: Modern HTMX + Tailwind CSS with mobile responsiveness
 
 ## Features
 
@@ -16,14 +15,12 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 - **Repository Management**: Add, configure, and manage multiple Borg repositories
 - **Manual Backups**: Create backups on-demand with configurable compression and source paths
-- **Real-time Progress**: Monitor backup progress with live updates via Server-Sent Events
+- **Real-time Progress**: Monitor backup progress with live updates
 - **Archive Browser**: Interactive directory-based archive exploration with file downloads
 - **Job History**: Track all backup operations with detailed logs and expandable task views
 
-### Advanced Features
-
 - **Automated Scheduling**: Set up cron-based backup schedules with integrated cleanup and notifications
-- **Archive Cleanup**: Configure automated pruning policies with simple or advanced retention strategies
+- **Archive Pruning**: Configure automated pruning policies with simple or advanced retention strategies
 - **Cloud Sync**: Synchronize repositories to S3-compatible storage using Rclone
 - **Push Notifications**: Pushover integration for job completion alerts
 - **User Authentication**: Secure username/password authentication
@@ -134,8 +131,6 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ### Docker Volumes
 
-The application requires these volume mounts:
-
 ```yaml
 volumes:
   - ./data:/app/data # Persistent application data (required)
@@ -180,9 +175,9 @@ volumes:
 2. Create new schedule with cron expression
 3. Enable/disable schedules as needed
 
-### 3. Archive Cleanup (Pruning)
+### 3. Archive Pruning
 
-1. Create cleanup policies:
+1. Create pruning policies:
    - **Simple Strategy**: Keep archives within X days
    - **Advanced Strategy**: Granular retention (daily/weekly/monthly/yearly)
 2. Configure options:

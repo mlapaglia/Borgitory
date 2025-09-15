@@ -115,10 +115,10 @@ async def get_notifications_tab(
     )
 
 
-@router.get("/cleanup", response_class=HTMLResponse)
+@router.get("/prune", response_class=HTMLResponse)
 async def get_cleanup_tab(request: Request, current_user=Depends(get_current_user)):
     return _render_tab_with_nav(
-        request, "partials/cleanup/tab.html", "cleanup", {"current_user": current_user}
+        request, "partials/prune/tab.html", "prune", {"current_user": current_user}
     )
 
 

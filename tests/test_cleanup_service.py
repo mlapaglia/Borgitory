@@ -132,7 +132,7 @@ class TestCleanupService:
 
         assert success is False
         assert config is None
-        assert "A cleanup policy with this name already exists" in error
+        assert "A prune policy with this name already exists" in error
 
     def test_create_cleanup_config_database_error(self, service, test_db):
         """Test cleanup config creation with database error."""
@@ -196,7 +196,7 @@ class TestCleanupService:
 
         assert success is False
         assert config is None
-        assert "A cleanup policy with this name already exists" in error
+        assert "A prune policy with this name already exists" in error
 
     def test_enable_cleanup_config_success(self, service, test_db):
         """Test successfully enabling cleanup config."""

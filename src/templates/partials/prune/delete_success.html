@@ -1,12 +1,12 @@
 <!-- HTMX Notification Trigger -->
-<div hx-get="/api/shared/notification?message=Cleanup policy '{{ config_name }}' deleted successfully!&type=success"
+<div hx-get="/api/shared/notification?message=Prune policy '{{ config_name }}' deleted successfully!&type=success"
      hx-target="body"
      hx-swap="beforeend"
      hx-trigger="load">
 </div>
 
 <!-- Update Cleanup List -->
-<div hx-get="/api/cleanup/html" 
+<div hx-get="/api/prune/html" 
      hx-target="#cleanup-config-list" 
      hx-swap="innerHTML" 
      hx-trigger="load delay:100ms">

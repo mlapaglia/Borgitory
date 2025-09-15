@@ -3,8 +3,8 @@ from pathlib import Path
 
 # Use app/data for both local and container environments
 APP_DIR = Path(__file__).parent  # This is the app/ directory
-DATA_DIR = str(APP_DIR / "data")
-DATABASE_PATH = str(APP_DIR / "data" / "borgitory.db")
+DATA_DIR = str("data")
+DATABASE_PATH = str("data/borgitory.db")
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 

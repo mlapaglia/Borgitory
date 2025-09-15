@@ -1,0 +1,10 @@
+{% if description %}
+<div class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+    <span class="font-medium text-blue-800 dark:text-blue-200">Schedule:</span>
+    <span class="text-blue-700 dark:text-blue-300">{{ description }}</span>
+</div>
+{% elif error %}
+<div class="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-800">
+    <span class="font-medium">Error:</span> {{ error }}
+</div>
+{% endif %}

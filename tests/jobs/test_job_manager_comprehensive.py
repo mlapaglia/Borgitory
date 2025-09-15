@@ -1,6 +1,5 @@
 """
 Comprehensive tests for JobManager - covering missing lines and functionality
-Uses real database instances following FastAPI best practices
 """
 
 import pytest
@@ -39,7 +38,6 @@ class TestJobManagerFactory:
         assert deps.queue_manager is not None
         assert deps.event_broadcaster is not None
         assert deps.database_manager is not None
-        assert deps.cloud_coordinator is not None
         assert deps.pushover_service is not None
 
         # Test that it uses default session factory
@@ -298,7 +296,7 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock process execution and repository data
-        mock_process = Mock()
+        mock_process = AsyncMock()
         result = ProcessResult(
             return_code=0,
             stdout=b"Archive created successfully",
@@ -355,7 +353,7 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock failed process and repository data
-        mock_process = Mock()
+        mock_process = AsyncMock()
         result = ProcessResult(
             return_code=2,
             stdout=b"Repository locked",
@@ -412,9 +410,18 @@ class TestJobManagerTaskExecution:
             status="running",
             started_at=datetime.now(UTC),
             tasks=[task],
+            repository_id=1,  # Add repository_id for the updated method
         )
         job_manager_with_db.jobs[job_id] = job
         job_manager_with_db.output_manager.create_job_output(job_id)
+
+        # Mock repository data
+        mock_repo_data = {
+            "id": 1,
+            "name": "test-repo",
+            "path": "/tmp/test-repo",
+            "passphrase": "test-pass",
+        }
 
         # Mock successful prune
         result = ProcessResult(
@@ -423,6 +430,8 @@ class TestJobManagerTaskExecution:
 
         with patch.object(
             job_manager_with_db.executor, "execute_prune_task", return_value=result
+        ), patch.object(
+            job_manager_with_db, "_get_repository_data", return_value=mock_repo_data
         ):
             success = await job_manager_with_db._execute_prune_task(job, task)
 
@@ -454,7 +463,7 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock successful check and repository data
-        mock_process = Mock()
+        mock_process = AsyncMock()
         result = ProcessResult(
             return_code=0, stdout=b"Repository check passed", stderr=b"", error=None
         )
@@ -504,6 +513,7 @@ class TestJobManagerTaskExecution:
             status="running",
             started_at=datetime.now(UTC),
             tasks=[task],
+            repository_id=1,  # Add repository_id for cloud sync task
         )
         job_manager_with_db.jobs[job_id] = job
         job_manager_with_db.output_manager.create_job_output(job_id)
@@ -513,8 +523,18 @@ class TestJobManagerTaskExecution:
             return_code=0, stdout=b"Sync complete", stderr=b"", error=None
         )
 
+        # Mock repository data
+        repo_data = {
+            "id": 1,
+            "name": "test-repo",
+            "path": "/tmp/test-repo",
+            "passphrase": "test-passphrase",
+        }
+
         with patch.object(
             job_manager_with_db.executor, "execute_cloud_sync_task", return_value=result
+        ), patch.object(
+            job_manager_with_db, "_get_repository_data", return_value=repo_data
         ):
             success = await job_manager_with_db._execute_cloud_sync_task(job, task)
 
@@ -918,7 +938,7 @@ class TestJobManagerStreamingAndUtility:
         job = Mock(status="running")
         job_manager.jobs["test"] = job
 
-        mock_process = Mock()
+        mock_process = AsyncMock()
         job_manager._processes["test"] = mock_process
         job_manager.executor.terminate_process = AsyncMock(return_value=True)
 

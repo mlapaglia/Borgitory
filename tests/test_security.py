@@ -585,8 +585,8 @@ class TestSecurePathValidation:
             ("/mnt/data/repos", "Nested repository path"),
             ("relative/path", "Relative path"),
             ("test.txt", "Simple filename"),
-            ("/app/app/data/config", "App data path"),
-            ("/app/app/data/keyfiles/key.key", "Keyfile path"),
+            ("/app/data/config", "App data path"),
+            ("/app/data/keyfiles/key.key", "Keyfile path"),
         ]
 
         for test_path, description in legitimate_paths:
@@ -627,11 +627,11 @@ class TestSecurePathValidation:
             result = validate_mnt_path(path)
             assert result is not None, f"validate_mnt_path should allow: '{path}'"
 
-        # Should reject /app/app/data paths
+        # Should reject /app/data paths
         app_data_paths = [
-            "/app/app/data",
-            "/app/app/data/config",
-            "/app/app/data/keyfiles/key.key",
+            "/app/data",
+            "/app/data/config",
+            "/app/data/keyfiles/key.key",
         ]
         for path in app_data_paths:
             result = validate_mnt_path(path)
@@ -641,7 +641,7 @@ class TestSecurePathValidation:
 
     def test_pre_validate_user_input_type_validation(self):
         """Test pre-validation input type checking."""
-        allowed_prefixes = ["/mnt", "/app/app/data"]
+        allowed_prefixes = ["/mnt", "/app/data"]
 
         # Should reject non-strings
         assert _pre_validate_user_input(None, allowed_prefixes) is False
@@ -679,15 +679,13 @@ class TestSecurePathValidation:
 
     def test_pre_validate_user_input_absolute_path_restrictions(self):
         """Test pre-validation absolute path restrictions."""
-        allowed_prefixes = ["/mnt", "/app/app/data"]
+        allowed_prefixes = ["/mnt", "/app/data"]
 
         # Should allow absolute paths under allowed prefixes
         assert _pre_validate_user_input("/mnt", allowed_prefixes) is True
         assert _pre_validate_user_input("/mnt/test", allowed_prefixes) is True
-        assert _pre_validate_user_input("/app/app/data", allowed_prefixes) is True
-        assert (
-            _pre_validate_user_input("/app/app/data/config", allowed_prefixes) is True
-        )
+        assert _pre_validate_user_input("/app/data", allowed_prefixes) is True
+        assert _pre_validate_user_input("/app/data/config", allowed_prefixes) is True
 
         # Should reject absolute paths outside allowed prefixes
         assert _pre_validate_user_input("/etc/passwd", allowed_prefixes) is False
@@ -704,7 +702,7 @@ class TestSecurePathValidation:
         # Test paths that should work on both Windows and Unix
         cross_platform_paths = [
             "/mnt/backup",
-            "/app/app/data/config",
+            "/app/data/config",
             "relative/path",
             "test.txt",
         ]
@@ -720,7 +718,7 @@ class TestSecurePathValidation:
             "/mnt/../etc/passwd",
             "/mnt/backup/../../../etc/passwd",
             "/mnt/./../../etc/passwd",
-            "/app/app/data/../../../etc/passwd",
+            "/app/data/../../../etc/passwd",
         ]
 
         for path in traversal_attempts:
@@ -734,7 +732,7 @@ class TestSecurePathValidation:
         # but our resolve() + relative_to() check should catch that
 
         # Test legitimate paths that might contain symlinks
-        legitimate_paths = ["/mnt/data", "/app/app/data/keyfiles"]
+        legitimate_paths = ["/mnt/data", "/app/data/keyfiles"]
 
         for path in legitimate_paths:
             result = validate_secure_path(path)
@@ -743,7 +741,7 @@ class TestSecurePathValidation:
 
     def test_validate_secure_path_with_allow_app_data_flag(self):
         """Test that the allow_app_data flag works correctly."""
-        app_data_path = "/app/app/data/test"
+        app_data_path = "/app/data/test"
 
         # Should allow app data path when flag is True (default)
         result_with_app_data = validate_secure_path(app_data_path, allow_app_data=True)

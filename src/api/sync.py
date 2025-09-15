@@ -41,13 +41,6 @@ async def configure_s3_remote(config: S3RemoteConfig, rclone: RcloneServiceDep):
         raise HTTPException(status_code=500, detail="Failed to configure S3 remote")
 
 
-@router.get("/remotes")
-def list_remotes(rclone: RcloneServiceDep):
-    """List all configured Rclone remotes"""
-    remotes = rclone.get_configured_remotes()
-    return {"remotes": remotes}
-
-
 @router.post("/remotes/{remote_name}/test")
 async def test_remote_connection(
     remote_name: str,

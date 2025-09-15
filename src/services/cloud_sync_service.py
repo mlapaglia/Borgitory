@@ -24,7 +24,7 @@ class CloudSyncService:
         self, config: CloudSyncConfigCreate
     ) -> CloudSyncConfig:
         """Create a new cloud sync configuration."""
-        # Check if name already exists
+
         existing = (
             self.db.query(CloudSyncConfig)
             .filter(CloudSyncConfig.name == config.name)
@@ -108,7 +108,6 @@ class CloudSyncService:
         """Update a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
-        # Check if name is being changed and if it conflicts
         if config_update.name and config_update.name != config.name:
             existing = (
                 self.db.query(CloudSyncConfig)
@@ -125,21 +124,17 @@ class CloudSyncService:
                     detail=f"Cloud sync configuration with name '{config_update.name}' already exists",
                 )
 
-        # Update fields
         for field, value in config_update.model_dump(exclude_unset=True).items():
             if field in ["access_key", "secret_key", "password", "private_key"]:
-                continue  # Handle credentials separately
+                continue
             setattr(config, field, value)
 
-        # Update credentials based on provider type
         if config.provider == "s3":
-            # Update S3 credentials if provided
             if config_update.access_key and config_update.secret_key:
                 config.set_credentials(
                     config_update.access_key, config_update.secret_key
                 )
         elif config.provider == "sftp":
-            # Update SFTP credentials if provided
             if config_update.password or config_update.private_key:
                 config.set_sftp_credentials(
                     config_update.password, config_update.private_key
@@ -179,9 +174,7 @@ class CloudSyncService:
         """Test a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
-        # Test the connection based on provider type
         if config.provider == "s3":
-            # Get S3 credentials
             access_key, secret_key = config.get_credentials()
 
             result = await rclone.test_s3_connection(
@@ -191,7 +184,6 @@ class CloudSyncService:
             )
 
         elif config.provider == "sftp":
-            # Get SFTP credentials
             password, private_key = config.get_sftp_credentials()
 
             result = await rclone.test_sftp_connection(

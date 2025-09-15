@@ -43,10 +43,9 @@ async def lifespan(app: FastAPI):
 
         from config import DATA_DIR
 
-        if not os.getenv("SECRET_KEY"):
-            secret_key = get_or_generate_secret_key(DATA_DIR)
-            os.environ["SECRET_KEY"] = secret_key
-            logger.info("SECRET_KEY initialized")
+        secret_key = get_or_generate_secret_key(DATA_DIR)
+        os.environ["SECRET_KEY"] = secret_key
+        logger.info("SECRET_KEY initialized")
 
         await init_db()
         logger.info("Database initialized")
@@ -160,8 +159,8 @@ app.include_router(
 
 app.include_router(
     cleanup.router,
-    prefix="/api/cleanup",
-    tags=["cleanup"],
+    prefix="/api/prune",
+    tags=["prune"],
 )
 
 app.include_router(
@@ -207,7 +206,7 @@ VALID_TABS = {
     "statistics": "/api/tabs/statistics",
     "jobs": "/api/tabs/jobs",
     "notifications": "/api/tabs/notifications",
-    "cleanup": "/api/tabs/cleanup",
+    "prune": "/api/tabs/prune",
     "repository-check": "/api/tabs/repository-check",
     "debug": "/api/tabs/debug",
 }
