@@ -125,7 +125,7 @@ class TestTaskDefinitionBuilder:
 
         expected = {
             "type": "prune",
-            "name": "Clean up test-repo",
+            "name": "Prune test-repo",
             "dry_run": False,
             "show_list": True,
             "show_stats": True,
@@ -147,7 +147,7 @@ class TestTaskDefinitionBuilder:
 
         expected = {
             "type": "prune",
-            "name": "Clean up test-repo",
+            "name": "Prune test-repo",
             "dry_run": False,
             "show_list": True,
             "show_stats": False,
@@ -181,7 +181,7 @@ class TestTaskDefinitionBuilder:
 
         expected = {
             "type": "prune",
-            "name": "Clean up test-repo",
+            "name": "Prune test-repo",
             "dry_run": True,
             "show_list": True,
             "show_stats": True,
@@ -206,7 +206,7 @@ class TestTaskDefinitionBuilder:
 
         expected = {
             "type": "prune",
-            "name": "Clean up test-repo",
+            "name": "Prune test-repo",
             "dry_run": False,
             "show_list": True,
             "show_stats": True,
