@@ -135,7 +135,7 @@ async def enable_cleanup_config(
         response = templates.TemplateResponse(
             request,
             "partials/cleanup/action_success.html",
-            {"message": f"Cleanup policy '{config.name}' enabled successfully!"},
+            {"message": f"Prune policy '{config.name}' enabled successfully!"},
         )
         response.headers["HX-Trigger"] = "cleanupConfigUpdate"
         return response
@@ -162,7 +162,7 @@ async def disable_cleanup_config(
         response = templates.TemplateResponse(
             request,
             "partials/cleanup/action_success.html",
-            {"message": f"Cleanup policy '{config.name}' disabled successfully!"},
+            {"message": f"Prune policy '{config.name}' disabled successfully!"},
         )
         response.headers["HX-Trigger"] = "cleanupConfigUpdate"
         return response

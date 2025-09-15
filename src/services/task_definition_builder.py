@@ -79,7 +79,7 @@ class TaskDefinitionBuilder:
 
         task = {
             "type": "prune",
-            "name": f"Clean up {repository_name}",
+            "name": f"Prune {repository_name}",
             "dry_run": False,
             "show_list": cleanup_config.show_list,
             "show_stats": cleanup_config.show_stats,
@@ -116,7 +116,7 @@ class TaskDefinitionBuilder:
         """
         task = {
             "type": "prune",
-            "name": f"Clean up {repository_name}",
+            "name": f"Prune {repository_name}",
             "dry_run": prune_request.dry_run,
             "show_list": True,  # Default for manual requests
             "show_stats": True,  # Default for manual requests

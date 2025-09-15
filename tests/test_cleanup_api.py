@@ -232,7 +232,7 @@ class TestCleanupAPI:
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
             "partials/cleanup/action_success.html",
-            {"message": "Cleanup policy 'test-config' enabled successfully!"},
+            {"message": "Prune policy 'test-config' enabled successfully!"},
         )
 
         # Verify HX-Trigger header is set
@@ -283,7 +283,7 @@ class TestCleanupAPI:
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
             "partials/cleanup/action_success.html",
-            {"message": "Cleanup policy 'test-config' disabled successfully!"},
+            {"message": "Prune policy 'test-config' disabled successfully!"},
         )
 
         # Verify HX-Trigger header is set

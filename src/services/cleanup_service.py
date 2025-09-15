@@ -51,7 +51,7 @@ class CleanupService:
                 .first()
             )
             if existing:
-                return False, None, "A cleanup policy with this name already exists"
+                return False, None, "A prune policy with this name already exists"
 
             # Create new configuration
             db_config = CleanupConfig(
@@ -108,7 +108,7 @@ class CleanupService:
                     .first()
                 )
                 if existing:
-                    return False, None, "A cleanup policy with this name already exists"
+                    return False, None, "A prune policy with this name already exists"
 
             # Update fields that were provided
             for field, value in update_dict.items():
