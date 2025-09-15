@@ -114,8 +114,6 @@ class TestBackupsAPI:
 
         content = response.text
         assert "test-repo" in content
-        # Note: The exact content depends on the template structure
-        # These assertions verify that the endpoint works with all config types
 
     @pytest.mark.asyncio
     async def test_get_backup_form_only_enabled_configs(
@@ -151,10 +149,6 @@ class TestBackupsAPI:
         response = await async_client.get("/api/backups/form")
 
         assert response.status_code == 200
-
-        # The endpoint should only include enabled configs
-        # Note: Exact validation depends on template structure
-        # This test verifies the filtering logic works correctly
 
     @pytest.mark.asyncio
     async def test_get_backup_form_mixed_enabled_disabled(

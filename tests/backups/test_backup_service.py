@@ -224,13 +224,6 @@ class TestBackupService:
         assert updated_job.error == "Backup failed"
         assert updated_job.finished_at is not None
 
-    # Note: run_scheduled_backup method was removed from BackupService
-    # Scheduled backups now go through JobService directly, same as manual backups
-    # This eliminates circular dependencies and follows the single responsibility principle
-
-    # Note: test_run_scheduled_backup_no_repository was removed since
-    # run_scheduled_backup method no longer exists in BackupService
-
     @pytest.mark.asyncio
     async def test_create_and_run_prune_success(
         self, backup_service_with_mock_executor, test_repository
