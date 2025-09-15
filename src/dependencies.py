@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from models.database import get_db
+import os
 
 from services.simple_command_runner import SimpleCommandRunner
 from services.borg_service import BorgService
@@ -248,9 +249,8 @@ def get_scheduler_service() -> SchedulerService:
     """
     global _scheduler_service_instance
     if _scheduler_service_instance is None:
-        # Get the job manager dependency
         job_manager = get_job_manager_dependency()
-        # Use JobService as the factory function
+
         from services.jobs.job_service import JobService
 
         _scheduler_service_instance = SchedulerService(
@@ -393,9 +393,6 @@ def get_templates() -> Jinja2Templates:
     """
     global _templates_instance
     if _templates_instance is None:
-        import os
-
-        # Use same logic as main.py for template path detection
         base_path = "" if os.path.exists("templates") else "src/"
         template_path = f"{base_path}templates"
         _templates_instance = Jinja2Templates(directory=template_path)

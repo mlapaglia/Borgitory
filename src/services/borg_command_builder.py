@@ -269,19 +269,15 @@ class BorgCommandBuilder:
         """Build command to check repository integrity"""
         additional_args = []
 
-        # Determine what to check based on check_type
         if check_type == "repository_only":
             additional_args.append("--repository-only")
         elif check_type == "archives_only":
             additional_args.append("--archives-only")
         elif check_type == "full":
-            # Full check is the default, no special flag needed
             pass
         else:
-            # Default to repository check if unknown type
             additional_args.append("--repository-only")
 
-        # Add verification options
         if verify_data:
             additional_args.append("--verify-data")
         if repair_mode:
@@ -289,11 +285,9 @@ class BorgCommandBuilder:
         if save_space:
             additional_args.append("--save-space")
 
-        # Add time limit
         if max_duration:
             additional_args.extend(["--max-duration", str(max_duration)])
 
-        # Add archive selection options
         if archive_prefix:
             additional_args.extend(["--glob-archives", f"{archive_prefix}*"])
         elif archive_glob:
@@ -304,7 +298,6 @@ class BorgCommandBuilder:
         elif last_n_archives:
             additional_args.extend(["--last", str(last_n_archives)])
 
-        # Add repository path
         additional_args.append(repository.path)
 
         try:

@@ -16,13 +16,8 @@ from utils.db_session import get_db_session
 from services.jobs.job_service import JobService
 from services.jobs.job_manager import JobManager
 
-# Configure APScheduler logging only (don't override main basicConfig)
-logging.getLogger("apscheduler").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-# Global service instances for scheduler context
-# These are created once and reused by the scheduler
 _job_manager: Optional[JobManager] = None
 _job_service_factory = None
 
@@ -79,11 +74,10 @@ async def execute_scheduled_backup(schedule_id: int):
             logger.info(f"  - source_path: {schedule.source_path}")
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
-            # Create a backup request object to use with JobService
             backup_request = BackupRequest(
                 repository_id=repository.id,
                 source_path=schedule.source_path,
-                compression="zstd",  # Default compression for scheduled backups
+                compression="zstd",
                 dry_run=False,
                 cleanup_config_id=schedule.cleanup_config_id,
                 check_config_id=schedule.check_config_id,
@@ -91,7 +85,6 @@ async def execute_scheduled_backup(schedule_id: int):
                 notification_config_id=schedule.notification_config_id,
             )
 
-            # Use injected JobService to create the backup job (same as manual backups)
             job_service = _job_service_factory(db, _job_manager)
             result = await job_service.create_backup_job(
                 backup_request, JobType.SCHEDULED_BACKUP
@@ -109,7 +102,7 @@ async def execute_scheduled_backup(schedule_id: int):
             import traceback
 
             logger.error(f"SCHEDULER: Traceback: {traceback.format_exc()}")
-            raise  # Re-raise so APScheduler marks the job as failed
+            raise
 
 
 class SchedulerService:
@@ -132,11 +125,9 @@ class SchedulerService:
         )
         self._running = False
 
-        # Set up dependencies for scheduler context
         self.job_manager = job_manager or JobManager()
         self.job_service_factory = job_service_factory or JobService
 
-        # Set global dependencies for the execute_scheduled_backup function
         set_scheduler_dependencies(self.job_manager, self.job_service_factory)
 
     async def start(self):
@@ -147,7 +138,6 @@ class SchedulerService:
 
         logger.info("Starting APScheduler v3...")
 
-        # Add event listeners
         self.scheduler.add_listener(
             self._handle_job_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR
         )
@@ -155,7 +145,6 @@ class SchedulerService:
         self.scheduler.start()
         self._running = True
 
-        # Load existing schedules
         await self._reload_schedules()
 
         logger.info("APScheduler v3 started successfully")
@@ -214,7 +203,6 @@ class SchedulerService:
         job_id = f"backup_schedule_{schedule_id}"
 
         try:
-            # Validate cron expression
             try:
                 trigger = CronTrigger.from_crontab(cron_expression)
             except ValueError as e:
@@ -222,14 +210,12 @@ class SchedulerService:
                     f"Invalid cron expression '{cron_expression}': {str(e)}"
                 )
 
-            # Remove existing job if it exists
             try:
                 self.scheduler.remove_job(job_id)
                 logger.info(f"Removed existing job {job_id}")
             except Exception:
-                pass  # Job doesn't exist, which is fine
+                pass
 
-            # Add the job
             self.scheduler.add_job(
                 execute_scheduled_backup,
                 trigger,
@@ -237,12 +223,11 @@ class SchedulerService:
                 id=job_id,
                 name=schedule_name,
                 max_instances=1,
-                misfire_grace_time=300,  # 5 minutes grace for missed jobs
+                misfire_grace_time=300,
             )
 
             logger.info(f"Added scheduled job {job_id} with cron '{cron_expression}'")
 
-            # Update next run time in database
             if persist:
                 await self._update_next_run_time(schedule_id, job_id)
 

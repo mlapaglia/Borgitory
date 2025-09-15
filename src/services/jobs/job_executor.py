@@ -44,7 +44,6 @@ class JobExecutor:
         try:
             logger.info(f"Starting process: {' '.join(command[:3])}...")
 
-            # Merge environment variables
             merged_env = os.environ.copy()
             if env:
                 merged_env.update(env)
@@ -75,15 +74,12 @@ class JobExecutor:
         stderr_data = b""
 
         try:
-            # Read output line by line
             async for line in process.stdout:
                 line_text = line.decode("utf-8", errors="replace").rstrip()
                 stdout_data += line
 
-                # Parse progress information
                 progress_info = self.parse_progress_line(line_text)
 
-                # Call callbacks if provided (support both sync and async)
                 if output_callback:
                     if inspect.iscoroutinefunction(output_callback):
                         await output_callback(line_text, progress_info)
@@ -96,7 +92,6 @@ class JobExecutor:
                     else:
                         progress_callback(progress_info)
 
-            # Wait for process completion
             return_code = await process.wait()
 
             return ProcessResult(
@@ -115,7 +110,6 @@ class JobExecutor:
         progress_info = {}
 
         try:
-            # Check for Borg progress pattern
             match = self.progress_pattern.search(line)
             if match:
                 progress_info = {
@@ -127,7 +121,6 @@ class JobExecutor:
                     "timestamp": datetime.now().isoformat(),
                 }
 
-            # Parse other Borg status lines
             elif "Archive name:" in line:
                 progress_info["archive_name"] = line.split("Archive name:")[-1].strip()
             elif "Archive fingerprint:" in line:
@@ -193,7 +186,6 @@ class JobExecutor:
                 safe_command.append(arg)
                 skip_next = True
             elif "::" in arg and len(arg.split("::")) == 2:
-                # Repository path with potential passphrase
                 parts = arg.split("::")
                 safe_command.append(f"{parts[0]}::[ARCHIVE]")
             else:
@@ -241,10 +233,8 @@ class JobExecutor:
         try:
             from utils.security import build_secure_borg_command
 
-            # Build prune command arguments based on task configuration
             additional_args = []
 
-            # Add retention policy arguments
             if keep_within:
                 additional_args.extend(["--keep-within", keep_within])
             if keep_daily:
@@ -255,8 +245,6 @@ class JobExecutor:
                 additional_args.extend(["--keep-monthly", str(keep_monthly)])
             if keep_yearly:
                 additional_args.extend(["--keep-yearly", str(keep_yearly)])
-
-            # Add common options
             if show_stats:
                 additional_args.append("--stats")
             if show_list:
@@ -265,12 +253,9 @@ class JobExecutor:
                 additional_args.append("--save-space")
             if force_prune:
                 additional_args.append("--force")
-
-            # Add dry run flag if requested
             if dry_run:
                 additional_args.append("--dry-run")
 
-            # Repository path as positional argument
             additional_args.append(repository_path)
 
             logger.info(
@@ -284,10 +269,8 @@ class JobExecutor:
                 additional_args=additional_args,
             )
 
-            # Start the process
             process = await self.start_process(command, env)
 
-            # Monitor output with callback
             result = await self.monitor_process_output(process, output_callback)
 
             if result.return_code == 0:
@@ -329,16 +312,14 @@ class JobExecutor:
             ProcessResult with execution details
         """
         try:
-            # Import dependencies
             from utils.db_session import get_db_session
             from models.database import CloudSyncConfig
             from types import SimpleNamespace
 
-            # Use provided session factory or default
             session_factory = db_session_factory or get_db_session
 
             if not cloud_sync_config_id:
-                logger.info("📋 No cloud backup configuration - skipping cloud sync")
+                logger.info("No cloud backup configuration - skipping cloud sync")
                 return ProcessResult(
                     return_code=0,
                     stdout=b"Cloud sync skipped - no configuration",
@@ -351,7 +332,6 @@ class JobExecutor:
             if output_callback:
                 output_callback("Starting cloud sync...", {})
 
-            # Get cloud backup configuration
             with session_factory() as db:
                 config = (
                     db.query(CloudSyncConfig)
@@ -375,9 +355,7 @@ class JobExecutor:
                         error=None,
                     )
 
-                # Handle different provider types
                 if config.provider == "s3":
-                    # Get S3 credentials
                     access_key, secret_key = config.get_credentials()
 
                     logger.info(f"Syncing to {config.name} (S3: {config.bucket_name})")
@@ -386,10 +364,8 @@ class JobExecutor:
                             f"Syncing to {config.name} (S3: {config.bucket_name})", {}
                         )
 
-                    # Create a simple repository object for rclone service
                     repo_obj = SimpleNamespace(path=repository_path)
 
-                    # Use rclone service to sync to S3
                     if not rclone_service:
                         from services.rclone_service import RcloneService
 
@@ -404,7 +380,6 @@ class JobExecutor:
                     )
 
                 elif config.provider == "sftp":
-                    # Get SFTP credentials
                     password, private_key = config.get_sftp_credentials()
 
                     logger.info(
@@ -416,10 +391,8 @@ class JobExecutor:
                             {},
                         )
 
-                    # Create a simple repository object for rclone service
                     repo_obj = SimpleNamespace(path=repository_path)
 
-                    # Use rclone service to sync to SFTP
                     if not rclone_service:
                         from services.rclone_service import RcloneService
 

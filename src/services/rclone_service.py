@@ -63,7 +63,6 @@ class RcloneService:
 
             yield {"type": "started", "command": " ".join(command), "pid": process.pid}
 
-            # Read stdout and stderr concurrently
             async def read_stream(stream, stream_type):
                 while True:
                     line = await stream.readline()
@@ -82,14 +81,12 @@ class RcloneService:
                             "message": decoded_line,
                         }
 
-            # Stream both stdout and stderr
             async for item in self._merge_async_generators(
                 read_stream(process.stdout, "stdout"),
                 read_stream(process.stderr, "stderr"),
             ):
                 yield item
 
-            # Wait for process to complete
             return_code = await process.wait()
 
             yield {
@@ -109,7 +106,6 @@ class RcloneService:
     ) -> Dict:
         """Test S3 connection by checking bucket access"""
         try:
-            # Test 1: Check if we can list the bucket contents
             s3_path = f":s3:{bucket_name}"
 
             # Build rclone command with S3 backend flags
@@ -119,7 +115,7 @@ class RcloneService:
                 s3_path,
                 "--max-depth",
                 "1",
-                "--verbose",  # Add verbose to get more error details
+                "--verbose",
             ]
 
             # Add S3 configuration flags
@@ -135,7 +131,6 @@ class RcloneService:
             stderr_text = stderr.decode("utf-8")
 
             if process.returncode == 0:
-                # Test 2: Try to create and delete a test file to verify write permissions
                 test_result = await self._test_s3_write_permissions(
                     access_key_id, secret_access_key, bucket_name
                 )
@@ -155,7 +150,6 @@ class RcloneService:
                         "details": {"read_test": "passed", "write_test": "failed"},
                     }
             else:
-                # Analyze the error to provide better feedback
                 error_message = stderr_text.lower()
                 if "no such bucket" in error_message or "nosuchbucket" in error_message:
                     return {
@@ -191,7 +185,6 @@ class RcloneService:
             import os
             from datetime import datetime
 
-            # Create a small test file
             test_content = f"borgitory-test-{datetime.now().isoformat()}"
             test_filename = (
                 f"borgitory-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
@@ -204,7 +197,6 @@ class RcloneService:
                 temp_file_path = temp_file.name
 
             try:
-                # Test upload
                 s3_path = f":s3:{bucket_name}/{test_filename}"
 
                 upload_command = ["rclone", "copy", temp_file_path, s3_path]
@@ -221,7 +213,6 @@ class RcloneService:
                 stdout, stderr = await process.communicate()
 
                 if process.returncode == 0:
-                    # Test cleanup - delete the test file
                     delete_command = ["rclone", "delete", s3_path]
                     delete_command.extend(s3_flags)
 
@@ -244,7 +235,6 @@ class RcloneService:
                     }
 
             finally:
-                # Clean up local temp file
                 try:
                     os.unlink(temp_file_path)
                 except OSError:
@@ -299,15 +289,11 @@ class RcloneService:
         flags = ["--sftp-host", host, "--sftp-user", username, "--sftp-port", str(port)]
 
         if password:
-            # Obscure the password using rclone's method
             obscured_password = self._obscure_password(password)
             flags.extend(["--sftp-pass", obscured_password])
         elif private_key:
-            # For private key auth, we need to write the key to a temporary file
-            # and use --sftp-key-file
             import tempfile
 
-            # Create temp file for private key
             with tempfile.NamedTemporaryFile(
                 mode="w", delete=False, suffix=".pem"
             ) as key_file:
@@ -334,12 +320,10 @@ class RcloneService:
                 return result.stdout.strip()
             else:
                 logger.error(f"rclone obscure failed: {result.stderr}")
-                # Fallback: just use the password as-is and let rclone handle it
                 return password
 
         except Exception as e:
             logger.error(f"Failed to obscure password: {e}")
-            # Fallback: just use the password as-is and let rclone handle it
             return password
 
     async def sync_repository_to_sftp(
@@ -378,7 +362,6 @@ class RcloneService:
 
         key_file_path = None
         try:
-            # Extract key file path for cleanup later
             if "--sftp-key-file" in sftp_flags:
                 key_file_idx = sftp_flags.index("--sftp-key-file")
                 if key_file_idx + 1 < len(sftp_flags):
@@ -396,7 +379,6 @@ class RcloneService:
                 "pid": process.pid,
             }
 
-            # Read stdout and stderr concurrently
             async def read_stream(stream, stream_type):
                 while True:
                     line = await stream.readline()
@@ -415,14 +397,12 @@ class RcloneService:
                             "message": decoded_line,
                         }
 
-            # Stream both stdout and stderr
             async for item in self._merge_async_generators(
                 read_stream(process.stdout, "stdout"),
                 read_stream(process.stderr, "stderr"),
             ):
                 yield item
 
-            # Wait for process to complete
             return_code = await process.wait()
 
             yield {
@@ -434,7 +414,6 @@ class RcloneService:
         except Exception as e:
             yield {"type": "error", "message": str(e)}
         finally:
-            # Clean up temporary key file
             if key_file_path:
                 try:
                     import os
@@ -455,18 +434,15 @@ class RcloneService:
         """Test SFTP connection by listing remote directory"""
         key_file_path = None
         try:
-            # Build rclone command with SFTP backend flags
             sftp_path = f":sftp:{remote_path}"
 
             command = ["rclone", "lsd", sftp_path, "--max-depth", "1", "--verbose"]
 
-            # Add SFTP configuration flags
             sftp_flags = self._build_sftp_flags(
                 host, username, port, password, private_key
             )
             command.extend(sftp_flags)
 
-            # Extract key file path for cleanup later
             if "--sftp-key-file" in sftp_flags:
                 key_file_idx = sftp_flags.index("--sftp-key-file")
                 if key_file_idx + 1 < len(sftp_flags):
@@ -481,7 +457,6 @@ class RcloneService:
             stderr_text = stderr.decode("utf-8")
 
             if process.returncode == 0:
-                # Test write permissions by trying to create a test directory
                 test_result = await self._test_sftp_write_permissions(
                     host, username, remote_path, port, password, private_key
                 )
@@ -511,7 +486,6 @@ class RcloneService:
                         },
                     }
             else:
-                # Analyze the error to provide better feedback
                 error_message = stderr_text.lower()
                 if "connection refused" in error_message:
                     return {
@@ -543,7 +517,6 @@ class RcloneService:
                 "message": f"Test failed with exception: {str(e)}",
             }
         finally:
-            # Clean up temporary key file
             if key_file_path:
                 try:
                     import os
@@ -570,7 +543,6 @@ class RcloneService:
             import os
             from datetime import datetime
 
-            # Create a small test file
             test_content = f"borgitory-test-{datetime.now().isoformat()}"
             test_filename = (
                 f"borgitory-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
@@ -583,7 +555,6 @@ class RcloneService:
                 temp_file_path = temp_file.name
 
             try:
-                # Test upload
                 sftp_path = f":sftp:{remote_path}/{test_filename}"
 
                 upload_command = ["rclone", "copy", temp_file_path, sftp_path]
@@ -593,7 +564,6 @@ class RcloneService:
                 )
                 upload_command.extend(sftp_flags)
 
-                # Extract key file path for cleanup later
                 if "--sftp-key-file" in sftp_flags:
                     key_file_idx = sftp_flags.index("--sftp-key-file")
                     if key_file_idx + 1 < len(sftp_flags):
@@ -608,7 +578,6 @@ class RcloneService:
                 stdout, stderr = await process.communicate()
 
                 if process.returncode == 0:
-                    # Test cleanup - delete the test file
                     delete_command = ["rclone", "delete", sftp_path]
                     delete_command.extend(sftp_flags)
 
@@ -631,7 +600,6 @@ class RcloneService:
                     }
 
             finally:
-                # Clean up local temp file
                 if temp_file_path:
                     try:
                         os.unlink(temp_file_path)
@@ -641,7 +609,6 @@ class RcloneService:
         except Exception as e:
             return {"status": "failed", "message": f"Write test failed: {str(e)}"}
         finally:
-            # Clean up temporary key file
             if key_file_path:
                 try:
                     import os
@@ -661,7 +628,6 @@ class RcloneService:
 
             tasks.append(wrapper(gen))
 
-        # This is a simplified merge - in production you'd want a more sophisticated approach
         for task in tasks:
             async for item in task:
                 yield item
@@ -681,7 +647,6 @@ class RcloneService:
             provider = config.get("provider", "").lower()
 
             if provider == "s3":
-                # Extract S3-specific config
                 bucket_name = config.get("bucket_name")
                 access_key_id = config.get("access_key_id")
                 secret_access_key = config.get("secret_access_key")
@@ -693,11 +658,9 @@ class RcloneService:
                         "error": "Missing required S3 configuration (bucket_name, access_key_id, secret_access_key)",
                     }
 
-                # Create a Repository object for the existing method
                 mock_repo = Repository()
                 mock_repo.path = source_path
 
-                # Use the existing S3 sync method
                 stats = {}
                 async for progress_data in self.sync_repository_to_s3(
                     repository=mock_repo,
@@ -731,7 +694,6 @@ class RcloneService:
                 }
 
             elif provider == "sftp":
-                # Extract SFTP-specific config
                 host = config.get("host")
                 username = config.get("username")
                 port = config.get("port", 22)
@@ -751,11 +713,9 @@ class RcloneService:
                         "error": "Either password or private_key must be provided for SFTP",
                     }
 
-                # Create a Repository object for the existing method
                 mock_repo = Repository()
                 mock_repo.path = source_path
 
-                # Use the existing SFTP sync method
                 stats = {}
                 async for progress_data in self.sync_repository_to_sftp(
                     repository=mock_repo,

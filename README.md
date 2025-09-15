@@ -1,4 +1,5 @@
 # Borgitory
+
 [![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
 [![codecov](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/release.yml)](https://codecov.io/gh/mlapaglia/Borgitory)
 
@@ -17,7 +18,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 - **Job History**: Track all backup operations with detailed logs and expandable task views
 
 - **Automated Scheduling**: Set up cron-based backup schedules with integrated cleanup and notifications
-- **Archive Pruining**: Configure automated pruning policies with simple or advanced retention strategies
+- **Archive Pruning**: Configure automated pruning policies with simple or advanced retention strategies
 - **Cloud Sync**: Synchronize repositories to S3-compatible storage using Rclone
 - **Push Notifications**: Pushover integration for job completion alerts
 - **User Authentication**: Secure username/password authentication
@@ -131,7 +132,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 ```yaml
 volumes:
   - ./data:/app/data # Persistent application data (required)
-  - /path/to/backup/sources:/mnt/backup/sources:ro # Source directories to backup (suggested read-only)
+  - /path/to/backup/sources:/mnt/backup/sources:ro # Source directories to backup (read-only)
   - /path/to/borg/repos:/mnt/repos # Borg repository storage (read-write)
   - /additional/source:/mnt/additional:ro # Additional source directories as needed
   - /another/repo/location:/mnt/alt-repos # Additional repository locations as needed

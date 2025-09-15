@@ -726,7 +726,6 @@ class JobManager:
 
             params = task.parameters
 
-            # Get repository data
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
                 task.status = "failed"
@@ -873,7 +872,6 @@ class JobManager:
         try:
             params = task.parameters
 
-            # Get repository data
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
                 task.status = "failed"
@@ -934,7 +932,6 @@ class JobManager:
 
             params = task.parameters
 
-            # Get repository data
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
                 task.status = "failed"
@@ -956,10 +953,6 @@ class JobManager:
 
             additional_args = []
 
-            # Add verbose flag to get more output
-            additional_args.append("--verbose")
-
-            # Add check options
             if params.get("repository_only", False):
                 additional_args.append("--repository-only")
             if params.get("archives_only", False):
@@ -978,33 +971,26 @@ class JobManager:
                 additional_args=additional_args,
             )
 
-            # Start the check process
             process = await self.executor.start_process(command, env)
             self._processes[job.id] = process
 
-            # Monitor the process
             result = await self.executor.monitor_process_output(
                 process, output_callback=task_output_callback
             )
 
-            # Clean up process tracking
             if job.id in self._processes:
                 del self._processes[job.id]
 
-            # Set task status based on result
             task.return_code = result.return_code
             task.status = "completed" if result.return_code == 0 else "failed"
             task.completed_at = datetime.now(UTC)
 
-            # Always add the full process output to task output_lines for visibility
             if result.stdout:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()
                 if full_output:
-                    # Add the captured output to the task output lines
                     for line in full_output.split("\n"):
                         if line.strip():
                             task.output_lines.append(line)
-                            # Also add to output manager for real-time display
                             asyncio.create_task(
                                 self.output_manager.add_output_line(
                                     job.id, line, "stdout", {}
@@ -1014,12 +1000,10 @@ class JobManager:
             if result.error:
                 task.error = result.error
             elif result.return_code != 0:
-                # Set a default error message if none provided by result
                 if result.stdout:
                     output_text = result.stdout.decode(
                         "utf-8", errors="replace"
                     ).strip()
-                    # Get the last few lines which likely contain the error
                     error_lines = output_text.split("\n")[-5:] if output_text else []
                     stderr_text = (
                         "\n".join(error_lines) if error_lines else "No output captured"
@@ -1046,7 +1030,6 @@ class JobManager:
         """Execute a cloud sync task using JobExecutor"""
         params = task.parameters
 
-        # Get repository data
         repo_data = await self._get_repository_data(job.repository_id)
         if not repo_data:
             task.status = "failed"
@@ -1074,7 +1057,6 @@ class JobManager:
             http_client_factory=self.dependencies.http_client_factory,
         )
 
-        # Set task status based on result
         task.return_code = result.return_code
         task.status = "completed" if result.return_code == 0 else "failed"
         if result.error:
@@ -1100,7 +1082,6 @@ class JobManager:
             task.error = "No notification configuration"
             return False
 
-        # Get notification configuration
         try:
             with get_db_session() as db:
                 from models.database import NotificationConfig
@@ -1124,14 +1105,12 @@ class JobManager:
                     return True
 
                 if config.provider == "pushover":
-                    # Get decrypted credentials
                     user_key, app_token = config.get_pushover_credentials()
 
                     title = params.get("title", "Borgitory Notification")
                     message = params.get("message", "Job completed")
                     priority = params.get("priority", 0)
 
-                    # Add output showing notification attempt
                     task.output_lines.append(
                         {"text": f"Sending Pushover notification to {config.name}"}
                     )
@@ -1139,7 +1118,6 @@ class JobManager:
                     task.output_lines.append({"text": f"Message: {message}"})
                     task.output_lines.append({"text": f"Priority: {priority}"})
 
-                    # Broadcast initial output
                     self.event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
                         job_id=job.id,
@@ -1149,7 +1127,6 @@ class JobManager:
                         },
                     )
 
-                    # Send Pushover notification using injected service
                     if self.pushover_service:
                         (
                             success,
@@ -1165,7 +1142,6 @@ class JobManager:
                         success = False
                         response_message = "PushoverService not available"
 
-                    # Add result output
                     if success:
                         result_message = "✓ Notification sent successfully"
                         task.output_lines.append({"text": result_message})
@@ -1179,7 +1155,6 @@ class JobManager:
                         )
                         task.output_lines.append({"text": result_message})
 
-                    # Broadcast result output
                     self.event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
                         job_id=job.id,
@@ -1255,7 +1230,6 @@ class JobManager:
             async for output in self.output_manager.stream_job_output(job_id):
                 yield output
         else:
-            # Empty async generator
             return
             yield
 
@@ -1280,24 +1254,20 @@ class JobManager:
         if job.status not in ["running", "queued"]:
             return False
 
-        # Cancel the process if running
         if job_id in self._processes:
             process = self._processes[job_id]
             success = await self.executor.terminate_process(process)
             if success:
                 del self._processes[job_id]
 
-        # Update job status
         job.status = "cancelled"
         job.completed_at = datetime.now(UTC)
 
-        # Update database
         if self.database_manager:
             await self.database_manager.update_job_status(
                 job_id, "cancelled", job.completed_at
             )
 
-        # Broadcast cancellation
         self.event_broadcaster.broadcast_event(
             EventType.JOB_CANCELLED,
             job_id=job_id,
@@ -1312,13 +1282,10 @@ class JobManager:
             job = self.jobs[job_id]
             logger.debug(f"Cleaning up job {job_id} (status: {job.status})")
 
-            # Remove from active jobs
             del self.jobs[job_id]
 
-            # Clean up output
             self.output_manager.clear_job_output(job_id)
 
-            # Remove process if still tracked
             if job_id in self._processes:
                 del self._processes[job_id]
 

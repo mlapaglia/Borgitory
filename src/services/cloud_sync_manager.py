@@ -33,13 +33,11 @@ class CloudSyncManager:
     ) -> bool:
         """Execute a cloud sync task for a repository"""
         try:
-            # Get repository data
             repo_data = self._get_repository_data(repository_id)
             if not repo_data:
                 logger.error(f"Repository {repository_id} not found")
                 return False
 
-            # Check for cloud_sync_config_id
             if not cloud_sync_config_id:
                 logger.info("No cloud backup configuration - skipping cloud sync")
                 if output_callback:
@@ -54,7 +52,6 @@ class CloudSyncManager:
                     f"Starting cloud sync for repository {repo_data['name']}"
                 )
 
-            # Get cloud backup configuration
             with self._db_session_factory() as db:
                 config = (
                     db.query(CloudSyncConfig)
@@ -64,15 +61,14 @@ class CloudSyncManager:
 
                 if not config or not config.enabled:
                     logger.info(
-                        "📋 Cloud backup configuration not found or disabled - skipping"
+                        "Cloud backup configuration not found or disabled - skipping"
                     )
                     if output_callback:
                         output_callback(
-                            "📋 Cloud backup configuration not found or disabled - skipping"
+                            "Cloud backup configuration not found or disabled - skipping"
                         )
-                    return True  # Not an error, just skipped
+                    return True
 
-                # Handle different provider types
                 return await self._sync_to_provider(config, repo_data, output_callback)
 
         except Exception as e:
@@ -111,37 +107,30 @@ class CloudSyncManager:
         repo_data: Dict,
         output_callback: Optional[Callable[[str], None]] = None,
     ) -> bool:
-        """Sync repository to S3 using rclone"""
+        """Sync repository to S3 using rclone."""
         try:
-            # Get S3 credentials
             access_key, secret_key = config.get_credentials()
 
-            logger.info(f"☁️ Syncing to {config.name} (S3: {config.bucket_name})")
+            logger.info(f"Syncing to {config.name} (S3: {config.bucket_name})")
             if output_callback:
-                output_callback(
-                    f"☁️ Syncing to {config.name} (S3: {config.bucket_name})"
-                )
+                output_callback(f"Syncing to {config.name} (S3: {config.bucket_name})")
 
-            # Create a simple repository object for rclone service
             from types import SimpleNamespace
 
             repo_obj = SimpleNamespace()
             repo_obj.name = repo_data["name"]
             repo_obj.path = repo_data["path"]
 
-            # Import and use RcloneService
             from services.rclone_service import RcloneService
 
             rclone_service = RcloneService()
 
-            # Set up progress callback if provided
             progress_callback = None
             if output_callback:
 
                 def progress_callback(line: str):
-                    output_callback(f"☁️ {line}")
+                    output_callback(f"{line}")
 
-            # Start the sync and process the async generator
             sync_success = False
             final_result = None
 
@@ -225,7 +214,6 @@ class CloudSyncManager:
                 if not config.enabled:
                     return {"valid": False, "error": "Configuration is disabled"}
 
-                # Provider-specific validation
                 if config.provider == "s3":
                     return await self._validate_s3_config(config)
                 else:
@@ -240,11 +228,9 @@ class CloudSyncManager:
     async def _validate_s3_config(self, config: CloudSyncConfig) -> Dict[str, any]:
         """Validate S3 configuration"""
         try:
-            # Check required fields
             if not config.bucket_name:
                 return {"valid": False, "error": "S3 bucket name is required"}
 
-            # Try to get credentials
             try:
                 access_key, secret_key = config.get_credentials()
                 if not access_key or not secret_key:
