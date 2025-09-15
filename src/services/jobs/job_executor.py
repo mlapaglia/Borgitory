@@ -355,65 +355,75 @@ class JobExecutor:
                         error=None,
                     )
 
-                if config.provider == "s3":
-                    access_key, secret_key = config.get_credentials()
-
-                    logger.info(f"Syncing to {config.name} (S3: {config.bucket_name})")
+                # Use new provider pattern
+                try:
+                    from services.cloud_providers import CloudProviderFactory
+                    from types import SimpleNamespace
+                    import json
+                    
+                    # Get provider configuration
+                    provider_config = {}
+                    if config.provider_config:
+                        # New JSON-based configuration
+                        provider_config = json.loads(config.provider_config)
+                    else:
+                        # Fallback to legacy configuration for backward compatibility
+                        if config.provider == "s3":
+                            access_key, secret_key = config.get_credentials()
+                            provider_config = {
+                                "bucket_name": config.bucket_name,
+                                "access_key": access_key,
+                                "secret_key": secret_key,
+                                "region": "us-east-1",
+                                "storage_class": "STANDARD"
+                            }
+                        elif config.provider == "sftp":
+                            password, private_key = config.get_sftp_credentials()
+                            provider_config = {
+                                "host": config.host,
+                                "username": config.username,
+                                "remote_path": config.remote_path,
+                                "port": config.port or 22,
+                                "host_key_checking": True
+                            }
+                            if password:
+                                provider_config["password"] = password
+                            if private_key:
+                                provider_config["private_key"] = private_key
+                    
+                    # Create provider instance
+                    provider = CloudProviderFactory.create_provider(
+                        config.provider, 
+                        provider_config
+                    )
+                    
+                    # Decrypt sensitive fields if needed
+                    decrypted_config = provider.decrypt_sensitive_fields(provider_config)
+                    provider = CloudProviderFactory.create_provider(
+                        config.provider,
+                        decrypted_config
+                    )
+                    
+                    # Get connection info for logging
+                    conn_info = provider.get_connection_info()
+                    logger.info(f"Syncing to {config.name} ({config.provider.upper()}: {conn_info})")
                     if output_callback:
-                        output_callback(
-                            f"Syncing to {config.name} (S3: {config.bucket_name})", {}
-                        )
-
+                        output_callback(f"Syncing to {config.name} ({config.provider.upper()})", {})
+                    
+                    # Create repository object
                     repo_obj = SimpleNamespace(path=repository_path)
-
-                    if not rclone_service:
-                        from services.rclone_service import RcloneService
-
-                        rclone_service = RcloneService()
-
-                    progress_generator = rclone_service.sync_repository_to_s3(
+                    
+                    # Execute sync using provider
+                    progress_generator = provider.sync_repository(
                         repository=repo_obj,
-                        access_key_id=access_key,
-                        secret_access_key=secret_key,
-                        bucket_name=config.bucket_name,
                         path_prefix=config.path_prefix or "",
                     )
-
-                elif config.provider == "sftp":
-                    password, private_key = config.get_sftp_credentials()
-
-                    logger.info(
-                        f"Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})"
-                    )
+                    
+                except Exception as e:
+                    error_msg = f"Failed to initialize cloud provider {config.provider}: {str(e)}"
+                    logger.error(error_msg)
                     if output_callback:
-                        output_callback(
-                            f"Syncing to {config.name} (SFTP: {config.host}:{config.remote_path})",
-                            {},
-                        )
-
-                    repo_obj = SimpleNamespace(path=repository_path)
-
-                    if not rclone_service:
-                        from services.rclone_service import RcloneService
-
-                        rclone_service = RcloneService()
-
-                    progress_generator = rclone_service.sync_repository_to_sftp(
-                        repository=repo_obj,
-                        host=config.host,
-                        username=config.username,
-                        remote_path=config.remote_path,
-                        port=config.port or 22,
-                        password=password if password else None,
-                        private_key=private_key if private_key else None,
-                        path_prefix=config.path_prefix or "",
-                    )
-
-                else:
-                    error_msg = f"Unsupported cloud backup provider: {config.provider}"
-                    logger.error(f"{error_msg}")
-                    if output_callback:
-                        output_callback(f"{error_msg}", {})
+                        output_callback(error_msg, {})
                     return ProcessResult(
                         return_code=1,
                         stdout=b"",

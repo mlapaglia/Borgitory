@@ -279,6 +279,9 @@ class CloudSyncConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     provider = Column(String, nullable=False)  # "s3", "sftp", "azure", "gcp", etc.
+    
+    # New JSON configuration field for provider-specific settings
+    provider_config = Column(Text, nullable=True)  # JSON field for provider configuration
 
     # S3-specific fields
     bucket_name = Column(String, nullable=True)  # Made nullable for non-S3 providers

@@ -23,7 +23,9 @@ class CloudSyncService:
     def create_cloud_sync_config(
         self, config: CloudSyncConfigCreate
     ) -> CloudSyncConfig:
-        """Create a new cloud sync configuration."""
+        """Create a new cloud sync configuration using the new provider pattern."""
+        from services.cloud_providers import CloudProviderFactory
+        import json
 
         existing = (
             self.db.query(CloudSyncConfig)
@@ -36,48 +38,55 @@ class CloudSyncService:
                 detail=f"Cloud sync configuration with name '{config.name}' already exists",
             )
 
+        # Validate provider exists
+        if not CloudProviderFactory.is_provider_available(config.provider.value):
+            available = ", ".join(CloudProviderFactory.get_available_providers())
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported provider: {config.provider}. Available providers: {available}",
+            )
+
+        # Create provider instance to validate configuration
+        try:
+            provider = CloudProviderFactory.create_provider(
+                config.provider.value, 
+                config.provider_config
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid provider configuration: {str(e)}"
+            )
+
+        # Encrypt sensitive fields in the configuration
+        encrypted_config = provider.encrypt_sensitive_fields(config.provider_config)
+
+        # Create database record
         db_config = CloudSyncConfig(
             name=config.name,
-            provider=config.provider,
+            provider=config.provider.value,
+            provider_config=json.dumps(encrypted_config),
             path_prefix=config.path_prefix or "",
         )
 
-        if config.provider == "s3":
-            db_config.bucket_name = config.bucket_name
-
-            if not config.access_key or not config.secret_key:
-                raise HTTPException(
-                    status_code=400,
-                    detail="S3 configurations require access_key and secret_key",
+        # Set legacy fields for backward compatibility (if migration hasn't run yet)
+        if config.provider.value == "s3" and hasattr(db_config, 'bucket_name'):
+            db_config.bucket_name = config.provider_config.get("bucket_name")
+            if "access_key" in config.provider_config and "secret_key" in config.provider_config:
+                db_config.set_credentials(
+                    config.provider_config["access_key"], 
+                    config.provider_config["secret_key"]
                 )
-
-            db_config.set_credentials(config.access_key, config.secret_key)
-
-        elif config.provider == "sftp":
-            db_config.host = config.host
-            db_config.port = config.port or 22
-            db_config.username = config.username
-            db_config.remote_path = config.remote_path
-
-            if not config.host or not config.username or not config.remote_path:
-                raise HTTPException(
-                    status_code=400,
-                    detail="SFTP configurations require host, username, and remote_path",
+        elif config.provider.value == "sftp" and hasattr(db_config, 'host'):
+            db_config.host = config.provider_config.get("host")
+            db_config.port = config.provider_config.get("port", 22)
+            db_config.username = config.provider_config.get("username")
+            db_config.remote_path = config.provider_config.get("remote_path")
+            if "password" in config.provider_config or "private_key" in config.provider_config:
+                db_config.set_sftp_credentials(
+                    config.provider_config.get("password"),
+                    config.provider_config.get("private_key")
                 )
-
-            if not config.password and not config.private_key:
-                raise HTTPException(
-                    status_code=400,
-                    detail="SFTP configurations require either password or private_key",
-                )
-
-            db_config.set_sftp_credentials(config.password, config.private_key)
-
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported provider: {config.provider}. Supported providers: s3, sftp",
-            )
 
         self.db.add(db_config)
         self.db.commit()

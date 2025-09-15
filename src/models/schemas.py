@@ -469,11 +469,12 @@ class CloudSyncConfigBase(BaseModel):
     path_prefix: str = Field(
         default="", max_length=255, description="Optional path prefix for cloud storage"
     )
+    provider_config: dict = Field(
+        default_factory=dict, description="Provider-specific configuration"
+    )
 
-    # S3-specific fields (no validation constraints here - will be validated conditionally)
+    # Legacy fields for backward compatibility - will be deprecated
     bucket_name: Optional[str] = None
-
-    # SFTP-specific fields (no validation constraints here - will be validated conditionally)
     host: Optional[str] = None
     port: int = 22
     username: Optional[str] = None
@@ -481,88 +482,71 @@ class CloudSyncConfigBase(BaseModel):
 
 
 class CloudSyncConfigCreate(CloudSyncConfigBase):
-    # S3 credentials (no field validation - will be validated conditionally)
+    # Legacy credentials for backward compatibility - will be deprecated
     access_key: Optional[str] = None
     secret_key: Optional[str] = None
-
-    # SFTP credentials (no field validation - will be validated conditionally)
     password: Optional[str] = None
     private_key: Optional[str] = None
 
     @model_validator(mode="after")
-    def validate_provider_specific_fields(self):
-        """Validate fields based on the selected provider"""
-
+    def validate_and_build_provider_config(self):
+        """Build provider_config from legacy fields or validate existing provider_config"""
+        
+        # If provider_config is already provided, validate it using the provider classes
+        if self.provider_config:
+            try:
+                from services.cloud_providers import CloudProviderFactory
+                # This will validate the config and raise ValidationError if invalid
+                CloudProviderFactory.create_provider(self.provider.value, self.provider_config)
+                return self
+            except Exception as e:
+                raise ValueError(f"Invalid provider configuration: {str(e)}")
+        
+        # Build provider_config from legacy fields for backward compatibility
         if self.provider == ProviderType.S3:
-            # S3 provider validation
-            if not self.bucket_name:
-                raise ValueError("S3 bucket name is required for S3 provider")
-
-            # Validate S3 bucket name format
-            if not re.match(r"^[a-z0-9.-]+$", self.bucket_name):
-                raise ValueError(
-                    "S3 bucket name can only contain lowercase letters, numbers, dots, and hyphens"
-                )
-
-            if len(self.bucket_name) < 3 or len(self.bucket_name) > 63:
-                raise ValueError("S3 bucket name must be between 3 and 63 characters")
-
-            if not self.access_key:
-                raise ValueError("AWS Access Key ID is required for S3 provider")
-
-            if not self.secret_key:
-                raise ValueError("AWS Secret Access Key is required for S3 provider")
-
-            # Validate AWS Access Key ID
-            if len(self.access_key) != 20:
-                raise ValueError("AWS Access Key ID must be exactly 20 characters")
-
-            if not re.match(r"^[A-Z0-9]+$", self.access_key):
-                raise ValueError(
-                    "AWS Access Key ID can only contain uppercase letters A-Z and digits 0-9"
-                )
-
-            if not (
-                self.access_key.startswith("AKIA") or self.access_key.startswith("ASIA")
-            ):
-                raise ValueError(
-                    "AWS Access Key ID must start with 'AKIA' (standard) or 'ASIA' (temporary)"
-                )
-
-            # Validate AWS Secret Access Key
-            if len(self.secret_key) != 40:
-                raise ValueError("AWS Secret Access Key must be exactly 40 characters")
-
-            if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
-                raise ValueError("AWS Secret Access Key contains invalid characters")
-
+            if not all([self.bucket_name, self.access_key, self.secret_key]):
+                raise ValueError("S3 provider requires bucket_name, access_key, and secret_key")
+            
+            self.provider_config = {
+                "bucket_name": self.bucket_name,
+                "access_key": self.access_key,
+                "secret_key": self.secret_key,
+                "region": "us-east-1",  # Default
+                "storage_class": "STANDARD"  # Default
+            }
+            
         elif self.provider == ProviderType.SFTP:
-            # SFTP provider validation
-            if not self.host:
-                raise ValueError("SFTP host is required for SFTP provider")
-
-            if len(self.host) > 255:
-                raise ValueError("SFTP host must be 255 characters or less")
-
-            if not self.username:
-                raise ValueError("SFTP username is required for SFTP provider")
-
-            if len(self.username) > 128:
-                raise ValueError("SFTP username must be 128 characters or less")
-
-            if self.port < 1 or self.port > 65535:
-                raise ValueError("SFTP port must be between 1 and 65535")
-
-            if self.remote_path and not self.remote_path.startswith("/"):
-                raise ValueError("SFTP remote path must be absolute (start with /)")
-
-            # Require either password or private key
+            if not all([self.host, self.username, self.remote_path]):
+                raise ValueError("SFTP provider requires host, username, and remote_path")
+            
             if not self.password and not self.private_key:
-                raise ValueError(
-                    "Either SFTP password or private key is required for SFTP provider"
-                )
-
+                raise ValueError("SFTP provider requires either password or private_key")
+            
+            self.provider_config = {
+                "host": self.host,
+                "username": self.username,
+                "remote_path": self.remote_path,
+                "port": self.port or 22,
+                "host_key_checking": True
+            }
+            
+            if self.password:
+                self.provider_config["password"] = self.password
+            if self.private_key:
+                self.provider_config["private_key"] = self.private_key
+        
+        else:
+            raise ValueError(f"Unsupported provider: {self.provider}")
+        
+        # Validate the built configuration
+        try:
+            from services.cloud_providers import CloudProviderFactory
+            CloudProviderFactory.create_provider(self.provider.value, self.provider_config)
+        except Exception as e:
+            raise ValueError(f"Invalid provider configuration: {str(e)}")
+        
         return self
+
 
 
 class CloudSyncConfigUpdate(BaseModel):
