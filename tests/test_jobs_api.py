@@ -623,7 +623,7 @@ class TestJobsAPI:
         }
         setup_dependencies["job_manager"].jobs = mock_jobs
 
-        response = await async_client.post("/api/jobs/manager/cleanup")
+        response = await async_client.post("/api/jobs/manager/prune")
 
         assert response.status_code == 200
         data = response.json()

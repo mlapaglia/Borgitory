@@ -1,5 +1,5 @@
 """
-API endpoints for managing cleanup configurations (archive pruning policies)
+API endpoints for managing prune configurations (archive pruning policies)
 """
 
 import logging
@@ -34,7 +34,7 @@ async def get_cleanup_form(
 
     return templates.TemplateResponse(
         request,
-        "partials/cleanup/config_form.html",
+        "partials/prune/config_form.html",
         form_data,
     )
 
@@ -47,7 +47,7 @@ async def get_policy_form(
     """Get policy creation form"""
     return templates.TemplateResponse(
         request,
-        "partials/cleanup/create_form.html",
+        "partials/prune/create_form.html",
         {},
     )
 
@@ -59,7 +59,7 @@ async def get_strategy_fields(
     """Get dynamic strategy fields based on selection"""
     return templates.TemplateResponse(
         request,
-        "partials/cleanup/strategy_fields.html",
+        "partials/prune/strategy_fields.html",
         {"strategy": strategy},
     )
 
@@ -77,7 +77,7 @@ async def create_cleanup_config(
     if success:
         response = templates.TemplateResponse(
             request,
-            "partials/cleanup/create_success.html",
+            "partials/prune/create_success.html",
             {"config_name": config.name},
         )
         response.headers["HX-Trigger"] = "cleanupConfigUpdate"
@@ -85,7 +85,7 @@ async def create_cleanup_config(
     else:
         return templates.TemplateResponse(
             request,
-            "partials/cleanup/create_error.html",
+            "partials/prune/create_error.html",
             {"error_message": error_message},
             status_code=400,
         )
@@ -111,9 +111,9 @@ def get_cleanup_configs_html(
     try:
         processed_configs = service.get_configs_with_descriptions()
 
-        return templates.get_template(
-            "partials/cleanup/config_list_content.html"
-        ).render(request=request, configs=processed_configs)
+        return templates.get_template("partials/prune/config_list_content.html").render(
+            request=request, configs=processed_configs
+        )
 
     except Exception as e:
         return templates.get_template("partials/jobs/error_state.html").render(
@@ -134,7 +134,7 @@ async def enable_cleanup_config(
     if success:
         response = templates.TemplateResponse(
             request,
-            "partials/cleanup/action_success.html",
+            "partials/prune/action_success.html",
             {"message": f"Prune policy '{config.name}' enabled successfully!"},
         )
         response.headers["HX-Trigger"] = "cleanupConfigUpdate"
@@ -142,7 +142,7 @@ async def enable_cleanup_config(
     else:
         return templates.TemplateResponse(
             request,
-            "partials/cleanup/action_error.html",
+            "partials/prune/action_error.html",
             {"error_message": error_message},
             status_code=404,
         )
@@ -161,7 +161,7 @@ async def disable_cleanup_config(
     if success:
         response = templates.TemplateResponse(
             request,
-            "partials/cleanup/action_success.html",
+            "partials/prune/action_success.html",
             {"message": f"Prune policy '{config.name}' disabled successfully!"},
         )
         response.headers["HX-Trigger"] = "cleanupConfigUpdate"
@@ -169,7 +169,7 @@ async def disable_cleanup_config(
     else:
         return templates.TemplateResponse(
             request,
-            "partials/cleanup/action_error.html",
+            "partials/prune/action_error.html",
             {"error_message": error_message},
             status_code=404,
         )
@@ -195,9 +195,7 @@ async def get_cleanup_config_edit_form(
         "is_edit_mode": True,
     }
 
-    return templates.TemplateResponse(
-        request, "partials/cleanup/edit_form.html", context
-    )
+    return templates.TemplateResponse(request, "partials/prune/edit_form.html", context)
 
 
 @router.put("/{config_id}", response_class=HTMLResponse)
@@ -216,7 +214,7 @@ async def update_cleanup_config(
     if success:
         response = templates.TemplateResponse(
             request,
-            "partials/cleanup/update_success.html",
+            "partials/prune/update_success.html",
             {"config_name": updated_config.name},
         )
         response.headers["HX-Trigger"] = "cleanupConfigUpdate"
@@ -224,7 +222,7 @@ async def update_cleanup_config(
     else:
         return templates.TemplateResponse(
             request,
-            "partials/cleanup/update_error.html",
+            "partials/prune/update_error.html",
             {"error_message": error_message},
             status_code=404,
         )
@@ -243,7 +241,7 @@ async def delete_cleanup_config(
     if success:
         response = templates.TemplateResponse(
             request,
-            "partials/cleanup/action_success.html",
+            "partials/prune/action_success.html",
             {"message": f"Cleanup configuration '{config_name}' deleted successfully!"},
         )
         response.headers["HX-Trigger"] = "cleanupConfigUpdate"
@@ -251,7 +249,7 @@ async def delete_cleanup_config(
     else:
         return templates.TemplateResponse(
             request,
-            "partials/cleanup/action_error.html",
+            "partials/prune/action_error.html",
             {"error_message": error_message},
             status_code=404,
         )

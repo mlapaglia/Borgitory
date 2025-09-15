@@ -71,7 +71,7 @@ class TestCleanupAPI:
         # Verify template was rendered
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/config_form.html",
+            "partials/prune/config_form.html",
             mock_form_data,
         )
 
@@ -85,7 +85,7 @@ class TestCleanupAPI:
         # Verify template was rendered
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/create_form.html",
+            "partials/prune/create_form.html",
             {},
         )
 
@@ -99,7 +99,7 @@ class TestCleanupAPI:
         # Verify template was rendered
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/strategy_fields.html",
+            "partials/prune/strategy_fields.html",
             {"strategy": "advanced"},
         )
 
@@ -125,7 +125,7 @@ class TestCleanupAPI:
         # Verify HTMX success template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/create_success.html",
+            "partials/prune/create_success.html",
             {"config_name": "test-config"},
         )
 
@@ -153,7 +153,7 @@ class TestCleanupAPI:
         # Verify error template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/create_error.html",
+            "partials/prune/create_error.html",
             {"error_message": "Failed to create cleanup configuration"},
             status_code=400,
         )
@@ -192,7 +192,7 @@ class TestCleanupAPI:
 
         # Verify template was rendered
         mock_templates.get_template.assert_called_once_with(
-            "partials/cleanup/config_list_content.html"
+            "partials/prune/config_list_content.html"
         )
 
     def test_get_cleanup_configs_html_exception(
@@ -231,7 +231,7 @@ class TestCleanupAPI:
         # Verify HTMX success template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/action_success.html",
+            "partials/prune/action_success.html",
             {"message": "Prune policy 'test-config' enabled successfully!"},
         )
 
@@ -256,7 +256,7 @@ class TestCleanupAPI:
         # Verify error template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/action_error.html",
+            "partials/prune/action_error.html",
             {"error_message": "Cleanup configuration not found"},
             status_code=404,
         )
@@ -282,7 +282,7 @@ class TestCleanupAPI:
         # Verify HTMX success template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/action_success.html",
+            "partials/prune/action_success.html",
             {"message": "Prune policy 'test-config' disabled successfully!"},
         )
 
@@ -307,7 +307,7 @@ class TestCleanupAPI:
         # Verify error template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/action_error.html",
+            "partials/prune/action_error.html",
             {"error_message": "Cleanup configuration not found"},
             status_code=404,
         )
@@ -332,7 +332,7 @@ class TestCleanupAPI:
         # Verify correct template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/edit_form.html",
+            "partials/prune/edit_form.html",
             {
                 "config": mock_config,
                 "is_edit_mode": True,
@@ -380,7 +380,7 @@ class TestCleanupAPI:
         # Verify HTMX success template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/update_success.html",
+            "partials/prune/update_success.html",
             {"config_name": "updated-config"},
         )
 
@@ -407,7 +407,7 @@ class TestCleanupAPI:
         # Verify error template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/update_error.html",
+            "partials/prune/update_error.html",
             {"error_message": "Cleanup configuration not found"},
             status_code=404,
         )
@@ -431,7 +431,7 @@ class TestCleanupAPI:
         # Verify HTMX success template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/action_success.html",
+            "partials/prune/action_success.html",
             {"message": "Cleanup configuration 'test-config' deleted successfully!"},
         )
 
@@ -456,7 +456,7 @@ class TestCleanupAPI:
         # Verify error template response
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/cleanup/action_error.html",
+            "partials/prune/action_error.html",
             {"error_message": "Cleanup configuration not found"},
             status_code=404,
         )

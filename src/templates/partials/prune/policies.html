@@ -4,7 +4,7 @@
     
     <!-- Cleanup Prune Form Container -->
     <div id="cleanup-policy-form-container" class="mb-4 pb-4 border-b" 
-         hx-get="/api/cleanup/policy-form" 
+         hx-get="/api/prune/policy-form" 
          hx-trigger="load"
          hx-swap="innerHTML">
         <div class="text-gray-600 dark:text-gray-400 text-sm">Loading form...</div>
@@ -13,7 +13,7 @@
     
     <!-- Existing Cleanup Policies -->
     <div id="cleanup-config-list" 
-         hx-get="/api/cleanup/html" 
+         hx-get="/api/prune/html" 
          hx-trigger="load, cleanupConfigUpdate from:body" 
          hx-swap="innerHTML">
         <div class="text-gray-600 dark:text-gray-400 text-sm">Loading cleanup policies...</div>

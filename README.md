@@ -23,7 +23,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 ### Advanced Features
 
 - **Automated Scheduling**: Set up cron-based backup schedules with integrated cleanup and notifications
-- **Archive Cleanup**: Configure automated pruning policies with simple or advanced retention strategies
+- **Archive Pruining**: Configure automated pruning policies with simple or advanced retention strategies
 - **Cloud Sync**: Synchronize repositories to S3-compatible storage using Rclone
 - **Push Notifications**: Pushover integration for job completion alerts
 - **User Authentication**: Secure username/password authentication
@@ -178,9 +178,9 @@ volumes:
 2. Create new schedule with cron expression
 3. Enable/disable schedules as needed
 
-### 3. Archive Cleanup (Pruning)
+### 3. Archive Pruning
 
-1. Create cleanup policies:
+1. Create pruning policies:
    - **Simple Strategy**: Keep archives within X days
    - **Advanced Strategy**: Granular retention (daily/weekly/monthly/yearly)
 2. Configure options:

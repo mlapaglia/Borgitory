@@ -240,7 +240,7 @@ class TestJobDatabaseManager:
 
             mock_job2 = Mock()
             mock_job2.id = str(uuid.uuid4())
-            mock_job2.type = "cleanup"
+            mock_job2.type = "prune"
             mock_job2.status = "running"
             mock_job2.started_at = datetime.now(UTC)
             mock_job2.finished_at = None
