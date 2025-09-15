@@ -39,6 +39,8 @@ from services.repositories.repository_check_config_service import (
 )
 from services.notifications.notification_config_service import NotificationConfigService
 from services.cleanup_service import CleanupService
+from services.cron_description_service import CronDescriptionService
+from services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
 
 
@@ -392,6 +394,7 @@ def get_templates() -> Jinja2Templates:
     global _templates_instance
     if _templates_instance is None:
         import os
+
         # Use same logic as main.py for template path detection
         base_path = "" if os.path.exists("templates") else "src/"
         template_path = f"{base_path}templates"
@@ -457,6 +460,30 @@ def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
     return CleanupService(db=db)
 
 
+_cron_description_service_instance = None
+
+
+def get_cron_description_service() -> CronDescriptionService:
+    """
+    Provide a CronDescriptionService singleton instance.
+
+    Uses module-level singleton pattern for application-wide persistence.
+    """
+    global _cron_description_service_instance
+    if _cron_description_service_instance is None:
+        _cron_description_service_instance = CronDescriptionService()
+    return _cron_description_service_instance
+
+
+def get_upcoming_backups_service(
+    cron_description_service: CronDescriptionService = Depends(
+        get_cron_description_service
+    ),
+) -> UpcomingBackupsService:
+    """Provide UpcomingBackupsService instance."""
+    return UpcomingBackupsService(cron_description_service)
+
+
 # Type aliases for dependency injection
 SimpleCommandRunnerDep = Annotated[
     SimpleCommandRunner, Depends(get_simple_command_runner)
@@ -497,3 +524,9 @@ NotificationConfigServiceDep = Annotated[
     NotificationConfigService, Depends(get_notification_config_service)
 ]
 CleanupServiceDep = Annotated[CleanupService, Depends(get_cleanup_service)]
+CronDescriptionServiceDep = Annotated[
+    CronDescriptionService, Depends(get_cron_description_service)
+]
+UpcomingBackupsServiceDep = Annotated[
+    UpcomingBackupsService, Depends(get_upcoming_backups_service)
+]

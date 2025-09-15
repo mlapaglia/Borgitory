@@ -217,13 +217,15 @@ class ScheduleService:
             self.db.rollback()
             return False, None, f"Failed to delete schedule: {str(e)}"
 
-    def validate_schedule_creation_data(self, json_data: dict) -> tuple[bool, dict, Optional[str]]:
+    def validate_schedule_creation_data(
+        self, json_data: dict
+    ) -> tuple[bool, dict, Optional[str]]:
         """
         Validate and process schedule creation data.
-        
+
         Args:
             json_data: Raw JSON data from request
-            
+
         Returns:
             tuple: (is_valid, processed_data, error_message)
         """
@@ -232,27 +234,31 @@ class ScheduleService:
             cron_expression = json_data.get("cron_expression", "").strip()
             if not cron_expression:
                 return False, {}, "Cron expression is required"
-            
+
             # Check if cron expression has correct number of parts
             cron_parts = cron_expression.split()
             if len(cron_parts) != 5:
-                return False, {}, f"Cron expression must have 5 parts (minute hour day month weekday), but got {len(cron_parts)} parts: '{cron_expression}'"
-            
+                return (
+                    False,
+                    {},
+                    f"Cron expression must have 5 parts (minute hour day month weekday), but got {len(cron_parts)} parts: '{cron_expression}'",
+                )
+
             # Validate repository ID
             repository_id = json_data.get("repository_id")
             if not repository_id:
                 return False, {}, "Repository is required"
-            
+
             try:
                 repository_id = int(repository_id)
             except (ValueError, TypeError):
                 return False, {}, "Invalid repository ID"
-            
+
             # Validate name
             name = json_data.get("name", "").strip()
             if not name:
                 return False, {}, "Schedule name is required"
-            
+
             # Process optional fields
             def safe_int(value):
                 if not value or value == "":
@@ -261,7 +267,7 @@ class ScheduleService:
                     return int(value)
                 except (ValueError, TypeError):
                     return None
-            
+
             processed_data = {
                 "name": name,
                 "repository_id": repository_id,
@@ -269,10 +275,12 @@ class ScheduleService:
                 "source_path": json_data.get("source_path", ""),
                 "cloud_sync_config_id": safe_int(json_data.get("cloud_sync_config_id")),
                 "cleanup_config_id": safe_int(json_data.get("cleanup_config_id")),
-                "notification_config_id": safe_int(json_data.get("notification_config_id")),
+                "notification_config_id": safe_int(
+                    json_data.get("notification_config_id")
+                ),
             }
-            
+
             return True, processed_data, None
-            
+
         except Exception as e:
             return False, {}, f"Invalid form data: {str(e)}"

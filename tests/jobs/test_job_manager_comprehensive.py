@@ -1,6 +1,5 @@
 """
 Comprehensive tests for JobManager - covering missing lines and functionality
-Uses real database instances following FastAPI best practices
 """
 
 import pytest

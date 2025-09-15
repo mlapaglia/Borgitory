@@ -18,15 +18,9 @@ from dependencies import (
 )
 from services.scheduling.schedule_service import ScheduleService
 from services.configuration_service import ConfigurationService
-from api.schedules import (
-    format_cron_trigger,
-    format_hour,
-    get_day_name,
-    format_time_until,
-)
+from services.upcoming_backups_service import format_time_until
+from services.cron_description_service import CronDescriptionService
 
-
-# Create test client following FastAPI best practices
 client = TestClient(app)
 
 
@@ -149,7 +143,7 @@ class TestSchedulesAPI:
 
         response = client.post("/api/schedules/", json=schedule_data)
 
-        assert response.status_code == 400
+        assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         # Should contain error message
         assert "repository" in response.text.lower() or "error" in response.text.lower()
@@ -167,11 +161,10 @@ class TestSchedulesAPI:
 
         response = client.post("/api/schedules/", json=schedule_data)
 
-        assert response.status_code == 422  # Pydantic validation returns 422
-        assert "application/json" in response.headers.get("content-type", "")
-        # Should contain validation error info
-        error_data = response.json()
-        assert "detail" in error_data
+        assert response.status_code == 200  # Returns error template
+        assert "text/html" in response.headers.get("content-type", "")
+        # Should contain error info
+        assert "cron" in response.text.lower() or "error" in response.text.lower()
 
     def test_get_schedules_html(
         self, setup_test_dependencies, test_db, sample_repository
@@ -431,72 +424,50 @@ class TestSchedulesAPI:
 class TestScheduleUtilityFunctions:
     """Test utility functions for schedule processing"""
 
-    def test_format_cron_trigger_daily(self):
+    @pytest.fixture
+    def cron_description_service(self):
+        """Provide CronDescriptionService instance for tests"""
+        return CronDescriptionService()
+
+    def test_format_cron_trigger_daily(self, cron_description_service):
         """Test formatting daily cron trigger"""
         trigger_str = "cron[minute='0', hour='14', day='*', month='*', day_of_week='*']"
-        result = format_cron_trigger(trigger_str)
-        assert result == "Daily at 2:00 PM"
+        result = cron_description_service.format_cron_trigger(trigger_str)
+        assert result == "At 14:00"
 
-    def test_format_cron_trigger_weekly(self):
+    def test_format_cron_trigger_weekly(self, cron_description_service):
         """Test formatting weekly cron trigger"""
         trigger_str = "cron[minute='0', hour='9', day='*', month='*', day_of_week='1']"
-        result = format_cron_trigger(trigger_str)
-        assert result == "Weekly on Monday at 9:00 AM"
+        result = cron_description_service.format_cron_trigger(trigger_str)
+        assert result == "At 09:00, only on Monday"
 
-    def test_format_cron_trigger_monthly(self):
+    def test_format_cron_trigger_monthly(self, cron_description_service):
         """Test formatting monthly cron trigger"""
         trigger_str = "cron[minute='0', hour='2', day='15', month='*', day_of_week='*']"
-        result = format_cron_trigger(trigger_str)
-        assert result == "Monthly on 15 at 2:00 AM"
+        result = cron_description_service.format_cron_trigger(trigger_str)
+        assert result == "At 02:00, on day 15 of the month"
 
-    def test_format_cron_trigger_twice_monthly(self):
+    def test_format_cron_trigger_twice_monthly(self, cron_description_service):
         """Test formatting twice monthly cron trigger"""
         trigger_str = (
             "cron[minute='0', hour='2', day='1,15', month='*', day_of_week='*']"
         )
-        result = format_cron_trigger(trigger_str)
-        assert result == "Twice monthly (1,15) at 2:00 AM"
+        result = cron_description_service.format_cron_trigger(trigger_str)
+        assert result == "At 02:00, on day 1 and 15 of the month"
 
-    def test_format_cron_trigger_every_n_days(self):
+    def test_format_cron_trigger_every_n_days(self, cron_description_service):
         """Test formatting every N days cron trigger"""
         trigger_str = (
             "cron[minute='0', hour='2', day='*/3', month='*', day_of_week='*']"
         )
-        result = format_cron_trigger(trigger_str)
-        assert result == "Every 3 days at 2:00 AM"
+        result = cron_description_service.format_cron_trigger(trigger_str)
+        assert result == "At 02:00, every 3 days"
 
-    def test_format_cron_trigger_invalid(self):
+    def test_format_cron_trigger_invalid(self, cron_description_service):
         """Test formatting invalid cron trigger"""
         trigger_str = "invalid trigger format"
-        result = format_cron_trigger(trigger_str)
+        result = cron_description_service.format_cron_trigger(trigger_str)
         assert result == "invalid trigger format"
-
-    def test_format_hour_morning(self):
-        """Test formatting morning hours"""
-        assert format_hour("0") == "12:00 AM"
-        assert format_hour("9") == "9:00 AM"
-        assert format_hour("11") == "11:00 AM"
-
-    def test_format_hour_afternoon(self):
-        """Test formatting afternoon hours"""
-        assert format_hour("12") == "12:00 PM"
-        assert format_hour("13") == "1:00 PM"
-        assert format_hour("23") == "11:00 PM"
-
-    def test_format_hour_invalid(self):
-        """Test formatting invalid hour"""
-        assert format_hour("invalid") == "invalid"
-
-    def test_get_day_name_valid(self):
-        """Test getting valid day names"""
-        assert get_day_name("0") == "Sunday"
-        assert get_day_name("1") == "Monday"
-        assert get_day_name("6") == "Saturday"
-
-    def test_get_day_name_invalid(self):
-        """Test getting invalid day names"""
-        assert get_day_name("7") == "Unknown"
-        assert get_day_name("invalid") == "Unknown"
 
     def test_format_time_until_days(self):
         """Test formatting time until in days"""

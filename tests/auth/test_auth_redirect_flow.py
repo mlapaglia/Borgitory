@@ -30,10 +30,6 @@ class TestAuthRedirectFlow:
             },
         )
 
-        print(f"Login response status: {response.status_code}")
-        print(f"Login response headers: {dict(response.headers)}")
-        print(f"Login response cookies: {response.cookies}")
-
         # Should get a 200 OK with HTML success template
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
@@ -43,7 +39,6 @@ class TestAuthRedirectFlow:
         assert "auth_token" in response.cookies
         auth_token = response.cookies["auth_token"]
         assert auth_token is not None and len(auth_token) > 0
-        print(f"Auth token: {auth_token}")
 
         # Now try to access the main page with the cookie
         async_client.cookies.set("auth_token", auth_token)
@@ -55,14 +50,9 @@ class TestAuthRedirectFlow:
             follow_redirects=False,
         )
 
-        print(f"Main page response status: {response2.status_code}")
-        print(f"Main page response headers: {dict(response2.headers)}")
-
-        # Should get 302 redirect to repositories (not back to login)
         assert response2.status_code == 302
         assert response2.headers["location"] == "/repositories"
 
-        # Follow the redirect to make sure we get the repositories page
         response3 = await async_client.get(
             "/repositories",
             headers={
@@ -71,9 +61,6 @@ class TestAuthRedirectFlow:
             follow_redirects=False,
         )
 
-        print(f"Repositories page response status: {response3.status_code}")
-
-        # Should get 200 OK for repositories page
         assert response3.status_code == 200
         assert "Borgitory" in response3.text
 
@@ -101,9 +88,7 @@ class TestAuthRedirectFlow:
         assert response.status_code == 200
         assert "Login successful" in response.text
 
-        # Check cookie attributes
         set_cookie_header = response.headers.get("set-cookie", "")
-        print(f"Set-Cookie header: {set_cookie_header}")
 
         assert "auth_token=" in set_cookie_header
         assert "HttpOnly" in set_cookie_header
