@@ -1,7 +1,8 @@
 # Borgitory
 
 [![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
-[![codecov](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/release.yml)](https://codecov.io/gh/mlapaglia/Borgitory)
+[![build](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/release.yml)](https://github.com/mlapaglia/Borgitory/actions/workflows/release.yml)
+[![sponsors](https://img.shields.io/github/sponsors/mlapaglia)](https://github.com/sponsors/mlapaglia)
 
 <img alt="borgitory logo" src="./assets/logo.png" width="400">
 
