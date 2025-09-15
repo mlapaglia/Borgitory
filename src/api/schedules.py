@@ -14,6 +14,7 @@ from dependencies import (
     ScheduleServiceDep,
     ConfigurationServiceDep,
 )
+from services.cron_description_service import CronDescriptionService
 
 router = APIRouter()
 
@@ -37,11 +38,38 @@ async def get_schedules_form(
 
 @router.post("/", response_class=HTMLResponse, status_code=status.HTTP_201_CREATED)
 async def create_schedule(
-    schedule: ScheduleCreate,
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
 ):
+    try:
+        json_data = await request.json()
+        
+        # Validate and process data using service
+        is_valid, processed_data, error_msg = schedule_service.validate_schedule_creation_data(json_data)
+        if not is_valid:
+            return templates.TemplateResponse(
+                request,
+                "partials/schedules/create_error.html",
+                {"error_message": error_msg},
+            )
+        
+        # Create Pydantic model for additional validation
+        schedule = ScheduleCreate(**processed_data)
+        
+    except ValueError as e:
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/create_error.html",
+            {"error_message": str(e)},
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/create_error.html",
+            {"error_message": f"Invalid form data: {str(e)}"},
+        )
+    
     success, created_schedule, error_msg = await schedule_service.create_schedule(
         name=schedule.name,
         repository_id=schedule.repository_id,
@@ -57,7 +85,6 @@ async def create_schedule(
             request,
             "partials/schedules/create_error.html",
             {"error_message": error_msg},
-            status_code=500 if "Failed to" in error_msg else 400,
         )
 
     # Success response
@@ -446,3 +473,21 @@ def format_time_until(milliseconds: int) -> str:
         return f"{minutes}m {remaining_seconds}s"
     else:
         return f"{seconds}s"
+
+
+@router.get("/cron/describe", response_class=HTMLResponse)
+async def describe_cron_expression(
+    request: Request,
+    templates: TemplatesDep,
+    custom_cron_input: str = "",
+):
+    """Get human-readable description of a cron expression via HTMX."""
+    cron_expression = custom_cron_input.strip()
+    
+    result = CronDescriptionService.get_human_description(cron_expression)
+    
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/cron_description.html",
+        result,
+    )

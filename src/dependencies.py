@@ -391,7 +391,11 @@ def get_templates() -> Jinja2Templates:
     """
     global _templates_instance
     if _templates_instance is None:
-        _templates_instance = Jinja2Templates(directory="src/templates")
+        import os
+        # Use same logic as main.py for template path detection
+        base_path = "" if os.path.exists("templates") else "src/"
+        template_path = f"{base_path}templates"
+        _templates_instance = Jinja2Templates(directory=template_path)
     return _templates_instance
 
 

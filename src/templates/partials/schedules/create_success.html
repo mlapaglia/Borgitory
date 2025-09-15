@@ -13,19 +13,21 @@
 
 <script>
 // Reset form fields (keeping this JavaScript for complex form logic)
-const form = document.querySelector('form[hx-post="/api/schedules/"]');
-if (form) {
-    form.reset();
-    
-    // Clear custom form elements
-    const preset = document.getElementById('schedule-preset');
-    const cronExpression = document.getElementById('cron-expression');
-    const customCron = document.getElementById('custom-cron');
-    const cronDescription = document.getElementById('cron-description');
-    
-    if (preset) preset.value = '';
-    if (cronExpression) cronExpression.value = '';
-    if (customCron) customCron.classList.add('hidden');
-    if (cronDescription) cronDescription.classList.add('hidden');
-}
+(function() {
+    const form = document.querySelector('form[hx-post="/api/schedules/"]');
+    if (form) {
+        form.reset();
+        
+        // Clear custom form elements
+        const preset = document.getElementById('schedule-preset');
+        const cronExpression = document.getElementById('cron-expression');
+        const customCron = document.getElementById('custom-cron');
+        const cronDescription = document.getElementById('cron-description');
+        
+        if (preset) preset.value = '';
+        if (cronExpression) cronExpression.value = '';
+        if (customCron) customCron.classList.add('hidden');
+        if (cronDescription) cronDescription.classList.add('hidden');
+    }
+})();
 </script>
