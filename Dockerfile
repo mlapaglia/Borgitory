@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 ARG VERSION
 ENV BORGITORY_VERSION=${VERSION}
@@ -18,7 +18,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir .[dev]
 
-FROM python:3.13-slim AS test
+FROM python:3.12-slim-bookworm AS test
 
 WORKDIR /app
 
@@ -43,7 +43,7 @@ COPY alembic.ini lint.py ./
 
 CMD ["pytest"]
 
-FROM python:3.13-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
