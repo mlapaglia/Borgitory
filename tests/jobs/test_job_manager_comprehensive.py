@@ -411,9 +411,18 @@ class TestJobManagerTaskExecution:
             status="running",
             started_at=datetime.now(UTC),
             tasks=[task],
+            repository_id=1,  # Add repository_id for the updated method
         )
         job_manager_with_db.jobs[job_id] = job
         job_manager_with_db.output_manager.create_job_output(job_id)
+
+        # Mock repository data
+        mock_repo_data = {
+            "id": 1,
+            "name": "test-repo",
+            "path": "/tmp/test-repo",
+            "passphrase": "test-pass",
+        }
 
         # Mock successful prune
         result = ProcessResult(
@@ -422,6 +431,8 @@ class TestJobManagerTaskExecution:
 
         with patch.object(
             job_manager_with_db.executor, "execute_prune_task", return_value=result
+        ), patch.object(
+            job_manager_with_db, "_get_repository_data", return_value=mock_repo_data
         ):
             success = await job_manager_with_db._execute_prune_task(job, task)
 

@@ -28,7 +28,7 @@ def test_repository(test_db: Session):
     repository = Repository(
         name="test-repo",
         path="/test/repo/path",
-        encrypted_passphrase="dGVzdC1wYXNzcGhyYXNl"  # base64 encoded "test-passphrase"
+        encrypted_passphrase="dGVzdC1wYXNzcGhyYXNl",  # base64 encoded "test-passphrase"
     )
     test_db.add(repository)
     test_db.commit()
@@ -44,7 +44,7 @@ def s3_cloud_sync_config(test_db: Session):
         provider="s3",
         bucket_name="test-bucket",
         path_prefix="backup/path",
-        enabled=True
+        enabled=True,
     )
     # Use the proper method to set encrypted credentials
     config.set_credentials("test-access-key", "test-secret-key")
@@ -65,7 +65,7 @@ def sftp_cloud_sync_config(test_db: Session):
         port=22,
         remote_path="/remote/backup/path",
         path_prefix="backup/path",
-        enabled=True
+        enabled=True,
     )
     # Use the proper method to set encrypted credentials
     config.set_sftp_credentials(password="testpass")
@@ -724,11 +724,13 @@ class TestSyncRepositoryMethod:
     """Test the sync_repository method"""
 
     @pytest.mark.asyncio
-    async def test_sync_repository_s3_success(self, rclone_service, test_repository, s3_cloud_sync_config):
+    async def test_sync_repository_s3_success(
+        self, rclone_service, test_repository, s3_cloud_sync_config
+    ):
         """Test successful S3 sync using sync_repository method"""
         # Get decrypted credentials from the config
         access_key, secret_key = s3_cloud_sync_config.get_credentials()
-        
+
         # Prepare config dictionary (simulating what would be passed from CloudSyncConfig)
         config = {
             "provider": "s3",
@@ -741,13 +743,20 @@ class TestSyncRepositoryMethod:
         # Mock the S3 sync generator to simulate successful sync
         async def mock_s3_sync(*args, **kwargs):
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
-            yield {"type": "progress", "transferred": "100MB", "total": "100MB", "percentage": 100.0}
+            yield {
+                "type": "progress",
+                "transferred": "100MB",
+                "total": "100MB",
+                "percentage": 100.0,
+            }
             yield {"type": "completed", "return_code": 0, "status": "success"}
 
-        with patch.object(rclone_service, "sync_repository_to_s3", side_effect=mock_s3_sync):
+        with patch.object(
+            rclone_service, "sync_repository_to_s3", side_effect=mock_s3_sync
+        ):
             # Track progress calls
             progress_calls = []
-            
+
             def progress_callback(data):
                 progress_calls.append(data)
 
@@ -756,7 +765,7 @@ class TestSyncRepositoryMethod:
                 source_path=test_repository.path,
                 remote_path=f":s3:{config['bucket_name']}/{config['path_prefix']}",
                 config=config,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
             )
 
             # Verify result
@@ -770,7 +779,9 @@ class TestSyncRepositoryMethod:
             assert progress_calls[2]["type"] == "completed"
 
     @pytest.mark.asyncio
-    async def test_sync_repository_s3_missing_config(self, rclone_service, test_repository):
+    async def test_sync_repository_s3_missing_config(
+        self, rclone_service, test_repository
+    ):
         """Test S3 sync with missing required configuration"""
         config = {
             "provider": "s3",
@@ -781,18 +792,20 @@ class TestSyncRepositoryMethod:
         result = await rclone_service.sync_repository(
             source_path=test_repository.path,
             remote_path=":s3:test-bucket",
-            config=config
+            config=config,
         )
 
         assert result["success"] is False
         assert "Missing required S3 configuration" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_sync_repository_s3_sync_failure(self, rclone_service, test_repository, s3_cloud_sync_config):
+    async def test_sync_repository_s3_sync_failure(
+        self, rclone_service, test_repository, s3_cloud_sync_config
+    ):
         """Test S3 sync failure handling"""
         # Get decrypted credentials from the config
         access_key, secret_key = s3_cloud_sync_config.get_credentials()
-        
+
         config = {
             "provider": "s3",
             "bucket_name": s3_cloud_sync_config.bucket_name,
@@ -806,22 +819,26 @@ class TestSyncRepositoryMethod:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {"type": "error", "message": "Access denied"}
 
-        with patch.object(rclone_service, "sync_repository_to_s3", side_effect=mock_s3_sync_failure):
+        with patch.object(
+            rclone_service, "sync_repository_to_s3", side_effect=mock_s3_sync_failure
+        ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
                 remote_path=f":s3:{config['bucket_name']}",
-                config=config
+                config=config,
             )
 
             assert result["success"] is False
             assert result["error"] == "Access denied"
 
     @pytest.mark.asyncio
-    async def test_sync_repository_s3_process_failure(self, rclone_service, test_repository, s3_cloud_sync_config):
+    async def test_sync_repository_s3_process_failure(
+        self, rclone_service, test_repository, s3_cloud_sync_config
+    ):
         """Test S3 sync when rclone process fails"""
         # Get decrypted credentials from the config
         access_key, secret_key = s3_cloud_sync_config.get_credentials()
-        
+
         config = {
             "provider": "s3",
             "bucket_name": s3_cloud_sync_config.bucket_name,
@@ -833,25 +850,36 @@ class TestSyncRepositoryMethod:
         # Mock the S3 sync generator to simulate process failure
         async def mock_s3_sync_process_failure(*args, **kwargs):
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
-            yield {"type": "progress", "transferred": "50MB", "total": "100MB", "percentage": 50.0}
+            yield {
+                "type": "progress",
+                "transferred": "50MB",
+                "total": "100MB",
+                "percentage": 50.0,
+            }
             yield {"type": "completed", "return_code": 1, "status": "failed"}
 
-        with patch.object(rclone_service, "sync_repository_to_s3", side_effect=mock_s3_sync_process_failure):
+        with patch.object(
+            rclone_service,
+            "sync_repository_to_s3",
+            side_effect=mock_s3_sync_process_failure,
+        ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
                 remote_path=f":s3:{config['bucket_name']}",
-                config=config
+                config=config,
             )
 
             assert result["success"] is False
             assert "Rclone process failed with return code 1" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_sync_repository_sftp_success(self, rclone_service, test_repository, sftp_cloud_sync_config):
+    async def test_sync_repository_sftp_success(
+        self, rclone_service, test_repository, sftp_cloud_sync_config
+    ):
         """Test successful SFTP sync using sync_repository method"""
         # Get decrypted credentials from the config
         password, private_key = sftp_cloud_sync_config.get_sftp_credentials()
-        
+
         config = {
             "provider": "sftp",
             "host": sftp_cloud_sync_config.host,
@@ -865,21 +893,30 @@ class TestSyncRepositoryMethod:
         # Mock the SFTP sync generator to simulate successful sync
         async def mock_sftp_sync(*args, **kwargs):
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
-            yield {"type": "progress", "transferred": "200MB", "total": "200MB", "percentage": 100.0}
+            yield {
+                "type": "progress",
+                "transferred": "200MB",
+                "total": "200MB",
+                "percentage": 100.0,
+            }
             yield {"type": "completed", "return_code": 0, "status": "success"}
 
-        with patch.object(rclone_service, "sync_repository_to_sftp", side_effect=mock_sftp_sync):
+        with patch.object(
+            rclone_service, "sync_repository_to_sftp", side_effect=mock_sftp_sync
+        ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
                 remote_path=f"sftp_remote:{sftp_cloud_sync_config.remote_path}",
-                config=config
+                config=config,
             )
 
             assert result["success"] is True
             assert "stats" in result
 
     @pytest.mark.asyncio
-    async def test_sync_repository_sftp_missing_config(self, rclone_service, test_repository):
+    async def test_sync_repository_sftp_missing_config(
+        self, rclone_service, test_repository
+    ):
         """Test SFTP sync with missing required configuration"""
         config = {
             "provider": "sftp",
@@ -890,14 +927,16 @@ class TestSyncRepositoryMethod:
         result = await rclone_service.sync_repository(
             source_path=test_repository.path,
             remote_path="sftp:/remote/path",
-            config=config
+            config=config,
         )
 
         assert result["success"] is False
         assert "Missing required SFTP configuration" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_sync_repository_sftp_missing_auth(self, rclone_service, test_repository):
+    async def test_sync_repository_sftp_missing_auth(
+        self, rclone_service, test_repository
+    ):
         """Test SFTP sync with missing authentication"""
         config = {
             "provider": "sftp",
@@ -909,14 +948,19 @@ class TestSyncRepositoryMethod:
         result = await rclone_service.sync_repository(
             source_path=test_repository.path,
             remote_path="sftp:/remote/path",
-            config=config
+            config=config,
         )
 
         assert result["success"] is False
-        assert "Either password or private_key must be provided for SFTP" in result["error"]
+        assert (
+            "Either password or private_key must be provided for SFTP"
+            in result["error"]
+        )
 
     @pytest.mark.asyncio
-    async def test_sync_repository_sftp_with_private_key(self, rclone_service, test_repository):
+    async def test_sync_repository_sftp_with_private_key(
+        self, rclone_service, test_repository
+    ):
         """Test SFTP sync with private key authentication"""
         config = {
             "provider": "sftp",
@@ -933,38 +977,41 @@ class TestSyncRepositoryMethod:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {"type": "completed", "return_code": 0, "status": "success"}
 
-        with patch.object(rclone_service, "sync_repository_to_sftp", side_effect=mock_sftp_sync):
+        with patch.object(
+            rclone_service, "sync_repository_to_sftp", side_effect=mock_sftp_sync
+        ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
                 remote_path="sftp_remote:/remote/path",
-                config=config
+                config=config,
             )
 
             assert result["success"] is True
 
     @pytest.mark.asyncio
-    async def test_sync_repository_unsupported_provider(self, rclone_service, test_repository):
+    async def test_sync_repository_unsupported_provider(
+        self, rclone_service, test_repository
+    ):
         """Test sync_repository with unsupported provider"""
-        config = {
-            "provider": "unsupported_provider",
-            "some_config": "value"
-        }
+        config = {"provider": "unsupported_provider", "some_config": "value"}
 
         result = await rclone_service.sync_repository(
             source_path=test_repository.path,
             remote_path="unsupported:/path",
-            config=config
+            config=config,
         )
 
         assert result["success"] is False
         assert "Unsupported cloud provider: unsupported_provider" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_sync_repository_exception_handling(self, rclone_service, test_repository, s3_cloud_sync_config):
+    async def test_sync_repository_exception_handling(
+        self, rclone_service, test_repository, s3_cloud_sync_config
+    ):
         """Test sync_repository exception handling"""
         # Get decrypted credentials from the config
         access_key, secret_key = s3_cloud_sync_config.get_credentials()
-        
+
         config = {
             "provider": "s3",
             "bucket_name": s3_cloud_sync_config.bucket_name,
@@ -973,22 +1020,28 @@ class TestSyncRepositoryMethod:
         }
 
         # Mock the S3 sync method to raise an exception
-        with patch.object(rclone_service, "sync_repository_to_s3", side_effect=Exception("Test exception")):
+        with patch.object(
+            rclone_service,
+            "sync_repository_to_s3",
+            side_effect=Exception("Test exception"),
+        ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
                 remote_path=f":s3:{config['bucket_name']}",
-                config=config
+                config=config,
             )
 
             assert result["success"] is False
             assert "Test exception" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_sync_repository_progress_callback_integration(self, rclone_service, test_repository, s3_cloud_sync_config):
+    async def test_sync_repository_progress_callback_integration(
+        self, rclone_service, test_repository, s3_cloud_sync_config
+    ):
         """Test sync_repository progress callback functionality"""
         # Get decrypted credentials from the config
         access_key, secret_key = s3_cloud_sync_config.get_credentials()
-        
+
         config = {
             "provider": "s3",
             "bucket_name": s3_cloud_sync_config.bucket_name,
@@ -998,24 +1051,50 @@ class TestSyncRepositoryMethod:
 
         # Mock the S3 sync generator with detailed progress updates
         async def mock_s3_sync_with_progress(*args, **kwargs):
-            yield {"type": "started", "command": "rclone sync /test/repo/path :s3:test-bucket", "pid": 12345}
+            yield {
+                "type": "started",
+                "command": "rclone sync /test/repo/path :s3:test-bucket",
+                "pid": 12345,
+            }
             yield {"type": "log", "stream": "stdout", "message": "Starting sync..."}
-            yield {"type": "progress", "transferred": "25MB", "total": "100MB", "percentage": 25.0, "speed": "5MB/s"}
-            yield {"type": "progress", "transferred": "50MB", "total": "100MB", "percentage": 50.0, "speed": "5MB/s"}
-            yield {"type": "progress", "transferred": "100MB", "total": "100MB", "percentage": 100.0, "speed": "5MB/s"}
+            yield {
+                "type": "progress",
+                "transferred": "25MB",
+                "total": "100MB",
+                "percentage": 25.0,
+                "speed": "5MB/s",
+            }
+            yield {
+                "type": "progress",
+                "transferred": "50MB",
+                "total": "100MB",
+                "percentage": 50.0,
+                "speed": "5MB/s",
+            }
+            yield {
+                "type": "progress",
+                "transferred": "100MB",
+                "total": "100MB",
+                "percentage": 100.0,
+                "speed": "5MB/s",
+            }
             yield {"type": "completed", "return_code": 0, "status": "success"}
 
         progress_events = []
-        
+
         def detailed_progress_callback(data):
             progress_events.append(data)
 
-        with patch.object(rclone_service, "sync_repository_to_s3", side_effect=mock_s3_sync_with_progress):
+        with patch.object(
+            rclone_service,
+            "sync_repository_to_s3",
+            side_effect=mock_s3_sync_with_progress,
+        ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
                 remote_path=f":s3:{config['bucket_name']}",
                 config=config,
-                progress_callback=detailed_progress_callback
+                progress_callback=detailed_progress_callback,
             )
 
             # Verify successful result
@@ -1023,25 +1102,29 @@ class TestSyncRepositoryMethod:
 
             # Verify all progress events were captured
             assert len(progress_events) == 6
-            
+
             # Verify event types
             event_types = [event["type"] for event in progress_events]
             assert "started" in event_types
             assert "log" in event_types
             assert "progress" in event_types
             assert "completed" in event_types
-            
+
             # Verify progress data is preserved in final stats
-            progress_events_only = [e for e in progress_events if e["type"] == "progress"]
+            progress_events_only = [
+                e for e in progress_events if e["type"] == "progress"
+            ]
             assert len(progress_events_only) == 3
             assert progress_events_only[-1]["percentage"] == 100.0
 
     @pytest.mark.asyncio
-    async def test_sync_repository_with_real_database_config(self, rclone_service, test_repository, s3_cloud_sync_config):
+    async def test_sync_repository_with_real_database_config(
+        self, rclone_service, test_repository, s3_cloud_sync_config
+    ):
         """Test sync_repository using actual CloudSyncConfig from database"""
         # Get decrypted credentials from the config
         access_key, secret_key = s3_cloud_sync_config.get_credentials()
-        
+
         # Convert CloudSyncConfig to dictionary (simulating what would happen in real usage)
         config = {
             "provider": s3_cloud_sync_config.provider,
@@ -1052,21 +1135,25 @@ class TestSyncRepositoryMethod:
         }
 
         # Mock the S3 sync to verify the config values are passed correctly
-        async def mock_s3_sync(repository, access_key_id, secret_access_key, bucket_name, path_prefix):
+        async def mock_s3_sync(
+            repository, access_key_id, secret_access_key, bucket_name, path_prefix
+        ):
             # Verify that the real database values are passed through
             assert repository.path == test_repository.path
             assert access_key_id == access_key  # Use the decrypted value
             assert secret_access_key == secret_key  # Use the decrypted value
             assert bucket_name == s3_cloud_sync_config.bucket_name
             assert path_prefix == s3_cloud_sync_config.path_prefix
-            
+
             yield {"type": "completed", "return_code": 0, "status": "success"}
 
-        with patch.object(rclone_service, "sync_repository_to_s3", side_effect=mock_s3_sync):
+        with patch.object(
+            rclone_service, "sync_repository_to_s3", side_effect=mock_s3_sync
+        ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
                 remote_path=f":s3:{s3_cloud_sync_config.bucket_name}",
-                config=config
+                config=config,
             )
 
             assert result["success"] is True

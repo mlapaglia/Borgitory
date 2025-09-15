@@ -870,37 +870,60 @@ class JobManager:
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
     ) -> bool:
         """Execute a prune task using JobExecutor"""
-        params = task.parameters
+        try:
+            params = task.parameters
 
-        def task_output_callback(line: str, progress: Dict):
-            task.output_lines.append(line)
-            asyncio.create_task(
-                self.output_manager.add_output_line(job.id, line, "stdout", progress)
+            # Get repository data
+            repo_data = await self._get_repository_data(job.repository_id)
+            if not repo_data:
+                task.status = "failed"
+                task.return_code = 1
+                task.error = "Repository not found"
+                task.completed_at = datetime.now(UTC)
+                return False
+
+            repository_path = repo_data.get("path") or params.get("repository_path")
+            passphrase = repo_data.get("passphrase") or params.get("passphrase")
+
+            def task_output_callback(line: str, progress: Dict):
+                task.output_lines.append(line)
+                asyncio.create_task(
+                    self.output_manager.add_output_line(
+                        job.id, line, "stdout", progress
+                    )
+                )
+
+            result = await self.executor.execute_prune_task(
+                repository_path=repository_path,
+                passphrase=passphrase,
+                keep_within=params.get("keep_within"),
+                keep_daily=params.get("keep_daily"),
+                keep_weekly=params.get("keep_weekly"),
+                keep_monthly=params.get("keep_monthly"),
+                keep_yearly=params.get("keep_yearly"),
+                show_stats=params.get("show_stats", True),
+                show_list=params.get("show_list", False),
+                save_space=params.get("save_space", False),
+                force_prune=params.get("force_prune", False),
+                dry_run=params.get("dry_run", False),
+                output_callback=task_output_callback,
             )
 
-        result = await self.executor.execute_prune_task(
-            repository_path=params.get("repository_path"),
-            passphrase=params.get("passphrase"),
-            keep_within=params.get("keep_within"),
-            keep_daily=params.get("keep_daily"),
-            keep_weekly=params.get("keep_weekly"),
-            keep_monthly=params.get("keep_monthly"),
-            keep_yearly=params.get("keep_yearly"),
-            show_stats=params.get("show_stats", True),
-            show_list=params.get("show_list", False),
-            save_space=params.get("save_space", False),
-            force_prune=params.get("force_prune", False),
-            dry_run=params.get("dry_run", False),
-            output_callback=task_output_callback,
-        )
+            # Set task status based on result
+            task.return_code = result.return_code
+            task.status = "completed" if result.return_code == 0 else "failed"
+            if result.error:
+                task.error = result.error
 
-        # Set task status based on result
-        task.return_code = result.return_code
-        task.status = "completed" if result.return_code == 0 else "failed"
-        if result.error:
-            task.error = result.error
+            return result.return_code == 0
 
-        return result.return_code == 0
+        except Exception as e:
+            logger.error(f"Exception in prune task: {str(e)}")
+            task.status = "failed"
+            task.return_code = -1
+            task.error = f"Prune task failed: {str(e)}"
+            task.completed_at = datetime.now(UTC)
+            return False
 
     async def _execute_check_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
@@ -932,6 +955,9 @@ class JobManager:
                 )
 
             additional_args = []
+
+            # Add verbose flag to get more output
+            additional_args.append("--verbose")
 
             # Add check options
             if params.get("repository_only", False):
@@ -968,8 +994,41 @@ class JobManager:
             # Set task status based on result
             task.return_code = result.return_code
             task.status = "completed" if result.return_code == 0 else "failed"
+            task.completed_at = datetime.now(UTC)
+
+            # Always add the full process output to task output_lines for visibility
+            if result.stdout:
+                full_output = result.stdout.decode("utf-8", errors="replace").strip()
+                if full_output:
+                    # Add the captured output to the task output lines
+                    for line in full_output.split("\n"):
+                        if line.strip():
+                            task.output_lines.append(line)
+                            # Also add to output manager for real-time display
+                            asyncio.create_task(
+                                self.output_manager.add_output_line(
+                                    job.id, line, "stdout", {}
+                                )
+                            )
+
             if result.error:
                 task.error = result.error
+            elif result.return_code != 0:
+                # Set a default error message if none provided by result
+                if result.stdout:
+                    output_text = result.stdout.decode(
+                        "utf-8", errors="replace"
+                    ).strip()
+                    # Get the last few lines which likely contain the error
+                    error_lines = output_text.split("\n")[-5:] if output_text else []
+                    stderr_text = (
+                        "\n".join(error_lines) if error_lines else "No output captured"
+                    )
+                else:
+                    stderr_text = "No output captured"
+                task.error = (
+                    f"Check failed with return code {result.return_code}: {stderr_text}"
+                )
 
             return result.return_code == 0
 
