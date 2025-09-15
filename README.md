@@ -1,14 +1,10 @@
-# Borgitory [![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
+# Borgitory
+[![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
+[![codecov](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/release.yml)](https://codecov.io/gh/mlapaglia/Borgitory)
 
 <img alt="borgitory logo" src="./assets/logo.png" width="400">
 
 A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities.
-
-## System Status
-
-✅ **Archive Browsing**: Interactive exploration with FUSE mounting
-✅ **Multi-Task Jobs**: Backup, prune, check, and cloud sync operations
-✅ **User Interface**: Modern HTMX + Tailwind CSS with mobile responsiveness
 
 ## Features
 
@@ -16,11 +12,9 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 - **Repository Management**: Add, configure, and manage multiple Borg repositories
 - **Manual Backups**: Create backups on-demand with configurable compression and source paths
-- **Real-time Progress**: Monitor backup progress with live updates via Server-Sent Events
+- **Real-time Progress**: Monitor backup progress with live updates
 - **Archive Browser**: Interactive directory-based archive exploration with file downloads
 - **Job History**: Track all backup operations with detailed logs and expandable task views
-
-### Advanced Features
 
 - **Automated Scheduling**: Set up cron-based backup schedules with integrated cleanup and notifications
 - **Archive Pruining**: Configure automated pruning policies with simple or advanced retention strategies
