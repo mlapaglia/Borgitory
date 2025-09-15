@@ -115,9 +115,6 @@ class JobDatabaseManager:
 
                 logger.info(f"Updated database job {db_job.id} status to {status}")
 
-                # Note: Cloud sync is now handled as a regular task within the job
-                # No need to trigger separately - it's part of the job's task list
-
                 return True
 
         except Exception as e:

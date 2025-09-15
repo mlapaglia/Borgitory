@@ -189,8 +189,6 @@ class JobManagerFactory:
                 keepalive_timeout=config.sse_keepalive_timeout,
             )
 
-        # Note: CloudBackupCoordinator removed - cloud sync now handled by JobExecutor
-
         # PushoverService
         if custom_dependencies.pushover_service:
             deps.pushover_service = custom_dependencies.pushover_service
@@ -1589,7 +1587,7 @@ class JobManager:
 
 
 # Factory function for creating JobManager instances (no singleton)
-def create_job_manager(config=None) -> JobManager:
+def create_job_manager(config=None, rclone_service=None) -> JobManager:
     """Factory function for creating JobManager instances"""
     if config is None:
         # Use environment variables or defaults
@@ -1605,10 +1603,8 @@ def create_job_manager(config=None) -> JobManager:
         internal_config = config
 
     # Create dependencies with rclone service
-    from dependencies import get_rclone_service
-    
     custom_deps = JobManagerDependencies(
-        rclone_service=get_rclone_service()
+        rclone_service=rclone_service
     )
     
     dependencies = JobManagerFactory.create_dependencies(

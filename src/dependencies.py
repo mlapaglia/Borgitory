@@ -63,7 +63,7 @@ def get_job_manager_dependency() -> JobManager:
             max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
             max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
         )
-        _job_manager_instance = create_job_manager(config)
+        _job_manager_instance = create_job_manager(config, get_rclone_service())
     return _job_manager_instance
 
 
