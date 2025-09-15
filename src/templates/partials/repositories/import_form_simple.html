@@ -2,11 +2,14 @@
 <div>
     <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Repository Import Form</h4>
     
+    <!-- Status div for responses -->
+    <div id="import-form-status"></div>
+    
     <form 
         hx-post="/api/repositories/import" 
         hx-encoding="multipart/form-data"
-        hx-target="#import-form-container" 
-        hx-swap="outerHTML"
+        hx-target="#import-form-status" 
+        hx-swap="innerHTML"
         hx-indicator="#import-loading"
     >
     <div class="space-y-4">

@@ -1,0 +1,93 @@
+<!-- Import Existing Repository Form Inner Content -->
+<h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Import Existing Repository</h3>
+
+<!-- Status div for trigger templates -->
+<div id="import-form-status"></div>
+
+<div class="space-y-4">
+    <div class="flex space-x-2">
+        <button hx-get="/api/repositories/scan" 
+                hx-target="#scan-results" 
+                hx-swap="innerHTML"
+                hx-indicator="#scan-loading"
+                class="bg-gray-600 text-white px-3 py-2 rounded-md hover:bg-gray-700 text-sm">
+            Scan for Repositories
+        </button>
+        <div id="scan-loading" class="[&.htmx-request]:flex hidden items-center text-sm text-gray-700 dark:text-gray-300">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+            Scanning...
+        </div>
+    </div>
+    
+    <div id="scan-results">
+        <!-- Scan results will be populated here by HTMX -->
+    </div>
+    
+    <!-- Container for selected repository form -->
+    <div id="selected-repo-form" class="mt-4">
+        <!-- Selected repository form will appear here -->
+    </div>
+
+    <!-- Form fields (hidden initially) -->
+    <form 
+        id="import-form-fields"
+        class="hidden"
+        hx-post="/api/repositories/import" 
+        hx-encoding="multipart/form-data"
+        hx-target="#import-form-status" 
+        hx-swap="innerHTML"
+        hx-indicator="#import-loading"
+    >
+    <div class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name (for this app)</label>
+            <input type="text" name="name" required class="input-modern mt-1">
+        </div>
+        <!-- Dynamic form section controlled by HTMX -->
+        <div id="import-form-dynamic">
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository Path</label>
+                {% set input_id = "import-path" %}
+                {% set input_name = "path" %}
+                {% set input_value = "/repos/" %}
+                {% set placeholder = "/repos/" %}
+                {% set required = true %}
+                {% include "partials/shared/path_autocomplete.html" %}
+            </div>
+            
+            <!-- Encryption info display (hidden by default) -->
+            <div id="encryption-info" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span id="encryption-text" class="text-sm text-blue-700"></span>
+                </div>
+            </div>
+            
+            <!-- Passphrase field (hidden by default) -->
+            <div id="passphrase-field" class="hidden">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Passphrase</label>
+                <input type="password" name="passphrase" class="input-modern mt-1">
+            </div>
+            
+            <!-- Keyfile field (hidden by default) -->
+            <div id="keyfile-field" class="hidden">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Keyfile</label>
+                <input type="file" name="keyfile" accept=".key" class="input-modern mt-1">
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Upload the Borg keyfile (usually has .key extension)</p>
+            </div>
+            
+            <button type="submit" id="import-submit" disabled class="w-full bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed flex items-center justify-center">
+                <span id="import-button-text">Select a repository first</span>
+            </button>
+        </div>
+        
+        <!-- HTMX Loading Indicator -->
+        <div id="import-loading" class="[&.htmx-request]:flex hidden items-center justify-center text-sm text-gray-700 dark:text-gray-300 mt-2">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+            Importing repository...
+        </div>
+        </div>
+    </form>
+</div>

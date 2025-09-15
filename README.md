@@ -134,12 +134,10 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ### Docker Volumes
 
-The application requires these volume mounts:
-
 ```yaml
 volumes:
   - ./data:/app/data # Persistent application data (required)
-  - /path/to/backup/sources:/mnt/backup/sources:ro # Source directories to backup (read-only)
+  - /path/to/backup/sources:/mnt/backup/sources:ro # Source directories to backup (suggested read-only)
   - /path/to/borg/repos:/mnt/repos # Borg repository storage (read-write)
   - /additional/source:/mnt/additional:ro # Additional source directories as needed
   - /another/repo/location:/mnt/alt-repos # Additional repository locations as needed
