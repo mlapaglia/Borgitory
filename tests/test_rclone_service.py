@@ -693,11 +693,6 @@ class TestRcloneService:
             assert result["status"] == "failed"
             assert "does not exist" in result["message"]
 
-    def test_get_configured_remotes(self, rclone_service):
-        """Test get_configured_remotes returns empty list"""
-        result = rclone_service.get_configured_remotes()
-        assert result == []
-
     @pytest.mark.asyncio
     async def test_merge_async_generators(self, rclone_service):
         """Test merging multiple async generators"""

@@ -15,26 +15,6 @@ class TestSyncEndpoints:
     """Test class for sync API endpoints."""
 
     @pytest.mark.asyncio
-    async def test_list_remotes(self, async_client: AsyncClient, mock_rclone_service):
-        """Test listing configured remotes."""
-        mock_rclone_service.get_configured_remotes.return_value = ["remote1", "remote2"]
-
-        # Override dependency injection
-        app.dependency_overrides[get_rclone_service] = lambda: mock_rclone_service
-
-        try:
-            response = await async_client.get("/api/sync/remotes")
-        finally:
-            # Clean up
-            if get_rclone_service in app.dependency_overrides:
-                del app.dependency_overrides[get_rclone_service]
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "remotes" in data
-        assert data["remotes"] == ["remote1", "remote2"]
-
-    @pytest.mark.asyncio
     async def test_sync_repository_success(
         self,
         async_client: AsyncClient,

@@ -802,12 +802,3 @@ class RcloneService:
         except Exception as e:
             logger.error(f"Error in sync_repository: {e}")
             return {"success": False, "error": str(e)}
-
-    def get_configured_remotes(self) -> list:
-        """Get list of configured cloud backup configs from database"""
-        # This method is no longer needed since we don't use config files
-        # Cloud backup configurations are now stored in the database
-        return []
-
-
-# rclone_service = RcloneService()

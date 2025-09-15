@@ -98,7 +98,6 @@ def mock_rclone_service():
     mock = Mock()
 
     # Set up default return values for common methods
-    mock.get_configured_remotes.return_value = ["test-remote"]
     mock.test_s3_connection.return_value = {
         "status": "success",
         "message": "Connection successful",
