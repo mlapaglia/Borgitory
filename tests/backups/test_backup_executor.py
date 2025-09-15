@@ -515,17 +515,15 @@ class TestBackupExecutor:
         """Test successful prune execution"""
         config = PruneConfig(keep_daily=7)
 
+        # Create a proper async iterator
+        async def mock_stdout():
+            for line in [b"Prune completed successfully\n"]:
+                yield line
+
         # Mock the subprocess execution
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=0)
-        mock_process.stdout = AsyncMock()
-        mock_process.stdout.__aiter__ = AsyncMock(
-            return_value=iter(
-                [
-                    b"Prune completed successfully\n",
-                ]
-            )
-        )
+        mock_process.stdout = mock_stdout()
 
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
@@ -666,9 +664,17 @@ class TestBackupExecutor:
     @pytest.mark.asyncio
     async def test_monitor_process_output_exception(self, backup_executor):
         """Test _monitor_process_output exception handling"""
+
+        # Create a proper async iterator that raises exception on iteration
+        class MockStdout:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise Exception("Read error")
+
         mock_process = Mock()
-        mock_process.stdout = AsyncMock()
-        mock_process.stdout.__aiter__ = AsyncMock(side_effect=Exception("Read error"))
+        mock_process.stdout = MockStdout()
 
         result = BackupResult(
             status=BackupStatus.RUNNING, return_code=-1, output_lines=[]
@@ -782,17 +788,15 @@ class TestBackupExecutor:
         config = BackupConfig(source_paths=["/data"])
         operation_id = "backup-workflow-test"
 
+        # Create a proper async iterator
+        async def mock_stdout():
+            for line in [b"Archive created successfully\n"]:
+                yield line
+
         # Mock the subprocess execution
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=0)
-        mock_process.stdout = AsyncMock()
-        mock_process.stdout.__aiter__ = AsyncMock(
-            return_value=iter(
-                [
-                    b"Archive created successfully\n",
-                ]
-            )
-        )
+        mock_process.stdout = mock_stdout()
 
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
@@ -816,17 +820,15 @@ class TestBackupExecutor:
         config = PruneConfig(keep_daily=7)
         operation_id = "prune-workflow-test"
 
+        # Create a proper async iterator
+        async def mock_stdout():
+            for line in [b"Prune completed successfully\n"]:
+                yield line
+
         # Mock the subprocess execution
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=0)
-        mock_process.stdout = AsyncMock()
-        mock_process.stdout.__aiter__ = AsyncMock(
-            return_value=iter(
-                [
-                    b"Prune completed successfully\n",
-                ]
-            )
-        )
+        mock_process.stdout = mock_stdout()
 
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process

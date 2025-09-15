@@ -264,9 +264,7 @@ class TestRecoveryService:
                 ["borg", "break-lock", "/repo/path"],
                 {"BORG_PASSPHRASE": "test"},
             ),
-        ), patch("asyncio.create_subprocess_exec", return_value=mock_process), patch(
-            "asyncio.wait_for", return_value=(b"Lock released", b"")
-        ):
+        ), patch("asyncio.create_subprocess_exec", return_value=mock_process):
             await recovery_service._release_repository_lock(mock_repository)
 
             # Should build secure command with correct parameters
@@ -287,9 +285,7 @@ class TestRecoveryService:
                 ["borg", "break-lock", "/repo/path"],
                 {"BORG_PASSPHRASE": "test"},
             ),
-        ), patch("asyncio.create_subprocess_exec", return_value=mock_process), patch(
-            "asyncio.wait_for", return_value=(b"", b"Lock not found")
-        ):
+        ), patch("asyncio.create_subprocess_exec", return_value=mock_process):
             # Should not raise exception even on command failure
             await recovery_service._release_repository_lock(mock_repository)
 
@@ -343,9 +339,7 @@ class TestRecoveryService:
                 ["borg", "break-lock", "/repo/path"],
                 {"BORG_PASSPHRASE": "test"},
             ),
-        ), patch("asyncio.create_subprocess_exec", return_value=mock_process), patch(
-            "asyncio.wait_for", return_value=(b"", None)
-        ):
+        ), patch("asyncio.create_subprocess_exec", return_value=mock_process):
             await recovery_service._release_repository_lock(mock_repository)
 
     @pytest.mark.asyncio

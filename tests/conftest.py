@@ -69,26 +69,26 @@ def test_db():
     # Create ALL tables at once
     Base.metadata.create_all(bind=engine)
 
-    # Create a session for the test
-    db_session = TestingSessionLocal()
-
     def override_get_db():
+        db_session = TestingSessionLocal()
         try:
-            # Use the same session for the entire test
             yield db_session
         finally:
-            # Don't close during the test
-            pass
+            db_session.close()
 
     # Set up the dependency override
     app.dependency_overrides[get_db] = override_get_db
 
+    # Create a session for the test to return
+    test_session = TestingSessionLocal()
     try:
-        yield db_session
+        yield test_session
     finally:
         # Clean up after test
-        db_session.rollback()  # Roll back any uncommitted changes
-        db_session.close()
+        test_session.rollback()  # Roll back any uncommitted changes
+        test_session.close()
+        # Close the engine to ensure all connections are closed
+        engine.dispose()
         app.dependency_overrides.clear()
 
 
@@ -110,7 +110,7 @@ def mock_rclone_service():
         yield {"type": "log", "stream": "stdout", "message": "Syncing files"}
         yield {"type": "completed", "status": "success", "message": "Sync completed"}
 
-    mock.sync_repository_to_s3.return_value = mock_sync_generator()
+    mock.sync_repository_to_s3 = Mock(return_value=mock_sync_generator())
 
     return mock
 

@@ -297,7 +297,7 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock process execution and repository data
-        mock_process = Mock()
+        mock_process = AsyncMock()
         result = ProcessResult(
             return_code=0,
             stdout=b"Archive created successfully",
@@ -354,7 +354,7 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock failed process and repository data
-        mock_process = Mock()
+        mock_process = AsyncMock()
         result = ProcessResult(
             return_code=2,
             stdout=b"Repository locked",
@@ -464,7 +464,7 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock successful check and repository data
-        mock_process = Mock()
+        mock_process = AsyncMock()
         result = ProcessResult(
             return_code=0, stdout=b"Repository check passed", stderr=b"", error=None
         )
@@ -939,7 +939,7 @@ class TestJobManagerStreamingAndUtility:
         job = Mock(status="running")
         job_manager.jobs["test"] = job
 
-        mock_process = Mock()
+        mock_process = AsyncMock()
         job_manager._processes["test"] = mock_process
         job_manager.executor.terminate_process = AsyncMock(return_value=True)
 

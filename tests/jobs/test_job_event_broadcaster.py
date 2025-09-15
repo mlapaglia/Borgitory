@@ -169,16 +169,22 @@ class TestJobEventBroadcaster:
     @pytest.mark.asyncio
     async def test_stream_all_events(self):
         """Test streaming all events creates and manages client subscription"""
-        # Mock the client streaming
-        with patch.object(self.broadcaster, "stream_events_for_client") as mock_stream:
+        # Create a real queue with test events instead of mocking
+        test_queue = asyncio.Queue(maxsize=5)
+        test_queue.put_nowait({"type": "test", "data": "value"})
 
-            async def mock_async_iterator():
-                yield {"type": "test", "data": "value"}
-
-            mock_stream.return_value = mock_async_iterator()
-
+        # Mock subscribe_client to return our test queue
+        with patch.object(
+            self.broadcaster, "subscribe_client", return_value=test_queue
+        ):
             stream_gen = self.broadcaster.stream_all_events()
-            events = [event async for event in stream_gen]
+
+            # Get the first event, then break to avoid timeout
+            events = []
+            async for event in stream_gen:
+                events.append(event)
+                if len(events) >= 1:
+                    break
 
         assert len(events) == 1
         assert events[0]["type"] == "test"
