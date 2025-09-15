@@ -129,35 +129,6 @@ class BackupService:
             logger.error(f"Backup job {job.id} failed: {e}")
             raise
 
-    async def run_scheduled_backup(self, schedule: Schedule) -> str:
-        """
-        Execute a scheduled backup.
-
-        Args:
-            schedule: Schedule configuration with backup settings
-
-        Returns:
-            Job ID of the created backup job
-        """
-        logger.info(f"Running scheduled backup for schedule {schedule.id}")
-
-        # Get repository from schedule
-        repository = schedule.repository
-        if not repository:
-            raise ValueError(f"No repository found for schedule {schedule.id}")
-
-        # Create backup request from schedule
-        backup_request = BackupRequest(
-            repository_id=repository.id,
-            source_path="/data",  # Default source path for scheduled backups
-            compression="zstd",
-            dry_run=False,
-        )
-
-        # Execute backup
-        return await self.create_and_run_backup(
-            backup_request, JobType.SCHEDULED_BACKUP
-        )
 
     async def create_and_run_prune(self, prune_request: PruneRequest) -> str:
         """

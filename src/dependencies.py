@@ -240,13 +240,20 @@ _scheduler_service_instance = None
 
 def get_scheduler_service() -> SchedulerService:
     """
-    Provide a SchedulerService singleton instance.
+    Provide a SchedulerService singleton instance with proper dependency injection.
 
     Uses module-level singleton pattern for application-wide persistence.
     """
     global _scheduler_service_instance
     if _scheduler_service_instance is None:
-        _scheduler_service_instance = SchedulerService()
+        # Get the job manager dependency
+        job_manager = get_job_manager_dependency()
+        # Use JobService as the factory function
+        from services.jobs.job_service import JobService
+        _scheduler_service_instance = SchedulerService(
+            job_manager=job_manager,
+            job_service_factory=JobService
+        )
     return _scheduler_service_instance
 
 

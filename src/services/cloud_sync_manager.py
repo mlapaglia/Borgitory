@@ -41,17 +41,17 @@ class CloudSyncManager:
 
             # Check for cloud_sync_config_id
             if not cloud_sync_config_id:
-                logger.info("📋 No cloud backup configuration - skipping cloud sync")
+                logger.info("No cloud backup configuration - skipping cloud sync")
                 if output_callback:
                     output_callback(
-                        "📋 No cloud backup configuration - skipping cloud sync"
+                        "No cloud backup configuration - skipping cloud sync"
                     )
                 return True  # Not an error, just skipped
 
-            logger.info(f"☁️ Starting cloud sync for repository {repo_data['name']}")
+            logger.info(f"Starting cloud sync for repository {repo_data['name']}")
             if output_callback:
                 output_callback(
-                    f"☁️ Starting cloud sync for repository {repo_data['name']}"
+                    f"Starting cloud sync for repository {repo_data['name']}"
                 )
 
             # Get cloud backup configuration
@@ -154,14 +154,14 @@ class CloudSyncManager:
             ):
                 if event["type"] == "started":
                     if output_callback:
-                        output_callback(f"☁️ Starting sync: {event.get('command', '')}")
+                        output_callback(f"Starting sync: {event.get('command', '')}")
                 elif event["type"] == "progress":
                     if output_callback:
-                        progress_msg = f"☁️ Progress: {event.get('message', '')}"
+                        progress_msg = f"Progress: {event.get('message', '')}"
                         output_callback(progress_msg)
                 elif event["type"] == "log":
                     if output_callback:
-                        output_callback(f"☁️ {event.get('message', '')}")
+                        output_callback(f"{event.get('message', '')}")
                 elif event["type"] == "completed":
                     final_result = event
                     sync_success = event.get("status") == "success"

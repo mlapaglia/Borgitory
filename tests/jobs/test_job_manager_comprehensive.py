@@ -39,7 +39,6 @@ class TestJobManagerFactory:
         assert deps.queue_manager is not None
         assert deps.event_broadcaster is not None
         assert deps.database_manager is not None
-        assert deps.cloud_coordinator is not None
         assert deps.pushover_service is not None
 
         # Test that it uses default session factory

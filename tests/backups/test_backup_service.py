@@ -224,40 +224,12 @@ class TestBackupService:
         assert updated_job.error == "Backup failed"
         assert updated_job.finished_at is not None
 
-    @pytest.mark.asyncio
-    async def test_run_scheduled_backup(
-        self, backup_service_with_mock_executor, test_repository
-    ):
-        """Test running a scheduled backup"""
-        # Create schedule
-        schedule = Schedule(
-            id=1,
-            repository_id=test_repository.id,
-            name="Test Schedule",
-            cron_expression="0 2 * * *",
-            enabled=True,
-        )
-        backup_service_with_mock_executor.db.add(schedule)
-        backup_service_with_mock_executor.db.commit()
-        backup_service_with_mock_executor.db.refresh(schedule)
+    # Note: run_scheduled_backup method was removed from BackupService
+    # Scheduled backups now go through JobService directly, same as manual backups
+    # This eliminates circular dependencies and follows the single responsibility principle
 
-        # The run_scheduled_backup method should call create_and_run_prune or similar
-        # Since create_and_run_backup doesn't exist, let's test that it raises AttributeError
-        with pytest.raises(
-            AttributeError, match="has no attribute 'create_and_run_backup'"
-        ):
-            await backup_service_with_mock_executor.run_scheduled_backup(schedule)
-
-    @pytest.mark.asyncio
-    async def test_run_scheduled_backup_no_repository(self, backup_service):
-        """Test running scheduled backup with no repository"""
-        # Create schedule with non-existent repository
-        schedule = Schedule(
-            id=1, repository_id=999, name="Test Schedule", cron_expression="0 2 * * *"
-        )
-
-        with pytest.raises(ValueError, match="No repository found for schedule 1"):
-            await backup_service.run_scheduled_backup(schedule)
+    # Note: test_run_scheduled_backup_no_repository was removed since 
+    # run_scheduled_backup method no longer exists in BackupService
 
     @pytest.mark.asyncio
     async def test_create_and_run_prune_success(

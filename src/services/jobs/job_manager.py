@@ -21,7 +21,6 @@ from services.jobs.broadcaster.job_event_broadcaster import (
     EventType,
 )
 from services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
-from services.cloud_backup_coordinator import CloudBackupCoordinator
 from utils.db_session import get_db_session
 
 if TYPE_CHECKING:
@@ -63,7 +62,6 @@ class JobManagerDependencies:
     queue_manager: Optional[JobQueueManager] = None
     event_broadcaster: Optional[JobEventBroadcaster] = None
     database_manager: Optional[JobDatabaseManager] = None
-    cloud_coordinator: Optional[CloudBackupCoordinator] = None
     pushover_service: Optional["PushoverService"] = None
 
     # External dependencies (for testing/customization)
@@ -191,15 +189,7 @@ class JobManagerFactory:
                 keepalive_timeout=config.sse_keepalive_timeout,
             )
 
-        # Cloud Backup Coordinator
-        if custom_dependencies.cloud_coordinator:
-            deps.cloud_coordinator = custom_dependencies.cloud_coordinator
-        else:
-            deps.cloud_coordinator = CloudBackupCoordinator(
-                db_session_factory=deps.db_session_factory,
-                rclone_service=deps.rclone_service,
-                http_client_factory=deps.http_client_factory,
-            )
+        # Note: CloudBackupCoordinator removed - cloud sync now handled by JobExecutor
 
         # PushoverService
         if custom_dependencies.pushover_service:
@@ -215,7 +205,6 @@ class JobManagerFactory:
         else:
             deps.database_manager = JobDatabaseManager(
                 db_session_factory=deps.db_session_factory,
-                cloud_backup_coordinator=deps.cloud_coordinator,
             )
 
         return deps
@@ -276,7 +265,6 @@ class JobManager:
         self.queue_manager = dependencies.queue_manager
         self.event_broadcaster = dependencies.event_broadcaster
         self.database_manager = dependencies.database_manager
-        self.cloud_coordinator = dependencies.cloud_coordinator
         self.pushover_service = dependencies.pushover_service
 
         self.jobs: Dict[str, BorgJob] = {}
@@ -1422,9 +1410,6 @@ class JobManager:
 
         if self.event_broadcaster:
             await self.event_broadcaster.shutdown()
-
-        if self.cloud_coordinator:
-            await self.cloud_coordinator.shutdown()
 
         # Clear data
         self.jobs.clear()

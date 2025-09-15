@@ -35,10 +35,8 @@ class JobDatabaseManager:
     def __init__(
         self,
         db_session_factory: Optional[Callable] = None,
-        cloud_backup_coordinator: Optional[Any] = None,
     ):
         self.db_session_factory = db_session_factory or self._default_db_session_factory
-        self.cloud_backup_coordinator = cloud_backup_coordinator
 
     def _default_db_session_factory(self):
         """Default database session factory"""
@@ -117,13 +115,8 @@ class JobDatabaseManager:
 
                 logger.info(f"Updated database job {db_job.id} status to {status}")
 
-                # Trigger cloud backup if job completed successfully
-                if (
-                    status == "completed"
-                    and db_job.cloud_sync_config_id
-                    and self.cloud_backup_coordinator
-                ):
-                    await self._trigger_cloud_backup(db_job)
+                # Note: Cloud sync is now handled as a regular task within the job
+                # No need to trigger separately - it's part of the job's task list
 
                 return True
 
@@ -246,33 +239,6 @@ class JobDatabaseManager:
             logger.error(f"Failed to cleanup old jobs: {e}")
             return 0
 
-    async def _trigger_cloud_backup(self, db_job) -> None:
-        """Trigger cloud backup for completed backup job"""
-        try:
-            if not self.cloud_backup_coordinator:
-                logger.debug("No cloud backup coordinator configured")
-                return
-
-            logger.info(
-                f"Triggering cloud backup for job {db_job.id} "
-                f"with cloud_sync_config_id {db_job.cloud_sync_config_id}"
-            )
-
-            # Get repository data
-            repository_data = await self._get_repository_data(db_job.repository_id)
-            if not repository_data:
-                logger.error(f"Repository not found for job {db_job.id}")
-                return
-
-            # Trigger cloud backup through coordinator
-            await self.cloud_backup_coordinator.trigger_cloud_backup(
-                repository_data=repository_data,
-                cloud_sync_config_id=db_job.cloud_sync_config_id,
-                source_job_id=db_job.id,
-            )
-
-        except Exception as e:
-            logger.error(f"Failed to trigger cloud backup for job {db_job.id}: {e}")
 
     async def _get_repository_data(
         self, repository_id: int

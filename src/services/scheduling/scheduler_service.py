@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, UTC
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -10,18 +10,39 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 from config import DATABASE_URL
 from models.database import Schedule
+from models.schemas import BackupRequest
+from models.enums import JobType
 from utils.db_session import get_db_session
+from services.jobs.job_service import JobService
+from services.jobs.job_manager import JobManager
 
 # Configure APScheduler logging only (don't override main basicConfig)
 logging.getLogger("apscheduler").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# Global service instances for scheduler context
+# These are created once and reused by the scheduler
+_job_manager: Optional[JobManager] = None
+_job_service_factory = None
+
+
+def set_scheduler_dependencies(job_manager: JobManager, job_service_factory):
+    """Set the dependencies for the scheduler context"""
+    global _job_manager, _job_service_factory
+    _job_manager = job_manager
+    _job_service_factory = job_service_factory
+
+
 async def execute_scheduled_backup(schedule_id: int):
-    """Execute a scheduled backup"""
+    """Execute a scheduled backup using injected dependencies"""
     logger.info(
         f"SCHEDULER: execute_scheduled_backup called for schedule_id: {schedule_id}"
     )
+
+    if _job_manager is None or _job_service_factory is None:
+        logger.error("SCHEDULER: Dependencies not set. Call set_scheduler_dependencies first.")
+        return
 
     with get_db_session() as db:
         logger.info(f"SCHEDULER: Looking up schedule {schedule_id}")
@@ -57,8 +78,6 @@ async def execute_scheduled_backup(schedule_id: int):
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
             # Create a backup request object to use with JobService
-            from models.schemas import BackupRequest
-
             backup_request = BackupRequest(
                 repository_id=repository.id,
                 source_path=schedule.source_path,
@@ -70,14 +89,12 @@ async def execute_scheduled_backup(schedule_id: int):
                 notification_config_id=schedule.notification_config_id,
             )
 
-            # Use BackupService to create the backup job (simplified path)
-            from services.backups.backup_service import BackupService
-            from models.enums import JobType
-
-            backup_service = BackupService(db)
-            job_id = await backup_service.create_and_run_backup(
+            # Use injected JobService to create the backup job (same as manual backups)
+            job_service = _job_service_factory(db, _job_manager)
+            result = await job_service.create_backup_job(
                 backup_request, JobType.SCHEDULED_BACKUP
             )
+            job_id = result["job_id"]
 
             logger.info(
                 f"SCHEDULER: Created scheduled backup job {job_id} via JobService"
@@ -94,7 +111,14 @@ async def execute_scheduled_backup(schedule_id: int):
 
 
 class SchedulerService:
-    def __init__(self):
+    def __init__(self, job_manager: Optional[JobManager] = None, job_service_factory=None):
+        """
+        Initialize the scheduler service with proper dependency injection.
+        
+        Args:
+            job_manager: JobManager instance for handling jobs
+            job_service_factory: Factory function to create JobService instances
+        """
         jobstores = {"default": SQLAlchemyJobStore(url=DATABASE_URL)}
         executors = {"default": AsyncIOExecutor()}
         job_defaults = {"coalesce": False, "max_instances": 1}
@@ -103,6 +127,13 @@ class SchedulerService:
             jobstores=jobstores, executors=executors, job_defaults=job_defaults
         )
         self._running = False
+        
+        # Set up dependencies for scheduler context
+        self.job_manager = job_manager or JobManager()
+        self.job_service_factory = job_service_factory or JobService
+        
+        # Set global dependencies for the execute_scheduled_backup function
+        set_scheduler_dependencies(self.job_manager, self.job_service_factory)
 
     async def start(self):
         """Start the scheduler"""

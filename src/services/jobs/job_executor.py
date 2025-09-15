@@ -274,7 +274,7 @@ class JobExecutor:
             additional_args.append(repository_path)
 
             logger.info(
-                f"🗑️ Starting borg prune - Repository: {repository_path}, Dry run: {dry_run}"
+                f"Starting borg prune - Repository: {repository_path}, Dry run: {dry_run}"
             )
 
             command, env = build_secure_borg_command(
@@ -346,7 +346,7 @@ class JobExecutor:
                     error=None,
                 )
 
-            logger.info(f"☁️ Starting cloud sync for repository {repository_path}")
+            logger.info(f"Starting cloud sync for repository {repository_path}")
 
             if output_callback:
                 output_callback("Starting cloud sync...", {})
