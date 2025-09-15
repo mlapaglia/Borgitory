@@ -289,7 +289,11 @@ class TestTaskDefinitionBuilder:
         """Test building cloud sync task with repository name"""
         task = task_builder.build_cloud_sync_task("test-repo")
 
-        expected = {"type": "cloud_sync", "name": "Sync test-repo to Cloud", "cloud_sync_config_id": None}
+        expected = {
+            "type": "cloud_sync",
+            "name": "Sync test-repo to Cloud",
+            "cloud_sync_config_id": None,
+        }
 
         assert task == expected
 
@@ -297,7 +301,11 @@ class TestTaskDefinitionBuilder:
         """Test building cloud sync task without repository name"""
         task = task_builder.build_cloud_sync_task()
 
-        expected = {"type": "cloud_sync", "name": "Sync to Cloud", "cloud_sync_config_id": None}
+        expected = {
+            "type": "cloud_sync",
+            "name": "Sync to Cloud",
+            "cloud_sync_config_id": None,
+        }
 
         assert task == expected
 
@@ -305,7 +313,11 @@ class TestTaskDefinitionBuilder:
         """Test building cloud sync task with config ID"""
         task = task_builder.build_cloud_sync_task("test-repo", cloud_sync_config_id=123)
 
-        expected = {"type": "cloud_sync", "name": "Sync test-repo to Cloud", "cloud_sync_config_id": 123}
+        expected = {
+            "type": "cloud_sync",
+            "name": "Sync test-repo to Cloud",
+            "cloud_sync_config_id": 123,
+        }
 
         assert task == expected
 

@@ -41,7 +41,9 @@ async def execute_scheduled_backup(schedule_id: int):
     )
 
     if _job_manager is None or _job_service_factory is None:
-        logger.error("SCHEDULER: Dependencies not set. Call set_scheduler_dependencies first.")
+        logger.error(
+            "SCHEDULER: Dependencies not set. Call set_scheduler_dependencies first."
+        )
         return
 
     with get_db_session() as db:
@@ -111,10 +113,12 @@ async def execute_scheduled_backup(schedule_id: int):
 
 
 class SchedulerService:
-    def __init__(self, job_manager: Optional[JobManager] = None, job_service_factory=None):
+    def __init__(
+        self, job_manager: Optional[JobManager] = None, job_service_factory=None
+    ):
         """
         Initialize the scheduler service with proper dependency injection.
-        
+
         Args:
             job_manager: JobManager instance for handling jobs
             job_service_factory: Factory function to create JobService instances
@@ -127,11 +131,11 @@ class SchedulerService:
             jobstores=jobstores, executors=executors, job_defaults=job_defaults
         )
         self._running = False
-        
+
         # Set up dependencies for scheduler context
         self.job_manager = job_manager or JobManager()
         self.job_service_factory = job_service_factory or JobService
-        
+
         # Set global dependencies for the execute_scheduled_backup function
         set_scheduler_dependencies(self.job_manager, self.job_service_factory)
 

@@ -679,24 +679,24 @@ class RcloneService:
         """
         try:
             provider = config.get("provider", "").lower()
-            
+
             if provider == "s3":
                 # Extract S3-specific config
                 bucket_name = config.get("bucket_name")
                 access_key_id = config.get("access_key_id")
                 secret_access_key = config.get("secret_access_key")
                 path_prefix = config.get("path_prefix", "")
-                
+
                 if not all([bucket_name, access_key_id, secret_access_key]):
                     return {
                         "success": False,
-                        "error": "Missing required S3 configuration (bucket_name, access_key_id, secret_access_key)"
+                        "error": "Missing required S3 configuration (bucket_name, access_key_id, secret_access_key)",
                     }
-                
+
                 # Create a Repository object for the existing method
                 mock_repo = Repository()
                 mock_repo.path = source_path
-                
+
                 # Use the existing S3 sync method
                 stats = {}
                 async for progress_data in self.sync_repository_to_s3(
@@ -708,31 +708,28 @@ class RcloneService:
                 ):
                     if progress_callback:
                         progress_callback(progress_data)
-                    
+
                     if progress_data.get("type") == "completed":
                         if progress_data.get("status") == "success":
-                            return {
-                                "success": True,
-                                "stats": stats
-                            }
+                            return {"success": True, "stats": stats}
                         else:
                             return {
                                 "success": False,
-                                "error": f"Rclone process failed with return code {progress_data.get('return_code')}"
+                                "error": f"Rclone process failed with return code {progress_data.get('return_code')}",
                             }
                     elif progress_data.get("type") == "progress":
                         stats.update(progress_data)
                     elif progress_data.get("type") == "error":
                         return {
                             "success": False,
-                            "error": progress_data.get("message", "Unknown error")
+                            "error": progress_data.get("message", "Unknown error"),
                         }
-                
+
                 return {
                     "success": False,
-                    "error": "Sync process completed without final status"
+                    "error": "Sync process completed without final status",
                 }
-                
+
             elif provider == "sftp":
                 # Extract SFTP-specific config
                 host = config.get("host")
@@ -741,30 +738,32 @@ class RcloneService:
                 password = config.get("password")
                 private_key = config.get("private_key")
                 path_prefix = config.get("path_prefix", "")
-                
+
                 if not all([host, username]):
                     return {
                         "success": False,
-                        "error": "Missing required SFTP configuration (host, username)"
+                        "error": "Missing required SFTP configuration (host, username)",
                     }
-                
+
                 if not password and not private_key:
                     return {
                         "success": False,
-                        "error": "Either password or private_key must be provided for SFTP"
+                        "error": "Either password or private_key must be provided for SFTP",
                     }
-                
+
                 # Create a Repository object for the existing method
                 mock_repo = Repository()
                 mock_repo.path = source_path
-                
+
                 # Use the existing SFTP sync method
                 stats = {}
                 async for progress_data in self.sync_repository_to_sftp(
                     repository=mock_repo,
                     host=host,
                     username=username,
-                    remote_path=remote_path.replace(f"{config.get('remote_name', '')}:", ""),
+                    remote_path=remote_path.replace(
+                        f"{config.get('remote_name', '')}:", ""
+                    ),
                     port=port,
                     password=password,
                     private_key=private_key,
@@ -772,43 +771,37 @@ class RcloneService:
                 ):
                     if progress_callback:
                         progress_callback(progress_data)
-                    
+
                     if progress_data.get("type") == "completed":
                         if progress_data.get("status") == "success":
-                            return {
-                                "success": True,
-                                "stats": stats
-                            }
+                            return {"success": True, "stats": stats}
                         else:
                             return {
                                 "success": False,
-                                "error": f"Rclone process failed with return code {progress_data.get('return_code')}"
+                                "error": f"Rclone process failed with return code {progress_data.get('return_code')}",
                             }
                     elif progress_data.get("type") == "progress":
                         stats.update(progress_data)
                     elif progress_data.get("type") == "error":
                         return {
                             "success": False,
-                            "error": progress_data.get("message", "Unknown error")
+                            "error": progress_data.get("message", "Unknown error"),
                         }
-                
+
                 return {
                     "success": False,
-                    "error": "Sync process completed without final status"
+                    "error": "Sync process completed without final status",
                 }
-            
+
             else:
                 return {
                     "success": False,
-                    "error": f"Unsupported cloud provider: {provider}"
+                    "error": f"Unsupported cloud provider: {provider}",
                 }
-                
+
         except Exception as e:
             logger.error(f"Error in sync_repository: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def get_configured_remotes(self) -> list:
         """Get list of configured cloud backup configs from database"""

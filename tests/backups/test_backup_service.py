@@ -6,7 +6,7 @@ from contextlib import contextmanager
 
 from services.backups.backup_service import BackupService
 from services.backups.backup_executor import BackupExecutor, BackupResult, BackupStatus
-from models.database import Repository, Job, JobTask, Schedule
+from models.database import Repository, Job, JobTask
 from models.schemas import BackupRequest, PruneRequest
 from models.enums import JobType
 
@@ -228,7 +228,7 @@ class TestBackupService:
     # Scheduled backups now go through JobService directly, same as manual backups
     # This eliminates circular dependencies and follows the single responsibility principle
 
-    # Note: test_run_scheduled_backup_no_repository was removed since 
+    # Note: test_run_scheduled_backup_no_repository was removed since
     # run_scheduled_backup method no longer exists in BackupService
 
     @pytest.mark.asyncio

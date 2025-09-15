@@ -14,7 +14,7 @@ from datetime import datetime, UTC
 from typing import Dict, List, Optional, Any, Callable
 from sqlalchemy.orm import Session
 
-from models.database import Repository, Job, JobTask, Schedule
+from models.database import Repository, Job, JobTask
 from models.schemas import BackupRequest, PruneRequest
 from models.enums import JobType
 from services.backups.backup_executor import (
@@ -128,7 +128,6 @@ class BackupService:
 
             logger.error(f"Backup job {job.id} failed: {e}")
             raise
-
 
     async def create_and_run_prune(self, prune_request: PruneRequest) -> str:
         """

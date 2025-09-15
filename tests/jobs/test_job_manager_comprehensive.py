@@ -516,9 +516,9 @@ class TestJobManagerTaskExecution:
         # Mock repository data
         repo_data = {
             "id": 1,
-            "name": "test-repo", 
+            "name": "test-repo",
             "path": "/tmp/test-repo",
-            "passphrase": "test-passphrase"
+            "passphrase": "test-passphrase",
         }
 
         with patch.object(

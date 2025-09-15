@@ -380,9 +380,7 @@ class JobExecutor:
                     # Get S3 credentials
                     access_key, secret_key = config.get_credentials()
 
-                    logger.info(
-                        f"Syncing to {config.name} (S3: {config.bucket_name})"
-                    )
+                    logger.info(f"Syncing to {config.name} (S3: {config.bucket_name})")
                     if output_callback:
                         output_callback(
                             f"Syncing to {config.name} (S3: {config.bucket_name})", {}

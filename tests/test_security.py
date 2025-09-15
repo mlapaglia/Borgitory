@@ -685,9 +685,7 @@ class TestSecurePathValidation:
         assert _pre_validate_user_input("/mnt", allowed_prefixes) is True
         assert _pre_validate_user_input("/mnt/test", allowed_prefixes) is True
         assert _pre_validate_user_input("/app/data", allowed_prefixes) is True
-        assert (
-            _pre_validate_user_input("/app/data/config", allowed_prefixes) is True
-        )
+        assert _pre_validate_user_input("/app/data/config", allowed_prefixes) is True
 
         # Should reject absolute paths outside allowed prefixes
         assert _pre_validate_user_input("/etc/passwd", allowed_prefixes) is False

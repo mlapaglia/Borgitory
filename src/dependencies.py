@@ -250,9 +250,9 @@ def get_scheduler_service() -> SchedulerService:
         job_manager = get_job_manager_dependency()
         # Use JobService as the factory function
         from services.jobs.job_service import JobService
+
         _scheduler_service_instance = SchedulerService(
-            job_manager=job_manager,
-            job_service_factory=JobService
+            job_manager=job_manager, job_service_factory=JobService
         )
     return _scheduler_service_instance
 

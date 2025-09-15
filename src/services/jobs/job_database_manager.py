@@ -236,7 +236,6 @@ class JobDatabaseManager:
             logger.error(f"Failed to cleanup old jobs: {e}")
             return 0
 
-
     async def _get_repository_data(
         self, repository_id: int
     ) -> Optional[Dict[str, Any]]:

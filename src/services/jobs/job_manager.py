@@ -1603,13 +1603,10 @@ def create_job_manager(config=None, rclone_service=None) -> JobManager:
         internal_config = config
 
     # Create dependencies with rclone service
-    custom_deps = JobManagerDependencies(
-        rclone_service=rclone_service
-    )
-    
+    custom_deps = JobManagerDependencies(rclone_service=rclone_service)
+
     dependencies = JobManagerFactory.create_dependencies(
-        config=internal_config,
-        custom_dependencies=custom_deps
+        config=internal_config, custom_dependencies=custom_deps
     )
 
     job_manager = JobManager(config=internal_config, dependencies=dependencies)

@@ -7,7 +7,7 @@ the AttributeError with _db_session_factory that was encountered during cloud sy
 
 import pytest
 import uuid
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 from datetime import datetime, UTC
 
 from services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
@@ -32,9 +32,7 @@ class TestJobDatabaseManager:
         return JobDatabaseManager(db_session_factory=factory)
 
     @pytest.fixture
-    def job_database_manager_with_coordinator(
-        self, mock_db_session_factory
-    ):
+    def job_database_manager_with_coordinator(self, mock_db_session_factory):
         """Create JobDatabaseManager with cloud backup coordinator"""
         factory, _ = mock_db_session_factory
         return JobDatabaseManager(
@@ -62,9 +60,7 @@ class TestJobDatabaseManager:
         assert not hasattr(manager, "_db_session_factory")
         assert manager.db_session_factory is not None
 
-    def test_initialization_with_custom_dependencies(
-        self, mock_db_session_factory
-    ):
+    def test_initialization_with_custom_dependencies(self, mock_db_session_factory):
         """Test initialization with custom dependencies"""
         factory, _ = mock_db_session_factory
 

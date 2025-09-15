@@ -158,6 +158,7 @@ class ScheduleCreate(ScheduleBase):
     @classmethod
     def validate_source_path(cls, v):
         from utils.path_prefix import normalize_path_with_mnt_prefix
+
         return normalize_path_with_mnt_prefix(v)
 
     @field_validator("cloud_sync_config_id", mode="before")
@@ -214,6 +215,7 @@ class ScheduleUpdate(BaseModel):
         if v is None:
             return v
         from utils.path_prefix import normalize_path_with_mnt_prefix
+
         return normalize_path_with_mnt_prefix(v)
 
     @field_validator("cron_expression")
@@ -393,6 +395,7 @@ class BackupRequest(BaseModel):
     @classmethod
     def validate_source_path(cls, v):
         from utils.path_prefix import normalize_path_with_mnt_prefix
+
         return normalize_path_with_mnt_prefix(v)
 
     @field_validator("dry_run", mode="before")
