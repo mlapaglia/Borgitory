@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+from pydantic import ValidationError
 
 from models.database import get_db
 from models.schemas import (
@@ -16,6 +17,52 @@ from dependencies import RcloneServiceDep, EncryptionServiceDep, StorageFactoryD
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _parse_form_data_to_config(form_data) -> CloudSyncConfigCreate:
+    """Parse form data with bracket notation into CloudSyncConfigCreate object"""
+    provider_config = {}
+    regular_fields = {}
+
+    # Parse form data
+    for key, value in form_data.items():
+        if key.startswith("provider_config[") and key.endswith("]"):
+            # Extract field name from provider_config[field_name]
+            field_name = key[16:-1]  # Remove "provider_config[" and "]"
+            provider_config[field_name] = value
+        else:
+            regular_fields[key] = value
+
+    # Create the configuration object
+    return CloudSyncConfigCreate(
+        name=regular_fields["name"],
+        provider=regular_fields["provider"],
+        path_prefix=regular_fields.get("path_prefix", ""),
+        provider_config=provider_config,
+    )
+
+
+def _parse_form_data_to_config_update(form_data) -> CloudSyncConfigUpdate:
+    """Parse form data with bracket notation into CloudSyncConfigUpdate object"""
+    provider_config = {}
+    regular_fields = {}
+
+    # Parse form data
+    for key, value in form_data.items():
+        if key.startswith("provider_config[") and key.endswith("]"):
+            # Extract field name from provider_config[field_name]
+            field_name = key[16:-1]  # Remove "provider_config[" and "]"
+            provider_config[field_name] = value
+        else:
+            regular_fields[key] = value
+
+    # Create the configuration object
+    return CloudSyncConfigUpdate(
+        name=regular_fields.get("name"),
+        provider=regular_fields.get("provider"),
+        path_prefix=regular_fields.get("path_prefix"),
+        provider_config=provider_config if provider_config else None,
+    )
 
 
 def get_templates() -> Jinja2Templates:
@@ -71,12 +118,23 @@ async def get_provider_fields(
 @router.post("/", response_class=HTMLResponse)
 async def create_cloud_sync_config(
     request: Request,
-    config: CloudSyncConfigCreate,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ):
-    """Create a new cloud sync configuration (JSON API)"""
+    """Create a new cloud sync configuration"""
     try:
+        # Handle both JSON and form data
+        content_type = request.headers.get("content-type", "")
+
+        if "application/json" in content_type:
+            # Handle JSON data (from tests or direct API calls)
+            json_data = await request.json()
+            config = CloudSyncConfigCreate(**json_data)
+        else:
+            # Handle form data (from HTMX forms)
+            form_data = await request.form()
+            config = _parse_form_data_to_config(form_data)
+
         cloud_sync_service.create_cloud_sync_config(config)
 
         response = templates.TemplateResponse(
@@ -87,6 +145,15 @@ async def create_cloud_sync_config(
         response.headers["HX-Trigger"] = "cloudSyncUpdate"
         return response
 
+    except ValidationError as e:
+        # Handle Pydantic validation errors (return 422)
+        error_msg = f"Validation error: {str(e)}"
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/create_error.html",
+            {"error_message": error_msg},
+            status_code=422,
+        )
     except HTTPException as e:
         return templates.TemplateResponse(
             request,
@@ -226,12 +293,23 @@ async def get_cloud_sync_edit_form(
 async def update_cloud_sync_config(
     request: Request,
     config_id: int,
-    config_update: CloudSyncConfigUpdate,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ):
     """Update a cloud sync configuration"""
     try:
+        # Handle both JSON and form data
+        content_type = request.headers.get("content-type", "")
+
+        if "application/json" in content_type:
+            # Handle JSON data (from tests or direct API calls)
+            json_data = await request.json()
+            config_update = CloudSyncConfigUpdate(**json_data)
+        else:
+            # Handle form data (from HTMX forms)
+            form_data = await request.form()
+            config_update = _parse_form_data_to_config_update(form_data)
+
         result = cloud_sync_service.update_cloud_sync_config(config_id, config_update)
 
         response = templates.TemplateResponse(

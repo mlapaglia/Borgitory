@@ -16,17 +16,63 @@ class S3StorageConfig(CloudStorageConfig):
     """Configuration for Amazon S3 storage"""
 
     bucket_name: str = Field(..., min_length=3, max_length=63)
-    access_key: str = Field(..., min_length=1)
-    secret_key: str = Field(..., min_length=1)
+    access_key: str = Field(..., min_length=16, max_length=128)
+    secret_key: str = Field(..., min_length=40, max_length=128)
     region: str = Field(default="us-east-1")
     endpoint_url: Optional[str] = None
     storage_class: str = Field(default="STANDARD")
 
+    @field_validator("access_key")
+    @classmethod
+    def validate_access_key(cls, v: str) -> str:
+        """Validate AWS Access Key ID format"""
+        if not v.startswith("AKIA"):
+            raise ValueError("AWS Access Key ID must start with 'AKIA'")
+        if len(v) != 20:
+            raise ValueError("AWS Access Key ID must be exactly 20 characters long")
+        if not v.isalnum():
+            raise ValueError(
+                "AWS Access Key ID must contain only alphanumeric characters"
+            )
+        return v.upper()
+
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Validate AWS Secret Access Key format"""
+        if len(v) != 40:
+            raise ValueError("AWS Secret Access Key must be exactly 40 characters long")
+        # AWS secret keys are base64-like but can contain +, /, and = characters
+        import re
+
+        if not re.match(r"^[A-Za-z0-9+/=]+$", v):
+            raise ValueError("AWS Secret Access Key contains invalid characters")
+        return v
+
     @field_validator("bucket_name")
     @classmethod
     def validate_bucket_name(cls, v: str) -> str:
-        """Normalize bucket name to lowercase"""
-        return v.lower()
+        """Validate and normalize S3 bucket name"""
+        v_lower = v.lower()
+
+        # Basic bucket name validation according to AWS rules
+        if not (3 <= len(v_lower) <= 63):
+            raise ValueError("Bucket name must be between 3 and 63 characters long")
+
+        import re
+
+        if not re.match(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$", v_lower):
+            raise ValueError(
+                "Bucket name must start and end with a letter or number, and contain only lowercase letters, numbers, periods, and hyphens"
+            )
+
+        if ".." in v_lower:
+            raise ValueError("Bucket name cannot contain consecutive periods")
+
+        if ".-" in v_lower or "-." in v_lower:
+            raise ValueError("Bucket name cannot contain periods adjacent to hyphens")
+
+        return v_lower
 
     @field_validator("storage_class")
     @classmethod

@@ -215,12 +215,21 @@ class CloudSyncService:
 
             storage_factory = StorageFactory(rclone)
 
-        # Decrypt sensitive fields
-        storage = storage_factory.create_storage(config.provider, provider_config)
-        sensitive_fields = storage.get_sensitive_fields()
+        # Get sensitive field names without creating storage (since config is encrypted)
+        if config.provider == "s3":
+            sensitive_fields = ["access_key", "secret_key"]
+        elif config.provider == "sftp":
+            sensitive_fields = ["password", "private_key"]
+        else:
+            sensitive_fields = []
+
+        # Decrypt sensitive fields first
         decrypted_config = encryption_service.decrypt_sensitive_fields(
             provider_config, sensitive_fields
         )
+
+        # Now create storage with decrypted config for testing
+        storage_factory.create_storage(config.provider, decrypted_config)
 
         if config.provider == "s3":
             result = await rclone.test_s3_connection(
@@ -258,9 +267,16 @@ class CloudSyncService:
 
         provider_config = json.loads(config.provider_config)
 
-        # Decrypt sensitive fields using injected dependencies
-        storage = storage_factory.create_storage(config.provider, provider_config)
-        sensitive_fields = storage.get_sensitive_fields()
+        # First, create a temporary storage instance to get sensitive field names
+        # We need to do this without full validation since the config is encrypted
+        if config.provider == "s3":
+            sensitive_fields = ["access_key", "secret_key"]
+        elif config.provider == "sftp":
+            sensitive_fields = ["password", "private_key"]
+        else:
+            sensitive_fields = []
+
+        # Decrypt sensitive fields
         decrypted_provider_config = encryption_service.decrypt_sensitive_fields(
             provider_config, sensitive_fields
         )

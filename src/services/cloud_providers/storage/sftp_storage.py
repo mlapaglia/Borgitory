@@ -23,13 +23,57 @@ class SFTPStorageConfig(CloudStorageConfig):
     remote_path: str = Field(..., min_length=1)
     host_key_checking: bool = Field(default=True)
 
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, v: str) -> str:
+        """Validate SFTP host format"""
+        import re
+
+        # Basic validation for hostname or IP
+        if not re.match(r"^[a-zA-Z0-9.-]+$", v):
+            raise ValueError(
+                "Host must contain only letters, numbers, periods, and hyphens"
+            )
+        if v.startswith(".") or v.endswith("."):
+            raise ValueError("Host cannot start or end with a period")
+        if ".." in v:
+            raise ValueError("Host cannot contain consecutive periods")
+        return v.lower()
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        """Validate SFTP username format"""
+        import re
+
+        if not re.match(r"^[a-zA-Z0-9._-]+$", v):
+            raise ValueError(
+                "Username must contain only letters, numbers, periods, underscores, and hyphens"
+            )
+        return v
+
     @field_validator("remote_path")
     @classmethod
-    def normalize_remote_path(cls, v: str) -> str:
-        """Ensure remote path starts with / and doesn't end with /"""
+    def validate_remote_path(cls, v: str) -> str:
+        """Validate and normalize remote path"""
+        if not v:
+            raise ValueError("Remote path cannot be empty")
+
+        # Ensure path starts with /
         if not v.startswith("/"):
             v = "/" + v
-        return v.rstrip("/")
+
+        # Remove trailing slash unless it's root
+        if len(v) > 1:
+            v = v.rstrip("/")
+
+        # Basic path validation
+        import re
+
+        if not re.match(r"^/[a-zA-Z0-9._/-]*$", v):
+            raise ValueError("Remote path contains invalid characters")
+
+        return v
 
     @model_validator(mode="after")
     def validate_auth_method(self):
