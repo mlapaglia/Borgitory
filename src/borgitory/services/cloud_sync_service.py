@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 from datetime import datetime, UTC
@@ -66,22 +67,21 @@ class CloudSyncService:
     def __init__(
         self,
         db: Session,
-        rclone_service: RcloneService = None,
-        storage_factory: StorageFactory = None,
-        encryption_service: EncryptionService = None,
-        provider_registry=None,
+        rclone_service: RcloneService,
+        storage_factory: StorageFactory,
+        encryption_service: EncryptionService,
+        get_metadata_func,
     ):
         self.db = db
-        self._rclone_service = rclone_service or RcloneService()
-        self._storage_factory = storage_factory or StorageFactory(self._rclone_service)
-        self._encryption_service = encryption_service or EncryptionService()
-        self._provider_registry = provider_registry
+        self._rclone_service = rclone_service
+        self._storage_factory = storage_factory
+        self._encryption_service = encryption_service
+        self._get_metadata = get_metadata_func
 
     def create_cloud_sync_config(
         self, config: CloudSyncConfigCreate
     ) -> CloudSyncConfig:
         """Create a new cloud sync configuration using the new provider pattern."""
-        import json
 
         existing = (
             self.db.query(CloudSyncConfig)
@@ -94,14 +94,12 @@ class CloudSyncService:
                 detail=f"Cloud sync configuration with name '{config.name}' already exists",
             )
 
-        if not self._provider_registry:
-            raise ValueError("Provider registry is required but not provided")
-
-        supported_providers = self._provider_registry.get_supported_providers()
-        if config.provider not in supported_providers:
+        # Validate provider exists by checking if we can get its metadata
+        metadata = self._get_metadata(config.provider)
+        if not metadata:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(sorted(supported_providers))}",
+                detail=f"Unsupported provider: {config.provider}",
             )
 
         try:
@@ -152,7 +150,6 @@ class CloudSyncService:
         self, config_id: int, config_update: CloudSyncConfigUpdate
     ) -> CloudSyncConfig:
         """Update a cloud sync configuration."""
-        import json
 
         config = self.get_cloud_sync_config_by_id(config_id)
 
@@ -173,22 +170,22 @@ class CloudSyncService:
                 )
 
         if config_update.name is not None:
-            config.name = config_update.name
+            config.name = config_update.name  # type: ignore
         if config_update.provider is not None:
-            config.provider = config_update.provider
+            config.provider = config_update.provider  # type: ignore
         if config_update.path_prefix is not None:
-            config.path_prefix = config_update.path_prefix
+            config.path_prefix = config_update.path_prefix  # type: ignore
         if config_update.enabled is not None:
-            config.enabled = config_update.enabled
+            config.enabled = config_update.enabled  # type: ignore
 
         if config_update.provider_config is not None:
             provider = (
-                config_update.provider if config_update.provider else config.provider
+                config_update.provider
+                if config_update.provider
+                else str(config.provider)
             )
             try:
-                rclone_service = RcloneService()
-                storage_factory = StorageFactory(rclone_service)
-                storage = storage_factory.create_storage(
+                storage = self._storage_factory.create_storage(
                     provider, config_update.provider_config
                 )
             except Exception as e:
@@ -196,15 +193,14 @@ class CloudSyncService:
                     status_code=400, detail=f"Invalid provider configuration: {str(e)}"
                 )
 
-            encryption_service = EncryptionService()
             sensitive_fields = storage.get_sensitive_fields()
-            encrypted_config = encryption_service.encrypt_sensitive_fields(
+            encrypted_config = self._encryption_service.encrypt_sensitive_fields(
                 config_update.provider_config, sensitive_fields
             )
 
-            config.provider_config = json.dumps(encrypted_config)
+            config.provider_config = json.dumps(encrypted_config)  # type: ignore
 
-        config.updated_at = datetime.now(UTC)
+        config.updated_at = datetime.now(UTC)  # type: ignore
         self.db.commit()
         self.db.refresh(config)
 
@@ -219,16 +215,16 @@ class CloudSyncService:
     def enable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
         """Enable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
-        config.enabled = True
-        config.updated_at = datetime.now(UTC)
+        config.enabled = True  # type: ignore
+        config.updated_at = datetime.now(UTC)  # type: ignore
         self.db.commit()
         return config
 
     def disable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
         """Disable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
-        config.enabled = False
-        config.updated_at = datetime.now(UTC)
+        config.enabled = False  # type: ignore
+        config.updated_at = datetime.now(UTC)  # type: ignore
         self.db.commit()
         return config
 
@@ -240,34 +236,34 @@ class CloudSyncService:
         storage_factory=None,
     ) -> dict:
         """Test a cloud sync configuration using dynamic provider registry."""
-        import logging
-        from borgitory.services.cloud_providers.registry import get_metadata
-        
-        logger = logging.getLogger(__name__)
         logger.info(f"Starting test for cloud sync config {config_id}")
-        
-        config = self.get_cloud_sync_config_by_id(config_id)
-        logger.info(f"Config {config_id}: provider={config.provider}, name={config.name}")
 
-        provider_config = json.loads(config.provider_config)
+        config = self.get_cloud_sync_config_by_id(config_id)
+        logger.info(
+            f"Config {config_id}: provider={config.provider}, name={config.name}"
+        )
+
+        provider_config = json.loads(str(config.provider_config))
 
         if encryption_service is None:
             encryption_service = self._encryption_service
         if storage_factory is None:
             storage_factory = self._storage_factory
 
-        sensitive_fields = _get_sensitive_fields_for_provider(config.provider)
+        sensitive_fields = _get_sensitive_fields_for_provider(str(config.provider))
 
         decrypted_config = encryption_service.decrypt_sensitive_fields(
             provider_config, sensitive_fields
         )
 
-        storage_factory.create_storage(config.provider, decrypted_config)
+        storage_factory.create_storage(str(config.provider), decrypted_config)
 
-        # Get provider metadata and rclone mapping
-        metadata = get_metadata(config.provider)
+        # Get provider metadata and rclone mapping using injected dependency
+        metadata = self._get_metadata(str(config.provider))
         if not metadata or not metadata.rclone_mapping:
-            logger.error(f"Provider '{config.provider}' not registered or missing rclone mapping")
+            logger.error(
+                f"Provider '{config.provider}' not registered or missing rclone mapping"
+            )
             raise HTTPException(
                 status_code=400,
                 detail=f"Provider '{config.provider}' not registered or missing rclone mapping",
@@ -289,34 +285,40 @@ class CloudSyncService:
         test_params = {}
         logger.info(f"Decrypted config fields: {list(decrypted_config.keys())}")
         logger.info(f"Parameter mapping: {mapping.parameter_mapping}")
-        
+
         for config_field, rclone_param in mapping.parameter_mapping.items():
             if config_field in decrypted_config:
                 test_params[rclone_param] = decrypted_config[config_field]
                 logger.info(f"Mapped {config_field} -> {rclone_param}")
             else:
-                logger.info(f"Config field '{config_field}' not found in decrypted config")
-        
+                logger.info(
+                    f"Config field '{config_field}' not found in decrypted config"
+                )
+
         # Add optional parameters with defaults if not already set
         for param, default_value in mapping.optional_params.items():
             if param not in test_params:
                 test_params[param] = default_value
 
-        logger.info(f"Built test params: {list(test_params.keys())}")  # Don't log values for security
+        logger.info(
+            f"Built test params: {list(test_params.keys())}"
+        )  # Don't log values for security
 
         # Get the test method and filter parameters to match method signature
         test_method = getattr(rclone, test_method_name)
-        
+
         # Filter parameters to only include those supported by the test method
-        import inspect
         method_signature = inspect.signature(test_method)
         filtered_params = {
-            param: value for param, value in test_params.items()
+            param: value
+            for param, value in test_params.items()
             if param in method_signature.parameters
         }
-        
-        logger.info(f"Filtered params for {test_method_name}: {list(filtered_params.keys())}")
-        
+
+        logger.info(
+            f"Filtered params for {test_method_name}: {list(filtered_params.keys())}"
+        )
+
         try:
             result = await test_method(**filtered_params)
             logger.info(f"Test method result: {result}")
@@ -331,9 +333,9 @@ class CloudSyncService:
         """Get decrypted configuration for editing in forms."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
-        provider_config = json.loads(config.provider_config)
+        provider_config = json.loads(str(config.provider_config))
 
-        sensitive_fields = _get_sensitive_fields_for_provider(config.provider)
+        sensitive_fields = _get_sensitive_fields_for_provider(str(config.provider))
 
         decrypted_provider_config = encryption_service.decrypt_sensitive_fields(
             provider_config, sensitive_fields

@@ -14,10 +14,21 @@ from tests.conftest import create_s3_cloud_sync_config, create_sftp_cloud_sync_c
 @pytest.fixture
 def service(test_db):
     """CloudSyncService instance with real database session."""
-    from borgitory.services.cloud_providers.registry import get_registry
+    from borgitory.services.cloud_providers.registry import get_metadata
+    from borgitory.services.rclone_service import RcloneService
+    from borgitory.services.cloud_providers import StorageFactory, EncryptionService
 
-    registry = get_registry()
-    return CloudSyncService(test_db, provider_registry=registry)
+    rclone_service = RcloneService()
+    storage_factory = StorageFactory(rclone_service)
+    encryption_service = EncryptionService()
+
+    return CloudSyncService(
+        db=test_db,
+        rclone_service=rclone_service,
+        storage_factory=storage_factory,
+        encryption_service=encryption_service,
+        get_metadata_func=get_metadata,
+    )
 
 
 class TestCloudSyncService:

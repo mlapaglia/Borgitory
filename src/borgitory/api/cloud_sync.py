@@ -60,9 +60,9 @@ def _get_provider_template(provider: str, mode: str = "create") -> str:
     full_path = f"src/borgitory/templates/{template_path}"
 
     # Ensure normalized full_path remains inside templates using commonpath
-    base_templates_dir = os.path.abspath(os.path.normpath(
-        "src/borgitory/templates/partials/cloud_sync/providers/"
-    ))
+    base_templates_dir = os.path.abspath(
+        os.path.normpath("src/borgitory/templates/partials/cloud_sync/providers/")
+    )
     normalized_path = os.path.abspath(os.path.normpath(full_path))
     if os.path.commonpath([base_templates_dir, normalized_path]) != base_templates_dir:
         return None
@@ -166,10 +166,10 @@ def get_templates() -> Jinja2Templates:
 
 def get_cloud_sync_service(
     registry: ProviderRegistryDep,
+    rclone_service: RcloneServiceDep,
+    storage_factory: StorageFactoryDep,
+    encryption_service: EncryptionServiceDep,
     db: Session = Depends(get_db),
-    rclone_service: RcloneServiceDep = None,
-    storage_factory: StorageFactoryDep = None,
-    encryption_service: EncryptionServiceDep = None,
 ) -> CloudSyncService:
     """Dependency to get cloud sync service instance."""
     return CloudSyncService(
@@ -177,7 +177,7 @@ def get_cloud_sync_service(
         rclone_service=rclone_service,
         storage_factory=storage_factory,
         encryption_service=encryption_service,
-        provider_registry=registry,
+        get_metadata_func=registry.get_metadata,
     )
 
 

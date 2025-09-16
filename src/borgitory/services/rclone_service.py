@@ -464,10 +464,6 @@ class RcloneService:
                 host, username, port, password, private_key
             )
             command.extend(sftp_flags)
-            
-            # Log the command (without sensitive data)
-            safe_command = [arg for arg in command if not arg.startswith("--sftp-pass")]
-            logger.info(f"Executing SFTP test command: {' '.join(safe_command)}")
 
             if "--sftp-key-file" in sftp_flags:
                 key_file_idx = sftp_flags.index("--sftp-key-file")
@@ -965,21 +961,6 @@ class RcloneService:
                 kerberos_ccache,
             )
             command.extend(smb_flags)
-            
-            # Log the command (without sensitive data)
-            safe_command = []
-            skip_next = False
-            for i, arg in enumerate(command):
-                if skip_next:
-                    skip_next = False
-                    continue
-                if arg == "--smb-pass":
-                    safe_command.append("--smb-pass")
-                    safe_command.append("[REDACTED]")
-                    skip_next = True
-                else:
-                    safe_command.append(arg)
-            logger.info(f"Executing SMB test command: {' '.join(safe_command)}")
 
             process = await asyncio.create_subprocess_exec(
                 *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -988,7 +969,7 @@ class RcloneService:
             stdout, stderr = await process.communicate()
             stdout_text = stdout.decode("utf-8")
             stderr_text = stderr.decode("utf-8")
-            
+
             logger.info(f"SMB test command return code: {process.returncode}")
             if stderr_text.strip():
                 logger.info(f"SMB test stderr: {stderr_text.strip()}")

@@ -425,12 +425,15 @@ class TestCloudSyncService:
 
     @pytest.fixture
     def service(self, mock_storage_factory, mock_encryption_service):
-        return CloudSyncService(mock_storage_factory, mock_encryption_service)
+        return CloudSyncService(
+            storage_factory=mock_storage_factory,
+            encryption_service=mock_encryption_service,
+        )
 
     @pytest.fixture
     def service_with_defaults(self, mock_storage_factory):
         """Service without injected encryption service (uses default)"""
-        return CloudSyncService(mock_storage_factory)
+        return CloudSyncService(storage_factory=mock_storage_factory)
 
     @pytest.fixture
     def sample_s3_config(self):

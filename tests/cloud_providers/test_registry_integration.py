@@ -262,11 +262,21 @@ class TestCloudSyncServiceIntegration:
         mock_db.query().filter().first.return_value = None  # No existing config
 
         # Get the registry for the service
-        from borgitory.services.cloud_providers.registry import get_registry
+        from borgitory.services.cloud_providers.registry import get_metadata
+        from borgitory.services.rclone_service import RcloneService
+        from borgitory.services.cloud_providers import StorageFactory, EncryptionService
 
-        registry = get_registry()
+        mock_rclone = Mock(spec=RcloneService)
+        mock_storage_factory = Mock(spec=StorageFactory)
+        mock_encryption = Mock(spec=EncryptionService)
 
-        service = CloudSyncService(mock_db, provider_registry=registry)
+        service = CloudSyncService(
+            db=mock_db,
+            rclone_service=mock_rclone,
+            storage_factory=mock_storage_factory,
+            encryption_service=mock_encryption,
+            get_metadata_func=get_metadata,
+        )
 
         # Create a mock config object that bypasses pydantic validation
         mock_config = Mock()
@@ -281,8 +291,4 @@ class TestCloudSyncServiceIntegration:
         assert exc_info.value.status_code == 400
         detail = str(exc_info.value.detail)
         assert "Unsupported provider:" in detail
-        assert "Available providers:" in detail
-        # Should include our known providers
-        assert "s3" in detail
-        assert "sftp" in detail
-        assert "smb" in detail
+        assert "unknown" in detail
