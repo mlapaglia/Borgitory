@@ -3,13 +3,14 @@ Tests for tabs API endpoints
 """
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import Mock
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
 from main import app
 from api.auth import get_current_user
 from models.database import User
+from dependencies import get_provider_registry
 
 
 @pytest.fixture
@@ -96,18 +97,22 @@ class TestTabsAPI:
         self, async_client: AsyncClient, mock_current_user
     ):
         """Test that cloud sync tab uses registry to get providers."""
-        # Mock the registry function to return specific providers
-        mock_providers = [
-            {
-                "value": "mock_provider",
+        # Create a mock registry
+        mock_registry = Mock()
+        mock_registry.get_all_provider_info.return_value = {
+            "mock_provider": {
                 "label": "Mock Provider",
                 "description": "Test provider",
+                "supports_encryption": True,
+                "supports_versioning": False,
+                "requires_credentials": True,
             }
-        ]
+        }
 
-        with patch(
-            "api.cloud_sync._get_supported_providers", return_value=mock_providers
-        ):
+        # Override the registry dependency
+        app.dependency_overrides[get_provider_registry] = lambda: mock_registry
+
+        try:
             response = await async_client.get("/api/tabs/cloud-sync")
             assert response.status_code == 200
 
@@ -120,14 +125,23 @@ class TestTabsAPI:
             assert 'value="s3"' not in content
             assert 'value="sftp"' not in content
             assert 'value="smb"' not in content
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_get_cloud_sync_tab_empty_providers(
         self, async_client: AsyncClient, mock_current_user
     ):
         """Test cloud sync tab behavior when no providers are registered."""
-        # Mock registry to return empty list
-        with patch("api.cloud_sync._get_supported_providers", return_value=[]):
+        # Create a mock registry with no providers
+        mock_registry = Mock()
+        mock_registry.get_all_provider_info.return_value = {}
+
+        # Override the registry dependency
+        app.dependency_overrides[get_provider_registry] = lambda: mock_registry
+
+        try:
             response = await async_client.get("/api/tabs/cloud-sync")
             assert response.status_code == 200
 
@@ -141,6 +155,9 @@ class TestTabsAPI:
             assert 'value="s3"' not in content
             assert 'value="sftp"' not in content
             assert 'value="smb"' not in content
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_provider_fields_endpoint_uses_registry_for_submit_text(

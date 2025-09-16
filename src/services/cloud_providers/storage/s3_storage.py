@@ -8,6 +8,8 @@ from business logic and easy testability.
 from typing import Callable, Optional
 from pydantic import Field, field_validator
 
+from src.services.rclone_service import RcloneService
+
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider
@@ -43,7 +45,6 @@ class S3StorageConfig(CloudStorageConfig):
         """Validate AWS Secret Access Key format"""
         if len(v) != 40:
             raise ValueError("AWS Secret Access Key must be exactly 40 characters long")
-        # AWS secret keys are base64-like but can contain +, /, and = characters
         import re
 
         if not re.match(r"^[A-Za-z0-9+/=]+$", v):
@@ -56,7 +57,6 @@ class S3StorageConfig(CloudStorageConfig):
         """Validate and normalize S3 bucket name"""
         v_lower = v.lower()
 
-        # Basic bucket name validation according to AWS rules
         if not (3 <= len(v_lower) <= 63):
             raise ValueError("Bucket name must be between 3 and 63 characters long")
 
@@ -104,7 +104,7 @@ class S3Storage(CloudStorage):
     CloudStorage interface for easy testing and integration.
     """
 
-    def __init__(self, config: S3StorageConfig, rclone_service):
+    def __init__(self, config: S3StorageConfig, rclone_service: RcloneService):
         """
         Initialize S3 storage.
 
@@ -131,7 +131,6 @@ class S3Storage(CloudStorage):
             )
 
         try:
-            # Use rclone service for actual I/O - this is what we'll mock in tests
             async for progress in self._rclone_service.sync_repository_to_s3(
                 repository_path=repository_path,
                 access_key_id=self._config.access_key,

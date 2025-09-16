@@ -18,6 +18,7 @@ from services.recovery_service import RecoveryService
 from services.notifications.pushover_service import PushoverService
 from services.jobs.job_stream_service import JobStreamService
 from services.jobs.job_render_service import JobRenderService
+from services.cloud_providers.registry import ProviderRegistry
 from services.debug_service import DebugService
 from services.rclone_service import RcloneService
 from services.repositories.repository_stats_service import RepositoryStatsService
@@ -384,6 +385,27 @@ def get_templates() -> Jinja2Templates:
     return _templates_instance
 
 
+_provider_registry_instance = None
+
+
+def get_provider_registry() -> ProviderRegistry:
+    """
+    Provide a ProviderRegistry singleton instance with proper dependency injection.
+
+    Ensures all cloud storage providers are registered by importing the storage modules.
+    """
+    global _provider_registry_instance
+    if _provider_registry_instance is None:
+        # Import storage modules first to trigger registration
+        import services.cloud_providers.storage  # noqa: F401
+
+        # Then get the global registry instance that has the providers registered
+        from services.cloud_providers.registry import get_registry
+
+        _provider_registry_instance = get_registry()
+    return _provider_registry_instance
+
+
 def get_schedule_service(
     db: Session = Depends(get_db),
     scheduler_service: SchedulerService = Depends(get_scheduler_service),
@@ -525,3 +547,4 @@ CronDescriptionServiceDep = Annotated[
 UpcomingBackupsServiceDep = Annotated[
     UpcomingBackupsService, Depends(get_upcoming_backups_service)
 ]
+ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]

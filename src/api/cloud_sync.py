@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,16 +14,20 @@ from models.schemas import (
     CloudSyncConfig as CloudSyncConfigSchema,
 )
 from services.cloud_sync_service import CloudSyncService
-from dependencies import RcloneServiceDep, EncryptionServiceDep, StorageFactoryDep
-from services.cloud_providers.registry import get_all_provider_info, get_storage_class
+from dependencies import (
+    RcloneServiceDep,
+    EncryptionServiceDep,
+    StorageFactoryDep,
+    ProviderRegistryDep,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _get_supported_providers() -> List[dict]:
+def _get_supported_providers(registry) -> List[dict]:
     """Get supported providers from the registry."""
-    provider_info = get_all_provider_info()
+    provider_info = registry.get_all_provider_info()
     supported_providers = []
 
     for provider_name, info in provider_info.items():
@@ -43,16 +48,17 @@ def _get_provider_template(provider: str, mode: str = "create") -> str:
     if not provider:
         return None
 
-    # Check if provider is registered in the registry
-    provider_info = get_all_provider_info()
-    if provider not in provider_info:
-        return None  # Don't try to load template for unknown providers
+    # Check if template file exists by checking known providers with templates
+    # These are the providers that currently have template files
+    providers_with_templates = {"s3", "sftp", "smb"}
+    if provider not in providers_with_templates:
+        return None
 
     suffix = "_edit" if mode == "edit" else ""
     return f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
 
 
-def _get_submit_button_text(provider: str, mode: str = "create") -> str:
+def _get_submit_button_text(registry, provider: str, mode: str = "create") -> str:
     """Get submit button text using registry information"""
     if not provider:
         if mode == "create":
@@ -60,7 +66,7 @@ def _get_submit_button_text(provider: str, mode: str = "create") -> str:
         else:
             return "Update Sync Location"
 
-    provider_info = get_all_provider_info()
+    provider_info = registry.get_all_provider_info()
     provider_data = provider_info.get(provider)
 
     if provider_data:
@@ -73,10 +79,12 @@ def _get_submit_button_text(provider: str, mode: str = "create") -> str:
         return f"{action} Sync Location"
 
 
-def _get_provider_display_details(provider: str, provider_config: dict) -> dict:
+def _get_provider_display_details(
+    registry, provider: str, provider_config: dict
+) -> dict:
     """Get provider display details using registry and storage classes"""
     try:
-        storage_class = get_storage_class(provider)
+        storage_class = registry.get_storage_class(provider)
         if storage_class:
             # Create a temporary instance to call get_display_details
             # We don't need a valid config for this method, just the dict
@@ -99,7 +107,6 @@ def _parse_form_data_to_config(form_data) -> CloudSyncConfigCreate:
     provider_config = {}
     regular_fields = {}
 
-    # Parse form data
     for key, value in form_data.items():
         if key.startswith("provider_config[") and key.endswith("]"):
             # Extract field name from provider_config[field_name]
@@ -122,7 +129,6 @@ def _parse_form_data_to_config_update(form_data) -> CloudSyncConfigUpdate:
     provider_config = {}
     regular_fields = {}
 
-    # Parse form data
     for key, value in form_data.items():
         if key.startswith("provider_config[") and key.endswith("]"):
             # Extract field name from provider_config[field_name]
@@ -131,7 +137,6 @@ def _parse_form_data_to_config_update(form_data) -> CloudSyncConfigUpdate:
         else:
             regular_fields[key] = value
 
-    # Create the configuration object
     return CloudSyncConfigUpdate(
         name=regular_fields.get("name"),
         provider=regular_fields.get("provider"),
@@ -144,18 +149,32 @@ def get_templates() -> Jinja2Templates:
     return Jinja2Templates(directory="src/templates")
 
 
-def get_cloud_sync_service(db: Session = Depends(get_db)) -> CloudSyncService:
+def get_cloud_sync_service(
+    registry: ProviderRegistryDep,
+    db: Session = Depends(get_db),
+    rclone_service: RcloneServiceDep = None,
+    storage_factory: StorageFactoryDep = None,
+    encryption_service: EncryptionServiceDep = None,
+) -> CloudSyncService:
     """Dependency to get cloud sync service instance."""
-    return CloudSyncService(db)
+    return CloudSyncService(
+        db=db,
+        rclone_service=rclone_service,
+        storage_factory=storage_factory,
+        encryption_service=encryption_service,
+        provider_registry=registry,
+    )
 
 
 @router.get("/add-form", response_class=HTMLResponse)
 async def get_add_form(
-    request: Request, templates: Jinja2Templates = Depends(get_templates)
+    request: Request,
+    registry: ProviderRegistryDep,
+    templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Get the add form (for cancel functionality)"""
     context = {
-        "supported_providers": _get_supported_providers(),
+        "supported_providers": _get_supported_providers(registry),
     }
     return templates.TemplateResponse(
         request, "partials/cloud_sync/add_form.html", context
@@ -165,6 +184,7 @@ async def get_add_form(
 @router.get("/provider-fields", response_class=HTMLResponse)
 async def get_provider_fields(
     request: Request,
+    registry: ProviderRegistryDep,
     provider: str = "",
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
@@ -172,7 +192,7 @@ async def get_provider_fields(
     context = {
         "provider": provider,
         "provider_template": _get_provider_template(provider, "create"),
-        "submit_text": _get_submit_button_text(provider, "create"),
+        "submit_text": _get_submit_button_text(registry, provider, "create"),
         "show_submit": provider != "",
     }
 
@@ -203,7 +223,6 @@ async def create_cloud_sync_config(
         return response
 
     except ValidationError as e:
-        # Handle Pydantic validation errors (return 422)
         error_msg = f"Validation error: {str(e)}"
         return templates.TemplateResponse(
             request,
@@ -230,6 +249,7 @@ async def create_cloud_sync_config(
 
 @router.get("/html", response_class=HTMLResponse)
 def get_cloud_sync_configs_html(
+    registry: ProviderRegistryDep,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> str:
@@ -240,20 +260,15 @@ def get_cloud_sync_configs_html(
         # Process configs to add computed fields for template
         processed_configs = []
         for config in configs_raw:
-            # Parse JSON configuration
-            import json
-
             try:
                 provider_config = json.loads(config.provider_config)
             except (json.JSONDecodeError, AttributeError):
                 provider_config = {}
 
-            # Generate provider-specific details using registry
             display_info = _get_provider_display_details(
-                config.provider, provider_config
+                registry, config.provider, provider_config
             )
 
-            # Create processed config object for template
             processed_config = config.__dict__.copy()
             processed_config["provider_name"] = display_info["provider_name"]
             processed_config["provider_details"] = display_info["provider_details"]
@@ -264,7 +279,6 @@ def get_cloud_sync_configs_html(
         ).render(configs=processed_configs)
 
     except Exception:
-        # If there's a database error (like table doesn't exist), return a helpful message
         return templates.get_template("partials/jobs/error_state.html").render(
             message="Cloud sync feature is initializing... If this persists, try restarting the application.",
             padding="4",
@@ -292,6 +306,7 @@ def get_cloud_sync_config(
 async def get_cloud_sync_edit_form(
     request: Request,
     config_id: int,
+    registry: ProviderRegistryDep,
     encryption_service: EncryptionServiceDep,
     storage_factory: StorageFactoryDep,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
@@ -311,10 +326,10 @@ async def get_cloud_sync_edit_form(
             "provider_template": _get_provider_template(
                 decrypted_config["provider"], "edit"
             ),
-            "supported_providers": _get_supported_providers(),
+            "supported_providers": _get_supported_providers(registry),
             "is_edit_mode": True,
             "submit_text": _get_submit_button_text(
-                decrypted_config["provider"], "edit"
+                registry, decrypted_config["provider"], "edit"
             ),
         }
 
@@ -519,6 +534,6 @@ def disable_cloud_sync_config(
 
 
 @router.get("/providers")
-def get_supported_providers():
+def get_supported_providers(registry: ProviderRegistryDep):
     """Get list of supported cloud providers from the registry."""
-    return _get_supported_providers()
+    return _get_supported_providers(registry)

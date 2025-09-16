@@ -202,7 +202,6 @@ class NotificationConfigService:
                     ", ".join(notify_types) if notify_types else "No notifications"
                 )
 
-                # Create processed config object for template
                 processed_config = config.__dict__.copy()
                 processed_config["notification_desc"] = notification_desc
                 processed_configs.append(processed_config)

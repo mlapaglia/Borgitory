@@ -5,6 +5,7 @@ This module provides the business logic for coordinating cloud sync operations
 with clean separation of concerns and easy testability.
 """
 
+import asyncio
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
@@ -59,7 +60,6 @@ class LoggingSyncEventHandler(SyncEventHandler):
         elif event.type == SyncEventType.LOG:
             self._logger.info(event.message)
 
-        # Also call output callback if provided (for real-time UI updates)
         if self._output_callback:
             self._output_callback(event.message)
 
@@ -106,7 +106,6 @@ class CloudSyncer:
         start_time = time.time()
 
         try:
-            # Send start event
             await self._event_handler.handle_event(
                 SyncEvent(
                     type=SyncEventType.STARTED,
@@ -114,7 +113,6 @@ class CloudSyncer:
                 )
             )
 
-            # Test connection first
             if not await self._storage.test_connection():
                 error_msg = "Connection test failed"
                 await self._event_handler.handle_event(
@@ -138,19 +136,14 @@ class CloudSyncer:
                     bytes_transferred += 1024  # Placeholder
                     files_transferred += 1  # Placeholder
 
-                # Forward event to handler
-                import asyncio
-
                 asyncio.create_task(self._event_handler.handle_event(event))
 
             await self._storage.upload_repository(
                 repository_path, remote_path, progress_callback
             )
 
-            # Calculate duration
             duration = time.time() - start_time
 
-            # Send completion event
             await self._event_handler.handle_event(
                 SyncEvent(
                     type=SyncEventType.COMPLETED,

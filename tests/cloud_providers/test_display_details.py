@@ -168,10 +168,13 @@ class TestDisplayDetailsIntegration:
     def test_get_provider_display_details_function(self):
         """Test the _get_provider_display_details function from cloud_sync.py"""
         from api.cloud_sync import _get_provider_display_details
+        from services.cloud_providers.registry import get_registry
+
+        registry = get_registry()
 
         # Test with S3
         s3_config = {"bucket_name": "test-bucket", "region": "eu-west-1"}
-        result = _get_provider_display_details("s3", s3_config)
+        result = _get_provider_display_details(registry, "s3", s3_config)
 
         assert result["provider_name"] == "AWS S3"
         assert "test-bucket" in result["provider_details"]
@@ -180,8 +183,10 @@ class TestDisplayDetailsIntegration:
     def test_get_provider_display_details_unknown_provider(self):
         """Test display details function with unknown provider"""
         from api.cloud_sync import _get_provider_display_details
+        from services.cloud_providers.registry import get_registry
 
-        result = _get_provider_display_details("unknown", {})
+        registry = get_registry()
+        result = _get_provider_display_details(registry, "unknown", {})
 
         assert result["provider_name"] == "UNKNOWN"
         assert "Unknown provider" in result["provider_details"]
@@ -189,8 +194,10 @@ class TestDisplayDetailsIntegration:
     def test_get_provider_display_details_empty_provider(self):
         """Test display details function with empty provider"""
         from api.cloud_sync import _get_provider_display_details
+        from services.cloud_providers.registry import get_registry
 
-        result = _get_provider_display_details("", {})
+        registry = get_registry()
+        result = _get_provider_display_details(registry, "", {})
 
         assert result["provider_name"] == "Unknown"  # Empty provider becomes "Unknown"
         assert "Unknown provider" in result["provider_details"]

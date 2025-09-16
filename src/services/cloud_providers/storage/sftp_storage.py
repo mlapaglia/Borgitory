@@ -5,8 +5,11 @@ This module provides SFTP-specific storage operations with clean separation
 from business logic and easy testability.
 """
 
+import re
 from typing import Callable, Optional
 from pydantic import Field, field_validator, model_validator
+
+from src.services.rclone_service import RcloneService
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
@@ -30,7 +33,6 @@ class SFTPStorageConfig(CloudStorageConfig):
         """Validate SFTP host format"""
         import re
 
-        # Basic validation for hostname or IP
         if not re.match(r"^[a-zA-Z0-9.-]+$", v):
             raise ValueError(
                 "Host must contain only letters, numbers, periods, and hyphens"
@@ -60,16 +62,12 @@ class SFTPStorageConfig(CloudStorageConfig):
         if not v:
             raise ValueError("Remote path cannot be empty")
 
-        # Ensure path starts with /
         if not v.startswith("/"):
             v = "/" + v
 
         # Remove trailing slash unless it's root
         if len(v) > 1:
             v = v.rstrip("/")
-
-        # Basic path validation
-        import re
 
         if not re.match(r"^/[a-zA-Z0-9._/-]*$", v):
             raise ValueError("Remote path contains invalid characters")
@@ -92,7 +90,7 @@ class SFTPStorage(CloudStorage):
     CloudStorage interface for easy testing and integration.
     """
 
-    def __init__(self, config: SFTPStorageConfig, rclone_service):
+    def __init__(self, config: SFTPStorageConfig, rclone_service: RcloneService):
         """
         Initialize SFTP storage.
 
@@ -119,7 +117,6 @@ class SFTPStorage(CloudStorage):
             )
 
         try:
-            # Use rclone service for actual I/O
             async for progress in self._rclone_service.sync_repository_to_sftp(
                 repository_path=repository_path,
                 host=self._config.host,

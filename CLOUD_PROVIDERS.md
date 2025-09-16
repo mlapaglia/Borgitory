@@ -94,7 +94,7 @@ class {ProviderName}Storage(CloudStorage):
     {Provider Name} cloud storage implementation.
     """
 
-    def __init__(self, config: {ProviderName}StorageConfig, rclone_service):
+    def __init__(self, config: {ProviderName}StorageConfig, rclone_service: RcloneService):
         """
         Initialize {Provider Name} storage.
 

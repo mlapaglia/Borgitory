@@ -12,6 +12,7 @@ from services.cloud_providers.registry import (
 )
 from models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
 from services.cloud_providers.storage.base import CloudStorage, CloudStorageConfig
+from src.services.rclone_service import RcloneService
 
 
 class MockStorageConfig(CloudStorageConfig):
@@ -23,7 +24,7 @@ class MockStorageConfig(CloudStorageConfig):
 class MockStorage(CloudStorage):
     """Mock storage for testing"""
 
-    def __init__(self, rclone_service, config):
+    def __init__(self, rclone_service: RcloneService, config):
         super().__init__(rclone_service, config)
 
     async def sync_to_cloud(self, source_path: str, destination_path: str):

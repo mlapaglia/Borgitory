@@ -21,6 +21,7 @@ from services.jobs.broadcaster.job_event_broadcaster import (
     EventType,
 )
 from services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
+from src.services.rclone_service import RcloneService
 from utils.db_session import get_db_session
 
 if TYPE_CHECKING:
@@ -1606,7 +1607,7 @@ class JobManager:
 
 
 # Factory function for creating JobManager instances (no singleton)
-def create_job_manager(config=None, rclone_service=None) -> JobManager:
+def create_job_manager(config=None, rclone_service: RcloneService = None) -> JobManager:
     """Factory function for creating JobManager instances"""
     if config is None:
         # Use environment variables or defaults

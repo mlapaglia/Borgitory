@@ -23,9 +23,6 @@ class JobType(str, Enum):
     CHECK = "check"
 
 
-# Provider validation using registry - no enum needed
-
-
 class CleanupStrategy(str, Enum):
     SIMPLE = "simple"
     ADVANCED = "advanced"
@@ -499,7 +496,6 @@ class CloudSyncConfigCreate(CloudSyncConfigBase):
         if not self.provider_config:
             raise ValueError("provider_config is required")
 
-        # Use registry-based validation
         validate_provider_config(self.provider, self.provider_config)
         return self
 
@@ -539,11 +535,9 @@ class CloudSyncConfigUpdate(BaseModel):
     def validate_provider_config(self):
         """Validate provider_config if provided"""
 
-        # Only validate if both provider and provider_config are provided
         if self.provider and self.provider_config:
             from services.cloud_providers.registry import validate_provider_config
 
-            # Use registry-based validation
             validate_provider_config(self.provider, self.provider_config)
 
         return self

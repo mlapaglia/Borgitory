@@ -63,7 +63,6 @@ class RepositoryService:
                     success=False, validation_errors=validation_errors
                 )
 
-            # Create repository object
             db_repo = Repository(name=request.name, path=request.path)
             db_repo.set_passphrase(request.passphrase)
 
@@ -126,7 +125,6 @@ class RepositoryService:
                     )
                 keyfile_path = keyfile_result["path"]
 
-            # Create repository object
             db_repo = Repository(name=request.name, path=request.path)
             db_repo.set_passphrase(request.passphrase)
 
@@ -134,7 +132,6 @@ class RepositoryService:
             db.commit()
             db.refresh(db_repo)
 
-            # Verify repository access
             verification_successful = await self.borg_service.verify_repository_access(
                 repo_path=request.path,
                 passphrase=request.passphrase,
@@ -142,7 +139,6 @@ class RepositoryService:
             )
 
             if not verification_successful:
-                # Cleanup on failure
                 if keyfile_path:
                     secure_remove_file(keyfile_path)
                 db.delete(db_repo)
@@ -153,7 +149,6 @@ class RepositoryService:
                     error_message="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
                 )
 
-            # Try to count archives for logging
             try:
                 archives = await self.borg_service.list_archives(db_repo)
                 logger.info(
@@ -235,7 +230,6 @@ class RepositoryService:
 
             archives = await self.borg_service.list_archives(repository)
 
-            # Process archives into DTOs
             archive_infos = []
             for archive in archives:
                 archive_info = ArchiveInfo(
@@ -244,7 +238,6 @@ class RepositoryService:
                     stats=archive.get("stats"),
                 )
 
-                # Format time
                 if archive_info.time:
                     try:
                         dt = datetime.fromisoformat(
@@ -254,7 +247,6 @@ class RepositoryService:
                     except (ValueError, TypeError):
                         archive_info.formatted_time = archive_info.time
 
-                # Format size
                 if archive_info.stats and "original_size" in archive_info.stats:
                     size_bytes = archive_info.stats["original_size"]
                     for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -265,7 +257,6 @@ class RepositoryService:
 
                 archive_infos.append(archive_info)
 
-            # Get recent archives (last 10)
             recent_archives = []
             if archive_infos:
                 recent_list = (
@@ -311,7 +302,6 @@ class RepositoryService:
                 request.path, include_files=request.include_files
             )
 
-            # Limit results if requested
             if request.max_items > 0:
                 directories = directories[: request.max_items]
 
@@ -358,7 +348,6 @@ class RepositoryService:
                 repository, request.archive_name, request.path
             )
 
-            # Convert to DTOs
             items = []
             for item in contents:
                 directory_item = DirectoryItem(
@@ -447,7 +436,6 @@ class RepositoryService:
 
             repo_name = repository.name
 
-            # Check for active jobs
             active_jobs = (
                 db.query(Job)
                 .filter(
@@ -466,7 +454,6 @@ class RepositoryService:
                     error_message=f"Cannot delete repository '{repo_name}' - {len(active_jobs)} active job(s) running: {', '.join(active_job_types)}. Please wait for jobs to complete or cancel them first.",
                 )
 
-            # Remove associated schedules
             schedules_to_delete = (
                 db.query(Schedule)
                 .filter(Schedule.repository_id == request.repository_id)
@@ -484,7 +471,6 @@ class RepositoryService:
                         f"Could not remove scheduled job for schedule ID {schedule.id}: {e}"
                     )
 
-            # Delete repository
             db.delete(repository)
             db.commit()
 
@@ -507,15 +493,12 @@ class RepositoryService:
                 error_message=error_message,
             )
 
-    # Private helper methods
-
     async def _validate_repository_creation(
         self, request: CreateRepositoryRequest, db: Session
     ) -> List[RepositoryValidationError]:
         """Validate repository creation request."""
         errors = []
 
-        # Check if repository name already exists
         existing_name = (
             db.query(Repository).filter(Repository.name == request.name).first()
         )
@@ -526,7 +509,6 @@ class RepositoryService:
                 )
             )
 
-        # Check if repository path already exists
         existing_path = (
             db.query(Repository).filter(Repository.path == request.path).first()
         )
@@ -546,7 +528,6 @@ class RepositoryService:
         """Validate repository import request."""
         errors = []
 
-        # Check if repository name already exists
         existing_name = (
             db.query(Repository).filter(Repository.name == request.name).first()
         )
@@ -557,7 +538,6 @@ class RepositoryService:
                 )
             )
 
-        # Check if repository path already exists
         existing_path = (
             db.query(Repository).filter(Repository.path == request.path).first()
         )
@@ -585,7 +565,7 @@ class RepositoryService:
     async def _save_keyfile(self, repository_name: str, keyfile) -> Dict[str, Any]:
         """Save uploaded keyfile securely."""
         try:
-            keyfiles_dir = "/app/data/keyfiles"  # Store keyfiles with app data
+            keyfiles_dir = "/app/data/keyfiles"
             os.makedirs(keyfiles_dir, exist_ok=True)
 
             safe_filename = create_secure_filename(

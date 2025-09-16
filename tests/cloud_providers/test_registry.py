@@ -15,6 +15,7 @@ from src.services.cloud_providers.registry import (
     clear_registry,
     get_registry,
 )
+from src.services.rclone_service import RcloneService
 
 
 # Mock classes for testing
@@ -23,7 +24,7 @@ class MockConfigClass(BaseModel):
 
 
 class MockStorageClass:
-    def __init__(self, config, rclone_service):
+    def __init__(self, config, rclone_service: RcloneService):
         self.config = config
         self.rclone_service = rclone_service
 

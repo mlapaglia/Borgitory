@@ -9,6 +9,8 @@ import json
 import logging
 from typing import Dict, Any, Callable, Optional
 
+from src.services.rclone_service import RcloneService
+
 from .types import CloudSyncConfig, SyncResult
 from .storage import CloudStorage
 from .registry import get_config_class, get_storage_class, get_supported_providers
@@ -48,7 +50,7 @@ class ConfigValidator:
 class StorageFactory:
     """Factory for creating cloud storage instances"""
 
-    def __init__(self, rclone_service):
+    def __init__(self, rclone_service: RcloneService):
         """
         Initialize storage factory.
 
@@ -197,15 +199,12 @@ class CloudSyncService:
             SyncResult indicating success/failure and details
         """
         try:
-            # Create storage instance
             storage = self._storage_factory.create_storage(
                 config.provider, config.config
             )
 
-            # Create event handler
             event_handler = LoggingSyncEventHandler(logger, output_callback)
 
-            # Create syncer and execute
             syncer = CloudSyncer(storage, event_handler)
 
             return await syncer.sync_repository(repository_path, config.path_prefix)
@@ -267,11 +266,10 @@ class CloudSyncService:
         Returns:
             JSON string with encrypted sensitive fields
         """
-        # Get sensitive fields for this provider
+
         temp_storage = self._storage_factory.create_storage(provider, config)
         sensitive_fields = temp_storage.get_sensitive_fields()
 
-        # Encrypt sensitive fields
         encrypted_config = self._encryption_service.encrypt_sensitive_fields(
             config, sensitive_fields
         )
@@ -293,11 +291,9 @@ class CloudSyncService:
         """
         config = json.loads(stored_config)
 
-        # Get sensitive fields for this provider
         temp_storage = self._storage_factory.create_storage(provider, config)
         sensitive_fields = temp_storage.get_sensitive_fields()
 
-        # Decrypt sensitive fields
         return self._encryption_service.decrypt_sensitive_fields(
             config, sensitive_fields
         )

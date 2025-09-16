@@ -146,8 +146,10 @@ class TestAPIProviderIntegration:
     def test_api_get_supported_providers_format(self):
         """Test that API returns providers in correct format"""
         # Import storage modules to trigger registration
+        from services.cloud_providers.registry import get_registry
 
-        providers = _get_supported_providers()
+        registry = get_registry()
+        providers = _get_supported_providers(registry)
 
         # Should be a list of dicts with correct structure
         assert isinstance(providers, list)
@@ -171,8 +173,10 @@ class TestAPIProviderIntegration:
     def test_api_providers_are_sorted(self):
         """Test that API returns providers in sorted order"""
         # Import storage modules to trigger registration
+        from services.cloud_providers.registry import get_registry
 
-        providers = _get_supported_providers()
+        registry = get_registry()
+        providers = _get_supported_providers(registry)
 
         values = [p["value"] for p in providers]
         assert values == sorted(values)  # Should be sorted
@@ -265,7 +269,12 @@ class TestCloudSyncServiceIntegration:
         mock_db = Mock()
         mock_db.query().filter().first.return_value = None  # No existing config
 
-        service = CloudSyncService(mock_db)
+        # Get the registry for the service
+        from services.cloud_providers.registry import get_registry
+
+        registry = get_registry()
+
+        service = CloudSyncService(mock_db, provider_registry=registry)
 
         # Create a mock config object that bypasses pydantic validation
         mock_config = Mock()

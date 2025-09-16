@@ -355,19 +355,15 @@ class JobExecutor:
                         error=None,
                     )
 
-                # Use new provider pattern
                 try:
                     from services.cloud_providers import CloudProviderFactory
                     from types import SimpleNamespace
                     import json
 
-                    # Get provider configuration
                     provider_config = {}
                     if config.provider_config:
-                        # New JSON-based configuration
                         provider_config = json.loads(config.provider_config)
                     else:
-                        # Fallback to legacy configuration for backward compatibility
                         if config.provider == "s3":
                             access_key, secret_key = config.get_credentials()
                             provider_config = {
@@ -391,12 +387,10 @@ class JobExecutor:
                             if private_key:
                                 provider_config["private_key"] = private_key
 
-                    # Create provider instance
                     provider = CloudProviderFactory.create_provider(
                         config.provider, provider_config
                     )
 
-                    # Decrypt sensitive fields if needed
                     decrypted_config = provider.decrypt_sensitive_fields(
                         provider_config
                     )
@@ -404,7 +398,6 @@ class JobExecutor:
                         config.provider, decrypted_config
                     )
 
-                    # Get connection info for logging
                     conn_info = provider.get_connection_info()
                     logger.info(
                         f"Syncing to {config.name} ({config.provider.upper()}: {conn_info})"
@@ -414,10 +407,8 @@ class JobExecutor:
                             f"Syncing to {config.name} ({config.provider.upper()})", {}
                         )
 
-                    # Create repository object
                     repo_obj = SimpleNamespace(path=repository_path)
 
-                    # Execute sync using provider
                     progress_generator = provider.sync_repository(
                         repository=repo_obj,
                         path_prefix=config.path_prefix or "",
@@ -533,7 +524,6 @@ class JobExecutor:
             if output_callback:
                 output_callback("Starting cloud sync...")
 
-            # Load configuration using injected service
             sync_config = await config_load_service.load_config(cloud_sync_config_id)
 
             if not sync_config:
@@ -547,12 +537,10 @@ class JobExecutor:
                     error=None,
                 )
 
-            # Execute sync using injected service - clean and simple!
             result = await cloud_sync_service.execute_sync(
                 sync_config, repository_path, output_callback
             )
 
-            # Convert SyncResult to ProcessResult
             if result.success:
                 logger.info(
                     f"Cloud sync completed successfully in {result.duration_seconds:.1f}s"

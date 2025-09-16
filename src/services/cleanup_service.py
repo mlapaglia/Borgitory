@@ -236,7 +236,6 @@ class CleanupService:
                         parts.append(f"{config.keep_yearly} yearly")
                     description = ", ".join(parts) if parts else "No retention rules"
 
-                # Create processed config object for template
                 processed_config = config.__dict__.copy()
                 processed_config["description"] = description
                 processed_configs.append(processed_config)

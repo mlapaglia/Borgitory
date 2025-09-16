@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from api.auth import get_current_user
+from dependencies import ProviderRegistryDep
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -67,8 +68,23 @@ async def get_schedules_tab(request: Request, current_user=Depends(get_current_u
 
 
 @router.get("/cloud-sync", response_class=HTMLResponse)
-async def get_cloud_sync_tab(request: Request, current_user=Depends(get_current_user)):
-    from api.cloud_sync import _get_supported_providers
+async def get_cloud_sync_tab(
+    request: Request,
+    registry: ProviderRegistryDep,
+    current_user=Depends(get_current_user),
+):
+    # Generate supported providers list directly from registry
+    provider_info = registry.get_all_provider_info()
+    supported_providers = []
+    for provider_name, info in provider_info.items():
+        supported_providers.append(
+            {
+                "value": provider_name,
+                "label": info["label"],
+                "description": info["description"],
+            }
+        )
+    supported_providers = sorted(supported_providers, key=lambda x: x["value"])
 
     return _render_tab_with_nav(
         request,
@@ -76,7 +92,7 @@ async def get_cloud_sync_tab(request: Request, current_user=Depends(get_current_
         "cloud-sync",
         {
             "current_user": current_user,
-            "supported_providers": _get_supported_providers(),
+            "supported_providers": supported_providers,
         },
     )
 

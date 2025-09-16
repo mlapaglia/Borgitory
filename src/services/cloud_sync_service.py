@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, UTC
 from typing import List
@@ -13,7 +14,6 @@ from services.rclone_service import RcloneService
 from services.cloud_providers.registry import (
     get_storage_class,
     get_config_class,
-    get_supported_providers,
 )
 from services.cloud_providers import StorageFactory, EncryptionService
 
@@ -34,17 +34,12 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
     try:
         # Most storage classes have this as a class method or don't need the instance
         if hasattr(storage_class, "get_sensitive_fields"):
-            # Try to call as static method first
             try:
                 return storage_class.get_sensitive_fields(None)
             except TypeError:
-                # If that fails, we need to create an instance
-                # For this we'll need to look at the config class
                 config_class = get_config_class(provider)
                 if config_class:
-                    # Create a minimal config instance for the method call
                     try:
-                        # Create instance with minimal required fields
                         if provider == "s3":
                             temp_config = config_class(
                                 bucket="temp", access_key="temp", secret_key="temp"
@@ -69,7 +64,6 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
                         )
                         return []
 
-        # Fallback to hardcoded values if registry approach fails
         if provider == "s3":
             return ["access_key", "secret_key"]
         elif provider == "sftp":
@@ -81,7 +75,6 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
 
     except Exception as e:
         logger.warning(f"Error getting sensitive fields for provider '{provider}': {e}")
-        # Fallback to hardcoded values
         if provider == "s3":
             return ["access_key", "secret_key"]
         elif provider == "sftp":
@@ -101,12 +94,13 @@ class CloudSyncService:
         rclone_service: RcloneService = None,
         storage_factory: StorageFactory = None,
         encryption_service: EncryptionService = None,
+        provider_registry=None,
     ):
         self.db = db
-        # Use provided dependencies or create defaults
         self._rclone_service = rclone_service or RcloneService()
         self._storage_factory = storage_factory or StorageFactory(self._rclone_service)
         self._encryption_service = encryption_service or EncryptionService()
+        self._provider_registry = provider_registry
 
     def create_cloud_sync_config(
         self, config: CloudSyncConfigCreate
@@ -125,15 +119,16 @@ class CloudSyncService:
                 detail=f"Cloud sync configuration with name '{config.name}' already exists",
             )
 
-        # Validate provider exists using registry
-        supported_providers = get_supported_providers()
+        if not self._provider_registry:
+            raise ValueError("Provider registry is required but not provided")
+
+        supported_providers = self._provider_registry.get_supported_providers()
         if config.provider not in supported_providers:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(sorted(supported_providers))}",
             )
 
-        # Create storage instance to validate configuration (this will raise validation errors if invalid)
         try:
             storage = self._storage_factory.create_storage(
                 config.provider, config.provider_config
@@ -143,13 +138,11 @@ class CloudSyncService:
                 status_code=400, detail=f"Invalid provider configuration: {str(e)}"
             )
 
-        # Encrypt sensitive fields in the configuration
         sensitive_fields = storage.get_sensitive_fields()
         encrypted_config = self._encryption_service.encrypt_sensitive_fields(
             config.provider_config, sensitive_fields
         )
 
-        # Create database record
         db_config = CloudSyncConfig(
             name=config.name,
             provider=config.provider,
@@ -188,7 +181,6 @@ class CloudSyncService:
 
         config = self.get_cloud_sync_config_by_id(config_id)
 
-        # Check for duplicate name
         if config_update.name and config_update.name != config.name:
             existing = (
                 self.db.query(CloudSyncConfig)
@@ -205,7 +197,6 @@ class CloudSyncService:
                     detail=f"Cloud sync configuration with name '{config_update.name}' already exists",
                 )
 
-        # Update basic fields
         if config_update.name is not None:
             config.name = config_update.name
         if config_update.provider is not None:
@@ -215,9 +206,7 @@ class CloudSyncService:
         if config_update.enabled is not None:
             config.enabled = config_update.enabled
 
-        # Update provider_config if provided
         if config_update.provider_config is not None:
-            # Validate the new configuration
             provider = (
                 config_update.provider if config_update.provider else config.provider
             )
@@ -232,7 +221,6 @@ class CloudSyncService:
                     status_code=400, detail=f"Invalid provider configuration: {str(e)}"
                 )
 
-            # Encrypt sensitive fields in the new configuration
             encryption_service = EncryptionService()
             sensitive_fields = storage.get_sensitive_fields()
             encrypted_config = encryption_service.encrypt_sensitive_fields(
@@ -279,26 +267,19 @@ class CloudSyncService:
         """Test a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
-        # Parse JSON configuration
-        import json
-
         provider_config = json.loads(config.provider_config)
 
-        # Use injected dependencies or fall back to instance dependencies
         if encryption_service is None:
             encryption_service = self._encryption_service
         if storage_factory is None:
             storage_factory = self._storage_factory
 
-        # Get sensitive fields using the registry system
         sensitive_fields = _get_sensitive_fields_for_provider(config.provider)
 
-        # Decrypt sensitive fields first
         decrypted_config = encryption_service.decrypt_sensitive_fields(
             provider_config, sensitive_fields
         )
 
-        # Now create storage with decrypted config for testing
         storage_factory.create_storage(config.provider, decrypted_config)
 
         if config.provider == "s3":
@@ -332,20 +313,14 @@ class CloudSyncService:
         """Get decrypted configuration for editing in forms."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
-        # Parse JSON configuration
-        import json
-
         provider_config = json.loads(config.provider_config)
 
-        # Get sensitive fields using the registry system
         sensitive_fields = _get_sensitive_fields_for_provider(config.provider)
 
-        # Decrypt sensitive fields
         decrypted_provider_config = encryption_service.decrypt_sensitive_fields(
             provider_config, sensitive_fields
         )
 
-        # Build decrypted config for template
         decrypted_config = {
             "id": config.id,
             "name": config.name,
@@ -356,7 +331,6 @@ class CloudSyncService:
             "updated_at": config.updated_at,
         }
 
-        # Add all provider-specific fields from decrypted JSON
         decrypted_config.update(decrypted_provider_config)
 
         return decrypted_config

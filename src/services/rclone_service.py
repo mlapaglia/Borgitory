@@ -832,12 +832,10 @@ class RcloneService:
     ) -> AsyncGenerator[Dict, None]:
         """Sync a Borg repository to SMB using Rclone with SMB backend"""
 
-        # Build SMB path - format is :smb:sharename/path
         smb_path = f":smb:{share_name}"
         if path_prefix:
             smb_path = f"{smb_path}/{path_prefix}"
 
-        # Build rclone command with SMB backend flags
         command = [
             "rclone",
             "sync",
@@ -849,7 +847,6 @@ class RcloneService:
             "--verbose",
         ]
 
-        # Add SMB configuration flags
         smb_flags = self._build_smb_flags(
             host,
             user,
@@ -874,7 +871,7 @@ class RcloneService:
                 "type": "started",
                 "command": " ".join(
                     [c for c in command if not c.startswith("--smb-pass")]
-                ),  # Hide password
+                ),
                 "pid": process.pid,
             }
 
@@ -930,7 +927,6 @@ class RcloneService:
     ) -> Dict:
         """Test SMB connection by listing share contents"""
         try:
-            # Test basic connectivity by listing the share
             smb_path = f":smb:{share_name}"
 
             command = ["rclone", "lsd", smb_path, "--max-depth", "1", "--verbose"]
@@ -959,7 +955,6 @@ class RcloneService:
             stderr_text = stderr.decode("utf-8")
 
             if process.returncode == 0:
-                # Test write permissions by attempting to create a test file
                 test_result = await self._test_smb_write_permissions(
                     host,
                     user,
@@ -1037,18 +1032,15 @@ class RcloneService:
 
         temp_file = None
         try:
-            # Create a temporary test file
             with tempfile.NamedTemporaryFile(
                 mode="w", delete=False, suffix=".borgitory_test"
             ) as f:
                 f.write(f"Borgitory SMB test file - {time.time()}")
                 temp_file = f.name
 
-            # Test file name on remote
             test_filename = f"borgitory_test_{int(time.time())}.txt"
             remote_test_path = f":smb:{share_name}/{test_filename}"
 
-            # Try to copy the test file to SMB share
             command = ["rclone", "copy", temp_file, remote_test_path, "--verbose"]
 
             smb_flags = self._build_smb_flags(
@@ -1073,7 +1065,6 @@ class RcloneService:
             stdout, stderr = await process.communicate()
 
             if process.returncode == 0:
-                # Successfully wrote file, now try to delete it
                 delete_command = [
                     "rclone",
                     "deletefile",
@@ -1108,7 +1099,6 @@ class RcloneService:
                 "message": f"Write permission test failed: {str(e)}",
             }
         finally:
-            # Clean up temporary file
             if temp_file and os.path.exists(temp_file):
                 try:
                     os.unlink(temp_file)

@@ -5,8 +5,11 @@ This module provides SMB/CIFS-specific storage operations with clean separation
 from business logic and easy testability.
 """
 
+import re
 from typing import Callable, Optional
 from pydantic import Field, field_validator, model_validator
+
+from src.services.rclone_service import RcloneService
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
@@ -47,9 +50,7 @@ class SMBStorageConfig(CloudStorageConfig):
     @classmethod
     def validate_host(cls, v: str) -> str:
         """Validate SMB host format"""
-        import re
 
-        # Basic validation for hostname or IP
         if not re.match(r"^[a-zA-Z0-9.-]+$", v):
             raise ValueError(
                 "Host must contain only letters, numbers, periods, and hyphens"
@@ -64,7 +65,6 @@ class SMBStorageConfig(CloudStorageConfig):
     @classmethod
     def validate_user(cls, v: str) -> str:
         """Validate SMB username format"""
-        import re
 
         if not re.match(r"^[a-zA-Z0-9._-]+$", v):
             raise ValueError(
@@ -76,9 +76,7 @@ class SMBStorageConfig(CloudStorageConfig):
     @classmethod
     def validate_share_name(cls, v: str) -> str:
         """Validate SMB share name format"""
-        import re
 
-        # SMB share names can contain letters, numbers, spaces, and some special characters
         if not re.match(r"^[a-zA-Z0-9 ._-]+$", v):
             raise ValueError(
                 "Share name can only contain letters, numbers, spaces, periods, underscores, and hyphens"
@@ -89,7 +87,6 @@ class SMBStorageConfig(CloudStorageConfig):
     @classmethod
     def validate_domain(cls, v: str) -> str:
         """Validate domain name format"""
-        import re
 
         if not re.match(r"^[a-zA-Z0-9.-]+$", v):
             raise ValueError(
@@ -101,9 +98,7 @@ class SMBStorageConfig(CloudStorageConfig):
     @classmethod
     def validate_idle_timeout(cls, v: str) -> str:
         """Validate idle timeout format"""
-        import re
 
-        # Validate duration format like "1m0s", "30s", "2h", etc.
         if not re.match(r"^\d+[smh](\d+[smh])*$", v):
             raise ValueError(
                 "Idle timeout must be in duration format (e.g., '1m0s', '30s', '2h')"
@@ -131,7 +126,7 @@ class SMBStorage(CloudStorage):
     CloudStorage interface for easy testing and integration.
     """
 
-    def __init__(self, config: SMBStorageConfig, rclone_service):
+    def __init__(self, config: SMBStorageConfig, rclone_service: RcloneService):
         """
         Initialize SMB storage.
 
@@ -158,7 +153,6 @@ class SMBStorage(CloudStorage):
             )
 
         try:
-            # Use rclone service for actual I/O
             async for progress in self._rclone_service.sync_repository_to_smb(
                 repository_path=repository_path,
                 host=self._config.host,

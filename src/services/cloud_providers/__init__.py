@@ -12,7 +12,6 @@ Architecture Components:
 - config_service: Configuration loading and management
 """
 
-# Clean, testable cloud provider architecture
 from .types import SyncResult, SyncEvent, SyncEventType, CloudSyncConfig, ConnectionInfo
 from .storage import (
     CloudStorage,
@@ -35,7 +34,6 @@ from .config_service import (
 )
 
 __all__ = [
-    # New architecture
     "SyncResult",
     "SyncEvent",
     "SyncEventType",
