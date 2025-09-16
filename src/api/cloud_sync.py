@@ -123,17 +123,8 @@ async def create_cloud_sync_config(
 ):
     """Create a new cloud sync configuration"""
     try:
-        # Handle both JSON and form data
-        content_type = request.headers.get("content-type", "")
-
-        if "application/json" in content_type:
-            # Handle JSON data (from tests or direct API calls)
-            json_data = await request.json()
-            config = CloudSyncConfigCreate(**json_data)
-        else:
-            # Handle form data (from HTMX forms)
-            form_data = await request.form()
-            config = _parse_form_data_to_config(form_data)
+        form_data = await request.form()
+        config = _parse_form_data_to_config(form_data)
 
         cloud_sync_service.create_cloud_sync_config(config)
 
@@ -298,17 +289,8 @@ async def update_cloud_sync_config(
 ):
     """Update a cloud sync configuration"""
     try:
-        # Handle both JSON and form data
-        content_type = request.headers.get("content-type", "")
-
-        if "application/json" in content_type:
-            # Handle JSON data (from tests or direct API calls)
-            json_data = await request.json()
-            config_update = CloudSyncConfigUpdate(**json_data)
-        else:
-            # Handle form data (from HTMX forms)
-            form_data = await request.form()
-            config_update = _parse_form_data_to_config_update(form_data)
+        form_data = await request.form()
+        config_update = _parse_form_data_to_config_update(form_data)
 
         result = cloud_sync_service.update_cloud_sync_config(config_id, config_update)
 
