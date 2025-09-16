@@ -681,7 +681,6 @@ class TestSFTPStorage:
             port=2222,
             password="secure_password",
             private_key=None,
-            host_key_checking=True,
         )
 
     @pytest.mark.asyncio
