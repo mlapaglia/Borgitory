@@ -818,15 +818,108 @@ The registry pattern provides these key advantages:
 
 Much simpler! 🎉
 
+## Enhanced Rclone Integration Pattern
+
+The system now includes an enhanced rclone integration pattern that automates parameter mapping and provides generic dispatcher methods.
+
+### RcloneMethodMapping
+
+Each provider can define how its configuration maps to rclone method parameters:
+
+```python
+from src.services.cloud_providers.registry import RcloneMethodMapping
+
+mapping = RcloneMethodMapping(
+    sync_method="sync_repository_to_s3",           # RcloneService method name
+    test_method="test_s3_connection",              # Connection test method name
+    parameter_mapping={
+        "access_key": "access_key_id",             # config_field -> rclone_param
+        "secret_key": "secret_access_key",
+        "bucket_name": "bucket_name",
+        "region": "region"
+    },
+    required_params=["repository", "access_key_id", "secret_access_key", "bucket_name"],
+    optional_params={"region": "us-east-1", "path_prefix": ""}
+)
+```
+
+### Two Ways to Define Rclone Mapping
+
+#### Option 1: In Registration Decorator
+```python
+@register_provider(
+    name="myprovider",
+    label="My Provider",
+    rclone_mapping=mapping
+)
+class MyProvider:
+    config_class = MyProviderConfig
+    storage_class = MyProviderStorage
+```
+
+#### Option 2: Auto-Discovery from Storage Class
+```python
+class MyProviderStorage(CloudStorage):
+    @classmethod
+    def get_rclone_mapping(cls) -> RcloneMethodMapping:
+        return RcloneMethodMapping(
+            sync_method="sync_repository_to_myprovider",
+            test_method="test_myprovider_connection",
+            parameter_mapping={"field": "param"},
+            required_params=["repository", "param"]
+        )
+
+@register_provider(name="myprovider", label="My Provider")  # No explicit mapping needed
+class MyProvider:
+    config_class = MyProviderConfig
+    storage_class = MyProviderStorage
+```
+
+### Generic Dispatcher Methods
+
+The `RcloneService` now provides generic dispatcher methods that work with any registered provider:
+
+```python
+# Generic sync - automatically routes to provider-specific method
+async for result in rclone_service.sync_repository_to_provider(
+    "s3", repository, access_key="key", secret_key="secret", bucket_name="bucket"
+):
+    print(result)
+
+# Generic connection test
+result = await rclone_service.test_provider_connection(
+    "sftp", host="example.com", username="user", password="pass"
+)
+```
+
+### Validation
+
+Validate your provider's rclone integration:
+
+```python
+from src.services.cloud_providers.registry import validate_rclone_integration
+from src.services.rclone_service import RcloneService
+
+errors = validate_rclone_integration("myprovider", RcloneService())
+if errors:
+    print("Validation errors:", errors)
+else:
+    print("✅ Rclone integration is valid!")
+```
+
 ## Current Limitations
 
 While the registry pattern significantly simplifies adding new providers, some manual steps remain:
 
 ### Manual Steps Still Required:
 - **Template Creation**: Template files must be created manually (though they're auto-discovered)
-- **Rclone Methods**: Provider-specific rclone methods must be implemented
-- **Dispatcher Updates**: Generic dispatcher methods need manual updates for new providers
+- **Rclone Methods**: Provider-specific rclone methods must be implemented in `RcloneService`
 - **Testing**: Comprehensive test suites should be written
+
+### What's Now Automated:
+- **Rclone Dispatchers**: Generic dispatcher methods automatically route to provider-specific methods using registry
+- **Parameter Mapping**: Configuration parameters are automatically mapped to rclone method parameters
+- **Validation**: Comprehensive validation of rclone integration is available
 
 ### Future Improvements:
 - Auto-generate basic template files from provider metadata

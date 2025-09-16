@@ -1105,74 +1105,110 @@ class RcloneService:
                 except OSError:
                     pass
 
-    # Generic dispatcher methods for provider-agnostic access
+    # Generic dispatcher methods using registry-based mapping
     async def sync_repository_to_provider(
         self, provider: str, repository: Repository, **provider_config
     ) -> AsyncGenerator[Dict, None]:
-        """Generic provider sync dispatcher"""
-        if provider == "s3":
-            async for result in self.sync_repository_to_s3(
-                repository=repository,
-                access_key_id=provider_config["access_key"],
-                secret_access_key=provider_config["secret_key"],
-                bucket_name=provider_config["bucket"],
-                path_prefix=provider_config.get("path_prefix", ""),
-            ):
-                yield result
-        elif provider == "sftp":
-            async for result in self.sync_repository_to_sftp(
-                repository=repository,
-                host=provider_config["host"],
-                username=provider_config["username"],
-                remote_path=provider_config.get("remote_path", ""),
-                port=provider_config.get("port", 22),
-                password=provider_config.get("password"),
-                private_key=provider_config.get("private_key"),
-                host_key_checking=provider_config.get("host_key_checking", True),
-                timeout=provider_config.get("timeout", "10s"),
-            ):
-                yield result
-        elif provider == "smb":
-            async for result in self.sync_repository_to_smb(
-                repository=repository,
-                host=provider_config["host"],
-                user=provider_config["user"],
-                share_name=provider_config["share_name"],
-                remote_path=provider_config.get("remote_path", ""),
-                password=provider_config.get("pass"),
-                port=provider_config.get("port", 445),
-                domain=provider_config.get("domain", ""),
-            ):
-                yield result
-        else:
-            raise ValueError(f"Unsupported provider for sync: {provider}")
+        """
+        Truly generic provider sync dispatcher using registry.
+
+        Args:
+            provider: Provider name (e.g., "s3", "sftp", "smb")
+            repository: Repository object to sync
+            **provider_config: Provider-specific configuration parameters
+
+        Yields:
+            Progress dictionaries from the underlying rclone method
+
+        Raises:
+            ValueError: If provider is unknown or has no rclone mapping
+        """
+        from .cloud_providers.registry import get_metadata
+
+        # Get rclone mapping from registry
+        metadata = get_metadata(provider)
+        if not metadata or not metadata.rclone_mapping:
+            raise ValueError(f"Provider '{provider}' has no rclone mapping configured")
+
+        mapping = metadata.rclone_mapping
+
+        # Get the rclone method
+        sync_method = getattr(self, mapping.sync_method, None)
+        if not sync_method:
+            raise ValueError(f"Rclone method '{mapping.sync_method}' not found")
+
+        # Map parameters from config to rclone method parameters
+        rclone_params = {"repository": repository}
+
+        # Apply parameter mapping
+        for config_field, rclone_param in mapping.parameter_mapping.items():
+            if config_field in provider_config:
+                rclone_params[rclone_param] = provider_config[config_field]
+
+        # Add optional parameters with defaults
+        for param, default_value in mapping.optional_params.items():
+            if param not in rclone_params:
+                rclone_params[param] = provider_config.get(param, default_value)
+
+        # Validate required parameters
+        missing_params = [p for p in mapping.required_params if p not in rclone_params]
+        if missing_params:
+            raise ValueError(
+                f"Missing required parameters for {provider}: {missing_params}"
+            )
+
+        # Call the method and yield results
+        async for result in sync_method(**rclone_params):
+            yield result
 
     async def test_provider_connection(self, provider: str, **provider_config) -> Dict:
-        """Generic provider connection test dispatcher"""
-        if provider == "s3":
-            return await self.test_s3_connection(
-                access_key_id=provider_config["access_key"],
-                secret_access_key=provider_config["secret_key"],
-                bucket_name=provider_config["bucket"],
+        """
+        Generic provider connection test dispatcher using registry.
+
+        Args:
+            provider: Provider name (e.g., "s3", "sftp", "smb")
+            **provider_config: Provider-specific configuration parameters
+
+        Returns:
+            Dictionary with connection test results
+
+        Raises:
+            ValueError: If provider is unknown or has no rclone mapping
+        """
+        from .cloud_providers.registry import get_metadata
+
+        # Get rclone mapping from registry
+        metadata = get_metadata(provider)
+        if not metadata or not metadata.rclone_mapping:
+            raise ValueError(f"Provider '{provider}' has no rclone mapping configured")
+
+        mapping = metadata.rclone_mapping
+
+        # Get the rclone test method
+        test_method = getattr(self, mapping.test_method, None)
+        if not test_method:
+            raise ValueError(f"Rclone test method '{mapping.test_method}' not found")
+
+        # Map parameters from config to rclone method parameters
+        rclone_params = {}
+
+        # Apply parameter mapping
+        for config_field, rclone_param in mapping.parameter_mapping.items():
+            if config_field in provider_config:
+                rclone_params[rclone_param] = provider_config[config_field]
+
+        # Add optional parameters with defaults (excluding repository and path_prefix for connection tests)
+        for param, default_value in mapping.optional_params.items():
+            if param not in ["path_prefix"] and param not in rclone_params:
+                rclone_params[param] = provider_config.get(param, default_value)
+
+        # Validate required parameters (excluding repository for connection tests)
+        test_required_params = [p for p in mapping.required_params if p != "repository"]
+        missing_params = [p for p in test_required_params if p not in rclone_params]
+        if missing_params:
+            raise ValueError(
+                f"Missing required parameters for {provider} connection test: {missing_params}"
             )
-        elif provider == "sftp":
-            return await self.test_sftp_connection(
-                host=provider_config["host"],
-                username=provider_config["username"],
-                port=provider_config.get("port", 22),
-                password=provider_config.get("password"),
-                private_key=provider_config.get("private_key"),
-                host_key_checking=provider_config.get("host_key_checking", True),
-                timeout=provider_config.get("timeout", "10s"),
-            )
-        elif provider == "smb":
-            return await self.test_smb_connection(
-                host=provider_config["host"],
-                user=provider_config["user"],
-                share_name=provider_config["share_name"],
-                password=provider_config.get("pass"),
-                port=provider_config.get("port", 445),
-                domain=provider_config.get("domain", ""),
-            )
-        else:
-            raise ValueError(f"Unsupported provider for connection test: {provider}")
+
+        # Call the test method
+        return await test_method(**rclone_params)

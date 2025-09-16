@@ -13,7 +13,7 @@ from src.services.rclone_service import RcloneService
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
-from ..registry import register_provider
+from ..registry import register_provider, RcloneMethodMapping
 
 
 class SFTPStorageConfig(CloudStorageConfig):
@@ -205,6 +205,30 @@ class SFTPStorage(CloudStorage):
 
         return {"provider_name": "SFTP (SSH)", "provider_details": provider_details}
 
+    @classmethod
+    def get_rclone_mapping(cls) -> RcloneMethodMapping:
+        """Define rclone parameter mapping for SFTP"""
+        return RcloneMethodMapping(
+            sync_method="sync_repository_to_sftp",
+            test_method="test_sftp_connection",
+            parameter_mapping={
+                "host": "host",
+                "username": "username",
+                "remote_path": "remote_path",
+                "port": "port",
+                "password": "password",
+                "private_key": "private_key",
+                "host_key_checking": "host_key_checking",
+            },
+            required_params=["repository", "host", "username"],
+            optional_params={
+                "port": 22,
+                "host_key_checking": True,
+                "timeout": "10s",
+                "path_prefix": "",
+            },
+        )
+
 
 @register_provider(
     name="sftp",
@@ -213,6 +237,26 @@ class SFTPStorage(CloudStorage):
     supports_encryption=True,
     supports_versioning=False,
     requires_credentials=True,
+    rclone_mapping=RcloneMethodMapping(
+        sync_method="sync_repository_to_sftp",
+        test_method="test_sftp_connection",
+        parameter_mapping={
+            "host": "host",
+            "username": "username",
+            "remote_path": "remote_path",
+            "port": "port",
+            "password": "password",
+            "private_key": "private_key",
+            "host_key_checking": "host_key_checking",
+        },
+        required_params=["repository", "host", "username"],
+        optional_params={
+            "port": 22,
+            "host_key_checking": True,
+            "timeout": "10s",
+            "path_prefix": "",
+        },
+    ),
 )
 class SFTPProvider:
     """SFTP provider registration"""

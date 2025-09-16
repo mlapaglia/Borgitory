@@ -13,7 +13,7 @@ from src.services.rclone_service import RcloneService
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
-from ..registry import register_provider
+from ..registry import register_provider, RcloneMethodMapping
 
 
 class SMBStorageConfig(CloudStorageConfig):
@@ -258,6 +258,30 @@ class SMBStorage(CloudStorage):
 
         return {"provider_name": "SMB/CIFS", "provider_details": provider_details}
 
+    @classmethod
+    def get_rclone_mapping(cls) -> RcloneMethodMapping:
+        """Define rclone parameter mapping for SMB"""
+        return RcloneMethodMapping(
+            sync_method="sync_repository_to_smb",
+            test_method="test_smb_connection",
+            parameter_mapping={
+                "host": "host",
+                "user": "user",
+                "pass_": "password",  # SMB config uses pass_ (alias), rclone expects password
+                "port": "port",
+                "domain": "domain",
+                "share_name": "share_name",
+                "spn": "spn",
+                "use_kerberos": "use_kerberos",
+                "idle_timeout": "idle_timeout",
+                "hide_special_share": "hide_special_share",
+                "case_insensitive": "case_insensitive",
+                "kerberos_ccache": "kerberos_ccache",
+            },
+            required_params=["repository", "host", "user", "share_name"],
+            optional_params={"port": 445, "domain": "WORKGROUP", "path_prefix": ""},
+        )
+
 
 @register_provider(
     name="smb",
@@ -266,6 +290,26 @@ class SMBStorage(CloudStorage):
     supports_encryption=True,
     supports_versioning=False,
     requires_credentials=True,
+    rclone_mapping=RcloneMethodMapping(
+        sync_method="sync_repository_to_smb",
+        test_method="test_smb_connection",
+        parameter_mapping={
+            "host": "host",
+            "user": "user",
+            "pass_": "password",  # SMB config uses pass_ (alias), rclone expects password
+            "port": "port",
+            "domain": "domain",
+            "share_name": "share_name",
+            "spn": "spn",
+            "use_kerberos": "use_kerberos",
+            "idle_timeout": "idle_timeout",
+            "hide_special_share": "hide_special_share",
+            "case_insensitive": "case_insensitive",
+            "kerberos_ccache": "kerberos_ccache",
+        },
+        required_params=["repository", "host", "user", "share_name"],
+        optional_params={"port": 445, "domain": "WORKGROUP", "path_prefix": ""},
+    ),
 )
 class SMBProvider:
     """SMB provider registration"""

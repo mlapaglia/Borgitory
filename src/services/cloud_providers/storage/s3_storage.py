@@ -12,7 +12,7 @@ from src.services.rclone_service import RcloneService
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
-from ..registry import register_provider
+from ..registry import register_provider, RcloneMethodMapping
 
 
 class S3StorageConfig(CloudStorageConfig):
@@ -213,6 +213,29 @@ class S3Storage(CloudStorage):
 
         return {"provider_name": "AWS S3", "provider_details": provider_details}
 
+    @classmethod
+    def get_rclone_mapping(cls) -> RcloneMethodMapping:
+        """Define rclone parameter mapping for S3"""
+        return RcloneMethodMapping(
+            sync_method="sync_repository_to_s3",
+            test_method="test_s3_connection",
+            parameter_mapping={
+                "access_key": "access_key_id",
+                "secret_key": "secret_access_key",
+                "bucket_name": "bucket_name",
+                "region": "region",
+                "endpoint_url": "endpoint_url",
+                "storage_class": "storage_class",
+            },
+            required_params=[
+                "repository",
+                "access_key_id",
+                "secret_access_key",
+                "bucket_name",
+            ],
+            optional_params={"path_prefix": "", "region": "us-east-1"},
+        )
+
 
 @register_provider(
     name="s3",
@@ -221,6 +244,25 @@ class S3Storage(CloudStorage):
     supports_encryption=True,
     supports_versioning=True,
     requires_credentials=True,
+    rclone_mapping=RcloneMethodMapping(
+        sync_method="sync_repository_to_s3",
+        test_method="test_s3_connection",
+        parameter_mapping={
+            "access_key": "access_key_id",
+            "secret_key": "secret_access_key",
+            "bucket_name": "bucket_name",
+            "region": "region",
+            "endpoint_url": "endpoint_url",
+            "storage_class": "storage_class",
+        },
+        required_params=[
+            "repository",
+            "access_key_id",
+            "secret_access_key",
+            "bucket_name",
+        ],
+        optional_params={"path_prefix": "", "region": "us-east-1"},
+    ),
 )
 class S3Provider:
     """S3 provider registration"""

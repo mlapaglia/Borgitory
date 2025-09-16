@@ -14,6 +14,21 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class RcloneMethodMapping:
+    """Defines how to map config parameters to rclone method parameters"""
+
+    sync_method: str  # e.g., "sync_repository_to_s3"
+    test_method: str  # e.g., "test_s3_connection"
+    parameter_mapping: Dict[str, str]  # config_field -> rclone_param
+    required_params: List[str]
+    optional_params: Optional[Dict[str, Any]] = None  # param -> default_value
+
+    def __post_init__(self):
+        if self.optional_params is None:
+            self.optional_params = {}
+
+
+@dataclass
 class ProviderMetadata:
     """Metadata about a cloud storage provider"""
 
@@ -24,6 +39,7 @@ class ProviderMetadata:
     supports_versioning: bool = False
     requires_credentials: bool = True
     additional_info: Dict[str, Any] = None
+    rclone_mapping: Optional[RcloneMethodMapping] = None
 
     def __post_init__(self):
         if self.additional_info is None:
@@ -150,6 +166,7 @@ def register_provider(
     supports_encryption: bool = True,
     supports_versioning: bool = False,
     requires_credentials: bool = True,
+    rclone_mapping: Optional[RcloneMethodMapping] = None,
     **metadata_kwargs,
 ) -> Callable:
     """
@@ -187,6 +204,19 @@ def register_provider(
                 f"Provider class {provider_class.__name__} must have 'storage_class' attribute"
             )
 
+        # Auto-discover rclone mapping if not provided
+        final_rclone_mapping = rclone_mapping
+        if not final_rclone_mapping and hasattr(
+            provider_class.storage_class, "get_rclone_mapping"
+        ):
+            try:
+                final_rclone_mapping = provider_class.storage_class.get_rclone_mapping()
+                logger.debug(f"Auto-discovered rclone mapping for provider '{name}'")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to auto-discover rclone mapping for provider '{name}': {e}"
+                )
+
         # Create metadata
         metadata = ProviderMetadata(
             name=name,
@@ -196,6 +226,7 @@ def register_provider(
             supports_versioning=supports_versioning,
             requires_credentials=requires_credentials,
             additional_info=metadata_kwargs,
+            rclone_mapping=final_rclone_mapping,
         )
 
         # Register with global registry
@@ -295,3 +326,65 @@ def clear_registry() -> None:
     _registry._config_classes.clear()
     _registry._storage_classes.clear()
     _registry._metadata.clear()
+
+
+def validate_rclone_integration(provider: str, rclone_service) -> List[str]:
+    """
+    Validate that provider has proper rclone integration.
+
+    Args:
+        provider: Provider name to validate
+        rclone_service: Rclone service instance for method validation (required)
+
+    Returns:
+        List of validation error messages (empty if valid)
+    """
+    errors = []
+
+    if rclone_service is None:
+        errors.append("Rclone service is required for validation")
+        return errors
+
+    metadata = get_metadata(provider)
+    if not metadata:
+        errors.append(f"Provider '{provider}' not registered")
+        return errors
+
+    if not metadata.rclone_mapping:
+        errors.append(f"Provider '{provider}' has no rclone mapping configured")
+        return errors
+
+    mapping = metadata.rclone_mapping
+
+    # Validate required fields
+    if not mapping.sync_method:
+        errors.append(f"Provider '{provider}' missing sync_method in rclone mapping")
+
+    if not mapping.test_method:
+        errors.append(f"Provider '{provider}' missing test_method in rclone mapping")
+
+    if not mapping.parameter_mapping:
+        errors.append(
+            f"Provider '{provider}' missing parameter_mapping in rclone mapping"
+        )
+
+    if not mapping.required_params:
+        errors.append(
+            f"Provider '{provider}' missing required_params in rclone mapping"
+        )
+
+    # Check if rclone methods exist
+    try:
+        if mapping.sync_method and not hasattr(rclone_service, mapping.sync_method):
+            errors.append(f"Rclone sync method '{mapping.sync_method}' not found")
+
+        if mapping.test_method and not hasattr(rclone_service, mapping.test_method):
+            errors.append(f"Rclone test method '{mapping.test_method}' not found")
+
+    except Exception as e:
+        logger.warning(
+            f"Could not validate rclone methods for provider '{provider}': {e}"
+        )
+        errors.append(f"Error validating rclone methods: {str(e)}")
+
+    return errors
