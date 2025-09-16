@@ -146,6 +146,25 @@ markers = [
     "integration: marks tests as integration tests (may require external dependencies)",
 ]
 
+[tool.coverage.run]
+source = ["src/borgitory"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/alembic/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
 [tool.mypy]
 python_version = "3.11"
 show_error_codes = true
