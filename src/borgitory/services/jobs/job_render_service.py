@@ -158,13 +158,13 @@ class JobRenderService:
         job_id = job.id
 
         # Status styling
-        if job.status is "completed":
+        if job.status == "completed":
             status_class = "bg-green-100 text-green-800"
             status_icon = "✓"
-        elif job.status is "failed":
+        elif job.status == "failed":
             status_class = "bg-red-100 text-red-800"
             status_icon = "✗"
-        elif job.status is "running":
+        elif job.status == "running":
             status_class = "bg-blue-100 text-blue-800"
             status_icon = "⟳"
         else:
@@ -198,7 +198,7 @@ class JobRenderService:
         sorted_tasks = sorted(job.tasks or [], key=lambda t: t.task_order)
 
         # Fix task statuses for failed jobs
-        if job.status is "failed":
+        if job.status == "failed":
             sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
 
         # Create a job context object that uses UUID as the primary ID
@@ -273,13 +273,13 @@ class JobRenderService:
             repository_name = job.repository.name if job.repository else "Unknown"
 
             # Status styling
-            if job.status is "completed":
+            if job.status == "completed":
                 status_class = "bg-green-100 text-green-800"
                 status_icon = "✓"
-            elif job.status is "failed":
+            elif job.status == "failed":
                 status_class = "bg-red-100 text-red-800"
                 status_icon = "✗"
-            elif job.status is "running":
+            elif job.status == "running":
                 status_class = "bg-blue-100 text-blue-800"
                 status_icon = "⟳"
             else:
@@ -321,7 +321,7 @@ class JobRenderService:
             )
 
             # Fix task statuses for failed jobs
-            if has_tasks and job.status is "failed":
+            if has_tasks and job.status == "failed":
                 sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
 
             # Create a job context object that uses UUID as the primary ID
@@ -437,7 +437,9 @@ class JobRenderService:
                 # If we're using database status for completed/failed jobs, use database tasks too
                 if db_job and db_job.status in ["completed", "failed"] and db_job.tasks:
                     # Use database tasks for consistency
-                    sorted_tasks = sorted(db_job.tasks or [], key=lambda t: t.task_order)
+                    sorted_tasks = sorted(
+                        db_job.tasks or [], key=lambda t: t.task_order
+                    )
                 elif hasattr(manager_job, "tasks"):
                     # Use manager tasks for running jobs
                     for i, task in enumerate(manager_job.tasks):

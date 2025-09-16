@@ -192,7 +192,7 @@ class TestJobRenderServiceIntegration:
 
 
 class TestJobRenderServiceErrorHandling:
-    """Test error handling in JobRenderService"""# type: ignore
+    """Test error handling in JobRenderService"""  # type: ignore
 
     def test_handles_missing_repository_gracefully(self, mock_job_manager):
         """Test handling jobs with missing repository"""
