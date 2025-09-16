@@ -1104,3 +1104,75 @@ class RcloneService:
                     os.unlink(temp_file)
                 except OSError:
                     pass
+
+    # Generic dispatcher methods for provider-agnostic access
+    async def sync_repository_to_provider(
+        self, provider: str, repository: Repository, **provider_config
+    ) -> AsyncGenerator[Dict, None]:
+        """Generic provider sync dispatcher"""
+        if provider == "s3":
+            async for result in self.sync_repository_to_s3(
+                repository=repository,
+                access_key_id=provider_config["access_key"],
+                secret_access_key=provider_config["secret_key"],
+                bucket_name=provider_config["bucket"],
+                path_prefix=provider_config.get("path_prefix", ""),
+            ):
+                yield result
+        elif provider == "sftp":
+            async for result in self.sync_repository_to_sftp(
+                repository=repository,
+                host=provider_config["host"],
+                username=provider_config["username"],
+                remote_path=provider_config.get("remote_path", ""),
+                port=provider_config.get("port", 22),
+                password=provider_config.get("password"),
+                private_key=provider_config.get("private_key"),
+                host_key_checking=provider_config.get("host_key_checking", True),
+                timeout=provider_config.get("timeout", "10s"),
+            ):
+                yield result
+        elif provider == "smb":
+            async for result in self.sync_repository_to_smb(
+                repository=repository,
+                host=provider_config["host"],
+                user=provider_config["user"],
+                share_name=provider_config["share_name"],
+                remote_path=provider_config.get("remote_path", ""),
+                password=provider_config.get("pass"),
+                port=provider_config.get("port", 445),
+                domain=provider_config.get("domain", ""),
+            ):
+                yield result
+        else:
+            raise ValueError(f"Unsupported provider for sync: {provider}")
+
+    async def test_provider_connection(self, provider: str, **provider_config) -> Dict:
+        """Generic provider connection test dispatcher"""
+        if provider == "s3":
+            return await self.test_s3_connection(
+                access_key_id=provider_config["access_key"],
+                secret_access_key=provider_config["secret_key"],
+                bucket_name=provider_config["bucket"],
+            )
+        elif provider == "sftp":
+            return await self.test_sftp_connection(
+                host=provider_config["host"],
+                username=provider_config["username"],
+                port=provider_config.get("port", 22),
+                password=provider_config.get("password"),
+                private_key=provider_config.get("private_key"),
+                host_key_checking=provider_config.get("host_key_checking", True),
+                timeout=provider_config.get("timeout", "10s"),
+            )
+        elif provider == "smb":
+            return await self.test_smb_connection(
+                host=provider_config["host"],
+                user=provider_config["user"],
+                share_name=provider_config["share_name"],
+                password=provider_config.get("pass"),
+                port=provider_config.get("port", 445),
+                domain=provider_config.get("domain", ""),
+            )
+        else:
+            raise ValueError(f"Unsupported provider for connection test: {provider}")

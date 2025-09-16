@@ -13,7 +13,6 @@ from models.schemas import (
 from services.rclone_service import RcloneService
 from services.cloud_providers.registry import (
     get_storage_class,
-    get_config_class,
 )
 from services.cloud_providers import StorageFactory, EncryptionService
 
@@ -32,57 +31,33 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
     # Create a temporary instance to get sensitive fields
     # We need to pass None for config and rclone_service since we only need the method
     try:
-        # Most storage classes have this as a class method or don't need the instance
         if hasattr(storage_class, "get_sensitive_fields"):
+            # Try to call it as a static method first
             try:
                 return storage_class.get_sensitive_fields(None)
             except TypeError:
-                config_class = get_config_class(provider)
-                if config_class:
-                    try:
-                        if provider == "s3":
-                            temp_config = config_class(
-                                bucket="temp", access_key="temp", secret_key="temp"
-                            )
-                        elif provider == "sftp":
-                            temp_config = config_class(
-                                host="temp", username="temp", password="temp"
-                            )
-                        elif provider == "smb":
-                            temp_config = config_class(
-                                host="temp", user="temp", share_name="temp"
-                            )
-                        else:
-                            # Generic fallback
-                            temp_config = config_class()
+                # It's an instance method, so we need to create a temporary instance
+                # Since we only need the get_sensitive_fields method, we can pass None
+                # for both config and rclone_service - storage classes should handle this
+                try:
+                    temp_storage = storage_class(None, None)
+                    return temp_storage.get_sensitive_fields()
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create temp storage instance for {provider}: {e}"
+                    )
+                    # If we can't create an instance, try to inspect the method
+                    # or return empty list - no hardcoded fallbacks
+                    return []
 
-                        temp_storage = storage_class(temp_config, None)
-                        return temp_storage.get_sensitive_fields()
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to create temp storage for {provider}: {e}"
-                        )
-                        return []
-
-        if provider == "s3":
-            return ["access_key", "secret_key"]
-        elif provider == "sftp":
-            return ["password", "private_key"]
-        elif provider == "smb":
-            return ["pass"]
-        else:
-            return []
+        logger.warning(
+            f"Provider '{provider}' storage class has no get_sensitive_fields method"
+        )
+        return []
 
     except Exception as e:
         logger.warning(f"Error getting sensitive fields for provider '{provider}': {e}")
-        if provider == "s3":
-            return ["access_key", "secret_key"]
-        elif provider == "sftp":
-            return ["password", "private_key"]
-        elif provider == "smb":
-            return ["pass"]
-        else:
-            return []
+        return []
 
 
 class CloudSyncService:

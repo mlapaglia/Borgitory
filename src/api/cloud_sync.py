@@ -45,17 +45,20 @@ def _get_supported_providers(registry) -> List[dict]:
 
 def _get_provider_template(provider: str, mode: str = "create") -> str:
     """Get the appropriate template path for a provider and mode"""
+    import os
+
     if not provider:
         return None
 
-    # Check if template file exists by checking known providers with templates
-    # These are the providers that currently have template files
-    providers_with_templates = {"s3", "sftp", "smb"}
-    if provider not in providers_with_templates:
-        return None
-
+    # Automatically discover templates by checking if they exist on filesystem
     suffix = "_edit" if mode == "edit" else ""
-    return f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
+    template_path = f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
+    full_path = f"src/templates/{template_path}"
+
+    if os.path.exists(full_path):
+        return template_path
+
+    return None
 
 
 def _get_submit_button_text(registry, provider: str, mode: str = "create") -> str:

@@ -41,6 +41,7 @@ from pydantic import Field, field_validator, model_validator
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider
+from ...rclone_service import RcloneService
 
 
 class {ProviderName}StorageConfig(CloudStorageConfig):
@@ -259,71 +260,129 @@ Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`
 </div>
 ```
 
-### 4. Update Frontend Template Context
+### 4. Template Integration (Automatic)
 
-Edit `src/api/cloud_sync.py` in the `get_provider_fields` function to add your provider's context variable:
+**Good news!** With the current implementation, templates are automatically discovered by checking if the template file exists on the filesystem. You don't need to manually update any API context variables.
 
-```python
-context = {
-    "provider": provider,
-    "is_s3": provider == "s3",
-    "is_sftp": provider == "sftp",
-    "is_smb": provider == "smb",
-    "is_{provider_name}": provider == "{provider_name}",  # Add this line for template logic
-}
-```
+The system will automatically:
+- Check if `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html` exists
+- Include it in the provider fields if found
+- Generate submit button text from registry metadata
+- Handle provider validation through the registry
 
-**Note**: With the registry pattern, submit button text and provider validation are handled automatically. You only need to add the `is_{provider_name}` context variable for template conditional logic.
+Simply create your template file and it will be automatically integrated!
 
-## What's No Longer Needed ✨
+## What's Simplified by the Registry Pattern ✨
 
-Thanks to the registry pattern, you **do not** need to:
+Thanks to the registry pattern, many things are automated:
 
-- ❌ **Update Provider Enums**: No more manual enum updates in `src/models/schemas.py`
-- ❌ **Update Service Layer**: No hardcoded if/elif chains in service classes
-- ❌ **Update API Provider Lists**: No manual provider lists in `src/api/cloud_sync.py`
-- ❌ **Update Sensitive Field Detection**: Handled automatically via registry
-- ❌ **Update Submit Button Logic**: Generated automatically from registry metadata
+- ✅ **Provider Discovery**: Automatic detection via `@register_provider` decorator
+- ✅ **API Integration**: Providers appear in `/api/cloud-sync/providers` automatically
+- ✅ **Template Discovery**: Automatic filesystem-based template detection
+- ✅ **Submit Button Text**: Generated from registry metadata
+- ✅ **Configuration Validation**: Uses registered config classes
+- ✅ **Sensitive Field Detection**: Uses storage class methods
 
-The `@register_provider` decorator handles all of this automatically!
+**Note**: Some manual steps are still required when adding new providers:
+- Create template files manually
+- Add rclone service methods for new providers
+- Update this documentation with provider-specific details
 
 ### 5. Implement Rclone Integration
 
 Add methods to `src/services/rclone_service.py`:
 
 ```python
+async def sync_repository_to_{provider_name}(
+    self,
+    repository: Repository,
+    endpoint_url: str,
+    api_key: str,
+    bucket_name: str,
+    path_prefix: str = "",
+    region: Optional[str] = None,
+) -> AsyncGenerator[Dict, None]:
+    """Sync repository to {Provider Name} using rclone"""
+    try:
+        # Build provider-specific rclone command
+        # Example structure (adapt for your provider):
+        command = [
+            "rclone", "sync",
+            repository.path,
+            f":your-provider:{bucket_name}/{path_prefix}",
+            "--progress", "--stats", "1s", "--verbose"
+        ]
+        
+        # Add provider-specific flags
+        command.extend([
+            "--your-provider-endpoint", endpoint_url,
+            "--your-provider-api-key", api_key,
+        ])
+        
+        # Execute and yield progress (see existing methods for full implementation)
+        process = await asyncio.create_subprocess_exec(
+            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        
+        # ... rest of implementation similar to existing methods
+        
+    except Exception as e:
+        yield {"type": "error", "message": str(e)}
+
 async def test_{provider_name}_connection(
     self,
     endpoint_url: str,
     api_key: str,
     bucket_name: str,
     region: Optional[str] = None,
-) -> dict:
+) -> Dict:
     """Test {Provider Name} connection"""
     try:
-        # Implement your connection test logic
-        # This will vary based on your provider's API
-        pass
+        # Test connection using rclone lsd or similar command
+        command = [
+            "rclone", "lsd", f":your-provider:{bucket_name}",
+            "--your-provider-endpoint", endpoint_url,
+            "--your-provider-api-key", api_key,
+        ]
+        
+        process = await asyncio.create_subprocess_exec(
+            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode == 0:
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": stderr.decode()}
+            
     except Exception as e:
         return {"status": "error", "message": str(e)}
+```
 
-async def upload_to_{provider_name}(
-    self,
-    source_path: str,
-    remote_path: str,
-    endpoint_url: str,
-    api_key: str,
-    bucket_name: str,
-    region: Optional[str] = None,
-    progress_callback: Optional[Callable] = None,
-) -> None:
-    """Upload to {Provider Name} using rclone"""
-    try:
-        # Implement your upload logic using rclone
-        # This will vary based on your provider's rclone backend
-        pass
-    except Exception as e:
-        raise Exception(f"Failed to upload to {Provider Name}: {str(e)}") from e
+**Important**: After adding these methods, update the generic dispatcher methods in the same file:
+
+```python
+# Add your provider to the generic sync_repository_to_provider method
+if provider == "{provider_name}":
+    async for result in self.sync_repository_to_{provider_name}(
+        repository=repository,
+        endpoint_url=provider_config["endpoint_url"],
+        api_key=provider_config["api_key"],
+        bucket_name=provider_config["bucket_name"],
+        path_prefix=provider_config.get("path_prefix", ""),
+        region=provider_config.get("region"),
+    ):
+        yield result
+
+# Add your provider to the generic test_provider_connection method
+elif provider == "{provider_name}":
+    return await self.test_{provider_name}_connection(
+        endpoint_url=provider_config["endpoint_url"],
+        api_key=provider_config["api_key"],
+        bucket_name=provider_config["bucket_name"],
+        region=provider_config.get("region"),
+    )
 ```
 
 ### 6. Create Tests
@@ -454,6 +513,7 @@ def test_create_{provider_name}_config_success(self, service, test_db):
 
 ```bash
 python -c "
+import sys; sys.path.append('src')
 from src.services.cloud_providers.storage.{provider_name}_storage import {ProviderName}StorageConfig
 config = {ProviderName}StorageConfig(
     endpoint_url='https://api.{provider}.com',
@@ -489,10 +549,10 @@ Verify your provider is automatically registered:
 ```bash
 python -c "
 import sys; sys.path.append('src')
-from services.cloud_providers.registry import get_supported_providers, get_all_provider_info
+from src.services.cloud_providers.registry import get_supported_providers, get_all_provider_info
 
 # Import your storage module to trigger registration
-import services.cloud_providers.storage.{provider_name}_storage
+from src.services.cloud_providers.storage.{provider_name}_storage import {ProviderName}Provider
 
 print('Registered providers:', get_supported_providers())
 info = get_all_provider_info()
@@ -751,7 +811,25 @@ The registry pattern provides these key advantages:
 ```text
 1. Create storage classes ✏️
 2. Add @register_provider decorator ✨
-3. Update frontend template ✏️
+3. Create frontend template ✏️
+4. Add rclone service methods ✏️
+5. Update rclone dispatcher methods ✏️
 ```
 
-That's it! 🎉
+Much simpler! 🎉
+
+## Current Limitations
+
+While the registry pattern significantly simplifies adding new providers, some manual steps remain:
+
+### Manual Steps Still Required:
+- **Template Creation**: Template files must be created manually (though they're auto-discovered)
+- **Rclone Methods**: Provider-specific rclone methods must be implemented
+- **Dispatcher Updates**: Generic dispatcher methods need manual updates for new providers
+- **Testing**: Comprehensive test suites should be written
+
+### Future Improvements:
+- Auto-generate basic template files from provider metadata
+- Create more generic rclone integration patterns
+- Add provider validation CLI tool
+- Implement template generation from config schemas
