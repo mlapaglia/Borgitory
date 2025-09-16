@@ -75,7 +75,7 @@ async def create_cloud_sync_config(
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ):
-    """Create a new cloud sync configuration"""
+    """Create a new cloud sync configuration (JSON API)"""
     try:
         cloud_sync_service.create_cloud_sync_config(config)
 
@@ -116,18 +116,29 @@ def get_cloud_sync_configs_html(
         # Process configs to add computed fields for template
         processed_configs = []
         for config in configs_raw:
+            # Parse JSON configuration
+            import json
+
+            try:
+                provider_config = json.loads(config.provider_config)
+            except (json.JSONDecodeError, AttributeError):
+                provider_config = {}
+
             # Generate provider-specific details
             if config.provider == "s3":
                 provider_name = "AWS S3"
-                provider_details = (
-                    f"<div><strong>Bucket:</strong> {config.bucket_name}</div>"
-                )
+                bucket_name = provider_config.get("bucket_name", "Unknown")
+                provider_details = f"<div><strong>Bucket:</strong> {bucket_name}</div>"
             elif config.provider == "sftp":
                 provider_name = "SFTP"
+                host = provider_config.get("host", "Unknown")
+                port = provider_config.get("port", 22)
+                username = provider_config.get("username", "Unknown")
+                remote_path = provider_config.get("remote_path", "Unknown")
                 provider_details = f"""
-                    <div><strong>Host:</strong> {config.host}:{config.port}</div>
-                    <div><strong>Username:</strong> {config.username}</div>
-                    <div><strong>Remote Path:</strong> {config.remote_path}</div>
+                    <div><strong>Host:</strong> {host}:{port}</div>
+                    <div><strong>Username:</strong> {username}</div>
+                    <div><strong>Remote Path:</strong> {remote_path}</div>
                 """
             else:
                 provider_name = config.provider.upper()
@@ -181,12 +192,10 @@ async def get_cloud_sync_edit_form(
 ) -> HTMLResponse:
     """Get edit form for a specific cloud sync configuration"""
     try:
-        # Get decrypted config for editing from service layer with proper DI
         decrypted_config = cloud_sync_service.get_decrypted_config_for_editing(
             config_id, encryption_service, storage_factory
         )
 
-        # Create a simple object for template access
         config_obj = type("Config", (), decrypted_config)()
 
         context = {
@@ -197,7 +206,6 @@ async def get_cloud_sync_edit_form(
             "is_edit_mode": True,
         }
 
-        # Set submit button text based on provider
         if decrypted_config["provider"] == "s3":
             context["submit_text"] = "Update S3 Location"
         elif decrypted_config["provider"] == "sftp":

@@ -60,9 +60,13 @@ class TestCloudSyncAPIHTMX:
         config_data = {
             "name": "test-s3-html",
             "provider": "s3",
-            "bucket_name": "test-bucket",
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config": {
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
         }
 
         # Mock the service to avoid actual database operations
@@ -90,8 +94,10 @@ class TestCloudSyncAPIHTMX:
         config_data = {
             "name": "test-validation-error",
             "provider": "s3",
-            "bucket_name": "test-bucket",
-            # Missing access_key and secret_key
+            "provider_config": {
+                "bucket_name": "test-bucket",
+                # Missing access_key and secret_key
+            },
         }
 
         response = await async_client.post("/api/cloud-sync/", json=config_data)
@@ -105,9 +111,13 @@ class TestCloudSyncAPIHTMX:
         config_data = {
             "name": "service-error-test",
             "provider": "s3",
-            "bucket_name": "test-bucket",
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config": {
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
         }
 
         # Mock service to throw HTTPException
@@ -303,9 +313,13 @@ class TestCloudSyncAPIHTMX:
         config_data = {
             "name": "htmx-headers-test",
             "provider": "s3",
-            "bucket_name": "test-bucket",
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config": {
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
         }
 
         response = await async_client.post("/api/cloud-sync/", json=config_data)

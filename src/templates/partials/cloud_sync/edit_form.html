@@ -37,15 +37,28 @@
             <div id="s3-fields">
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bucket Name</label>
-                    <input type="text" name="bucket_name" value="{{ config.bucket_name or '' }}" placeholder="my-backup-bucket" class="input-modern mt-1">
+                    <input type="text" name="provider_config.bucket_name" value="{{ config.bucket_name or '' }}" placeholder="my-backup-bucket" class="input-modern mt-1">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Access Key ID</label>
-                    <input type="text" name="access_key" value="{{ config.access_key or '' }}" class="input-modern mt-1">
+                    <input type="text" name="provider_config.access_key" value="{{ config.access_key or '' }}" class="input-modern mt-1">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Secret Access Key</label>
-                    <input type="password" name="secret_key" value="{{ config.secret_key or '' }}" placeholder="Current value will be used if left empty" class="input-modern mt-1">
+                    <input type="password" name="provider_config.secret_key" value="{{ config.secret_key or '' }}" placeholder="Current value will be used if left empty" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Region (optional)</label>
+                    <input type="text" name="provider_config.region" value="{{ config.region or 'us-east-1' }}" placeholder="us-east-1" class="input-modern mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Storage Class (optional)</label>
+                    <select name="provider_config.storage_class" class="select-modern mt-1">
+                        <option value="STANDARD" {% if config.storage_class == 'STANDARD' %}selected{% endif %}>Standard</option>
+                        <option value="STANDARD_IA" {% if config.storage_class == 'STANDARD_IA' %}selected{% endif %}>Standard-IA</option>
+                        <option value="GLACIER" {% if config.storage_class == 'GLACIER' %}selected{% endif %}>Glacier</option>
+                        <option value="DEEP_ARCHIVE" {% if config.storage_class == 'DEEP_ARCHIVE' %}selected{% endif %}>Deep Archive</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
@@ -57,28 +70,35 @@
             <div id="sftp-fields">
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Host</label>
-                    <input type="text" name="host" value="{{ config.host or '' }}" placeholder="sftp.example.com" class="input-modern mt-1">
+                    <input type="text" name="provider_config.host" value="{{ config.host or '' }}" placeholder="sftp.example.com" class="input-modern mt-1">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Port</label>
-                    <input type="number" name="port" value="{{ config.port or 22 }}" placeholder="22" class="input-modern mt-1">
+                    <input type="number" name="provider_config.port" value="{{ config.port or 22 }}" placeholder="22" class="input-modern mt-1">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Username</label>
-                    <input type="text" name="username" value="{{ config.username or '' }}" placeholder="backup-user" class="input-modern mt-1">
+                    <input type="text" name="provider_config.username" value="{{ config.username or '' }}" placeholder="backup-user" class="input-modern mt-1">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Remote Path</label>
-                    <input type="text" name="remote_path" value="{{ config.remote_path or '' }}" placeholder="/backups" class="input-modern mt-1">
+                    <input type="text" name="provider_config.remote_path" value="{{ config.remote_path or '' }}" placeholder="/backups" class="input-modern mt-1">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Password (optional if using private key)</label>
-                    <input type="password" name="password" value="{{ config.password or '' }}" placeholder="Current value will be used if left empty" class="input-modern mt-1">
+                    <input type="password" name="provider_config.password" value="{{ config.password or '' }}" placeholder="Current value will be used if left empty" class="input-modern mt-1">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Private Key (optional if using password)</label>
-                    <textarea name="private_key" rows="6" class="input-modern mt-1" placeholder="Current value will be used if left empty">{{ config.private_key or '' }}</textarea>
+                    <textarea name="provider_config.private_key" rows="6" class="input-modern mt-1" placeholder="Current value will be used if left empty">{{ config.private_key or '' }}</textarea>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Current private key will be used if left empty.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Host Key Checking</label>
+                    <select name="provider_config.host_key_checking" class="select-modern mt-1">
+                        <option value="true" {% if config.host_key_checking %}selected{% endif %}>Enabled (Recommended)</option>
+                        <option value="false" {% if not config.host_key_checking %}selected{% endif %}>Disabled</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>

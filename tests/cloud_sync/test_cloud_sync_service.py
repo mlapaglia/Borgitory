@@ -25,9 +25,13 @@ class TestCloudSyncService:
         config_data = CloudSyncConfigCreate(
             name="test-s3",
             provider="s3",
-            bucket_name="test-bucket",
-            access_key="AKIAIOSFODNN7EXAMPLE",  # 20 characters
-            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # 40 characters
+            provider_config={
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",  # 20 characters
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # 40 characters
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
             path_prefix="backups/",
         )
 
@@ -62,11 +66,14 @@ class TestCloudSyncService:
         config_data = CloudSyncConfigCreate(
             name="test-sftp",
             provider="sftp",
-            host="sftp.example.com",
-            port=22,
-            username="testuser",
-            password="testpass",
-            remote_path="/backups",
+            provider_config={
+                "host": "sftp.example.com",
+                "port": 22,
+                "username": "testuser",
+                "password": "testpass",
+                "remote_path": "/backups",
+                "host_key_checking": True,
+            },
             path_prefix="borg/",
         )
 
@@ -103,11 +110,14 @@ class TestCloudSyncService:
         config_data = CloudSyncConfigCreate(
             name="test-sftp-key",
             provider="sftp",
-            host="sftp.example.com",
-            port=22,
-            username="testuser",
-            private_key="-----BEGIN RSA PRIVATE KEY-----\ntest-key-content\n-----END RSA PRIVATE KEY-----",
-            remote_path="/backups",
+            provider_config={
+                "host": "sftp.example.com",
+                "port": 22,
+                "username": "testuser",
+                "private_key": "-----BEGIN RSA PRIVATE KEY-----\ntest-key-content\n-----END RSA PRIVATE KEY-----",
+                "remote_path": "/backups",
+                "host_key_checking": True,
+            },
         )
 
         result = service.create_cloud_sync_config(config_data)
@@ -144,9 +154,13 @@ class TestCloudSyncService:
         config_data = CloudSyncConfigCreate(
             name="duplicate-test",  # Same name
             provider="s3",
-            bucket_name="test-bucket",
-            access_key="AKIAIOSFODNN7EXAMPLE",
-            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            provider_config={
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
         )
 
         with pytest.raises(HTTPException) as exc_info:
@@ -162,13 +176,13 @@ class TestCloudSyncService:
             CloudSyncConfigCreate(
                 name="incomplete-s3",
                 provider="s3",
-                bucket_name="test-bucket",
-                # Missing access_key and secret_key
+                provider_config={
+                    "bucket_name": "test-bucket",
+                    # Missing access_key and secret_key
+                },
             )
 
-        assert "S3 provider requires bucket_name, access_key, and secret_key" in str(
-            exc_info.value
-        )
+        assert "Invalid provider configuration" in str(exc_info.value)
 
     def test_create_sftp_config_missing_required_fields(self, service, test_db):
         """Test SFTP config creation with missing required fields - schema validation."""
@@ -177,13 +191,13 @@ class TestCloudSyncService:
             CloudSyncConfigCreate(
                 name="incomplete-sftp",
                 provider="sftp",
-                host="sftp.example.com",
-                # Missing username, remote_path, and auth method
+                provider_config={
+                    "host": "sftp.example.com",
+                    # Missing username, remote_path, and auth method
+                },
             )
 
-        assert "SFTP provider requires host, username, and remote_path" in str(
-            exc_info.value
-        )
+        assert "Invalid provider configuration" in str(exc_info.value)
 
     def test_create_sftp_config_missing_auth(self, service, test_db):
         """Test SFTP config creation with missing authentication - schema validation."""
@@ -192,15 +206,15 @@ class TestCloudSyncService:
             CloudSyncConfigCreate(
                 name="sftp-no-auth",
                 provider="sftp",
-                host="sftp.example.com",
-                username="testuser",
-                remote_path="/backups",
-                # Missing both password and private_key
+                provider_config={
+                    "host": "sftp.example.com",
+                    "username": "testuser",
+                    "remote_path": "/backups",
+                    # Missing both password and private_key
+                },
             )
 
-        assert "SFTP provider requires either password or private_key" in str(
-            exc_info.value
-        )
+        assert "Invalid provider configuration" in str(exc_info.value)
 
     def test_create_config_unsupported_provider(self, service, test_db):
         """Test config creation with unsupported provider."""
@@ -211,10 +225,10 @@ class TestCloudSyncService:
             CloudSyncConfigCreate(
                 name="unsupported",
                 provider="azure",  # Not supported
-                bucket_name="test",
+                provider_config={"bucket_name": "test"},
             )
 
-        assert "Unsupported provider" in str(exc_info.value)
+        assert "azure" in str(exc_info.value).lower()
 
     def test_list_configs_empty(self, service, test_db):
         """Test listing configs when empty."""
@@ -270,21 +284,29 @@ class TestCloudSyncService:
     def test_update_config_success(self, service, test_db):
         """Test successful config update."""
         # Create existing config
-        existing_config = create_s3_cloud_sync_config(
-            name="update-test", bucket_name="old-bucket", enabled=True
-        )
+        existing_config = create_s3_cloud_sync_config(name="update-test", enabled=True)
         test_db.add(existing_config)
         test_db.commit()
         test_db.refresh(existing_config)
 
         update_data = CloudSyncConfigUpdate(
-            bucket_name="new-bucket", path_prefix="updated/"
+            provider_config={
+                "bucket_name": "new-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
+            path_prefix="updated/",
         )
 
         result = service.update_cloud_sync_config(existing_config.id, update_data)
 
         # Verify the update
-        assert result.bucket_name == "new-bucket"
+        import json
+
+        provider_config = json.loads(result.provider_config)
+        assert provider_config["bucket_name"] == "new-bucket"
         assert result.path_prefix == "updated/"
 
         # Verify in database
@@ -293,7 +315,8 @@ class TestCloudSyncService:
             .filter(CloudSyncConfig.id == existing_config.id)
             .first()
         )
-        assert updated_config.bucket_name == "new-bucket"
+        updated_provider_config = json.loads(updated_config.provider_config)
+        assert updated_provider_config["bucket_name"] == "new-bucket"
         assert updated_config.path_prefix == "updated/"
 
     def test_update_config_duplicate_name(self, service, test_db):
@@ -391,9 +414,13 @@ class TestCloudSyncService:
         config_data = CloudSyncConfigCreate(
             name="lifecycle-test",
             provider="s3",
-            bucket_name="lifecycle-bucket",
-            access_key="AKIAIOSFODNN7EXAMPLE",
-            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            provider_config={
+                "bucket_name": "lifecycle-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
         )
 
         created_config = service.create_cloud_sync_config(config_data)
@@ -401,9 +428,22 @@ class TestCloudSyncService:
         config_id = created_config.id
 
         # Update
-        update_data = CloudSyncConfigUpdate(bucket_name="updated-bucket")
+        update_data = CloudSyncConfigUpdate(
+            provider_config={
+                "bucket_name": "updated-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            }
+        )
         updated_config = service.update_cloud_sync_config(config_id, update_data)
-        assert updated_config.bucket_name == "updated-bucket"
+
+        # Verify the update
+        import json
+
+        provider_config = json.loads(updated_config.provider_config)
+        assert provider_config["bucket_name"] == "updated-bucket"
 
         # Disable
         disabled_config = service.disable_cloud_sync_config(config_id)

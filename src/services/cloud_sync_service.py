@@ -74,31 +74,6 @@ class CloudSyncService:
             path_prefix=config.path_prefix or "",
         )
 
-        # Set legacy fields for backward compatibility (if migration hasn't run yet)
-        if config.provider.value == "s3" and hasattr(db_config, "bucket_name"):
-            db_config.bucket_name = config.provider_config.get("bucket_name")
-            if (
-                "access_key" in config.provider_config
-                and "secret_key" in config.provider_config
-            ):
-                db_config.set_credentials(
-                    config.provider_config["access_key"],
-                    config.provider_config["secret_key"],
-                )
-        elif config.provider.value == "sftp" and hasattr(db_config, "host"):
-            db_config.host = config.provider_config.get("host")
-            db_config.port = config.provider_config.get("port", 22)
-            db_config.username = config.provider_config.get("username")
-            db_config.remote_path = config.provider_config.get("remote_path")
-            if (
-                "password" in config.provider_config
-                or "private_key" in config.provider_config
-            ):
-                db_config.set_sftp_credentials(
-                    config.provider_config.get("password"),
-                    config.provider_config.get("private_key"),
-                )
-
         self.db.add(db_config)
         self.db.commit()
         self.db.refresh(db_config)
@@ -126,8 +101,13 @@ class CloudSyncService:
         self, config_id: int, config_update: CloudSyncConfigUpdate
     ) -> CloudSyncConfig:
         """Update a cloud sync configuration."""
+        from services.cloud_providers import StorageFactory, EncryptionService
+        from services.rclone_service import RcloneService
+        import json
+
         config = self.get_cloud_sync_config_by_id(config_id)
 
+        # Check for duplicate name
         if config_update.name and config_update.name != config.name:
             existing = (
                 self.db.query(CloudSyncConfig)
@@ -144,21 +124,43 @@ class CloudSyncService:
                     detail=f"Cloud sync configuration with name '{config_update.name}' already exists",
                 )
 
-        for field, value in config_update.model_dump(exclude_unset=True).items():
-            if field in ["access_key", "secret_key", "password", "private_key"]:
-                continue
-            setattr(config, field, value)
+        # Update basic fields
+        if config_update.name is not None:
+            config.name = config_update.name
+        if config_update.provider is not None:
+            config.provider = config_update.provider.value
+        if config_update.path_prefix is not None:
+            config.path_prefix = config_update.path_prefix
+        if config_update.enabled is not None:
+            config.enabled = config_update.enabled
 
-        if config.provider == "s3":
-            if config_update.access_key and config_update.secret_key:
-                config.set_credentials(
-                    config_update.access_key, config_update.secret_key
+        # Update provider_config if provided
+        if config_update.provider_config is not None:
+            # Validate the new configuration
+            provider = (
+                config_update.provider.value
+                if config_update.provider
+                else config.provider
+            )
+            try:
+                rclone_service = RcloneService()
+                storage_factory = StorageFactory(rclone_service)
+                storage = storage_factory.create_storage(
+                    provider, config_update.provider_config
                 )
-        elif config.provider == "sftp":
-            if config_update.password or config_update.private_key:
-                config.set_sftp_credentials(
-                    config_update.password, config_update.private_key
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid provider configuration: {str(e)}"
                 )
+
+            # Encrypt sensitive fields in the new configuration
+            encryption_service = EncryptionService()
+            sensitive_fields = storage.get_sensitive_fields()
+            encrypted_config = encryption_service.encrypt_sensitive_fields(
+                config_update.provider_config, sensitive_fields
+            )
+
+            config.provider_config = json.dumps(encrypted_config)
 
         config.updated_at = datetime.now(UTC)
         self.db.commit()
