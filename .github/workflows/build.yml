@@ -38,7 +38,7 @@ jobs:
           -v $(pwd):/workspace \
           -w /workspace \
           borgitory-test \
-          pytest tests/ --cov=src --cov-report=xml --cov-report=html --junitxml=junit.xml -o junit_family=legacy
+          pytest tests/ --cov=src/borgitory --cov-report=xml --cov-report=html --junitxml=junit.xml -o junit_family=legacy
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5

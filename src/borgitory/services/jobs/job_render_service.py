@@ -42,7 +42,7 @@ class JobRenderService:
 
             for job in db_jobs:
                 # Only render jobs that have UUIDs
-                if not job.id:
+                if job.id is None:
                     continue
 
                 should_expand = expand and job.id == expand
@@ -90,26 +90,22 @@ class JobRenderService:
                             }
                         )
                     else:
-                        # Handle simple borg job (only show if not part of a composite job)
-                        # Skip jobs that are likely created by composite jobs
                         if not self._is_child_of_composite_job(job_id, job):
                             job_type = JobType.from_command(getattr(job, "command", []))
 
                             # Calculate progress info
                             progress_info = ""
-                            if (
-                                hasattr(job, "current_progress")
-                                and job.current_progress
-                            ):
-                                if "files" in job.current_progress:
+                            current_progress = getattr(job, "current_progress", None)
+                            if current_progress:
+                                if "files" in current_progress:
                                     progress_info = (
-                                        f"Files: {job.current_progress['files']}"
+                                        f"Files: {current_progress['files']}"
                                     )
-                                if "transferred" in job.current_progress:
+                                if "transferred" in current_progress:
                                     progress_info += (
-                                        f" | {job.current_progress['transferred']}"
+                                        f" | {current_progress['transferred']}"
                                         if progress_info
-                                        else job.current_progress["transferred"]
+                                        else current_progress["transferred"]
                                     )
 
                             current_jobs.append(
@@ -156,19 +152,19 @@ class JobRenderService:
         repository_name = job.repository.name if job.repository else "Unknown"
 
         # Only process jobs that have UUIDs - skip legacy jobs without UUIDs
-        if not job.id:
+        if job.id is None:
             return ""  # Don't render jobs without UUIDs
 
         job_id = job.id
 
         # Status styling
-        if job.status == "completed":
+        if job.status is "completed":
             status_class = "bg-green-100 text-green-800"
             status_icon = "✓"
-        elif job.status == "failed":
+        elif job.status is "failed":
             status_class = "bg-red-100 text-red-800"
             status_icon = "✗"
-        elif job.status == "running":
+        elif job.status is "running":
             status_class = "bg-blue-100 text-blue-800"
             status_icon = "⟳"
         else:
@@ -199,10 +195,10 @@ class JobRenderService:
         job_title += f" {progress_text}"
 
         # Sort tasks by order if composite
-        sorted_tasks = sorted(job.tasks, key=lambda t: t.task_order)
+        sorted_tasks = sorted(job.tasks or [], key=lambda t: t.task_order)
 
         # Fix task statuses for failed jobs
-        if job.status == "failed":
+        if job.status is "failed":
             sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
 
         # Create a job context object that uses UUID as the primary ID
@@ -277,13 +273,13 @@ class JobRenderService:
             repository_name = job.repository.name if job.repository else "Unknown"
 
             # Status styling
-            if job.status == "completed":
+            if job.status is "completed":
                 status_class = "bg-green-100 text-green-800"
                 status_icon = "✓"
-            elif job.status == "failed":
+            elif job.status is "failed":
                 status_class = "bg-red-100 text-red-800"
                 status_icon = "✗"
-            elif job.status == "running":
+            elif job.status is "running":
                 status_class = "bg-blue-100 text-blue-800"
                 status_icon = "⟳"
             else:
@@ -321,11 +317,11 @@ class JobRenderService:
 
             # Sort tasks by order (all jobs have tasks now)
             sorted_tasks = (
-                sorted(job.tasks, key=lambda t: t.task_order) if has_tasks else []
+                sorted(job.tasks or [], key=lambda t: t.task_order) if has_tasks else []
             )
 
             # Fix task statuses for failed jobs
-            if has_tasks and job.status == "failed":
+            if has_tasks and job.status is "failed":
                 sorted_tasks = self._fix_task_statuses_for_failed_job(sorted_tasks)
 
             # Create a job context object that uses UUID as the primary ID
@@ -441,7 +437,7 @@ class JobRenderService:
                 # If we're using database status for completed/failed jobs, use database tasks too
                 if db_job and db_job.status in ["completed", "failed"] and db_job.tasks:
                     # Use database tasks for consistency
-                    sorted_tasks = sorted(db_job.tasks, key=lambda t: t.task_order)
+                    sorted_tasks = sorted(db_job.tasks or [], key=lambda t: t.task_order)
                 elif hasattr(manager_job, "tasks"):
                     # Use manager tasks for running jobs
                     for i, task in enumerate(manager_job.tasks):

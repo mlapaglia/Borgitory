@@ -636,20 +636,3 @@ class RepositoryStatsService:
             if archive_stats
             else 0,
         }
-
-    async def _get_file_type_stats(
-        self,
-        repository: Repository,
-        archives: List[str],
-        progress_callback: Optional[Callable[[str, int], None]] = None,
-    ) -> Dict[str, Any]:
-        """Get file type statistics from archives"""
-        # For now, return empty stats structure
-        # This can be implemented later using the command executor
-        return {
-            "count_chart": {"labels": [], "datasets": []},
-            "size_chart": {"labels": [], "datasets": []},
-        }
-
-
-# repository_stats_service = RepositoryStatsService()

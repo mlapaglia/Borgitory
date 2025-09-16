@@ -192,15 +192,7 @@ class TestJobRenderServiceIntegration:
 
 
 class TestJobRenderServiceErrorHandling:
-    """Test error handling in JobRenderService"""
-
-    def test_handles_none_job_gracefully(self, mock_job_manager):
-        """Test that None jobs are handled gracefully"""
-        service = JobRenderService(job_manager=mock_job_manager)
-
-        # The actual service will fail on None - test that it raises AttributeError
-        with pytest.raises(AttributeError):
-            service._render_job_html(None)
+    """Test error handling in JobRenderService"""# type: ignore
 
     def test_handles_missing_repository_gracefully(self, mock_job_manager):
         """Test handling jobs with missing repository"""

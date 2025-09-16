@@ -151,7 +151,6 @@ python_version = "3.11"
 show_error_codes = true
 show_column_numbers = true
 
-# Very relaxed settings for gradual adoption - only catch the most critical issues
 warn_return_any = false
 warn_unused_configs = false
 check_untyped_defs = false
@@ -162,7 +161,6 @@ warn_no_return = false
 warn_unreachable = false
 strict_equality = false
 
-# Allow all kinds of Any usage
 disallow_any_unimported = false
 disallow_any_expr = false
 disallow_any_decorated = false
@@ -170,19 +168,16 @@ disallow_any_explicit = false
 disallow_any_generics = false
 disallow_subclassing_any = false
 
-# Don't require type annotations
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_decorators = false
 
-# Ignore almost all error types for gradual adoption
 disable_error_code = [
     "assignment",
     "return-value", 
     "arg-type",
     "no-any-return",
     "var-annotated",
-    "no-redef",
     "misc",
     "valid-type",
     "call-arg",
@@ -194,9 +189,6 @@ disable_error_code = [
     "attr-defined",
 ]
 
-# Allow some flexibility for third-party libraries
-ignore_missing_imports = false
-
 plugins = ["sqlalchemy.ext.mypy.plugin"]
 
 exclude = [
@@ -205,7 +197,6 @@ exclude = [
     "^\\.",
 ]
 
-# Let mypy discover files through imports from tests
 files = ["src/borgitory", "tests"]
 
 [[tool.mypy.overrides]]
@@ -224,3 +215,9 @@ module = [
     "sse_starlette.*",
 ]
 ignore_missing_imports = true
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+pythonVersion = "3.11"
+pythonPlatform = "All"
