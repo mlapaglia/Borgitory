@@ -1,0 +1,282 @@
+"""
+Tests for registry integration with the service layer.
+
+These tests focus on business logic and verify that the registry system
+is properly integrated with the cloud sync services.
+"""
+
+import pytest
+from unittest.mock import Mock, patch
+from services.cloud_providers.registry import (
+    get_all_provider_info,
+    get_supported_providers,
+    get_config_class,
+    get_storage_class,
+)
+from services.cloud_sync_service import _get_sensitive_fields_for_provider
+from api.cloud_sync import _get_supported_providers
+
+
+class TestRegistryBusinessLogic:
+    """Test registry functions directly (business logic)"""
+
+    def test_get_all_provider_info_with_registered_providers(self):
+        """Test getting all provider info when providers are registered"""
+        # Import storage modules to trigger registration (if not already done)
+
+        provider_info = get_all_provider_info()
+
+        # Should have all three providers
+        assert len(provider_info) >= 3
+        assert "s3" in provider_info
+        assert "sftp" in provider_info
+        assert "smb" in provider_info
+
+        # Check S3 info
+        s3_info = provider_info["s3"]
+        assert s3_info["label"] == "AWS S3"
+        assert s3_info["description"] == "Amazon S3 compatible storage"
+        assert s3_info["supports_encryption"] is True
+        assert s3_info["supports_versioning"] is True
+
+        # Check SMB info
+        smb_info = provider_info["smb"]
+        assert smb_info["label"] == "SMB/CIFS"
+        assert (
+            smb_info["description"]
+            == "Server Message Block / Common Internet File System"
+        )
+        assert smb_info["supports_encryption"] is True
+        assert smb_info["supports_versioning"] is False
+
+    def test_get_supported_providers_returns_sorted_list(self):
+        """Test that supported providers are returned in sorted order"""
+        # Import storage modules to trigger registration (if not already done)
+
+        providers = get_supported_providers()
+
+        # Should include our three providers, possibly more
+        assert "s3" in providers
+        assert "sftp" in providers
+        assert "smb" in providers
+
+        # Should be sorted
+        assert providers == sorted(providers)
+
+    def test_get_config_class_returns_correct_classes(self):
+        """Test that config classes are returned correctly"""
+        # Import storage modules to trigger registration (if not already done)
+        from services.cloud_providers.storage import (
+            S3StorageConfig,
+            SFTPStorageConfig,
+            SMBStorageConfig,
+        )
+
+        assert get_config_class("s3") == S3StorageConfig
+        assert get_config_class("sftp") == SFTPStorageConfig
+        assert get_config_class("smb") == SMBStorageConfig
+        assert get_config_class("unknown") is None
+
+    def test_get_storage_class_returns_correct_classes(self):
+        """Test that storage classes are returned correctly"""
+        # Import storage modules to trigger registration (if not already done)
+        from services.cloud_providers.storage import S3Storage, SFTPStorage, SMBStorage
+
+        assert get_storage_class("s3") == S3Storage
+        assert get_storage_class("sftp") == SFTPStorage
+        assert get_storage_class("smb") == SMBStorage
+        assert get_storage_class("unknown") is None
+
+
+class TestSensitiveFieldsIntegration:
+    """Test sensitive fields detection using registry"""
+
+    def test_get_sensitive_fields_for_registered_providers(self):
+        """Test that sensitive fields are correctly retrieved from registry"""
+        # Import storage modules to trigger registration (if not already done)
+
+        # Test each provider
+        s3_fields = _get_sensitive_fields_for_provider("s3")
+        assert set(s3_fields) == {"access_key", "secret_key"}
+
+        sftp_fields = _get_sensitive_fields_for_provider("sftp")
+        assert set(sftp_fields) == {"password", "private_key"}
+
+        smb_fields = _get_sensitive_fields_for_provider("smb")
+        assert set(smb_fields) == {"pass"}
+
+    def test_get_sensitive_fields_for_unknown_provider(self):
+        """Test that unknown providers return empty list with warning"""
+        # Import storage modules to trigger registration
+
+        with patch("services.cloud_sync_service.logger") as mock_logger:
+            fields = _get_sensitive_fields_for_provider("unknown")
+
+            assert fields == []
+            mock_logger.warning.assert_called_once()
+            assert "Unknown provider 'unknown'" in mock_logger.warning.call_args[0][0]
+
+    def test_get_sensitive_fields_fallback_on_error(self):
+        """Test that fallback values are used when registry fails"""
+        # Import storage modules to trigger registration (if not already done)
+
+        # Mock get_storage_class to return None (simulating unknown provider)
+        with patch("services.cloud_sync_service.get_storage_class", return_value=None):
+            with patch("services.cloud_sync_service.logger") as mock_logger:
+                fields = _get_sensitive_fields_for_provider("unknown_provider")
+
+                # Should return empty list and log warning
+                assert fields == []
+                mock_logger.warning.assert_called_once()
+                assert (
+                    "Unknown provider 'unknown_provider'"
+                    in mock_logger.warning.call_args[0][0]
+                )
+
+
+class TestAPIProviderIntegration:
+    """Test API layer integration with registry"""
+
+    def test_api_get_supported_providers_format(self):
+        """Test that API returns providers in correct format"""
+        # Import storage modules to trigger registration
+
+        providers = _get_supported_providers()
+
+        # Should be a list of dicts with correct structure
+        assert isinstance(providers, list)
+        assert len(providers) == 3
+
+        # Check structure of first provider (s3, since it's sorted)
+        s3_provider = providers[0]
+        assert s3_provider["value"] == "s3"
+        assert s3_provider["label"] == "AWS S3"
+        assert s3_provider["description"] == "Amazon S3 compatible storage"
+
+        # Check that all providers have required fields
+        for provider in providers:
+            assert "value" in provider
+            assert "label" in provider
+            assert "description" in provider
+            assert isinstance(provider["value"], str)
+            assert isinstance(provider["label"], str)
+            assert isinstance(provider["description"], str)
+
+    def test_api_providers_are_sorted(self):
+        """Test that API returns providers in sorted order"""
+        # Import storage modules to trigger registration
+
+        providers = _get_supported_providers()
+
+        values = [p["value"] for p in providers]
+        assert values == sorted(values)  # Should be sorted
+        assert values == ["s3", "sftp", "smb"]
+
+
+class TestServiceLayerIntegration:
+    """Test service layer integration with registry"""
+
+    def test_config_validator_uses_registry(self):
+        """Test that ConfigValidator uses registry for validation"""
+        # Import storage modules to trigger registration (if not already done)
+        from services.cloud_providers.service import ConfigValidator
+
+        validator = ConfigValidator()
+
+        # Test valid provider with complete config
+        config = validator.validate_config(
+            "s3",
+            {
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+            },
+        )
+        assert config.bucket_name == "test-bucket"
+        assert config.access_key == "AKIAIOSFODNN7EXAMPLE"
+
+        # Test invalid provider
+        with pytest.raises(ValueError) as exc_info:
+            validator.validate_config("unknown", {})
+
+        error_msg = str(exc_info.value)
+        assert "Unknown provider: unknown" in error_msg
+        assert "Supported providers:" in error_msg
+
+    def test_storage_factory_uses_registry(self):
+        """Test that StorageFactory uses registry for creation"""
+        # Import storage modules to trigger registration (if not already done)
+        from services.cloud_providers.service import StorageFactory
+
+        mock_rclone = Mock()
+        factory = StorageFactory(mock_rclone)
+
+        # Test valid provider with complete config
+        storage_instance = factory.create_storage(
+            "s3",
+            {
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+            },
+        )
+        assert storage_instance.__class__.__name__ == "S3Storage"
+
+        # Test invalid provider
+        with pytest.raises(ValueError) as exc_info:
+            factory.create_storage("unknown", {})
+
+        error_msg = str(exc_info.value)
+        assert "Unknown provider: unknown" in error_msg
+        assert "Supported providers:" in error_msg
+
+    def test_storage_factory_get_supported_providers(self):
+        """Test that StorageFactory returns supported providers from registry"""
+        # Import storage modules to trigger registration (if not already done)
+        from services.cloud_providers.service import StorageFactory
+
+        mock_rclone = Mock()
+        factory = StorageFactory(mock_rclone)
+
+        providers = factory.get_supported_providers()
+        # Should include our three providers, possibly more
+        assert "s3" in providers
+        assert "sftp" in providers
+        assert "smb" in providers
+
+
+class TestCloudSyncServiceIntegration:
+    """Test CloudSyncService integration with registry"""
+
+    def test_cloud_sync_service_validates_providers_using_registry(self):
+        """Test that CloudSyncService validates providers using registry"""
+        # Import storage modules to trigger registration (if not already done)
+        from services.cloud_sync_service import CloudSyncService
+        from fastapi import HTTPException
+
+        mock_db = Mock()
+        mock_db.query().filter().first.return_value = None  # No existing config
+
+        service = CloudSyncService(mock_db)
+
+        # Create a mock config object that bypasses pydantic validation
+        mock_config = Mock()
+        mock_config.name = "test-config"
+        mock_config.provider = Mock()
+        mock_config.provider.value = "unknown"  # Invalid provider
+        mock_config.provider_config = {}
+
+        # Test with invalid provider - should use registry validation
+        with pytest.raises(HTTPException) as exc_info:
+            service.create_cloud_sync_config(mock_config)
+
+        assert exc_info.value.status_code == 400
+        detail = str(exc_info.value.detail)
+        assert "Unsupported provider:" in detail
+        assert "Available providers:" in detail
+        # Should include our known providers
+        assert "s3" in detail
+        assert "sftp" in detail
+        assert "smb" in detail

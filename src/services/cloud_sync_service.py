@@ -10,22 +10,108 @@ from models.schemas import (
     CloudSyncConfigUpdate,
 )
 from services.rclone_service import RcloneService
+from services.cloud_providers.registry import (
+    get_storage_class,
+    get_config_class,
+    get_supported_providers,
+)
+from services.cloud_providers import StorageFactory, EncryptionService
 
 logger = logging.getLogger(__name__)
+
+
+def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
+    """Get sensitive fields for a provider using the registry system."""
+    storage_class = get_storage_class(provider)
+    if storage_class is None:
+        logger.warning(
+            f"Unknown provider '{provider}', returning empty sensitive fields list"
+        )
+        return []
+
+    # Create a temporary instance to get sensitive fields
+    # We need to pass None for config and rclone_service since we only need the method
+    try:
+        # Most storage classes have this as a class method or don't need the instance
+        if hasattr(storage_class, "get_sensitive_fields"):
+            # Try to call as static method first
+            try:
+                return storage_class.get_sensitive_fields(None)
+            except TypeError:
+                # If that fails, we need to create an instance
+                # For this we'll need to look at the config class
+                config_class = get_config_class(provider)
+                if config_class:
+                    # Create a minimal config instance for the method call
+                    try:
+                        # Create instance with minimal required fields
+                        if provider == "s3":
+                            temp_config = config_class(
+                                bucket="temp", access_key="temp", secret_key="temp"
+                            )
+                        elif provider == "sftp":
+                            temp_config = config_class(
+                                host="temp", username="temp", password="temp"
+                            )
+                        elif provider == "smb":
+                            temp_config = config_class(
+                                host="temp", user="temp", share_name="temp"
+                            )
+                        else:
+                            # Generic fallback
+                            temp_config = config_class()
+
+                        temp_storage = storage_class(temp_config, None)
+                        return temp_storage.get_sensitive_fields()
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to create temp storage for {provider}: {e}"
+                        )
+                        return []
+
+        # Fallback to hardcoded values if registry approach fails
+        if provider == "s3":
+            return ["access_key", "secret_key"]
+        elif provider == "sftp":
+            return ["password", "private_key"]
+        elif provider == "smb":
+            return ["pass"]
+        else:
+            return []
+
+    except Exception as e:
+        logger.warning(f"Error getting sensitive fields for provider '{provider}': {e}")
+        # Fallback to hardcoded values
+        if provider == "s3":
+            return ["access_key", "secret_key"]
+        elif provider == "sftp":
+            return ["password", "private_key"]
+        elif provider == "smb":
+            return ["pass"]
+        else:
+            return []
 
 
 class CloudSyncService:
     """Service class for cloud sync configuration operations."""
 
-    def __init__(self, db: Session):
+    def __init__(
+        self,
+        db: Session,
+        rclone_service: RcloneService = None,
+        storage_factory: StorageFactory = None,
+        encryption_service: EncryptionService = None,
+    ):
         self.db = db
+        # Use provided dependencies or create defaults
+        self._rclone_service = rclone_service or RcloneService()
+        self._storage_factory = storage_factory or StorageFactory(self._rclone_service)
+        self._encryption_service = encryption_service or EncryptionService()
 
     def create_cloud_sync_config(
         self, config: CloudSyncConfigCreate
     ) -> CloudSyncConfig:
         """Create a new cloud sync configuration using the new provider pattern."""
-        from services.cloud_providers import StorageFactory, EncryptionService
-        from services.rclone_service import RcloneService
         import json
 
         existing = (
@@ -39,21 +125,17 @@ class CloudSyncService:
                 detail=f"Cloud sync configuration with name '{config.name}' already exists",
             )
 
-        # Validate provider exists and configuration is valid
-        from api.cloud_sync import SUPPORTED_PROVIDERS
-
-        supported_provider_values = [p["value"] for p in SUPPORTED_PROVIDERS]
-        if config.provider.value not in supported_provider_values:
+        # Validate provider exists using registry
+        supported_providers = get_supported_providers()
+        if config.provider.value not in supported_providers:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(supported_provider_values)}",
+                detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(sorted(supported_providers))}",
             )
 
         # Create storage instance to validate configuration (this will raise validation errors if invalid)
         try:
-            rclone_service = RcloneService()
-            storage_factory = StorageFactory(rclone_service)
-            storage = storage_factory.create_storage(
+            storage = self._storage_factory.create_storage(
                 config.provider.value, config.provider_config
             )
         except Exception as e:
@@ -62,9 +144,8 @@ class CloudSyncService:
             )
 
         # Encrypt sensitive fields in the configuration
-        encryption_service = EncryptionService()
         sensitive_fields = storage.get_sensitive_fields()
-        encrypted_config = encryption_service.encrypt_sensitive_fields(
+        encrypted_config = self._encryption_service.encrypt_sensitive_fields(
             config.provider_config, sensitive_fields
         )
 
@@ -103,8 +184,6 @@ class CloudSyncService:
         self, config_id: int, config_update: CloudSyncConfigUpdate
     ) -> CloudSyncConfig:
         """Update a cloud sync configuration."""
-        from services.cloud_providers import StorageFactory, EncryptionService
-        from services.rclone_service import RcloneService
         import json
 
         config = self.get_cloud_sync_config_by_id(config_id)
@@ -207,23 +286,14 @@ class CloudSyncService:
 
         provider_config = json.loads(config.provider_config)
 
-        # Use injected dependencies or create them (for backward compatibility)
+        # Use injected dependencies or fall back to instance dependencies
         if encryption_service is None:
-            from services.cloud_providers import EncryptionService
-
-            encryption_service = EncryptionService()
+            encryption_service = self._encryption_service
         if storage_factory is None:
-            from services.cloud_providers import StorageFactory
+            storage_factory = self._storage_factory
 
-            storage_factory = StorageFactory(rclone)
-
-        # Get sensitive field names without creating storage (since config is encrypted)
-        if config.provider == "s3":
-            sensitive_fields = ["access_key", "secret_key"]
-        elif config.provider == "sftp":
-            sensitive_fields = ["password", "private_key"]
-        else:
-            sensitive_fields = []
+        # Get sensitive fields using the registry system
+        sensitive_fields = _get_sensitive_fields_for_provider(config.provider)
 
         # Decrypt sensitive fields first
         decrypted_config = encryption_service.decrypt_sensitive_fields(
@@ -269,14 +339,8 @@ class CloudSyncService:
 
         provider_config = json.loads(config.provider_config)
 
-        # First, create a temporary storage instance to get sensitive field names
-        # We need to do this without full validation since the config is encrypted
-        if config.provider == "s3":
-            sensitive_fields = ["access_key", "secret_key"]
-        elif config.provider == "sftp":
-            sensitive_fields = ["password", "private_key"]
-        else:
-            sensitive_fields = []
+        # Get sensitive fields using the registry system
+        sensitive_fields = _get_sensitive_fields_for_provider(config.provider)
 
         # Decrypt sensitive fields
         decrypted_provider_config = encryption_service.decrypt_sensitive_fields(

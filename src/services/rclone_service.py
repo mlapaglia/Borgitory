@@ -762,3 +762,355 @@ class RcloneService:
         except Exception as e:
             logger.error(f"Error in sync_repository: {e}")
             return {"success": False, "error": str(e)}
+
+    def _build_smb_flags(
+        self,
+        host: str,
+        user: str,
+        password: Optional[str] = None,
+        port: int = 445,
+        domain: str = "WORKGROUP",
+        spn: Optional[str] = None,
+        use_kerberos: bool = False,
+        idle_timeout: str = "1m0s",
+        hide_special_share: bool = True,
+        case_insensitive: bool = True,
+        kerberos_ccache: Optional[str] = None,
+    ) -> list:
+        """Build SMB configuration flags for rclone command"""
+        flags = [
+            "--smb-host",
+            host,
+            "--smb-user",
+            user,
+            "--smb-port",
+            str(port),
+            "--smb-domain",
+            domain,
+            "--smb-idle-timeout",
+            idle_timeout,
+        ]
+
+        if password:
+            obscured_password = self._obscure_password(password)
+            flags.extend(["--smb-pass", obscured_password])
+
+        if spn:
+            flags.extend(["--smb-spn", spn])
+
+        if use_kerberos:
+            flags.append("--smb-use-kerberos")
+
+        if kerberos_ccache:
+            flags.extend(["--smb-kerberos-ccache", kerberos_ccache])
+
+        if hide_special_share:
+            flags.append("--smb-hide-special-share")
+
+        if case_insensitive:
+            flags.append("--smb-case-insensitive")
+
+        return flags
+
+    async def sync_repository_to_smb(
+        self,
+        repository_path: str,
+        host: str,
+        user: str,
+        share_name: str,
+        password: Optional[str] = None,
+        port: int = 445,
+        domain: str = "WORKGROUP",
+        path_prefix: str = "",
+        spn: Optional[str] = None,
+        use_kerberos: bool = False,
+        idle_timeout: str = "1m0s",
+        hide_special_share: bool = True,
+        case_insensitive: bool = True,
+        kerberos_ccache: Optional[str] = None,
+        progress_callback: Optional[Callable] = None,
+    ) -> AsyncGenerator[Dict, None]:
+        """Sync a Borg repository to SMB using Rclone with SMB backend"""
+
+        # Build SMB path - format is :smb:sharename/path
+        smb_path = f":smb:{share_name}"
+        if path_prefix:
+            smb_path = f"{smb_path}/{path_prefix}"
+
+        # Build rclone command with SMB backend flags
+        command = [
+            "rclone",
+            "sync",
+            repository_path,
+            smb_path,
+            "--progress",
+            "--stats",
+            "1s",
+            "--verbose",
+        ]
+
+        # Add SMB configuration flags
+        smb_flags = self._build_smb_flags(
+            host,
+            user,
+            password,
+            port,
+            domain,
+            spn,
+            use_kerberos,
+            idle_timeout,
+            hide_special_share,
+            case_insensitive,
+            kerberos_ccache,
+        )
+        command.extend(smb_flags)
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+
+            yield {
+                "type": "started",
+                "command": " ".join(
+                    [c for c in command if not c.startswith("--smb-pass")]
+                ),  # Hide password
+                "pid": process.pid,
+            }
+
+            async def read_stream(stream, stream_type):
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+
+                    decoded_line = line.decode("utf-8").strip()
+                    progress_data = self.parse_rclone_progress(decoded_line)
+
+                    if progress_data:
+                        yield {"type": "progress", **progress_data}
+                    else:
+                        yield {
+                            "type": "log",
+                            "stream": stream_type,
+                            "message": decoded_line,
+                        }
+
+            async for item in self._merge_async_generators(
+                read_stream(process.stdout, "stdout"),
+                read_stream(process.stderr, "stderr"),
+            ):
+                yield item
+
+            return_code = await process.wait()
+
+            yield {
+                "type": "completed",
+                "return_code": return_code,
+                "status": "success" if return_code == 0 else "failed",
+            }
+
+        except Exception as e:
+            yield {"type": "error", "message": str(e)}
+
+    async def test_smb_connection(
+        self,
+        host: str,
+        user: str,
+        share_name: str,
+        password: Optional[str] = None,
+        port: int = 445,
+        domain: str = "WORKGROUP",
+        spn: Optional[str] = None,
+        use_kerberos: bool = False,
+        idle_timeout: str = "1m0s",
+        hide_special_share: bool = True,
+        case_insensitive: bool = True,
+        kerberos_ccache: Optional[str] = None,
+    ) -> Dict:
+        """Test SMB connection by listing share contents"""
+        try:
+            # Test basic connectivity by listing the share
+            smb_path = f":smb:{share_name}"
+
+            command = ["rclone", "lsd", smb_path, "--max-depth", "1", "--verbose"]
+
+            smb_flags = self._build_smb_flags(
+                host,
+                user,
+                password,
+                port,
+                domain,
+                spn,
+                use_kerberos,
+                idle_timeout,
+                hide_special_share,
+                case_insensitive,
+                kerberos_ccache,
+            )
+            command.extend(smb_flags)
+
+            process = await asyncio.create_subprocess_exec(
+                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+
+            stdout, stderr = await process.communicate()
+            stdout_text = stdout.decode("utf-8")
+            stderr_text = stderr.decode("utf-8")
+
+            if process.returncode == 0:
+                # Test write permissions by attempting to create a test file
+                test_result = await self._test_smb_write_permissions(
+                    host,
+                    user,
+                    share_name,
+                    password,
+                    port,
+                    domain,
+                    spn,
+                    use_kerberos,
+                    idle_timeout,
+                    hide_special_share,
+                    case_insensitive,
+                    kerberos_ccache,
+                )
+
+                if test_result["status"] == "success":
+                    return {
+                        "status": "success",
+                        "message": f"Successfully connected to SMB share {share_name} on {host}",
+                        "details": {
+                            "can_list": True,
+                            "can_write": test_result.get("can_write", False),
+                            "stdout": stdout_text,
+                        },
+                    }
+                else:
+                    return {
+                        "status": "warning",
+                        "message": f"Connected to SMB share but write test failed: {test_result.get('message', 'Unknown error')}",
+                        "details": {
+                            "can_list": True,
+                            "can_write": False,
+                            "stdout": stdout_text,
+                            "write_error": test_result.get("message"),
+                        },
+                    }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to connect to SMB share {share_name} on {host}",
+                    "details": {
+                        "return_code": process.returncode,
+                        "stdout": stdout_text,
+                        "stderr": stderr_text,
+                    },
+                }
+
+        except Exception as e:
+            logger.error(f"SMB connection test failed: {e}")
+            return {
+                "status": "error",
+                "message": f"Connection test failed: {str(e)}",
+                "details": {"exception": str(e)},
+            }
+
+    async def _test_smb_write_permissions(
+        self,
+        host: str,
+        user: str,
+        share_name: str,
+        password: Optional[str] = None,
+        port: int = 445,
+        domain: str = "WORKGROUP",
+        spn: Optional[str] = None,
+        use_kerberos: bool = False,
+        idle_timeout: str = "1m0s",
+        hide_special_share: bool = True,
+        case_insensitive: bool = True,
+        kerberos_ccache: Optional[str] = None,
+    ) -> Dict:
+        """Test write permissions on SMB share"""
+        import tempfile
+        import os
+        import time
+
+        temp_file = None
+        try:
+            # Create a temporary test file
+            with tempfile.NamedTemporaryFile(
+                mode="w", delete=False, suffix=".borgitory_test"
+            ) as f:
+                f.write(f"Borgitory SMB test file - {time.time()}")
+                temp_file = f.name
+
+            # Test file name on remote
+            test_filename = f"borgitory_test_{int(time.time())}.txt"
+            remote_test_path = f":smb:{share_name}/{test_filename}"
+
+            # Try to copy the test file to SMB share
+            command = ["rclone", "copy", temp_file, remote_test_path, "--verbose"]
+
+            smb_flags = self._build_smb_flags(
+                host,
+                user,
+                password,
+                port,
+                domain,
+                spn,
+                use_kerberos,
+                idle_timeout,
+                hide_special_share,
+                case_insensitive,
+                kerberos_ccache,
+            )
+            command.extend(smb_flags)
+
+            process = await asyncio.create_subprocess_exec(
+                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+
+            stdout, stderr = await process.communicate()
+
+            if process.returncode == 0:
+                # Successfully wrote file, now try to delete it
+                delete_command = [
+                    "rclone",
+                    "deletefile",
+                    f"{remote_test_path}/{test_filename}",
+                    "--verbose",
+                ]
+                delete_command.extend(smb_flags)
+
+                delete_process = await asyncio.create_subprocess_exec(
+                    *delete_command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await delete_process.communicate()
+
+                return {
+                    "status": "success",
+                    "can_write": True,
+                    "message": "Write permissions confirmed",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "can_write": False,
+                    "message": f"Write test failed: {stderr.decode('utf-8')}",
+                }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "can_write": False,
+                "message": f"Write permission test failed: {str(e)}",
+            }
+        finally:
+            # Clean up temporary file
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.unlink(temp_file)
+                except OSError:
+                    pass

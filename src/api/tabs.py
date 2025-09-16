@@ -68,11 +68,16 @@ async def get_schedules_tab(request: Request, current_user=Depends(get_current_u
 
 @router.get("/cloud-sync", response_class=HTMLResponse)
 async def get_cloud_sync_tab(request: Request, current_user=Depends(get_current_user)):
+    from api.cloud_sync import _get_supported_providers
+
     return _render_tab_with_nav(
         request,
         "partials/cloud_sync/tab.html",
         "cloud-sync",
-        {"current_user": current_user},
+        {
+            "current_user": current_user,
+            "supported_providers": _get_supported_providers(),
+        },
     )
 
 

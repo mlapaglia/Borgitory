@@ -14,20 +14,28 @@ from models.schemas import (
 )
 from services.cloud_sync_service import CloudSyncService
 from dependencies import RcloneServiceDep, EncryptionServiceDep, StorageFactoryDep
+from services.cloud_providers.registry import get_all_provider_info
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# Provider registry - single source of truth for supported providers
-SUPPORTED_PROVIDERS = [
-    {"value": "s3", "label": "AWS S3", "description": "Amazon S3 compatible storage"},
-    {
-        "value": "sftp",
-        "label": "SFTP (SSH)",
-        "description": "Secure File Transfer Protocol",
-    },
-]
+def _get_supported_providers() -> List[dict]:
+    """Get supported providers from the registry."""
+    provider_info = get_all_provider_info()
+    supported_providers = []
+
+    for provider_name, info in provider_info.items():
+        supported_providers.append(
+            {
+                "value": provider_name,
+                "label": info["label"],
+                "description": info["description"],
+            }
+        )
+
+    # Sort by provider name for consistent ordering
+    return sorted(supported_providers, key=lambda x: x["value"])
 
 
 def _get_provider_template(provider: str, mode: str = "create") -> str:
@@ -37,11 +45,6 @@ def _get_provider_template(provider: str, mode: str = "create") -> str:
 
     suffix = "_edit" if mode == "edit" else ""
     return f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
-
-
-def _get_supported_providers() -> list:
-    """Get list of supported providers for dropdowns"""
-    return SUPPORTED_PROVIDERS
 
 
 def _parse_form_data_to_config(form_data) -> CloudSyncConfigCreate:
@@ -129,6 +132,8 @@ async def get_provider_fields(
         context["submit_text"] = "Add S3 Location"
     elif provider == "sftp":
         context["submit_text"] = "Add SFTP Location"
+    elif provider == "smb":
+        context["submit_text"] = "Add SMB Location"
     elif provider == "":
         context["submit_text"] = "Add Sync Location"
         context["show_submit"] = False
@@ -299,6 +304,8 @@ async def get_cloud_sync_edit_form(
             context["submit_text"] = "Update S3 Location"
         elif decrypted_config["provider"] == "sftp":
             context["submit_text"] = "Update SFTP Location"
+        elif decrypted_config["provider"] == "smb":
+            context["submit_text"] = "Update SMB Location"
         else:
             context["submit_text"] = "Update Sync Location"
 
@@ -500,3 +507,9 @@ def disable_cloud_sync_config(
             {"error_message": error_message},
             status_code=500,
         )
+
+
+@router.get("/providers")
+def get_supported_providers():
+    """Get list of supported cloud providers from the registry."""
+    return _get_supported_providers()

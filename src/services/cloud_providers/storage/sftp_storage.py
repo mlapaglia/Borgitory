@@ -10,6 +10,7 @@ from pydantic import Field, field_validator, model_validator
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
+from ..registry import register_provider
 
 
 class SFTPStorageConfig(CloudStorageConfig):
@@ -189,3 +190,18 @@ class SFTPStorage(CloudStorage):
     def get_sensitive_fields(self) -> list[str]:
         """SFTP sensitive fields"""
         return ["password", "private_key"]
+
+
+@register_provider(
+    name="sftp",
+    label="SFTP (SSH)",
+    description="Secure File Transfer Protocol",
+    supports_encryption=True,
+    supports_versioning=False,
+    requires_credentials=True,
+)
+class SFTPProvider:
+    """SFTP provider registration"""
+
+    config_class = SFTPStorageConfig
+    storage_class = SFTPStorage

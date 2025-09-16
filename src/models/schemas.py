@@ -26,6 +26,7 @@ class JobType(str, Enum):
 class ProviderType(str, Enum):
     S3 = "s3"
     SFTP = "sftp"
+    SMB = "smb"
     AZURE = "azure"
     GCP = "gcp"
 

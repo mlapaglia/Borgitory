@@ -13,6 +13,17 @@ The cloud sync system is designed with a modular architecture that makes adding 
 
 Borgitory uses **[rclone](https://rclone.org/)** for syncing. Borgitory can theoretically support any destination that rclone does.
 
+## Registry Pattern
+
+Borgitory uses a **registry pattern** for cloud providers, which means:
+
+- **No hardcoded provider lists**: Providers are automatically discovered
+- **Dynamic registration**: Use the `@register_provider` decorator to register your provider
+- **Automatic integration**: Once registered, your provider appears in APIs, validation, and frontend dropdowns
+- **Metadata support**: Include provider capabilities like versioning support, encryption, etc.
+
+This eliminates the need to manually update multiple files when adding a provider!
+
 ## Step-by-Step Implementation Guide
 
 ### 1. Create the Storage Configuration Schema
@@ -29,6 +40,7 @@ from pydantic import Field, field_validator, model_validator
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
+from ..registry import register_provider
 
 
 class {ProviderName}StorageConfig(CloudStorageConfig):
@@ -170,36 +182,23 @@ class {ProviderName}Storage(CloudStorage):
     def get_sensitive_fields(self) -> list[str]:
         """{Provider Name} sensitive fields that should be encrypted"""
         return ["api_key"]  # Add all sensitive field names here
-```
 
-### 2. Update the Storage Factory
 
-Edit `src/services/cloud_providers/service.py`:
-
-```python
-# Add import at the top
-from .storage import (
-    # ... existing imports ...
-    {ProviderName}Storage,
-    {ProviderName}StorageConfig,
+@register_provider(
+    name="{provider_name}",
+    label="{Provider Display Name}",
+    description="{Provider description}",
+    supports_encryption=True,
+    supports_versioning=False,  # Set to True if your provider supports versioning
+    requires_credentials=True
 )
-
-class ConfigValidator:
-    def validate_config(self, provider: str, config: Dict[str, Any]) -> Any:
-        # Add your provider case
-        if provider == "{provider_name}":
-            return {ProviderName}StorageConfig(**config)
-        # ... existing cases ...
-
-class StorageFactory:
-    def create_storage(self, provider: str, config: Dict[str, Any]) -> CloudStorage:
-        # Add your provider case
-        if provider == "{provider_name}":
-            return {ProviderName}Storage(validated_config, self._rclone_service)
-        # ... existing cases ...
+class {ProviderName}Provider:
+    """{Provider Name} provider registration"""
+    config_class = {ProviderName}StorageConfig
+    storage_class = {ProviderName}Storage
 ```
 
-### 3. Update the Storage Module Exports
+### 2. Update the Storage Module Exports
 
 Edit `src/services/cloud_providers/storage/__init__.py`:
 
@@ -213,9 +212,9 @@ __all__ = [
 ]
 ```
 
-### 4. Update the Provider Enum
+### 3. Update the Provider Enum
 
-Edit `src/models/enums.py`:
+Edit `src/models/schemas.py`:
 
 ```python
 class ProviderType(str, Enum):
@@ -223,7 +222,7 @@ class ProviderType(str, Enum):
     {PROVIDER_NAME_UPPER} = "{provider_name}"
 ```
 
-### 5. Create Frontend Template
+### 4. Create Frontend Template
 
 Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`:
 
@@ -253,7 +252,7 @@ Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`
 </div>
 ```
 
-### 7. Update API Provider Fields Endpoint
+### 5. Update API Provider Fields Endpoint
 
 Edit `src/api/cloud_sync.py` in the `get_provider_fields` function:
 
@@ -294,62 +293,7 @@ async def get_provider_fields(
     )
 ```
 
-### 8. Update Service Layer
-
-Edit `src/services/cloud_sync_service.py` to add the provider to sensitive fields detection:
-
-```python
-def get_decrypted_config_for_editing(
-    self, config_id: int, encryption_service, storage_factory
-) -> dict:
-    # ... existing code ...
-    
-    # Add your provider to the sensitive fields detection
-    if config.provider == "s3":
-        sensitive_fields = ["access_key", "secret_key"]
-    elif config.provider == "sftp":
-        sensitive_fields = ["password", "private_key"]
-    elif config.provider == "{provider_name}":  # Add this
-        sensitive_fields = ["api_key"]  # Add your sensitive fields
-    else:
-        sensitive_fields = []
-
-async def test_cloud_sync_config(
-    self,
-    config_id: int,
-    rclone: RcloneService,
-    encryption_service=None,
-    storage_factory=None,
-) -> dict:
-    # ... existing code ...
-    
-    # Add your provider to the sensitive fields detection (same as above)
-    if config.provider == "s3":
-        sensitive_fields = ["access_key", "secret_key"]
-    elif config.provider == "sftp":
-        sensitive_fields = ["password", "private_key"]
-    elif config.provider == "{provider_name}":  # Add this
-        sensitive_fields = ["api_key"]  # Add your sensitive fields
-    else:
-        sensitive_fields = []
-```
-
-### 9. Update Provider Registry
-
-Edit the `SUPPORTED_PROVIDERS` list in `src/api/cloud_sync.py`:
-
-```python
-# Provider registry - single source of truth for supported providers
-SUPPORTED_PROVIDERS = [
-    {"value": "s3", "label": "AWS S3", "description": "Amazon S3 compatible storage"},
-    {"value": "sftp", "label": "SFTP (SSH)", "description": "Secure File Transfer Protocol"},
-    {"value": "{provider_name}", "label": "{Provider Display Name}", "description": "{Provider description}"},  # Add this line
-]
-```
-
-The frontend dropdown will automatically pick up the new provider since it's built server-side from this list.
-
-### 10. Implement Rclone Integration
+### 6. Implement Rclone Integration
 
 Add methods to `src/services/rclone_service.py`:
 
@@ -388,24 +332,7 @@ async def upload_to_{provider_name}(
         raise Exception(f"Failed to upload to {Provider Name}: {str(e)}") from e
 ```
 
-### 11. Add Supported Providers List
-
-Update `src/services/cloud_sync_service.py`:
-
-```python
-def create_cloud_sync_config(
-    self, config: CloudSyncConfigCreate
-) -> CloudSyncConfig:
-    # Update supported providers list
-    supported_providers = ["s3", "sftp", "{provider_name}"]  # Add your provider
-    if config.provider.value not in supported_providers:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(supported_providers)}",
-        )
-```
-
-### 12. Create Tests
+### 7. Create Tests
 
 Create `tests/cloud_providers/test_{provider_name}_storage.py`:
 
@@ -529,35 +456,114 @@ def test_create_{provider_name}_config_success(self, service, test_db):
 
 ## Testing Your Implementation
 
-1. **Run the validation tests**:
-   ```bash
-   python -c "
-   from src.services.cloud_providers.storage.{provider_name}_storage import {ProviderName}StorageConfig
-   config = {ProviderName}StorageConfig(
-       endpoint_url='https://api.{provider}.com',
-       api_key='valid-api-key-12345',
-       bucket_name='test-bucket'
-   )
-   print('Configuration validation passed!')
-   "
-   ```
+### 1. Configuration Validation Tests
 
-2. **Run the unit tests**:
-   ```bash
-   python -m pytest tests/cloud_providers/test_{provider_name}_storage.py -v
-   ```
+```bash
+python -c "
+from src.services.cloud_providers.storage.{provider_name}_storage import {ProviderName}StorageConfig
+config = {ProviderName}StorageConfig(
+    endpoint_url='https://api.{provider}.com',
+    api_key='valid-api-key-12345',
+    bucket_name='test-bucket'
+)
+print('Configuration validation passed!')
+"
+```
 
-3. **Run integration tests**:
-   ```bash
-   python -m pytest tests/cloud_sync/ -v
-   ```
+### 2. Unit Tests
 
-4. **Test the frontend**:
-   - Start the application
-   - Navigate to Cloud Sync settings
-   - Select your new provider from the dropdown
-   - Verify the form fields appear correctly
-   - Try creating a configuration (will fail without real credentials, but should show proper validation)
+```bash
+python -m pytest tests/cloud_providers/test_{provider_name}_storage.py -v
+```
+
+### 3. Integration Tests
+
+```bash
+python -m pytest tests/cloud_sync/ -v
+```
+
+### 4. Full Cloud Provider Test Suite
+
+```bash
+python -m pytest tests/cloud_providers/ -v
+```
+
+### 5. Registry Integration Test
+
+Verify your provider is automatically registered:
+
+```bash
+python -c "
+from src.services.cloud_providers.registry import get_supported_providers, get_all_provider_info
+print('Registered providers:', get_supported_providers())
+info = get_all_provider_info()
+if '{provider_name}' in info:
+    print('✅ {Provider Name} successfully registered!')
+    print('Metadata:', info['{provider_name}'])
+else:
+    print('❌ {Provider Name} not found in registry')
+"
+```
+
+### 6. Frontend Testing
+
+- Start the application
+- Navigate to Cloud Sync settings
+- Your provider should automatically appear in the dropdown (thanks to the registry!)
+- Select your provider and verify the form fields appear correctly
+- Try creating a configuration (will fail without real credentials, but should show proper validation)
+
+## Testing Best Practices
+
+### Pydantic Field Aliases in Tests
+
+When your configuration uses field aliases (common for reserved keywords), ensure tests use the correct format:
+
+```python
+# ❌ Wrong - will cause validation errors
+config = ProviderStorageConfig(
+    host="example.com",
+    reserved_field="value"  # This won't work with aliases
+)
+
+# ✅ Correct - use alias with kwargs unpacking
+config = ProviderStorageConfig(
+    host="example.com",
+    **{"reserved-field": "value"}  # Use the alias name
+)
+```
+
+### Mocking Async Generators
+
+Rclone service methods return async generators. Mock them properly:
+
+```python
+# ❌ Wrong - will cause parameter errors
+async def mock_sync_generator():
+    yield {"type": "completed"}
+
+# ✅ Correct - accept all parameters
+async def mock_sync_generator(*args, **kwargs):
+    yield {"type": "completed"}
+
+mock_rclone_service.sync_repository_to_provider = mock_sync_generator
+```
+
+### Duration Field Testing
+
+Test various duration formats if your provider supports timeout configurations:
+
+```python
+def test_valid_duration_formats(self):
+    """Test various valid duration formats"""
+    valid_durations = ["30s", "1m", "1m30s", "2h", "1h30m", "1h30m45s"]
+    for duration in valid_durations:
+        config = ProviderStorageConfig(
+            host="example.com",
+            timeout=duration,
+        )
+        assert config.timeout == duration
+```
 
 ## Common Pitfalls
 
@@ -567,27 +573,140 @@ def test_create_{provider_name}_config_success(self, service, test_db):
 4. **Error Handling**: Provide clear error messages in validation and connection testing
 5. **Rclone Integration**: The rclone service methods need to match your provider's rclone backend capabilities
 6. **Testing**: Create both unit tests for the storage classes and integration tests for the full flow
+7. **Pydantic Field Aliases**: When using field aliases (e.g., `pass_` with `alias="pass"`), tests must use the alias name with kwargs unpacking: `**{"pass": "value"}` instead of `pass_="value"`
+8. **Async Generator Mocking**: For rclone service methods that return `AsyncGenerator[Dict, None]`, test mocks need to accept variable arguments: `async def mock_generator(*args, **kwargs):`
+9. **Duration Field Validation**: When validating duration strings (like timeouts), use specific regex patterns that match the expected format (e.g., `^\d+[smh](\d+[smh])*$` for "1m30s" format)
+10. **Connection Testing**: Implement comprehensive connection testing including read/write permissions, not just basic connectivity
 
 ## Provider-Specific Considerations
 
 ### For Object Storage Providers (S3-like)
+
 - Follow S3 patterns for bucket naming, regions, storage classes
 - Consider implementing storage class options if supported
 - Add endpoint URL validation for custom S3-compatible services
 
 ### For File Transfer Providers (SFTP-like)
+
 - Focus on connection authentication (keys, passwords, certificates)
 - Validate host/port combinations
 - Consider connection timeout and retry logic
 
 ### For API-based Providers
+
 - Implement proper API key validation and formatting
 - Add rate limiting considerations
 - Handle API versioning if applicable
 
+## Advanced Implementation Patterns
+
+### Field Validation Patterns
+
+When implementing field validation, consider these common patterns:
+
+#### Host/Domain Validation
+
+```python
+@field_validator("host")
+@classmethod
+def validate_host(cls, v: str) -> str:
+    """Validate host format"""
+    import re
+    
+    # Basic validation for hostname or IP
+    if not re.match(r"^[a-zA-Z0-9.-]+$", v):
+        raise ValueError(
+            "Host must contain only letters, numbers, periods, and hyphens"
+        )
+    if v.startswith(".") or v.endswith("."):
+        raise ValueError("Host cannot start or end with a period")
+    if ".." in v:
+        raise ValueError("Host cannot contain consecutive periods")
+    return v.lower()
+```
+
+#### Duration Field Validation
+
+```python
+@field_validator("timeout")
+@classmethod
+def validate_timeout(cls, v: str) -> str:
+    """Validate timeout duration format"""
+    import re
+    
+    # Validate duration format like "1m0s", "30s", "2h", etc.
+    if not re.match(r"^\d+[smh](\d+[smh])*$", v):
+        raise ValueError(
+            "Timeout must be in duration format (e.g., '1m0s', '30s', '2h')"
+        )
+    return v
+```
+
+#### Username/Identifier Validation
+
+```python
+@field_validator("username")
+@classmethod
+def validate_username(cls, v: str) -> str:
+    """Validate username format"""
+    import re
+    
+    if not re.match(r"^[a-zA-Z0-9._-]+$", v):
+        raise ValueError(
+            "Username must contain only letters, numbers, periods, underscores, and hyphens"
+        )
+    return v
+```
+
+#### Complex Field Combinations
+
+```python
+@model_validator(mode="after")
+def validate_auth_combination(self):
+    """Validate authentication method combinations"""
+    if self.use_oauth and self.api_key:
+        raise ValueError("Cannot use both OAuth and API key authentication")
+    
+    if not self.use_oauth and not self.api_key:
+        raise ValueError("Either OAuth or API key authentication must be configured")
+    
+    return self
+```
+
+### Reserved Keyword Handling
+
+When your provider uses reserved Python keywords as field names, use aliases:
+
+```python
+class ProviderStorageConfig(CloudStorageConfig):
+    # Use alias for reserved keywords
+    pass_: Optional[str] = Field(default=None, alias="pass", description="Password")
+    class_: Optional[str] = Field(default=None, alias="class", description="Storage class")
+    
+    # Remember to update sensitive fields to use the field name, not alias
+    def get_sensitive_fields(self) -> list[str]:
+        return ["pass_"]  # Use field name, not alias
+```
+
 ## Final Steps
 
-1. Update this documentation with any provider-specific details
-2. Add the provider to the main README.md supported providers list
-3. Consider adding provider-specific documentation in the `docs/` folder
-4. Update any deployment documentation if new dependencies are required
+1. **That's it!** 🎉 With the registry pattern, your provider is automatically:
+   - Available in API endpoints (`/cloud-sync/providers`)
+   - Included in validation and error messages
+   - Visible in frontend dropdowns
+   - Integrated with the service layer
+
+2. Update this documentation with any provider-specific details
+3. Add the provider to the main README.md supported providers list
+4. Consider adding provider-specific documentation in the `docs/` folder
+5. Update any deployment documentation if new dependencies are required
+
+## Registry Pattern Benefits
+
+The new registry pattern eliminates the need to manually update:
+- ❌ ~~Service layer if/elif chains~~
+- ❌ ~~Hardcoded provider lists in APIs~~
+- ❌ ~~Manual sensitive field detection~~
+- ❌ ~~Provider validation lists~~
+
+Instead, everything is handled automatically through the `@register_provider` decorator!

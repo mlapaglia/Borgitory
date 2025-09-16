@@ -3,6 +3,7 @@ Tests for tabs API endpoints
 """
 
 import pytest
+from unittest.mock import patch
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
@@ -64,6 +65,82 @@ class TestTabsAPI:
         response = await async_client.get("/api/tabs/cloud-sync")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_sync_tab_contains_provider_dropdown(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test that cloud sync tab contains provider dropdown with options."""
+        response = await async_client.get("/api/tabs/cloud-sync")
+        assert response.status_code == 200
+
+        content = response.text
+
+        # Check that the provider dropdown exists
+        assert 'name="provider"' in content
+        assert 'id="provider-select"' in content
+        assert "Select Provider Type" in content
+
+        # Check that provider options are populated from the registry
+        assert 'value="s3"' in content
+        assert 'value="sftp"' in content
+        assert 'value="smb"' in content
+
+        # Check that provider labels are present
+        assert "AWS S3" in content
+        assert "SFTP (SSH)" in content
+        assert "SMB/CIFS" in content
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_sync_tab_uses_registry(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test that cloud sync tab uses registry to get providers."""
+        # Mock the registry function to return specific providers
+        mock_providers = [
+            {
+                "value": "mock_provider",
+                "label": "Mock Provider",
+                "description": "Test provider",
+            }
+        ]
+
+        with patch(
+            "api.cloud_sync._get_supported_providers", return_value=mock_providers
+        ):
+            response = await async_client.get("/api/tabs/cloud-sync")
+            assert response.status_code == 200
+
+            content = response.text
+            # Should contain our mocked provider
+            assert 'value="mock_provider"' in content
+            assert "Mock Provider" in content
+
+            # Should NOT contain real providers since we mocked them
+            assert 'value="s3"' not in content
+            assert 'value="sftp"' not in content
+            assert 'value="smb"' not in content
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_sync_tab_empty_providers(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test cloud sync tab behavior when no providers are registered."""
+        # Mock registry to return empty list
+        with patch("api.cloud_sync._get_supported_providers", return_value=[]):
+            response = await async_client.get("/api/tabs/cloud-sync")
+            assert response.status_code == 200
+
+            content = response.text
+            # Should still have the dropdown structure
+            assert 'name="provider"' in content
+            assert 'id="provider-select"' in content
+            assert "Select Provider Type" in content
+
+            # But no provider options
+            assert 'value="s3"' not in content
+            assert 'value="sftp"' not in content
+            assert 'value="smb"' not in content
 
     @pytest.mark.asyncio
     async def test_get_archives_tab(self, async_client: AsyncClient, mock_current_user):

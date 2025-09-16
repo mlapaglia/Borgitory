@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
+from ..registry import register_provider
 
 
 class S3StorageConfig(CloudStorageConfig):
@@ -198,3 +199,18 @@ class S3Storage(CloudStorage):
     def get_sensitive_fields(self) -> list[str]:
         """S3 sensitive fields"""
         return ["access_key", "secret_key"]
+
+
+@register_provider(
+    name="s3",
+    label="AWS S3",
+    description="Amazon S3 compatible storage",
+    supports_encryption=True,
+    supports_versioning=True,
+    requires_credentials=True,
+)
+class S3Provider:
+    """S3 provider registration"""
+
+    config_class = S3StorageConfig
+    storage_class = S3Storage

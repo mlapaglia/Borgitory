@@ -10,13 +10,8 @@ import logging
 from typing import Dict, Any, Callable, Optional
 
 from .types import CloudSyncConfig, SyncResult
-from .storage import (
-    CloudStorage,
-    S3Storage,
-    SFTPStorage,
-    S3StorageConfig,
-    SFTPStorageConfig,
-)
+from .storage import CloudStorage
+from .registry import get_config_class, get_storage_class, get_supported_providers
 from .orchestration import CloudSyncer, LoggingSyncEventHandler
 
 logger = logging.getLogger(__name__)
@@ -30,21 +25,24 @@ class ConfigValidator:
         Validate configuration for a specific provider.
 
         Args:
-            provider: Provider name (s3, sftp)
+            provider: Provider name (e.g., s3, sftp, smb)
             config: Configuration dictionary
 
         Returns:
             Validated configuration object
 
         Raises:
-            ValueError: If configuration is invalid
+            ValueError: If configuration is invalid or provider is unknown
         """
-        if provider == "s3":
-            return S3StorageConfig(**config)
-        elif provider == "sftp":
-            return SFTPStorageConfig(**config)
-        else:
-            raise ValueError(f"Unknown provider: {provider}")
+        config_class = get_config_class(provider)
+        if config_class is None:
+            supported = get_supported_providers()
+            raise ValueError(
+                f"Unknown provider: {provider}. "
+                f"Supported providers: {', '.join(sorted(supported))}"
+            )
+
+        return config_class(**config)
 
 
 class StorageFactory:
@@ -65,7 +63,7 @@ class StorageFactory:
         Create a cloud storage instance.
 
         Args:
-            provider: Provider name (s3, sftp)
+            provider: Provider name (e.g., s3, sftp, smb)
             config: Configuration dictionary
 
         Returns:
@@ -76,12 +74,19 @@ class StorageFactory:
         """
         validated_config = self._validator.validate_config(provider, config)
 
-        if provider == "s3":
-            return S3Storage(validated_config, self._rclone_service)
-        elif provider == "sftp":
-            return SFTPStorage(validated_config, self._rclone_service)
-        else:
-            raise ValueError(f"Unknown provider: {provider}")
+        storage_class = get_storage_class(provider)
+        if storage_class is None:
+            supported = get_supported_providers()
+            raise ValueError(
+                f"Unknown provider: {provider}. "
+                f"Supported providers: {', '.join(sorted(supported))}"
+            )
+
+        return storage_class(validated_config, self._rclone_service)
+
+    def get_supported_providers(self) -> list[str]:
+        """Get list of supported provider names."""
+        return get_supported_providers()
 
 
 class EncryptionService:
