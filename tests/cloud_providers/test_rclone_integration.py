@@ -105,10 +105,6 @@ class TestRegistryRcloneIntegration:
         """Clear registry before each test"""
         clear_registry()
 
-    def teardown_method(self):
-        """Clear registry after each test"""
-        clear_registry()
-
     def test_register_provider_with_explicit_rclone_mapping(self):
         """Test registering provider with explicit rclone mapping"""
         mapping = RcloneMethodMapping(
@@ -178,10 +174,6 @@ class TestRcloneValidation:
 
     def setup_method(self):
         """Clear registry before each test"""
-        clear_registry()
-
-    def teardown_method(self):
-        """Clear registry after each test"""
         clear_registry()
 
     def test_validate_valid_provider(self):
@@ -334,10 +326,6 @@ class TestIsolatedRcloneDispatchers:
 
     def setup_method(self):
         """Clear registry before each test"""
-        clear_registry()
-
-    def teardown_method(self):
-        """Clear registry after each test"""
         clear_registry()
 
     @pytest.mark.asyncio

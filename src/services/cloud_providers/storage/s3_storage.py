@@ -5,6 +5,7 @@ This module provides S3-specific storage operations with clean separation
 from business logic and easy testability.
 """
 
+import re
 from typing import Callable, Optional
 from pydantic import Field, field_validator
 
@@ -45,7 +46,6 @@ class S3StorageConfig(CloudStorageConfig):
         """Validate AWS Secret Access Key format"""
         if len(v) != 40:
             raise ValueError("AWS Secret Access Key must be exactly 40 characters long")
-        import re
 
         if not re.match(r"^[A-Za-z0-9+/=]+$", v):
             raise ValueError("AWS Secret Access Key contains invalid characters")
@@ -59,8 +59,6 @@ class S3StorageConfig(CloudStorageConfig):
 
         if not (3 <= len(v_lower) <= 63):
             raise ValueError("Bucket name must be between 3 and 63 characters long")
-
-        import re
 
         if not re.match(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$", v_lower):
             raise ValueError(

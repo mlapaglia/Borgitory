@@ -265,6 +265,7 @@ Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`
 **Good news!** With the current implementation, templates are automatically discovered by checking if the template file exists on the filesystem. You don't need to manually update any API context variables.
 
 The system will automatically:
+
 - Check if `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html` exists
 - Include it in the provider fields if found
 - Generate submit button text from registry metadata
@@ -284,6 +285,7 @@ Thanks to the registry pattern, many things are automated:
 - ✅ **Sensitive Field Detection**: Uses storage class methods
 
 **Note**: Some manual steps are still required when adding new providers:
+
 - Create template files manually
 - Add rclone service methods for new providers
 - Update this documentation with provider-specific details
@@ -846,6 +848,7 @@ mapping = RcloneMethodMapping(
 ### Two Ways to Define Rclone Mapping
 
 #### Option 1: In Registration Decorator
+
 ```python
 @register_provider(
     name="myprovider",
@@ -858,6 +861,7 @@ class MyProvider:
 ```
 
 #### Option 2: Auto-Discovery from Storage Class
+
 ```python
 class MyProviderStorage(CloudStorage):
     @classmethod
@@ -911,17 +915,20 @@ else:
 
 While the registry pattern significantly simplifies adding new providers, some manual steps remain:
 
-### Manual Steps Still Required:
+### Manual Steps Still Required
+
 - **Template Creation**: Template files must be created manually (though they're auto-discovered)
 - **Rclone Methods**: Provider-specific rclone methods must be implemented in `RcloneService`
 - **Testing**: Comprehensive test suites should be written
 
-### What's Now Automated:
+### What's Now Automated
+
 - **Rclone Dispatchers**: Generic dispatcher methods automatically route to provider-specific methods using registry
 - **Parameter Mapping**: Configuration parameters are automatically mapped to rclone method parameters
 - **Validation**: Comprehensive validation of rclone integration is available
 
-### Future Improvements:
+### Future Improvements
+
 - Auto-generate basic template files from provider metadata
 - Create more generic rclone integration patterns
 - Add provider validation CLI tool

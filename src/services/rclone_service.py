@@ -1,6 +1,9 @@
 import asyncio
 import logging
 import subprocess
+import tempfile
+import os
+import time
 from typing import AsyncGenerator, Dict, Optional, Callable, Any
 
 from models.database import Repository
@@ -12,7 +15,14 @@ class RcloneService:
     def __init__(self):
         pass  # No longer need config file management
 
-    def _build_s3_flags(self, access_key_id: str, secret_access_key: str) -> list:
+    def _build_s3_flags(
+        self,
+        access_key_id: str,
+        secret_access_key: str,
+        region: str = "us-east-1",
+        endpoint_url: Optional[str] = None,
+        storage_class: str = "STANDARD",
+    ) -> list:
         """Build S3 configuration flags for rclone command"""
         flags = [
             "--s3-access-key-id",
@@ -21,7 +31,15 @@ class RcloneService:
             secret_access_key,
             "--s3-provider",
             "AWS",
+            "--s3-region",
+            region,
+            "--s3-storage-class",
+            storage_class,
         ]
+
+        # Add endpoint URL if specified (for S3-compatible services)
+        if endpoint_url:
+            flags.extend(["--s3-endpoint", endpoint_url])
 
         return flags
 
@@ -32,6 +50,9 @@ class RcloneService:
         secret_access_key: str,
         bucket_name: str,
         path_prefix: str = "",
+        region: str = "us-east-1",
+        endpoint_url: Optional[str] = None,
+        storage_class: str = "STANDARD",
     ) -> AsyncGenerator[Dict, None]:
         """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
 
@@ -53,7 +74,9 @@ class RcloneService:
         ]
 
         # Add S3 configuration flags
-        s3_flags = self._build_s3_flags(access_key_id, secret_access_key)
+        s3_flags = self._build_s3_flags(
+            access_key_id, secret_access_key, region, endpoint_url, storage_class
+        )
         command.extend(s3_flags)
 
         try:
@@ -103,6 +126,9 @@ class RcloneService:
         access_key_id: str,
         secret_access_key: str,
         bucket_name: str,
+        region: str = "us-east-1",
+        endpoint_url: Optional[str] = None,
+        storage_class: str = "STANDARD",
     ) -> Dict:
         """Test S3 connection by checking bucket access"""
         try:
@@ -119,7 +145,9 @@ class RcloneService:
             ]
 
             # Add S3 configuration flags
-            s3_flags = self._build_s3_flags(access_key_id, secret_access_key)
+            s3_flags = self._build_s3_flags(
+                access_key_id, secret_access_key, region, endpoint_url, storage_class
+            )
             command.extend(s3_flags)
 
             process = await asyncio.create_subprocess_exec(
@@ -181,8 +209,6 @@ class RcloneService:
     ) -> Dict:
         """Test write permissions by creating and deleting a small test file"""
         try:
-            import tempfile
-            import os
             from datetime import datetime
 
             test_content = f"borgitory-test-{datetime.now().isoformat()}"
@@ -292,8 +318,6 @@ class RcloneService:
             obscured_password = self._obscure_password(password)
             flags.extend(["--sftp-pass", obscured_password])
         elif private_key:
-            import tempfile
-
             with tempfile.NamedTemporaryFile(
                 mode="w", delete=False, suffix=".pem"
             ) as key_file:
@@ -416,8 +440,6 @@ class RcloneService:
         finally:
             if key_file_path:
                 try:
-                    import os
-
                     os.unlink(key_file_path)
                 except OSError:
                     pass
@@ -519,8 +541,6 @@ class RcloneService:
         finally:
             if key_file_path:
                 try:
-                    import os
-
                     os.unlink(key_file_path)
                 except OSError:
                     pass
@@ -539,8 +559,6 @@ class RcloneService:
         temp_file_path = None
 
         try:
-            import tempfile
-            import os
             from datetime import datetime
 
             test_content = f"borgitory-test-{datetime.now().isoformat()}"
@@ -611,8 +629,6 @@ class RcloneService:
         finally:
             if key_file_path:
                 try:
-                    import os
-
                     os.unlink(key_file_path)
                 except OSError:
                     pass
@@ -1026,9 +1042,6 @@ class RcloneService:
         kerberos_ccache: Optional[str] = None,
     ) -> Dict:
         """Test write permissions on SMB share"""
-        import tempfile
-        import os
-        import time
 
         temp_file = None
         try:

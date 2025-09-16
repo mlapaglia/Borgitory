@@ -72,6 +72,9 @@ class JobManagerDependencies:
     db_session_factory: Optional[Callable] = None
     rclone_service: Optional[Any] = None
     http_client_factory: Optional[Callable] = None
+    encryption_service: Optional[Any] = None
+    storage_factory: Optional[Any] = None
+    provider_registry: Optional[Any] = None
 
     def __post_init__(self):
         """Initialize default dependencies if not provided"""
@@ -153,6 +156,9 @@ class JobManagerFactory:
             db_session_factory=custom_dependencies.db_session_factory,
             rclone_service=custom_dependencies.rclone_service,
             http_client_factory=custom_dependencies.http_client_factory,
+            encryption_service=custom_dependencies.encryption_service,
+            storage_factory=custom_dependencies.storage_factory,
+            provider_registry=custom_dependencies.provider_registry,
         )
 
         # Job Executor
@@ -197,6 +203,30 @@ class JobManagerFactory:
             from services.notifications.pushover_service import PushoverService
 
             deps.pushover_service = PushoverService()
+
+        # Cloud Provider Services
+        if not deps.encryption_service:
+            from services.cloud_providers.service import EncryptionService
+
+            deps.encryption_service = EncryptionService()
+
+        if not deps.storage_factory:
+            from services.cloud_providers.service import StorageFactory
+
+            # Create storage factory with rclone service (create default if needed)
+            rclone_service = deps.rclone_service
+            if not rclone_service:
+                from services.rclone_service import RcloneService
+
+                rclone_service = RcloneService()
+                deps.rclone_service = rclone_service
+            deps.storage_factory = StorageFactory(rclone_service)
+
+        # Provider Registry
+        if not deps.provider_registry:
+            from services.cloud_providers.registry_factory import RegistryFactory
+
+            deps.provider_registry = RegistryFactory.get_default_registry()
 
         # Job Database Manager
         if custom_dependencies.database_manager:
@@ -1049,6 +1079,9 @@ class JobManager:
             db_session_factory=self.dependencies.db_session_factory,
             rclone_service=self.dependencies.rclone_service,
             http_client_factory=self.dependencies.http_client_factory,
+            encryption_service=self.dependencies.encryption_service,
+            storage_factory=self.dependencies.storage_factory,
+            provider_registry=self.dependencies.provider_registry,
         )
 
         task.return_code = result.return_code

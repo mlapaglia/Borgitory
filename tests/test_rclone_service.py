@@ -100,6 +100,10 @@ class TestRcloneService:
             "test_secret_key",
             "--s3-provider",
             "AWS",
+            "--s3-region",
+            "us-east-1",
+            "--s3-storage-class",
+            "STANDARD",
         ]
 
         assert flags == expected_flags

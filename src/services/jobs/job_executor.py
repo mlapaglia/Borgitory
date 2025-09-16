@@ -3,6 +3,7 @@ Job Executor Module - Handles subprocess execution and process management
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -295,6 +296,9 @@ class JobExecutor:
         db_session_factory: Optional[Callable] = None,
         rclone_service=None,
         http_client_factory: Optional[Callable] = None,
+        encryption_service=None,  # Will be required - no fallback
+        storage_factory=None,  # Will be required - no fallback
+        provider_registry=None,  # Optional registry injection
     ) -> ProcessResult:
         """
         Execute a cloud sync task with the job executor's proper streaming
@@ -307,16 +311,24 @@ class JobExecutor:
             db_session_factory: Factory for database sessions
             rclone_service: Rclone service instance
             http_client_factory: HTTP client factory for notifications
+            encryption_service: Service for encrypting/decrypting sensitive fields
+            storage_factory: Factory for creating cloud storage instances
+            provider_registry: Optional registry for cloud providers (uses default if None)
 
         Returns:
             ProcessResult with execution details
         """
         try:
-            from utils.db_session import get_db_session
             from models.database import CloudSyncConfig
-            from types import SimpleNamespace
 
-            session_factory = db_session_factory or get_db_session
+            # Require explicit dependency injection
+            if db_session_factory is None:
+                raise ValueError(
+                    "db_session_factory is required for cloud sync operations. "
+                    "Please provide it via dependency injection."
+                )
+
+            session_factory = db_session_factory
 
             if not cloud_sync_config_id:
                 logger.info("No cloud backup configuration - skipping cloud sync")
@@ -356,62 +368,108 @@ class JobExecutor:
                     )
 
                 try:
-                    from services.cloud_providers import CloudProviderFactory
-                    from types import SimpleNamespace
-                    import json
+                    from models.database import Repository
 
-                    provider_config = {}
-                    if config.provider_config:
-                        provider_config = json.loads(config.provider_config)
+                    # Build provider configuration from JSON
+                    if not config.provider_config:
+                        raise ValueError(
+                            f"Cloud sync configuration '{config.name}' has no provider_config. "
+                            f"Please update the configuration through the web UI to add the required "
+                            f"connection details for {config.provider.upper()}."
+                        )
+
+                    try:
+                        encrypted_config = json.loads(config.provider_config)
+                    except json.JSONDecodeError as e:
+                        raise ValueError(
+                            f"Cloud sync configuration '{config.name}' has invalid JSON in provider_config: {e}"
+                        )
+
+                    # Validate that we have some configuration
+                    if not encrypted_config or not isinstance(encrypted_config, dict):
+                        raise ValueError(
+                            f"Cloud sync configuration '{config.name}' has empty or invalid provider_config. "
+                            f"Please update the configuration through the web UI."
+                        )
+
+                    # Require explicit dependency injection
+                    if encryption_service is None:
+                        raise ValueError(
+                            "encryption_service is required for cloud sync operations. "
+                            "Please provide it via dependency injection."
+                        )
+
+                    if storage_factory is None:
+                        raise ValueError(
+                            "storage_factory is required for cloud sync operations. "
+                            "Please provide it via dependency injection."
+                        )
+
+                    # Get sensitive fields by creating a temporary storage with dummy config
+                    if provider_registry:
+                        metadata = provider_registry.get_metadata(config.provider)
                     else:
-                        if config.provider == "s3":
-                            access_key, secret_key = config.get_credentials()
-                            provider_config = {
-                                "bucket_name": config.bucket_name,
-                                "access_key": access_key,
-                                "secret_key": secret_key,
-                                "region": "us-east-1",
-                                "storage_class": "STANDARD",
-                            }
-                        elif config.provider == "sftp":
-                            password, private_key = config.get_sftp_credentials()
-                            provider_config = {
-                                "host": config.host,
-                                "username": config.username,
-                                "remote_path": config.remote_path,
-                                "port": config.port or 22,
-                                "host_key_checking": True,
-                            }
-                            if password:
-                                provider_config["password"] = password
-                            if private_key:
-                                provider_config["private_key"] = private_key
+                        # Fallback to global registry for backward compatibility
+                        from services.cloud_providers.registry import get_metadata
 
-                    provider = CloudProviderFactory.create_provider(
-                        config.provider, provider_config
+                        metadata = get_metadata(config.provider)
+                    if not metadata:
+                        raise ValueError(f"Unknown provider: {config.provider}")
+
+                    # Create minimal dummy config to get sensitive fields
+                    if config.provider == "s3":
+                        dummy_config = {
+                            "access_key": "AKIAIOSFODNN7EXAMPLE",
+                            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                            "bucket_name": "dummy-bucket",
+                        }
+                    elif config.provider == "sftp":
+                        dummy_config = {
+                            "host": "dummy.example.com",
+                            "username": "dummy",
+                            "remote_path": "/dummy",
+                            "password": "dummy_password",
+                        }
+                    elif config.provider == "smb":
+                        dummy_config = {
+                            "host": "dummy.example.com",
+                            "user": "dummy",
+                            "pass_": "dummy",
+                            "share_name": "dummy",
+                        }
+                    else:
+                        raise ValueError(
+                            f"Unsupported provider for decryption: {config.provider}"
+                        )
+
+                    # Create temporary storage to get sensitive fields
+                    temp_storage = storage_factory.create_storage(
+                        config.provider, dummy_config
+                    )
+                    sensitive_fields = temp_storage.get_sensitive_fields()
+
+                    # Decrypt the configuration
+                    provider_config = encryption_service.decrypt_sensitive_fields(
+                        encrypted_config, sensitive_fields
                     )
 
-                    decrypted_config = provider.decrypt_sensitive_fields(
-                        provider_config
-                    )
-                    provider = CloudProviderFactory.create_provider(
-                        config.provider, decrypted_config
-                    )
+                    # Add path prefix if specified
+                    if config.path_prefix:
+                        provider_config["path_prefix"] = config.path_prefix
 
-                    conn_info = provider.get_connection_info()
-                    logger.info(
-                        f"Syncing to {config.name} ({config.provider.upper()}: {conn_info})"
-                    )
+                    # Create repository object for rclone service
+                    repo_obj = Repository()
+                    repo_obj.path = repository_path
+
+                    logger.info(f"Syncing to {config.name} ({config.provider.upper()})")
                     if output_callback:
                         output_callback(
                             f"Syncing to {config.name} ({config.provider.upper()})", {}
                         )
 
-                    repo_obj = SimpleNamespace(path=repository_path)
-
-                    progress_generator = provider.sync_repository(
-                        repository=repo_obj,
-                        path_prefix=config.path_prefix or "",
+                    # Use the generic rclone dispatcher
+                    progress_generator = rclone_service.sync_repository_to_provider(
+                        provider=config.provider, repository=repo_obj, **provider_config
                     )
 
                 except Exception as e:
