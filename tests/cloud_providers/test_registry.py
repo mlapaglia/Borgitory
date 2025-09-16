@@ -15,7 +15,7 @@ from src.services.cloud_providers.registry import (
     clear_registry,
     get_registry,
 )
-from src.services.rclone_service import RcloneService
+from services.rclone_service import RcloneService
 
 
 # Mock classes for testing
@@ -217,6 +217,7 @@ class TestRegisterProviderDecorator:
         assert get_storage_class("test") == MockStorageClass
 
         metadata = get_metadata("test")
+        assert metadata is not None
         assert metadata.name == "test"
         assert metadata.label == "Test Provider"
         assert metadata.description == "Test storage provider"
@@ -230,6 +231,7 @@ class TestRegisterProviderDecorator:
             storage_class = MockStorageClass
 
         metadata = get_metadata("test")
+        assert metadata is not None
         assert metadata.label == "TEST"
         assert metadata.description == "TEST storage provider"
         assert metadata.supports_encryption is True
@@ -250,6 +252,7 @@ class TestRegisterProviderDecorator:
             storage_class = MockStorageClass
 
         metadata = get_metadata("test")
+        assert metadata is not None
         assert metadata.supports_versioning is True
         assert metadata.additional_info["custom_field"] == "custom_value"
 
@@ -292,9 +295,13 @@ class TestGlobalRegistryFunctions:
         # Test all global functions
         assert get_config_class("test") == MockConfigClass
         assert get_storage_class("test") == MockStorageClass
-        assert get_metadata("test").name == "test"
+        metadata = get_metadata("test")
+        assert metadata is not None
+        assert metadata.name == "test"
         assert "test" in get_supported_providers()
-        assert get_provider_info("test")["name"] == "test"
+        provider_info = get_provider_info("test")
+        assert provider_info is not None
+        assert provider_info["name"] == "test"
         assert "test" in get_all_provider_info()
         assert is_provider_registered("test")
 

@@ -21,7 +21,7 @@ from services.jobs.broadcaster.job_event_broadcaster import (
     EventType,
 )
 from services.jobs.job_database_manager import JobDatabaseManager, DatabaseJobData
-from src.services.rclone_service import RcloneService
+from services.rclone_service import RcloneService
 from utils.db_session import get_db_session
 
 if TYPE_CHECKING:

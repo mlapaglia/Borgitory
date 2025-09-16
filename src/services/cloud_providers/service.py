@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Dict, Any, Callable, Optional
 
-from src.services.rclone_service import RcloneService
+from services.rclone_service import RcloneService
 
 from .types import CloudSyncConfig, SyncResult
 from .storage import CloudStorage
