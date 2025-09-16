@@ -1,9 +1,7 @@
 <!-- Dynamic Provider Fields -->
 <div class="provider-fields-content">
-{% if is_s3 %}
-    {% include "partials/cloud_sync/providers/s3_fields.html" %}
-{% elif is_sftp %}
-    {% include "partials/cloud_sync/providers/sftp_fields.html" %}
+{% if provider_template %}
+    {% include provider_template %}
 {% endif %}
 
 {% if show_submit %}

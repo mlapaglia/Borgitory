@@ -24,8 +24,9 @@
                 hx-swap="innerHTML"
                 hx-include="this">
                 <option value="">Select Provider Type</option>
-                <option value="s3">AWS S3</option>
-                <option value="sftp">SFTP (SSH)</option>
+                {% for provider in supported_providers %}
+                <option value="{{ provider.value }}">{{ provider.label }}</option>
+                {% endfor %}
             </select>
         </div>
 

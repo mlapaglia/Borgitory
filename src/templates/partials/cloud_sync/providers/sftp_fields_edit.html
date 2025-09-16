@@ -1,0 +1,39 @@
+<!-- SFTP Fields for Editing -->
+<div id="sftp-fields">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Host</label>
+        <input type="text" name="provider_config[host]" value="{{ config.host or '' }}" placeholder="sftp.example.com" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Port</label>
+        <input type="number" name="provider_config[port]" value="{{ config.port or 22 }}" placeholder="22" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Username</label>
+        <input type="text" name="provider_config[username]" value="{{ config.username or '' }}" placeholder="backup-user" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Remote Path</label>
+        <input type="text" name="provider_config[remote_path]" value="{{ config.remote_path or '' }}" placeholder="/backups" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Password (optional if using private key)</label>
+        <input type="password" name="provider_config[password]" value="{{ config.password or '' }}" placeholder="Current value will be used if left empty" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Private Key (optional if using password)</label>
+        <textarea name="provider_config[private_key]" rows="6" class="input-modern mt-1" placeholder="Current value will be used if left empty">{{ config.private_key or '' }}</textarea>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Current private key will be used if left empty.</p>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Host Key Checking</label>
+        <select name="provider_config[host_key_checking]" class="select-modern mt-1">
+            <option value="true" {% if config.host_key_checking %}selected{% endif %}>Enabled (Recommended)</option>
+            <option value="false" {% if not config.host_key_checking %}selected{% endif %}>Disabled</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
+        <input type="text" name="path_prefix" value="{{ config.path_prefix or '' }}" placeholder="backups/borgitory" class="input-modern mt-1">
+    </div>
+</div>

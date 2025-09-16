@@ -19,6 +19,31 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+# Provider registry - single source of truth for supported providers
+SUPPORTED_PROVIDERS = [
+    {"value": "s3", "label": "AWS S3", "description": "Amazon S3 compatible storage"},
+    {
+        "value": "sftp",
+        "label": "SFTP (SSH)",
+        "description": "Secure File Transfer Protocol",
+    },
+]
+
+
+def _get_provider_template(provider: str, mode: str = "create") -> str:
+    """Get the appropriate template path for a provider and mode"""
+    if not provider:
+        return None
+
+    suffix = "_edit" if mode == "edit" else ""
+    return f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
+
+
+def _get_supported_providers() -> list:
+    """Get list of supported providers for dropdowns"""
+    return SUPPORTED_PROVIDERS
+
+
 def _parse_form_data_to_config(form_data) -> CloudSyncConfigCreate:
     """Parse form data with bracket notation into CloudSyncConfigCreate object"""
     provider_config = {}
@@ -79,7 +104,12 @@ async def get_add_form(
     request: Request, templates: Jinja2Templates = Depends(get_templates)
 ) -> HTMLResponse:
     """Get the add form (for cancel functionality)"""
-    return templates.TemplateResponse(request, "partials/cloud_sync/add_form.html", {})
+    context = {
+        "supported_providers": _get_supported_providers(),
+    }
+    return templates.TemplateResponse(
+        request, "partials/cloud_sync/add_form.html", context
+    )
 
 
 @router.get("/provider-fields", response_class=HTMLResponse)
@@ -91,8 +121,7 @@ async def get_provider_fields(
     """Get dynamic provider fields based on selection"""
     context = {
         "provider": provider,
-        "is_s3": provider == "s3",
-        "is_sftp": provider == "sftp",
+        "provider_template": _get_provider_template(provider, "create"),
     }
 
     # Update submit button text based on provider
@@ -259,8 +288,10 @@ async def get_cloud_sync_edit_form(
         context = {
             "config": config_obj,
             "provider": decrypted_config["provider"],
-            "is_s3": decrypted_config["provider"] == "s3",
-            "is_sftp": decrypted_config["provider"] == "sftp",
+            "provider_template": _get_provider_template(
+                decrypted_config["provider"], "edit"
+            ),
+            "supported_providers": _get_supported_providers(),
             "is_edit_mode": True,
         }
 

@@ -40,11 +40,13 @@ class CloudSyncService:
             )
 
         # Validate provider exists and configuration is valid
-        supported_providers = ["s3", "sftp"]
-        if config.provider.value not in supported_providers:
+        from api.cloud_sync import SUPPORTED_PROVIDERS
+
+        supported_provider_values = [p["value"] for p in SUPPORTED_PROVIDERS]
+        if config.provider.value not in supported_provider_values:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(supported_providers)}",
+                detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(supported_provider_values)}",
             )
 
         # Create storage instance to validate configuration (this will raise validation errors if invalid)
