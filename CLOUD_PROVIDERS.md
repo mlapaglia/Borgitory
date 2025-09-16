@@ -253,31 +253,6 @@ Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`
 </div>
 ```
 
-### 6. Update Main Provider Fields Template
-
-Edit `src/templates/partials/cloud_sync/provider_fields.html`:
-
-```html
-<!-- Dynamic Provider Fields -->
-<div class="provider-fields-content">
-{% if is_s3 %}
-    {% include "partials/cloud_sync/providers/s3_fields.html" %}
-{% elif is_sftp %}
-    {% include "partials/cloud_sync/providers/sftp_fields.html" %}
-{% elif is_{provider_name} %}
-    {% include "partials/cloud_sync/providers/{provider_name}_fields.html" %}
-{% endif %}
-
-{% if show_submit %}
-<div class="flex space-x-2 mt-4">
-    <button type="submit" id="submit-button" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-        {{ submit_text }}
-    </button>
-</div>
-{% endif %}
-</div>
-```
-
 ### 7. Update API Provider Fields Endpoint
 
 Edit `src/api/cloud_sync.py` in the `get_provider_fields` function:
