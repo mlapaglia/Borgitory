@@ -41,7 +41,9 @@ class TestS3StorageConfig:
     def test_s3_config_with_defaults(self):
         """Test S3 config with default values"""
         config = S3StorageConfig(
-            bucket_name="test-bucket", access_key="test-key", secret_key="test-secret"
+            bucket_name="test-bucket",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         )
 
         assert config.region == "us-east-1"  # Default
@@ -52,8 +54,8 @@ class TestS3StorageConfig:
         """Test S3 config with custom endpoint (MinIO, etc.)"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
-            access_key="test-key",
-            secret_key="test-secret",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             endpoint_url="https://minio.example.com:9000",
         )
 
@@ -63,8 +65,8 @@ class TestS3StorageConfig:
         """Test that bucket names are normalized to lowercase"""
         config = S3StorageConfig(
             bucket_name="MY-UPPERCASE-BUCKET",
-            access_key="test-key",
-            secret_key="test-secret",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         )
 
         assert config.bucket_name == "my-uppercase-bucket"
@@ -74,8 +76,8 @@ class TestS3StorageConfig:
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="ab",  # Too short
-                access_key="test-key",
-                secret_key="test-secret",
+                access_key="AKIAIOSFODNN7EXAMPLE",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
 
         assert "at least 3 characters" in str(exc_info.value)
@@ -85,8 +87,8 @@ class TestS3StorageConfig:
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="a" * 64,  # Too long
-                access_key="test-key",
-                secret_key="test-secret",
+                access_key="AKIAIOSFODNN7EXAMPLE",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
 
         assert "at most 63 characters" in str(exc_info.value)
@@ -96,8 +98,8 @@ class TestS3StorageConfig:
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
-                access_key="test-key",
-                secret_key="test-secret",
+                access_key="AKIAIOSFODNN7EXAMPLE",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
                 storage_class="INVALID_CLASS",
             )
 
@@ -107,8 +109,8 @@ class TestS3StorageConfig:
         """Test that storage class is normalized to uppercase"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
-            access_key="test-key",
-            secret_key="test-secret",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             storage_class="glacier",  # lowercase
         )
 
@@ -129,8 +131,8 @@ class TestS3StorageConfig:
         for storage_class in valid_classes:
             config = S3StorageConfig(
                 bucket_name="test-bucket",
-                access_key="test-key",
-                secret_key="test-secret",
+                access_key="AKIAIOSFODNN7EXAMPLE",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
                 storage_class=storage_class,
             )
             assert config.storage_class == storage_class
@@ -141,21 +143,88 @@ class TestS3StorageConfig:
             S3StorageConfig(
                 bucket_name="test-bucket",
                 access_key="",  # Empty
-                secret_key="test-secret",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
 
-        assert "at least 1 character" in str(exc_info.value)
+        assert "at least 16 characters" in str(exc_info.value)
 
     def test_empty_secret_key(self):
         """Test validation of empty secret key"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
-                access_key="test-key",
+                access_key="AKIAIOSFODNN7EXAMPLE",
                 secret_key="",  # Empty
             )
 
-        assert "at least 1 character" in str(exc_info.value)
+        assert "at least 40 characters" in str(exc_info.value)
+
+    def test_invalid_access_key_format(self):
+        """Test validation of access key format"""
+        # Test key not starting with AKIA
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                bucket_name="test-bucket",
+                access_key="NOTAKIA123456789",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            )
+        assert "must start with 'AKIA'" in str(exc_info.value)
+
+        # Test key with wrong length (too short)
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                bucket_name="test-bucket",
+                access_key="AKIA123",  # Too short
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            )
+        assert "at least 16 characters" in str(exc_info.value)
+
+        # Test key with non-alphanumeric characters (exactly 20 chars)
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                bucket_name="test-bucket",
+                access_key="AKIA123456789012345-",  # Contains hyphen, exactly 20 chars
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            )
+        assert "must contain only alphanumeric characters" in str(exc_info.value)
+
+        # Test key with valid length but wrong prefix
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                bucket_name="test-bucket",
+                access_key="NOTAKIA123456789012",  # Exactly 20 chars but wrong prefix
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            )
+        assert "must start with 'AKIA'" in str(exc_info.value)
+
+    def test_invalid_secret_key_format(self):
+        """Test validation of secret key format"""
+        # Test key with wrong length (too short)
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                bucket_name="test-bucket",
+                access_key="AKIAIOSFODNN7EXAMPLE",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLE",  # Too short
+            )
+        assert "at least 40 characters" in str(exc_info.value)
+
+        # Test key with invalid characters (exactly 40 chars)
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                bucket_name="test-bucket",
+                access_key="AKIAIOSFODNN7EXAMPLE",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKE@",  # Contains @, exactly 40 chars
+            )
+        assert "contains invalid characters" in str(exc_info.value)
+
+        # Test key with wrong length (too long)
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                bucket_name="test-bucket",
+                access_key="AKIAIOSFODNN7EXAMPLE",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYX",  # 41 chars
+            )
+        assert "must be exactly 40 characters long" in str(exc_info.value)
 
 
 class TestSFTPStorageConfig:
@@ -316,8 +385,8 @@ class TestS3Storage:
         """Valid S3 configuration"""
         return S3StorageConfig(
             bucket_name="test-bucket",
-            access_key="AKIATESTKEY123",  # Longer key for masking test
-            secret_key="test-secret-key",
+            access_key="AKIATESTKEY123456789",  # Exactly 20 chars
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             region="us-west-2",
         )
 
@@ -353,20 +422,21 @@ class TestS3Storage:
         assert access_key_display.startswith("AKIA")
         assert "***" in access_key_display
         assert len(access_key_display) <= len(
-            "AKIATESTKEY123"
+            "AKIATESTKEY123456789"
         )  # Could be same length if masking pattern changes
 
     def test_get_connection_info_short_access_key(self, mock_rclone_service):
-        """Test connection info with short access key"""
+        """Test connection info with short access key that still meets validation"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
-            access_key="SHORT",  # Short key
-            secret_key="secret",
+            access_key="AKIASHORTKEY12345678",  # Still 20 chars but "short" for masking
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         )
         storage = S3Storage(config, mock_rclone_service)
 
         info = storage.get_connection_info()
-        assert info.details["access_key"] == "***"
+        # Should still mask the key
+        assert "***" in info.details["access_key"]
 
     def test_get_sensitive_fields(self, s3_storage):
         """Test getting sensitive field names"""
@@ -459,8 +529,8 @@ class TestS3Storage:
 
         assert result is True
         mock_rclone_service.test_s3_connection.assert_called_once_with(
-            access_key_id="AKIATESTKEY123",
-            secret_access_key="test-secret-key",
+            access_key_id="AKIATESTKEY123456789",
+            secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             bucket_name="test-bucket",
             region="us-west-2",
             endpoint_url=None,
