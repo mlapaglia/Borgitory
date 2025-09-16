@@ -42,7 +42,7 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
         try:
             command, env = build_secure_borg_command(
                 base_command="borg list",
-                repository_path=repository.path,
+                repository_path=str(repository.path),
                 passphrase=repository.get_passphrase(),
                 additional_args=["--short"],
             )
@@ -238,7 +238,7 @@ class RepositoryStatsService:
         try:
             command, env = build_secure_borg_command(
                 base_command="borg list",
-                repository_path=repository.path,
+                repository_path=str(repository.path),
                 passphrase=repository.get_passphrase(),
                 additional_args=["--short"],
             )
@@ -269,7 +269,7 @@ class RepositoryStatsService:
 
     async def _get_archive_info(
         self, repository: Repository, archive_name: str
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Any] | None:
         """Get detailed information for a specific archive"""
         try:
             command, env = build_secure_borg_command(

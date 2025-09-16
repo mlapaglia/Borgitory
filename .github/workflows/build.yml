@@ -35,10 +35,10 @@ jobs:
         docker run --rm \
           --cap-add SYS_ADMIN \
           --device /dev/fuse:/dev/fuse:rwm \
-          -v $(pwd):/workspace \
-          -w /workspace \
+          -v $(pwd):/app \
+          -w /app \
           borgitory-test \
-          pytest tests/ --cov=src/borgitory --cov-report=xml --cov-report=html --junitxml=junit.xml -o junit_family=legacy
+          sh -c "pip install -e .[dev] && pytest tests/ --cov=src/borgitory --cov-report=xml:coverage.xml --cov-report=html:htmlcov --junitxml=junit.xml -o junit_family=legacy"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5

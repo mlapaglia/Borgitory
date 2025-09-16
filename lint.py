@@ -35,7 +35,6 @@ def main():
     elif command == "format":
         exit_code = run_command(["ruff", "format"])
     elif command == "mypy":
-        # No PYTHONPATH needed anymore!
         exit_code = run_command(
             [".env_borg\\Scripts\\python.exe", "-m", "mypy", "src/borgitory", "tests"]
         )
@@ -51,7 +50,7 @@ def main():
             env = os.environ.copy()
             env["PYTHONPATH"] = "src"
             exit_code = run_command(
-                [".env_borg\\Scripts\\python.exe", "-m", "mypy", "src", "tests"],
+                [".env_borg\\Scripts\\python.exe", "-m", "mypy", "src/borgitory", "tests"],
                 env=env,
             )
     else:
