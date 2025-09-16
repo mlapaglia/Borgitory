@@ -5,9 +5,9 @@ Tests for RepositoryParser - Comprehensive coverage
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, mock_open
 
-from services.repositories.repository_parser import RepositoryParser
-from models.database import Repository
-from services.simple_command_runner import SimpleCommandRunner
+from borgitory.services.repositories.repository_parser import RepositoryParser
+from borgitory.models.database import Repository
+from borgitory.services.simple_command_runner import SimpleCommandRunner
 
 
 @pytest.fixture
@@ -838,7 +838,7 @@ class TestRepositoryParserVerification:
         repository_parser.job_manager = mock_job_manager
 
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],
@@ -870,7 +870,7 @@ class TestRepositoryParserVerification:
         repository_parser.job_manager = mock_job_manager
 
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],
@@ -903,7 +903,9 @@ class TestRepositoryParserVerification:
         )
         repository_parser.job_manager = mock_job_manager
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd:
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],
                 {"BORG_PASSPHRASE": "wrong"},
@@ -933,7 +935,7 @@ class TestRepositoryParserVerification:
         repository_parser.job_manager = mock_job_manager
 
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],
@@ -964,7 +966,7 @@ class TestRepositoryParserVerification:
         repository_parser.job_manager = mock_job_manager
 
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],
@@ -991,7 +993,7 @@ class TestRepositoryParserVerification:
         repository_parser.job_manager = mock_job_manager
 
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],
@@ -1022,7 +1024,9 @@ class TestRepositoryParserVerification:
         )
         repository_parser.job_manager = mock_job_manager
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd, patch(
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd, patch(
             "asyncio.sleep", new_callable=AsyncMock
         ):  # Speed up the test
             mock_build_cmd.return_value = (
@@ -1044,7 +1048,7 @@ class TestRepositoryParserVerification:
         repository_parser.job_manager = None
 
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],
@@ -1063,7 +1067,7 @@ class TestRepositoryParserVerification:
     ):
         """Test repository verification when security validation fails."""
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.side_effect = Exception("Security validation failed")
 
@@ -1085,7 +1089,7 @@ class TestRepositoryParserVerification:
         repository_parser.job_manager = mock_job_manager
 
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],
@@ -1116,7 +1120,7 @@ class TestRepositoryParserVerification:
         repository_parser.job_manager = mock_job_manager
 
         with patch(
-            "services.repositories.repository_parser.build_secure_borg_command"
+            "borgitory.services.repositories.repository_parser.build_secure_borg_command"
         ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "info", "/repo", "--json"],

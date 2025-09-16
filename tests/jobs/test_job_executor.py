@@ -6,7 +6,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-from services.jobs.job_executor import JobExecutor
+from borgitory.services.jobs.job_executor import JobExecutor
 
 
 class TestJobExecutor:

@@ -8,11 +8,11 @@ from sqlalchemy.orm import Session
 from unittest.mock import patch, AsyncMock
 from io import BytesIO
 
-from main import app
-from models.database import Repository, Job
-from dependencies import get_borg_service, get_volume_service
-from services.borg_service import BorgService
-from services.volumes.volume_service import VolumeService
+from borgitory.main import app
+from borgitory.models.database import Repository, Job
+from borgitory.dependencies import get_borg_service, get_volume_service
+from borgitory.services.borg_service import BorgService
+from borgitory.services.volumes.volume_service import VolumeService
 
 
 class TestRepositoriesAPI:
@@ -70,9 +70,12 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_scan_repositories_success(self, async_client: AsyncClient):
         """Test successful repository scanning."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import RepositoryScanResult, ScannedRepository
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import (
+            RepositoryScanResult,
+            ScannedRepository,
+        )
 
         # Create mock result that matches the DTO structure
         mock_result = RepositoryScanResult(
@@ -120,9 +123,12 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_scan_repositories_htmx_response(self, async_client: AsyncClient):
         """Test repository scanning with HTMX request."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import RepositoryScanResult, ScannedRepository
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import (
+            RepositoryScanResult,
+            ScannedRepository,
+        )
 
         # Create mock result
         mock_result = RepositoryScanResult(
@@ -161,9 +167,9 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_scan_repositories_service_error(self, async_client: AsyncClient):
         """Test repository scanning with service error."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import RepositoryScanResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import RepositoryScanResult
 
         # Create mock result with error
         mock_result = RepositoryScanResult(
@@ -190,9 +196,9 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_scan_repositories_htmx_error(self, async_client: AsyncClient):
         """Test repository scanning error with HTMX."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import RepositoryScanResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import RepositoryScanResult
 
         # Create mock result with error
         mock_result = RepositoryScanResult(
@@ -503,9 +509,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test successful repository import."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import RepositoryOperationResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import RepositoryOperationResult
 
         # Create mock success result
         mock_result = RepositoryOperationResult(
@@ -546,9 +552,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test successful repository import via HTMX."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import RepositoryOperationResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import RepositoryOperationResult
 
         # Create mock success result
         mock_result = RepositoryOperationResult(
@@ -614,9 +620,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test repository import with keyfile."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import RepositoryOperationResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import RepositoryOperationResult
 
         keyfile_content = b"fake-keyfile-content"
 
@@ -664,9 +670,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test repository import with verification failure."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import RepositoryOperationResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import RepositoryOperationResult
 
         # Create mock failure result
         mock_result = RepositoryOperationResult(
@@ -759,9 +765,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test deleting repository returns HTMX success response."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import DeleteRepositoryResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import DeleteRepositoryResult
 
         # Create mock success result
         mock_result = DeleteRepositoryResult(
@@ -799,9 +805,9 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_delete_repository_not_found(self, async_client: AsyncClient):
         """Test deleting non-existent repository."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import DeleteRepositoryResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import DeleteRepositoryResult
 
         # Create mock not found result
         mock_result = DeleteRepositoryResult(
@@ -852,9 +858,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test repository deletion HTMX response includes schedule cleanup information."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import DeleteRepositoryResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import DeleteRepositoryResult
 
         # Create mock success result with schedule cleanup
         mock_result = DeleteRepositoryResult(
@@ -894,9 +900,9 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_list_archives_repository_not_found(self, async_client: AsyncClient):
         """Test listing archives for non-existent repository."""
-        from dependencies import get_repository_service
-        from services.repositories.repository_service import RepositoryService
-        from models.repository_dtos import ArchiveListingResult
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+        from borgitory.models.repository_dtos import ArchiveListingResult
 
         # Create mock not found result
         mock_result = ArchiveListingResult(
@@ -1175,8 +1181,8 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_stats_content_no_repository(self, async_client: AsyncClient):
         """Test getting stats content without repository ID shows empty state."""
-        from dependencies import get_repository_stats_service
-        from services.repositories.repository_stats_service import (
+        from borgitory.dependencies import get_repository_stats_service
+        from borgitory.services.repositories.repository_stats_service import (
             RepositoryStatsService,
         )
 
@@ -1202,8 +1208,8 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test getting stats content with valid repository ID."""
-        from dependencies import get_repository_stats_service
-        from services.repositories.repository_stats_service import (
+        from borgitory.dependencies import get_repository_stats_service
+        from borgitory.services.repositories.repository_stats_service import (
             RepositoryStatsService,
         )
 
@@ -1265,8 +1271,8 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient
     ):
         """Test getting stats content with non-existent repository ID."""
-        from dependencies import get_repository_stats_service
-        from services.repositories.repository_stats_service import (
+        from borgitory.dependencies import get_repository_stats_service
+        from borgitory.services.repositories.repository_stats_service import (
             RepositoryStatsService,
         )
 
@@ -1293,8 +1299,8 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test the direct repository statistics endpoint."""
-        from dependencies import get_repository_stats_service
-        from services.repositories.repository_stats_service import (
+        from borgitory.dependencies import get_repository_stats_service
+        from borgitory.services.repositories.repository_stats_service import (
             RepositoryStatsService,
         )
 
@@ -1358,8 +1364,8 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_repository_statistics_not_found(self, async_client: AsyncClient):
         """Test repository statistics endpoint with non-existent repository."""
-        from dependencies import get_repository_stats_service
-        from services.repositories.repository_stats_service import (
+        from borgitory.dependencies import get_repository_stats_service
+        from borgitory.services.repositories.repository_stats_service import (
             RepositoryStatsService,
         )
 
@@ -1383,8 +1389,8 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test that autocomplete endpoint returns proper HTMX HTML response."""
-        from api.auth import get_current_user
-        from models.database import User
+        from borgitory.api.auth import get_current_user
+        from borgitory.models.database import User
 
         # Create a test user and mock authentication
         test_user = User(username="testuser")
@@ -1399,7 +1405,7 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_current_user] = override_get_current_user
 
         # Mock the secure path functions to return some test data
-        from api import repositories
+        from borgitory.api import repositories
 
         original_exists = repositories.user_secure_exists
         original_isdir = repositories.user_secure_isdir
@@ -1451,8 +1457,8 @@ class TestRepositoriesAPI:
         This test specifically catches the bug where a FastAPI Depends object
         was being passed instead of the actual database session.
         """
-        from dependencies import get_repository_stats_service
-        from services.repositories.repository_stats_service import (
+        from borgitory.dependencies import get_repository_stats_service
+        from borgitory.services.repositories.repository_stats_service import (
             RepositoryStatsService,
         )
 

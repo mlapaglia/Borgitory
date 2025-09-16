@@ -3,23 +3,23 @@ from datetime import datetime
 from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 
-from main import app
-from models.database import (
+from borgitory.main import app
+from borgitory.models.database import (
     Schedule,
     Repository,
     CloudSyncConfig,
     CleanupConfig,
     NotificationConfig,
 )
-from dependencies import (
+from borgitory.dependencies import (
     get_schedule_service,
     get_configuration_service,
     get_scheduler_service,
 )
-from services.scheduling.schedule_service import ScheduleService
-from services.configuration_service import ConfigurationService
-from services.upcoming_backups_service import format_time_until
-from services.cron_description_service import CronDescriptionService
+from borgitory.services.scheduling.schedule_service import ScheduleService
+from borgitory.services.configuration_service import ConfigurationService
+from borgitory.services.upcoming_backups_service import format_time_until
+from borgitory.services.cron_description_service import CronDescriptionService
 
 client = TestClient(app)
 

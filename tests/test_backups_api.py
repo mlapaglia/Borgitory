@@ -7,7 +7,7 @@ import json
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from models.database import (
+from borgitory.models.database import (
     Repository,
     CleanupConfig,
     CloudSyncConfig,

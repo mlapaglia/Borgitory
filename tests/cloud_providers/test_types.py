@@ -7,7 +7,7 @@ No complex mocking or async generators - just pure function testing.
 
 from datetime import datetime, UTC
 
-from services.cloud_providers.types import (
+from borgitory.services.cloud_providers.types import (
     SyncEvent,
     SyncEventType,
     SyncResult,

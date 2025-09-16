@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock
-from src.services.cloud_providers.storage.smb_storage import (
+from borgitory.services.cloud_providers.storage.smb_storage import (
     SMBStorageConfig,
     SMBStorage,
 )

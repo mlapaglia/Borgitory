@@ -9,13 +9,13 @@ import pytest
 import json
 from unittest.mock import Mock, AsyncMock, patch
 
-from services.cloud_providers.service import (
+from borgitory.services.cloud_providers.service import (
     ConfigValidator,
     StorageFactory,
     EncryptionService,
     CloudSyncService,
 )
-from services.cloud_providers.types import CloudSyncConfig, SyncResult
+from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
 
 class TestConfigValidator:
@@ -474,7 +474,9 @@ class TestCloudSyncService:
 
         repository_path = "/test/repo"
 
-        with patch("services.cloud_providers.service.CloudSyncer") as mock_syncer_class:
+        with patch(
+            "borgitory.services.cloud_providers.service.CloudSyncer"
+        ) as mock_syncer_class:
             mock_syncer = AsyncMock()
             mock_syncer.sync_repository.return_value = expected_result
             mock_syncer_class.return_value = mock_syncer
@@ -506,7 +508,9 @@ class TestCloudSyncService:
         def output_callback(message):
             output_messages.append(message)
 
-        with patch("services.cloud_providers.service.CloudSyncer") as mock_syncer_class:
+        with patch(
+            "borgitory.services.cloud_providers.service.CloudSyncer"
+        ) as mock_syncer_class:
             mock_syncer = AsyncMock()
             mock_syncer.sync_repository.return_value = SyncResult.success_result()
             mock_syncer_class.return_value = mock_syncer
@@ -540,7 +544,9 @@ class TestCloudSyncService:
         mock_storage = AsyncMock()
         mock_storage_factory.create_storage.return_value = mock_storage
 
-        with patch("services.cloud_providers.service.CloudSyncer") as mock_syncer_class:
+        with patch(
+            "borgitory.services.cloud_providers.service.CloudSyncer"
+        ) as mock_syncer_class:
             mock_syncer = AsyncMock()
             mock_syncer.sync_repository.side_effect = Exception("Sync failed")
             mock_syncer_class.return_value = mock_syncer
@@ -733,7 +739,9 @@ class TestCloudSyncService:
         mock_storage = AsyncMock()
         mock_storage_factory.create_storage.return_value = mock_storage
 
-        with patch("services.cloud_providers.service.CloudSyncer") as mock_syncer_class:
+        with patch(
+            "borgitory.services.cloud_providers.service.CloudSyncer"
+        ) as mock_syncer_class:
             mock_syncer = AsyncMock()
             mock_syncer.sync_repository.return_value = SyncResult.success_result()
             mock_syncer_class.return_value = mock_syncer

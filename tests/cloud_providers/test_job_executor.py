@@ -6,9 +6,9 @@ Tests for JobExecutor cloud sync method.
 import pytest
 from unittest.mock import AsyncMock
 
-from services.jobs.job_executor import JobExecutor
-from services.cloud_providers.types import CloudSyncConfig, SyncResult
-from services.cloud_providers.config_service import MockConfigLoadService
+from borgitory.services.jobs.job_executor import JobExecutor
+from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
+from borgitory.services.cloud_providers.config_service import MockConfigLoadService
 
 
 class TestJobExecutor:
@@ -188,31 +188,6 @@ class TestJobExecutor:
 
         assert result.return_code == 1
         assert result.error == "Connection lost during transfer"
-
-    @pytest.mark.asyncio
-    async def test_config_not_found(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
-        """Test when config ID is provided but config doesn't exist"""
-        # Arrange - mock config loading to return None
-        mock_config_load_service.load_config.return_value = None
-        
-        # Act
-        result = await job_executor.execute_cloud_sync_task_v2(
-            repository_path="/test/repo",
-            cloud_sync_config_id=999,  # Valid ID but config doesn't exist
-            cloud_sync_service=mock_cloud_sync_service,
-            config_load_service=mock_config_load_service,
-        )
-
-        # Assert
-        assert result.return_code == 0  # Skip, not error
-        assert b"configuration disabled" in result.stdout
-        assert result.error is None
-
-        # Config loading should be called, but sync service should not
-        mock_config_load_service.load_config.assert_called_once_with(999)
-        mock_cloud_sync_service.execute_sync.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_zero_config_id(

@@ -7,10 +7,10 @@ from unittest.mock import Mock
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from main import app
-from api.auth import get_current_user
-from models.database import User
-from dependencies import get_provider_registry
+from borgitory.main import app
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
+from borgitory.dependencies import get_provider_registry
 
 
 @pytest.fixture

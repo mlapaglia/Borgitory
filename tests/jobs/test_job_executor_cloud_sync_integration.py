@@ -13,9 +13,9 @@ import json
 from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.orm import Session
 
-from services.jobs.job_executor import JobExecutor
-from services.rclone_service import RcloneService
-from models.database import CloudSyncConfig
+from borgitory.services.jobs.job_executor import JobExecutor
+from borgitory.services.rclone_service import RcloneService
+from borgitory.models.database import CloudSyncConfig
 
 # Import registry fixtures
 
@@ -180,12 +180,13 @@ class TestCloudSyncDependencyInjection:
         # Create a mock registry if not provided
         if mock_provider_registry is None:
             from unittest.mock import MagicMock
+
             mock_provider_registry = MagicMock()
             # Mock the get_metadata method to return a valid metadata object
             mock_metadata = MagicMock()
             mock_metadata.storage_class = MagicMock()
             mock_provider_registry.get_metadata.return_value = mock_metadata
-            
+
         return await job_executor.execute_cloud_sync_task(
             repository_path="/test/repo/path",
             cloud_sync_config_id=config_id,
@@ -420,7 +421,7 @@ class TestNoDeprecatedImports:
         """Test that CloudProviderFactory is not imported anywhere in job executor"""
 
         # Read the job executor file
-        with open("src/services/jobs/job_executor.py", "r") as f:
+        with open("src/borgitory/services/jobs/job_executor.py", "r") as f:
             content = f.read()
 
         # Ensure CloudProviderFactory is not imported
@@ -436,7 +437,7 @@ class TestNoDeprecatedImports:
     def test_proper_rclone_service_usage(self):
         """Test that RcloneService is used via dependency injection"""
 
-        with open("src/services/jobs/job_executor.py", "r") as f:
+        with open("src/borgitory/services/jobs/job_executor.py", "r") as f:
             content = f.read()
 
         # Should use the injected rclone_service parameter
@@ -456,7 +457,7 @@ class TestNoDeprecatedImports:
 
     def test_rclone_service_has_generic_dispatchers(self):
         """Test that RcloneService has the required generic dispatcher methods"""
-        from src.services.rclone_service import RcloneService
+        from borgitory.services.rclone_service import RcloneService
 
         service = RcloneService()
 
@@ -491,12 +492,13 @@ class TestCloudSyncProgressHandling:
         # Create a mock registry if not provided
         if mock_provider_registry is None:
             from unittest.mock import MagicMock
+
             mock_provider_registry = MagicMock()
             # Mock the get_metadata method to return a valid metadata object
             mock_metadata = MagicMock()
             mock_metadata.storage_class = MagicMock()
             mock_provider_registry.get_metadata.return_value = mock_metadata
-            
+
         return await job_executor.execute_cloud_sync_task(
             repository_path="/test/repo/path",
             cloud_sync_config_id=config_id,

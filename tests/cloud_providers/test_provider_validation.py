@@ -5,14 +5,17 @@ Tests for provider validation using registry and Pydantic validators.
 import pytest
 from pydantic import ValidationError
 
-from services.cloud_providers.registry import (
+from borgitory.services.cloud_providers.registry import (
     clear_registry,
     register_provider,
     is_provider_registered,
 )
-from models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
-from services.cloud_providers.storage.base import CloudStorage, CloudStorageConfig
-from src.services.rclone_service import RcloneService
+from borgitory.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
+from borgitory.services.cloud_providers.storage.base import (
+    CloudStorage,
+    CloudStorageConfig,
+)
+from borgitory.services.rclone_service import RcloneService
 
 
 class MockStorageConfig(CloudStorageConfig):
@@ -25,7 +28,7 @@ class MockStorage(CloudStorage):
     """Mock storage for testing"""
 
     def __init__(self, rclone_service: RcloneService, config):
-        super().__init__(rclone_service, config)
+        super().__init__()
 
     async def sync_to_cloud(self, source_path: str, destination_path: str):
         pass
@@ -49,13 +52,13 @@ def clean_registry():
     clear_registry()
     # Force reload of storage modules to re-register providers after clearing
     import importlib
-    import services.cloud_providers.storage.s3_storage
-    import services.cloud_providers.storage.sftp_storage
-    import services.cloud_providers.storage.smb_storage
+    import borgitory.services.cloud_providers.storage.s3_storage
+    import borgitory.services.cloud_providers.storage.sftp_storage
+    import borgitory.services.cloud_providers.storage.smb_storage
 
-    importlib.reload(services.cloud_providers.storage.s3_storage)
-    importlib.reload(services.cloud_providers.storage.sftp_storage)
-    importlib.reload(services.cloud_providers.storage.smb_storage)
+    importlib.reload(borgitory.services.cloud_providers.storage.s3_storage)
+    importlib.reload(borgitory.services.cloud_providers.storage.sftp_storage)
+    importlib.reload(borgitory.services.cloud_providers.storage.smb_storage)
     yield
     # Don't clear after - let the next test's setup handle it
 

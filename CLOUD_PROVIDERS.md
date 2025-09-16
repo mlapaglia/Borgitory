@@ -232,7 +232,7 @@ __all__ = [
 
 ### 3. Create Frontend Template
 
-Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`:
+Create `src/borgitory/templates/partials/cloud_sync/providers/{provider_name}_fields.html`:
 
 ```html
 <!-- {Provider Name} Fields -->
@@ -266,7 +266,7 @@ Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`
 
 The system will automatically:
 
-- Check if `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html` exists
+- Check if `src/borgitory/templates/partials/cloud_sync/providers/{provider_name}_fields.html` exists
 - Include it in the provider fields if found
 - Generate submit button text from registry metadata
 - Handle provider validation through the registry
@@ -394,7 +394,7 @@ Create `tests/cloud_providers/test_{provider_name}_storage.py`:
 ```python
 import pytest
 from unittest.mock import Mock, AsyncMock
-from src.services.cloud_providers.storage.{provider_name}_storage import (
+from borgitory.services.cloud_providers.storage.{provider_name}_storage import (
     {ProviderName}StorageConfig,
     {ProviderName}Storage,
 )
@@ -516,7 +516,7 @@ def test_create_{provider_name}_config_success(self, service, test_db):
 ```bash
 python -c "
 import sys; sys.path.append('src')
-from src.services.cloud_providers.storage.{provider_name}_storage import {ProviderName}StorageConfig
+from borgitory.services.cloud_providers.storage.{provider_name}_storage import {ProviderName}StorageConfig
 config = {ProviderName}StorageConfig(
     endpoint_url='https://api.{provider}.com',
     api_key='valid-api-key-12345',
@@ -551,10 +551,10 @@ Verify your provider is automatically registered:
 ```bash
 python -c "
 import sys; sys.path.append('src')
-from src.services.cloud_providers.registry import get_supported_providers, get_all_provider_info
+from borgitory.services.cloud_providers.registry import get_supported_providers, get_all_provider_info
 
 # Import your storage module to trigger registration
-from src.services.cloud_providers.storage.{provider_name}_storage import {ProviderName}Provider
+from borgitory.services.cloud_providers.storage.{provider_name}_storage import {ProviderName}Provider
 
 print('Registered providers:', get_supported_providers())
 info = get_all_provider_info()
@@ -829,7 +829,7 @@ The system now includes an enhanced rclone integration pattern that automates pa
 Each provider can define how its configuration maps to rclone method parameters:
 
 ```python
-from src.services.cloud_providers.registry import RcloneMethodMapping
+from borgitory.services.cloud_providers.registry import RcloneMethodMapping
 
 mapping = RcloneMethodMapping(
     sync_method="sync_repository_to_s3",           # RcloneService method name
@@ -901,8 +901,8 @@ result = await rclone_service.test_provider_connection(
 Validate your provider's rclone integration:
 
 ```python
-from src.services.cloud_providers.registry import validate_rclone_integration
-from src.services.rclone_service import RcloneService
+from borgitory.services.cloud_providers.registry import validate_rclone_integration
+from borgitory.services.rclone_service import RcloneService
 
 errors = validate_rclone_integration("myprovider", RcloneService())
 if errors:
@@ -932,4 +932,4 @@ While the registry pattern significantly simplifies adding new providers, some m
 - Auto-generate basic template files from provider metadata
 - Create more generic rclone integration patterns
 - Add provider validation CLI tool
-- Implement template generation from config schemas
+- Implement template generation from borgitory.config schemas

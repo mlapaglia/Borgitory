@@ -5,9 +5,9 @@ Tests for CleanupService - Business logic tests
 import pytest
 from unittest.mock import patch
 
-from services.cleanup_service import CleanupService
-from models.database import CleanupConfig, Repository
-from models.schemas import CleanupConfigCreate, CleanupConfigUpdate
+from borgitory.services.cleanup_service import CleanupService
+from borgitory.models.database import CleanupConfig, Repository
+from borgitory.models.schemas import CleanupConfigCreate, CleanupConfigUpdate
 
 
 @pytest.fixture

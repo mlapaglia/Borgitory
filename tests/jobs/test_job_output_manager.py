@@ -5,7 +5,7 @@ Tests for JobOutputManager - job output collection, storage, and streaming
 import pytest
 from datetime import datetime, timedelta
 
-from services.jobs.job_output_manager import JobOutputManager
+from borgitory.services.jobs.job_output_manager import JobOutputManager
 
 
 class TestJobOutputManager:

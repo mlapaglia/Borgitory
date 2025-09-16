@@ -10,19 +10,19 @@ from fastapi.responses import HTMLResponse
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from main import app
-from models.database import Repository, Job
-from dependencies import (
+from borgitory.main import app
+from borgitory.models.database import Repository, Job
+from borgitory.dependencies import (
     get_job_service,
     get_job_stream_service,
     get_job_render_service,
     get_templates,
     get_job_manager_dependency,
 )
-from services.jobs.job_service import JobService
-from services.jobs.job_stream_service import JobStreamService
-from services.jobs.job_render_service import JobRenderService
-from services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_service import JobService
+from borgitory.services.jobs.job_stream_service import JobStreamService
+from borgitory.services.jobs.job_render_service import JobRenderService
+from borgitory.services.jobs.job_manager import JobManager
 
 
 class TestJobsAPI:
@@ -128,7 +128,7 @@ class TestJobsAPI:
         mock_templates,
     ):
         """Setup dependency overrides for testing."""
-        from api.jobs import get_job_manager_dependency as local_get_jm_dep
+        from borgitory.api.jobs import get_job_manager_dependency as local_get_jm_dep
 
         app.dependency_overrides[get_job_service] = lambda: mock_job_service
         app.dependency_overrides[get_job_stream_service] = (
@@ -552,7 +552,7 @@ class TestJobsAPI:
     ):
         """Test getting job manager statistics."""
         # Setup mock job manager with some test data
-        from services.jobs.job_manager import BorgJob
+        from borgitory.services.jobs.job_manager import BorgJob
         from datetime import datetime, UTC
 
         mock_jobs = {
@@ -595,7 +595,7 @@ class TestJobsAPI:
     ):
         """Test cleaning up completed jobs."""
         # Setup mock job manager with completed jobs
-        from services.jobs.job_manager import BorgJob
+        from borgitory.services.jobs.job_manager import BorgJob
         from datetime import datetime, UTC
 
         mock_jobs = {

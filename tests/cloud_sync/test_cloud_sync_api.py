@@ -8,7 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy.orm import Session
 from unittest.mock import patch, Mock
 
-from services.cloud_sync_service import CloudSyncService
+from borgitory.services.cloud_sync_service import CloudSyncService
 from tests.conftest import create_s3_cloud_sync_config
 
 
@@ -69,7 +69,7 @@ class TestCloudSyncAPIHTMX:
         }
 
         # Mock the service to avoid actual database operations
-        with patch("dependencies.get_db") as mock_get_db, patch.object(
+        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
             CloudSyncService, "create_cloud_sync_config"
         ) as mock_create:
             mock_db = Mock()
@@ -120,7 +120,7 @@ class TestCloudSyncAPIHTMX:
         # Mock service to throw HTTPException
         from fastapi import HTTPException
 
-        with patch("dependencies.get_db") as mock_get_db, patch.object(
+        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
             CloudSyncService, "create_cloud_sync_config"
         ) as mock_create:
             mock_db = Mock()
@@ -258,7 +258,7 @@ class TestCloudSyncAPIHTMX:
 
         # Mock the rclone service and cloud sync service
         with patch(
-            "services.cloud_sync_service.CloudSyncService.test_cloud_sync_config"
+            "borgitory.services.cloud_sync_service.CloudSyncService.test_cloud_sync_config"
         ) as mock_test:
             mock_test.return_value = {
                 "status": "success",
@@ -319,7 +319,7 @@ class TestCloudSyncAPIHTMX:
         }
 
         # Mock the service to avoid actual database operations
-        with patch("dependencies.get_db") as mock_get_db, patch.object(
+        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
             CloudSyncService, "create_cloud_sync_config"
         ) as mock_create:
             mock_db = Mock()

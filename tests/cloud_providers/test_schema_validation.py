@@ -7,8 +7,8 @@ correctly validates configurations using the registry pattern.
 
 import pytest
 from pydantic import ValidationError
-from services.cloud_providers.registry import validate_provider_config
-from models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
+from borgitory.services.cloud_providers.registry import validate_provider_config
+from borgitory.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
 
 
 class TestRegistryValidation:

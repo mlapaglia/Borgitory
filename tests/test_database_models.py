@@ -6,14 +6,14 @@ import pytest
 from unittest.mock import Mock, patch
 from cryptography.fernet import Fernet, InvalidToken
 
-from models.database import (
+from borgitory.models.database import (
     Repository,
     User,
     CloudSyncConfig,
     NotificationConfig,
     get_cipher_suite,
 )
-import models.database
+import borgitory.models.database
 
 
 class TestCipherSuite:
@@ -22,7 +22,8 @@ class TestCipherSuite:
     def test_get_cipher_suite_creates_instance(self):
         """Test that cipher suite is created properly."""
         with patch(
-            "config.get_secret_key", return_value="test_secret_key_32_characters_long!"
+            "borgitory.config.get_secret_key",
+            return_value="test_secret_key_32_characters_long!",
         ):
             cipher = get_cipher_suite()
             assert cipher is not None
@@ -31,10 +32,11 @@ class TestCipherSuite:
     def test_get_cipher_suite_caches_instance(self):
         """Test that cipher suite is cached and reused."""
         with patch(
-            "config.get_secret_key", return_value="test_secret_key_32_characters_long!"
+            "borgitory.config.get_secret_key",
+            return_value="test_secret_key_32_characters_long!",
         ):
             # Clear any existing cached instance
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             cipher1 = get_cipher_suite()
             cipher2 = get_cipher_suite()
@@ -44,9 +46,9 @@ class TestCipherSuite:
         """Test that cipher suite properly derives key from secret."""
         test_secret = "test_secret_key_for_derivation"
 
-        with patch("config.get_secret_key", return_value=test_secret):
+        with patch("borgitory.config.get_secret_key", return_value=test_secret):
             # Clear cached instance to force recreation
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             cipher = get_cipher_suite()
             # The Fernet instance should be created with the derived key
@@ -55,9 +57,9 @@ class TestCipherSuite:
     def test_cipher_suite_with_invalid_key(self):
         """Test cipher suite behavior with invalid key."""
         # Fernet keys must be 32 URL-safe base64-encoded bytes
-        with patch("config.get_secret_key", return_value="short"):
+        with patch("borgitory.config.get_secret_key", return_value="short"):
             # Clear cached instance
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             # This should work because we hash the secret to get proper length
             cipher = get_cipher_suite()
@@ -74,7 +76,9 @@ class TestRepositoryModel:
         self.mock_cipher.encrypt.return_value = b"encrypted_data"
         self.mock_cipher.decrypt.return_value = b"decrypted_data"
 
-        with patch("models.database.get_cipher_suite", return_value=self.mock_cipher):
+        with patch(
+            "borgitory.models.database.get_cipher_suite", return_value=self.mock_cipher
+        ):
             self.repository = Repository(name="test-repo", path="/path/to/repo")
 
     def test_repository_creation(self):
@@ -88,7 +92,9 @@ class TestRepositoryModel:
         """Test that passphrase is properly encrypted."""
         test_passphrase = "my_secret_passphrase_123!"
 
-        with patch("models.database.get_cipher_suite", return_value=self.mock_cipher):
+        with patch(
+            "borgitory.models.database.get_cipher_suite", return_value=self.mock_cipher
+        ):
             self.repository.set_passphrase(test_passphrase)
 
             # Should call encrypt with encoded passphrase
@@ -100,7 +106,9 @@ class TestRepositoryModel:
         """Test that passphrase is properly decrypted."""
         self.repository.encrypted_passphrase = "stored_encrypted_data"
 
-        with patch("models.database.get_cipher_suite", return_value=self.mock_cipher):
+        with patch(
+            "borgitory.models.database.get_cipher_suite", return_value=self.mock_cipher
+        ):
             result = self.repository.get_passphrase()
 
             # Should call decrypt with encoded encrypted data
@@ -114,10 +122,11 @@ class TestRepositoryModel:
 
         # Use real cipher for full test
         with patch(
-            "config.get_secret_key", return_value="test_key_32_chars_long_for_test!"
+            "borgitory.config.get_secret_key",
+            return_value="test_key_32_chars_long_for_test!",
         ):
             # Clear cached cipher
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             repo = Repository(name="test", path="/test")
             repo.set_passphrase(original_passphrase)
@@ -135,9 +144,10 @@ class TestRepositoryModel:
         unicode_passphrase = "pässwörd_with_ünicöde_çhars_日本語"
 
         with patch(
-            "config.get_secret_key", return_value="test_key_32_chars_long_for_test!"
+            "borgitory.config.get_secret_key",
+            return_value="test_key_32_chars_long_for_test!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             repo = Repository(name="test", path="/test")
             repo.set_passphrase(unicode_passphrase)
@@ -148,9 +158,10 @@ class TestRepositoryModel:
     def test_passphrase_encryption_empty_string(self):
         """Test passphrase encryption with empty string."""
         with patch(
-            "config.get_secret_key", return_value="test_key_32_chars_long_for_test!"
+            "borgitory.config.get_secret_key",
+            return_value="test_key_32_chars_long_for_test!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             repo = Repository(name="test", path="/test")
             repo.set_passphrase("")
@@ -166,7 +177,9 @@ class TestRepositoryModel:
         mock_cipher = Mock()
         mock_cipher.decrypt.side_effect = InvalidToken("Invalid token")
 
-        with patch("models.database.get_cipher_suite", return_value=mock_cipher):
+        with patch(
+            "borgitory.models.database.get_cipher_suite", return_value=mock_cipher
+        ):
             with pytest.raises(InvalidToken):
                 repo.get_passphrase()
 
@@ -175,9 +188,10 @@ class TestRepositoryModel:
         long_passphrase = "a" * 1000  # 1000 character passphrase
 
         with patch(
-            "config.get_secret_key", return_value="test_key_32_chars_long_for_test!"
+            "borgitory.config.get_secret_key",
+            return_value="test_key_32_chars_long_for_test!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             repo = Repository(name="test", path="/test")
             repo.set_passphrase(long_passphrase)
@@ -297,7 +311,9 @@ class TestNotificationConfigModel:
         user_key = "u4t8z5j2k9x7m1n3q6r8s4v2w9y5z7a2"
         app_token = "a3g7h2j5k8l4m9n6p1q4r7s2t5v8w3x6"
 
-        with patch("models.database.get_cipher_suite", return_value=self.mock_cipher):
+        with patch(
+            "borgitory.models.database.get_cipher_suite", return_value=self.mock_cipher
+        ):
             config.set_pushover_credentials(user_key, app_token)
 
             assert config.encrypted_user_key == f"encrypted_{user_key}"
@@ -309,7 +325,9 @@ class TestNotificationConfigModel:
         config.encrypted_user_key = "encrypted_u4t8z5j2k9x7m1n3q6r8s4v2w9y5z7a2"
         config.encrypted_app_token = "encrypted_a3g7h2j5k8l4m9n6p1q4r7s2t5v8w3x6"
 
-        with patch("models.database.get_cipher_suite", return_value=self.mock_cipher):
+        with patch(
+            "borgitory.models.database.get_cipher_suite", return_value=self.mock_cipher
+        ):
             user_key, app_token = config.get_pushover_credentials()
 
             assert user_key == "u4t8z5j2k9x7m1n3q6r8s4v2w9y5z7a2"
@@ -321,9 +339,10 @@ class TestNotificationConfigModel:
         original_app_token = "test_app_token_67890"
 
         with patch(
-            "config.get_secret_key", return_value="test_key_32_chars_long_for_test!"
+            "borgitory.config.get_secret_key",
+            return_value="test_key_32_chars_long_for_test!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             config = NotificationConfig(name="test", provider="pushover")
             config.set_pushover_credentials(original_user_key, original_app_token)
@@ -346,18 +365,20 @@ class TestEncryptionSecurity:
         test_data = "sensitive_information"
 
         with patch(
-            "config.get_secret_key", return_value="key1_32_chars_long_for_testing!"
+            "borgitory.config.get_secret_key",
+            return_value="key1_32_chars_long_for_testing!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             repo1 = Repository(name="test1", path="/test1")
             repo1.set_passphrase(test_data)
             encrypted1 = repo1.encrypted_passphrase
 
         with patch(
-            "config.get_secret_key", return_value="key2_32_chars_long_for_testing!"
+            "borgitory.config.get_secret_key",
+            return_value="key2_32_chars_long_for_testing!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             repo2 = Repository(name="test2", path="/test2")
             repo2.set_passphrase(test_data)
@@ -371,9 +392,10 @@ class TestEncryptionSecurity:
         test_data = "identical_data"
 
         with patch(
-            "config.get_secret_key", return_value="test_key_32_chars_long_for_test!"
+            "borgitory.config.get_secret_key",
+            return_value="test_key_32_chars_long_for_test!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             repo1 = Repository(name="test1", path="/test1")
             repo1.set_passphrase(test_data)
@@ -393,9 +415,10 @@ class TestEncryptionSecurity:
         repo = Repository(name="test", path="/test")
 
         with patch(
-            "config.get_secret_key", return_value="test_key_32_chars_long_for_test!"
+            "borgitory.config.get_secret_key",
+            return_value="test_key_32_chars_long_for_test!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             # Set valid encrypted data first
             repo.set_passphrase("test_data")
@@ -412,9 +435,10 @@ class TestEncryptionSecurity:
         binary_like_data = "data_with_\x00_null_\xff_bytes"
 
         with patch(
-            "config.get_secret_key", return_value="test_key_32_chars_long_for_test!"
+            "borgitory.config.get_secret_key",
+            return_value="test_key_32_chars_long_for_test!",
         ):
-            models.database._cipher_suite = None
+            borgitory.models.database._cipher_suite = None
 
             repo = Repository(name="test", path="/test")
             repo.set_passphrase(binary_like_data)

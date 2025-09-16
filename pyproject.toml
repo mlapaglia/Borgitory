@@ -63,13 +63,7 @@ Repository = "https://github.com/mlapaglia/Borgitory"
 Issues = "https://github.com/mlapaglia/Borgitory/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
-[tool.hatch.build.targets.wheel.sources]
-"src" = "borgitory"
+packages = ["src/borgitory"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
@@ -212,7 +206,7 @@ exclude = [
 ]
 
 # Let mypy discover files through imports from tests
-# files = ["tests"]
+files = ["src/borgitory", "tests"]
 
 [[tool.mypy.overrides]]
 module = [

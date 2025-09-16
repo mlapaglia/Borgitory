@@ -8,12 +8,12 @@ proper DI patterns and real database usage where appropriate.
 import pytest
 import json
 
-from services.cloud_providers.config_service import (
+from borgitory.services.cloud_providers.config_service import (
     DatabaseConfigLoadService,
     MockConfigLoadService,
 )
-from services.cloud_providers.types import CloudSyncConfig
-from models.database import CloudSyncConfig as DbCloudSyncConfig
+from borgitory.services.cloud_providers.types import CloudSyncConfig
+from borgitory.models.database import CloudSyncConfig as DbCloudSyncConfig
 from tests.conftest import create_s3_cloud_sync_config
 
 

@@ -20,7 +20,7 @@ def clean_registry():
     Returns:
         ProviderRegistry: Empty registry instance
     """
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_empty_registry()
 
@@ -36,7 +36,7 @@ def production_registry():
     Returns:
         ProviderRegistry: Registry with all production providers
     """
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_production_registry()
 
@@ -49,7 +49,7 @@ def s3_only_registry():
     Returns:
         ProviderRegistry: Registry with only S3 provider
     """
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(["s3"])
 
@@ -62,7 +62,7 @@ def sftp_only_registry():
     Returns:
         ProviderRegistry: Registry with only SFTP provider
     """
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(["sftp"])
 
@@ -75,7 +75,7 @@ def smb_only_registry():
     Returns:
         ProviderRegistry: Registry with only SMB provider
     """
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(["smb"])
 
@@ -88,7 +88,7 @@ def multi_provider_registry():
     Returns:
         ProviderRegistry: Registry with S3 and SFTP providers
     """
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(["s3", "sftp"])
 
@@ -103,7 +103,7 @@ def create_test_registry_with_providers(providers: List[str]):
     Returns:
         ProviderRegistry: Registry with specified providers
     """
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(providers)
 
@@ -119,8 +119,8 @@ def isolated_job_dependencies():
     Returns:
         JobManagerDependencies: Dependencies with isolated registry
     """
-    from src.services.jobs.job_manager import JobManagerDependencies
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.jobs.job_manager import JobManagerDependencies
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
     from unittest.mock import Mock
 
     # Create isolated registry
@@ -146,8 +146,8 @@ def job_executor_with_registry():
     Returns:
         tuple: (JobExecutor, ProviderRegistry) for testing
     """
-    from src.services.jobs.job_executor import JobExecutor
-    from src.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.jobs.job_executor import JobExecutor
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     registry = RegistryFactory.create_test_registry(["s3", "sftp", "smb"])
     executor = JobExecutor()

@@ -6,7 +6,7 @@ import pytest
 import asyncio
 from unittest.mock import patch
 
-from services.jobs.broadcaster.job_event_broadcaster import (
+from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
     EventType,
     JobEvent,

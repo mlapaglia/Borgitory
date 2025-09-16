@@ -6,7 +6,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from models.database import User
+from borgitory.models.database import User
 
 
 class TestAuthRedirectFlow:

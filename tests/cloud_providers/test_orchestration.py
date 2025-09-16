@@ -10,13 +10,17 @@ import asyncio
 import time
 from unittest.mock import Mock
 
-from services.cloud_providers.orchestration import (
+from borgitory.services.cloud_providers.orchestration import (
     CloudSyncer,
     LoggingSyncEventHandler,
     SyncEventHandler,
 )
-from services.cloud_providers.types import SyncEvent, SyncEventType, ConnectionInfo
-from services.cloud_providers.storage import CloudStorage
+from borgitory.services.cloud_providers.types import (
+    SyncEvent,
+    SyncEventType,
+    ConnectionInfo,
+)
+from borgitory.services.cloud_providers.storage import CloudStorage
 
 
 class MockCloudStorage(CloudStorage):

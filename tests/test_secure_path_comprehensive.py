@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch, Mock
 
-from utils.secure_path import (
+from borgitory.utils.secure_path import (
     PathSecurityError,
     sanitize_filename,
     create_secure_filename,
@@ -161,7 +161,9 @@ class TestSecurePathJoin:
             mnt_dir = os.path.join(temp_dir, "mnt")
             os.makedirs(mnt_dir, exist_ok=True)
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 # Mock both calls - first for base validation, second for final validation
                 expected_final = Path(mnt_dir) / "subdir" / "file.txt"
                 mock_validate.side_effect = [Path(mnt_dir), expected_final]
@@ -176,7 +178,9 @@ class TestSecurePathJoin:
             mnt_dir = os.path.join(temp_dir, "mnt")
             os.makedirs(mnt_dir, exist_ok=True)
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.side_effect = (
                     lambda x, **kwargs: Path(mnt_dir) if "mnt" in str(x) else None
                 )
@@ -196,7 +200,9 @@ class TestSecurePathJoin:
             mnt_dir = os.path.join(temp_dir, "mnt")
             os.makedirs(mnt_dir, exist_ok=True)
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 expected_final = Path(mnt_dir) / "file.txt"
                 mock_validate.side_effect = [Path(mnt_dir), expected_final]
 
@@ -209,7 +215,9 @@ class TestSecurePathJoin:
             mnt_dir = os.path.join(temp_dir, "mnt")
             os.makedirs(mnt_dir, exist_ok=True)
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 # First call succeeds (base validation), second fails (final validation)
                 mock_validate.side_effect = [Path(mnt_dir), None]
 
@@ -226,7 +234,9 @@ class TestSecureExists:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(test_file)
 
                 assert secure_exists(test_file) is True
@@ -236,7 +246,9 @@ class TestSecureExists:
         with tempfile.TemporaryDirectory() as temp_dir:
             nonexistent = os.path.join(temp_dir, "nonexistent.txt")
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(nonexistent)
 
                 assert secure_exists(nonexistent) is False
@@ -247,7 +259,7 @@ class TestSecureExists:
 
     def test_secure_exists_permission_error(self):
         """Test handling of permission errors."""
-        with patch("utils.secure_path.validate_secure_path") as mock_validate:
+        with patch("borgitory.utils.secure_path.validate_secure_path") as mock_validate:
             mock_path = Mock()
             mock_path.exists.side_effect = PermissionError("Access denied")
             mock_validate.return_value = mock_path
@@ -266,7 +278,9 @@ class TestSecureIsdir:
     def test_secure_isdir_valid_directory(self):
         """Test directory check for valid directories."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(temp_dir)
 
                 assert secure_isdir(temp_dir) is True
@@ -277,7 +291,9 @@ class TestSecureIsdir:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(test_file)
 
                 assert secure_isdir(test_file) is False
@@ -288,7 +304,7 @@ class TestSecureIsdir:
 
     def test_secure_isdir_permission_error(self):
         """Test handling of permission errors."""
-        with patch("utils.secure_path.validate_secure_path") as mock_validate:
+        with patch("borgitory.utils.secure_path.validate_secure_path") as mock_validate:
             mock_path = Mock()
             mock_path.is_dir.side_effect = PermissionError("Access denied")
             mock_validate.return_value = mock_path
@@ -305,7 +321,9 @@ class TestSecureRemoveFile:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(test_file)
 
                 assert secure_remove_file(test_file) is True
@@ -316,7 +334,9 @@ class TestSecureRemoveFile:
         with tempfile.TemporaryDirectory() as temp_dir:
             nonexistent = os.path.join(temp_dir, "nonexistent.txt")
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(nonexistent)
 
                 assert secure_remove_file(nonexistent) is True
@@ -331,7 +351,9 @@ class TestSecureRemoveFile:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_path = Mock()
                 mock_path.exists.return_value = True
                 mock_path.unlink.side_effect = PermissionError("Access denied")
@@ -352,7 +374,9 @@ class TestGetDirectoryListing:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(temp_dir)
 
                 result = get_directory_listing(temp_dir)
@@ -370,7 +394,9 @@ class TestGetDirectoryListing:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(temp_dir)
 
                 result = get_directory_listing(temp_dir, include_files=True)
@@ -391,7 +417,9 @@ class TestGetDirectoryListing:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(test_file)
 
                 result = get_directory_listing(test_file)
@@ -399,7 +427,7 @@ class TestGetDirectoryListing:
 
     def test_get_directory_listing_permission_error(self):
         """Test handling permission errors during listing."""
-        with patch("utils.secure_path.validate_secure_path") as mock_validate:
+        with patch("borgitory.utils.secure_path.validate_secure_path") as mock_validate:
             mock_path = Mock()
             mock_path.is_dir.return_value = True
             mock_path.iterdir.side_effect = PermissionError("Access denied")
@@ -415,7 +443,9 @@ class TestGetDirectoryListing:
             for name in ["zebra", "apple", "banana"]:
                 os.makedirs(os.path.join(temp_dir, name))
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(temp_dir)
 
                 result = get_directory_listing(temp_dir)
@@ -432,7 +462,9 @@ class TestUserFacingFunctions:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_mnt_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_mnt_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(test_file)
 
                 assert user_secure_exists("/mnt/test.txt") is True
@@ -443,7 +475,7 @@ class TestUserFacingFunctions:
 
     def test_user_secure_exists_permission_error(self):
         """Test handling permission errors in user existence check."""
-        with patch("utils.secure_path.validate_mnt_path") as mock_validate:
+        with patch("borgitory.utils.secure_path.validate_mnt_path") as mock_validate:
             mock_path = Mock()
             mock_path.exists.side_effect = PermissionError("Access denied")
             mock_validate.return_value = mock_path
@@ -453,9 +485,9 @@ class TestUserFacingFunctions:
     def test_user_secure_isdir_valid_directory(self):
         """Test user directory check for valid directories."""
         with tempfile.TemporaryDirectory():
-            with patch("utils.secure_path.validate_mnt_path") as mock_validate, patch(
-                "os.path.realpath"
-            ) as mock_realpath:
+            with patch(
+                "borgitory.utils.secure_path.validate_mnt_path"
+            ) as mock_validate, patch("os.path.realpath") as mock_realpath:
                 # Create a mock path that behaves like it's under /mnt
                 mock_path = Mock(spec=Path)
                 mock_path.is_dir.return_value = True
@@ -467,9 +499,9 @@ class TestUserFacingFunctions:
 
     def test_user_secure_isdir_path_outside_mnt(self):
         """Test user directory check blocks paths outside /mnt."""
-        with patch("utils.secure_path.validate_mnt_path") as mock_validate, patch(
-            "os.path.realpath"
-        ) as mock_realpath:
+        with patch(
+            "borgitory.utils.secure_path.validate_mnt_path"
+        ) as mock_validate, patch("os.path.realpath") as mock_realpath:
             mock_validate.return_value = Path("/app/data/test")
             mock_realpath.return_value = "/mnt"
 
@@ -477,9 +509,9 @@ class TestUserFacingFunctions:
 
     def test_user_secure_isdir_permission_error(self):
         """Test handling permission errors in user directory check."""
-        with patch("utils.secure_path.validate_mnt_path") as mock_validate, patch(
-            "os.path.realpath"
-        ) as mock_realpath:
+        with patch(
+            "borgitory.utils.secure_path.validate_mnt_path"
+        ) as mock_validate, patch("os.path.realpath") as mock_realpath:
             mock_path = Mock()
             mock_path.is_dir.side_effect = PermissionError("Access denied")
             mock_validate.return_value = mock_path
@@ -494,7 +526,9 @@ class TestUserFacingFunctions:
             subdir = os.path.join(temp_dir, "subdir")
             os.makedirs(subdir)
 
-            with patch("utils.secure_path.validate_mnt_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_mnt_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(temp_dir)
 
                 result = user_get_directory_listing("/mnt/test")
@@ -512,7 +546,9 @@ class TestUserFacingFunctions:
             test_file = os.path.join(temp_dir, "test.txt")
             Path(test_file).touch()
 
-            with patch("utils.secure_path.validate_mnt_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_mnt_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(temp_dir)
 
                 result = user_get_directory_listing("/mnt/test", include_files=True)
@@ -521,7 +557,7 @@ class TestUserFacingFunctions:
 
     def test_user_get_directory_listing_permission_error(self):
         """Test handling permission errors in user directory listing."""
-        with patch("utils.secure_path.validate_mnt_path") as mock_validate:
+        with patch("borgitory.utils.secure_path.validate_mnt_path") as mock_validate:
             mock_path = Mock()
             mock_path.is_dir.return_value = True
             mock_path.iterdir.side_effect = PermissionError("Access denied")
@@ -536,7 +572,7 @@ class TestValidateUserRepositoryPath:
 
     def test_validate_user_repository_path_valid(self):
         """Test validation of valid user repository paths."""
-        with patch("utils.secure_path.validate_mnt_path") as mock_validate:
+        with patch("borgitory.utils.secure_path.validate_mnt_path") as mock_validate:
             mock_validate.return_value = Path("/mnt/repo")
 
             result = validate_user_repository_path("/mnt/repo")
@@ -544,7 +580,7 @@ class TestValidateUserRepositoryPath:
 
     def test_validate_user_repository_path_invalid(self):
         """Test validation rejects invalid paths."""
-        with patch("utils.secure_path.validate_mnt_path") as mock_validate:
+        with patch("borgitory.utils.secure_path.validate_mnt_path") as mock_validate:
             mock_validate.return_value = None
 
             result = validate_user_repository_path("/etc/passwd")
@@ -573,7 +609,7 @@ class TestEdgeCasesAndErrorHandling:
         with patch("os.path.realpath") as mock_realpath:
             mock_realpath.side_effect = OSError("Filesystem error")
 
-            from utils.secure_path import validate_secure_path
+            from borgitory.utils.secure_path import validate_secure_path
 
             result = validate_secure_path("/mnt/test")
             assert result is None
@@ -584,7 +620,9 @@ class TestEdgeCasesAndErrorHandling:
             mnt_dir = os.path.join(temp_dir, "mnt")
             os.makedirs(mnt_dir, exist_ok=True)
 
-            with patch("utils.secure_path.validate_secure_path") as mock_validate:
+            with patch(
+                "borgitory.utils.secure_path.validate_secure_path"
+            ) as mock_validate:
                 mock_validate.return_value = Path(mnt_dir)
 
                 # All parts should be cleaned away
@@ -626,7 +664,7 @@ class TestEdgeCasesAndErrorHandling:
 
     def test_windows_path_handling(self):
         """Test Windows-specific path handling in pre-validation."""
-        from utils.secure_path import _pre_validate_user_input
+        from borgitory.utils.secure_path import _pre_validate_user_input
 
         allowed_prefixes = ["/mnt", "/app/data"]
 

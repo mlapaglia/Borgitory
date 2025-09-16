@@ -4,7 +4,6 @@ Test configuration and fixtures
 
 import asyncio
 import os
-import sys
 from typing import AsyncGenerator, Generator
 from unittest.mock import Mock
 
@@ -19,10 +18,9 @@ from sqlalchemy.pool import StaticPool
 if not os.getenv("SECRET_KEY"):
     os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
 
-from main import app
-from models.database import Base, get_db, CloudSyncConfig
+from borgitory.main import app
+from borgitory.models.database import Base, get_db, CloudSyncConfig
 
-# Import all models to ensure they're registered with Base
 # Import job fixtures to make them available to all tests - noqa prevents removal
 from tests.fixtures.job_fixtures import (  # noqa: F401
     mock_job_manager,
@@ -36,6 +34,15 @@ from tests.fixtures.job_fixtures import (  # noqa: F401
     mock_event_broadcaster,
     mock_job_dependencies,
     mock_subprocess_process,
+)
+
+# Import registry fixtures to make them available to all tests
+from tests.fixtures.registry_fixtures import (  # noqa: F401
+    production_registry,
+    clean_registry,
+    s3_only_registry,
+    sftp_only_registry,
+    smb_only_registry,
 )
 
 

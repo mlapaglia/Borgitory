@@ -5,7 +5,7 @@ Integration testing of SSE endpoints requires specialized tools due to streaming
 
 from fastapi.testclient import TestClient
 
-from main import app
+from borgitory.main import app
 
 
 class TestJobsAPISSEEndpoint:
@@ -19,7 +19,7 @@ class TestJobsAPISSEEndpoint:
         """Test that SSE endpoint is properly registered"""
         # This test just verifies the endpoint exists and can be called
         # without actually consuming the stream
-        from api.jobs import router
+        from borgitory.api.jobs import router
 
         # Check that the route is registered
         routes = [route.path for route in router.routes]
@@ -27,7 +27,7 @@ class TestJobsAPISSEEndpoint:
 
     def test_sse_endpoint_function_signature(self):
         """Test that SSE endpoint function has correct signature"""
-        from api.jobs import stream_current_jobs_html
+        from borgitory.api.jobs import stream_current_jobs_html
         import inspect
 
         # Check function signature
@@ -39,7 +39,7 @@ class TestJobsAPISSEEndpoint:
 
     def test_sse_endpoint_imports(self):
         """Test that SSE endpoint has all necessary imports"""
-        from api.jobs import stream_current_jobs_html
+        from borgitory.api.jobs import stream_current_jobs_html
         import inspect
 
         # Get the source code to verify it uses StreamingResponse

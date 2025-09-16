@@ -7,8 +7,8 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy.orm import Session
 
-from services.repositories.repository_service import RepositoryService
-from models.repository_dtos import (
+from borgitory.services.repositories.repository_service import RepositoryService
+from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
     ImportRepositoryRequest,
     RepositoryOperationResult,
@@ -94,7 +94,7 @@ class TestRepositoryService:
         mock_db_session.refresh = Mock(side_effect=lambda x: setattr(x, "id", 123))
 
         with patch(
-            "services.repositories.repository_service.Repository",
+            "borgitory.services.repositories.repository_service.Repository",
             return_value=mock_repo,
         ):
             # Act
@@ -168,7 +168,7 @@ class TestRepositoryService:
         mock_repo.name = "test-repo"
 
         with patch(
-            "services.repositories.repository_service.Repository",
+            "borgitory.services.repositories.repository_service.Repository",
             return_value=mock_repo,
         ):
             # Act
@@ -250,7 +250,7 @@ class TestRepositoryService:
         mock_db_session.query.side_effect = [repo_query, jobs_query]
 
         with patch.multiple(
-            "services.repositories.repository_service",
+            "borgitory.services.repositories.repository_service",
             Repository=Mock(),
             Job=Mock(),
         ):
@@ -292,7 +292,7 @@ class TestRepositoryService:
         mock_repo.name = "imported-repo"
 
         with patch(
-            "services.repositories.repository_service.Repository",
+            "borgitory.services.repositories.repository_service.Repository",
             return_value=mock_repo,
         ):
             # Act

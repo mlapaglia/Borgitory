@@ -6,8 +6,8 @@ import pytest
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime
-from services.recovery_service import RecoveryService
-from models.database import Repository, Job, JobTask
+from borgitory.services.recovery_service import RecoveryService
+from borgitory.models.database import Repository, Job, JobTask
 
 
 @pytest.fixture
@@ -72,7 +72,9 @@ class TestRecoveryService:
         # Mock query to return no interrupted jobs
         mock_db.query.return_value.filter.return_value.all.return_value = []
 
-        with patch("services.recovery_service.get_db_session") as mock_get_session:
+        with patch(
+            "borgitory.services.recovery_service.get_db_session"
+        ) as mock_get_session:
             mock_get_session.return_value.__enter__.return_value = mock_db
             mock_get_session.return_value.__exit__.return_value = None
 
@@ -98,7 +100,7 @@ class TestRecoveryService:
         )
 
         with patch(
-            "services.recovery_service.get_db_session"
+            "borgitory.services.recovery_service.get_db_session"
         ) as mock_get_session, patch.object(
             recovery_service, "_release_repository_lock"
         ) as mock_release_lock:
@@ -139,7 +141,7 @@ class TestRecoveryService:
         ]
 
         with patch(
-            "services.recovery_service.get_db_session"
+            "borgitory.services.recovery_service.get_db_session"
         ) as mock_get_session, patch.object(
             recovery_service, "_release_repository_lock"
         ) as mock_release_lock:
@@ -175,7 +177,7 @@ class TestRecoveryService:
         )
 
         with patch(
-            "services.recovery_service.get_db_session"
+            "borgitory.services.recovery_service.get_db_session"
         ) as mock_get_session, patch.object(
             recovery_service, "_release_repository_lock"
         ) as mock_release_lock:
@@ -225,7 +227,7 @@ class TestRecoveryService:
         )
 
         with patch(
-            "services.recovery_service.get_db_session"
+            "borgitory.services.recovery_service.get_db_session"
         ) as mock_get_session, patch.object(
             recovery_service, "_release_repository_lock"
         ) as mock_release_lock:
@@ -243,7 +245,7 @@ class TestRecoveryService:
     ):
         """Test exception handling in database job recovery"""
         with patch(
-            "services.recovery_service.get_db_session",
+            "borgitory.services.recovery_service.get_db_session",
             side_effect=Exception("Database error"),
         ):
             # Should not raise exception
@@ -259,7 +261,7 @@ class TestRecoveryService:
         mock_process.communicate = AsyncMock(return_value=(b"Lock released", b""))
 
         with patch(
-            "utils.security.build_secure_borg_command",
+            "borgitory.utils.security.build_secure_borg_command",
             return_value=(
                 ["borg", "break-lock", "/repo/path"],
                 {"BORG_PASSPHRASE": "test"},
@@ -280,7 +282,7 @@ class TestRecoveryService:
         mock_process.communicate = AsyncMock(return_value=(b"", b"Lock not found"))
 
         with patch(
-            "utils.security.build_secure_borg_command",
+            "borgitory.utils.security.build_secure_borg_command",
             return_value=(
                 ["borg", "break-lock", "/repo/path"],
                 {"BORG_PASSPHRASE": "test"},
@@ -298,7 +300,7 @@ class TestRecoveryService:
         mock_process.kill = MagicMock()
 
         with patch(
-            "utils.security.build_secure_borg_command",
+            "borgitory.utils.security.build_secure_borg_command",
             return_value=(
                 ["borg", "break-lock", "/repo/path"],
                 {"BORG_PASSPHRASE": "test"},
@@ -318,7 +320,7 @@ class TestRecoveryService:
     ):
         """Test repository lock release with exception"""
         with patch(
-            "utils.security.build_secure_borg_command",
+            "borgitory.utils.security.build_secure_borg_command",
             side_effect=Exception("Command build failed"),
         ):
             # Should handle exception gracefully
@@ -334,7 +336,7 @@ class TestRecoveryService:
         mock_process.communicate = AsyncMock(return_value=(b"", None))  # No stderr
 
         with patch(
-            "utils.security.build_secure_borg_command",
+            "borgitory.utils.security.build_secure_borg_command",
             return_value=(
                 ["borg", "break-lock", "/repo/path"],
                 {"BORG_PASSPHRASE": "test"},
@@ -362,7 +364,7 @@ class TestRecoveryService:
         ]
 
         with patch(
-            "services.recovery_service.get_db_session"
+            "borgitory.services.recovery_service.get_db_session"
         ) as mock_get_session, patch.object(
             recovery_service, "_release_repository_lock"
         ) as mock_release_lock:
@@ -414,7 +416,9 @@ class TestRecoveryService:
             ],  # Only incomplete tasks returned by query
         ]
 
-        with patch("services.recovery_service.get_db_session") as mock_get_session:
+        with patch(
+            "borgitory.services.recovery_service.get_db_session"
+        ) as mock_get_session:
             mock_get_session.return_value.__enter__.return_value = mock_db
             mock_get_session.return_value.__exit__.return_value = None
             await recovery_service.recover_database_job_records()

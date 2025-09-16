@@ -5,8 +5,8 @@ Tests for RcloneService - Service for cloud backup synchronization using Rclone
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from sqlalchemy.orm import Session
-from services.rclone_service import RcloneService
-from models.database import Repository, CloudSyncConfig
+from borgitory.services.rclone_service import RcloneService
+from borgitory.models.database import Repository, CloudSyncConfig
 
 
 @pytest.fixture
@@ -905,7 +905,7 @@ class TestSyncRepositoryMethod:
             "password": provider_config["password"],
             "port": provider_config["port"],
             "path_prefix": sftp_cloud_sync_config.path_prefix,
-            "remote_name": "sftp_remote",  # Simulates remote name from config
+            "remote_name": "sftp_remote",  # Simulates remote name from borgitory.config
         }
 
         # Mock the SFTP sync generator to simulate successful sync

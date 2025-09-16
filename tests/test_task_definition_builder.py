@@ -5,9 +5,13 @@ Tests for TaskDefinitionBuilder - Centralized task definition creation
 import pytest
 from unittest.mock import MagicMock
 from sqlalchemy.orm import Session
-from services.task_definition_builder import TaskDefinitionBuilder
-from models.database import CleanupConfig, RepositoryCheckConfig, NotificationConfig
-from models.schemas import PruneRequest, CheckRequest
+from borgitory.services.task_definition_builder import TaskDefinitionBuilder
+from borgitory.models.database import (
+    CleanupConfig,
+    RepositoryCheckConfig,
+    NotificationConfig,
+)
+from borgitory.models.schemas import PruneRequest, CheckRequest
 
 
 @pytest.fixture
@@ -223,7 +227,7 @@ class TestTaskDefinitionBuilder:
     def test_build_check_task_from_config(
         self, task_builder, mock_db, mock_check_config
     ):
-        """Test building check task from configuration"""
+        """Test building check task from borgitory.configuration"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
             mock_check_config
         )

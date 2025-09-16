@@ -9,7 +9,7 @@ with proper DI patterns and real database usage.
 import pytest
 from unittest.mock import AsyncMock
 
-from services.jobs.job_executor import JobExecutor, ProcessResult
+from borgitory.services.jobs.job_executor import JobExecutor, ProcessResult
 from tests.conftest import create_s3_cloud_sync_config
 
 
@@ -233,9 +233,9 @@ class TestJobExecutorCloudSyncTaskV2:
         # This test is no longer valid since cloud_sync_config_id is now required (int, not Optional[int])
         # The skip logic has been moved to the job manager level
         # We'll test a valid scenario instead
-        
+
         mock_config_load_service.load_config.return_value = None  # Config not found
-        
+
         result = await executor.execute_cloud_sync_task_v2(
             repository_path="/test/repo",
             cloud_sync_config_id=999,  # Valid ID but config doesn't exist
@@ -278,7 +278,7 @@ class TestJobExecutorCloudSyncTaskV2:
         self, executor, mock_cloud_sync_service, mock_config_load_service
     ):
         """Test successful cloud sync task v2"""
-        from services.cloud_providers.types import CloudSyncConfig, SyncResult
+        from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
         # Setup config
         config = CloudSyncConfig(
@@ -317,7 +317,7 @@ class TestJobExecutorCloudSyncTaskV2:
         self, executor, mock_cloud_sync_service, mock_config_load_service
     ):
         """Test cloud sync task v2 when sync fails"""
-        from services.cloud_providers.types import CloudSyncConfig, SyncResult
+        from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
         config = CloudSyncConfig(
             provider="s3", config={"bucket_name": "test-bucket"}, name="test-config"
@@ -344,7 +344,7 @@ class TestJobExecutorCloudSyncTaskV2:
         self, executor, mock_cloud_sync_service, mock_config_load_service
     ):
         """Test cloud sync task v2 with output callback"""
-        from services.cloud_providers.types import CloudSyncConfig, SyncResult
+        from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
         config = CloudSyncConfig(
             provider="s3", config={"bucket_name": "test-bucket"}, name="test-config"
@@ -398,7 +398,7 @@ class TestJobExecutorCloudSyncTaskV2:
         self, executor, mock_cloud_sync_service, mock_config_load_service
     ):
         """Test cloud sync task v2 when sync service raises exception"""
-        from services.cloud_providers.types import CloudSyncConfig
+        from borgitory.services.cloud_providers.types import CloudSyncConfig
 
         config = CloudSyncConfig(
             provider="s3", config={"bucket_name": "test-bucket"}, name="test-config"
@@ -423,8 +423,10 @@ class TestJobExecutorCloudSyncTaskV2:
         self, executor, test_db
     ):
         """Test cloud sync task v2 with real database configuration"""
-        from services.cloud_providers.config_service import DatabaseConfigLoadService
-        from services.cloud_providers.types import SyncResult
+        from borgitory.services.cloud_providers.config_service import (
+            DatabaseConfigLoadService,
+        )
+        from borgitory.services.cloud_providers.types import SyncResult
 
         # Create a real config in the database
         config = create_s3_cloud_sync_config(
@@ -465,7 +467,9 @@ class TestJobExecutorCloudSyncTaskV2:
         self, executor, test_db
     ):
         """Test cloud sync task v2 with disabled config in database"""
-        from services.cloud_providers.config_service import DatabaseConfigLoadService
+        from borgitory.services.cloud_providers.config_service import (
+            DatabaseConfigLoadService,
+        )
 
         # Create a disabled config in the database
         config = create_s3_cloud_sync_config(

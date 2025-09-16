@@ -5,16 +5,16 @@ Tests for CloudSyncService - Business logic tests migrated from API tests
 import pytest
 from fastapi import HTTPException
 
-from services.cloud_sync_service import CloudSyncService
-from models.database import CloudSyncConfig
-from models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
+from borgitory.services.cloud_sync_service import CloudSyncService
+from borgitory.models.database import CloudSyncConfig
+from borgitory.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
 from tests.conftest import create_s3_cloud_sync_config, create_sftp_cloud_sync_config
 
 
 @pytest.fixture
 def service(test_db):
     """CloudSyncService instance with real database session."""
-    from services.cloud_providers.registry import get_registry
+    from borgitory.services.cloud_providers.registry import get_registry
 
     registry = get_registry()
     return CloudSyncService(test_db, provider_registry=registry)

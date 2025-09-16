@@ -7,10 +7,12 @@ import asyncio
 from unittest.mock import Mock
 from httpx import AsyncClient, ASGITransport
 
-from main import app
-from models.database import Repository, get_db
-from services.repositories.repository_stats_service import RepositoryStatsService
-from dependencies import get_repository_stats_service
+from borgitory.main import app
+from borgitory.models.database import Repository, get_db
+from borgitory.services.repositories.repository_stats_service import (
+    RepositoryStatsService,
+)
+from borgitory.dependencies import get_repository_stats_service
 
 
 class TestProgressStreaming:
@@ -239,7 +241,7 @@ class TestProgressStreaming:
         from fastapi import Request
         from unittest.mock import MagicMock
 
-        templates = Jinja2Templates(directory="src/templates")
+        templates = Jinja2Templates(directory="src/borgitory/templates")
 
         # Mock request object
         mock_request = MagicMock(spec=Request)

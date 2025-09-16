@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel, Field
 
-from src.services.cloud_providers.registry import (
+from borgitory.services.cloud_providers.registry import (
     ProviderRegistry,
     ProviderMetadata,
     register_provider,
@@ -15,7 +15,7 @@ from src.services.cloud_providers.registry import (
     clear_registry,
     get_registry,
 )
-from services.rclone_service import RcloneService
+from borgitory.services.rclone_service import RcloneService
 
 
 # Mock classes for testing

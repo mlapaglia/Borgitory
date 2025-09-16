@@ -17,8 +17,8 @@ All tests use proper mocking to avoid external dependencies.
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, mock_open
 
-from services.borg_service import BorgService
-from models.database import Repository
+from borgitory.services.borg_service import BorgService
+from borgitory.models.database import Repository
 
 
 class TestBorgServiceCore:
@@ -195,7 +195,7 @@ class TestRepositoryOperations:
     @pytest.mark.asyncio
     async def test_initialize_repository_success(self):
         """Test successful repository initialization."""
-        from services.simple_command_runner import CommandResult
+        from borgitory.services.simple_command_runner import CommandResult
 
         mock_command_result = CommandResult(
             success=True, return_code=0, stdout="", stderr="", duration=1.0
@@ -205,7 +205,9 @@ class TestRepositoryOperations:
             return_value=mock_command_result
         )
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd:
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd:
             mock_build_cmd.return_value = (
                 ["borg", "init", "--encryption=repokey", "/path/to/repo"],
                 {"BORG_PASSPHRASE": "test_passphrase"},
@@ -220,7 +222,7 @@ class TestRepositoryOperations:
     @pytest.mark.asyncio
     async def test_initialize_repository_already_exists(self):
         """Test repository initialization when repo already exists."""
-        from services.simple_command_runner import CommandResult
+        from borgitory.services.simple_command_runner import CommandResult
 
         mock_command_result = CommandResult(
             success=False,
@@ -234,7 +236,9 @@ class TestRepositoryOperations:
             return_value=mock_command_result
         )
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd:
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd:
             mock_build_cmd.return_value = (["borg", "init"], {})
 
             result = await self.borg_service.initialize_repository(self.mock_repository)
@@ -255,7 +259,9 @@ class TestRepositoryOperations:
 
         # Using constructor-injected job manager instead of patching
         self.borg_service.job_manager = mock_job_manager
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd:
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd:
             mock_build_cmd.return_value = (["borg", "list", "--short"], {})
 
             result = await self.borg_service.verify_repository_access(
@@ -278,7 +284,9 @@ class TestRepositoryOperations:
 
         # Using constructor-injected job manager instead of patching
         self.borg_service.job_manager = mock_job_manager
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd:
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd:
             mock_build_cmd.return_value = (["borg", "list", "--short"], {})
 
             result = await self.borg_service.verify_repository_access(
@@ -303,7 +311,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_success(self):
         """Test successful repository info retrieval."""
-        from services.jobs.job_executor import ProcessResult
+        from borgitory.services.jobs.job_executor import ProcessResult
 
         mock_process_result = ProcessResult(
             return_code=0,
@@ -319,7 +327,9 @@ class TestGetRepoInfo:
 
         borg_service = BorgService(job_executor=mock_job_executor)
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd:
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd:
             mock_build_cmd.return_value = (["borg", "info", "--json"], {})
 
             info = await borg_service.get_repo_info(self.mock_repository)
@@ -331,7 +341,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_command_failure(self):
         """Test repository info retrieval failure."""
-        from services.jobs.job_executor import ProcessResult
+        from borgitory.services.jobs.job_executor import ProcessResult
 
         mock_process_result = ProcessResult(
             return_code=1, stdout=b"", stderr=b"borg: error: Repository does not exist"
@@ -345,7 +355,9 @@ class TestGetRepoInfo:
 
         borg_service = BorgService(job_executor=mock_job_executor)
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd:
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd:
             mock_build_cmd.return_value = (["borg", "info", "--json"], {})
 
             with pytest.raises(Exception) as exc_info:
@@ -357,7 +369,7 @@ class TestGetRepoInfo:
     @pytest.mark.asyncio
     async def test_get_repo_info_invalid_json(self):
         """Test handling of invalid JSON output."""
-        from services.jobs.job_executor import ProcessResult
+        from borgitory.services.jobs.job_executor import ProcessResult
 
         mock_process_result = ProcessResult(
             return_code=0, stdout=b"Invalid JSON output from borg", stderr=b""
@@ -371,7 +383,9 @@ class TestGetRepoInfo:
 
         borg_service = BorgService(job_executor=mock_job_executor)
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd:
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd:
             mock_build_cmd.return_value = (["borg", "info", "--json"], {})
 
             with pytest.raises(Exception) as exc_info:
@@ -394,7 +408,7 @@ class TestListArchiveContents:
     @pytest.mark.asyncio
     async def test_list_archive_contents_success(self):
         """Test successful archive content listing."""
-        from services.jobs.job_executor import ProcessResult
+        from borgitory.services.jobs.job_executor import ProcessResult
 
         mock_process_result = ProcessResult(
             return_code=0,
@@ -410,9 +424,9 @@ class TestListArchiveContents:
 
         borg_service = BorgService(job_executor=mock_job_executor)
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd, patch(
-            "utils.security.validate_archive_name"
-        ):
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd, patch("borgitory.utils.security.validate_archive_name"):
             mock_build_cmd.return_value = (["borg", "list", "--json-lines"], {})
 
             contents = await borg_service.list_archive_contents(
@@ -438,7 +452,7 @@ class TestListArchiveContents:
     @pytest.mark.asyncio
     async def test_list_archive_contents_command_failure(self):
         """Test archive content listing command failure."""
-        from services.jobs.job_executor import ProcessResult
+        from borgitory.services.jobs.job_executor import ProcessResult
 
         mock_process_result = ProcessResult(
             return_code=1, stdout=b"", stderr=b"borg: error: Archive not found"
@@ -452,9 +466,9 @@ class TestListArchiveContents:
 
         borg_service = BorgService(job_executor=mock_job_executor)
 
-        with patch("utils.security.build_secure_borg_command") as mock_build_cmd, patch(
-            "utils.security.validate_archive_name"
-        ):
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command"
+        ) as mock_build_cmd, patch("borgitory.utils.security.validate_archive_name"):
             mock_build_cmd.return_value = (["borg", "list", "--json-lines"], {})
 
             with pytest.raises(Exception) as exc_info:
@@ -491,7 +505,7 @@ class TestExtractFileStream:
     @pytest.mark.asyncio
     async def test_extract_file_stream_empty_path(self):
         """Test file extraction with empty file path."""
-        with patch("utils.security.validate_archive_name"):
+        with patch("borgitory.utils.security.validate_archive_name"):
             with pytest.raises(Exception) as exc_info:
                 await self.borg_service.extract_file_stream(
                     self.mock_repository, "test-archive", ""
@@ -502,7 +516,7 @@ class TestExtractFileStream:
     @pytest.mark.asyncio
     async def test_extract_file_stream_none_path(self):
         """Test file extraction with None file path."""
-        with patch("utils.security.validate_archive_name"):
+        with patch("borgitory.utils.security.validate_archive_name"):
             with pytest.raises(Exception) as exc_info:
                 await self.borg_service.extract_file_stream(
                     self.mock_repository, "test-archive", None
@@ -513,8 +527,8 @@ class TestExtractFileStream:
     @pytest.mark.asyncio
     async def test_extract_file_stream_security_error(self):
         """Test file extraction with security validation error."""
-        with patch("utils.security.validate_archive_name"), patch(
-            "services.borg_service.build_secure_borg_command",
+        with patch("borgitory.utils.security.validate_archive_name"), patch(
+            "borgitory.services.borg_service.build_secure_borg_command",
             side_effect=Exception("Security error"),
         ):
             with pytest.raises(Exception) as exc_info:
@@ -550,10 +564,13 @@ class TestRepositoryScanningComprehensive:
         # Using constructor-injected job manager instead of patching
         self.borg_service.job_manager = mock_job_manager
         with patch(
-            "dependencies.get_volume_service", return_value=mock_volume_service
-        ), patch("utils.security.sanitize_path", side_effect=lambda x: x), patch(
-            "os.path.exists", return_value=True
-        ), patch("os.path.isdir", return_value=True):
+            "borgitory.dependencies.get_volume_service",
+            return_value=mock_volume_service,
+        ), patch(
+            "borgitory.utils.security.sanitize_path", side_effect=lambda x: x
+        ), patch("os.path.exists", return_value=True), patch(
+            "os.path.isdir", return_value=True
+        ):
             job_id = await self.borg_service.start_repository_scan()
 
             assert job_id == "scan-job-456"
@@ -582,7 +599,10 @@ class TestRepositoryScanningComprehensive:
 
         # Using constructor-injected job manager instead of patching
         self.borg_service.job_manager = mock_job_manager
-        with patch("dependencies.get_volume_service", return_value=mock_volume_service):
+        with patch(
+            "borgitory.dependencies.get_volume_service",
+            return_value=mock_volume_service,
+        ):
             job_id = await self.borg_service.start_repository_scan()
 
             assert job_id == "scan-job-789"
@@ -599,7 +619,8 @@ class TestRepositoryScanningComprehensive:
         # Using constructor-injected job manager instead of patching
         self.borg_service.job_manager = mock_job_manager
         with patch(
-            "utils.security.sanitize_path", side_effect=ValueError("Dangerous path")
+            "borgitory.utils.security.sanitize_path",
+            side_effect=ValueError("Dangerous path"),
         ), patch("os.path.exists", return_value=False):
             job_id = await self.borg_service.start_repository_scan("/invalid/path")
 
@@ -743,9 +764,9 @@ class TestSecurityIntegrationExtended:
     async def test_create_backup_security_validation_prevents_injection(self):
         """Test that security validation prevents injection attacks in backup creation."""
         with patch(
-            "utils.security.validate_compression",
+            "borgitory.utils.security.validate_compression",
             side_effect=ValueError("Invalid compression"),
-        ), patch("utils.security.validate_archive_name"):
+        ), patch("borgitory.utils.security.validate_archive_name"):
             with pytest.raises(Exception) as exc_info:
                 await self.borg_service.create_backup(
                     self.mock_repository, "/source/path", compression="lz4; rm -rf /"
@@ -758,7 +779,7 @@ class TestSecurityIntegrationExtended:
     async def test_list_archives_security_validation(self):
         """Test that archive listing uses security validation."""
         with patch(
-            "utils.security.build_secure_borg_command",
+            "borgitory.utils.security.build_secure_borg_command",
             side_effect=ValueError("Security error"),
         ):
             with pytest.raises(Exception) as exc_info:
@@ -783,7 +804,7 @@ class TestSecurityIntegrationExtended:
     async def test_verify_repository_access_security_validation(self):
         """Test that repository access verification uses security validation."""
         with patch(
-            "utils.security.build_secure_borg_command",
+            "borgitory.utils.security.build_secure_borg_command",
             side_effect=Exception("Security error"),
         ):
             result = await self.borg_service.verify_repository_access(
@@ -863,8 +884,8 @@ class TestEdgeCasesAndBoundaryConditions:
         "/" + "/".join(["very_long_directory_name_" + str(i) for i in range(50)])
 
         # Test that operations handle long paths without crashing
-        with patch("utils.security.validate_archive_name"), patch(
-            "utils.security.build_secure_borg_command",
+        with patch("borgitory.utils.security.validate_archive_name"), patch(
+            "borgitory.utils.security.build_secure_borg_command",
             side_effect=ValueError("Path too long"),
         ):
             with pytest.raises(Exception):

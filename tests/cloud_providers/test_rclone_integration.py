@@ -12,7 +12,7 @@ This module tests the registry-based rclone integration including:
 import pytest
 from unittest.mock import MagicMock
 
-from src.services.cloud_providers.registry import (
+from borgitory.services.cloud_providers.registry import (
     RcloneMethodMapping,
     ProviderMetadata,
     register_provider,
@@ -20,8 +20,8 @@ from src.services.cloud_providers.registry import (
     get_metadata,
     clear_registry,
 )
-from src.services.rclone_service import RcloneService
-from models.database import Repository
+from borgitory.services.rclone_service import RcloneService
+from borgitory.models.database import Repository
 
 
 class TestRcloneMethodMapping:
@@ -369,9 +369,9 @@ class TestRealProviderIntegration:
     def test_real_providers_have_rclone_mappings_via_storage_classes(self):
         """Test that real providers have rclone mappings via their storage classes"""
         # Test that storage classes can provide mappings directly
-        from src.services.cloud_providers.storage.s3_storage import S3Storage
-        from src.services.cloud_providers.storage.sftp_storage import SFTPStorage
-        from src.services.cloud_providers.storage.smb_storage import SMBStorage
+        from borgitory.services.cloud_providers.storage.s3_storage import S3Storage
+        from borgitory.services.cloud_providers.storage.sftp_storage import SFTPStorage
+        from borgitory.services.cloud_providers.storage.smb_storage import SMBStorage
 
         storage_classes = [
             (S3Storage, "s3"),
@@ -405,8 +405,8 @@ class TestRealProviderIntegration:
 
     def test_real_providers_validation(self):
         """Test that all real providers pass validation"""
-        from src.services.rclone_service import RcloneService
-        from src.services.cloud_providers.registry import get_supported_providers
+        from borgitory.services.rclone_service import RcloneService
+        from borgitory.services.cloud_providers.registry import get_supported_providers
 
         rclone_service = RcloneService()
         providers = get_supported_providers()
@@ -421,9 +421,9 @@ class TestRealProviderIntegration:
 
     def test_storage_classes_have_get_rclone_mapping(self):
         """Test that all storage classes have get_rclone_mapping method"""
-        from src.services.cloud_providers.storage.s3_storage import S3Storage
-        from src.services.cloud_providers.storage.sftp_storage import SFTPStorage
-        from src.services.cloud_providers.storage.smb_storage import SMBStorage
+        from borgitory.services.cloud_providers.storage.s3_storage import S3Storage
+        from borgitory.services.cloud_providers.storage.sftp_storage import SFTPStorage
+        from borgitory.services.cloud_providers.storage.smb_storage import SMBStorage
 
         storage_classes = [S3Storage, SFTPStorage, SMBStorage]
 

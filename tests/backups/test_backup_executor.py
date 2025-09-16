@@ -4,14 +4,14 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
-from services.backups.backup_executor import (
+from borgitory.services.backups.backup_executor import (
     BackupExecutor,
     BackupConfig,
     PruneConfig,
     BackupResult,
     BackupStatus,
 )
-from models.database import Repository
+from borgitory.models.database import Repository
 
 
 class TestBackupStatus:
@@ -308,7 +308,8 @@ class TestBackupExecutor:
         )
 
         with patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             command, env = backup_executor._build_backup_command(
                 test_repository, config
@@ -327,7 +328,8 @@ class TestBackupExecutor:
         )
 
         with patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             command, env = backup_executor._build_backup_command(
                 test_repository, config
@@ -347,7 +349,8 @@ class TestBackupExecutor:
         )
 
         with patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             command, env = backup_executor._build_prune_command(test_repository, config)
 
@@ -371,7 +374,8 @@ class TestBackupExecutor:
         )
 
         with patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             command, env = backup_executor._build_prune_command(test_repository, config)
 
@@ -410,7 +414,8 @@ class TestBackupExecutor:
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
         ), patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             result = await backup_executor.execute_backup(test_repository, config)
 
@@ -439,7 +444,8 @@ class TestBackupExecutor:
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
         ), patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             result = await backup_executor.execute_backup(test_repository, config)
 
@@ -479,7 +485,8 @@ class TestBackupExecutor:
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
         ), patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             result = await backup_executor.execute_backup(
                 test_repository,
@@ -502,7 +509,8 @@ class TestBackupExecutor:
         with patch.object(
             backup_executor, "_start_process", side_effect=Exception("Process failed")
         ), patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             result = await backup_executor.execute_backup(test_repository, config)
 
@@ -528,7 +536,8 @@ class TestBackupExecutor:
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
         ), patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             result = await backup_executor.execute_prune(test_repository, config)
 
@@ -554,7 +563,8 @@ class TestBackupExecutor:
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
         ), patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             result = await backup_executor.execute_prune(test_repository, config)
 
@@ -801,7 +811,8 @@ class TestBackupExecutor:
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
         ), patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             # Start backup - should track operation
             result = await backup_executor.execute_backup(
@@ -833,7 +844,8 @@ class TestBackupExecutor:
         with patch.object(
             backup_executor, "_start_process", return_value=mock_process
         ), patch(
-            "models.database.Repository.get_passphrase", return_value="test-passphrase"
+            "borgitory.models.database.Repository.get_passphrase",
+            return_value="test-passphrase",
         ):
             # Start prune - should track operation
             result = await backup_executor.execute_prune(

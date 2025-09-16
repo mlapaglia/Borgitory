@@ -6,11 +6,11 @@ import pytest
 from unittest.mock import Mock, AsyncMock
 from datetime import datetime, timezone
 
-from services.jobs.job_render_service import JobRenderService
+from borgitory.services.jobs.job_render_service import JobRenderService
 from tests.fixtures.job_fixtures import (
     create_mock_job_context,
 )
-from models.database import Job
+from borgitory.models.database import Job
 
 
 class TestJobRenderService:
@@ -141,7 +141,7 @@ class TestJobRenderService:
 
     def test_dependency_injection_service(self):
         """Test that dependency injection service works"""
-        from dependencies import get_job_render_service
+        from borgitory.dependencies import get_job_render_service
 
         service = get_job_render_service()
         assert service is not None

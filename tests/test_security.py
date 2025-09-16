@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from utils.security import (
+from borgitory.utils.security import (
     sanitize_path,
     sanitize_passphrase,
     build_secure_borg_command,
@@ -15,7 +15,7 @@ from utils.security import (
     validate_compression,
     get_or_generate_secret_key,
 )
-from utils.secure_path import (
+from borgitory.utils.secure_path import (
     validate_secure_path,
     validate_mnt_path,
     _pre_validate_user_input,

@@ -5,9 +5,9 @@ These tests verify that each storage provider correctly implements
 the get_display_details method and returns properly formatted HTML.
 """
 
-from services.cloud_providers.storage.s3_storage import S3Storage
-from services.cloud_providers.storage.sftp_storage import SFTPStorage
-from services.cloud_providers.storage.smb_storage import SMBStorage
+from borgitory.services.cloud_providers.storage.s3_storage import S3Storage
+from borgitory.services.cloud_providers.storage.sftp_storage import SFTPStorage
+from borgitory.services.cloud_providers.storage.smb_storage import SMBStorage
 
 
 class TestS3DisplayDetails:
@@ -167,8 +167,8 @@ class TestDisplayDetailsIntegration:
 
     def test_get_provider_display_details_function(self):
         """Test the _get_provider_display_details function from cloud_sync.py"""
-        from api.cloud_sync import _get_provider_display_details
-        from services.cloud_providers.registry import get_registry
+        from borgitory.api.cloud_sync import _get_provider_display_details
+        from borgitory.services.cloud_providers.registry import get_registry
 
         registry = get_registry()
 
@@ -182,8 +182,8 @@ class TestDisplayDetailsIntegration:
 
     def test_get_provider_display_details_unknown_provider(self):
         """Test display details function with unknown provider"""
-        from api.cloud_sync import _get_provider_display_details
-        from services.cloud_providers.registry import get_registry
+        from borgitory.api.cloud_sync import _get_provider_display_details
+        from borgitory.services.cloud_providers.registry import get_registry
 
         registry = get_registry()
         result = _get_provider_display_details(registry, "unknown", {})
@@ -193,8 +193,8 @@ class TestDisplayDetailsIntegration:
 
     def test_get_provider_display_details_empty_provider(self):
         """Test display details function with empty provider"""
-        from api.cloud_sync import _get_provider_display_details
-        from services.cloud_providers.registry import get_registry
+        from borgitory.api.cloud_sync import _get_provider_display_details
+        from borgitory.services.cloud_providers.registry import get_registry
 
         registry = get_registry()
         result = _get_provider_display_details(registry, "", {})

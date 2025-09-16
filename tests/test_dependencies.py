@@ -2,7 +2,7 @@
 Tests for FastAPI dependency providers
 """
 
-from dependencies import (
+from borgitory.dependencies import (
     get_simple_command_runner,
     get_borg_service,
     get_job_service,
@@ -15,17 +15,19 @@ from dependencies import (
     get_repository_stats_service,
     get_volume_service,
 )
-from services.simple_command_runner import SimpleCommandRunner
-from services.borg_service import BorgService
-from services.jobs.job_service import JobService
-from services.recovery_service import RecoveryService
-from services.notifications.pushover_service import PushoverService
-from services.jobs.job_stream_service import JobStreamService
-from services.jobs.job_render_service import JobRenderService
-from services.debug_service import DebugService
-from services.rclone_service import RcloneService
-from services.repositories.repository_stats_service import RepositoryStatsService
-from services.volumes.volume_service import VolumeService
+from borgitory.services.simple_command_runner import SimpleCommandRunner
+from borgitory.services.borg_service import BorgService
+from borgitory.services.jobs.job_service import JobService
+from borgitory.services.recovery_service import RecoveryService
+from borgitory.services.notifications.pushover_service import PushoverService
+from borgitory.services.jobs.job_stream_service import JobStreamService
+from borgitory.services.jobs.job_render_service import JobRenderService
+from borgitory.services.debug_service import DebugService
+from borgitory.services.rclone_service import RcloneService
+from borgitory.services.repositories.repository_stats_service import (
+    RepositoryStatsService,
+)
+from borgitory.services.volumes.volume_service import VolumeService
 
 
 class TestDependencies:

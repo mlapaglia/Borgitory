@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, AsyncMock
 
-from services.scheduling.schedule_service import ScheduleService
+from borgitory.services.scheduling.schedule_service import ScheduleService
 
 
 class TestScheduleValidationService:

@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.join(os.path.abspath("."), "src"))
 
 # Import the models and Base for autogenerate support
-from models.database import Base
-from config import DATABASE_URL
+from borgitory.models.database import Base
+from borgitory.config import DATABASE_URL
 
 # Import all models to ensure they're registered with Base
 

@@ -9,13 +9,13 @@ import pytest
 from unittest.mock import AsyncMock
 from pydantic import ValidationError
 
-from services.cloud_providers.storage import (
+from borgitory.services.cloud_providers.storage import (
     S3Storage,
     SFTPStorage,
     S3StorageConfig,
     SFTPStorageConfig,
 )
-from services.cloud_providers.types import SyncEventType, ConnectionInfo
+from borgitory.services.cloud_providers.types import SyncEventType, ConnectionInfo
 
 
 class TestS3StorageConfig:

@@ -1,0 +1,87 @@
+"""
+Configuration Business Logic Service.
+Handles all configuration-related business operations for dropdowns and form data.
+"""
+
+import logging
+from typing import List, Dict, Any
+from sqlalchemy.orm import Session
+
+from borgitory.models.database import (
+    Repository,
+    CleanupConfig,
+    CloudSyncConfig,
+    NotificationConfig,
+    RepositoryCheckConfig,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class ConfigurationService:
+    """Service for configuration and form data operations."""
+
+    def __init__(self):
+        pass
+
+    def get_schedule_form_data(self, db: Session) -> Dict[str, List[Any]]:
+        """
+        Get all configuration data needed for schedule forms.
+
+        Returns:
+            Dict containing lists of repositories and enabled configurations
+        """
+        return {
+            "repositories": db.query(Repository).all(),
+            "cleanup_configs": db.query(CleanupConfig)
+            .filter(CleanupConfig.enabled)
+            .all(),
+            "cloud_sync_configs": db.query(CloudSyncConfig)
+            .filter(CloudSyncConfig.enabled)
+            .all(),
+            "notification_configs": db.query(NotificationConfig)
+            .filter(NotificationConfig.enabled)
+            .all(),
+            "check_configs": db.query(RepositoryCheckConfig)
+            .filter(RepositoryCheckConfig.enabled)
+            .all(),
+        }
+
+    def get_cron_preset_descriptions(self) -> Dict[str, str]:
+        """
+        Get human-readable descriptions for cron presets.
+
+        Returns:
+            Dict mapping cron expressions to their descriptions
+        """
+        return {
+            "0 2 * * *": "Daily at 2:00 AM",
+            "0 2 * * 0": "Weekly on Sunday at 2:00 AM",
+            "0 2 1 * *": "Monthly on 1st at 2:00 AM",
+            "0 2 1,15 * *": "Twice monthly (1st and 15th) at 2:00 AM",
+            "0 2 */2 * *": "Every 2 days at 2:00 AM",
+        }
+
+    def get_cron_form_context(self, preset: str = "") -> Dict[str, Any]:
+        """
+        Get context data for cron expression form based on preset.
+
+        Args:
+            preset: The selected cron preset
+
+        Returns:
+            Dict containing form context data
+        """
+        context = {
+            "preset": preset,
+            "is_custom": preset == "custom",
+            "cron_expression": preset if preset != "custom" and preset else "",
+            "description": "",
+        }
+
+        # Get human readable description for preset
+        if preset and preset != "custom":
+            preset_descriptions = self.get_cron_preset_descriptions()
+            context["description"] = preset_descriptions.get(preset, "")
+
+        return context
