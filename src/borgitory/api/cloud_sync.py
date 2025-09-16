@@ -59,12 +59,12 @@ def _get_provider_template(provider: str, mode: str = "create") -> str:
     template_path = f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
     full_path = f"src/borgitory/templates/{template_path}"
 
-    # Optionally, ensure normalized full_path remains inside templates
-    base_templates_dir = os.path.normpath(
+    # Ensure normalized full_path remains inside templates using commonpath
+    base_templates_dir = os.path.abspath(os.path.normpath(
         "src/borgitory/templates/partials/cloud_sync/providers/"
-    )
-    normalized_path = os.path.normpath(full_path)
-    if not normalized_path.startswith(base_templates_dir):
+    ))
+    normalized_path = os.path.abspath(os.path.normpath(full_path))
+    if os.path.commonpath([base_templates_dir, normalized_path]) != base_templates_dir:
         return None
 
     if os.path.exists(full_path):
