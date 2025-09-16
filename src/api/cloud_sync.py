@@ -46,14 +46,25 @@ def _get_supported_providers(registry) -> List[dict]:
 def _get_provider_template(provider: str, mode: str = "create") -> str:
     """Get the appropriate template path for a provider and mode"""
     import os
+    import re
 
     if not provider:
+        return None
+
+    # Validate provider name: only allow alphanumerics, underscores, hyphens
+    if not re.fullmatch(r'^[\w-]+$', provider):
         return None
 
     # Automatically discover templates by checking if they exist on filesystem
     suffix = "_edit" if mode == "edit" else ""
     template_path = f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
     full_path = f"src/templates/{template_path}"
+
+    # Optionally, ensure normalized full_path remains inside templates
+    base_templates_dir = os.path.normpath("src/templates/partials/cloud_sync/providers/")
+    normalized_path = os.path.normpath(full_path)
+    if not normalized_path.startswith(base_templates_dir):
+        return None
 
     if os.path.exists(full_path):
         return template_path
