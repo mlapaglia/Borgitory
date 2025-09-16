@@ -265,6 +265,7 @@ class SMBStorage(CloudStorage):
             sync_method="sync_repository_to_smb",
             test_method="test_smb_connection",
             parameter_mapping={
+                "repository": "repository_path",
                 "host": "host",
                 "user": "user",
                 "pass": "password",
@@ -294,6 +295,7 @@ class SMBStorage(CloudStorage):
         sync_method="sync_repository_to_smb",
         test_method="test_smb_connection",
         parameter_mapping={
+            "repository": "repository_path",
             "host": "host",
             "user": "user",
             "pass": "password",  # SMB config uses pass (alias for pass_), rclone expects password

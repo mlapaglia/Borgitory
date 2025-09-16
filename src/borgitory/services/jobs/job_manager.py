@@ -1093,6 +1093,16 @@ class JobManager:
                 self.output_manager.add_output_line(job.id, line, "stdout", progress)
             )
 
+            self.event_broadcaster.broadcast_event(
+                EventType.JOB_OUTPUT,
+                job_id=job.id,
+                data={
+                    "line": line,
+                    "progress": progress,
+                    "task_index": task_index,
+                },
+            )
+
         # Get cloud sync config ID, defaulting to None if not configured
         cloud_sync_config_id = params.get("cloud_sync_config_id")
 

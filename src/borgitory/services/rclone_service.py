@@ -1163,14 +1163,34 @@ class RcloneService:
         for config_field, rclone_param in mapping.parameter_mapping.items():
             if config_field in provider_config:
                 rclone_params[rclone_param] = provider_config[config_field]
+            elif config_field == "repository" and config_field in rclone_params:
+                # Handle repository -> repository_path conversion
+                if rclone_param == "repository_path":
+                    rclone_params[rclone_param] = repository.path
+                else:
+                    rclone_params[rclone_param] = repository
 
         # Add optional parameters with defaults
         for param, default_value in mapping.optional_params.items():
             if param not in rclone_params:
                 rclone_params[param] = provider_config.get(param, default_value)
 
-        # Validate required parameters
-        missing_params = [p for p in mapping.required_params if p not in rclone_params]
+        # Remove the original repository key if it was mapped to a different name
+        if (
+            "repository" in mapping.parameter_mapping
+            and "repository" in rclone_params
+            and mapping.parameter_mapping["repository"] != "repository"
+        ):
+            del rclone_params["repository"]
+
+        # Validate required parameters (check mapped parameter names)
+        missing_params = []
+        for required_param in mapping.required_params:
+            # Check if the required param was mapped to a different name
+            mapped_param = mapping.parameter_mapping.get(required_param, required_param)
+            if mapped_param not in rclone_params:
+                missing_params.append(required_param)
+
         if missing_params:
             raise ValueError(
                 f"Missing required parameters for {provider}: {missing_params}"

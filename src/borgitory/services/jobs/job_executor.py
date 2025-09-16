@@ -377,8 +377,6 @@ class JobExecutor:
                             f"Please update the configuration through the web UI."
                         )
 
-                    # Dependencies are now required by type system - no need for runtime checks
-
                     # Get sensitive fields by creating a temporary storage with dummy config
                     metadata = provider_registry.get_metadata(config.provider)
                     if not metadata:
@@ -402,7 +400,7 @@ class JobExecutor:
                         dummy_config = {
                             "host": "dummy.example.com",
                             "user": "dummy",
-                            "pass_": "dummy",
+                            "pass": "dummy",
                             "share_name": "dummy",
                         }
                     else:

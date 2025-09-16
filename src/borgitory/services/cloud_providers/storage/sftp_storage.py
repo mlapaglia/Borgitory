@@ -117,8 +117,13 @@ class SFTPStorage(CloudStorage):
             )
 
         try:
+            # Create a simple repository object with the path
+            from types import SimpleNamespace
+
+            repository_obj = SimpleNamespace(path=repository_path)
+
             async for progress in self._rclone_service.sync_repository_to_sftp(
-                repository_path=repository_path,
+                repository=repository_obj,
                 host=self._config.host,
                 username=self._config.username,
                 remote_path=self._config.remote_path,
@@ -126,7 +131,6 @@ class SFTPStorage(CloudStorage):
                 password=self._config.password,
                 private_key=self._config.private_key,
                 path_prefix=remote_path,
-                host_key_checking=self._config.host_key_checking,
             ):
                 if progress_callback and progress.get("type") == "progress":
                     progress_callback(
@@ -163,7 +167,6 @@ class SFTPStorage(CloudStorage):
                 port=self._config.port,
                 password=self._config.password,
                 private_key=self._config.private_key,
-                host_key_checking=self._config.host_key_checking,
             )
             return result.get("status") == "success"
         except Exception:
@@ -212,19 +215,17 @@ class SFTPStorage(CloudStorage):
             sync_method="sync_repository_to_sftp",
             test_method="test_sftp_connection",
             parameter_mapping={
+                "repository": "repository",
                 "host": "host",
                 "username": "username",
                 "remote_path": "remote_path",
                 "port": "port",
                 "password": "password",
                 "private_key": "private_key",
-                "host_key_checking": "host_key_checking",
             },
             required_params=["repository", "host", "username"],
             optional_params={
                 "port": 22,
-                "host_key_checking": True,
-                "timeout": "10s",
                 "path_prefix": "",
             },
         )
@@ -241,19 +242,17 @@ class SFTPStorage(CloudStorage):
         sync_method="sync_repository_to_sftp",
         test_method="test_sftp_connection",
         parameter_mapping={
+            "repository": "repository",
             "host": "host",
             "username": "username",
             "remote_path": "remote_path",
             "port": "port",
             "password": "password",
             "private_key": "private_key",
-            "host_key_checking": "host_key_checking",
         },
         required_params=["repository", "host", "username"],
         optional_params={
             "port": 22,
-            "host_key_checking": True,
-            "timeout": "10s",
             "path_prefix": "",
         },
     ),
