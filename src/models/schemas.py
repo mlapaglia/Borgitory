@@ -491,62 +491,86 @@ class CloudSyncConfigCreate(CloudSyncConfigBase):
     @model_validator(mode="after")
     def validate_and_build_provider_config(self):
         """Build provider_config from legacy fields or validate existing provider_config"""
-        
-        # If provider_config is already provided, validate it using the provider classes
+
+        # If provider_config is already provided, validate it using the new storage classes
         if self.provider_config:
             try:
-                from services.cloud_providers import CloudProviderFactory
-                # This will validate the config and raise ValidationError if invalid
-                CloudProviderFactory.create_provider(self.provider.value, self.provider_config)
+                from services.cloud_providers.storage import (
+                    S3StorageConfig,
+                    SFTPStorageConfig,
+                )
+
+                # Validate the config using the appropriate storage config class
+                if self.provider.value == "s3":
+                    S3StorageConfig(**self.provider_config)
+                elif self.provider.value == "sftp":
+                    SFTPStorageConfig(**self.provider_config)
+                else:
+                    raise ValueError(f"Unknown provider: {self.provider.value}")
+
                 return self
             except Exception as e:
                 raise ValueError(f"Invalid provider configuration: {str(e)}")
-        
+
         # Build provider_config from legacy fields for backward compatibility
         if self.provider == ProviderType.S3:
             if not all([self.bucket_name, self.access_key, self.secret_key]):
-                raise ValueError("S3 provider requires bucket_name, access_key, and secret_key")
-            
+                raise ValueError(
+                    "S3 provider requires bucket_name, access_key, and secret_key"
+                )
+
             self.provider_config = {
                 "bucket_name": self.bucket_name,
                 "access_key": self.access_key,
                 "secret_key": self.secret_key,
                 "region": "us-east-1",  # Default
-                "storage_class": "STANDARD"  # Default
+                "storage_class": "STANDARD",  # Default
             }
-            
+
         elif self.provider == ProviderType.SFTP:
             if not all([self.host, self.username, self.remote_path]):
-                raise ValueError("SFTP provider requires host, username, and remote_path")
-            
+                raise ValueError(
+                    "SFTP provider requires host, username, and remote_path"
+                )
+
             if not self.password and not self.private_key:
-                raise ValueError("SFTP provider requires either password or private_key")
-            
+                raise ValueError(
+                    "SFTP provider requires either password or private_key"
+                )
+
             self.provider_config = {
                 "host": self.host,
                 "username": self.username,
                 "remote_path": self.remote_path,
                 "port": self.port or 22,
-                "host_key_checking": True
+                "host_key_checking": True,
             }
-            
+
             if self.password:
                 self.provider_config["password"] = self.password
             if self.private_key:
                 self.provider_config["private_key"] = self.private_key
-        
+
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
-        
+
         # Validate the built configuration
         try:
-            from services.cloud_providers import CloudProviderFactory
-            CloudProviderFactory.create_provider(self.provider.value, self.provider_config)
+            from services.cloud_providers.storage import (
+                S3StorageConfig,
+                SFTPStorageConfig,
+            )
+
+            if self.provider.value == "s3":
+                S3StorageConfig(**self.provider_config)
+            elif self.provider.value == "sftp":
+                SFTPStorageConfig(**self.provider_config)
+            else:
+                raise ValueError(f"Unknown provider: {self.provider.value}")
         except Exception as e:
             raise ValueError(f"Invalid provider configuration: {str(e)}")
-        
-        return self
 
+        return self
 
 
 class CloudSyncConfigUpdate(BaseModel):

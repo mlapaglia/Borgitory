@@ -27,7 +27,6 @@ from services.volumes.volume_service import VolumeService
 from services.repositories.repository_parser import RepositoryParser
 from services.borg_command_builder import BorgCommandBuilder
 from services.archives.archive_manager import ArchiveManager
-from services.cloud_sync_manager import CloudSyncManager
 from services.repositories.repository_service import RepositoryService
 from services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
@@ -335,21 +334,6 @@ def get_archive_manager() -> ArchiveManager:
     return _archive_manager_instance
 
 
-_cloud_sync_manager_instance = None
-
-
-def get_cloud_sync_manager() -> CloudSyncManager:
-    """
-    Provide a CloudSyncManager singleton instance.
-
-    Uses module-level singleton pattern for application-wide persistence.
-    """
-    global _cloud_sync_manager_instance
-    if _cloud_sync_manager_instance is None:
-        _cloud_sync_manager_instance = CloudSyncManager()
-    return _cloud_sync_manager_instance
-
-
 _repository_service_instance = None
 
 
@@ -504,7 +488,6 @@ TaskDefinitionBuilderDep = Annotated[
 RepositoryParserDep = Annotated[RepositoryParser, Depends(get_repository_parser)]
 BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
 ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
-CloudSyncManagerDep = Annotated[CloudSyncManager, Depends(get_cloud_sync_manager)]
 RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
 JobEventBroadcasterDep = Annotated[
     JobEventBroadcaster, Depends(get_job_event_broadcaster_dep)

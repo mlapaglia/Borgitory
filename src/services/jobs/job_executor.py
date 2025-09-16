@@ -360,7 +360,7 @@ class JobExecutor:
                     from services.cloud_providers import CloudProviderFactory
                     from types import SimpleNamespace
                     import json
-                    
+
                     # Get provider configuration
                     provider_config = {}
                     if config.provider_config:
@@ -375,7 +375,7 @@ class JobExecutor:
                                 "access_key": access_key,
                                 "secret_key": secret_key,
                                 "region": "us-east-1",
-                                "storage_class": "STANDARD"
+                                "storage_class": "STANDARD",
                             }
                         elif config.provider == "sftp":
                             password, private_key = config.get_sftp_credentials()
@@ -384,41 +384,45 @@ class JobExecutor:
                                 "username": config.username,
                                 "remote_path": config.remote_path,
                                 "port": config.port or 22,
-                                "host_key_checking": True
+                                "host_key_checking": True,
                             }
                             if password:
                                 provider_config["password"] = password
                             if private_key:
                                 provider_config["private_key"] = private_key
-                    
+
                     # Create provider instance
                     provider = CloudProviderFactory.create_provider(
-                        config.provider, 
+                        config.provider, provider_config
+                    )
+
+                    # Decrypt sensitive fields if needed
+                    decrypted_config = provider.decrypt_sensitive_fields(
                         provider_config
                     )
-                    
-                    # Decrypt sensitive fields if needed
-                    decrypted_config = provider.decrypt_sensitive_fields(provider_config)
                     provider = CloudProviderFactory.create_provider(
-                        config.provider,
-                        decrypted_config
+                        config.provider, decrypted_config
                     )
-                    
+
                     # Get connection info for logging
                     conn_info = provider.get_connection_info()
-                    logger.info(f"Syncing to {config.name} ({config.provider.upper()}: {conn_info})")
+                    logger.info(
+                        f"Syncing to {config.name} ({config.provider.upper()}: {conn_info})"
+                    )
                     if output_callback:
-                        output_callback(f"Syncing to {config.name} ({config.provider.upper()})", {})
-                    
+                        output_callback(
+                            f"Syncing to {config.name} ({config.provider.upper()})", {}
+                        )
+
                     # Create repository object
                     repo_obj = SimpleNamespace(path=repository_path)
-                    
+
                     # Execute sync using provider
                     progress_generator = provider.sync_repository(
                         repository=repo_obj,
                         path_prefix=config.path_prefix or "",
                     )
-                    
+
                 except Exception as e:
                     error_msg = f"Failed to initialize cloud provider {config.provider}: {str(e)}"
                     logger.error(error_msg)
@@ -486,6 +490,92 @@ class JobExecutor:
             logger.error(f"Exception in cloud sync task: {str(e)}")
             if output_callback:
                 output_callback(f"Exception in cloud sync task: {str(e)}", {})
+            return ProcessResult(
+                return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
+            )
+
+    async def execute_cloud_sync_task_v2(
+        self,
+        repository_path: str,
+        cloud_sync_config_id: int,
+        cloud_sync_service,
+        config_load_service,
+        output_callback: Optional[Callable[[str], None]] = None,
+    ) -> ProcessResult:
+        """
+        Execute cloud sync using the new clean architecture with proper DI.
+
+        This method demonstrates proper dependency injection - all dependencies
+        are injected via parameters, making it easy to test with mocks.
+
+        Args:
+            repository_path: Path to the repository to sync
+            cloud_sync_config_id: ID of the cloud sync configuration
+            cloud_sync_service: Injected cloud sync service
+            config_load_service: Injected config loading service
+            output_callback: Optional callback for real-time output
+
+        Returns:
+            ProcessResult with execution details
+        """
+        try:
+            if not cloud_sync_config_id:
+                logger.info("No cloud backup configuration - skipping cloud sync")
+                return ProcessResult(
+                    return_code=0,
+                    stdout=b"Cloud sync skipped - no configuration",
+                    stderr=b"",
+                    error=None,
+                )
+
+            logger.info(f"Starting cloud sync v2 for repository {repository_path}")
+
+            if output_callback:
+                output_callback("Starting cloud sync...")
+
+            # Load configuration using injected service
+            sync_config = await config_load_service.load_config(cloud_sync_config_id)
+
+            if not sync_config:
+                logger.info("Cloud backup configuration not found or disabled")
+                if output_callback:
+                    output_callback("Cloud backup configuration not found or disabled")
+                return ProcessResult(
+                    return_code=0,
+                    stdout=b"Cloud sync skipped - configuration disabled",
+                    stderr=b"",
+                    error=None,
+                )
+
+            # Execute sync using injected service - clean and simple!
+            result = await cloud_sync_service.execute_sync(
+                sync_config, repository_path, output_callback
+            )
+
+            # Convert SyncResult to ProcessResult
+            if result.success:
+                logger.info(
+                    f"Cloud sync completed successfully in {result.duration_seconds:.1f}s"
+                )
+                return ProcessResult(
+                    return_code=0,
+                    stdout="Cloud sync completed successfully".encode(),
+                    stderr=b"",
+                    error=None,
+                )
+            else:
+                logger.error(f"Cloud sync failed: {result.error}")
+                return ProcessResult(
+                    return_code=1,
+                    stdout=b"",
+                    stderr=result.error.encode() if result.error else b"Unknown error",
+                    error=result.error,
+                )
+
+        except Exception as e:
+            logger.error(f"Exception in cloud sync task v2: {str(e)}")
+            if output_callback:
+                output_callback(f"Exception in cloud sync task: {str(e)}")
             return ProcessResult(
                 return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
             )

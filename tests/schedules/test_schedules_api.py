@@ -78,12 +78,18 @@ class TestSchedulesAPI:
         cleanup_config = CleanupConfig(
             name="test-cleanup", strategy="simple", keep_daily=7, enabled=True
         )
+        import json
+
         cloud_config = CloudSyncConfig(
             name="test-cloud",
             provider="s3",
-            bucket_name="test",
-            encrypted_access_key="test-encrypted-key",
-            encrypted_secret_key="test-encrypted-secret",
+            provider_config=json.dumps(
+                {
+                    "bucket_name": "test",
+                    "access_key": "test-access-key",
+                    "secret_key": "test-secret-key",
+                }
+            ),
             enabled=True,
         )
         notification_config = NotificationConfig(

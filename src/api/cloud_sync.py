@@ -181,7 +181,24 @@ async def get_cloud_sync_edit_form(
     try:
         config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
 
-        # Decrypt sensitive fields for editing
+        # Parse and decrypt JSON configuration
+        import json
+        from services.cloud_providers import EncryptionService, StorageFactory
+        from services.rclone_service import RcloneService
+
+        provider_config = json.loads(config.provider_config)
+
+        # Decrypt sensitive fields
+        rclone_service = RcloneService()
+        encryption_service = EncryptionService()
+        storage_factory = StorageFactory(rclone_service)
+        storage = storage_factory.create_storage(config.provider, provider_config)
+        sensitive_fields = storage.get_sensitive_fields()
+        decrypted_provider_config = encryption_service.decrypt_sensitive_fields(
+            provider_config, sensitive_fields
+        )
+
+        # Build decrypted config for template
         decrypted_config = {
             "id": config.id,
             "name": config.name,
@@ -192,28 +209,8 @@ async def get_cloud_sync_edit_form(
             "updated_at": config.updated_at,
         }
 
-        # Add provider-specific decrypted fields
-        if config.provider == "s3":
-            decrypted_config["bucket_name"] = config.bucket_name
-            if config.encrypted_access_key and config.encrypted_secret_key:
-                access_key, secret_key = config.get_credentials()
-                decrypted_config["access_key"] = access_key
-                decrypted_config["secret_key"] = secret_key
-        elif config.provider == "sftp":
-            decrypted_config.update(
-                {
-                    "host": config.host,
-                    "port": config.port,
-                    "username": config.username,
-                    "remote_path": config.remote_path,
-                }
-            )
-            if config.encrypted_password or config.encrypted_private_key:
-                password, private_key = config.get_sftp_credentials()
-                if password:
-                    decrypted_config["password"] = password
-                if private_key:
-                    decrypted_config["private_key"] = private_key
+        # Add all provider-specific fields from decrypted JSON
+        decrypted_config.update(decrypted_provider_config)
 
         # Create a simple object for template access
         config_obj = type("Config", (), decrypted_config)()

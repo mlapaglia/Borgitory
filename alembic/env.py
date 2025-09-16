@@ -7,8 +7,9 @@ from sqlalchemy import pool
 
 from alembic import context
 
-# Add the project root to the Python path
+# Add the project root and src directory to the Python path
 sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(0, os.path.join(os.path.abspath("."), "src"))
 
 # Import the models and Base for autogenerate support
 from models.database import Base
@@ -37,6 +38,12 @@ target_metadata = Base.metadata
 
 def get_database_url():
     """Get database URL, preferring environment variable over config."""
+    # For local development, use local-data path if the file exists
+    local_db_path = "local-data/borgitory.db"
+    if os.path.exists(local_db_path):
+        return f"sqlite:///{local_db_path}"
+
+    # Otherwise use environment variable or default config
     return os.getenv("DATABASE_URL", DATABASE_URL)
 
 

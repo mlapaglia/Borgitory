@@ -24,7 +24,8 @@ class CloudSyncService:
         self, config: CloudSyncConfigCreate
     ) -> CloudSyncConfig:
         """Create a new cloud sync configuration using the new provider pattern."""
-        from services.cloud_providers import CloudProviderFactory
+        from services.cloud_providers import StorageFactory, EncryptionService
+        from services.rclone_service import RcloneService
         import json
 
         existing = (
@@ -38,28 +39,32 @@ class CloudSyncService:
                 detail=f"Cloud sync configuration with name '{config.name}' already exists",
             )
 
-        # Validate provider exists
-        if not CloudProviderFactory.is_provider_available(config.provider.value):
-            available = ", ".join(CloudProviderFactory.get_available_providers())
+        # Validate provider exists and configuration is valid
+        supported_providers = ["s3", "sftp"]
+        if config.provider.value not in supported_providers:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported provider: {config.provider}. Available providers: {available}",
+                detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(supported_providers)}",
             )
 
-        # Create provider instance to validate configuration
+        # Create storage instance to validate configuration (this will raise validation errors if invalid)
         try:
-            provider = CloudProviderFactory.create_provider(
-                config.provider.value, 
-                config.provider_config
+            rclone_service = RcloneService()
+            storage_factory = StorageFactory(rclone_service)
+            storage = storage_factory.create_storage(
+                config.provider.value, config.provider_config
             )
         except Exception as e:
             raise HTTPException(
-                status_code=400,
-                detail=f"Invalid provider configuration: {str(e)}"
+                status_code=400, detail=f"Invalid provider configuration: {str(e)}"
             )
 
         # Encrypt sensitive fields in the configuration
-        encrypted_config = provider.encrypt_sensitive_fields(config.provider_config)
+        encryption_service = EncryptionService()
+        sensitive_fields = storage.get_sensitive_fields()
+        encrypted_config = encryption_service.encrypt_sensitive_fields(
+            config.provider_config, sensitive_fields
+        )
 
         # Create database record
         db_config = CloudSyncConfig(
@@ -70,22 +75,28 @@ class CloudSyncService:
         )
 
         # Set legacy fields for backward compatibility (if migration hasn't run yet)
-        if config.provider.value == "s3" and hasattr(db_config, 'bucket_name'):
+        if config.provider.value == "s3" and hasattr(db_config, "bucket_name"):
             db_config.bucket_name = config.provider_config.get("bucket_name")
-            if "access_key" in config.provider_config and "secret_key" in config.provider_config:
+            if (
+                "access_key" in config.provider_config
+                and "secret_key" in config.provider_config
+            ):
                 db_config.set_credentials(
-                    config.provider_config["access_key"], 
-                    config.provider_config["secret_key"]
+                    config.provider_config["access_key"],
+                    config.provider_config["secret_key"],
                 )
-        elif config.provider.value == "sftp" and hasattr(db_config, 'host'):
+        elif config.provider.value == "sftp" and hasattr(db_config, "host"):
             db_config.host = config.provider_config.get("host")
             db_config.port = config.provider_config.get("port", 22)
             db_config.username = config.provider_config.get("username")
             db_config.remote_path = config.provider_config.get("remote_path")
-            if "password" in config.provider_config or "private_key" in config.provider_config:
+            if (
+                "password" in config.provider_config
+                or "private_key" in config.provider_config
+            ):
                 db_config.set_sftp_credentials(
                     config.provider_config.get("password"),
-                    config.provider_config.get("private_key")
+                    config.provider_config.get("private_key"),
                 )
 
         self.db.add(db_config)
@@ -183,25 +194,36 @@ class CloudSyncService:
         """Test a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
-        if config.provider == "s3":
-            access_key, secret_key = config.get_credentials()
+        # Parse JSON configuration
+        import json
+        from services.cloud_providers import EncryptionService, StorageFactory
 
+        provider_config = json.loads(config.provider_config)
+
+        # Decrypt sensitive fields
+        encryption_service = EncryptionService()
+        storage_factory = StorageFactory(rclone)
+        storage = storage_factory.create_storage(config.provider, provider_config)
+        sensitive_fields = storage.get_sensitive_fields()
+        decrypted_config = encryption_service.decrypt_sensitive_fields(
+            provider_config, sensitive_fields
+        )
+
+        if config.provider == "s3":
             result = await rclone.test_s3_connection(
-                access_key_id=access_key,
-                secret_access_key=secret_key,
-                bucket_name=config.bucket_name,
+                access_key_id=decrypted_config["access_key"],
+                secret_access_key=decrypted_config["secret_key"],
+                bucket_name=decrypted_config["bucket_name"],
             )
 
         elif config.provider == "sftp":
-            password, private_key = config.get_sftp_credentials()
-
             result = await rclone.test_sftp_connection(
-                host=config.host,
-                username=config.username,
-                remote_path=config.remote_path,
-                port=config.port or 22,
-                password=password if password else None,
-                private_key=private_key if private_key else None,
+                host=decrypted_config["host"],
+                username=decrypted_config["username"],
+                remote_path=decrypted_config["remote_path"],
+                port=decrypted_config.get("port", 22),
+                password=decrypted_config.get("password"),
+                private_key=decrypted_config.get("private_key"),
             )
 
         else:

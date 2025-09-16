@@ -14,7 +14,6 @@ from api import (
     jobs,
     auth,
     schedules,
-    sync,
     cloud_sync,
     cleanup,
     backups,
@@ -145,11 +144,6 @@ app.include_router(
     tags=["schedules"],
 )
 
-app.include_router(
-    sync.router,
-    prefix="/api/sync",
-    tags=["sync"],
-)
 
 app.include_router(
     cloud_sync.router,

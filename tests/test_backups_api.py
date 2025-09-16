@@ -3,6 +3,7 @@ Tests for backups API endpoints
 """
 
 import pytest
+import json
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
@@ -80,11 +81,19 @@ class TestBackupsAPI:
         test_db.add(cleanup_config)
 
         # Create enabled cloud sync config
+        import json
+
         cloud_sync_config = CloudSyncConfig(
             name="test-cloud-sync",
-            enabled=True,
             provider="s3",
-            bucket_name="test-bucket",
+            provider_config=json.dumps(
+                {
+                    "bucket_name": "test-bucket",
+                    "access_key": "test-access-key",
+                    "secret_key": "test-secret-key",
+                }
+            ),
+            enabled=True,
         )
         test_db.add(cloud_sync_config)
 
@@ -187,10 +196,28 @@ class TestBackupsAPI:
             ),
             # Cloud sync configs
             CloudSyncConfig(
-                name="cloud-1", enabled=True, provider="s3", bucket_name="bucket1"
+                name="cloud-1",
+                provider="s3",
+                provider_config=json.dumps(
+                    {
+                        "bucket_name": "bucket1",
+                        "access_key": "key1",
+                        "secret_key": "secret1",
+                    }
+                ),
+                enabled=True,
             ),
             CloudSyncConfig(
-                name="cloud-2", enabled=False, provider="s3", bucket_name="bucket2"
+                name="cloud-2",
+                provider="s3",
+                provider_config=json.dumps(
+                    {
+                        "bucket_name": "bucket2",
+                        "access_key": "key2",
+                        "secret_key": "secret2",
+                    }
+                ),
+                enabled=False,
             ),
             # Notification configs
             NotificationConfig(name="notif-1", enabled=True, provider="pushover"),
@@ -267,7 +294,16 @@ class TestBackupsAPI:
         test_db.add(cleanup_config)
 
         cloud_sync_config = CloudSyncConfig(
-            name="context-cloud", enabled=True, provider="s3", bucket_name="test-bucket"
+            name="context-cloud",
+            provider="s3",
+            provider_config=json.dumps(
+                {
+                    "bucket_name": "test-bucket",
+                    "access_key": "test-access-key",
+                    "secret_key": "test-secret-key",
+                }
+            ),
+            enabled=True,
         )
         test_db.add(cloud_sync_config)
 

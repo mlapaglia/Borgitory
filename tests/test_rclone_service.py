@@ -39,15 +39,21 @@ def test_repository(test_db: Session):
 @pytest.fixture
 def s3_cloud_sync_config(test_db: Session):
     """Create a real S3 cloud sync config in the test database"""
+    import json
+
     config = CloudSyncConfig(
         name="Test S3 Config",
         provider="s3",
-        bucket_name="test-bucket",
-        path_prefix="backup/path",
+        provider_config=json.dumps(
+            {
+                "bucket_name": "test-bucket",
+                "access_key": "test-access-key",
+                "secret_key": "test-secret-key",
+            }
+        ),
         enabled=True,
+        path_prefix="backup/path",
     )
-    # Use the proper method to set encrypted credentials
-    config.set_credentials("test-access-key", "test-secret-key")
     test_db.add(config)
     test_db.commit()
     test_db.refresh(config)
@@ -57,18 +63,23 @@ def s3_cloud_sync_config(test_db: Session):
 @pytest.fixture
 def sftp_cloud_sync_config(test_db: Session):
     """Create a real SFTP cloud sync config in the test database"""
+    import json
+
     config = CloudSyncConfig(
         name="Test SFTP Config",
         provider="sftp",
-        host="test.example.com",
-        username="testuser",
-        port=22,
-        remote_path="/remote/backup/path",
-        path_prefix="backup/path",
+        provider_config=json.dumps(
+            {
+                "host": "test.example.com",
+                "username": "testuser",
+                "port": 22,
+                "password": "testpass",
+                "remote_path": "/remote/backup/path",
+            }
+        ),
         enabled=True,
+        path_prefix="backup/path",
     )
-    # Use the proper method to set encrypted credentials
-    config.set_sftp_credentials(password="testpass")
     test_db.add(config)
     test_db.commit()
     test_db.refresh(config)
@@ -723,15 +734,17 @@ class TestSyncRepositoryMethod:
         self, rclone_service, test_repository, s3_cloud_sync_config
     ):
         """Test successful S3 sync using sync_repository method"""
-        # Get decrypted credentials from the config
-        access_key, secret_key = s3_cloud_sync_config.get_credentials()
+        # Parse JSON configuration
+        import json
+
+        provider_config = json.loads(s3_cloud_sync_config.provider_config)
 
         # Prepare config dictionary (simulating what would be passed from CloudSyncConfig)
         config = {
             "provider": "s3",
-            "bucket_name": s3_cloud_sync_config.bucket_name,
-            "access_key_id": access_key,
-            "secret_access_key": secret_key,
+            "bucket_name": provider_config["bucket_name"],
+            "access_key_id": provider_config["access_key"],
+            "secret_access_key": provider_config["secret_key"],
             "path_prefix": s3_cloud_sync_config.path_prefix,
         }
 
@@ -798,14 +811,16 @@ class TestSyncRepositoryMethod:
         self, rclone_service, test_repository, s3_cloud_sync_config
     ):
         """Test S3 sync failure handling"""
-        # Get decrypted credentials from the config
-        access_key, secret_key = s3_cloud_sync_config.get_credentials()
+        # Parse JSON configuration
+        import json
+
+        provider_config = json.loads(s3_cloud_sync_config.provider_config)
 
         config = {
             "provider": "s3",
-            "bucket_name": s3_cloud_sync_config.bucket_name,
-            "access_key_id": access_key,
-            "secret_access_key": secret_key,
+            "bucket_name": provider_config["bucket_name"],
+            "access_key_id": provider_config["access_key"],
+            "secret_access_key": provider_config["secret_key"],
             "path_prefix": s3_cloud_sync_config.path_prefix,
         }
 
@@ -831,14 +846,16 @@ class TestSyncRepositoryMethod:
         self, rclone_service, test_repository, s3_cloud_sync_config
     ):
         """Test S3 sync when rclone process fails"""
-        # Get decrypted credentials from the config
-        access_key, secret_key = s3_cloud_sync_config.get_credentials()
+        # Parse JSON configuration
+        import json
+
+        provider_config = json.loads(s3_cloud_sync_config.provider_config)
 
         config = {
             "provider": "s3",
-            "bucket_name": s3_cloud_sync_config.bucket_name,
-            "access_key_id": access_key,
-            "secret_access_key": secret_key,
+            "bucket_name": provider_config["bucket_name"],
+            "access_key_id": provider_config["access_key"],
+            "secret_access_key": provider_config["secret_key"],
             "path_prefix": s3_cloud_sync_config.path_prefix,
         }
 
@@ -872,15 +889,17 @@ class TestSyncRepositoryMethod:
         self, rclone_service, test_repository, sftp_cloud_sync_config
     ):
         """Test successful SFTP sync using sync_repository method"""
-        # Get decrypted credentials from the config
-        password, private_key = sftp_cloud_sync_config.get_sftp_credentials()
+        # Parse JSON configuration
+        import json
+
+        provider_config = json.loads(sftp_cloud_sync_config.provider_config)
 
         config = {
             "provider": "sftp",
-            "host": sftp_cloud_sync_config.host,
-            "username": sftp_cloud_sync_config.username,
-            "password": password,
-            "port": sftp_cloud_sync_config.port,
+            "host": provider_config["host"],
+            "username": provider_config["username"],
+            "password": provider_config["password"],
+            "port": provider_config["port"],
             "path_prefix": sftp_cloud_sync_config.path_prefix,
             "remote_name": "sftp_remote",  # Simulates remote name from config
         }
@@ -901,7 +920,7 @@ class TestSyncRepositoryMethod:
         ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
-                remote_path=f"sftp_remote:{sftp_cloud_sync_config.remote_path}",
+                remote_path=f"sftp_remote:{provider_config['remote_path']}",
                 config=config,
             )
 
@@ -1004,14 +1023,16 @@ class TestSyncRepositoryMethod:
         self, rclone_service, test_repository, s3_cloud_sync_config
     ):
         """Test sync_repository exception handling"""
-        # Get decrypted credentials from the config
-        access_key, secret_key = s3_cloud_sync_config.get_credentials()
+        # Parse JSON configuration
+        import json
+
+        provider_config = json.loads(s3_cloud_sync_config.provider_config)
 
         config = {
             "provider": "s3",
-            "bucket_name": s3_cloud_sync_config.bucket_name,
-            "access_key_id": access_key,
-            "secret_access_key": secret_key,
+            "bucket_name": provider_config["bucket_name"],
+            "access_key_id": provider_config["access_key"],
+            "secret_access_key": provider_config["secret_key"],
         }
 
         # Mock the S3 sync method to raise an exception
@@ -1034,14 +1055,16 @@ class TestSyncRepositoryMethod:
         self, rclone_service, test_repository, s3_cloud_sync_config
     ):
         """Test sync_repository progress callback functionality"""
-        # Get decrypted credentials from the config
-        access_key, secret_key = s3_cloud_sync_config.get_credentials()
+        # Parse JSON configuration
+        import json
+
+        provider_config = json.loads(s3_cloud_sync_config.provider_config)
 
         config = {
             "provider": "s3",
-            "bucket_name": s3_cloud_sync_config.bucket_name,
-            "access_key_id": access_key,
-            "secret_access_key": secret_key,
+            "bucket_name": provider_config["bucket_name"],
+            "access_key_id": provider_config["access_key"],
+            "secret_access_key": provider_config["secret_key"],
         }
 
         # Mock the S3 sync generator with detailed progress updates
@@ -1117,15 +1140,17 @@ class TestSyncRepositoryMethod:
         self, rclone_service, test_repository, s3_cloud_sync_config
     ):
         """Test sync_repository using actual CloudSyncConfig from database"""
-        # Get decrypted credentials from the config
-        access_key, secret_key = s3_cloud_sync_config.get_credentials()
+        # Parse JSON configuration
+        import json
+
+        provider_config = json.loads(s3_cloud_sync_config.provider_config)
 
         # Convert CloudSyncConfig to dictionary (simulating what would happen in real usage)
         config = {
             "provider": s3_cloud_sync_config.provider,
-            "bucket_name": s3_cloud_sync_config.bucket_name,
-            "access_key_id": access_key,
-            "secret_access_key": secret_key,
+            "bucket_name": provider_config["bucket_name"],
+            "access_key_id": provider_config["access_key"],
+            "secret_access_key": provider_config["secret_key"],
             "path_prefix": s3_cloud_sync_config.path_prefix,
         }
 
@@ -1135,9 +1160,9 @@ class TestSyncRepositoryMethod:
         ):
             # Verify that the real database values are passed through
             assert repository.path == test_repository.path
-            assert access_key_id == access_key  # Use the decrypted value
-            assert secret_access_key == secret_key  # Use the decrypted value
-            assert bucket_name == s3_cloud_sync_config.bucket_name
+            assert access_key_id == provider_config["access_key"]
+            assert secret_access_key == provider_config["secret_key"]
+            assert bucket_name == provider_config["bucket_name"]
             assert path_prefix == s3_cloud_sync_config.path_prefix
 
             yield {"type": "completed", "return_code": 0, "status": "success"}
@@ -1147,7 +1172,7 @@ class TestSyncRepositoryMethod:
         ):
             result = await rclone_service.sync_repository(
                 source_path=test_repository.path,
-                remote_path=f":s3:{s3_cloud_sync_config.bucket_name}",
+                remote_path=f":s3:{provider_config['bucket_name']}",
                 config=config,
             )
 

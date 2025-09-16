@@ -1,16 +1,59 @@
 """
 Cloud Providers Package
 
-This package contains the cloud storage provider implementations for Borgitory.
-Each provider implements the CloudProvider interface and handles syncing repositories
-to their respective cloud storage services.
+This package provides a clean, testable architecture for cloud storage operations.
+It separates concerns into focused components that are easy to test and maintain.
+
+Architecture Components:
+- types: Core types (SyncResult, SyncEvent, etc.)
+- storage/: Storage interface and provider implementations
+- orchestration: Business logic coordination
+- service: High-level service interface
+- config_service: Configuration loading and management
 """
 
-from .base import CloudProvider, ProviderConfig
-from .factory import CloudProviderFactory
+# Clean, testable cloud provider architecture
+from .types import SyncResult, SyncEvent, SyncEventType, CloudSyncConfig, ConnectionInfo
+from .storage import (
+    CloudStorage,
+    S3Storage,
+    SFTPStorage,
+    S3StorageConfig,
+    SFTPStorageConfig,
+)
+from .orchestration import CloudSyncer, SyncEventHandler, LoggingSyncEventHandler
+from .service import (
+    CloudSyncService,
+    StorageFactory,
+    ConfigValidator,
+    EncryptionService,
+)
+from .config_service import (
+    ConfigLoadService,
+    DatabaseConfigLoadService,
+    MockConfigLoadService,
+)
 
-# Import providers to register them with the factory
-from .s3_provider import S3Provider
-from .sftp_provider import SFTPProvider
-
-__all__ = ["CloudProvider", "ProviderConfig", "CloudProviderFactory", "S3Provider", "SFTPProvider"]
+__all__ = [
+    # New architecture
+    "SyncResult",
+    "SyncEvent",
+    "SyncEventType",
+    "CloudSyncConfig",
+    "ConnectionInfo",
+    "CloudStorage",
+    "S3Storage",
+    "SFTPStorage",
+    "S3StorageConfig",
+    "SFTPStorageConfig",
+    "CloudSyncer",
+    "SyncEventHandler",
+    "LoggingSyncEventHandler",
+    "CloudSyncService",
+    "StorageFactory",
+    "ConfigValidator",
+    "EncryptionService",
+    "ConfigLoadService",
+    "DatabaseConfigLoadService",
+    "MockConfigLoadService",
+]

@@ -8,8 +8,8 @@ from httpx import AsyncClient
 from sqlalchemy.orm import Session
 from unittest.mock import patch, Mock
 
-from models.database import CloudSyncConfig
 from services.cloud_sync_service import CloudSyncService
+from tests.conftest import create_s3_cloud_sync_config
 
 
 class TestCloudSyncAPIHTMX:
@@ -156,9 +156,8 @@ class TestCloudSyncAPIHTMX:
     ):
         """Test config update returns HTML response."""
         # Create test config in database
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="update-html-test",
-            provider="s3",
             bucket_name="old-bucket",
             enabled=True,
         )
@@ -182,8 +181,8 @@ class TestCloudSyncAPIHTMX:
     ):
         """Test config deletion returns HTML response."""
         # Create test config
-        config = CloudSyncConfig(
-            name="delete-html-test", provider="s3", bucket_name="delete-bucket"
+        config = create_s3_cloud_sync_config(
+            name="delete-html-test", bucket_name="delete-bucket"
         )
         test_db.add(config)
         test_db.commit()
@@ -200,9 +199,8 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test config enable returns HTML response."""
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="enable-html-test",
-            provider="s3",
             bucket_name="test-bucket",
             enabled=False,
         )
@@ -221,9 +219,8 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test config disable returns HTML response."""
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="disable-html-test",
-            provider="s3",
             bucket_name="test-bucket",
             enabled=True,
         )
@@ -242,14 +239,12 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test config test returns HTML response."""
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="test-config-html",
-            provider="s3",
             bucket_name="test-bucket",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             enabled=True,
-        )
-        config.set_credentials(
-            "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         )
         test_db.add(config)
         test_db.commit()
@@ -273,17 +268,16 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test getting edit form returns HTML."""
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="edit-form-test",
-            provider="s3",
             bucket_name="edit-bucket",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             enabled=True,
-        )
-        config.set_credentials(
-            "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         )
         test_db.add(config)
         test_db.commit()
+        test_db.refresh(config)  # Ensure ID is populated
 
         response = await async_client.get(f"/api/cloud-sync/{config.id}/edit")
 
