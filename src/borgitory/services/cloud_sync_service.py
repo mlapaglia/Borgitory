@@ -239,8 +239,15 @@ class CloudSyncService:
         encryption_service=None,
         storage_factory=None,
     ) -> dict:
-        """Test a cloud sync configuration."""
+        """Test a cloud sync configuration using dynamic provider registry."""
+        import logging
+        from borgitory.services.cloud_providers.registry import get_metadata
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting test for cloud sync config {config_id}")
+        
         config = self.get_cloud_sync_config_by_id(config_id)
+        logger.info(f"Config {config_id}: provider={config.provider}, name={config.name}")
 
         provider_config = json.loads(config.provider_config)
 
@@ -257,30 +264,66 @@ class CloudSyncService:
 
         storage_factory.create_storage(config.provider, decrypted_config)
 
-        if config.provider == "s3":
-            result = await rclone.test_s3_connection(
-                access_key_id=decrypted_config["access_key"],
-                secret_access_key=decrypted_config["secret_key"],
-                bucket_name=decrypted_config["bucket_name"],
-            )
-
-        elif config.provider == "sftp":
-            result = await rclone.test_sftp_connection(
-                host=decrypted_config["host"],
-                username=decrypted_config["username"],
-                remote_path=decrypted_config["remote_path"],
-                port=decrypted_config.get("port", 22),
-                password=decrypted_config.get("password"),
-                private_key=decrypted_config.get("private_key"),
-            )
-
-        else:
+        # Get provider metadata and rclone mapping
+        metadata = get_metadata(config.provider)
+        if not metadata or not metadata.rclone_mapping:
+            logger.error(f"Provider '{config.provider}' not registered or missing rclone mapping")
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported provider for testing: {config.provider}",
+                detail=f"Provider '{config.provider}' not registered or missing rclone mapping",
             )
 
-        return result
+        mapping = metadata.rclone_mapping
+        test_method_name = mapping.test_method
+        logger.info(f"Using test method: {test_method_name}")
+
+        # Check if rclone service has the test method
+        if not hasattr(rclone, test_method_name):
+            logger.error(f"Rclone service missing test method: {test_method_name}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Rclone service missing test method: {test_method_name}",
+            )
+
+        # Build parameters for the test method using parameter mapping
+        test_params = {}
+        logger.info(f"Decrypted config fields: {list(decrypted_config.keys())}")
+        logger.info(f"Parameter mapping: {mapping.parameter_mapping}")
+        
+        for config_field, rclone_param in mapping.parameter_mapping.items():
+            if config_field in decrypted_config:
+                test_params[rclone_param] = decrypted_config[config_field]
+                logger.info(f"Mapped {config_field} -> {rclone_param}")
+            else:
+                logger.info(f"Config field '{config_field}' not found in decrypted config")
+        
+        # Add optional parameters with defaults if not already set
+        for param, default_value in mapping.optional_params.items():
+            if param not in test_params:
+                test_params[param] = default_value
+
+        logger.info(f"Built test params: {list(test_params.keys())}")  # Don't log values for security
+
+        # Get the test method and filter parameters to match method signature
+        test_method = getattr(rclone, test_method_name)
+        
+        # Filter parameters to only include those supported by the test method
+        import inspect
+        method_signature = inspect.signature(test_method)
+        filtered_params = {
+            param: value for param, value in test_params.items()
+            if param in method_signature.parameters
+        }
+        
+        logger.info(f"Filtered params for {test_method_name}: {list(filtered_params.keys())}")
+        
+        try:
+            result = await test_method(**filtered_params)
+            logger.info(f"Test method result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error calling {test_method_name}: {e}", exc_info=True)
+            raise
 
     def get_decrypted_config_for_editing(
         self, config_id: int, encryption_service, storage_factory

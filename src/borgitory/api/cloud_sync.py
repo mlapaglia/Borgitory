@@ -473,7 +473,7 @@ async def test_cloud_sync_config(
                 request,
                 "partials/cloud_sync/test_error.html",
                 {"error_message": error_message},
-                status_code=400,
+                status_code=200,
             )
 
     except Exception as e:

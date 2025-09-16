@@ -267,7 +267,7 @@ class SMBStorage(CloudStorage):
             parameter_mapping={
                 "host": "host",
                 "user": "user",
-                "pass_": "password",  # SMB config uses pass_ (alias), rclone expects password
+                "pass": "password",
                 "port": "port",
                 "domain": "domain",
                 "share_name": "share_name",
@@ -296,7 +296,7 @@ class SMBStorage(CloudStorage):
         parameter_mapping={
             "host": "host",
             "user": "user",
-            "pass_": "password",  # SMB config uses pass_ (alias), rclone expects password
+            "pass": "password",  # SMB config uses pass (alias for pass_), rclone expects password
             "port": "port",
             "domain": "domain",
             "share_name": "share_name",
