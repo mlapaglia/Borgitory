@@ -16,7 +16,6 @@ from services.cloud_providers.service import (
     CloudSyncService,
 )
 from services.cloud_providers.types import CloudSyncConfig, SyncResult
-from services.cloud_providers.storage import S3StorageConfig, SFTPStorageConfig
 
 
 class TestConfigValidator:
@@ -38,7 +37,8 @@ class TestConfigValidator:
 
         result = validator.validate_config("s3", config)
 
-        assert isinstance(result, S3StorageConfig)
+        # Check by class name to avoid identity issues after module reloading
+        assert result.__class__.__name__ == "S3StorageConfig"
         assert result.bucket_name == "test-bucket"
         assert result.access_key == "AKIAIOSFODNN7EXAMPLE"
         assert result.region == "us-east-1"
@@ -53,7 +53,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("s3", config)
 
-        assert isinstance(result, S3StorageConfig)
+        assert result.__class__.__name__ == "S3StorageConfig"
         assert result.bucket_name == "test-bucket"
         # Should have defaults
         assert result.region is not None
@@ -89,7 +89,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("sftp", config)
 
-        assert isinstance(result, SFTPStorageConfig)
+        assert result.__class__.__name__ == "SFTPStorageConfig"
         assert result.host == "sftp.example.com"
         assert result.username == "testuser"
         assert result.password == "testpass"
@@ -108,7 +108,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("sftp", config)
 
-        assert isinstance(result, SFTPStorageConfig)
+        assert result.__class__.__name__ == "SFTPStorageConfig"
         assert result.host == "sftp.example.com"
         assert result.private_key is not None
         assert result.port == 2222
@@ -125,7 +125,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("sftp", config)
 
-        assert isinstance(result, SFTPStorageConfig)
+        assert result.__class__.__name__ == "SFTPStorageConfig"
         assert result.port == 22  # Default port
         assert result.host_key_checking is True  # Default
 

@@ -246,6 +246,24 @@ class SMBStorage(CloudStorage):
         """SMB sensitive fields that should be encrypted"""
         return ["pass"]
 
+    def get_display_details(self, config_dict: dict) -> dict:
+        """Get SMB-specific display details for the UI"""
+        host = config_dict.get("host", "Unknown")
+        port = config_dict.get("port", 445)
+        user = config_dict.get("user", "Unknown")
+        domain = config_dict.get("domain", "WORKGROUP")
+        share_name = config_dict.get("share_name", "Unknown")
+        auth_method = "kerberos" if config_dict.get("use_kerberos") else "password"
+
+        provider_details = f"""
+            <div><strong>Host:</strong> {host}:{port}</div>
+            <div><strong>Share:</strong> {share_name}</div>
+            <div><strong>User:</strong> {domain}\\{user}</div>
+            <div><strong>Auth Method:</strong> {auth_method}</div>
+        """.strip()
+
+        return {"provider_name": "SMB/CIFS", "provider_details": provider_details}
+
 
 @register_provider(
     name="smb",

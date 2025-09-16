@@ -243,8 +243,44 @@ def get_all_provider_info() -> Dict[str, Dict[str, Any]]:
 
 
 def is_provider_registered(provider: str) -> bool:
-    """Check if a provider is registered."""
+    """
+    Check if a provider is registered in the registry.
+
+    Args:
+        provider: Provider name to check
+
+    Returns:
+        True if provider is registered, False otherwise
+    """
     return _registry.is_provider_registered(provider)
+
+
+def validate_provider_config(provider: str, config_dict: dict) -> None:
+    """
+    Validate provider configuration using the registered config class.
+
+    Args:
+        provider: Provider name (e.g., "s3", "sftp", "smb")
+        config_dict: Configuration dictionary to validate
+
+    Raises:
+        ValueError: If provider is unknown or configuration is invalid
+    """
+    if not provider:
+        raise ValueError("Provider is required")
+
+    if not config_dict:
+        raise ValueError("Configuration is required")
+
+    config_class = get_config_class(provider)
+    if not config_class:
+        raise ValueError(f"Unknown provider: {provider}")
+
+    try:
+        # This will raise validation errors if the config is invalid
+        config_class(**config_dict)
+    except Exception as e:
+        raise ValueError(f"Invalid {provider} configuration: {str(e)}") from e
 
 
 # Testing utilities
@@ -256,4 +292,6 @@ def get_registry() -> ProviderRegistry:
 def clear_registry() -> None:
     """Clear all registered providers (for testing only)."""
     global _registry
-    _registry = ProviderRegistry()
+    _registry._config_classes.clear()
+    _registry._storage_classes.clear()
+    _registry._metadata.clear()

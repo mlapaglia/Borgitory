@@ -83,3 +83,16 @@ class CloudStorage(ABC):
             List of sensitive field names for encryption
         """
         pass
+
+    @abstractmethod
+    def get_display_details(self, config_dict: dict) -> dict:
+        """
+        Get provider-specific display details for the UI.
+
+        Args:
+            config_dict: Provider configuration as dictionary
+
+        Returns:
+            Dictionary with 'provider_name' and 'provider_details' (HTML string)
+        """
+        pass

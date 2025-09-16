@@ -23,12 +23,7 @@ class JobType(str, Enum):
     CHECK = "check"
 
 
-class ProviderType(str, Enum):
-    S3 = "s3"
-    SFTP = "sftp"
-    SMB = "smb"
-    AZURE = "azure"
-    GCP = "gcp"
+# Provider validation using registry - no enum needed
 
 
 class CleanupStrategy(str, Enum):
@@ -466,7 +461,7 @@ class CloudSyncConfigBase(BaseModel):
         pattern=r"^[A-Za-z0-9-_\s]+$",
         description="Configuration name (alphanumeric, hyphens, underscores, spaces only)",
     )
-    provider: ProviderType = ProviderType.S3
+    provider: str = "s3"
     path_prefix: str = Field(
         default="", max_length=255, description="Optional path prefix for cloud storage"
     )
@@ -474,44 +469,71 @@ class CloudSyncConfigBase(BaseModel):
         default_factory=dict, description="Provider-specific configuration"
     )
 
+    @field_validator("provider")
+    @classmethod
+    def validate_provider(cls, v: str) -> str:
+        """Validate that provider is registered in the registry."""
+        from services.cloud_providers.registry import (
+            is_provider_registered,
+            get_all_provider_info,
+        )
+
+        if not v:
+            raise ValueError("Provider is required")
+
+        if not is_provider_registered(v):
+            supported = sorted(get_all_provider_info().keys())
+            raise ValueError(
+                f"Unknown provider '{v}'. Supported providers: {supported}"
+            )
+
+        return v
+
 
 class CloudSyncConfigCreate(CloudSyncConfigBase):
     @model_validator(mode="after")
     def validate_provider_config(self):
-        """Validate provider_config using the appropriate storage config class"""
+        """Validate provider_config using the registry"""
+        from services.cloud_providers.registry import validate_provider_config
 
         if not self.provider_config:
             raise ValueError("provider_config is required")
 
-        try:
-            from services.cloud_providers.storage import (
-                S3StorageConfig,
-                SFTPStorageConfig,
-            )
-
-            # Validate the config using the appropriate storage config class
-            if self.provider.value == "s3":
-                S3StorageConfig(**self.provider_config)
-            elif self.provider.value == "sftp":
-                SFTPStorageConfig(**self.provider_config)
-            else:
-                raise ValueError(f"Unknown provider: {self.provider.value}")
-
-            return self
-        except Exception as e:
-            raise ValueError(f"Invalid provider configuration: {str(e)}")
+        # Use registry-based validation
+        validate_provider_config(self.provider, self.provider_config)
+        return self
 
 
 class CloudSyncConfigUpdate(BaseModel):
     name: Optional[str] = Field(
         None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9-_\s]+$"
     )
-    provider: Optional[ProviderType] = None
+    provider: Optional[str] = None
     path_prefix: Optional[str] = Field(None, max_length=255)
     provider_config: Optional[dict] = Field(
         None, description="Provider-specific configuration"
     )
     enabled: Optional[bool] = None
+
+    @field_validator("provider")
+    @classmethod
+    def validate_provider_field(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that provider is registered in the registry if provided."""
+        if v is None:
+            return v
+
+        from services.cloud_providers.registry import (
+            is_provider_registered,
+            get_all_provider_info,
+        )
+
+        if not is_provider_registered(v):
+            supported = sorted(get_all_provider_info().keys())
+            raise ValueError(
+                f"Unknown provider '{v}'. Supported providers: {supported}"
+            )
+
+        return v
 
     @model_validator(mode="after")
     def validate_provider_config(self):
@@ -519,22 +541,10 @@ class CloudSyncConfigUpdate(BaseModel):
 
         # Only validate if both provider and provider_config are provided
         if self.provider and self.provider_config:
-            try:
-                from services.cloud_providers.storage import (
-                    S3StorageConfig,
-                    SFTPStorageConfig,
-                )
+            from services.cloud_providers.registry import validate_provider_config
 
-                # Validate the config using the appropriate storage config class
-                if self.provider.value == "s3":
-                    S3StorageConfig(**self.provider_config)
-                elif self.provider.value == "sftp":
-                    SFTPStorageConfig(**self.provider_config)
-                else:
-                    raise ValueError(f"Unknown provider: {self.provider.value}")
-
-            except Exception as e:
-                raise ValueError(f"Invalid provider configuration: {str(e)}")
+            # Use registry-based validation
+            validate_provider_config(self.provider, self.provider_config)
 
         return self
 

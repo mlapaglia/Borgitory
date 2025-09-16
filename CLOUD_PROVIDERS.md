@@ -183,6 +183,23 @@ class {ProviderName}Storage(CloudStorage):
         """{Provider Name} sensitive fields that should be encrypted"""
         return ["api_key"]  # Add all sensitive field names here
 
+    def get_display_details(self, config_dict: dict) -> dict:
+        """Get {Provider Name}-specific display details for the UI"""
+        endpoint = config_dict.get("endpoint_url", "Unknown")
+        bucket = config_dict.get("bucket_name", "Unknown")
+        region = config_dict.get("region", "default")
+        
+        provider_details = f"""
+            <div><strong>Endpoint:</strong> {endpoint}</div>
+            <div><strong>Bucket:</strong> {bucket}</div>
+            <div><strong>Region:</strong> {region}</div>
+        """.strip()
+        
+        return {
+            "provider_name": "{Provider Display Name}",
+            "provider_details": provider_details
+        }
+
 
 @register_provider(
     name="{provider_name}",
@@ -212,17 +229,7 @@ __all__ = [
 ]
 ```
 
-### 3. Update the Provider Enum
-
-Edit `src/models/schemas.py`:
-
-```python
-class ProviderType(str, Enum):
-    # ... existing providers ...
-    {PROVIDER_NAME_UPPER} = "{provider_name}"
-```
-
-### 4. Create Frontend Template
+### 3. Create Frontend Template
 
 Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`:
 
@@ -252,48 +259,35 @@ Create `src/templates/partials/cloud_sync/providers/{provider_name}_fields.html`
 </div>
 ```
 
-### 5. Update API Provider Fields Endpoint
+### 4. Update Frontend Template Context
 
-Edit `src/api/cloud_sync.py` in the `get_provider_fields` function:
+Edit `src/api/cloud_sync.py` in the `get_provider_fields` function to add your provider's context variable:
 
 ```python
-@router.get("/provider-fields", response_class=HTMLResponse)
-async def get_provider_fields(
-    request: Request,
-    provider: str = "",
-    templates: Jinja2Templates = Depends(get_templates),
-) -> HTMLResponse:
-    """Get dynamic provider fields based on selection"""
-    context = {
-        "provider": provider,
-        "is_s3": provider == "s3",
-        "is_sftp": provider == "sftp",
-        "is_{provider_name}": provider == "{provider_name}",  # Add this line
-    }
-
-    # Update submit button text
-    if provider == "s3":
-        context["submit_text"] = "Add S3 Location"
-    elif provider == "sftp":
-        context["submit_text"] = "Add SFTP Location"
-    elif provider == "{provider_name}":  # Add this block
-        context["submit_text"] = "Add {Provider Name} Location"
-    elif provider == "":
-        context["submit_text"] = "Add Sync Location"
-        context["show_submit"] = False
-    else:
-        context["submit_text"] = "Add Sync Location"
-        context["show_submit"] = True
-
-    # Set show_submit flag
-    context["show_submit"] = provider != ""
-
-    return templates.TemplateResponse(
-        request, "partials/cloud_sync/provider_fields.html", context
-    )
+context = {
+    "provider": provider,
+    "is_s3": provider == "s3",
+    "is_sftp": provider == "sftp",
+    "is_smb": provider == "smb",
+    "is_{provider_name}": provider == "{provider_name}",  # Add this line for template logic
+}
 ```
 
-### 6. Implement Rclone Integration
+**Note**: With the registry pattern, submit button text and provider validation are handled automatically. You only need to add the `is_{provider_name}` context variable for template conditional logic.
+
+## What's No Longer Needed ✨
+
+Thanks to the registry pattern, you **do not** need to:
+
+- ❌ **Update Provider Enums**: No more manual enum updates in `src/models/schemas.py`
+- ❌ **Update Service Layer**: No hardcoded if/elif chains in service classes
+- ❌ **Update API Provider Lists**: No manual provider lists in `src/api/cloud_sync.py`
+- ❌ **Update Sensitive Field Detection**: Handled automatically via registry
+- ❌ **Update Submit Button Logic**: Generated automatically from registry metadata
+
+The `@register_provider` decorator handles all of this automatically!
+
+### 5. Implement Rclone Integration
 
 Add methods to `src/services/rclone_service.py`:
 
@@ -332,7 +326,7 @@ async def upload_to_{provider_name}(
         raise Exception(f"Failed to upload to {Provider Name}: {str(e)}") from e
 ```
 
-### 7. Create Tests
+### 6. Create Tests
 
 Create `tests/cloud_providers/test_{provider_name}_storage.py`:
 
@@ -494,7 +488,12 @@ Verify your provider is automatically registered:
 
 ```bash
 python -c "
-from src.services.cloud_providers.registry import get_supported_providers, get_all_provider_info
+import sys; sys.path.append('src')
+from services.cloud_providers.registry import get_supported_providers, get_all_provider_info
+
+# Import your storage module to trigger registration
+import services.cloud_providers.storage.{provider_name}_storage
+
 print('Registered providers:', get_supported_providers())
 info = get_all_provider_info()
 if '{provider_name}' in info:
@@ -691,7 +690,7 @@ class ProviderStorageConfig(CloudStorageConfig):
 ## Final Steps
 
 1. **That's it!** 🎉 With the registry pattern, your provider is automatically:
-   - Available in API endpoints (`/cloud-sync/providers`)
+   - Available in API endpoints (`/api/cloud-sync/providers`)
    - Included in validation and error messages
    - Visible in frontend dropdowns
    - Integrated with the service layer
@@ -703,10 +702,56 @@ class ProviderStorageConfig(CloudStorageConfig):
 
 ## Registry Pattern Benefits
 
-The new registry pattern eliminates the need to manually update:
-- ❌ ~~Service layer if/elif chains~~
-- ❌ ~~Hardcoded provider lists in APIs~~
-- ❌ ~~Manual sensitive field detection~~
-- ❌ ~~Provider validation lists~~
+The registry pattern provides these key advantages:
 
-Instead, everything is handled automatically through the `@register_provider` decorator!
+### ✅ **Automatic Integration**
+
+- Your provider appears in API endpoints (`/api/cloud-sync/providers`) automatically
+- Frontend dropdowns populate without manual updates
+- Validation includes your provider without code changes
+
+### ✅ **Zero Boilerplate**
+
+- No hardcoded if/elif chains in service classes
+- No manual provider lists to maintain
+- No enum updates required
+
+### ✅ **Dynamic Capabilities**
+
+- Provider metadata (encryption support, versioning, etc.) drives UI behavior
+- Error messages automatically include your provider in "supported providers" lists
+- Submit button text generated from registry metadata
+
+### ✅ **Type Safety**
+
+- Pydantic validators use registry for provider validation
+- Comprehensive error messages with available providers
+- Runtime provider discovery with compile-time safety
+
+### ✅ **Developer Experience**
+
+- Add one decorator, get full integration
+- Consistent patterns across all providers
+- Self-documenting through metadata
+
+**Before Registry Pattern:**
+
+```text
+1. Create storage classes ✏️
+2. Update provider enum ✏️
+3. Update service layer ✏️
+4. Update API endpoints ✏️
+5. Update validation logic ✏️
+6. Update frontend templates ✏️
+7. Update sensitive field detection ✏️
+```
+
+**With Registry Pattern:**
+
+```text
+1. Create storage classes ✏️
+2. Add @register_provider decorator ✨
+3. Update frontend template ✏️
+```
+
+That's it! 🎉

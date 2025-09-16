@@ -182,7 +182,7 @@ class TestCloudSyncService:
                 },
             )
 
-        assert "Invalid provider configuration" in str(exc_info.value)
+        assert "Invalid s3 configuration" in str(exc_info.value)
 
     def test_create_sftp_config_missing_required_fields(self, service, test_db):
         """Test SFTP config creation with missing required fields - schema validation."""
@@ -197,7 +197,7 @@ class TestCloudSyncService:
                 },
             )
 
-        assert "Invalid provider configuration" in str(exc_info.value)
+        assert "Invalid sftp configuration" in str(exc_info.value)
 
     def test_create_sftp_config_missing_auth(self, service, test_db):
         """Test SFTP config creation with missing authentication - schema validation."""
@@ -214,7 +214,7 @@ class TestCloudSyncService:
                 },
             )
 
-        assert "Invalid provider configuration" in str(exc_info.value)
+        assert "Invalid sftp configuration" in str(exc_info.value)
 
     def test_create_config_unsupported_provider(self, service, test_db):
         """Test config creation with unsupported provider."""

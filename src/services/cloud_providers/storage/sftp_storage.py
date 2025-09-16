@@ -191,6 +191,23 @@ class SFTPStorage(CloudStorage):
         """SFTP sensitive fields"""
         return ["password", "private_key"]
 
+    def get_display_details(self, config_dict: dict) -> dict:
+        """Get SFTP-specific display details for the UI"""
+        host = config_dict.get("host", "Unknown")
+        port = config_dict.get("port", 22)
+        username = config_dict.get("username", "Unknown")
+        remote_path = config_dict.get("remote_path", "Unknown")
+        auth_method = "password" if config_dict.get("password") else "private_key"
+
+        provider_details = f"""
+            <div><strong>Host:</strong> {host}:{port}</div>
+            <div><strong>Username:</strong> {username}</div>
+            <div><strong>Remote Path:</strong> {remote_path}</div>
+            <div><strong>Auth Method:</strong> {auth_method}</div>
+        """.strip()
+
+        return {"provider_name": "SFTP (SSH)", "provider_details": provider_details}
+
 
 @register_provider(
     name="sftp",

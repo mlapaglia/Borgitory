@@ -14,7 +14,7 @@ from models.schemas import (
 )
 from services.cloud_sync_service import CloudSyncService
 from dependencies import RcloneServiceDep, EncryptionServiceDep, StorageFactoryDep
-from services.cloud_providers.registry import get_all_provider_info
+from services.cloud_providers.registry import get_all_provider_info, get_storage_class
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -43,8 +43,55 @@ def _get_provider_template(provider: str, mode: str = "create") -> str:
     if not provider:
         return None
 
+    # Check if provider is registered in the registry
+    provider_info = get_all_provider_info()
+    if provider not in provider_info:
+        return None  # Don't try to load template for unknown providers
+
     suffix = "_edit" if mode == "edit" else ""
     return f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
+
+
+def _get_submit_button_text(provider: str, mode: str = "create") -> str:
+    """Get submit button text using registry information"""
+    if not provider:
+        if mode == "create":
+            return "Add Sync Location"
+        else:
+            return "Update Sync Location"
+
+    provider_info = get_all_provider_info()
+    provider_data = provider_info.get(provider)
+
+    if provider_data:
+        provider_label = provider_data["label"]
+        action = "Add" if mode == "create" else "Update"
+        return f"{action} {provider_label} Location"
+    else:
+        # Fallback for unknown providers
+        action = "Add" if mode == "create" else "Update"
+        return f"{action} Sync Location"
+
+
+def _get_provider_display_details(provider: str, provider_config: dict) -> dict:
+    """Get provider display details using registry and storage classes"""
+    try:
+        storage_class = get_storage_class(provider)
+        if storage_class:
+            # Create a temporary instance to call get_display_details
+            # We don't need a valid config for this method, just the dict
+            temp_storage = storage_class(
+                None, None
+            )  # rclone_service and config not needed
+            return temp_storage.get_display_details(provider_config)
+    except Exception as e:
+        logger.warning(f"Error getting display details for provider '{provider}': {e}")
+
+    # Fallback to hardcoded behavior for unknown providers
+    provider_name = provider.upper() if provider else "Unknown"
+    provider_details = "<div><strong>Configuration:</strong> Unknown provider</div>"
+
+    return {"provider_name": provider_name, "provider_details": provider_details}
 
 
 def _parse_form_data_to_config(form_data) -> CloudSyncConfigCreate:
@@ -125,24 +172,9 @@ async def get_provider_fields(
     context = {
         "provider": provider,
         "provider_template": _get_provider_template(provider, "create"),
+        "submit_text": _get_submit_button_text(provider, "create"),
+        "show_submit": provider != "",
     }
-
-    # Update submit button text based on provider
-    if provider == "s3":
-        context["submit_text"] = "Add S3 Location"
-    elif provider == "sftp":
-        context["submit_text"] = "Add SFTP Location"
-    elif provider == "smb":
-        context["submit_text"] = "Add SMB Location"
-    elif provider == "":
-        context["submit_text"] = "Add Sync Location"
-        context["show_submit"] = False
-    else:
-        context["submit_text"] = "Add Sync Location"
-        context["show_submit"] = True
-
-    # Set show_submit flag
-    context["show_submit"] = provider != ""
 
     return templates.TemplateResponse(
         request, "partials/cloud_sync/provider_fields.html", context
@@ -216,32 +248,15 @@ def get_cloud_sync_configs_html(
             except (json.JSONDecodeError, AttributeError):
                 provider_config = {}
 
-            # Generate provider-specific details
-            if config.provider == "s3":
-                provider_name = "AWS S3"
-                bucket_name = provider_config.get("bucket_name", "Unknown")
-                provider_details = f"<div><strong>Bucket:</strong> {bucket_name}</div>"
-            elif config.provider == "sftp":
-                provider_name = "SFTP"
-                host = provider_config.get("host", "Unknown")
-                port = provider_config.get("port", 22)
-                username = provider_config.get("username", "Unknown")
-                remote_path = provider_config.get("remote_path", "Unknown")
-                provider_details = f"""
-                    <div><strong>Host:</strong> {host}:{port}</div>
-                    <div><strong>Username:</strong> {username}</div>
-                    <div><strong>Remote Path:</strong> {remote_path}</div>
-                """
-            else:
-                provider_name = config.provider.upper()
-                provider_details = (
-                    "<div><strong>Configuration:</strong> Unknown provider</div>"
-                )
+            # Generate provider-specific details using registry
+            display_info = _get_provider_display_details(
+                config.provider, provider_config
+            )
 
             # Create processed config object for template
             processed_config = config.__dict__.copy()
-            processed_config["provider_name"] = provider_name
-            processed_config["provider_details"] = provider_details
+            processed_config["provider_name"] = display_info["provider_name"]
+            processed_config["provider_details"] = display_info["provider_details"]
             processed_configs.append(type("Config", (), processed_config)())
 
         return templates.get_template(
@@ -298,16 +313,10 @@ async def get_cloud_sync_edit_form(
             ),
             "supported_providers": _get_supported_providers(),
             "is_edit_mode": True,
+            "submit_text": _get_submit_button_text(
+                decrypted_config["provider"], "edit"
+            ),
         }
-
-        if decrypted_config["provider"] == "s3":
-            context["submit_text"] = "Update S3 Location"
-        elif decrypted_config["provider"] == "sftp":
-            context["submit_text"] = "Update SFTP Location"
-        elif decrypted_config["provider"] == "smb":
-            context["submit_text"] = "Update SMB Location"
-        else:
-            context["submit_text"] = "Update Sync Location"
 
         return templates.TemplateResponse(
             request, "partials/cloud_sync/edit_form.html", context

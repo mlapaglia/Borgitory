@@ -127,7 +127,7 @@ class CloudSyncService:
 
         # Validate provider exists using registry
         supported_providers = get_supported_providers()
-        if config.provider.value not in supported_providers:
+        if config.provider not in supported_providers:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported provider: {config.provider}. Available providers: {', '.join(sorted(supported_providers))}",
@@ -136,7 +136,7 @@ class CloudSyncService:
         # Create storage instance to validate configuration (this will raise validation errors if invalid)
         try:
             storage = self._storage_factory.create_storage(
-                config.provider.value, config.provider_config
+                config.provider, config.provider_config
             )
         except Exception as e:
             raise HTTPException(
@@ -152,7 +152,7 @@ class CloudSyncService:
         # Create database record
         db_config = CloudSyncConfig(
             name=config.name,
-            provider=config.provider.value,
+            provider=config.provider,
             provider_config=json.dumps(encrypted_config),
             path_prefix=config.path_prefix or "",
         )
@@ -209,7 +209,7 @@ class CloudSyncService:
         if config_update.name is not None:
             config.name = config_update.name
         if config_update.provider is not None:
-            config.provider = config_update.provider.value
+            config.provider = config_update.provider
         if config_update.path_prefix is not None:
             config.path_prefix = config_update.path_prefix
         if config_update.enabled is not None:
@@ -219,9 +219,7 @@ class CloudSyncService:
         if config_update.provider_config is not None:
             # Validate the new configuration
             provider = (
-                config_update.provider.value
-                if config_update.provider
-                else config.provider
+                config_update.provider if config_update.provider else config.provider
             )
             try:
                 rclone_service = RcloneService()

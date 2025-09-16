@@ -63,6 +63,12 @@ class MockCloudStorage(CloudStorage):
     def get_sensitive_fields(self) -> list[str]:
         return ["password", "secret_key"]
 
+    def get_display_details(self, config_dict: dict) -> dict:
+        return {
+            "provider_name": "Mock Provider",
+            "provider_details": "<div><strong>Mock:</strong> Test Provider</div>",
+        }
+
 
 class MockSyncEventHandler(SyncEventHandler):
     """Mock event handler for testing"""
@@ -434,6 +440,12 @@ class TestCloudSyncer:
 
             def get_sensitive_fields(self):
                 return []
+
+            def get_display_details(self, config_dict: dict) -> dict:
+                return {
+                    "provider_name": "Exception Provider",
+                    "provider_details": "<div><strong>Test:</strong> Exception Provider</div>",
+                }
 
         storage = ExceptionStorage()
         syncer = CloudSyncer(storage, mock_event_handler)

@@ -200,6 +200,20 @@ class S3Storage(CloudStorage):
         """S3 sensitive fields"""
         return ["access_key", "secret_key"]
 
+    def get_display_details(self, config_dict: dict) -> dict:
+        """Get S3-specific display details for the UI"""
+        bucket_name = config_dict.get("bucket_name", "Unknown")
+        region = config_dict.get("region", "us-east-1")
+        storage_class = config_dict.get("storage_class", "STANDARD")
+
+        provider_details = f"""
+            <div><strong>Bucket:</strong> {bucket_name}</div>
+            <div><strong>Region:</strong> {region}</div>
+            <div><strong>Storage Class:</strong> {storage_class}</div>
+        """.strip()
+
+        return {"provider_name": "AWS S3", "provider_details": provider_details}
+
 
 @register_provider(
     name="s3",

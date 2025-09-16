@@ -65,26 +65,32 @@ class TestRegistryBusinessLogic:
 
     def test_get_config_class_returns_correct_classes(self):
         """Test that config classes are returned correctly"""
-        # Import storage modules to trigger registration (if not already done)
-        from services.cloud_providers.storage import (
-            S3StorageConfig,
-            SFTPStorageConfig,
-            SMBStorageConfig,
-        )
+        # Test by class name to avoid identity issues after module reloading
+        s3_config_class = get_config_class("s3")
+        sftp_config_class = get_config_class("sftp")
+        smb_config_class = get_config_class("smb")
 
-        assert get_config_class("s3") == S3StorageConfig
-        assert get_config_class("sftp") == SFTPStorageConfig
-        assert get_config_class("smb") == SMBStorageConfig
+        assert s3_config_class is not None
+        assert s3_config_class.__name__ == "S3StorageConfig"
+        assert sftp_config_class is not None
+        assert sftp_config_class.__name__ == "SFTPStorageConfig"
+        assert smb_config_class is not None
+        assert smb_config_class.__name__ == "SMBStorageConfig"
         assert get_config_class("unknown") is None
 
     def test_get_storage_class_returns_correct_classes(self):
         """Test that storage classes are returned correctly"""
-        # Import storage modules to trigger registration (if not already done)
-        from services.cloud_providers.storage import S3Storage, SFTPStorage, SMBStorage
+        # Test by class name to avoid identity issues after module reloading
+        s3_storage_class = get_storage_class("s3")
+        sftp_storage_class = get_storage_class("sftp")
+        smb_storage_class = get_storage_class("smb")
 
-        assert get_storage_class("s3") == S3Storage
-        assert get_storage_class("sftp") == SFTPStorage
-        assert get_storage_class("smb") == SMBStorage
+        assert s3_storage_class is not None
+        assert s3_storage_class.__name__ == "S3Storage"
+        assert sftp_storage_class is not None
+        assert sftp_storage_class.__name__ == "SFTPStorage"
+        assert smb_storage_class is not None
+        assert smb_storage_class.__name__ == "SMBStorage"
         assert get_storage_class("unknown") is None
 
 
@@ -264,8 +270,7 @@ class TestCloudSyncServiceIntegration:
         # Create a mock config object that bypasses pydantic validation
         mock_config = Mock()
         mock_config.name = "test-config"
-        mock_config.provider = Mock()
-        mock_config.provider.value = "unknown"  # Invalid provider
+        mock_config.provider = "unknown"  # Invalid provider (now a simple string)
         mock_config.provider_config = {}
 
         # Test with invalid provider - should use registry validation

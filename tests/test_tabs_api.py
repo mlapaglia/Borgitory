@@ -143,6 +143,52 @@ class TestTabsAPI:
             assert 'value="smb"' not in content
 
     @pytest.mark.asyncio
+    async def test_provider_fields_endpoint_uses_registry_for_submit_text(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test that provider fields endpoint uses registry for submit button text."""
+        # Test with S3 provider
+        response = await async_client.get("/api/cloud-sync/provider-fields?provider=s3")
+        assert response.status_code == 200
+        content = response.text
+        assert "Add AWS S3 Location" in content
+
+        # Test with SFTP provider
+        response = await async_client.get(
+            "/api/cloud-sync/provider-fields?provider=sftp"
+        )
+        assert response.status_code == 200
+        content = response.text
+        assert "Add SFTP (SSH) Location" in content
+
+        # Test with SMB provider
+        response = await async_client.get(
+            "/api/cloud-sync/provider-fields?provider=smb"
+        )
+        assert response.status_code == 200
+        content = response.text
+        assert "Add SMB/CIFS Location" in content
+
+        # Test with empty provider (should not show submit button)
+        response = await async_client.get("/api/cloud-sync/provider-fields?provider=")
+        assert response.status_code == 200
+        content = response.text
+        # Should not have submit button when provider is empty
+        assert "submit-button" not in content
+
+    @pytest.mark.asyncio
+    async def test_provider_fields_endpoint_handles_unknown_provider(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test that provider fields endpoint handles unknown providers gracefully."""
+        response = await async_client.get(
+            "/api/cloud-sync/provider-fields?provider=unknown"
+        )
+        assert response.status_code == 200
+        content = response.text
+        assert "Add Sync Location" in content  # Should fallback to generic text
+
+    @pytest.mark.asyncio
     async def test_get_archives_tab(self, async_client: AsyncClient, mock_current_user):
         """Test getting archives tab content."""
         response = await async_client.get("/api/tabs/archives")
