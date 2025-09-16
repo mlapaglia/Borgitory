@@ -1064,6 +1064,21 @@ class JobManager:
 
         repository_path = repo_data.get("path") or params.get("repository_path")
         passphrase = repo_data.get("passphrase") or params.get("passphrase")
+        
+        # Validate required parameters
+        if not repository_path:
+            task.status = "failed"
+            task.return_code = 1
+            task.error = "Repository path is required for cloud sync"
+            task.completed_at = datetime.now(UTC)
+            return False
+            
+        if not passphrase:
+            task.status = "failed"
+            task.return_code = 1
+            task.error = "Repository passphrase is required for cloud sync"
+            task.completed_at = datetime.now(UTC)
+            return False
 
         def task_output_callback(line: str, progress: Dict):
             task.output_lines.append(line)
@@ -1071,17 +1086,33 @@ class JobManager:
                 self.output_manager.add_output_line(job.id, line, "stdout", progress)
             )
 
+        # Get cloud sync config ID, defaulting to None if not configured
+        cloud_sync_config_id = params.get("cloud_sync_config_id")
+        
+        # Handle skip case at caller level instead of inside executor
+        if not cloud_sync_config_id:
+            logger.info("No cloud backup configuration - skipping cloud sync")
+            task.status = "completed"
+            task.return_code = 0
+            task.completed_at = datetime.now(UTC)
+            # Add output line for UI feedback
+            task.output_lines.append("Cloud sync skipped - no configuration")
+            asyncio.create_task(
+                self.output_manager.add_output_line(
+                    job.id, "Cloud sync skipped - no configuration", "stdout", {}
+                )
+            )
+            return True
+        
         result = await self.executor.execute_cloud_sync_task(
             repository_path=repository_path,
-            passphrase=passphrase,  # Not used but kept for consistency
-            cloud_sync_config_id=params.get("cloud_sync_config_id"),
-            output_callback=task_output_callback,
+            cloud_sync_config_id=cloud_sync_config_id,
             db_session_factory=self.dependencies.db_session_factory,
             rclone_service=self.dependencies.rclone_service,
-            http_client_factory=self.dependencies.http_client_factory,
             encryption_service=self.dependencies.encryption_service,
             storage_factory=self.dependencies.storage_factory,
             provider_registry=self.dependencies.provider_registry,
+            output_callback=task_output_callback,
         )
 
         task.return_code = result.return_code

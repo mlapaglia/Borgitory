@@ -229,20 +229,26 @@ class TestJobExecutorCloudSyncTaskV2:
     async def test_execute_cloud_sync_task_v2_no_config_id(
         self, executor, mock_cloud_sync_service, mock_config_load_service
     ):
-        """Test cloud sync task v2 with no config ID"""
+        """Test cloud sync task v2 - this test should be removed since config_id is now required"""
+        # This test is no longer valid since cloud_sync_config_id is now required (int, not Optional[int])
+        # The skip logic has been moved to the job manager level
+        # We'll test a valid scenario instead
+        
+        mock_config_load_service.load_config.return_value = None  # Config not found
+        
         result = await executor.execute_cloud_sync_task_v2(
             repository_path="/test/repo",
-            cloud_sync_config_id=None,
+            cloud_sync_config_id=999,  # Valid ID but config doesn't exist
             cloud_sync_service=mock_cloud_sync_service,
             config_load_service=mock_config_load_service,
         )
 
         assert result.return_code == 0
-        assert b"Cloud sync skipped - no configuration" in result.stdout
+        assert b"Cloud sync skipped - configuration disabled" in result.stdout
         assert result.error is None
 
-        # Services should not be called
-        mock_config_load_service.load_config.assert_not_called()
+        # Config loading should be called, but sync service should not
+        mock_config_load_service.load_config.assert_called_once_with(999)
         mock_cloud_sync_service.execute_sync.assert_not_called()
 
     @pytest.mark.asyncio

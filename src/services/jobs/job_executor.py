@@ -8,9 +8,15 @@ import logging
 import os
 import re
 import inspect
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Any, TYPE_CHECKING
 from datetime import datetime
 from dataclasses import dataclass
+
+# Import types for type hints only (avoids circular imports)
+if TYPE_CHECKING:
+    from services.rclone_service import RcloneService
+    from services.cloud_providers.registry import ProviderRegistry
+    from services.cloud_providers.service import EncryptionService, StorageFactory
 
 logger = logging.getLogger(__name__)
 
@@ -290,30 +296,26 @@ class JobExecutor:
     async def execute_cloud_sync_task(
         self,
         repository_path: str,
-        passphrase: str,
-        cloud_sync_config_id: Optional[int] = None,
+        cloud_sync_config_id: int,
+        db_session_factory: Callable,
+        rclone_service: RcloneService,
+        encryption_service: EncryptionService,
+        storage_factory: StorageFactory,
+        provider_registry: ProviderRegistry,
         output_callback: Optional[Callable] = None,
-        db_session_factory: Optional[Callable] = None,
-        rclone_service=None,
-        http_client_factory: Optional[Callable] = None,
-        encryption_service=None,  # Will be required - no fallback
-        storage_factory=None,  # Will be required - no fallback
-        provider_registry=None,  # Optional registry injection
     ) -> ProcessResult:
         """
         Execute a cloud sync task with the job executor's proper streaming
 
         Args:
             repository_path: Path to the borg repository
-            passphrase: Repository passphrase (not used but kept for consistency)
             cloud_sync_config_id: ID of the cloud sync configuration
-            output_callback: Callback for streaming output
-            db_session_factory: Factory for database sessions
-            rclone_service: Rclone service instance
-            http_client_factory: HTTP client factory for notifications
-            encryption_service: Service for encrypting/decrypting sensitive fields
-            storage_factory: Factory for creating cloud storage instances
-            provider_registry: Optional registry for cloud providers (uses default if None)
+            db_session_factory: Factory for database sessions (required)
+            rclone_service: Rclone service instance for cloud operations (required)
+            encryption_service: Service for encrypting/decrypting sensitive fields (required)
+            storage_factory: Factory for creating cloud storage instances (required)
+            provider_registry: Registry for cloud providers (required)
+            output_callback: Optional callback for streaming output
 
         Returns:
             ProcessResult with execution details
@@ -321,23 +323,7 @@ class JobExecutor:
         try:
             from models.database import CloudSyncConfig
 
-            # Require explicit dependency injection
-            if db_session_factory is None:
-                raise ValueError(
-                    "db_session_factory is required for cloud sync operations. "
-                    "Please provide it via dependency injection."
-                )
-
             session_factory = db_session_factory
-
-            if not cloud_sync_config_id:
-                logger.info("No cloud backup configuration - skipping cloud sync")
-                return ProcessResult(
-                    return_code=0,
-                    stdout=b"Cloud sync skipped - no configuration",
-                    stderr=b"",
-                    error=None,
-                )
 
             logger.info(f"Starting cloud sync for repository {repository_path}")
 
@@ -392,27 +378,10 @@ class JobExecutor:
                             f"Please update the configuration through the web UI."
                         )
 
-                    # Require explicit dependency injection
-                    if encryption_service is None:
-                        raise ValueError(
-                            "encryption_service is required for cloud sync operations. "
-                            "Please provide it via dependency injection."
-                        )
-
-                    if storage_factory is None:
-                        raise ValueError(
-                            "storage_factory is required for cloud sync operations. "
-                            "Please provide it via dependency injection."
-                        )
+                    # Dependencies are now required by type system - no need for runtime checks
 
                     # Get sensitive fields by creating a temporary storage with dummy config
-                    if provider_registry:
-                        metadata = provider_registry.get_metadata(config.provider)
-                    else:
-                        # Fallback to global registry for backward compatibility
-                        from services.cloud_providers.registry import get_metadata
-
-                        metadata = get_metadata(config.provider)
+                    metadata = provider_registry.get_metadata(config.provider)
                     if not metadata:
                         raise ValueError(f"Unknown provider: {config.provider}")
 
@@ -568,15 +537,6 @@ class JobExecutor:
             ProcessResult with execution details
         """
         try:
-            if not cloud_sync_config_id:
-                logger.info("No cloud backup configuration - skipping cloud sync")
-                return ProcessResult(
-                    return_code=0,
-                    stdout=b"Cloud sync skipped - no configuration",
-                    stderr=b"",
-                    error=None,
-                )
-
             logger.info(f"Starting cloud sync v2 for repository {repository_path}")
 
             if output_callback:

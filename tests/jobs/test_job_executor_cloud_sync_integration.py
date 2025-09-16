@@ -173,19 +173,28 @@ class TestCloudSyncDependencyInjection:
         mock_rclone_service,
         mock_encryption_service,
         mock_storage_factory,
+        mock_provider_registry=None,
         output_callback=None,
     ):
         """Helper method to execute cloud sync with all DI parameters"""
+        # Create a mock registry if not provided
+        if mock_provider_registry is None:
+            from unittest.mock import MagicMock
+            mock_provider_registry = MagicMock()
+            # Mock the get_metadata method to return a valid metadata object
+            mock_metadata = MagicMock()
+            mock_metadata.storage_class = MagicMock()
+            mock_provider_registry.get_metadata.return_value = mock_metadata
+            
         return await job_executor.execute_cloud_sync_task(
             repository_path="/test/repo/path",
-            passphrase="test_passphrase",
             cloud_sync_config_id=config_id,
-            output_callback=output_callback,
             db_session_factory=lambda: test_db,
             rclone_service=mock_rclone_service,
-            http_client_factory=None,
             encryption_service=mock_encryption_service,
             storage_factory=mock_storage_factory,
+            provider_registry=mock_provider_registry,
+            output_callback=output_callback,
         )
 
     @pytest.mark.asyncio
@@ -213,7 +222,7 @@ class TestCloudSyncDependencyInjection:
             mock_rclone_service,
             mock_encryption_service,
             mock_storage_factory,
-            output_callback,
+            output_callback=output_callback,
         )
 
         # Verify the result
@@ -368,31 +377,9 @@ class TestCloudSyncDependencyInjection:
         assert result.return_code == 1
         assert "Rclone sync failed" in result.error
 
-    @pytest.mark.asyncio
-    async def test_cloud_sync_skips_when_no_config(
-        self,
-        job_executor,
-        mock_rclone_service,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
-    ):
-        """Test that cloud sync is skipped when no config ID provided"""
-
-        result = await self._execute_cloud_sync_with_di(
-            job_executor,
-            None,
-            test_db,
-            mock_rclone_service,
-            mock_encryption_service,
-            mock_storage_factory,
-        )
-
-        assert result.return_code == 0
-        assert b"Cloud sync skipped - no configuration" in result.stdout
-
-        # RcloneService should not be called
-        mock_rclone_service.sync_repository_to_provider.assert_not_called()
+    # NOTE: The "skip when no config" test has been removed because the skip logic
+    # has been moved to the JobManager level. The JobExecutor now requires a valid
+    # config_id parameter. Skip logic should be tested at the JobManager level.
 
     @pytest.mark.asyncio
     async def test_cloud_sync_skips_when_config_disabled(
@@ -497,19 +484,28 @@ class TestCloudSyncProgressHandling:
         mock_rclone_service,
         mock_encryption_service,
         mock_storage_factory,
+        mock_provider_registry=None,
         output_callback=None,
     ):
         """Helper method to execute cloud sync with all DI parameters"""
+        # Create a mock registry if not provided
+        if mock_provider_registry is None:
+            from unittest.mock import MagicMock
+            mock_provider_registry = MagicMock()
+            # Mock the get_metadata method to return a valid metadata object
+            mock_metadata = MagicMock()
+            mock_metadata.storage_class = MagicMock()
+            mock_provider_registry.get_metadata.return_value = mock_metadata
+            
         return await job_executor.execute_cloud_sync_task(
             repository_path="/test/repo/path",
-            passphrase="test_passphrase",
             cloud_sync_config_id=config_id,
-            output_callback=output_callback,
             db_session_factory=lambda: test_db,
             rclone_service=mock_rclone_service,
-            http_client_factory=None,
             encryption_service=mock_encryption_service,
             storage_factory=mock_storage_factory,
+            provider_registry=mock_provider_registry,
+            output_callback=output_callback,
         )
 
     @pytest.mark.asyncio
@@ -551,7 +547,7 @@ class TestCloudSyncProgressHandling:
             mock_rclone_service,
             mock_encryption_service,
             mock_storage_factory,
-            progress_callback,
+            output_callback=progress_callback,
         )
 
         assert result.return_code == 0

@@ -190,48 +190,51 @@ class TestJobExecutor:
         assert result.error == "Connection lost during transfer"
 
     @pytest.mark.asyncio
-    async def test_no_config_id(
+    async def test_config_not_found(
         self, job_executor, mock_cloud_sync_service, mock_config_load_service
     ):
-        """Test when no config ID is provided"""
+        """Test when config ID is provided but config doesn't exist"""
+        # Arrange - mock config loading to return None
+        mock_config_load_service.load_config.return_value = None
+        
         # Act
         result = await job_executor.execute_cloud_sync_task_v2(
             repository_path="/test/repo",
-            cloud_sync_config_id=None,  # No config
+            cloud_sync_config_id=999,  # Valid ID but config doesn't exist
             cloud_sync_service=mock_cloud_sync_service,
             config_load_service=mock_config_load_service,
         )
 
         # Assert
         assert result.return_code == 0  # Skip, not error
-        assert b"no configuration" in result.stdout
+        assert b"configuration disabled" in result.stdout
         assert result.error is None
 
-        # Neither service should be called
-        mock_config_load_service.load_config.assert_not_called()
+        # Config loading should be called, but sync service should not
+        mock_config_load_service.load_config.assert_called_once_with(999)
         mock_cloud_sync_service.execute_sync.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_zero_config_id(
         self, job_executor, mock_cloud_sync_service, mock_config_load_service
     ):
-        """Test when config ID is 0 (falsy but valid)"""
+        """Test when config ID is 0 (falsy but valid ID)"""
         config = CloudSyncConfig(provider="s3", config={"bucket_name": "test"})
         mock_config_load_service.load_config.return_value = config
         mock_cloud_sync_service.execute_sync.return_value = SyncResult.success_result()
 
         result = await job_executor.execute_cloud_sync_task_v2(
             repository_path="/test/repo",
-            cloud_sync_config_id=0,  # Valid ID that's falsy
+            cloud_sync_config_id=0,  # Valid ID that happens to be falsy in Python
             cloud_sync_service=mock_cloud_sync_service,
             config_load_service=mock_config_load_service,
         )
 
-        # The current implementation treats 0 as falsy and skips - let's test that behavior
+        # 0 should be treated as a valid ID, not as "no config"
         assert result.return_code == 0
-        assert b"no configuration" in result.stdout
-        mock_config_load_service.load_config.assert_not_called()
-        mock_cloud_sync_service.execute_sync.assert_not_called()
+        assert b"Cloud sync completed successfully" in result.stdout
+        mock_config_load_service.load_config.assert_called_once_with(0)
+        mock_cloud_sync_service.execute_sync.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_with_output_callback(
