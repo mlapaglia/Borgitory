@@ -189,20 +189,31 @@ class CloudSyncService:
         return config
 
     async def test_cloud_sync_config(
-        self, config_id: int, rclone: RcloneService
+        self,
+        config_id: int,
+        rclone: RcloneService,
+        encryption_service=None,
+        storage_factory=None,
     ) -> dict:
         """Test a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
         # Parse JSON configuration
         import json
-        from services.cloud_providers import EncryptionService, StorageFactory
 
         provider_config = json.loads(config.provider_config)
 
+        # Use injected dependencies or create them (for backward compatibility)
+        if encryption_service is None:
+            from services.cloud_providers import EncryptionService
+
+            encryption_service = EncryptionService()
+        if storage_factory is None:
+            from services.cloud_providers import StorageFactory
+
+            storage_factory = StorageFactory(rclone)
+
         # Decrypt sensitive fields
-        encryption_service = EncryptionService()
-        storage_factory = StorageFactory(rclone)
         storage = storage_factory.create_storage(config.provider, provider_config)
         sensitive_fields = storage.get_sensitive_fields()
         decrypted_config = encryption_service.decrypt_sensitive_fields(
@@ -233,3 +244,37 @@ class CloudSyncService:
             )
 
         return result
+
+    def get_decrypted_config_for_editing(
+        self, config_id: int, encryption_service, storage_factory
+    ) -> dict:
+        """Get decrypted configuration for editing in forms."""
+        config = self.get_cloud_sync_config_by_id(config_id)
+
+        # Parse JSON configuration
+        import json
+
+        provider_config = json.loads(config.provider_config)
+
+        # Decrypt sensitive fields using injected dependencies
+        storage = storage_factory.create_storage(config.provider, provider_config)
+        sensitive_fields = storage.get_sensitive_fields()
+        decrypted_provider_config = encryption_service.decrypt_sensitive_fields(
+            provider_config, sensitive_fields
+        )
+
+        # Build decrypted config for template
+        decrypted_config = {
+            "id": config.id,
+            "name": config.name,
+            "provider": config.provider,
+            "path_prefix": config.path_prefix,
+            "enabled": config.enabled,
+            "created_at": config.created_at,
+            "updated_at": config.updated_at,
+        }
+
+        # Add all provider-specific fields from decrypted JSON
+        decrypted_config.update(decrypted_provider_config)
+
+        return decrypted_config

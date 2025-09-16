@@ -42,6 +42,7 @@ from services.cleanup_service import CleanupService
 from services.cron_description_service import CronDescriptionService
 from services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
+from services.cloud_providers import EncryptionService, StorageFactory
 
 
 # Global singleton instances
@@ -465,6 +466,18 @@ def get_upcoming_backups_service(
     return UpcomingBackupsService(cron_description_service)
 
 
+def get_encryption_service() -> EncryptionService:
+    """Provide an EncryptionService instance."""
+    return EncryptionService()
+
+
+def get_storage_factory(
+    rclone: RcloneService = Depends(get_rclone_service),
+) -> StorageFactory:
+    """Provide a StorageFactory instance with injected RcloneService."""
+    return StorageFactory(rclone)
+
+
 # Type aliases for dependency injection
 SimpleCommandRunnerDep = Annotated[
     SimpleCommandRunner, Depends(get_simple_command_runner)
@@ -503,6 +516,8 @@ RepositoryCheckConfigServiceDep = Annotated[
 NotificationConfigServiceDep = Annotated[
     NotificationConfigService, Depends(get_notification_config_service)
 ]
+EncryptionServiceDep = Annotated[EncryptionService, Depends(get_encryption_service)]
+StorageFactoryDep = Annotated[StorageFactory, Depends(get_storage_factory)]
 CleanupServiceDep = Annotated[CleanupService, Depends(get_cleanup_service)]
 CronDescriptionServiceDep = Annotated[
     CronDescriptionService, Depends(get_cron_description_service)

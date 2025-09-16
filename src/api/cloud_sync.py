@@ -12,7 +12,7 @@ from models.schemas import (
     CloudSyncConfig as CloudSyncConfigSchema,
 )
 from services.cloud_sync_service import CloudSyncService
-from dependencies import RcloneServiceDep
+from dependencies import RcloneServiceDep, EncryptionServiceDep, StorageFactoryDep
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -174,59 +174,33 @@ def get_cloud_sync_config(
 async def get_cloud_sync_edit_form(
     request: Request,
     config_id: int,
+    encryption_service: EncryptionServiceDep,
+    storage_factory: StorageFactoryDep,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Get edit form for a specific cloud sync configuration"""
     try:
-        config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
-
-        # Parse and decrypt JSON configuration
-        import json
-        from services.cloud_providers import EncryptionService, StorageFactory
-        from services.rclone_service import RcloneService
-
-        provider_config = json.loads(config.provider_config)
-
-        # Decrypt sensitive fields
-        rclone_service = RcloneService()
-        encryption_service = EncryptionService()
-        storage_factory = StorageFactory(rclone_service)
-        storage = storage_factory.create_storage(config.provider, provider_config)
-        sensitive_fields = storage.get_sensitive_fields()
-        decrypted_provider_config = encryption_service.decrypt_sensitive_fields(
-            provider_config, sensitive_fields
+        # Get decrypted config for editing from service layer with proper DI
+        decrypted_config = cloud_sync_service.get_decrypted_config_for_editing(
+            config_id, encryption_service, storage_factory
         )
-
-        # Build decrypted config for template
-        decrypted_config = {
-            "id": config.id,
-            "name": config.name,
-            "provider": config.provider,
-            "path_prefix": config.path_prefix,
-            "enabled": config.enabled,
-            "created_at": config.created_at,
-            "updated_at": config.updated_at,
-        }
-
-        # Add all provider-specific fields from decrypted JSON
-        decrypted_config.update(decrypted_provider_config)
 
         # Create a simple object for template access
         config_obj = type("Config", (), decrypted_config)()
 
         context = {
             "config": config_obj,
-            "provider": config.provider,
-            "is_s3": config.provider == "s3",
-            "is_sftp": config.provider == "sftp",
+            "provider": decrypted_config["provider"],
+            "is_s3": decrypted_config["provider"] == "s3",
+            "is_sftp": decrypted_config["provider"] == "sftp",
             "is_edit_mode": True,
         }
 
         # Set submit button text based on provider
-        if config.provider == "s3":
+        if decrypted_config["provider"] == "s3":
             context["submit_text"] = "Update S3 Location"
-        elif config.provider == "sftp":
+        elif decrypted_config["provider"] == "sftp":
             context["submit_text"] = "Update SFTP Location"
         else:
             context["submit_text"] = "Update Sync Location"
@@ -316,13 +290,17 @@ async def test_cloud_sync_config(
     request: Request,
     config_id: int,
     rclone: RcloneServiceDep,
+    encryption_service: EncryptionServiceDep,
+    storage_factory: StorageFactoryDep,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ):
     """Test a cloud sync configuration"""
 
     try:
-        result = await cloud_sync_service.test_cloud_sync_config(config_id, rclone)
+        result = await cloud_sync_service.test_cloud_sync_config(
+            config_id, rclone, encryption_service, storage_factory
+        )
         config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
 
         if result["status"] == "success":
