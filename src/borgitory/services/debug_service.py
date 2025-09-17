@@ -44,10 +44,10 @@ class DebugService:
             debug_info["database"] = {"error": str(e)}
 
         try:
-            debug_info["docker"] = await self._get_docker_info()
+            debug_info["volumes"] = await self._get_volume_info()
         except Exception as e:
-            logger.error(f"Error getting docker info: {str(e)}")
-            debug_info["docker"] = {"error": str(e)}
+            logger.error(f"Error getting volume info: {str(e)}")
+            debug_info["volumes"] = {"error": str(e)}
 
         try:
             debug_info["tools"] = await self._get_tool_versions()
@@ -110,11 +110,9 @@ class DebugService:
             database_size = "Unknown"
             database_size_bytes = 0
             try:
-                if DATABASE_URL.startswith("sqlite://"):
-                    # Extract file path from SQLite URL
-                    db_path = DATABASE_URL.replace("sqlite://", "").replace(
-                        "sqlite:///", ""
-                    )
+                if DATABASE_URL.startswith("sqlite:///"):
+                    # Extract file path from SQLite URL (sqlite:///path/to/file.db)
+                    db_path = DATABASE_URL[10:]  # Remove "sqlite:///" prefix
                     if os.path.exists(db_path):
                         database_size_bytes = os.path.getsize(db_path)
                         # Convert to human readable format
@@ -130,6 +128,28 @@ class DebugService:
                             database_size = (
                                 f"{database_size_bytes / (1024 * 1024 * 1024):.1f} GB"
                             )
+                    else:
+                        database_size = f"File not found: {db_path}"
+                elif DATABASE_URL.startswith("sqlite://"):
+                    # Handle relative path format (sqlite://path/to/file.db)
+                    db_path = DATABASE_URL[9:]  # Remove "sqlite://" prefix
+                    if os.path.exists(db_path):
+                        database_size_bytes = os.path.getsize(db_path)
+                        # Convert to human readable format
+                        if database_size_bytes < 1024:
+                            database_size = f"{database_size_bytes} B"
+                        elif database_size_bytes < 1024 * 1024:
+                            database_size = f"{database_size_bytes / 1024:.1f} KB"
+                        elif database_size_bytes < 1024 * 1024 * 1024:
+                            database_size = (
+                                f"{database_size_bytes / (1024 * 1024):.1f} MB"
+                            )
+                        else:
+                            database_size = (
+                                f"{database_size_bytes / (1024 * 1024 * 1024):.1f} GB"
+                            )
+                    else:
+                        database_size = f"File not found: {db_path}"
             except Exception as size_error:
                 database_size = f"Error: {str(size_error)}"
 
@@ -146,8 +166,8 @@ class DebugService:
         except Exception as e:
             return {"error": str(e), "database_accessible": False}
 
-    async def _get_docker_info(self) -> Dict[str, Any]:
-        """Get Docker and volume mount information"""
+    async def _get_volume_info(self) -> Dict[str, Any]:
+        """Get volume mount information"""
         try:
             # Use the shared volume service for volume discovery
             if self.volume_service:
@@ -161,30 +181,7 @@ class DebugService:
                 volume_info = await volume_service.get_volume_info()
                 mounted_volumes = volume_info.get("mounted_volumes", [])
 
-            # Try to get basic Docker info if available
-            docker_info = {"accessible": False}
-            try:
-                import docker
-
-                client = docker.from_env()
-                version = client.version()
-                containers = client.containers.list()
-
-                docker_info = {
-                    "accessible": True,
-                    "version": version.get("Version", "Unknown"),
-                    "api_version": version.get("ApiVersion", "Unknown"),
-                    "running_containers": len(containers),
-                }
-            except Exception:
-                # Docker not accessible, but we can still show volume info
-                docker_info = {
-                    "accessible": False,
-                    "error": "Docker daemon not accessible",
-                }
-
             return {
-                "docker_info": docker_info,
                 "mounted_volumes": mounted_volumes,
                 "total_mounted_volumes": len(mounted_volumes),
             }
@@ -192,7 +189,6 @@ class DebugService:
         except Exception as e:
             return {
                 "error": str(e),
-                "docker_info": {"accessible": False},
                 "mounted_volumes": [],
                 "total_mounted_volumes": 0,
             }
@@ -201,7 +197,6 @@ class DebugService:
         """Get versions of external tools"""
         tools = {}
 
-        # Get Borg version directly (local binary)
         try:
             process = await asyncio.create_subprocess_exec(
                 "borg",
@@ -222,7 +217,6 @@ class DebugService:
         except Exception as e:
             tools["borg"] = {"error": str(e), "accessible": False}
 
-        # Get Rclone version
         try:
             process = await asyncio.create_subprocess_exec(
                 "rclone",
@@ -247,6 +241,86 @@ class DebugService:
                 }
         except Exception as e:
             tools["rclone"] = {"error": str(e), "accessible": False}
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "dpkg",
+                "-l",
+                "fuse3",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await process.communicate()
+
+            if process.returncode == 0:
+                output = stdout.decode().strip()
+                # Parse dpkg output to get version
+                lines = output.split("\n")
+                for line in lines:
+                    if line.startswith("ii") and "fuse3" in line:
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            version = parts[2]
+                            tools["fuse3"] = {
+                                "version": f"fuse3 {version}",
+                                "accessible": True,
+                            }
+                            break
+                else:
+                    tools["fuse3"] = {
+                        "error": "Package info not found",
+                        "accessible": False,
+                    }
+            else:
+                tools["fuse3"] = {
+                    "error": stderr.decode().strip()
+                    if stderr
+                    else "Package not installed",
+                    "accessible": False,
+                }
+        except Exception as e:
+            tools["fuse3"] = {"error": str(e), "accessible": False}
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "dpkg",
+                "-l",
+                "python3-pyfuse3",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await process.communicate()
+
+            if process.returncode == 0:
+                output = stdout.decode().strip()
+                # Parse dpkg output to get version
+                lines = output.split("\n")
+                for line in lines:
+                    if line.startswith("ii") and "python3-pyfuse3" in line:
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            version = parts[2]
+                            tools["python3-pyfuse3"] = {
+                                "version": f"python3-pyfuse3 {version}",
+                                "accessible": True,
+                            }
+                            break
+                else:
+                    tools["python3-pyfuse3"] = {
+                        "error": "Package info not found",
+                        "accessible": False,
+                    }
+            else:
+                tools["python3-pyfuse3"] = {
+                    "error": stderr.decode().strip()
+                    if stderr
+                    else "Package not installed",
+                    "accessible": False,
+                }
+        except Exception as e:
+            tools["python3-pyfuse3"] = {"error": str(e), "accessible": False}
 
         return tools
 

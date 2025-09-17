@@ -39,7 +39,7 @@ class TestDebugService:
         ), patch.object(
             debug_service, "_get_database_info", return_value={"db": "info"}
         ), patch.object(
-            debug_service, "_get_docker_info", return_value={"docker": "info"}
+            debug_service, "_get_volume_info", return_value={"volumes": "info"}
         ), patch.object(
             debug_service, "_get_tool_versions", return_value={"tools": "info"}
         ), patch.object(
@@ -52,7 +52,7 @@ class TestDebugService:
             assert result["system"] == {"system": "info"}
             assert result["application"] == {"app": "info"}
             assert result["database"] == {"db": "info"}
-            assert result["docker"] == {"docker": "info"}
+            assert result["volumes"] == {"volumes": "info"}
             assert result["tools"] == {"tools": "info"}
             assert result["environment"] == {"env": "info"}
             assert result["job_manager"] == {"jobs": "info"}
@@ -69,7 +69,7 @@ class TestDebugService:
         ), patch.object(
             debug_service, "_get_database_info", side_effect=Exception("DB error")
         ), patch.object(
-            debug_service, "_get_docker_info", return_value={"docker": "info"}
+            debug_service, "_get_volume_info", return_value={"volumes": "info"}
         ), patch.object(
             debug_service, "_get_tool_versions", return_value={"tools": "info"}
         ), patch.object(
@@ -82,7 +82,7 @@ class TestDebugService:
             assert result["system"] == {"error": "System error"}
             assert result["application"] == {"app": "info"}
             assert result["database"] == {"error": "DB error"}
-            assert result["docker"] == {"docker": "info"}
+            assert result["volumes"] == {"volumes": "info"}
 
     @pytest.mark.asyncio
     async def test_get_system_info(self, debug_service):
@@ -214,8 +214,8 @@ class TestDebugService:
         assert result["database_accessible"] is False
 
     @pytest.mark.asyncio
-    async def test_get_docker_info_success_with_docker(self, debug_service):
-        """Test Docker info collection with Docker available"""
+    async def test_get_volume_info_success(self, debug_service):
+        """Test volume info collection success"""
         mock_volume_service = MagicMock()
         mock_volume_service.get_volume_info = AsyncMock(
             return_value={
@@ -224,32 +224,18 @@ class TestDebugService:
             }
         )
 
-        mock_docker_client = MagicMock()
-        mock_docker_client.version.return_value = {
-            "Version": "20.10.0",
-            "ApiVersion": "1.41",
-        }
-        mock_docker_client.containers.list.return_value = [
-            MagicMock(),
-            MagicMock(),
-        ]  # 2 containers
-
         with patch(
             "borgitory.dependencies.get_volume_service",
             return_value=mock_volume_service,
-        ), patch("docker.from_env", return_value=mock_docker_client):
-            result = await debug_service._get_docker_info()
+        ):
+            result = await debug_service._get_volume_info()
 
             assert result["mounted_volumes"] == ["/data", "/backup"]
             assert result["total_mounted_volumes"] == 2
-            assert result["docker_info"]["accessible"] is True
-            assert result["docker_info"]["version"] == "20.10.0"
-            assert result["docker_info"]["api_version"] == "1.41"
-            assert result["docker_info"]["running_containers"] == 2
 
     @pytest.mark.asyncio
-    async def test_get_docker_info_docker_not_accessible(self, debug_service):
-        """Test Docker info when Docker is not accessible"""
+    async def test_get_volume_info_with_volumes(self, debug_service):
+        """Test volume info when volumes are present"""
         mock_volume_service = MagicMock()
         mock_volume_service.get_volume_info = AsyncMock(
             return_value={"mounted_volumes": ["/data"], "total_mounted_volumes": 1}
@@ -258,25 +244,22 @@ class TestDebugService:
         with patch(
             "borgitory.dependencies.get_volume_service",
             return_value=mock_volume_service,
-        ), patch("docker.from_env", side_effect=Exception("Docker not available")):
-            result = await debug_service._get_docker_info()
+        ):
+            result = await debug_service._get_volume_info()
 
             assert result["mounted_volumes"] == ["/data"]
             assert result["total_mounted_volumes"] == 1
-            assert result["docker_info"]["accessible"] is False
-            assert "error" in result["docker_info"]
 
     @pytest.mark.asyncio
-    async def test_get_docker_info_volume_service_failure(self, debug_service):
-        """Test Docker info when volume service fails"""
+    async def test_get_volume_info_service_failure(self, debug_service):
+        """Test volume info when volume service fails"""
         with patch(
             "borgitory.dependencies.get_volume_service",
             side_effect=Exception("Volume service error"),
         ):
-            result = await debug_service._get_docker_info()
+            result = await debug_service._get_volume_info()
 
             assert "error" in result
-            assert result["docker_info"]["accessible"] is False
             assert result["mounted_volumes"] == []
             assert result["total_mounted_volumes"] == 0
 

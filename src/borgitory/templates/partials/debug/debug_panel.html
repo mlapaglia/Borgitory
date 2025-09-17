@@ -14,25 +14,55 @@
                     <span class="font-semibold">✗ System Error:</span> {{ debug_info.system.error }}
                 </div>
             {% else %}
+            <!-- Main platform info (always visible) -->
             <div class="flex justify-between">
-                <span class="text-gray-600 dark:text-gray-400">Platform:</span>
-                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.platform }}</span>
+                <span class="text-gray-600 dark:text-gray-400">Kernel:</span>
+                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.release }}</span>
             </div>
-            <div class="flex justify-between">
-                <span class="text-gray-600 dark:text-gray-400">System:</span>
-                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.system }}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-gray-600 dark:text-gray-400">Architecture:</span>
-                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.architecture }}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-gray-600 dark:text-gray-400">Hostname:</span>
-                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.hostname }}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-gray-600 dark:text-gray-400">Python Version:</span>
-                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.python_version.split()[0] }}</span>
+            
+            <!-- Expandable details section -->
+            <div class="mt-3">
+                <button 
+                    class="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium"
+                    onclick="toggleSystemDetails()"
+                    id="system-toggle-btn"
+                >
+                    <svg id="system-chevron" class="w-4 h-4 mr-1 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                    Show Details
+                </button>
+                
+                <div id="system-details" class="hidden mt-2 pl-5 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">System:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.system }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Platform:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.platform }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Version:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.version }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Architecture:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.architecture }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Processor:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.processor or 'Unknown' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Hostname:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.hostname }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Python Executable:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100 break-all">{{ debug_info.system.python_executable }}</span>
+                    </div>
+                </div>
             </div>
             {% endif %}
         </div>
@@ -58,7 +88,7 @@
             </div>
             <div class="flex justify-between">
                 <span class="text-gray-600 dark:text-gray-400">Working Directory:</span>
-                <span class="font-mono text-gray-900 break-all">{{ debug_info.application.working_directory }}</span>
+                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.application.working_directory }}</span>
             </div>
             {% endif %}
         </div>
@@ -92,7 +122,7 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-600 dark:text-gray-400">Database URL:</span>
-                    <span class="font-mono text-gray-900 break-all">{{ debug_info.database.database_url }}</span>
+                    <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.database.database_url }}</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-600 dark:text-gray-400">Database Size:</span>
@@ -110,63 +140,35 @@
         </div>
     </div>
 
-    <!-- Docker & Volume Information -->
+    <!-- Volume Information -->
     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
             <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
             </svg>
-            Docker & Volume Information
+            Volume Information
         </h3>
         <div class="space-y-2 text-sm">
-            {% if debug_info.docker.error is defined %}
+            {% if debug_info.volumes.error is defined %}
                 <div class="text-red-600">
-                    <span class="font-semibold">✗ Error:</span> {{ debug_info.docker.error }}
+                    <span class="font-semibold">✗ Error:</span> {{ debug_info.volumes.error }}
                 </div>
             {% else %}
-                <!-- Docker Status -->
-                {% if debug_info.docker.docker_info.accessible %}
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Docker Status:</span>
-                        <span class="text-green-600 font-semibold">✓ Accessible</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Docker Version:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.docker.docker_info.version }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">API Version:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.docker.docker_info.api_version }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Running Containers:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.docker.docker_info.running_containers }}</span>
+                <div class="flex justify-between mb-2">
+                    <span class="text-gray-600 dark:text-gray-400 font-semibold">Mounted Volumes:</span>
+                    <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.volumes.total_mounted_volumes }}</span>
+                </div>
+                {% if debug_info.volumes.mounted_volumes %}
+                    <div class="space-y-1 max-h-32 overflow-y-auto">
+                        {% for volume in debug_info.volumes.mounted_volumes %}
+                            <div class="font-mono text-xs text-gray-700 dark:text-gray-300 break-all bg-white dark:bg-gray-600 px-2 py-1 rounded">
+                                {{ volume }}
+                            </div>
+                        {% endfor %}
                     </div>
                 {% else %}
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Docker Status:</span>
-                        <span class="text-yellow-600 font-semibold">⚠ Not Accessible</span>
-                    </div>
+                    <div class="text-gray-500 dark:text-gray-400 text-xs italic">No external volumes detected</div>
                 {% endif %}
-                
-                <!-- Mounted Volumes -->
-                <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                    <div class="flex justify-between mb-2">
-                        <span class="text-gray-600 dark:text-gray-400 font-semibold">Mounted Volumes:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.docker.total_mounted_volumes }}</span>
-                    </div>
-                    {% if debug_info.docker.mounted_volumes %}
-                        <div class="space-y-1 max-h-32 overflow-y-auto">
-                            {% for volume in debug_info.docker.mounted_volumes %}
-                                <div class="font-mono text-xs text-gray-700 dark:text-gray-300 break-all bg-white dark:bg-gray-600 px-2 py-1 rounded">
-                                    {{ volume }}
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="text-gray-500 dark:text-gray-400 text-xs italic">No external volumes detected</div>
-                    {% endif %}
-                </div>
             {% endif %}
         </div>
     </div>
@@ -181,40 +183,39 @@
             Tool Versions
         </h3>
         <div class="space-y-3 text-sm">
-            <!-- Borg -->
-            <div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600 font-semibold">BorgBackup:</span>
-                    {% if debug_info.tools.borg.accessible %}
+            {% if debug_info.tools.error is defined %}
+                <div class="text-red-600">
+                    <span class="font-semibold">✗ Tools Error:</span> {{ debug_info.tools.error }}
+                </div>
+            {% else %}
+                <!-- Python Version (always first) -->
+                <div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Python:</span>
                         <span class="text-green-600 font-semibold">✓ Available</span>
+                    </div>
+                    <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ debug_info.system.python_version.split()[0] }}</div>
+                </div>
+                
+                <!-- Other tools -->
+                {% for tool_name, tool_info in debug_info.tools.items() %}
+                <div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">{{ tool_name|title }}:</span>
+                        {% if tool_info.accessible %}
+                            <span class="text-green-600 font-semibold">✓ Available</span>
+                        {% else %}
+                            <span class="text-red-600 font-semibold">✗ Not Available</span>
+                        {% endif %}
+                    </div>
+                    {% if tool_info.accessible %}
+                        <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ tool_info.version }}</div>
                     {% else %}
-                        <span class="text-red-600 font-semibold">✗ Error</span>
+                        <div class="text-red-600 text-xs mt-1">{{ tool_info.error }}</div>
                     {% endif %}
                 </div>
-                {% if debug_info.tools.borg.accessible %}
-                    <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ debug_info.tools.borg.version }}</div>
-                {% else %}
-                    <div class="text-red-600 text-xs mt-1">{{ debug_info.tools.borg.error }}</div>
-                {% endif %}
-            </div>
-
-            <!-- Rclone -->
-            <div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600 font-semibold">Rclone:</span>
-                    {% if debug_info.tools.rclone.accessible %}
-                        <span class="text-green-600 font-semibold">✓ Available</span>
-                    {% else %}
-                        <span class="text-red-600 font-semibold">✗ Not Available</span>
-                    {% endif %}
-                </div>
-                {% if debug_info.tools.rclone.accessible %}
-                    <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ debug_info.tools.rclone.version }}</div>
-                {% else %}
-                    <div class="text-red-600 text-xs mt-1">{{ debug_info.tools.rclone.error }}</div>
-                {% endif %}
-            </div>
-
+                {% endfor %}
+            {% endif %}
         </div>
     </div>
 
@@ -249,8 +250,6 @@
     </div>
 </div>
 
-<!-- Jobs in Memory Section -->
-{% include 'partials/debug/jobs_memory.html' %}
 
 <!-- Environment Variables Section -->
 <div class="mt-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
@@ -269,3 +268,24 @@
         {% endfor %}
     </div>
 </div>
+
+<!-- JavaScript for expandable system details -->
+<script>
+function toggleSystemDetails() {
+    const details = document.getElementById('system-details');
+    const chevron = document.getElementById('system-chevron');
+    const button = document.getElementById('system-toggle-btn');
+    
+    if (details.classList.contains('hidden')) {
+        // Show details
+        details.classList.remove('hidden');
+        chevron.style.transform = 'rotate(90deg)';
+        button.innerHTML = button.innerHTML.replace('Show Details', 'Hide Details');
+    } else {
+        // Hide details
+        details.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+        button.innerHTML = button.innerHTML.replace('Hide Details', 'Show Details');
+    }
+}
+</script>
