@@ -435,8 +435,8 @@ class TestRepositoriesAPI:
 
     @pytest.mark.asyncio
     async def test_update_import_form_no_path(self, async_client: AsyncClient):
-        """Test import form update with no path."""
-        response = await async_client.get("/api/repositories/import-form-update")
+        """Test import form update with empty path parameter."""
+        response = await async_client.get("/api/repositories/import-form-update?path=")
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]

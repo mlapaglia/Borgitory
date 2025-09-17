@@ -11,8 +11,8 @@ class JobEvent:
 
     event_type: EventType
     job_id: Optional[str] = None
-    data: Dict[str, Any] = None
-    timestamp: datetime = None
+    data: Optional[Dict[str, Any]] = None
+    timestamp: Optional[datetime] = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -26,5 +26,5 @@ class JobEvent:
             "type": self.event_type.value,
             "job_id": self.job_id,
             "data": self.data,
-            "timestamp": self.timestamp.isoformat(),
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
         }

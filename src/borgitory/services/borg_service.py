@@ -588,32 +588,11 @@ class BorgService:
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
             raise Exception(f"Failed to extract file: {str(e)}")
 
-    async def start_repository_scan(self, scan_path: str = None) -> str:
+    async def start_repository_scan(self, scan_path: str) -> str:
         """Start repository scan and return job_id for tracking"""
 
-        # If no specific path provided, scan all mounted volumes
-        if scan_path is None:
-            if self.volume_service:
-                mounted_volumes = await self.volume_service.get_mounted_volumes()
-            else:
-                # Fallback: use direct import (for backward compatibility)
-                from borgitory.dependencies import get_volume_service
-
-                volume_service = get_volume_service()
-                mounted_volumes = await volume_service.get_mounted_volumes()
-
-            if not mounted_volumes:
-                logger.warning("No mounted volumes found, falling back to /repos")
-                scan_paths = ["/repos"]
-            else:
-                scan_paths = mounted_volumes
-
-            logger.info(
-                f"Starting repository scan across {len(scan_paths)} mounted volumes: {scan_paths}"
-            )
-        else:
-            scan_paths = [scan_path]
-            logger.info(f"Starting repository scan in specific path: {scan_path}")
+        scan_paths = [scan_path]
+        logger.info(f"Starting repository scan in specific path: {scan_path}")
 
         # Build command to scan multiple paths
         # Use find command to scan for Borg repositories - only check top-level subdirectories
@@ -749,13 +728,13 @@ class BorgService:
             return []
 
     async def verify_repository_access(
-        self, repo_path: str, passphrase: str, keyfile_path: str = None
+        self, repo_path: str, passphrase: str, keyfile_path: str = ""
     ) -> bool:
         """Verify we can access a repository with given credentials"""
         try:
             # Build environment overrides for keyfile if needed
             env_overrides = {}
-            if keyfile_path:
+            if keyfile_path != "":
                 env_overrides["BORG_KEY_FILE"] = keyfile_path
 
             command, env = build_secure_borg_command(
@@ -798,7 +777,7 @@ class BorgService:
             logger.error(f"Failed to verify repository access: {e}")
             return False
 
-    async def scan_for_repositories(self, scan_path: str = None) -> List[Dict]:
+    async def scan_for_repositories(self, scan_path: str) -> List[Dict]:
         """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
         job_id = await self.start_repository_scan(scan_path)
 

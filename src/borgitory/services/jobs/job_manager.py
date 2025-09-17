@@ -1490,7 +1490,7 @@ class JobManager:
         else:
             # Fallback: empty stream
             return
-            yield  # Make this a generator
+            yield  # type: ignore[unreachable]
 
     async def shutdown(self):
         """Shutdown the job manager"""

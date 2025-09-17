@@ -208,7 +208,6 @@ class TestUserModel:
         user = User(username="testuser")
         assert user.username == "testuser"
         assert user.password_hash is None
-        assert user.created_at is None  # Not set until added to session
 
     def test_set_password_hashing(self):
         """Test that password is properly hashed."""

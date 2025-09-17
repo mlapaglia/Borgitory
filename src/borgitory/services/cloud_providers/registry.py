@@ -38,7 +38,7 @@ class ProviderMetadata:
     supports_encryption: bool = True
     supports_versioning: bool = False
     requires_credentials: bool = True
-    additional_info: Dict[str, Any] = None
+    additional_info: Optional[Dict[str, Any]] = None
     rclone_mapping: Optional[RcloneMethodMapping] = None
 
     def __post_init__(self):

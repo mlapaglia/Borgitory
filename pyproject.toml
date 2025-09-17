@@ -172,14 +172,14 @@ show_column_numbers = true
 
 pretty = true
 warn_return_any = false
-warn_unused_configs = false
+warn_unused_configs = true
 disallow_untyped_defs = false
-disallow_any_unimported = false
-no_implicit_optional = false
-check_untyped_defs = false
-warn_redundant_casts = false
-warn_unused_ignores = false
-warn_no_return = false
+disallow_any_unimported = true
+no_implicit_optional = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 

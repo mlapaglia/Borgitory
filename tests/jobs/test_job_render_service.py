@@ -72,16 +72,6 @@ class TestJobRenderService:
         assert job_context["job"].id in html
         assert html != ""
 
-    def test_render_job_html_skips_jobs_without_uuid(self, mock_job_manager):
-        """Test that jobs without UUID are skipped"""
-        job_without_id = Mock()
-        job_without_id.id = None
-
-        service = JobRenderService(job_manager=mock_job_manager)
-        html = service._render_job_html(job_without_id)
-
-        assert html == ""
-
     def test_format_database_job_creates_context_with_uuid(self, mock_job_manager):
         """Test that database job formatting creates context with UUID"""
         job_context = create_mock_job_context(
@@ -192,7 +182,7 @@ class TestJobRenderServiceIntegration:
 
 
 class TestJobRenderServiceErrorHandling:
-    """Test error handling in JobRenderService"""  # type: ignore
+    """Test error handling in JobRenderService"""
 
     def test_handles_missing_repository_gracefully(self, mock_job_manager):
         """Test handling jobs with missing repository"""
@@ -438,7 +428,7 @@ class TestJobRenderServiceJobRetrieval:
 
         result = service.get_job_for_render("nonexistent", mock_db)
 
-        assert result is None
+        assert result == {}
 
     def test_get_job_for_render_error_handling(self, mock_job_manager):
         """Test error handling in job retrieval"""
@@ -449,7 +439,7 @@ class TestJobRenderServiceJobRetrieval:
 
         result = service.get_job_for_render("job-123", mock_db)
 
-        assert result is None
+        assert result == {}
 
 
 class TestJobRenderServiceManagerJobFormatting:
@@ -937,7 +927,7 @@ class TestJobRenderServiceEdgeCases:
         service = JobRenderService(job_manager=mock_job_manager)
         result = service._format_database_job_for_render(job)
 
-        assert result is None
+        assert result == {}
 
     def test_current_jobs_with_no_current_task(self, mock_job_manager):
         """Test current jobs rendering when get_current_task returns None"""

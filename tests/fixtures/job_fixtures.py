@@ -196,14 +196,12 @@ def mock_subprocess_process():
 
 
 def create_mock_job_context(
-    job_id: str = None,
+    job_id: str = "",
     status: str = "completed",
     job_type: str = "simple",
-    tasks: List = None,
+    tasks: List = [],
 ) -> dict:
     """Factory function to create mock job context for rendering tests."""
-    if job_id is None:
-        job_id = str(uuid.uuid4())
 
     mock_job = Mock()
     mock_job.id = job_id

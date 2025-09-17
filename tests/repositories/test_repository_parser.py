@@ -623,7 +623,7 @@ class TestRepositoryParserMetadata:
     async def test_get_repository_metadata_size_success(self, repository_parser):
         """Test successful size collection."""
         mock_result = Mock()
-        mock_result.returncode = 0
+        mock_result.return_code = 0
         mock_result.stdout = "1.5G\t/path/to/repo"
 
         repository_parser.command_runner.run_command = AsyncMock(
@@ -911,10 +911,12 @@ class TestRepositoryParserVerification:
                 {"BORG_PASSPHRASE": "wrong"},
             )
 
-            result = await repository_parser.verify_repository_access(test_repository)
+            result = await repository_parser.verify_repository_access(
+                test_repository, "wrong_passphrase"
+            )
 
-        assert result["accessible"] is False
-        assert result["error"] == "Incorrect passphrase"
+            assert result["accessible"] is False
+            assert result["error"] == "Incorrect passphrase"
         assert result["requires_passphrase"] is True
 
     @pytest.mark.asyncio
@@ -1034,7 +1036,9 @@ class TestRepositoryParserVerification:
                 {"BORG_PASSPHRASE": "test"},
             )
 
-            result = await repository_parser.verify_repository_access(test_repository)
+            result = await repository_parser.verify_repository_access(
+                test_repository, "valid_passphrase"
+            )
 
         assert result["accessible"] is False
         assert "timed out" in result["error"]

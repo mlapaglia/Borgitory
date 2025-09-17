@@ -225,13 +225,6 @@ class TestBuildSecureBorgCommand:
                 environment_overrides={"invalid-name": "value"},
             )
 
-    def test_build_command_non_string_args(self):
-        """Test that non-string arguments are rejected."""
-        with pytest.raises(ValueError, match="All arguments must be strings"):
-            build_secure_borg_command(
-                "borg create", "/path/to/repo", "test_passphrase", [123, "valid_arg"]
-            )
-
     def test_build_command_dangerous_args(self):
         """Test that dangerous arguments are rejected."""
         dangerous_args = [

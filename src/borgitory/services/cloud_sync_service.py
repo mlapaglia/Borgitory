@@ -170,13 +170,13 @@ class CloudSyncService:
                 )
 
         if config_update.name is not None:
-            config.name = config_update.name  # type: ignore
+            config.name = config_update.name
         if config_update.provider is not None:
-            config.provider = config_update.provider  # type: ignore
+            config.provider = config_update.provider
         if config_update.path_prefix is not None:
-            config.path_prefix = config_update.path_prefix  # type: ignore
+            config.path_prefix = config_update.path_prefix
         if config_update.enabled is not None:
-            config.enabled = config_update.enabled  # type: ignore
+            config.enabled = config_update.enabled
 
         if config_update.provider_config is not None:
             provider = (
@@ -198,9 +198,9 @@ class CloudSyncService:
                 config_update.provider_config, sensitive_fields
             )
 
-            config.provider_config = json.dumps(encrypted_config)  # type: ignore
+            config.provider_config = json.dumps(encrypted_config)
 
-        config.updated_at = datetime.now(UTC)  # type: ignore
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         self.db.refresh(config)
 
@@ -215,16 +215,16 @@ class CloudSyncService:
     def enable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
         """Enable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
-        config.enabled = True  # type: ignore
-        config.updated_at = datetime.now(UTC)  # type: ignore
+        config.enabled = True
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         return config
 
     def disable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
         """Disable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
-        config.enabled = False  # type: ignore
-        config.updated_at = datetime.now(UTC)  # type: ignore
+        config.enabled = False
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         return config
 

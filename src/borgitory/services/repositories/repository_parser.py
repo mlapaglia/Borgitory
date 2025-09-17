@@ -36,7 +36,7 @@ class RepositoryParser:
         self.command_runner = command_runner or SimpleCommandRunner()
         self.job_manager = job_manager
 
-    def parse_borg_config(self, repo_path: str) -> Dict[str, any]:
+    def parse_borg_config(self, repo_path: str) -> Dict[str, Any]:
         """Parse a Borg repository config file to determine encryption mode"""
         config_path = os.path.join(repo_path, "config")
 
@@ -175,10 +175,8 @@ class RepositoryParser:
                 "preview": f"Parse error: {str(e)}",
             }
 
-    async def start_repository_scan(self, scan_path: str = None) -> str:
+    async def start_repository_scan(self, scan_path: str = "/mnt") -> str:
         """Start an asynchronous repository scan and return job_id for tracking"""
-        if scan_path is None:
-            scan_path = "/mnt"
 
         logger.info(f"Starting repository scan in {scan_path}")
 
@@ -345,7 +343,7 @@ class RepositoryParser:
         logger.info(f"Found {len(repositories)} repositories total")
         return repositories
 
-    async def _get_repository_metadata(self, repo_path: str) -> Dict[str, any]:
+    async def _get_repository_metadata(self, repo_path: str) -> Dict[str, Any]:
         """Try to get additional metadata about a repository (size, last backup, etc.)"""
         metadata = {}
 
@@ -357,7 +355,7 @@ class RepositoryParser:
                     ["du", "-sh", repo_path],
                     timeout=10,  # Quick timeout
                 )
-                if result.returncode == 0:
+                if result.return_code == 0:
                     size_line = result.stdout.strip().split("\t")[0]
                     metadata["size"] = size_line
         except Exception as e:
@@ -389,8 +387,8 @@ class RepositoryParser:
         return metadata
 
     async def verify_repository_access(
-        self, repository: Repository, test_passphrase: str = None
-    ) -> Dict[str, any]:
+        self, repository: Repository, test_passphrase: str = ""
+    ) -> Dict[str, Any]:
         """Verify that we can access a repository with given credentials"""
         try:
             # Use the provided passphrase or the one stored in the repository
@@ -500,7 +498,7 @@ class RepositoryParser:
                 "requires_passphrase": True,
             }
 
-    async def scan_for_repositories(self, scan_path: str = None) -> List[Dict]:
+    async def scan_for_repositories(self, scan_path: str = "/mnt") -> List[Dict]:
         """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
         job_id = await self.start_repository_scan(scan_path)
 

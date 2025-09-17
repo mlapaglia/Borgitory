@@ -9,7 +9,6 @@ from cryptography.fernet import Fernet
 from passlib.context import CryptContext
 from sqlalchemy import (
     create_engine,
-    Column,
     Integer,
     String,
     DateTime,
@@ -17,7 +16,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
 )
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 from sqlalchemy.orm import sessionmaker, relationship
 
 from borgitory.config import DATABASE_URL, get_secret_key, DATA_DIR
@@ -53,11 +52,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class Repository(Base):
     __tablename__ = "repositories"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True, nullable=False)
-    path = Column(String, nullable=False)
-    encrypted_passphrase = Column(String, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    path: Mapped[str] = mapped_column(String, nullable=False)
+    encrypted_passphrase: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
 
     jobs = relationship(
         "Job", back_populates="repository", cascade="all, delete-orphan"
@@ -78,33 +79,41 @@ class Repository(Base):
 class Job(Base):
     __tablename__ = "jobs"
 
-    id = Column(
+    id: Mapped[str] = mapped_column(
         String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())
     )  # UUID as primary key
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
-    type = Column(String, nullable=False)  # backup, restore, list, etc.
-    status = Column(
+    repository_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("repositories.id"), nullable=False
+    )
+    type: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # backup, restore, list, etc.
+    status: Mapped[str] = mapped_column(
         String, nullable=False, default="pending"
     )  # pending, running, completed, failed
-    started_at = Column(DateTime, nullable=True)
-    finished_at = Column(DateTime, nullable=True)
-    log_output = Column(Text, nullable=True)
-    error = Column(Text, nullable=True)
-    container_id = Column(String, nullable=True)
-    cloud_sync_config_id = Column(
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    log_output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    container_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    cloud_sync_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("cloud_sync_configs.id"), nullable=True
     )
-    cleanup_config_id = Column(Integer, ForeignKey("cleanup_configs.id"), nullable=True)
-    check_config_id = Column(
+    cleanup_config_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cleanup_configs.id"), nullable=True
+    )
+    check_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("repository_check_configs.id"), nullable=True
     )
-    notification_config_id = Column(
+    notification_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("notification_configs.id"), nullable=True
     )
 
-    job_type = Column(String, nullable=False, default="simple")  # 'simple', 'composite'
-    total_tasks = Column(Integer, default=1)
-    completed_tasks = Column(Integer, default=0)
+    job_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="simple"
+    )  # 'simple', 'composite'
+    total_tasks: Mapped[int] = mapped_column(Integer, default=1)
+    completed_tasks: Mapped[int] = mapped_column(Integer, default=0)
 
     repository = relationship("Repository", back_populates="jobs")
     cloud_backup_config = relationship("CloudSyncConfig")
@@ -115,19 +124,25 @@ class Job(Base):
 class JobTask(Base):
     __tablename__ = "job_tasks"
 
-    id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(String, ForeignKey("jobs.id"), nullable=False)  # UUID foreign key
-    task_type = Column(String, nullable=False)  # 'backup', 'cloud_sync', 'verify', etc.
-    task_name = Column(String, nullable=False)
-    status = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    job_id: Mapped[str] = mapped_column(
+        String, ForeignKey("jobs.id"), nullable=False
+    )  # UUID foreign key
+    task_type: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # 'backup', 'cloud_sync', 'verify', etc.
+    task_name: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(
         String, nullable=False, default="pending"
     )  # 'pending', 'running', 'completed', 'failed', 'skipped'
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    output = Column(Text, nullable=True)
-    error = Column(Text, nullable=True)
-    return_code = Column(Integer, nullable=True)
-    task_order = Column(Integer, nullable=False)  # Order of execution within the job
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    return_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    task_order: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )  # Order of execution within the job
 
     job = relationship("Job", back_populates="tasks")
 
@@ -135,23 +150,29 @@ class JobTask(Base):
 class Schedule(Base):
     __tablename__ = "schedules"
 
-    id = Column(Integer, primary_key=True, index=True)
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
-    name = Column(String, nullable=False)
-    cron_expression = Column(String, nullable=False)
-    source_path = Column(String, nullable=False, default="/data")
-    enabled = Column(Boolean, default=True)
-    last_run = Column(DateTime, nullable=True)
-    next_run = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    cloud_sync_config_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    repository_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("repositories.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    cron_expression: Mapped[str] = mapped_column(String, nullable=False)
+    source_path: Mapped[str] = mapped_column(String, nullable=False, default="/data")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    cloud_sync_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("cloud_sync_configs.id"), nullable=True
     )
-    cleanup_config_id = Column(Integer, ForeignKey("cleanup_configs.id"), nullable=True)
-    check_config_id = Column(
+    cleanup_config_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cleanup_configs.id"), nullable=True
+    )
+    check_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("repository_check_configs.id"), nullable=True
     )
-    notification_config_id = Column(
+    notification_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("notification_configs.id"), nullable=True
     )
 
@@ -165,11 +186,15 @@ class Schedule(Base):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    last_login = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(
+        String, unique=True, index=True, nullable=False
+    )
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     sessions = relationship("UserSession", back_populates="user")
 
@@ -185,15 +210,23 @@ class User(Base):
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    session_token = Column(String, unique=True, index=True, nullable=False)
-    expires_at = Column(DateTime, nullable=False)
-    remember_me = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    last_activity = Column(DateTime, default=lambda: datetime.now(UTC))
-    user_agent = Column(String, nullable=True)
-    ip_address = Column(String, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    session_token: Mapped[str] = mapped_column(
+        String, unique=True, index=True, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    remember_me: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    last_activity: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    user_agent: Mapped[str | None] = mapped_column(String, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String, nullable=True)
 
     user = relationship("User", back_populates="sessions")
 
@@ -201,9 +234,9 @@ class UserSession(Base):
 class Setting(Base):
     __tablename__ = "settings"
 
-    key = Column(String, primary_key=True, index=True)
-    value = Column(String, nullable=False)
-    updated_at = Column(
+    key: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    value: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
@@ -211,27 +244,31 @@ class Setting(Base):
 class CleanupConfig(Base):
     __tablename__ = "cleanup_configs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    strategy = Column(String, nullable=False)  # "simple" or "advanced"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    strategy: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # "simple" or "advanced"
 
     # Simple strategy
-    keep_within_days = Column(Integer, nullable=True)
+    keep_within_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Advanced strategy
-    keep_daily = Column(Integer, nullable=True)
-    keep_weekly = Column(Integer, nullable=True)
-    keep_monthly = Column(Integer, nullable=True)
-    keep_yearly = Column(Integer, nullable=True)
+    keep_daily: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    keep_weekly: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    keep_monthly: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    keep_yearly: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Options
-    show_list = Column(Boolean, default=True)
-    show_stats = Column(Boolean, default=True)
-    save_space = Column(Boolean, default=False)
+    show_list: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_stats: Mapped[bool] = mapped_column(Boolean, default=True)
+    save_space: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
@@ -239,21 +276,23 @@ class CleanupConfig(Base):
 class NotificationConfig(Base):
     __tablename__ = "notification_configs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    provider = Column(String, nullable=False)  # "pushover"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String, nullable=False)  # "pushover"
 
     # Pushover-specific fields
-    encrypted_user_key = Column(String, nullable=True)
-    encrypted_app_token = Column(String, nullable=True)
+    encrypted_user_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    encrypted_app_token: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Notification settings
-    notify_on_success = Column(Boolean, default=True)
-    notify_on_failure = Column(Boolean, default=True)
+    notify_on_success: Mapped[bool] = mapped_column(Boolean, default=True)
+    notify_on_failure: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
@@ -266,6 +305,8 @@ class NotificationConfig(Base):
 
     def get_pushover_credentials(self) -> tuple[str, str]:
         """Decrypt and return Pushover credentials"""
+        if not self.encrypted_user_key or not self.encrypted_app_token:
+            raise ValueError("Pushover credentials not set")
         user_key = get_cipher_suite().decrypt(self.encrypted_user_key.encode()).decode()
         app_token = (
             get_cipher_suite().decrypt(self.encrypted_app_token.encode()).decode()
@@ -276,20 +317,24 @@ class NotificationConfig(Base):
 class CloudSyncConfig(Base):
     __tablename__ = "cloud_sync_configs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    provider = Column(String, nullable=False)  # "s3", "sftp", "azure", "gcp", etc.
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # "s3", "sftp", "azure", "gcp", etc.
 
     # JSON configuration field for provider-specific settings
-    provider_config = Column(
+    provider_config: Mapped[str] = mapped_column(
         Text, nullable=False
     )  # JSON field for provider configuration
 
     # Common fields
-    path_prefix = Column(String, default="", nullable=False)
-    enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(
+    path_prefix: Mapped[str] = mapped_column(String, default="", nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
@@ -297,31 +342,33 @@ class CloudSyncConfig(Base):
 class RepositoryCheckConfig(Base):
     __tablename__ = "repository_check_configs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    description = Column(String, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Check Type
-    check_type = Column(
+    check_type: Mapped[str] = mapped_column(
         String, nullable=False, default="full"
     )  # "full", "repository_only", "archives_only"
 
     # Verification Options
-    verify_data = Column(Boolean, default=False)
-    repair_mode = Column(Boolean, default=False)
-    save_space = Column(Boolean, default=False)
+    verify_data: Mapped[bool] = mapped_column(Boolean, default=False)
+    repair_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    save_space: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Advanced Options
-    max_duration = Column(Integer, nullable=True)  # seconds
-    archive_prefix = Column(String, nullable=True)
-    archive_glob = Column(String, nullable=True)
-    first_n_archives = Column(Integer, nullable=True)
-    last_n_archives = Column(Integer, nullable=True)
+    max_duration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # seconds
+    archive_prefix: Mapped[str | None] = mapped_column(String, nullable=True)
+    archive_glob: Mapped[str | None] = mapped_column(String, nullable=True)
+    first_n_archives: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_n_archives: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Metadata
-    enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 

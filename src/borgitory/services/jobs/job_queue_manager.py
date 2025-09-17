@@ -28,8 +28,8 @@ class QueuedJob:
     job_id: str
     job_type: str
     priority: JobPriority = JobPriority.NORMAL
-    queued_at: datetime = None
-    metadata: Dict[str, Any] = None
+    queued_at: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.queued_at is None:

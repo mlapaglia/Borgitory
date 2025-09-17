@@ -173,13 +173,10 @@ class RepositoryService:
             return RepositoryOperationResult(success=False, error_message=error_message)
 
     async def scan_repositories(
-        self, request: RepositoryScanRequest = None
+        self, request: RepositoryScanRequest
     ) -> RepositoryScanResult:
         """Scan for existing repositories."""
         try:
-            if request is None:
-                request = RepositoryScanRequest()
-
             available_repos = await self.borg_service.scan_for_repositories(
                 scan_path=request.scan_path
             )

@@ -29,7 +29,7 @@ class TestJobStreamService:
         # Mock the streaming method to return empty async generator
         async def mock_stream_generator():
             return
-            yield  # unreachable but needed for generator syntax
+            yield  # pragma: no cover
 
         self.mock_job_manager.stream_all_job_updates = Mock(
             return_value=mock_stream_generator()
@@ -108,8 +108,9 @@ class TestJobStreamService:
 
         # Mock streaming method to raise an exception
         async def mock_error_generator():
+            if False:  # Make it a generator without yielding
+                yield  # type: ignore[unreachable]
             raise RuntimeError("Test streaming error")
-            yield  # unreachable but needed for generator syntax
 
         self.mock_job_manager.stream_all_job_updates = Mock(
             return_value=mock_error_generator()
@@ -321,7 +322,7 @@ class TestJobStreamService:
         # Mock empty output stream
         async def mock_empty_generator():
             return
-            yield  # unreachable but needed for generator syntax
+            yield  # pragma: no cover
 
         self.mock_job_manager.stream_job_output = Mock(
             return_value=mock_empty_generator()

@@ -551,62 +551,44 @@ class TestRepositoryScanningComprehensive:
         self.borg_service = BorgService()
 
     @pytest.mark.asyncio
-    async def test_start_repository_scan_with_mounted_volumes(self):
-        """Test repository scan using mounted volumes."""
-        mock_volume_service = Mock()
-        mock_volume_service.get_mounted_volumes = AsyncMock(
-            return_value=["/mount1", "/mount2"]
-        )
-
+    async def test_start_repository_scan_with_specific_path(self):
+        """Test repository scan with specific path."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-456")
 
         # Using constructor-injected job manager instead of patching
         self.borg_service.job_manager = mock_job_manager
         with patch(
-            "borgitory.dependencies.get_volume_service",
-            return_value=mock_volume_service,
-        ), patch(
             "borgitory.utils.security.sanitize_path", side_effect=lambda x: x
         ), patch("os.path.exists", return_value=True), patch(
             "os.path.isdir", return_value=True
         ):
-            job_id = await self.borg_service.start_repository_scan()
+            job_id = await self.borg_service.start_repository_scan("/mnt")
 
             assert job_id == "scan-job-456"
-            mock_volume_service.get_mounted_volumes.assert_called_once()
             mock_job_manager.start_borg_command.assert_called_once()
 
-            # Verify command includes both mount points (may be transformed on Windows)
+            # Verify command includes the specified scan path (handle Windows path transformation)
             call_args = mock_job_manager.start_borg_command.call_args[0][0]
             command_str = " ".join(call_args)
-            # Check for either original paths or Windows-transformed paths
-            assert any(
-                mount in command_str for mount in ["/mount1", "C:\\mount1", "mount1"]
-            )
-            assert any(
-                mount in command_str for mount in ["/mount2", "C:\\mount2", "mount2"]
-            )
+            # Check for either Unix path or Windows-transformed path
+            assert any(path in command_str for path in ["/mnt", "C:\\mnt", "mnt"])
 
     @pytest.mark.asyncio
-    async def test_start_repository_scan_no_mounted_volumes(self):
-        """Test repository scan fallback when no mounted volumes."""
-        mock_volume_service = Mock()
-        mock_volume_service.get_mounted_volumes = AsyncMock(return_value=[])
-
+    async def test_start_repository_scan_fallback_path(self):
+        """Test repository scan fallback when path doesn't exist."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-789")
 
         # Using constructor-injected job manager instead of patching
         self.borg_service.job_manager = mock_job_manager
-        with patch(
-            "borgitory.dependencies.get_volume_service",
-            return_value=mock_volume_service,
+        with patch("os.path.exists", return_value=False), patch(
+            "os.path.isdir", return_value=False
         ):
-            job_id = await self.borg_service.start_repository_scan()
+            job_id = await self.borg_service.start_repository_scan("/nonexistent")
 
             assert job_id == "scan-job-789"
-            # Should fallback to /repos
+            # Should fallback to /repos when no valid paths exist
             call_args = mock_job_manager.start_borg_command.call_args[0][0]
             assert "/repos" in call_args
 
@@ -717,7 +699,7 @@ class TestRepositoryScanningComprehensive:
             side_effect=lambda x: mock_check_status(x),
         ), patch("asyncio.sleep", return_value=None):
             # Should timeout and return empty list
-            results = await self.borg_service.scan_for_repositories()
+            results = await self.borg_service.scan_for_repositories("/mnt")
 
             assert results == []
 
@@ -744,7 +726,7 @@ class TestRepositoryScanningComprehensive:
         ), patch.object(
             self.borg_service, "get_scan_results", return_value=[{"path": "/repo1"}]
         ), patch("asyncio.sleep", return_value=None):
-            results = await self.borg_service.scan_for_repositories()
+            results = await self.borg_service.scan_for_repositories("/mnt")
 
             assert len(results) == 1
             assert results[0]["path"] == "/repo1"

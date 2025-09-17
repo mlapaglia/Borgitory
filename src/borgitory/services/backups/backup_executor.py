@@ -41,7 +41,7 @@ class BackupConfig:
     source_paths: List[str]
     archive_name: Optional[str] = None
     compression: str = "zstd"
-    excludes: List[str] = None
+    excludes: Optional[List[str]] = None
     dry_run: bool = False
     show_stats: bool = True
     show_list: bool = True

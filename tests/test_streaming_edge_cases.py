@@ -333,9 +333,7 @@ class TestBackwardCompatibilityEdgeCases:
             # This tests the robustness of our line processing logic
             if empty_state:
                 for line in empty_state:
-                    if isinstance(line, dict):
-                        text = line.get("text", "") or ""  # Handle None values
-                    else:
-                        text = str(line)
+                    text = line.get("text", "") or ""  # Handle None values
+
                     # Should not raise exception and should be string
                     assert isinstance(text, str)

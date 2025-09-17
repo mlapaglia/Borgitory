@@ -21,7 +21,7 @@ class JobRenderService:
         self.templates = Jinja2Templates(directory=templates_dir)
         self.job_manager = job_manager
 
-    def render_jobs_html(self, db: Session, expand: str = None) -> str:
+    def render_jobs_html(self, db: Session, expand: str = "") -> str:
         """Render job history as HTML"""
         try:
             # Get recent jobs (last 20) with their tasks
@@ -41,10 +41,6 @@ class JobRenderService:
             html_content = '<div class="space-y-3">'
 
             for job in db_jobs:
-                # Only render jobs that have UUIDs
-                if job.id is None:
-                    continue
-
                 should_expand = expand and job.id == expand
                 html_content += self._render_job_html(job, expand_details=should_expand)
 
@@ -150,10 +146,6 @@ class JobRenderService:
     def _render_job_html(self, job: Job, expand_details: bool = False) -> str:
         """Render HTML for a single job (simple or composite)"""
         repository_name = job.repository.name if job.repository else "Unknown"
-
-        # Only process jobs that have UUIDs - skip legacy jobs without UUIDs
-        if job.id is None:
-            return ""  # Don't render jobs without UUIDs
 
         job_id = job.id
 
@@ -262,10 +254,10 @@ class JobRenderService:
                 return self._format_database_job_for_render(job)
 
             logger.info(f"Job {job_id} not found anywhere")
-            return None
+            return {}
         except Exception as e:
             logger.error(f"Error getting job for render: {e}")
-            return None
+            return {}
 
     def _format_database_job_for_render(self, job: Job) -> dict:
         """Format a database job for template rendering"""
@@ -352,7 +344,7 @@ class JobRenderService:
             }
         except Exception as e:
             logger.error(f"Error formatting database job {job.id}: {e}")
-            return None
+            return {}
 
     def _format_manager_job_for_render(self, manager_job, job_id, db_job=None):
         """Format a job manager job for template rendering"""

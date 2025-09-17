@@ -231,7 +231,7 @@ async def list_directories_autocomplete(
 
 @router.get("/import-form-update", response_class=HTMLResponse)
 async def update_import_form(
-    request: Request, borg_svc: BorgServiceDep, path: str = "", loading: str = ""
+    request: Request, borg_svc: BorgServiceDep, path: str, loading: str = ""
 ):
     """Update import form fields based on selected repository path"""
 
@@ -259,7 +259,7 @@ async def update_import_form(
         )
 
     try:
-        available_repos = await borg_svc.scan_for_repositories()
+        available_repos = await borg_svc.scan_for_repositories(path)
         selected_repo = None
 
         for repo in available_repos:
