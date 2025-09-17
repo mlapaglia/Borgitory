@@ -4,7 +4,7 @@ import logging
 import re
 import os
 from datetime import datetime, UTC
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from borgitory.models.database import Repository, Job
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -673,7 +673,7 @@ class BorgService:
             logger.error(f"Failed to start repository scan: {e}")
             raise Exception(f"Failed to start repository scan: {e}")
 
-    async def check_scan_status(self, job_id: str) -> Dict[str, any]:
+    async def check_scan_status(self, job_id: str) -> Dict[str, Any]:
         """Check status of repository scan job"""
         status = self._get_job_manager().get_job_status(job_id)
         if not status:
@@ -818,7 +818,7 @@ class BorgService:
                         f"Current output: {status['output'][-200:]}"
                     )  # Last 200 chars
 
-            if status["completed"]:
+            if status.get("completed"):
                 logger.info(f"Scan completed after {wait_time}s")
                 return await self.get_scan_results(job_id)
 

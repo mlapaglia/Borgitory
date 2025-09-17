@@ -1306,7 +1306,6 @@ class JobManager:
                 yield output
         else:
             return
-            yield
 
     def get_job(self, job_id: str) -> Optional[BorgJob]:
         """Get job by ID"""

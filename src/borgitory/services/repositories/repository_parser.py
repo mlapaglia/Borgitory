@@ -7,7 +7,7 @@ import configparser
 import logging
 import os
 from datetime import datetime, UTC
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from borgitory.models.database import Repository
 from borgitory.services.simple_command_runner import SimpleCommandRunner
@@ -233,7 +233,7 @@ class RepositoryParser:
             logger.error(f"Failed to start repository scan: {e}")
             raise
 
-    async def check_scan_status(self, job_id: str) -> Dict[str, any]:
+    async def check_scan_status(self, job_id: str) -> Dict[str, Any]:
         """Check the status of a running repository scan"""
         try:
             if not self.job_manager:
@@ -520,7 +520,7 @@ class RepositoryParser:
                         f"Current output: {status['output'][-200:]}"
                     )  # Last 200 chars
 
-            if status["completed"]:
+            if status.get("completed"):
                 logger.info(f"Scan completed after {wait_time}s")
                 return await self.get_scan_results(job_id)
 
