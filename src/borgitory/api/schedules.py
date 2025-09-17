@@ -74,13 +74,13 @@ async def create_schedule(
         name=schedule.name,
         repository_id=schedule.repository_id,
         cron_expression=schedule.cron_expression,
-        source_path=schedule.source_path,
+        source_path=schedule.source_path or "",
         cloud_sync_config_id=schedule.cloud_sync_config_id,
         cleanup_config_id=schedule.cleanup_config_id,
         notification_config_id=schedule.notification_config_id,
     )
 
-    if not success:
+    if not success or not created_schedule:
         return templates.TemplateResponse(
             request,
             "partials/schedules/create_error.html",
@@ -193,11 +193,10 @@ async def get_schedule_edit_form(
             raise HTTPException(status_code=404, detail="Schedule not found")
 
         form_data = config_service.get_schedule_form_data(db)
-        form_data["schedule"] = schedule
-        form_data["is_edit_mode"] = True
+        context = {**form_data, "schedule": schedule, "is_edit_mode": True}
 
         return templates.TemplateResponse(
-            request, "partials/schedules/edit_form.html", form_data
+            request, "partials/schedules/edit_form.html", context
         )
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Schedule not found: {str(e)}")
@@ -217,7 +216,7 @@ async def update_schedule(
         schedule_id, update_data
     )
 
-    if not success:
+    if not success or not updated_schedule:
         return templates.TemplateResponse(
             request,
             "partials/schedules/update_error.html",

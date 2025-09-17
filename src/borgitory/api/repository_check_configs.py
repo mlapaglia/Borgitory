@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 from borgitory.models.schemas import (
     RepositoryCheckConfigCreate,
     RepositoryCheckConfigUpdate,
+    RepositoryCheckConfig,
 )
 
 from borgitory.dependencies import TemplatesDep, RepositoryCheckConfigServiceDep
@@ -16,7 +17,7 @@ async def create_repository_check_config(
     config: RepositoryCheckConfigCreate,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
-):
+) -> HTMLResponse:
     """Create a new repository check configuration"""
     success, created_config, error_msg = service.create_config(
         name=config.name,
@@ -32,12 +33,12 @@ async def create_repository_check_config(
         last_n_archives=config.last_n_archives,
     )
 
-    if not success:
+    if not success or not created_config:
         return templates.TemplateResponse(
             request,
             "partials/repository_check/create_error.html",
             {"error_message": error_msg},
-            status_code=500 if "Failed to" in error_msg else 400,
+            status_code=500 if error_msg and "Failed to" in error_msg else 400,
         )
 
     response = templates.TemplateResponse(
@@ -50,7 +51,7 @@ async def create_repository_check_config(
 
 
 @router.get("/", response_class=HTMLResponse)
-def get_repository_check_configs(service: RepositoryCheckConfigServiceDep):
+def get_repository_check_configs(service: RepositoryCheckConfigServiceDep) -> list:
     """Get all repository check configurations"""
     return service.get_all_configs()
 
@@ -60,7 +61,7 @@ async def get_repository_check_form(
     request: Request,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
-):
+) -> HTMLResponse:
     """Get repository check form with all dropdowns populated"""
     form_data = service.get_form_data()
 
@@ -89,7 +90,7 @@ def get_repository_check_configs_html(
     request: Request,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
-):
+) -> HTMLResponse:
     """Get repository check configurations as HTML"""
     try:
         configs = service.get_all_configs()
@@ -113,7 +114,7 @@ def toggle_custom_options(
     request: Request,
     templates: TemplatesDep,
     check_config_id: str = "",
-):
+) -> HTMLResponse:
     """Toggle custom check options visibility based on policy selection"""
 
     show_custom = check_config_id == ""
@@ -134,7 +135,7 @@ def update_check_options(
     check_type: str = "full",
     max_duration: str = "",
     repair_mode: str = "",
-):
+) -> HTMLResponse:
     """Update check options based on check type selection"""
 
     if check_type == "repository_only":
@@ -171,7 +172,7 @@ def update_check_options(
 @router.get("/{config_id}", response_class=HTMLResponse)
 def get_repository_check_config(
     config_id: int, service: RepositoryCheckConfigServiceDep
-):
+) -> RepositoryCheckConfig:
     """Get a specific repository check configuration"""
     config = service.get_config_by_id(config_id)
     if not config:
@@ -211,17 +212,17 @@ async def update_repository_check_config(
     update_data: RepositoryCheckConfigUpdate,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
-):
+) -> HTMLResponse:
     """Update a repository check configuration"""
     update_dict = update_data.model_dump(exclude_unset=True)
     success, updated_config, error_msg = service.update_config(config_id, update_dict)
 
-    if not success:
+    if not success or not updated_config:
         return templates.TemplateResponse(
             request,
             "partials/repository_check/update_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 400,
+            status_code=404 if error_msg and "not found" in error_msg else 400,
         )
 
     response = templates.TemplateResponse(
@@ -238,13 +239,13 @@ def patch_repository_check_config(
     config_id: int,
     update_data: RepositoryCheckConfigUpdate,
     service: RepositoryCheckConfigServiceDep,
-):
+) -> RepositoryCheckConfig:
     """Update a repository check configuration (PATCH method for backwards compatibility)"""
     update_dict = update_data.model_dump(exclude_unset=True)
     success, updated_config, error_msg = service.update_config(config_id, update_dict)
 
     if not success:
-        if "not found" in error_msg:
+        if error_msg and "not found" in error_msg:
             raise HTTPException(status_code=404, detail=error_msg)
         else:
             raise HTTPException(status_code=400, detail=error_msg)
@@ -258,7 +259,7 @@ async def enable_repository_check_config(
     config_id: int,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
-):
+) -> HTMLResponse:
     """Enable a repository check configuration"""
     success, success_msg, error_msg = service.enable_config(config_id)
 
@@ -267,7 +268,7 @@ async def enable_repository_check_config(
             request,
             "partials/repository_check/action_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     response = templates.TemplateResponse(
@@ -285,7 +286,7 @@ async def disable_repository_check_config(
     config_id: int,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
-):
+) -> HTMLResponse:
     """Disable a repository check configuration"""
     success, success_msg, error_msg = service.disable_config(config_id)
 
@@ -294,7 +295,7 @@ async def disable_repository_check_config(
             request,
             "partials/repository_check/action_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     response = templates.TemplateResponse(
@@ -312,7 +313,7 @@ async def delete_repository_check_config(
     config_id: int,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
-):
+) -> HTMLResponse:
     """Delete a repository check configuration"""
     success, config_name, error_msg = service.delete_config(config_id)
 
@@ -321,7 +322,7 @@ async def delete_repository_check_config(
             request,
             "partials/repository_check/delete_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     response = templates.TemplateResponse(

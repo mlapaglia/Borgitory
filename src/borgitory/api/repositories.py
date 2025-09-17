@@ -9,7 +9,7 @@ from fastapi import (
     UploadFile,
     Request,
 )
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -60,7 +60,7 @@ async def create_repository(
     repo_svc: RepositoryServiceDep,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+) -> HTMLResponse:
     """Create a new repository - thin controller using business logic service."""
     # Convert to DTO
     create_request = CreateRepositoryRequest(
@@ -86,7 +86,9 @@ def list_repositories(
 
 
 @router.get("/scan")
-async def scan_repositories(request: Request, repo_svc: RepositoryServiceDep):
+async def scan_repositories(
+    request: Request, repo_svc: RepositoryServiceDep
+) -> HTMLResponse:
     """Scan for existing repositories - thin controller using business logic service."""
     # Create scan request
     scan_request = RepositoryScanRequest()
@@ -176,7 +178,7 @@ async def list_directories_autocomplete(
             break
 
     # Normalize the path with /mnt/ prefix
-    normalized_path = normalize_path_with_mnt_prefix(input_value)
+    normalized_path = normalize_path_with_mnt_prefix(str(input_value))
 
     # Parse the normalized path to get directory and search term
     dir_path, search_term = parse_path_for_autocomplete(normalized_path)
@@ -266,7 +268,7 @@ async def update_import_form(
         )
 
     try:
-        available_repos = await borg_svc.scan_for_repositories(path)
+        available_repos = await borg_svc.scan_for_repositories()
         selected_repo = None
 
         for repo in available_repos:
@@ -358,7 +360,7 @@ async def import_repository(
     passphrase: str = Form(...),
     keyfile: UploadFile = File(None),
     db: Session = Depends(get_db),
-):
+) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
     # Convert to DTO
     import_request = ImportRepositoryRequest(
@@ -412,7 +414,7 @@ async def delete_repository(
     repo_svc: RepositoryServiceDep,
     delete_borg_repo: bool = False,
     db: Session = Depends(get_db),
-) -> _TemplateResponse:
+) -> HTMLResponse:
     """Delete a repository - thin controller using business logic service."""
     # Convert to DTO
     delete_request = DeleteRepositoryRequest(
@@ -434,7 +436,7 @@ async def list_archives(
     repo_id: int,
     repo_svc: RepositoryServiceDep,
     db: Session = Depends(get_db),
-) -> _TemplateResponse:
+) -> HTMLResponse:
     """List repository archives - thin controller using business logic service."""
     # Call business service
     result = await repo_svc.list_archives(repo_id, db)
@@ -681,7 +683,7 @@ async def extract_file(
     file: str,
     borg_svc: BorgServiceDep,
     db: Session = Depends(get_db),
-) -> bytes:
+) -> StreamingResponse:
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")

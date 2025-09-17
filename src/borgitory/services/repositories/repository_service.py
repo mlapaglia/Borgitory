@@ -177,9 +177,7 @@ class RepositoryService:
     ) -> RepositoryScanResult:
         """Scan for existing repositories."""
         try:
-            available_repos = await self.borg_service.scan_for_repositories(
-                scan_path=request.scan_path
-            )
+            available_repos = await self.borg_service.scan_for_repositories()
 
             scanned_repos = []
             for repo in available_repos:
@@ -196,7 +194,6 @@ class RepositoryService:
             return RepositoryScanResult(
                 success=True,
                 repositories=scanned_repos,
-                scan_path=request.scan_path,
             )
 
         except Exception as e:

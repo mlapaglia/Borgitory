@@ -19,6 +19,7 @@ from unittest.mock import Mock, AsyncMock, patch, mock_open
 
 from borgitory.services.borg_service import BorgService
 from borgitory.models.database import Repository
+from borgitory.services.simple_command_runner import CommandResult
 
 
 class TestBorgServiceCore:
@@ -519,7 +520,7 @@ class TestExtractFileStream:
         with patch("borgitory.utils.security.validate_archive_name"):
             with pytest.raises(Exception) as exc_info:
                 await self.borg_service.extract_file_stream(
-                    self.mock_repository, "test-archive", None
+                    self.mock_repository, "test-archive", ""
                 )
 
             assert "File path is required" in str(exc_info.value)
@@ -541,195 +542,6 @@ class TestExtractFileStream:
                 phrase in str(exc_info.value)
                 for phrase in ["Security error", "Failed to extract file"]
             )
-
-
-class TestRepositoryScanningComprehensive:
-    """Comprehensive tests for repository scanning operations."""
-
-    def setup_method(self) -> None:
-        """Set up test fixtures."""
-        self.borg_service = BorgService()
-
-    @pytest.mark.asyncio
-    async def test_start_repository_scan_with_specific_path(self) -> None:
-        """Test repository scan with specific path."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-456")
-
-        # Using constructor-injected job manager instead of patching
-        self.borg_service.job_manager = mock_job_manager
-        with patch(
-            "borgitory.utils.security.sanitize_path", side_effect=lambda x: x
-        ), patch("os.path.exists", return_value=True), patch(
-            "os.path.isdir", return_value=True
-        ):
-            job_id = await self.borg_service.start_repository_scan("/mnt")
-
-            assert job_id == "scan-job-456"
-            mock_job_manager.start_borg_command.assert_called_once()
-
-            # Verify command includes the specified scan path (handle Windows path transformation)
-            call_args = mock_job_manager.start_borg_command.call_args[0][0]
-            command_str = " ".join(call_args)
-            # Check for either Unix path or Windows-transformed path
-            assert any(path in command_str for path in ["/mnt", "C:\\mnt", "mnt"])
-
-    @pytest.mark.asyncio
-    async def test_start_repository_scan_fallback_path(self) -> None:
-        """Test repository scan fallback when path doesn't exist."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-789")
-
-        # Using constructor-injected job manager instead of patching
-        self.borg_service.job_manager = mock_job_manager
-        with patch("os.path.exists", return_value=False), patch(
-            "os.path.isdir", return_value=False
-        ):
-            job_id = await self.borg_service.start_repository_scan("/nonexistent")
-
-            assert job_id == "scan-job-789"
-            # Should fallback to /repos when no valid paths exist
-            call_args = mock_job_manager.start_borg_command.call_args[0][0]
-            assert "/repos" in call_args
-
-    @pytest.mark.asyncio
-    async def test_start_repository_scan_invalid_paths(self) -> None:
-        """Test repository scan with invalid paths."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-invalid")
-
-        # Using constructor-injected job manager instead of patching
-        self.borg_service.job_manager = mock_job_manager
-        with patch(
-            "borgitory.utils.security.sanitize_path",
-            side_effect=ValueError("Dangerous path"),
-        ), patch("os.path.exists", return_value=False):
-            job_id = await self.borg_service.start_repository_scan("/invalid/path")
-
-            # Should fallback to /repos when all paths are invalid
-            assert job_id == "scan-job-invalid"
-            call_args = mock_job_manager.start_borg_command.call_args[0][0]
-            assert "/repos" in call_args
-
-    # test_check_scan_status_job_not_found removed - was failing due to DI issues
-
-    # test_check_scan_status_with_output removed - was failing due to DI issues
-
-    # test_check_scan_status_output_error removed - was failing due to DI issues
-
-    @pytest.mark.asyncio
-    async def test_get_scan_results_success(self) -> None:
-        """Test successful scan results retrieval."""
-        mock_job_manager = Mock()
-        mock_job_manager.get_job_status.return_value = {
-            "completed": True,
-            "return_code": 0,
-        }
-        mock_job_manager.get_job_output_stream = AsyncMock(
-            return_value={
-                "lines": [
-                    {"text": "/path/to/repo1"},
-                    {"text": "/path/to/repo2"},
-                    {"text": "invalid line"},  # Should be filtered out
-                    {"text": "/path/to/repo3"},
-                ]
-            }
-        )
-        mock_job_manager.cleanup_job = Mock()
-
-        # Using constructor-injected job manager instead of patching
-        self.borg_service.job_manager = mock_job_manager
-        with patch("os.path.isdir", return_value=True), patch.object(
-            self.borg_service, "_parse_borg_config"
-        ) as mock_parse:
-            # Mock parse results for each repository
-            mock_parse.side_effect = [
-                {
-                    "mode": "repokey",
-                    "requires_keyfile": False,
-                    "preview": "Encrypted (repokey)",
-                },
-                {
-                    "mode": "keyfile",
-                    "requires_keyfile": True,
-                    "preview": "Encrypted (keyfile)",
-                },
-                {"mode": "none", "requires_keyfile": False, "preview": "Unencrypted"},
-            ]
-
-            results = await self.borg_service.get_scan_results("test-job")
-
-            assert len(results) == 3
-            assert results[0]["path"] == "/path/to/repo1"
-            assert results[0]["encryption_mode"] == "repokey"
-            assert results[0]["requires_keyfile"] is False
-            assert results[1]["encryption_mode"] == "keyfile"
-            assert results[1]["requires_keyfile"] is True
-
-            mock_job_manager.cleanup_job.assert_called_once_with("test-job")
-
-    # test_get_scan_results_job_not_completed removed - was failing due to DI issues
-
-    # test_get_scan_results_job_failed removed - was failing due to DI issues
-
-    # test_get_scan_results_error_handling removed - was failing due to DI issues
-
-    @pytest.mark.asyncio
-    async def test_scan_for_repositories_legacy_timeout(self) -> None:
-        """Test legacy scan method timeout handling."""
-        mock_job_manager = Mock()
-        mock_job_manager.start_borg_command = AsyncMock(return_value="timeout-job")
-
-        def mock_check_status(job_id):
-            return {
-                "completed": False,
-                "running": True,
-                "status": "running",
-                "error": None,
-                "output": None,
-            }
-
-        # Using constructor-injected job manager instead of patching
-        self.borg_service.job_manager = mock_job_manager
-        with patch.object(
-            self.borg_service, "start_repository_scan", return_value="timeout-job"
-        ), patch.object(
-            self.borg_service,
-            "check_scan_status",
-            side_effect=lambda x: mock_check_status(x),
-        ), patch("asyncio.sleep", return_value=None):
-            # Should timeout and return empty list
-            results = await self.borg_service.scan_for_repositories("/mnt")
-
-            assert results == []
-
-    @pytest.mark.asyncio
-    async def test_scan_for_repositories_legacy_success(self) -> None:
-        """Test legacy scan method successful completion."""
-
-        def mock_check_status(job_id):
-            # Simulate completion after a few calls
-            if not hasattr(mock_check_status, "call_count"):
-                mock_check_status.call_count = 0
-            mock_check_status.call_count += 1
-
-            if mock_check_status.call_count >= 3:
-                return {"completed": True, "error": None, "output": "Scan completed"}
-            return {"completed": False, "error": None, "output": "Scanning..."}
-
-        with patch.object(
-            self.borg_service, "start_repository_scan", return_value="success-job"
-        ), patch.object(
-            self.borg_service,
-            "check_scan_status",
-            side_effect=lambda x: mock_check_status(x),
-        ), patch.object(
-            self.borg_service, "get_scan_results", return_value=[{"path": "/repo1"}]
-        ), patch("asyncio.sleep", return_value=None):
-            results = await self.borg_service.scan_for_repositories("/mnt")
-
-            assert len(results) == 1
-            assert results[0]["path"] == "/repo1"
 
 
 class TestSecurityIntegrationExtended:
@@ -939,3 +751,249 @@ key = résumé_ñoño
         match = self.borg_service.progress_pattern.match(space_path_line)
         assert match is not None
         assert match.group("path") == "/path with spaces/file name.txt"
+
+
+class TestBorgServiceRepositoryScanning:
+    """Test repository scanning functionality using SimpleCommandRunner."""
+
+    def setup_method(self) -> None:
+        """Set up test fixtures."""
+        # Create mock command runner
+        self.mock_command_runner = Mock()
+        self.mock_volume_service = Mock()
+
+        # Create BorgService with mocked dependencies
+        self.borg_service = BorgService(
+            command_runner=self.mock_command_runner,
+            volume_service=self.mock_volume_service,
+        )
+
+    @pytest.mark.asyncio
+    async def test_scan_for_repositories_success(self) -> None:
+        """Test successful repository scanning with multiple repositories found."""
+        # Mock the abstracted I/O methods
+        self.borg_service._get_mounted_volumes = AsyncMock(
+            return_value=["/mnt/backup1", "/mnt/backup2"]
+        )
+
+        # Mock path validation to return True for our test paths
+        self.borg_service._validate_scan_path = Mock(return_value=True)
+
+        # Mock repository path validation to return True for our test repo paths
+        def mock_is_valid_repo_path(path: str) -> bool:
+            return path in [
+                "/mnt/backup1/repo1",
+                "/mnt/backup2/repo2",
+                "/mnt/backup1/repo3",
+            ]
+
+        self.borg_service._is_valid_repository_path = Mock(
+            side_effect=mock_is_valid_repo_path
+        )
+
+        # Mock successful command execution
+        mock_result = CommandResult(
+            success=True,
+            return_code=0,
+            stdout="/mnt/backup1/repo1\n/mnt/backup2/repo2\n/mnt/backup1/repo3\n",
+            stderr="",
+            duration=2.5,
+        )
+        self.mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        # Mock the _parse_borg_config method to return encryption info
+        self.borg_service._parse_borg_config = Mock(
+            return_value={
+                "mode": "repokey",
+                "requires_keyfile": False,
+                "preview": "Repository config preview",
+            }
+        )
+
+        # Mock sanitize_path to return paths unchanged for testing
+        with patch(
+            "borgitory.services.borg_service.sanitize_path", side_effect=lambda x: x
+        ):
+            result = await self.borg_service.scan_for_repositories()
+
+            # Verify results
+            assert len(result) == 3
+            assert all(repo["detected"] for repo in result)
+            assert all(repo["encryption_mode"] == "repokey" for repo in result)
+            assert all(not repo["requires_keyfile"] for repo in result)
+
+            # Verify paths are the expected paths from our mock output
+            expected_paths = [
+                "/mnt/backup1/repo1",
+                "/mnt/backup2/repo2",
+                "/mnt/backup1/repo3",
+            ]
+            actual_paths = [repo["path"] for repo in result]
+            assert sorted(actual_paths) == sorted(expected_paths)
+
+            # Verify command was called correctly
+            self.mock_command_runner.run_command.assert_called_once()
+            call_args = self.mock_command_runner.run_command.call_args
+            command = call_args[0][0]  # First positional argument
+
+            assert command[0] == "find"
+            assert "/mnt/backup1" in command
+            assert "/mnt/backup2" in command
+            assert "-name" in command
+            assert "config" in command
+
+    @pytest.mark.asyncio
+    async def test_scan_for_repositories_no_mounted_volumes(self) -> None:
+        """Test scanning when no mounted volumes are found."""
+        # Mock the abstracted I/O methods
+        self.borg_service._get_mounted_volumes = AsyncMock(return_value=[])
+
+        # Mock successful command execution - no repos found
+        mock_result = CommandResult(
+            success=True,
+            return_code=0,
+            stdout="",  # No repositories found
+            stderr="",
+            duration=1.0,
+        )
+        self.mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        # Mock sanitize_path to return paths unchanged for testing
+        with patch(
+            "borgitory.services.borg_service.sanitize_path", side_effect=lambda x: x
+        ):
+            result = await self.borg_service.scan_for_repositories()
+
+            # Should return empty list since no repos found
+            assert result == []
+
+            # Should use /mnt as fallback when no mounted volumes
+            call_args = self.mock_command_runner.run_command.call_args
+            command = call_args[0][0]
+            assert "/mnt" in command
+
+    @pytest.mark.asyncio
+    async def test_scan_for_repositories_command_failure(self) -> None:
+        """Test handling of command execution failure."""
+        # Mock the abstracted I/O methods
+        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service._validate_scan_path = Mock(return_value=True)
+
+        # Mock failed command execution
+        mock_result = CommandResult(
+            success=False,
+            return_code=1,
+            stdout="",
+            stderr="find: permission denied",
+            duration=0.5,
+            error="find: permission denied",
+        )
+        self.mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        result = await self.borg_service.scan_for_repositories()
+
+        # Should return empty list on failure
+        assert result == []
+        self.mock_command_runner.run_command.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_scan_for_repositories_invalid_paths_filtered(self) -> None:
+        """Test that invalid repository paths are filtered out."""
+        # Mock the abstracted I/O methods
+        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+
+        # Mock path validation to return True (scan path exists)
+        self.borg_service._validate_scan_path = Mock(return_value=True)
+
+        # Mock repository path validation to return True only for valid paths
+        def mock_is_valid_repo_path(path: str) -> bool:
+            # Only absolute paths starting with "/" that are "valid" repos
+            return path in ["/valid/repo1", "/valid/repo2"]
+
+        self.borg_service._is_valid_repository_path = Mock(
+            side_effect=mock_is_valid_repo_path
+        )
+
+        # Mock command output with mix of valid and invalid paths
+        mock_result = CommandResult(
+            success=True,
+            return_code=0,
+            stdout="/valid/repo1\nrelative/path\n/valid/repo2\n/nonexistent/repo\n",
+            stderr="",
+            duration=1.5,
+        )
+        self.mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        # Mock _parse_borg_config
+        self.borg_service._parse_borg_config = Mock(
+            return_value={
+                "mode": "repokey",
+                "requires_keyfile": False,
+                "preview": "Valid repo config",
+            }
+        )
+
+        result = await self.borg_service.scan_for_repositories()
+
+        # Should only return valid absolute paths that exist as directories
+        assert len(result) == 2
+        paths = [repo["path"] for repo in result]
+        assert "/valid/repo1" in paths
+        assert "/valid/repo2" in paths
+        # Invalid paths should not be in results
+        assert not any("relative/path" in path for path in paths)
+        assert not any("/nonexistent/repo" in path for path in paths)
+
+    @pytest.mark.asyncio
+    async def test_scan_for_repositories_empty_output(self) -> None:
+        """Test handling of empty command output."""
+        # Mock the abstracted I/O methods
+        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service._validate_scan_path = Mock(return_value=True)
+
+        # Mock command with empty output (no repositories found)
+        mock_result = CommandResult(
+            success=True, return_code=0, stdout="", stderr="", duration=0.1
+        )
+        self.mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        result = await self.borg_service.scan_for_repositories()
+
+        # Should return empty list when no repositories found
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_scan_for_repositories_exception_handling(self) -> None:
+        """Test proper exception handling during scanning."""
+        # Mock the abstracted I/O methods
+        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service._validate_scan_path = Mock(return_value=True)
+
+        # Mock command runner to raise exception
+        self.mock_command_runner.run_command = AsyncMock(
+            side_effect=Exception("Command execution failed")
+        )
+
+        result = await self.borg_service.scan_for_repositories()
+
+        # Should return empty list on exception
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_scan_for_repositories_timeout_parameter(self) -> None:
+        """Test that correct timeout is passed to command runner."""
+        # Mock the abstracted I/O methods
+        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service._validate_scan_path = Mock(return_value=True)
+
+        # Mock successful command execution
+        mock_result = CommandResult(
+            success=True, return_code=0, stdout="", stderr="", duration=1.0
+        )
+        self.mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        await self.borg_service.scan_for_repositories()
+
+        # Verify timeout parameter was passed
+        call_args = self.mock_command_runner.run_command.call_args
+        assert call_args[1]["timeout"] == 300  # 5 minutes

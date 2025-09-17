@@ -4,6 +4,7 @@ RepositoryParser - Handles Borg repository discovery and parsing
 
 import asyncio
 import configparser
+import json
 import logging
 import os
 from datetime import datetime, UTC
@@ -466,8 +467,6 @@ class RepositoryParser:
 
                         try:
                             if output.strip():
-                                import json
-
                                 repo_info = json.loads(output)
                         except json.JSONDecodeError:
                             # Output might not be JSON, that's okay

@@ -4,9 +4,12 @@ import logging
 import re
 import os
 from datetime import datetime, UTC
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+from starlette.responses import StreamingResponse
 
 from borgitory.models.database import Repository, Job
+from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.jobs.job_manager import JobManager
@@ -27,7 +30,7 @@ class BorgService:
         job_executor: Optional[JobExecutor] = None,
         command_runner: Optional[SimpleCommandRunner] = None,
         job_manager: Optional[JobManager] = None,
-        volume_service=None,
+        volume_service: Optional[VolumeService] = None,
     ) -> None:
         self.job_executor = job_executor or JobExecutor()
         self.command_runner = command_runner or SimpleCommandRunner()
@@ -492,7 +495,7 @@ class BorgService:
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """List contents of a specific directory within an archive using FUSE mount"""
         # Use the archive manager which now uses FUSE mounting
         if not hasattr(self, "_archive_manager"):
@@ -506,7 +509,7 @@ class BorgService:
 
     async def extract_file_stream(
         self, repository: Repository, archive_name: str, file_path: str
-    ):
+    ) -> StreamingResponse:
         """Extract a single file from an archive and stream it to the client"""
         try:
             validate_archive_name(archive_name)
@@ -527,11 +530,6 @@ class BorgService:
 
             logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
-            # Import required classes for streaming response
-            from fastapi.responses import StreamingResponse
-            import asyncio
-            import os
-
             # Start the borg process
             process = await asyncio.create_subprocess_exec(
                 *command,
@@ -540,24 +538,22 @@ class BorgService:
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            async def generate_stream():
+            async def generate_stream() -> AsyncGenerator[bytes, None]:
                 """Generator function to stream the file content with automatic backpressure"""
                 try:
                     while True:
-                        # Read chunk from Borg process - this already yields control to event loop
+                        if process.stdout is None:
+                            break
                         chunk = await process.stdout.read(
                             65536
                         )  # 64KB chunks for efficiency
                         if not chunk:
                             break
 
-                        # Yield chunk to client - FastAPI/Starlette handles backpressure automatically
                         yield chunk
 
                 finally:
-                    # Ensure process cleanup happens regardless of early client disconnect
                     if process.returncode is None:
-                        # Process still running - terminate it
                         process.terminate()
                         try:
                             await asyncio.wait_for(process.wait(), timeout=5.0)
@@ -565,8 +561,7 @@ class BorgService:
                             process.kill()
                             await process.wait()
 
-                    # Check for errors if process completed normally
-                    if process.returncode != 0:
+                    if process.returncode != 0 and process.stderr:
                         stderr = await process.stderr.read()
                         error_msg = (
                             stderr.decode("utf-8") if stderr else "Unknown error"
@@ -574,10 +569,8 @@ class BorgService:
                         logger.error(f"Borg extract process failed: {error_msg}")
                         raise Exception(f"Borg extract failed: {error_msg}")
 
-            # Get filename for download header
             filename = os.path.basename(file_path)
 
-            # Return streaming response
             return StreamingResponse(
                 generate_stream(),
                 media_type="application/octet-stream",
@@ -587,145 +580,6 @@ class BorgService:
         except Exception as e:
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
             raise Exception(f"Failed to extract file: {str(e)}")
-
-    async def start_repository_scan(self, scan_path: str) -> str:
-        """Start repository scan and return job_id for tracking"""
-
-        scan_paths = [scan_path]
-        logger.info(f"Starting repository scan in specific path: {scan_path}")
-
-        # Build command to scan multiple paths
-        # Use find command to scan for Borg repositories - only check top-level subdirectories
-        # This scans /backups/repo-1/, /backups/repo-2/ but not deeper like /backups/repo-1/sub/deep/
-
-        # Start with base find command structure
-        command_parts = ["find"]
-
-        # Add all scan paths
-        for path in scan_paths:
-            try:
-                safe_scan_path = sanitize_path(path)
-                # Check if path exists before adding it
-                import os
-
-                if os.path.exists(safe_scan_path) and os.path.isdir(safe_scan_path):
-                    command_parts.append(safe_scan_path)
-            except Exception as e:
-                logger.warning(f"Skipping invalid scan path {path}: {e}")
-                continue
-
-        # If no valid paths found, use /repos as fallback
-        if len(command_parts) == 1:  # Only "find" command
-            logger.warning("No valid scan paths found, using /repos as fallback")
-            command_parts.append("/repos")
-
-        # Add find parameters
-        command_parts.extend(
-            [
-                "-mindepth",
-                "2",  # Start looking 2 levels deep (scan_path/repo_name/config)
-                "-maxdepth",
-                "2",  # Don't go deeper than 2 levels
-                "-name",
-                "config",
-                "-type",
-                "f",
-                "-exec",
-                "sh",
-                "-c",
-                'if head -20 "$1" 2>/dev/null | grep -q "\\[repository\\]"; then echo "$(dirname "$1")"; fi',
-                "_",
-                "{}",
-                ";",
-            ]
-        )
-
-        command = command_parts
-
-        try:
-            logger.info(f"Executing scan command: {' '.join(command)}")
-            job_id = await self._get_job_manager().start_borg_command(command, env={})
-            logger.info(f"Repository scan job {job_id} started")
-            return job_id
-
-        except Exception as e:
-            logger.error(f"Failed to start repository scan: {e}")
-            raise Exception(f"Failed to start repository scan: {e}")
-
-    async def check_scan_status(self, job_id: str) -> Dict[str, Any]:
-        """Check status of repository scan job"""
-        status = self._get_job_manager().get_job_status(job_id)
-        if not status:
-            return {"running": False, "completed": False, "error": "Job not found"}
-
-        # Get job output for error debugging
-        output = ""
-        try:
-            job_output = await self._get_job_manager().get_job_output_stream(job_id)
-            if "lines" in job_output:
-                output = "\n".join(
-                    [line["text"] for line in job_output["lines"][-20:]]
-                )  # Last 20 lines
-        except Exception as e:
-            logger.debug(f"Could not get job output for {job_id}: {e}")
-
-        return {
-            "running": status["running"],
-            "completed": status["completed"],
-            "status": status["status"],
-            "started_at": status["started_at"],
-            "completed_at": status["completed_at"],
-            "return_code": status["return_code"],
-            "error": status["error"],
-            "output": output if output else None,
-        }
-
-    async def get_scan_results(self, job_id: str) -> List[Dict]:
-        """Get results of completed repository scan"""
-        try:
-            status = self._get_job_manager().get_job_status(job_id)
-            if not status or not status["completed"]:
-                return []
-
-            if status["return_code"] != 0:
-                logger.error(
-                    f"Scan job {job_id} failed with return code {status['return_code']}"
-                )
-                return []
-
-            # Get the output
-            output = await self._get_job_manager().get_job_output_stream(job_id)
-
-            repo_paths = []
-            for line in output.get("lines", []):
-                line_text = line["text"].strip()
-                if (
-                    line_text
-                    and line_text.startswith("/")  # Must be an absolute path
-                    and os.path.isdir(line_text)
-                ):  # Must be a valid directory
-                    # Parse the Borg config file to get encryption info
-                    encryption_info = self._parse_borg_config(line_text)
-
-                    repo_paths.append(
-                        {
-                            "path": line_text,
-                            "id": f"repo_{hash(line_text)}",
-                            "encryption_mode": encryption_info["mode"],
-                            "requires_keyfile": encryption_info["requires_keyfile"],
-                            "detected": True,
-                            "config_preview": encryption_info["preview"],
-                        }
-                    )
-
-            # Clean up job after getting results
-            self._get_job_manager().cleanup_job(job_id)
-
-            return repo_paths
-
-        except Exception as e:
-            logger.error(f"Error getting scan results: {e}")
-            return []
 
     async def verify_repository_access(
         self, repo_path: str, passphrase: str, keyfile_path: str = ""
@@ -777,53 +631,115 @@ class BorgService:
             logger.error(f"Failed to verify repository access: {e}")
             return False
 
-    async def scan_for_repositories(self, scan_path: str) -> List[Dict]:
-        """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
-        job_id = await self.start_repository_scan(scan_path)
+    def _validate_scan_path(self, path: str) -> bool:
+        """Validate if a scan path exists and is a directory (abstracted for testing)"""
+        try:
+            safe_scan_path = sanitize_path(path)
+            return os.path.exists(safe_scan_path) and os.path.isdir(safe_scan_path)
+        except Exception:
+            return False
 
-        max_wait = 300
-        wait_time = 0
+    def _is_valid_repository_path(self, path: str) -> bool:
+        """Check if a path is a valid repository path (abstracted for testing)"""
+        return bool(
+            path
+            and path.startswith("/")  # Must be an absolute path
+            and os.path.isdir(path)  # Must be a valid directory
+        )
 
-        logger.info(f"Waiting for scan completion (max {max_wait}s)...")
-        while wait_time < max_wait:
-            status = await self.check_scan_status(job_id)
+    async def _get_mounted_volumes(self) -> List[str]:
+        """Get mounted volumes (abstracted for testing)"""
+        if self.volume_service:
+            return await self.volume_service.get_mounted_volumes()
+        else:
+            # Fallback: use direct import (for backward compatibility)
+            from borgitory.dependencies import get_volume_service
 
-            if wait_time % 10 == 0:
-                logger.info(
-                    f"Scan progress: {wait_time}s elapsed, status: {status.get('status', 'unknown')}"
-                )
-                if status.get("output"):
-                    logger.debug(
-                        f"Current output: {status['output'][-200:]}"
-                    )  # Last 200 chars
+            volume_service = get_volume_service()
+            return await volume_service.get_mounted_volumes()
 
-            if status.get("completed"):
-                logger.info(f"Scan completed after {wait_time}s")
-                return await self.get_scan_results(job_id)
+    async def scan_for_repositories(self) -> List[Dict]:
+        """Scan for Borg repositories using SimpleCommandRunner"""
+        logger.info("Starting repository scan")
 
-            if status.get("error"):
-                logger.error(f"Scan error: {status['error']}")
-                break
+        mounted_volumes = await self._get_mounted_volumes()
 
-            await asyncio.sleep(1)
-            wait_time += 1
+        if not mounted_volumes:
+            logger.warning("No mounted volumes found, falling back to /mnt")
+            scan_paths = ["/mnt"]
+        else:
+            scan_paths = mounted_volumes
 
-        final_status = await self.check_scan_status(job_id)
-        logger.error(f"Legacy scan timed out for job {job_id} after {max_wait}s")
-        logger.error(f"Final status: {final_status.get('status', 'unknown')}")
-        if final_status.get("output"):
-            logger.error(
-                f"Final output: {final_status['output'][-500:]}"
-            )  # Last 500 chars
-        if final_status.get("error"):
-            logger.error(f"Job error: {final_status['error']}")
+        logger.info(f"Scanning across {len(scan_paths)} mounted volumes: {scan_paths}")
+
+        # Build command to scan multiple paths
+        command_parts = ["find"]
+
+        # Add all valid scan paths
+        for path in scan_paths:
+            if self._validate_scan_path(path):
+                command_parts.append(sanitize_path(path))
+            else:
+                logger.warning(f"Skipping invalid scan path {path}")
+
+        # If no valid paths found, use /mnt as fallback
+        if len(command_parts) == 1:  # Only "find" command
+            logger.warning("No valid scan paths found, using /mnt as fallback")
+            command_parts.append("/mnt")
+
+        # Add find parameters
+        command_parts.extend(
+            [
+                "-mindepth",
+                "2",  # Start looking 2 levels deep (scan_path/repo_name/config)
+                "-maxdepth",
+                "2",  # Don't go deeper than 2 levels
+                "-name",
+                "config",
+                "-type",
+                "f",
+                "-exec",
+                "sh",
+                "-c",
+                'if head -20 "$1" 2>/dev/null | grep -q "\\[repository\\]"; then echo "$(dirname "$1")"; fi',
+                "_",
+                "{}",
+                ";",
+            ]
+        )
 
         try:
-            if final_status.get("running"):
-                logger.warning(
-                    f"Job {job_id} is still running after timeout - it may continue in background"
-                )
-        except Exception as cleanup_error:
-            logger.error(f"Error during cleanup: {cleanup_error}")
+            logger.info(f"Executing scan command: {' '.join(command_parts)}")
 
-        return []
+            # Execute the command directly and wait for result
+            result = await self.command_runner.run_command(command_parts, timeout=300)
+
+            if not result.success:
+                logger.error(f"Scan failed: {result.error}")
+                return []
+
+            # Process the output to find repositories
+            repo_paths = []
+            for line in result.stdout.splitlines():
+                line_text = line.strip()
+                if self._is_valid_repository_path(line_text):
+                    # Parse the Borg config file to get encryption info
+                    encryption_info = self._parse_borg_config(line_text)
+
+                    repo_paths.append(
+                        {
+                            "path": line_text,
+                            "id": f"repo_{hash(line_text)}",
+                            "encryption_mode": encryption_info["mode"],
+                            "requires_keyfile": encryption_info["requires_keyfile"],
+                            "detected": True,
+                            "config_preview": encryption_info["preview"],
+                        }
+                    )
+
+            logger.info(f"Scan completed, found {len(repo_paths)} repositories")
+            return repo_paths
+
+        except Exception as e:
+            logger.error(f"Failed to scan for repositories: {e}")
+            return []
