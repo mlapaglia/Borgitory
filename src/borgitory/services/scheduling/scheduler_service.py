@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, UTC
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -10,7 +10,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 from borgitory.config import DATABASE_URL
 from borgitory.models.database import Schedule
-from borgitory.models.schemas import BackupRequest
+from borgitory.models.schemas import BackupRequest, CompressionType
 from borgitory.models.enums import JobType
 from borgitory.utils.db_session import get_db_session
 from borgitory.services.jobs.job_service import JobService
@@ -22,14 +22,16 @@ _job_manager: Optional[JobManager] = None
 _job_service_factory = None
 
 
-def set_scheduler_dependencies(job_manager: JobManager, job_service_factory) -> None:
+def set_scheduler_dependencies(
+    job_manager: JobManager, job_service_factory: Any
+) -> None:
     """Set the dependencies for the scheduler context"""
     global _job_manager, _job_service_factory
     _job_manager = job_manager
     _job_service_factory = job_service_factory
 
 
-async def execute_scheduled_backup(schedule_id: int):
+async def execute_scheduled_backup(schedule_id: int) -> None:
     """Execute a scheduled backup using injected dependencies"""
     logger.info(
         f"SCHEDULER: execute_scheduled_backup called for schedule_id: {schedule_id}"
@@ -77,7 +79,7 @@ async def execute_scheduled_backup(schedule_id: int):
             backup_request = BackupRequest(
                 repository_id=repository.id,
                 source_path=schedule.source_path,
-                compression="zstd",
+                compression=CompressionType.ZSTD,
                 dry_run=False,
                 cleanup_config_id=schedule.cleanup_config_id,
                 check_config_id=schedule.check_config_id,
@@ -107,7 +109,9 @@ async def execute_scheduled_backup(schedule_id: int):
 
 class SchedulerService:
     def __init__(
-        self, job_manager: Optional[JobManager] = None, job_service_factory=None
+        self,
+        job_manager: Optional[JobManager] = None,
+        job_service_factory: Optional[JobService] = None,
     ) -> None:
         """
         Initialize the scheduler service with proper dependency injection.
@@ -159,10 +163,12 @@ class SchedulerService:
         self._running = False
         logger.info("APScheduler v3 stopped successfully")
 
-    def _handle_job_event(self, event) -> None:
+    def _handle_job_event(self, event: Any) -> None:
         """Handle job execution events"""
-        if event.exception:
+        if hasattr(event, "exception") and event.exception:
             logger.error(f"Job {event.job_id} failed: {event.exception}")
+        elif event.code == EVENT_JOB_ERROR:
+            logger.error(f"Job {event.job_id} failed")
         else:
             logger.info(f"Job {event.job_id} executed successfully")
 
@@ -274,7 +280,7 @@ class SchedulerService:
 
     async def update_schedule(
         self, schedule_id: int, schedule_name: str, cron_expression: str, enabled: bool
-    ):
+    ) -> None:
         """Update an existing scheduled backup job"""
         try:
             await self.remove_schedule(schedule_id)

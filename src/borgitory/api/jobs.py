@@ -1,6 +1,8 @@
 import logging
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from starlette.responses import StreamingResponse
 from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from borgitory.models.enums import JobType
 from borgitory.dependencies import JobServiceDep
@@ -25,7 +27,7 @@ async def create_backup(
     request: Request,
     job_svc: JobServiceDep,
     templates: TemplatesDep,
-):
+) -> HTMLResponse:
     """Start a backup job using JobService"""
 
     try:
@@ -63,7 +65,7 @@ async def create_prune_job(
     prune_request: PruneRequest,
     job_svc: JobServiceDep,
     templates: TemplatesDep,
-):
+) -> HTMLResponse:
     """Start an archive pruning job using JobService"""
 
     try:
@@ -100,7 +102,7 @@ async def create_check_job(
     check_request: CheckRequest,
     job_svc: JobServiceDep,
     templates: TemplatesDep,
-):
+) -> HTMLResponse:
     """Start a repository check job and return job_id for tracking"""
 
     try:
@@ -134,7 +136,7 @@ async def create_check_job(
 @router.get("/stream")
 async def stream_all_jobs(
     stream_svc: JobStreamServiceDep,
-):
+) -> StreamingResponse:
     """Stream real-time updates for all jobs via Server-Sent Events"""
     return await stream_svc.stream_all_jobs()
 
@@ -144,8 +146,8 @@ def list_jobs(
     job_svc: JobServiceDep,
     skip: int = 0,
     limit: int = 100,
-    type: str = None,
-):
+    type: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """List database job records (legacy jobs) and active JobManager jobs"""
     return job_svc.list_jobs(skip, limit, type)
 
@@ -154,14 +156,14 @@ def list_jobs(
 def get_jobs_html(
     render_svc: JobRenderServiceDep,
     job_svc: JobServiceDep,
-    expand: str = None,
-):
+    expand: str = "",
+) -> str:
     """Get job history as HTML"""
     return render_svc.render_jobs_html(job_svc.db, expand)
 
 
 @router.get("/current/html", response_class=HTMLResponse)
-def get_current_jobs_html(render_svc: JobRenderServiceDep):
+def get_current_jobs_html(render_svc: JobRenderServiceDep) -> HTMLResponse:
     """Get current running jobs as HTML"""
     html_content = render_svc.render_current_jobs_html()
     return HTMLResponse(content=html_content)
@@ -170,9 +172,8 @@ def get_current_jobs_html(render_svc: JobRenderServiceDep):
 @router.get("/current/stream")
 async def stream_current_jobs_html(
     render_svc: JobRenderServiceDep,
-):
+) -> StreamingResponse:
     """Stream current running jobs as HTML via Server-Sent Events"""
-    from fastapi.responses import StreamingResponse
 
     return StreamingResponse(
         render_svc.stream_current_jobs_html(),
@@ -190,7 +191,7 @@ async def stream_current_jobs_html(
 def get_job(
     job_id: str,
     job_svc: JobServiceDep,
-):
+) -> Dict[str, Any]:
     """Get job details - supports both database IDs and JobManager IDs"""
     job = job_svc.get_job(job_id)
     if job is None:
@@ -199,7 +200,7 @@ def get_job(
 
 
 @router.get("/{job_id}/status")
-async def get_job_status(job_id: str, job_svc: JobServiceDep):
+async def get_job_status(job_id: str, job_svc: JobServiceDep) -> Dict[str, Any]:
     """Get current job status and progress"""
     try:
         output = await job_svc.get_job_status(job_id)
@@ -218,7 +219,7 @@ async def get_job_output(
     job_id: str,
     job_svc: JobServiceDep,
     last_n_lines: int = 100,
-):
+) -> Dict[str, Any]:
     """Get job output lines"""
     try:
         output = await job_svc.get_job_output(job_id, last_n_lines)
@@ -236,7 +237,7 @@ async def get_job_output(
 async def stream_job_output(
     job_id: str,
     stream_svc: JobStreamServiceDep,
-):
+) -> StreamingResponse:
     """Stream real-time job output via Server-Sent Events"""
     return await stream_svc.stream_job_output(job_id)
 
@@ -249,7 +250,7 @@ async def toggle_job_details(
     templates: TemplatesDep,
     job_svc: JobServiceDep,
     expanded: str = "false",
-):
+) -> HTMLResponse:
     """Toggle job details visibility and return refreshed job item"""
     job = render_svc.get_job_for_render(job_id, job_svc.db)
     if not job:
@@ -271,7 +272,7 @@ async def get_job_details_static(
     render_svc: JobRenderServiceDep,
     templates: TemplatesDep,
     job_svc: JobServiceDep,
-):
+) -> HTMLResponse:
     """Get static job details (used when job completes)"""
     job = render_svc.get_job_for_render(job_id, job_svc.db)
     if not job:
@@ -291,7 +292,7 @@ async def toggle_task_details(
     templates: TemplatesDep,
     job_svc: JobServiceDep,
     expanded: str = "false",
-):
+) -> HTMLResponse:
     """Toggle task details visibility and return updated task item"""
     job = render_svc.get_job_for_render(job_id, job_svc.db)
     if not job:
@@ -330,7 +331,7 @@ async def toggle_task_details(
 
 
 @router.post("/{job_id}/copy-output")
-async def copy_job_output():
+async def copy_job_output() -> Dict[str, Any]:
     """Copy job output to clipboard (returns success message)"""
     return {"message": "Output copied to clipboard"}
 
@@ -340,13 +341,13 @@ async def stream_task_output(
     job_id: str,
     task_order: int,
     stream_svc: JobStreamServiceDep,
-):
+) -> StreamingResponse:
     """Stream real-time output for a specific task via Server-Sent Events"""
     return await stream_svc.stream_task_output(job_id, task_order)
 
 
 @router.post("/{job_id}/tasks/{task_order}/copy-output")
-async def copy_task_output():
+async def copy_task_output() -> Dict[str, Any]:
     """Copy task output to clipboard (returns success message)"""
     return {"message": "Task output copied to clipboard"}
 
@@ -355,7 +356,7 @@ async def copy_task_output():
 async def cancel_job(
     job_id: str,
     job_svc: JobServiceDep,
-):
+) -> Dict[str, Any]:
     """Cancel a running job"""
     success = await job_svc.cancel_job(job_id)
     if success:
@@ -366,7 +367,7 @@ async def cancel_job(
 @router.get("/manager/stats")
 def get_job_manager_stats(
     job_manager: JobManager = Depends(get_job_manager_dependency),
-):
+) -> Dict[str, Any]:
     """Get JobManager statistics"""
     jobs = job_manager.jobs
     running_jobs = [job for job in jobs.values() if job.status == "running"]
@@ -386,7 +387,7 @@ def get_job_manager_stats(
 @router.post("/manager/prune")
 def cleanup_completed_jobs(
     job_manager: JobManager = Depends(get_job_manager_dependency),
-):
+) -> Dict[str, Any]:
     """Clean up completed jobs from JobManager memory"""
     cleaned = 0
     jobs_to_remove = []
@@ -405,13 +406,13 @@ def cleanup_completed_jobs(
 @router.get("/queue/stats")
 def get_queue_stats(
     job_manager: JobManager = Depends(get_job_manager_dependency),
-):
+) -> Dict[str, Any]:
     """Get backup queue statistics"""
     return job_manager.get_queue_stats()
 
 
 @router.post("/migrate")
-def run_database_migration(job_svc: JobServiceDep):
+def run_database_migration(job_svc: JobServiceDep) -> Dict[str, Any]:
     """Manually trigger database migration for jobs table"""
     try:
         return job_svc.run_database_migration()

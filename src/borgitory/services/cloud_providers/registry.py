@@ -128,8 +128,9 @@ class ProviderRegistry:
     def get_all_provider_info(self) -> Dict[str, Dict[str, Any]]:
         """Get information for all registered providers."""
         return {
-            provider: self.get_provider_info(provider)
+            provider: info
             for provider in self.get_supported_providers()
+            if (info := self.get_provider_info(provider)) is not None
         }
 
     def is_provider_registered(self, provider: str) -> bool:
@@ -161,14 +162,14 @@ _registry = ProviderRegistry()
 
 def register_provider(
     name: str,
-    label: str = None,
-    description: str = None,
+    label: str = "",
+    description: str = "",
     supports_encryption: bool = True,
     supports_versioning: bool = False,
     requires_credentials: bool = True,
     rclone_mapping: Optional[RcloneMethodMapping] = None,
     **metadata_kwargs,
-) -> Callable:
+) -> Callable[[Type], Type]:
     """
     Decorator to register a provider.
 

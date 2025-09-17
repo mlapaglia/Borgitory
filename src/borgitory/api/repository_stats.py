@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
 import asyncio
+from typing import Dict, Any, AsyncGenerator
 
 from borgitory.models.database import get_db, Repository
 from borgitory.dependencies import RepositoryStatsServiceDep
@@ -14,7 +15,7 @@ templates = Jinja2Templates(directory="src/borgitory/templates")
 @router.get("/stats/selector")
 async def get_stats_repository_selector(
     request: Request, db: Session = Depends(get_db)
-):
+) -> HTMLResponse:
     """Get repository selector with repositories populated for statistics"""
     repositories = db.query(Repository).all()
 
@@ -26,7 +27,7 @@ async def get_stats_repository_selector(
 
 
 @router.get("/stats/loading")
-async def get_stats_loading(request: Request, repository_id: int = None):
+async def get_stats_loading(request: Request, repository_id: int = 0) -> HTMLResponse:
     """Get loading state for statistics with SSE connection"""
     return templates.TemplateResponse(
         request,
@@ -41,7 +42,7 @@ async def get_stats_content(
     stats_svc: RepositoryStatsServiceDep,
     repository_id: str = "",
     db: Session = Depends(get_db),
-):
+) -> HTMLResponse:
     """Get statistics content based on repository selection"""
     if not repository_id or repository_id == "":
         return templates.TemplateResponse(
@@ -63,7 +64,7 @@ async def get_repository_statistics(
     repository_id: int,
     stats_svc: RepositoryStatsServiceDep,
     db: Session = Depends(get_db),
-):
+) -> Dict[str, Any]:
     """Get comprehensive repository statistics"""
 
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
@@ -84,16 +85,16 @@ async def get_repository_statistics_progress(
     request: Request,
     stats_svc: RepositoryStatsServiceDep,
     db: Session = Depends(get_db),
-):
+) -> StreamingResponse:
     """Stream repository statistics generation progress via Server-Sent Events"""
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    async def generate_progress():
+    async def generate_progress() -> AsyncGenerator[str, None]:
         progress_queue = asyncio.Queue()
 
-        def progress_callback(message: str, percent: int = None) -> None:
+        def progress_callback(message: str, percent: int = 0) -> None:
             # Put progress data in queue (non-blocking)
             try:
                 progress_data = {"message": message, "percent": percent}
@@ -157,9 +158,8 @@ async def get_repository_statistics_html(
     request: Request,
     stats_svc: RepositoryStatsServiceDep,
     db: Session = Depends(get_db),
-):
+) -> HTMLResponse:
     """Get repository statistics as HTML partial"""
-    from fastapi.templating import Jinja2Templates
 
     templates = Jinja2Templates(directory="src/borgitory/templates")
 

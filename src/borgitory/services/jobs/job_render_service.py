@@ -1,5 +1,6 @@
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict, Any
+from typing import List
 from sqlalchemy.orm import Session, joinedload
 from fastapi.templating import Jinja2Templates
 
@@ -41,7 +42,7 @@ class JobRenderService:
             html_content = '<div class="space-y-3">'
 
             for job in db_jobs:
-                should_expand = expand and job.id == expand
+                should_expand = bool(expand and job.id == expand)
                 html_content += self._render_job_html(job, expand_details=should_expand)
 
             html_content += "</div>"
@@ -130,7 +131,7 @@ class JobRenderService:
                 message=f"Error loading current operations: {str(e)}", padding="4"
             )
 
-    def _is_child_of_composite_job(self, job_id: str, job) -> bool:
+    def _is_child_of_composite_job(self, job_id: str, job: Any) -> bool:
         """Check if a job is a child task of a composite job"""
         # Simple heuristic: if there are composite jobs running,
         # assume simple borg jobs are their children
@@ -222,7 +223,7 @@ class JobRenderService:
             expand_details=expand_details,
         )
 
-    def get_job_for_render(self, job_id: str, db: Session) -> dict:
+    def get_job_for_render(self, job_id: str, db: Session) -> Dict[str, Any]:
         """Get job data formatted for template rendering - prioritize database for completed jobs"""
         try:
             logger.info(f"Getting job {job_id} for rendering")
@@ -259,7 +260,7 @@ class JobRenderService:
             logger.error(f"Error getting job for render: {e}")
             return {}
 
-    def _format_database_job_for_render(self, job: Job) -> dict:
+    def _format_database_job_for_render(self, job: Job) -> Dict[str, Any]:
         """Format a database job for template rendering"""
         try:
             repository_name = job.repository.name if job.repository else "Unknown"
@@ -346,7 +347,9 @@ class JobRenderService:
             logger.error(f"Error formatting database job {job.id}: {e}")
             return {}
 
-    def _format_manager_job_for_render(self, manager_job, job_id, db_job=None):
+    def _format_manager_job_for_render(
+        self, manager_job: Any, job_id: str, db_job: Any = None
+    ) -> Dict[str, Any]:
         """Format a job manager job for template rendering"""
         try:
             # Use database job data if available, otherwise create from manager job
@@ -485,7 +488,7 @@ class JobRenderService:
             logger.error(f"Error formatting manager job {job_id}: {e}")
             return None
 
-    def _fix_task_statuses_for_failed_job(self, sorted_tasks):
+    def _fix_task_statuses_for_failed_job(self, sorted_tasks: List[Any]) -> List[Any]:
         """
         Fix task statuses for failed jobs to ensure proper display.
 
