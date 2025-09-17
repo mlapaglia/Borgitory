@@ -2,7 +2,7 @@ import inspect
 import json
 import logging
 from datetime import datetime, UTC
-from typing import List
+from typing import List, Dict, Any, Callable
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -70,8 +70,8 @@ class CloudSyncService:
         rclone_service: RcloneService,
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
-        get_metadata_func,
-    ) -> None:
+        get_metadata_func: Callable,
+    ):
         self.db = db
         self._rclone_service = rclone_service
         self._storage_factory = storage_factory
@@ -232,9 +232,9 @@ class CloudSyncService:
         self,
         config_id: int,
         rclone: RcloneService,
-        encryption_service=None,
-        storage_factory=None,
-    ) -> dict:
+        encryption_service: EncryptionService,
+        storage_factory: StorageFactory,
+    ) -> Dict[str, Any]:
         """Test a cloud sync configuration using dynamic provider registry."""
         logger.info(f"Starting test for cloud sync config {config_id}")
 
@@ -244,11 +244,6 @@ class CloudSyncService:
         )
 
         provider_config = json.loads(str(config.provider_config))
-
-        if encryption_service is None:
-            encryption_service = self._encryption_service
-        if storage_factory is None:
-            storage_factory = self._storage_factory
 
         sensitive_fields = _get_sensitive_fields_for_provider(str(config.provider))
 
@@ -328,8 +323,11 @@ class CloudSyncService:
             raise
 
     def get_decrypted_config_for_editing(
-        self, config_id: int, encryption_service, storage_factory
-    ) -> dict:
+        self,
+        config_id: int,
+        encryption_service: EncryptionService,
+        storage_factory: StorageFactory,
+    ) -> Dict[str, Any]:
         """Get decrypted configuration for editing in forms."""
         config = self.get_cloud_sync_config_by_id(config_id)
 
