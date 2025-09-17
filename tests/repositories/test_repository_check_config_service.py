@@ -3,10 +3,10 @@ Tests for RepositoryCheckConfigService - Business logic tests
 """
 
 import pytest
-from services.repositories.repository_check_config_service import (
+from borgitory.services.repositories.repository_check_config_service import (
     RepositoryCheckConfigService,
 )
-from models.database import RepositoryCheckConfig, Repository
+from borgitory.models.database import RepositoryCheckConfig, Repository
 
 
 @pytest.fixture

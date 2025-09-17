@@ -322,6 +322,12 @@ docker logs <container-id>
 
 1. Fork the repository
 2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+3. Run lint (`python lint.py all`)
+4. Run tests (`pytest`)
+5. Commit changes (`git commit -m 'Add amazing feature'`)
+6. Push to branch (`git push origin feature/amazing-feature`)
+7. Open Pull Request
+
+### Adding additional cloud destinations
+
+- Refer to [CLOUD_PROVIDERS.md](https://github.com/mlapaglia/borgitory/blob/main/CLOUD_PROVIDERS.md) for adding additional cloud destinations.

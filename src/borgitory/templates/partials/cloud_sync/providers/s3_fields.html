@@ -1,0 +1,32 @@
+<!-- S3 Fields -->
+<div id="s3-fields">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bucket Name</label>
+        <input type="text" name="provider_config[bucket_name]" placeholder="my-backup-bucket" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Access Key ID</label>
+        <input type="text" name="provider_config[access_key]" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Secret Access Key</label>
+        <input type="password" name="provider_config[secret_key]" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Region (optional)</label>
+        <input type="text" name="provider_config[region]" value="us-east-1" placeholder="us-east-1" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Storage Class (optional)</label>
+        <select name="provider_config[storage_class]" class="select-modern mt-1">
+            <option value="STANDARD">Standard</option>
+            <option value="STANDARD_IA">Standard-IA</option>
+            <option value="GLACIER">Glacier</option>
+            <option value="DEEP_ARCHIVE">Deep Archive</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
+        <input type="text" name="path_prefix" placeholder="backups/borgitory" class="input-modern mt-1">
+    </div>
+</div>

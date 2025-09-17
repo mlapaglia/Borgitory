@@ -1,0 +1,42 @@
+<!-- Add New Cloud Sync -->
+<div class="border dark:border-gray-600 rounded-lg p-4">
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Add Cloud Sync Location</h3>
+    <form 
+        hx-post="/api/cloud-sync/" 
+        hx-target="#cloud-sync-status"
+        class="space-y-4"
+        id="cloud-sync-form"
+    >
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
+            <input type="text" name="name" required placeholder="My Sync Location" class="input-modern mt-1">
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Provider Type</label>
+            <select 
+                name="provider" 
+                id="provider-select" 
+                class="select-modern w-full"
+                hx-get="/api/cloud-sync/provider-fields"
+                hx-target="#provider-fields-container"
+                hx-trigger="change"
+                hx-swap="innerHTML"
+                hx-include="this">
+                <option value="">Select Provider Type</option>
+                {% for provider in supported_providers %}
+                <option value="{{ provider.value }}">{{ provider.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Dynamic Provider Fields Container -->
+        <div 
+            id="provider-fields-container"
+            hx-get="/api/cloud-sync/provider-fields"
+            hx-trigger="load"
+            hx-swap="innerHTML">
+        </div>
+    </form>
+    <div id="cloud-sync-status" class="mt-4"></div>
+</div>

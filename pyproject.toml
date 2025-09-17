@@ -35,7 +35,7 @@ dependencies = [
     "jinja2>=3.1.4",
     "passlib[bcrypt]>=1.7.4",
     "pydantic>=2.9.0",
-    "pyfuse3>=3.4.0",
+    "pyfuse3>=3.4.0; sys_platform != 'win32'",
     "python-dotenv>=1.0.1",
     "python-multipart>=0.0.12",
     "sqlalchemy>=2.0.35",
@@ -50,6 +50,11 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "httpx>=0.25.0",
+    "mypy>=1.8.0",
+    "sqlalchemy[mypy]>=2.0.35",
+    "types-passlib>=1.7.7.20240327",
+    "types-python-dateutil>=2.8.19.20240106",
+    "types-aiofiles>=23.2.0.20240106",
 ]
 
 [project.urls]
@@ -58,7 +63,7 @@ Repository = "https://github.com/mlapaglia/Borgitory"
 Issues = "https://github.com/mlapaglia/Borgitory/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["src/borgitory"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
@@ -140,3 +145,98 @@ asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: marks tests as integration tests (may require external dependencies)",
 ]
+
+[tool.coverage.run]
+source = ["src/borgitory"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/alembic/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.mypy]
+python_version = "3.11"
+show_error_codes = true
+show_column_numbers = true
+
+warn_return_any = false
+warn_unused_configs = false
+check_untyped_defs = false
+no_implicit_optional = false
+warn_redundant_casts = false
+warn_unused_ignores = false
+warn_no_return = false
+warn_unreachable = false
+strict_equality = false
+
+disallow_any_unimported = false
+disallow_any_expr = false
+disallow_any_decorated = false
+disallow_any_explicit = false
+disallow_any_generics = false
+disallow_subclassing_any = false
+
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+
+disable_error_code = [
+    "assignment",
+    "return-value", 
+    "arg-type",
+    "no-any-return",
+    "var-annotated",
+    "misc",
+    "valid-type",
+    "call-arg",
+    "index",
+    "dict-item",
+    "operator",
+    "annotation-unchecked",
+    "union-attr",
+    "attr-defined",
+]
+
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+
+exclude = [
+    "^alembic/",
+    "^htmlcov/",
+    "^\\.",
+]
+
+files = ["src/borgitory", "tests"]
+
+[[tool.mypy.overrides]]
+module = [
+    "sqlalchemy.*",
+    "alembic.*",
+    "passlib.*",
+    "bcrypt.*",
+    "cryptography.*",
+    "docker.*",
+    "aiofiles.*",
+    "aiohttp.*",
+    "apscheduler.*",
+    "cron_descriptor.*",
+    "pyfuse3.*",
+    "sse_starlette.*",
+]
+ignore_missing_imports = true
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+pythonVersion = "3.11"
+pythonPlatform = "All"

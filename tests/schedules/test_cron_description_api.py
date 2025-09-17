@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
-from main import app
+from borgitory.main import app
 
 
 class TestCronDescriptionAPI:
@@ -166,7 +166,7 @@ class TestCronDescriptionAPI:
                 )  # Valid or empty
 
     @patch(
-        "services.cron_description_service.CronDescriptionService.get_human_description"
+        "borgitory.services.cron_description_service.CronDescriptionService.get_human_description"
     )
     def test_service_integration(self, mock_service, client):
         """Test that the endpoint properly integrates with the service."""
@@ -185,7 +185,7 @@ class TestCronDescriptionAPI:
         assert "Mocked description" in response.text
 
     @patch(
-        "services.cron_description_service.CronDescriptionService.get_human_description"
+        "borgitory.services.cron_description_service.CronDescriptionService.get_human_description"
     )
     def test_service_error_handling(self, mock_service, client):
         """Test that service errors are properly handled."""

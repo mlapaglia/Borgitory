@@ -1,0 +1,32 @@
+<!-- S3 Fields for Editing -->
+<div id="s3-fields">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bucket Name</label>
+        <input type="text" name="provider_config[bucket_name]" value="{{ config.bucket_name or '' }}" placeholder="my-backup-bucket" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Access Key ID</label>
+        <input type="text" name="provider_config[access_key]" value="{{ config.access_key or '' }}" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">AWS Secret Access Key</label>
+        <input type="password" name="provider_config[secret_key]" value="{{ config.secret_key or '' }}" placeholder="Current value will be used if left empty" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Region (optional)</label>
+        <input type="text" name="provider_config[region]" value="{{ config.region or 'us-east-1' }}" placeholder="us-east-1" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Storage Class (optional)</label>
+        <select name="provider_config[storage_class]" class="select-modern mt-1">
+            <option value="STANDARD" {% if config.storage_class == 'STANDARD' %}selected{% endif %}>Standard</option>
+            <option value="STANDARD_IA" {% if config.storage_class == 'STANDARD_IA' %}selected{% endif %}>Standard-IA</option>
+            <option value="GLACIER" {% if config.storage_class == 'GLACIER' %}selected{% endif %}>Glacier</option>
+            <option value="DEEP_ARCHIVE" {% if config.storage_class == 'DEEP_ARCHIVE' %}selected{% endif %}>Deep Archive</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
+        <input type="text" name="path_prefix" value="{{ config.path_prefix or '' }}" placeholder="backups/borgitory" class="input-modern mt-1">
+    </div>
+</div>

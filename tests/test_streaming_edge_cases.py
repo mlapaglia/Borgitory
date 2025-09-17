@@ -7,7 +7,7 @@ import uuid
 from unittest.mock import Mock, patch, AsyncMock
 import asyncio
 
-from services.jobs.job_stream_service import JobStreamService
+from borgitory.services.jobs.job_stream_service import JobStreamService
 
 
 class TestStreamingErrorHandling:
@@ -37,7 +37,7 @@ class TestStreamingErrorHandling:
         mock_job_manager.jobs = {}
 
         # Should fall back to database lookup
-        with patch("models.database.SessionLocal") as mock_session_local:
+        with patch("borgitory.models.database.SessionLocal") as mock_session_local:
             mock_session = Mock()
             mock_session_local.return_value = mock_session
             mock_session.query().filter().first.return_value = (
@@ -151,7 +151,7 @@ class TestStreamingErrorHandling:
         # Job not found in manager, should try database
         mock_job_manager.jobs = {}
 
-        with patch("models.database.SessionLocal") as mock_session_local:
+        with patch("borgitory.models.database.SessionLocal") as mock_session_local:
             mock_session_local.side_effect = Exception("Database connection failed")
 
             events = []

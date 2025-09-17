@@ -1,0 +1,38 @@
+<!-- SFTP Fields -->
+<div id="sftp-fields">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Host</label>
+        <input type="text" name="provider_config[host]" placeholder="sftp.example.com" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Port</label>
+        <input type="number" name="provider_config[port]" value="22" placeholder="22" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Username</label>
+        <input type="text" name="provider_config[username]" placeholder="backup-user" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Remote Path</label>
+        <input type="text" name="provider_config[remote_path]" placeholder="/backups" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Password (optional if using private key)</label>
+        <input type="password" name="provider_config[password]" placeholder="Leave empty if using private key" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Private Key (optional if using password)</label>
+        <textarea name="provider_config[private_key]" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" rows="6" class="input-modern mt-1"></textarea>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Host Key Checking</label>
+        <select name="provider_config[host_key_checking]" class="select-modern mt-1">
+            <option value="true">Enabled (Recommended)</option>
+            <option value="false">Disabled</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
+        <input type="text" name="path_prefix" placeholder="backups/borgitory" class="input-modern mt-1">
+    </div>
+</div>

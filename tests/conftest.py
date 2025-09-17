@@ -4,7 +4,6 @@ Test configuration and fixtures
 
 import asyncio
 import os
-import sys
 from typing import AsyncGenerator, Generator
 from unittest.mock import Mock
 
@@ -15,17 +14,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Add src directory to Python path for tests
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
-
 # Set SECRET_KEY before importing the app to avoid RuntimeError
 if not os.getenv("SECRET_KEY"):
     os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
 
-from main import app
-from models.database import Base, get_db
+from borgitory.main import app
+from borgitory.models.database import Base, get_db, CloudSyncConfig
 
-# Import all models to ensure they're registered with Base
 # Import job fixtures to make them available to all tests - noqa prevents removal
 from tests.fixtures.job_fixtures import (  # noqa: F401
     mock_job_manager,
@@ -39,6 +34,15 @@ from tests.fixtures.job_fixtures import (  # noqa: F401
     mock_event_broadcaster,
     mock_job_dependencies,
     mock_subprocess_process,
+)
+
+# Import registry fixtures to make them available to all tests
+from tests.fixtures.registry_fixtures import (  # noqa: F401
+    production_registry,
+    clean_registry,
+    s3_only_registry,
+    sftp_only_registry,
+    smb_only_registry,
 )
 
 
@@ -152,3 +156,88 @@ def sample_s3_config():
         "access_key_id": "AKIAIOSFODNN7EXAMPLE",
         "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
     }
+
+
+def create_cloud_sync_config_with_json(
+    name: str,
+    provider: str,
+    provider_config: dict,
+    enabled: bool = True,
+    path_prefix: str = "",
+    **kwargs,
+) -> CloudSyncConfig:
+    """Helper function to create CloudSyncConfig with JSON provider_config.
+
+    Args:
+        name: Config name
+        provider: Provider type (s3, sftp, etc.)
+        provider_config: Dictionary of provider-specific configuration
+        enabled: Whether config is enabled
+        path_prefix: Path prefix for backups
+        **kwargs: Additional fields for CloudSyncConfig
+
+    Returns:
+        CloudSyncConfig instance with proper JSON configuration
+    """
+    import json
+
+    return CloudSyncConfig(
+        name=name,
+        provider=provider,
+        provider_config=json.dumps(provider_config),
+        enabled=enabled,
+        path_prefix=path_prefix,
+        **kwargs,
+    )
+
+
+def create_s3_cloud_sync_config(
+    name: str = "test-s3",
+    bucket_name: str = "test-bucket",
+    access_key: str = "test_access_key",
+    secret_key: str = "test_secret_key",
+    enabled: bool = True,
+    **kwargs,
+) -> CloudSyncConfig:
+    """Helper to create S3 CloudSyncConfig with proper JSON structure."""
+    s3_config = {
+        "bucket_name": bucket_name,
+        "access_key": access_key,
+        "secret_key": secret_key,
+    }
+    return create_cloud_sync_config_with_json(
+        name=name, provider="s3", provider_config=s3_config, enabled=enabled, **kwargs
+    )
+
+
+def create_sftp_cloud_sync_config(
+    name: str = "test-sftp",
+    host: str = "sftp.example.com",
+    port: int = 22,
+    username: str = "testuser",
+    password: str = None,
+    private_key: str = None,
+    remote_path: str = "/backups",
+    enabled: bool = True,
+    **kwargs,
+) -> CloudSyncConfig:
+    """Helper to create SFTP CloudSyncConfig with proper JSON structure."""
+    sftp_config = {
+        "host": host,
+        "port": port,
+        "username": username,
+        "remote_path": remote_path,
+    }
+
+    if password:
+        sftp_config["password"] = password
+    if private_key:
+        sftp_config["private_key"] = private_key
+
+    return create_cloud_sync_config_with_json(
+        name=name,
+        provider="sftp",
+        provider_config=sftp_config,
+        enabled=enabled,
+        **kwargs,
+    )

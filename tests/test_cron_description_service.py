@@ -1,6 +1,6 @@
 """Tests for CronDescriptionService."""
 
-from services.cron_description_service import CronDescriptionService
+from borgitory.services.cron_description_service import CronDescriptionService
 
 
 class TestCronDescriptionService:

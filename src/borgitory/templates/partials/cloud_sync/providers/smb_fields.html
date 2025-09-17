@@ -1,0 +1,74 @@
+<!-- SMB Fields -->
+<div id="smb-fields">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">SMB Server Host</label>
+        <input type="text" name="provider_config[host]" placeholder="server.example.com" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Share Name</label>
+        <input type="text" name="provider_config[share_name]" placeholder="backup-share" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Username</label>
+        <input type="text" name="provider_config[user]" value="guest" placeholder="guest" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Password (optional)</label>
+        <input type="password" name="provider_config[pass]" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Port</label>
+        <input type="number" name="provider_config[port]" value="445" placeholder="445" min="1" max="65535" class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Domain</label>
+        <input type="text" name="provider_config[domain]" value="WORKGROUP" placeholder="WORKGROUP" class="input-modern mt-1">
+    </div>
+    
+    <!-- Advanced Options -->
+    <details class="mt-4">
+        <summary class="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+            Advanced Options
+        </summary>
+        <div class="mt-3 space-y-3 border-l-2 border-gray-200 dark:border-gray-700 pl-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Service Principal Name (SPN)</label>
+                <input type="text" name="provider_config[spn]" placeholder="cifs/remotehost:1020" class="input-modern mt-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Required for some cluster configurations</p>
+            </div>
+            
+            <div class="flex items-center">
+                <input type="checkbox" name="provider_config[use_kerberos]" value="true" class="checkbox-modern">
+                <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">Use Kerberos Authentication</label>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Kerberos Credential Cache Path</label>
+                <input type="text" name="provider_config[kerberos_ccache]" placeholder="/path/to/ccache or FILE:/path/to/ccache" class="input-modern mt-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Only needed if not using default location</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Idle Timeout</label>
+                <input type="text" name="provider_config[idle_timeout]" value="1m0s" placeholder="1m0s" class="input-modern mt-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Format: 30s, 1m0s, 2h, etc.</p>
+            </div>
+            
+            <div class="flex items-center">
+                <input type="checkbox" name="provider_config[hide_special_share]" value="true" checked class="checkbox-modern">
+                <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">Hide Special Shares (print$, etc.)</label>
+            </div>
+            
+            <div class="flex items-center">
+                <input type="checkbox" name="provider_config[case_insensitive]" value="true" checked class="checkbox-modern">
+                <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">Case Insensitive</label>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Always true on Windows shares</p>
+            </div>
+        </div>
+    </details>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path Prefix (optional)</label>
+        <input type="text" name="path_prefix" placeholder="backups/borgitory" class="input-modern mt-1">
+    </div>
+</div>

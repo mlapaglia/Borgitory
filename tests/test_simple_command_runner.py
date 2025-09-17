@@ -6,7 +6,7 @@ import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 
-from services.simple_command_runner import SimpleCommandRunner, CommandResult
+from borgitory.services.simple_command_runner import SimpleCommandRunner, CommandResult
 
 
 class TestSimpleCommandRunner:
@@ -202,7 +202,7 @@ class TestSimpleCommandRunner:
         mock_process.communicate = AsyncMock(return_value=(b"output", b""))
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_process), patch(
-            "services.simple_command_runner.logger"
+            "borgitory.services.simple_command_runner.logger"
         ) as mock_logger:
             result = await runner.run_command(["echo", "test", "command"])
 
@@ -229,7 +229,9 @@ class TestSimpleCommandRunner:
 
         with patch(
             "asyncio.create_subprocess_exec", new_callable=AsyncMock
-        ) as mock_create, patch("services.simple_command_runner.logger") as mock_logger:
+        ) as mock_create, patch(
+            "borgitory.services.simple_command_runner.logger"
+        ) as mock_logger:
             mock_create.return_value = mock_process
 
             result = await runner.run_command(["false"])

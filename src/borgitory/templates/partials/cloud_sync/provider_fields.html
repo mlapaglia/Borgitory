@@ -1,0 +1,14 @@
+<!-- Dynamic Provider Fields -->
+<div class="provider-fields-content">
+{% if provider_template %}
+    {% include provider_template %}
+{% endif %}
+
+{% if show_submit %}
+<div class="flex space-x-2 mt-4">
+    <button type="submit" id="submit-button" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+        {{ submit_text }}
+    </button>
+</div>
+{% endif %}
+</div>

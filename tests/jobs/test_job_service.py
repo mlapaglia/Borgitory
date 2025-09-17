@@ -6,10 +6,15 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
 
-from services.jobs.job_service import JobService
-from models.database import Repository, Job, CleanupConfig, RepositoryCheckConfig
-from models.schemas import BackupRequest, PruneRequest, CheckRequest
-from models.enums import JobType
+from borgitory.services.jobs.job_service import JobService
+from borgitory.models.database import (
+    Repository,
+    Job,
+    CleanupConfig,
+    RepositoryCheckConfig,
+)
+from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
+from borgitory.models.enums import JobType
 
 
 class TestJobService:

@@ -3,12 +3,14 @@ Tests for tabs API endpoints
 """
 
 import pytest
+from unittest.mock import Mock
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from main import app
-from api.auth import get_current_user
-from models.database import User
+from borgitory.main import app
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
+from borgitory.dependencies import get_provider_registry
 
 
 @pytest.fixture
@@ -64,6 +66,144 @@ class TestTabsAPI:
         response = await async_client.get("/api/tabs/cloud-sync")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_sync_tab_contains_provider_dropdown(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test that cloud sync tab contains provider dropdown with options."""
+        response = await async_client.get("/api/tabs/cloud-sync")
+        assert response.status_code == 200
+
+        content = response.text
+
+        # Check that the provider dropdown exists
+        assert 'name="provider"' in content
+        assert 'id="provider-select"' in content
+        assert "Select Provider Type" in content
+
+        # Check that provider options are populated from the registry
+        assert 'value="s3"' in content
+        assert 'value="sftp"' in content
+        assert 'value="smb"' in content
+
+        # Check that provider labels are present
+        assert "AWS S3" in content
+        assert "SFTP (SSH)" in content
+        assert "SMB/CIFS" in content
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_sync_tab_uses_registry(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test that cloud sync tab uses registry to get providers."""
+        # Create a mock registry
+        mock_registry = Mock()
+        mock_registry.get_all_provider_info.return_value = {
+            "mock_provider": {
+                "label": "Mock Provider",
+                "description": "Test provider",
+                "supports_encryption": True,
+                "supports_versioning": False,
+                "requires_credentials": True,
+            }
+        }
+
+        # Override the registry dependency
+        app.dependency_overrides[get_provider_registry] = lambda: mock_registry
+
+        try:
+            response = await async_client.get("/api/tabs/cloud-sync")
+            assert response.status_code == 200
+
+            content = response.text
+            # Should contain our mocked provider
+            assert 'value="mock_provider"' in content
+            assert "Mock Provider" in content
+
+            # Should NOT contain real providers since we mocked them
+            assert 'value="s3"' not in content
+            assert 'value="sftp"' not in content
+            assert 'value="smb"' not in content
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_sync_tab_empty_providers(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test cloud sync tab behavior when no providers are registered."""
+        # Create a mock registry with no providers
+        mock_registry = Mock()
+        mock_registry.get_all_provider_info.return_value = {}
+
+        # Override the registry dependency
+        app.dependency_overrides[get_provider_registry] = lambda: mock_registry
+
+        try:
+            response = await async_client.get("/api/tabs/cloud-sync")
+            assert response.status_code == 200
+
+            content = response.text
+            # Should still have the dropdown structure
+            assert 'name="provider"' in content
+            assert 'id="provider-select"' in content
+            assert "Select Provider Type" in content
+
+            # But no provider options
+            assert 'value="s3"' not in content
+            assert 'value="sftp"' not in content
+            assert 'value="smb"' not in content
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_provider_fields_endpoint_uses_registry_for_submit_text(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test that provider fields endpoint uses registry for submit button text."""
+        # Test with S3 provider
+        response = await async_client.get("/api/cloud-sync/provider-fields?provider=s3")
+        assert response.status_code == 200
+        content = response.text
+        assert "Add AWS S3 Location" in content
+
+        # Test with SFTP provider
+        response = await async_client.get(
+            "/api/cloud-sync/provider-fields?provider=sftp"
+        )
+        assert response.status_code == 200
+        content = response.text
+        assert "Add SFTP (SSH) Location" in content
+
+        # Test with SMB provider
+        response = await async_client.get(
+            "/api/cloud-sync/provider-fields?provider=smb"
+        )
+        assert response.status_code == 200
+        content = response.text
+        assert "Add SMB/CIFS Location" in content
+
+        # Test with empty provider (should not show submit button)
+        response = await async_client.get("/api/cloud-sync/provider-fields?provider=")
+        assert response.status_code == 200
+        content = response.text
+        # Should not have submit button when provider is empty
+        assert "submit-button" not in content
+
+    @pytest.mark.asyncio
+    async def test_provider_fields_endpoint_handles_unknown_provider(
+        self, async_client: AsyncClient, mock_current_user
+    ):
+        """Test that provider fields endpoint handles unknown providers gracefully."""
+        response = await async_client.get(
+            "/api/cloud-sync/provider-fields?provider=unknown"
+        )
+        assert response.status_code == 200
+        content = response.text
+        assert "Add Sync Location" in content  # Should fallback to generic text
 
     @pytest.mark.asyncio
     async def test_get_archives_tab(self, async_client: AsyncClient, mock_current_user):

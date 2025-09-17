@@ -10,7 +10,7 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
-from services.jobs.job_manager import (
+from borgitory.services.jobs.job_manager import (
     JobManager,
     JobManagerConfig,
     JobManagerDependencies,
@@ -21,8 +21,8 @@ from services.jobs.job_manager import (
     get_default_job_manager_dependencies,
     get_test_job_manager_dependencies,
 )
-from services.jobs.job_executor import ProcessResult
-from models.database import NotificationConfig
+from borgitory.services.jobs.job_executor import ProcessResult
+from borgitory.models.database import NotificationConfig
 
 
 class TestJobManagerFactory:
@@ -305,7 +305,7 @@ class TestJobManagerTaskExecution:
         )
 
         with patch(
-            "utils.security.build_secure_borg_command"
+            "borgitory.utils.security.build_secure_borg_command"
         ) as mock_build, patch.object(
             job_manager_with_db.executor, "start_process", return_value=mock_process
         ), patch.object(
@@ -362,7 +362,7 @@ class TestJobManagerTaskExecution:
         )
 
         with patch(
-            "utils.security.build_secure_borg_command"
+            "borgitory.utils.security.build_secure_borg_command"
         ) as mock_build, patch.object(
             job_manager_with_db.executor, "start_process", return_value=mock_process
         ), patch.object(
@@ -469,7 +469,7 @@ class TestJobManagerTaskExecution:
         )
 
         with patch(
-            "utils.security.build_secure_borg_command"
+            "borgitory.utils.security.build_secure_borg_command"
         ) as mock_build, patch.object(
             job_manager_with_db.executor, "start_process", return_value=mock_process
         ), patch.object(
@@ -585,7 +585,7 @@ class TestJobManagerTaskExecution:
             notification_config,
             "get_pushover_credentials",
             return_value=("user_key", "app_token"),
-        ), patch("services.jobs.job_manager.get_db_session") as mock_get_db:
+        ), patch("borgitory.services.jobs.job_manager.get_db_session") as mock_get_db:
             # Set up the database session context manager
             mock_get_db.return_value.__enter__.return_value = test_db
 

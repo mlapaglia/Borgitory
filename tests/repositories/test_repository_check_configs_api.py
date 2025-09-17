@@ -7,7 +7,10 @@ from unittest.mock import MagicMock
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 
-from models.schemas import RepositoryCheckConfigCreate, RepositoryCheckConfigUpdate
+from borgitory.models.schemas import (
+    RepositoryCheckConfigCreate,
+    RepositoryCheckConfigUpdate,
+)
 
 
 @pytest.fixture
@@ -66,7 +69,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service, sample_config_create
     ):
         """Test successful config creation returns correct HTMX response."""
-        from api.repository_check_configs import create_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            create_repository_check_config,
+        )
 
         # Mock successful service response
         mock_config = MagicMock()
@@ -107,7 +112,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service, sample_config_create
     ):
         """Test failed config creation returns correct HTMX error response."""
-        from api.repository_check_configs import create_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            create_repository_check_config,
+        )
 
         # Mock service failure
         mock_service.create_config.return_value = (
@@ -133,7 +140,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service, sample_config_create
     ):
         """Test server error during creation returns correct status code."""
-        from api.repository_check_configs import create_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            create_repository_check_config,
+        )
 
         # Mock service failure with "Failed to" error
         mock_service.create_config.return_value = (
@@ -156,7 +165,9 @@ class TestRepositoryCheckConfigsAPI:
 
     def test_get_configs_html_success(self, mock_request, mock_templates, mock_service):
         """Test getting configs HTML returns correct template response."""
-        from api.repository_check_configs import get_repository_check_configs_html
+        from borgitory.api.repository_check_configs import (
+            get_repository_check_configs_html,
+        )
 
         mock_configs = [MagicMock(), MagicMock()]
         mock_service.get_all_configs.return_value = mock_configs
@@ -177,7 +188,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service
     ):
         """Test getting configs HTML with exception returns error template."""
-        from api.repository_check_configs import get_repository_check_configs_html
+        from borgitory.api.repository_check_configs import (
+            get_repository_check_configs_html,
+        )
 
         mock_service.get_all_configs.side_effect = Exception("Service error")
 
@@ -195,7 +208,7 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service
     ):
         """Test getting form returns correct HTMX template response."""
-        from api.repository_check_configs import get_repository_check_form
+        from borgitory.api.repository_check_configs import get_repository_check_form
 
         mock_form_data = {"repositories": [MagicMock()], "check_configs": [MagicMock()]}
         mock_service.get_form_data.return_value = mock_form_data
@@ -215,7 +228,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_get_policy_form_htmx_response(self, mock_request, mock_templates):
         """Test getting policy form returns correct HTMX template response."""
-        from api.repository_check_configs import get_policy_form
+        from borgitory.api.repository_check_configs import get_policy_form
 
         await get_policy_form(mock_request, mock_templates)
 
@@ -231,7 +244,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service
     ):
         """Test getting edit form returns correct HTMX template response."""
-        from api.repository_check_configs import get_repository_check_config_edit_form
+        from borgitory.api.repository_check_configs import (
+            get_repository_check_config_edit_form,
+        )
 
         mock_config = MagicMock()
         mock_service.get_config_by_id.return_value = mock_config
@@ -255,7 +270,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service
     ):
         """Test getting edit form for non-existent config raises HTTPException."""
-        from api.repository_check_configs import get_repository_check_config_edit_form
+        from borgitory.api.repository_check_configs import (
+            get_repository_check_config_edit_form,
+        )
         from fastapi import HTTPException
 
         mock_service.get_config_by_id.return_value = None
@@ -273,7 +290,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service, sample_config_update
     ):
         """Test successful config update returns correct HTMX response."""
-        from api.repository_check_configs import update_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            update_repository_check_config,
+        )
 
         mock_config = MagicMock()
         mock_config.name = "updated-config"
@@ -302,7 +321,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service, sample_config_update
     ):
         """Test failed config update returns correct HTMX error response."""
-        from api.repository_check_configs import update_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            update_repository_check_config,
+        )
 
         mock_service.update_config.return_value = (False, None, "Config not found")
 
@@ -323,7 +344,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service
     ):
         """Test successful config enable returns correct HTMX response."""
-        from api.repository_check_configs import enable_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            enable_repository_check_config,
+        )
 
         mock_service.enable_config.return_value = (
             True,
@@ -353,7 +376,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service
     ):
         """Test successful config disable returns correct HTMX response."""
-        from api.repository_check_configs import disable_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            disable_repository_check_config,
+        )
 
         mock_service.disable_config.return_value = (
             True,
@@ -383,7 +408,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service
     ):
         """Test successful config deletion returns correct HTMX response."""
-        from api.repository_check_configs import delete_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            delete_repository_check_config,
+        )
 
         mock_service.delete_config.return_value = (True, "test-config", None)
 
@@ -409,7 +436,9 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates, mock_service
     ):
         """Test failed config deletion returns correct HTMX error response."""
-        from api.repository_check_configs import delete_repository_check_config
+        from borgitory.api.repository_check_configs import (
+            delete_repository_check_config,
+        )
 
         mock_service.delete_config.return_value = (False, None, "Config not found")
 
@@ -427,7 +456,7 @@ class TestRepositoryCheckConfigsAPI:
 
     def test_get_config_by_id_success(self, mock_service):
         """Test getting config by ID returns service result."""
-        from api.repository_check_configs import get_repository_check_config
+        from borgitory.api.repository_check_configs import get_repository_check_config
 
         mock_config = MagicMock()
         mock_service.get_config_by_id.return_value = mock_config
@@ -442,7 +471,7 @@ class TestRepositoryCheckConfigsAPI:
 
     def test_get_config_by_id_not_found(self, mock_service):
         """Test getting non-existent config by ID raises HTTPException."""
-        from api.repository_check_configs import get_repository_check_config
+        from borgitory.api.repository_check_configs import get_repository_check_config
         from fastapi import HTTPException
 
         mock_service.get_config_by_id.return_value = None
@@ -455,7 +484,7 @@ class TestRepositoryCheckConfigsAPI:
 
     def test_toggle_custom_options_show_custom(self, mock_request, mock_templates):
         """Test toggling custom options shows custom options when no config selected."""
-        from api.repository_check_configs import toggle_custom_options
+        from borgitory.api.repository_check_configs import toggle_custom_options
 
         toggle_custom_options(mock_request, mock_templates, check_config_id="")
 
@@ -468,7 +497,7 @@ class TestRepositoryCheckConfigsAPI:
 
     def test_toggle_custom_options_hide_custom(self, mock_request, mock_templates):
         """Test toggling custom options hides custom options when config selected."""
-        from api.repository_check_configs import toggle_custom_options
+        from borgitory.api.repository_check_configs import toggle_custom_options
 
         toggle_custom_options(mock_request, mock_templates, check_config_id="123")
 
@@ -483,7 +512,7 @@ class TestRepositoryCheckConfigsAPI:
         self, mock_request, mock_templates
     ):
         """Test update check options for repository_only check type."""
-        from api.repository_check_configs import update_check_options
+        from borgitory.api.repository_check_configs import update_check_options
 
         update_check_options(
             mock_request,
@@ -505,7 +534,7 @@ class TestRepositoryCheckConfigsAPI:
 
     def test_update_check_options_full_check_type(self, mock_request, mock_templates):
         """Test update check options for full check type."""
-        from api.repository_check_configs import update_check_options
+        from borgitory.api.repository_check_configs import update_check_options
 
         update_check_options(
             mock_request,

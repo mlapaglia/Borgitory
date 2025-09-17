@@ -10,4 +10,4 @@ fi
 
 echo "✅ Database migrations completed"
 echo "🚀 Starting Borgitory with HTTP on port 8000"
-exec uvicorn main:app --host 0.0.0.0 --port 8000
+exec uvicorn borgitory.main:app --host 0.0.0.0 --port 8000

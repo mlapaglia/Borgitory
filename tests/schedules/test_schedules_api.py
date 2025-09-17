@@ -3,23 +3,23 @@ from datetime import datetime
 from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 
-from main import app
-from models.database import (
+from borgitory.main import app
+from borgitory.models.database import (
     Schedule,
     Repository,
     CloudSyncConfig,
     CleanupConfig,
     NotificationConfig,
 )
-from dependencies import (
+from borgitory.dependencies import (
     get_schedule_service,
     get_configuration_service,
     get_scheduler_service,
 )
-from services.scheduling.schedule_service import ScheduleService
-from services.configuration_service import ConfigurationService
-from services.upcoming_backups_service import format_time_until
-from services.cron_description_service import CronDescriptionService
+from borgitory.services.scheduling.schedule_service import ScheduleService
+from borgitory.services.configuration_service import ConfigurationService
+from borgitory.services.upcoming_backups_service import format_time_until
+from borgitory.services.cron_description_service import CronDescriptionService
 
 client = TestClient(app)
 
@@ -78,12 +78,18 @@ class TestSchedulesAPI:
         cleanup_config = CleanupConfig(
             name="test-cleanup", strategy="simple", keep_daily=7, enabled=True
         )
+        import json
+
         cloud_config = CloudSyncConfig(
             name="test-cloud",
             provider="s3",
-            bucket_name="test",
-            encrypted_access_key="test-encrypted-key",
-            encrypted_secret_key="test-encrypted-secret",
+            provider_config=json.dumps(
+                {
+                    "bucket_name": "test",
+                    "access_key": "test-access-key",
+                    "secret_key": "test-secret-key",
+                }
+            ),
             enabled=True,
         )
         notification_config = NotificationConfig(

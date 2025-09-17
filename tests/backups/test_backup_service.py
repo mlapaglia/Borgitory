@@ -4,11 +4,15 @@ from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
-from services.backups.backup_service import BackupService
-from services.backups.backup_executor import BackupExecutor, BackupResult, BackupStatus
-from models.database import Repository, Job, JobTask
-from models.schemas import BackupRequest, PruneRequest
-from models.enums import JobType
+from borgitory.services.backups.backup_service import BackupService
+from borgitory.services.backups.backup_executor import (
+    BackupExecutor,
+    BackupResult,
+    BackupStatus,
+)
+from borgitory.models.database import Repository, Job, JobTask
+from borgitory.models.schemas import BackupRequest, PruneRequest
+from borgitory.models.enums import JobType
 
 
 class TestBackupService:

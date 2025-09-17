@@ -1,0 +1,55 @@
+<!-- Edit Cloud Sync Configuration -->
+<div class="border dark:border-gray-600 rounded-lg p-4">
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Edit Cloud Sync Location</h3>
+    <form 
+        hx-put="/api/cloud-sync/{{ config.id }}" 
+        hx-target="#cloud-sync-status"
+        class="space-y-4"
+        id="cloud-sync-edit-form"
+    >
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
+            <input type="text" name="name" required value="{{ config.name }}" class="input-modern mt-1">
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Provider Type</label>
+            <select 
+                name="provider" 
+                id="provider-select-edit" 
+                class="select-modern w-full"
+                hx-get="/api/cloud-sync/provider-fields"
+                hx-target="#provider-fields-container-edit"
+                hx-trigger="change"
+                hx-swap="innerHTML"
+                hx-include="this">
+                <option value="">Select Provider Type</option>
+                {% for provider in supported_providers %}
+                <option value="{{ provider.value }}" {{ 'selected' if config.provider == provider.value else '' }}>{{ provider.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Dynamic Provider Fields Container -->
+        <div id="provider-fields-container-edit">
+            {% if provider_template %}
+                {% include provider_template %}
+            {% endif %}
+
+            <div class="flex space-x-2 mt-4">
+                <button type="submit" id="update-button" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                    {{ submit_text }}
+                </button>
+                <button 
+                    type="button" 
+                    hx-get="/api/cloud-sync/add-form"
+                    hx-target="#cloud-sync-form-container"
+                    hx-swap="innerHTML"
+                    class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </form>
+    <div id="cloud-sync-status" class="mt-4"></div>
+</div>

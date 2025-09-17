@@ -7,11 +7,11 @@ import json
 from unittest.mock import Mock, AsyncMock, patch
 from typing import Dict, Any, List
 
-from services.repositories.repository_stats_service import (
+from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
     CommandExecutorInterface,
 )
-from models.database import Repository
+from borgitory.models.database import Repository
 
 
 class MockCommandExecutor(CommandExecutorInterface):
@@ -166,7 +166,7 @@ class TestRepositoryStatsService:
         mock_stdout = "archive1\narchive2\narchive3\n"
 
         with patch("asyncio.create_subprocess_exec") as mock_subprocess, patch(
-            "services.repositories.repository_stats_service.build_secure_borg_command"
+            "borgitory.services.repositories.repository_stats_service.build_secure_borg_command"
         ) as mock_build_cmd:
             # Setup mocks
             mock_build_cmd.return_value = (
@@ -188,7 +188,7 @@ class TestRepositoryStatsService:
     async def test_get_archive_list_failure(self):
         """Test archive listing failure handling."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess, patch(
-            "services.repositories.repository_stats_service.build_secure_borg_command"
+            "borgitory.services.repositories.repository_stats_service.build_secure_borg_command"
         ) as mock_build_cmd:
             # Setup mocks
             mock_build_cmd.return_value = (
@@ -242,7 +242,7 @@ class TestRepositoryStatsService:
         }
 
         with patch("asyncio.create_subprocess_exec") as mock_subprocess, patch(
-            "services.repositories.repository_stats_service.build_secure_borg_command"
+            "borgitory.services.repositories.repository_stats_service.build_secure_borg_command"
         ) as mock_build_cmd:
             # Setup mocks
             mock_build_cmd.return_value = (
@@ -274,7 +274,7 @@ class TestRepositoryStatsService:
     async def test_get_archive_info_failure(self):
         """Test archive info retrieval failure."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess, patch(
-            "services.repositories.repository_stats_service.build_secure_borg_command"
+            "borgitory.services.repositories.repository_stats_service.build_secure_borg_command"
         ) as mock_build_cmd:
             # Setup mocks
             mock_build_cmd.return_value = (
@@ -354,7 +354,7 @@ class TestRepositoryStatsService:
         mock_file_output = "1024 file1.txt\n2048 file2.jpg\n512 file3.txt\n"
 
         with patch("asyncio.create_subprocess_exec") as mock_subprocess, patch(
-            "services.repositories.repository_stats_service.build_secure_borg_command"
+            "borgitory.services.repositories.repository_stats_service.build_secure_borg_command"
         ) as mock_build_cmd:
             # Setup mocks
             mock_build_cmd.return_value = (

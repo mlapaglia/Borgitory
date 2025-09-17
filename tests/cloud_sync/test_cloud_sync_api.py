@@ -8,8 +8,8 @@ from httpx import AsyncClient
 from sqlalchemy.orm import Session
 from unittest.mock import patch, Mock
 
-from models.database import CloudSyncConfig
-from services.cloud_sync_service import CloudSyncService
+from borgitory.services.cloud_sync_service import CloudSyncService
+from tests.conftest import create_s3_cloud_sync_config
 
 
 class TestCloudSyncAPIHTMX:
@@ -56,17 +56,20 @@ class TestCloudSyncAPIHTMX:
 
     @pytest.mark.asyncio
     async def test_create_config_html_response(self, async_client: AsyncClient):
-        """Test config creation returns HTML response."""
-        config_data = {
+        """Test config creation returns HTML response with form data."""
+        # Send as form data (how HTMX actually sends it)
+        form_data = {
             "name": "test-s3-html",
             "provider": "s3",
-            "bucket_name": "test-bucket",
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config[bucket_name]": "test-bucket",
+            "provider_config[access_key]": "AKIAIOSFODNN7EXAMPLE",
+            "provider_config[secret_key]": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config[region]": "us-east-1",
+            "provider_config[storage_class]": "STANDARD",
         }
 
         # Mock the service to avoid actual database operations
-        with patch("dependencies.get_db") as mock_get_db, patch.object(
+        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
             CloudSyncService, "create_cloud_sync_config"
         ) as mock_create:
             mock_db = Mock()
@@ -77,7 +80,7 @@ class TestCloudSyncAPIHTMX:
             mock_config.name = "test-s3-html"
             mock_create.return_value = mock_config
 
-            response = await async_client.post("/api/cloud-sync/", json=config_data)
+            response = await async_client.post("/api/cloud-sync/", data=form_data)
 
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
@@ -87,14 +90,15 @@ class TestCloudSyncAPIHTMX:
     @pytest.mark.asyncio
     async def test_create_config_validation_error_html(self, async_client: AsyncClient):
         """Test config creation validation error returns HTML."""
-        config_data = {
+        # Send as form data with missing required fields
+        form_data = {
             "name": "test-validation-error",
             "provider": "s3",
-            "bucket_name": "test-bucket",
+            "provider_config[bucket_name]": "test-bucket",
             # Missing access_key and secret_key
         }
 
-        response = await async_client.post("/api/cloud-sync/", json=config_data)
+        response = await async_client.post("/api/cloud-sync/", data=form_data)
 
         # Schema validation should return 422
         assert response.status_code == 422
@@ -102,18 +106,21 @@ class TestCloudSyncAPIHTMX:
     @pytest.mark.asyncio
     async def test_create_config_service_error_html(self, async_client: AsyncClient):
         """Test config creation service error returns HTML."""
-        config_data = {
+        # Send as form data
+        form_data = {
             "name": "service-error-test",
             "provider": "s3",
-            "bucket_name": "test-bucket",
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config[bucket_name]": "test-bucket",
+            "provider_config[access_key]": "AKIAIOSFODNN7EXAMPLE",
+            "provider_config[secret_key]": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config[region]": "us-east-1",
+            "provider_config[storage_class]": "STANDARD",
         }
 
         # Mock service to throw HTTPException
         from fastapi import HTTPException
 
-        with patch("dependencies.get_db") as mock_get_db, patch.object(
+        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
             CloudSyncService, "create_cloud_sync_config"
         ) as mock_create:
             mock_db = Mock()
@@ -122,7 +129,7 @@ class TestCloudSyncAPIHTMX:
                 status_code=400, detail="Test error"
             )
 
-            response = await async_client.post("/api/cloud-sync/", json=config_data)
+            response = await async_client.post("/api/cloud-sync/", data=form_data)
 
             assert response.status_code == 400
             assert "text/html" in response.headers["content-type"]
@@ -156,9 +163,8 @@ class TestCloudSyncAPIHTMX:
     ):
         """Test config update returns HTML response."""
         # Create test config in database
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="update-html-test",
-            provider="s3",
             bucket_name="old-bucket",
             enabled=True,
         )
@@ -182,8 +188,8 @@ class TestCloudSyncAPIHTMX:
     ):
         """Test config deletion returns HTML response."""
         # Create test config
-        config = CloudSyncConfig(
-            name="delete-html-test", provider="s3", bucket_name="delete-bucket"
+        config = create_s3_cloud_sync_config(
+            name="delete-html-test", bucket_name="delete-bucket"
         )
         test_db.add(config)
         test_db.commit()
@@ -200,9 +206,8 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test config enable returns HTML response."""
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="enable-html-test",
-            provider="s3",
             bucket_name="test-bucket",
             enabled=False,
         )
@@ -221,9 +226,8 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test config disable returns HTML response."""
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="disable-html-test",
-            provider="s3",
             bucket_name="test-bucket",
             enabled=True,
         )
@@ -242,21 +246,19 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test config test returns HTML response."""
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="test-config-html",
-            provider="s3",
             bucket_name="test-bucket",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             enabled=True,
-        )
-        config.set_credentials(
-            "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         )
         test_db.add(config)
         test_db.commit()
 
         # Mock the rclone service and cloud sync service
         with patch(
-            "services.cloud_sync_service.CloudSyncService.test_cloud_sync_config"
+            "borgitory.services.cloud_sync_service.CloudSyncService.test_cloud_sync_config"
         ) as mock_test:
             mock_test.return_value = {
                 "status": "success",
@@ -273,17 +275,16 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test getting edit form returns HTML."""
-        config = CloudSyncConfig(
+        config = create_s3_cloud_sync_config(
             name="edit-form-test",
-            provider="s3",
             bucket_name="edit-bucket",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             enabled=True,
-        )
-        config.set_credentials(
-            "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         )
         test_db.add(config)
         test_db.commit()
+        test_db.refresh(config)  # Ensure ID is populated
 
         response = await async_client.get(f"/api/cloud-sync/{config.id}/edit")
 
@@ -306,17 +307,32 @@ class TestCloudSyncAPIHTMX:
         self, async_client: AsyncClient, test_db: Session
     ):
         """Test that HTMX-specific headers are properly set."""
-        config_data = {
+        # Send as form data
+        form_data = {
             "name": "htmx-headers-test",
             "provider": "s3",
-            "bucket_name": "test-bucket",
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config[bucket_name]": "test-bucket",
+            "provider_config[access_key]": "AKIAIOSFODNN7EXAMPLE",
+            "provider_config[secret_key]": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "provider_config[region]": "us-east-1",
+            "provider_config[storage_class]": "STANDARD",
         }
 
-        response = await async_client.post("/api/cloud-sync/", json=config_data)
+        # Mock the service to avoid actual database operations
+        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
+            CloudSyncService, "create_cloud_sync_config"
+        ) as mock_create:
+            mock_db = Mock()
+            mock_get_db.return_value = mock_db
 
-        # Verify HTMX trigger header is set for successful operations
-        if response.status_code == 200:
-            assert "HX-Trigger" in response.headers
-            assert response.headers["HX-Trigger"] == "cloudSyncUpdate"
+            # Mock successful creation
+            mock_config = Mock()
+            mock_config.name = "htmx-headers-test"
+            mock_create.return_value = mock_config
+
+            response = await async_client.post("/api/cloud-sync/", data=form_data)
+
+            # Verify HTMX trigger header is set for successful operations
+            if response.status_code == 200:
+                assert "HX-Trigger" in response.headers
+                assert response.headers["HX-Trigger"] == "cloudSyncUpdate"

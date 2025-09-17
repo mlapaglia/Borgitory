@@ -5,15 +5,30 @@ Tests for CloudSyncService - Business logic tests migrated from API tests
 import pytest
 from fastapi import HTTPException
 
-from services.cloud_sync_service import CloudSyncService
-from models.database import CloudSyncConfig
-from models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
+from borgitory.services.cloud_sync_service import CloudSyncService
+from borgitory.models.database import CloudSyncConfig
+from borgitory.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
+from tests.conftest import create_s3_cloud_sync_config, create_sftp_cloud_sync_config
 
 
 @pytest.fixture
 def service(test_db):
     """CloudSyncService instance with real database session."""
-    return CloudSyncService(test_db)
+    from borgitory.services.cloud_providers.registry import get_metadata
+    from borgitory.services.rclone_service import RcloneService
+    from borgitory.services.cloud_providers import StorageFactory, EncryptionService
+
+    rclone_service = RcloneService()
+    storage_factory = StorageFactory(rclone_service)
+    encryption_service = EncryptionService()
+
+    return CloudSyncService(
+        db=test_db,
+        rclone_service=rclone_service,
+        storage_factory=storage_factory,
+        encryption_service=encryption_service,
+        get_metadata_func=get_metadata,
+    )
 
 
 class TestCloudSyncService:
@@ -24,9 +39,13 @@ class TestCloudSyncService:
         config_data = CloudSyncConfigCreate(
             name="test-s3",
             provider="s3",
-            bucket_name="test-bucket",
-            access_key="AKIAIOSFODNN7EXAMPLE",  # 20 characters
-            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # 40 characters
+            provider_config={
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",  # 20 characters
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # 40 characters
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
             path_prefix="backups/",
         )
 
@@ -35,8 +54,13 @@ class TestCloudSyncService:
         # Verify the result
         assert result.name == "test-s3"
         assert result.provider == "s3"
-        assert result.bucket_name == "test-bucket"
         assert result.path_prefix == "backups/"
+
+        # Verify provider config JSON contains expected values
+        import json
+
+        config_data = json.loads(result.provider_config)
+        assert config_data["bucket_name"] == "test-bucket"
 
         # Verify it was saved to database
         saved_config = (
@@ -46,18 +70,24 @@ class TestCloudSyncService:
         )
         assert saved_config is not None
         assert saved_config.provider == "s3"
-        assert saved_config.bucket_name == "test-bucket"
+
+        # Verify saved config JSON
+        saved_config_data = json.loads(saved_config.provider_config)
+        assert saved_config_data["bucket_name"] == "test-bucket"
 
     def test_create_sftp_config_success(self, service, test_db):
         """Test successful SFTP config creation with password."""
         config_data = CloudSyncConfigCreate(
             name="test-sftp",
             provider="sftp",
-            host="sftp.example.com",
-            port=22,
-            username="testuser",
-            password="testpass",
-            remote_path="/backups",
+            provider_config={
+                "host": "sftp.example.com",
+                "port": 22,
+                "username": "testuser",
+                "password": "testpass",
+                "remote_path": "/backups",
+                "host_key_checking": True,
+            },
             path_prefix="borg/",
         )
 
@@ -66,10 +96,15 @@ class TestCloudSyncService:
         # Verify the result
         assert result.name == "test-sftp"
         assert result.provider == "sftp"
-        assert result.host == "sftp.example.com"
-        assert result.port == 22
-        assert result.username == "testuser"
-        assert result.remote_path == "/backups"
+
+        # Verify provider config JSON contains expected values
+        import json
+
+        config_data = json.loads(result.provider_config)
+        assert config_data["host"] == "sftp.example.com"
+        assert config_data["port"] == 22
+        assert config_data["username"] == "testuser"
+        assert config_data["remote_path"] == "/backups"
 
         # Verify it was saved to database
         saved_config = (
@@ -79,18 +114,24 @@ class TestCloudSyncService:
         )
         assert saved_config is not None
         assert saved_config.provider == "sftp"
-        assert saved_config.host == "sftp.example.com"
+
+        # Verify saved config JSON
+        saved_config_data = json.loads(saved_config.provider_config)
+        assert saved_config_data["host"] == "sftp.example.com"
 
     def test_create_sftp_config_with_private_key(self, service, test_db):
         """Test successful SFTP config creation with private key."""
         config_data = CloudSyncConfigCreate(
             name="test-sftp-key",
             provider="sftp",
-            host="sftp.example.com",
-            port=22,
-            username="testuser",
-            private_key="-----BEGIN RSA PRIVATE KEY-----\ntest-key-content\n-----END RSA PRIVATE KEY-----",
-            remote_path="/backups",
+            provider_config={
+                "host": "sftp.example.com",
+                "port": 22,
+                "username": "testuser",
+                "private_key": "-----BEGIN RSA PRIVATE KEY-----\ntest-key-content\n-----END RSA PRIVATE KEY-----",
+                "remote_path": "/backups",
+                "host_key_checking": True,
+            },
         )
 
         result = service.create_cloud_sync_config(config_data)
@@ -98,7 +139,12 @@ class TestCloudSyncService:
         # Verify the result
         assert result.name == "test-sftp-key"
         assert result.provider == "sftp"
-        assert result.username == "testuser"
+
+        # Verify provider config JSON contains expected values
+        import json
+
+        config_data = json.loads(result.provider_config)
+        assert config_data["username"] == "testuser"
 
         # Verify it was saved to database
         saved_config = (
@@ -112,8 +158,8 @@ class TestCloudSyncService:
     def test_create_config_duplicate_name(self, service, test_db):
         """Test creating config with duplicate name."""
         # First, create a config
-        first_config = CloudSyncConfig(
-            name="duplicate-test", provider="s3", bucket_name="first-bucket"
+        first_config = create_s3_cloud_sync_config(
+            name="duplicate-test", bucket_name="first-bucket"
         )
         test_db.add(first_config)
         test_db.commit()
@@ -122,9 +168,13 @@ class TestCloudSyncService:
         config_data = CloudSyncConfigCreate(
             name="duplicate-test",  # Same name
             provider="s3",
-            bucket_name="test-bucket",
-            access_key="AKIAIOSFODNN7EXAMPLE",
-            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            provider_config={
+                "bucket_name": "test-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
         )
 
         with pytest.raises(HTTPException) as exc_info:
@@ -140,11 +190,13 @@ class TestCloudSyncService:
             CloudSyncConfigCreate(
                 name="incomplete-s3",
                 provider="s3",
-                bucket_name="test-bucket",
-                # Missing access_key and secret_key
+                provider_config={
+                    "bucket_name": "test-bucket",
+                    # Missing access_key and secret_key
+                },
             )
 
-        assert "AWS Access Key ID is required" in str(exc_info.value)
+        assert "Invalid s3 configuration" in str(exc_info.value)
 
     def test_create_sftp_config_missing_required_fields(self, service, test_db):
         """Test SFTP config creation with missing required fields - schema validation."""
@@ -153,11 +205,13 @@ class TestCloudSyncService:
             CloudSyncConfigCreate(
                 name="incomplete-sftp",
                 provider="sftp",
-                host="sftp.example.com",
-                # Missing username, remote_path, and auth method
+                provider_config={
+                    "host": "sftp.example.com",
+                    # Missing username, remote_path, and auth method
+                },
             )
 
-        assert "SFTP username is required" in str(exc_info.value)
+        assert "Invalid sftp configuration" in str(exc_info.value)
 
     def test_create_sftp_config_missing_auth(self, service, test_db):
         """Test SFTP config creation with missing authentication - schema validation."""
@@ -166,27 +220,29 @@ class TestCloudSyncService:
             CloudSyncConfigCreate(
                 name="sftp-no-auth",
                 provider="sftp",
-                host="sftp.example.com",
-                username="testuser",
-                remote_path="/backups",
-                # Missing both password and private_key
+                provider_config={
+                    "host": "sftp.example.com",
+                    "username": "testuser",
+                    "remote_path": "/backups",
+                    # Missing both password and private_key
+                },
             )
 
-        assert "Either SFTP password or private key is required" in str(exc_info.value)
+        assert "Invalid sftp configuration" in str(exc_info.value)
 
     def test_create_config_unsupported_provider(self, service, test_db):
         """Test config creation with unsupported provider."""
-        config_data = CloudSyncConfigCreate(
-            name="unsupported",
-            provider="azure",  # Not supported
-            bucket_name="test",
-        )
+        from pydantic_core import ValidationError
 
-        with pytest.raises(HTTPException) as exc_info:
-            service.create_cloud_sync_config(config_data)
+        # Should fail at Pydantic validation level
+        with pytest.raises(ValidationError) as exc_info:
+            CloudSyncConfigCreate(
+                name="unsupported",
+                provider="azure",  # Not supported
+                provider_config={"bucket_name": "test"},
+            )
 
-        assert exc_info.value.status_code == 400
-        assert "Unsupported provider" in str(exc_info.value.detail)
+        assert "azure" in str(exc_info.value).lower()
 
     def test_list_configs_empty(self, service, test_db):
         """Test listing configs when empty."""
@@ -197,12 +253,11 @@ class TestCloudSyncService:
     def test_list_configs_with_data(self, service, test_db):
         """Test listing configs with data."""
         # Create real configs in database
-        config1 = CloudSyncConfig(
-            name="s3-config", provider="s3", bucket_name="bucket1", enabled=True
+        config1 = create_s3_cloud_sync_config(
+            name="s3-config", bucket_name="bucket1", enabled=True
         )
-        config2 = CloudSyncConfig(
+        config2 = create_sftp_cloud_sync_config(
             name="sftp-config",
-            provider="sftp",
             host="sftp.example.com",
             username="user",
             remote_path="/backup",
@@ -221,8 +276,8 @@ class TestCloudSyncService:
 
     def test_get_config_by_id_success(self, service, test_db):
         """Test getting specific config by ID."""
-        config = CloudSyncConfig(
-            name="get-test", provider="s3", bucket_name="test-bucket", enabled=True
+        config = create_s3_cloud_sync_config(
+            name="get-test", bucket_name="test-bucket", enabled=True
         )
         test_db.add(config)
         test_db.commit()
@@ -243,21 +298,29 @@ class TestCloudSyncService:
     def test_update_config_success(self, service, test_db):
         """Test successful config update."""
         # Create existing config
-        existing_config = CloudSyncConfig(
-            name="update-test", provider="s3", bucket_name="old-bucket", enabled=True
-        )
+        existing_config = create_s3_cloud_sync_config(name="update-test", enabled=True)
         test_db.add(existing_config)
         test_db.commit()
         test_db.refresh(existing_config)
 
         update_data = CloudSyncConfigUpdate(
-            bucket_name="new-bucket", path_prefix="updated/"
+            provider_config={
+                "bucket_name": "new-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
+            path_prefix="updated/",
         )
 
         result = service.update_cloud_sync_config(existing_config.id, update_data)
 
         # Verify the update
-        assert result.bucket_name == "new-bucket"
+        import json
+
+        provider_config = json.loads(result.provider_config)
+        assert provider_config["bucket_name"] == "new-bucket"
         assert result.path_prefix == "updated/"
 
         # Verify in database
@@ -266,14 +329,15 @@ class TestCloudSyncService:
             .filter(CloudSyncConfig.id == existing_config.id)
             .first()
         )
-        assert updated_config.bucket_name == "new-bucket"
+        updated_provider_config = json.loads(updated_config.provider_config)
+        assert updated_provider_config["bucket_name"] == "new-bucket"
         assert updated_config.path_prefix == "updated/"
 
     def test_update_config_duplicate_name(self, service, test_db):
         """Test updating config with duplicate name."""
         # Create two configs
-        config1 = CloudSyncConfig(name="config1", provider="s3", bucket_name="bucket1")
-        config2 = CloudSyncConfig(name="config2", provider="s3", bucket_name="bucket2")
+        config1 = create_s3_cloud_sync_config(name="config1", bucket_name="bucket1")
+        config2 = create_s3_cloud_sync_config(name="config2", bucket_name="bucket2")
         test_db.add(config1)
         test_db.add(config2)
         test_db.commit()
@@ -291,8 +355,8 @@ class TestCloudSyncService:
 
     def test_delete_config_success(self, service, test_db):
         """Test successful config deletion."""
-        config = CloudSyncConfig(
-            name="delete-test", provider="s3", bucket_name="delete-bucket"
+        config = create_s3_cloud_sync_config(
+            name="delete-test", bucket_name="delete-bucket"
         )
         test_db.add(config)
         test_db.commit()
@@ -318,8 +382,8 @@ class TestCloudSyncService:
 
     def test_enable_config_success(self, service, test_db):
         """Test enabling config."""
-        config = CloudSyncConfig(
-            name="enable-test", provider="s3", bucket_name="test-bucket", enabled=False
+        config = create_s3_cloud_sync_config(
+            name="enable-test", bucket_name="test-bucket", enabled=False
         )
         test_db.add(config)
         test_db.commit()
@@ -339,8 +403,8 @@ class TestCloudSyncService:
 
     def test_disable_config_success(self, service, test_db):
         """Test disabling config."""
-        config = CloudSyncConfig(
-            name="disable-test", provider="s3", bucket_name="test-bucket", enabled=True
+        config = create_s3_cloud_sync_config(
+            name="disable-test", bucket_name="test-bucket", enabled=True
         )
         test_db.add(config)
         test_db.commit()
@@ -364,9 +428,13 @@ class TestCloudSyncService:
         config_data = CloudSyncConfigCreate(
             name="lifecycle-test",
             provider="s3",
-            bucket_name="lifecycle-bucket",
-            access_key="AKIAIOSFODNN7EXAMPLE",
-            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            provider_config={
+                "bucket_name": "lifecycle-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            },
         )
 
         created_config = service.create_cloud_sync_config(config_data)
@@ -374,9 +442,22 @@ class TestCloudSyncService:
         config_id = created_config.id
 
         # Update
-        update_data = CloudSyncConfigUpdate(bucket_name="updated-bucket")
+        update_data = CloudSyncConfigUpdate(
+            provider_config={
+                "bucket_name": "updated-bucket",
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "region": "us-east-1",
+                "storage_class": "STANDARD",
+            }
+        )
         updated_config = service.update_cloud_sync_config(config_id, update_data)
-        assert updated_config.bucket_name == "updated-bucket"
+
+        # Verify the update
+        import json
+
+        provider_config = json.loads(updated_config.provider_config)
+        assert provider_config["bucket_name"] == "updated-bucket"
 
         # Disable
         disabled_config = service.disable_cloud_sync_config(config_id)

@@ -5,15 +5,15 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from urllib.parse import unquote
 
-from main import app
-from models.database import Repository, User
-from dependencies import (
+from borgitory.main import app
+from borgitory.models.database import Repository, User
+from borgitory.dependencies import (
     get_schedule_service,
     get_configuration_service,
     get_scheduler_service,
 )
-from services.scheduling.schedule_service import ScheduleService
-from services.configuration_service import ConfigurationService
+from borgitory.services.scheduling.schedule_service import ScheduleService
+from borgitory.services.configuration_service import ConfigurationService
 
 
 def extract_error_message(html_content: str) -> str:
