@@ -43,7 +43,9 @@ class TestTabsAPI:
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
     @pytest.mark.asyncio
-    async def test_get_backups_tab(self, async_client: AsyncClient, mock_current_user) -> None:
+    async def test_get_backups_tab(
+        self, async_client: AsyncClient, mock_current_user
+    ) -> None:
         """Test getting backups tab content."""
         response = await async_client.get("/api/tabs/backups")
         assert response.status_code == 200
@@ -206,7 +208,9 @@ class TestTabsAPI:
         assert "Add Sync Location" in content  # Should fallback to generic text
 
     @pytest.mark.asyncio
-    async def test_get_archives_tab(self, async_client: AsyncClient, mock_current_user) -> None:
+    async def test_get_archives_tab(
+        self, async_client: AsyncClient, mock_current_user
+    ) -> None:
         """Test getting archives tab content."""
         response = await async_client.get("/api/tabs/archives")
         assert response.status_code == 200
@@ -222,7 +226,9 @@ class TestTabsAPI:
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
     @pytest.mark.asyncio
-    async def test_get_jobs_tab(self, async_client: AsyncClient, mock_current_user) -> None:
+    async def test_get_jobs_tab(
+        self, async_client: AsyncClient, mock_current_user
+    ) -> None:
         """Test getting jobs tab content."""
         response = await async_client.get("/api/tabs/jobs")
         assert response.status_code == 200
@@ -238,7 +244,9 @@ class TestTabsAPI:
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
     @pytest.mark.asyncio
-    async def test_get_cleanup_tab(self, async_client: AsyncClient, mock_current_user) -> None:
+    async def test_get_cleanup_tab(
+        self, async_client: AsyncClient, mock_current_user
+    ) -> None:
         """Test getting cleanup tab content."""
         response = await async_client.get("/api/tabs/prune")
         assert response.status_code == 200
@@ -254,7 +262,9 @@ class TestTabsAPI:
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
     @pytest.mark.asyncio
-    async def test_get_debug_tab(self, async_client: AsyncClient, mock_current_user) -> None:
+    async def test_get_debug_tab(
+        self, async_client: AsyncClient, mock_current_user
+    ) -> None:
         """Test getting debug tab content."""
         response = await async_client.get("/api/tabs/debug")
         assert response.status_code == 200

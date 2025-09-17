@@ -54,14 +54,18 @@ class TestBackupService:
         mock_executor = Mock(spec=BackupExecutor)
         return BackupService(db_session=test_db, backup_executor=mock_executor)
 
-    def test_backup_service_initialization_default_executor(self, test_db: Session) -> None:
+    def test_backup_service_initialization_default_executor(
+        self, test_db: Session
+    ) -> None:
         """Test BackupService initialization with default executor"""
         service = BackupService(db_session=test_db)
 
         assert service.db == test_db
         assert isinstance(service.executor, BackupExecutor)
 
-    def test_backup_service_initialization_custom_executor(self, test_db: Session) -> None:
+    def test_backup_service_initialization_custom_executor(
+        self, test_db: Session
+    ) -> None:
         """Test BackupService initialization with custom executor"""
         mock_executor = Mock(spec=BackupExecutor)
         service = BackupService(db_session=test_db, backup_executor=mock_executor)
@@ -268,7 +272,9 @@ class TestBackupService:
         assert job.type == JobType.PRUNE.value
 
     @pytest.mark.asyncio
-    async def test_create_and_run_prune_repository_not_found(self, backup_service) -> None:
+    async def test_create_and_run_prune_repository_not_found(
+        self, backup_service
+    ) -> None:
         """Test prune with non-existent repository"""
         prune_request = PruneRequest(repository_id=999, keep_daily=7)
 
@@ -434,7 +440,9 @@ class TestBackupService:
         assert success is False
 
     @pytest.mark.asyncio
-    async def test_cancel_job_non_running(self, backup_service_with_mock_executor) -> None:
+    async def test_cancel_job_non_running(
+        self, backup_service_with_mock_executor
+    ) -> None:
         """Test cancelling non-running job"""
         job_id = "cancel-non-running"
 
@@ -886,7 +894,9 @@ class TestBackupService:
         assert prune_status is not None
         assert len(recent_jobs) >= 2
 
-    def test_backup_service_database_integration(self, backup_service, test_repository) -> None:
+    def test_backup_service_database_integration(
+        self, backup_service, test_repository
+    ) -> None:
         """Test that backup service properly integrates with real database"""
         # Test repository retrieval
         repo = backup_service._get_repository(test_repository.id)

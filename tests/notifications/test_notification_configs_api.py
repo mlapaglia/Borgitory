@@ -136,7 +136,9 @@ class TestNotificationConfigsAPI:
         # Verify result is returned
         assert result == mock_configs
 
-    def test_get_configs_html_success(self, mock_request, mock_templates, mock_service) -> None:
+    def test_get_configs_html_success(
+        self, mock_request, mock_templates, mock_service
+    ) -> None:
         """Test getting configs HTML returns correct template response."""
         from borgitory.api.notifications import get_notification_configs_html
 

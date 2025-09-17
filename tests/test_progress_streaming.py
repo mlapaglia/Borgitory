@@ -35,7 +35,9 @@ class TestProgressStreaming:
         return db
 
     @pytest.mark.asyncio
-    async def test_progress_streaming_basic_flow(self, mock_repository, mock_db) -> None:
+    async def test_progress_streaming_basic_flow(
+        self, mock_repository, mock_db
+    ) -> None:
         """Test that progress streaming sends expected SSE events"""
 
         # Override database dependency
@@ -147,7 +149,9 @@ class TestProgressStreaming:
                 del app.dependency_overrides[get_repository_stats_service]
 
     @pytest.mark.asyncio
-    async def test_progress_streaming_error_handling(self, mock_repository, mock_db) -> None:
+    async def test_progress_streaming_error_handling(
+        self, mock_repository, mock_db
+    ) -> None:
         """Test that errors are properly streamed via SSE"""
 
         # Override database dependency

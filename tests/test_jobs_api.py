@@ -309,7 +309,9 @@ class TestJobsAPI:
     # Test job retrieval endpoints
 
     @pytest.mark.asyncio
-    async def test_list_jobs(self, async_client: AsyncClient, setup_dependencies) -> None:
+    async def test_list_jobs(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test listing jobs."""
         setup_dependencies["job_service"].list_jobs.return_value = [
             {"id": "job-1", "type": "backup", "status": "completed"},
@@ -341,7 +343,9 @@ class TestJobsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_jobs_html(self, async_client: AsyncClient, setup_dependencies) -> None:
+    async def test_get_jobs_html(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test getting jobs as HTML."""
         setup_dependencies[
             "job_render_service"
@@ -371,7 +375,9 @@ class TestJobsAPI:
         ].render_current_jobs_html.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_job_success(self, async_client: AsyncClient, setup_dependencies) -> None:
+    async def test_get_job_success(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test getting specific job details."""
         job_data = {"id": "test-job-123", "type": "backup", "status": "completed"}
         setup_dependencies["job_service"].get_job.return_value = job_data
@@ -460,7 +466,9 @@ class TestJobsAPI:
     # Test streaming endpoints
 
     @pytest.mark.asyncio
-    async def test_stream_all_jobs(self, async_client: AsyncClient, setup_dependencies) -> None:
+    async def test_stream_all_jobs(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test streaming all jobs endpoint."""
         from fastapi.responses import StreamingResponse
 
@@ -631,7 +639,9 @@ class TestJobsAPI:
         assert setup_dependencies["job_manager"].cleanup_job.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_get_queue_stats(self, async_client: AsyncClient, setup_dependencies) -> None:
+    async def test_get_queue_stats(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test getting queue statistics."""
         # The actual queue stats structure from the real implementation
         queue_stats = {
@@ -777,7 +787,9 @@ class TestJobsAPI:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_copy_job_output(self, async_client: AsyncClient, setup_dependencies) -> None:
+    async def test_copy_job_output(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test copying job output to clipboard."""
         response = await async_client.post("/api/jobs/test-job-123/copy-output")
 

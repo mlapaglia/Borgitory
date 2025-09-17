@@ -36,7 +36,9 @@ class SyncEventHandler(ABC):
 class LoggingSyncEventHandler(SyncEventHandler):
     """Event handler that logs sync events"""
 
-    def __init__(self, logger, output_callback: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(
+        self, logger, output_callback: Optional[Callable[[str], None]] = None
+    ) -> None:
         """
         Initialize logging event handler.
 

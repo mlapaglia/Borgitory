@@ -267,7 +267,9 @@ class TestSchedulesAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_list_schedules(self, setup_test_dependencies, test_db, sample_repository) -> None:
+    def test_list_schedules(
+        self, setup_test_dependencies, test_db, sample_repository
+    ) -> None:
         """Test listing schedules."""
         # Create test schedules
         schedule1 = Schedule(

@@ -36,7 +36,9 @@ class TestLoginPageEndpoint:
     """Test class for login_page endpoint in main.py."""
 
     @pytest.mark.asyncio
-    async def test_login_page_no_user_no_next_param(self, async_client: AsyncClient) -> None:
+    async def test_login_page_no_user_no_next_param(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test login page with no authenticated user and no next parameter."""
         response = await async_client.get("/login")
         assert response.status_code == 200
@@ -49,7 +51,9 @@ class TestLoginPageEndpoint:
         assert "/auth/check-users?next=/repositories" in response.text
 
     @pytest.mark.asyncio
-    async def test_login_page_no_user_with_next_param(self, async_client: AsyncClient) -> None:
+    async def test_login_page_no_user_with_next_param(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test login page with no authenticated user but with next parameter."""
         response = await async_client.get("/login?next=/backups")
         assert response.status_code == 200

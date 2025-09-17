@@ -109,7 +109,9 @@ class TestRcloneService:
 
         assert flags == expected_flags
 
-    def test_build_sftp_flags_with_password(self, rclone_service: RcloneService) -> None:
+    def test_build_sftp_flags_with_password(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test SFTP flags building with password"""
         with patch.object(
             rclone_service, "_obscure_password", return_value="obscured_pass"
@@ -134,7 +136,9 @@ class TestRcloneService:
 
             assert flags == expected_flags
 
-    def test_build_sftp_flags_with_private_key(self, rclone_service: RcloneService) -> None:
+    def test_build_sftp_flags_with_private_key(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test SFTP flags building with private key"""
         private_key_content = "-----BEGIN RSA PRIVATE KEY-----\ntest_key_content\n-----END RSA PRIVATE KEY-----"
 
@@ -209,7 +213,9 @@ class TestRcloneService:
 
             assert result == "plain_password"  # Fallback to original
 
-    def test_parse_rclone_progress_transferred(self, rclone_service: RcloneService) -> None:
+    def test_parse_rclone_progress_transferred(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test parsing rclone progress with transfer info"""
         line = "Transferred: 123.45 MiByte / 456.78 MiByte, 27%, 12.34"
         result = rclone_service.parse_rclone_progress(line)
@@ -236,14 +242,18 @@ class TestRcloneService:
         expected = {"eta": "2m30s remaining"}
         assert result == expected
 
-    def test_parse_rclone_progress_no_match(self, rclone_service: RcloneService) -> None:
+    def test_parse_rclone_progress_no_match(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test parsing rclone progress with no matching patterns"""
         line = "Some random output line"
         result = rclone_service.parse_rclone_progress(line)
 
         assert result is None
 
-    def test_parse_rclone_progress_malformed(self, rclone_service: RcloneService) -> None:
+    def test_parse_rclone_progress_malformed(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test parsing malformed rclone progress"""
         line = "Transferred: incomplete"
         result = rclone_service.parse_rclone_progress(line)
@@ -251,7 +261,9 @@ class TestRcloneService:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_sync_repository_to_s3_success(self, rclone_service: RcloneService, mock_repository: Repository) -> None:
+    async def test_sync_repository_to_s3_success(
+        self, rclone_service: RcloneService, mock_repository: Repository
+    ) -> None:
         """Test successful S3 repository sync"""
         mock_process = MagicMock()
         mock_process.pid = 12345
@@ -314,7 +326,9 @@ class TestRcloneService:
             assert ":s3:test-bucket/backups/repo1" in called_command
 
     @pytest.mark.asyncio
-    async def test_sync_repository_to_s3_failure(self, rclone_service: RcloneService, mock_repository: Repository) -> None:
+    async def test_sync_repository_to_s3_failure(
+        self, rclone_service: RcloneService, mock_repository: Repository
+    ) -> None:
         """Test S3 sync failure"""
         mock_process = MagicMock()
         mock_process.pid = 12345
@@ -389,7 +403,9 @@ class TestRcloneService:
             assert "percentage" in progress_events[0]
 
     @pytest.mark.asyncio
-    async def test_test_s3_connection_success(self, rclone_service: RcloneService) -> None:
+    async def test_test_s3_connection_success(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test successful S3 connection test"""
         # Mock the list command success
         mock_process = MagicMock()
@@ -415,7 +431,9 @@ class TestRcloneService:
             assert result["details"]["write_test"] == "passed"
 
     @pytest.mark.asyncio
-    async def test_test_s3_connection_read_only(self, rclone_service: RcloneService) -> None:
+    async def test_test_s3_connection_read_only(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test S3 connection with read-only access"""
         # Mock the list command success but write test failure
         mock_process = MagicMock()
@@ -441,7 +459,9 @@ class TestRcloneService:
             assert result["details"]["write_test"] == "failed"
 
     @pytest.mark.asyncio
-    async def test_test_s3_connection_bucket_not_found(self, rclone_service: RcloneService) -> None:
+    async def test_test_s3_connection_bucket_not_found(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test S3 connection with non-existent bucket"""
         mock_process = MagicMock()
         mock_process.returncode = 1
@@ -460,7 +480,9 @@ class TestRcloneService:
             assert "does not exist" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_test_s3_connection_access_denied(self, rclone_service: RcloneService) -> None:
+    async def test_test_s3_connection_access_denied(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test S3 connection with invalid credentials"""
         mock_process = MagicMock()
         mock_process.returncode = 1
@@ -477,7 +499,9 @@ class TestRcloneService:
             assert "check your AWS credentials" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_test_s3_connection_exception(self, rclone_service: RcloneService) -> None:
+    async def test_test_s3_connection_exception(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test S3 connection with exception"""
         with patch(
             "asyncio.create_subprocess_exec", side_effect=Exception("Connection failed")
@@ -492,7 +516,9 @@ class TestRcloneService:
             assert "Connection failed" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_test_s3_write_permissions_success(self, rclone_service: RcloneService) -> None:
+    async def test_test_s3_write_permissions_success(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test successful S3 write permissions"""
         # Mock upload success
         mock_upload_process = MagicMock()
@@ -521,7 +547,9 @@ class TestRcloneService:
             assert "Write permissions verified" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_test_s3_write_permissions_failure(self, rclone_service: RcloneService) -> None:
+    async def test_test_s3_write_permissions_failure(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test S3 write permissions failure"""
         # Mock upload failure
         mock_process = MagicMock()
@@ -613,7 +641,9 @@ class TestRcloneService:
             mock_unlink.assert_called_with("/tmp/key.pem")
 
     @pytest.mark.asyncio
-    async def test_test_sftp_connection_success(self, rclone_service: RcloneService) -> None:
+    async def test_test_sftp_connection_success(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test successful SFTP connection test"""
         mock_process = MagicMock()
         mock_process.returncode = 0
@@ -640,7 +670,9 @@ class TestRcloneService:
             assert result["details"]["port"] == 22
 
     @pytest.mark.asyncio
-    async def test_test_sftp_connection_authentication_failed(self, rclone_service: RcloneService) -> None:
+    async def test_test_sftp_connection_authentication_failed(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test SFTP connection with authentication failure"""
         mock_process = MagicMock()
         mock_process.returncode = 1
@@ -663,7 +695,9 @@ class TestRcloneService:
             assert "Authentication failed" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_test_sftp_connection_connection_refused(self, rclone_service: RcloneService) -> None:
+    async def test_test_sftp_connection_connection_refused(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test SFTP connection refused"""
         mock_process = MagicMock()
         mock_process.returncode = 1
@@ -687,7 +721,9 @@ class TestRcloneService:
             assert "Connection refused to test.com:2222" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_test_sftp_connection_path_not_found(self, rclone_service: RcloneService) -> None:
+    async def test_test_sftp_connection_path_not_found(
+        self, rclone_service: RcloneService
+    ) -> None:
         """Test SFTP connection with non-existent path"""
         mock_process = MagicMock()
         mock_process.returncode = 1
@@ -736,7 +772,10 @@ class TestSyncRepositoryMethod:
 
     @pytest.mark.asyncio
     async def test_sync_repository_s3_success(
-        self, rclone_service: RcloneService, test_repository: Repository, s3_cloud_sync_config: CloudSyncConfig
+        self,
+        rclone_service: RcloneService,
+        test_repository: Repository,
+        s3_cloud_sync_config: CloudSyncConfig,
     ) -> None:
         """Test successful S3 sync using sync_repository method"""
         # Parse JSON configuration
@@ -754,7 +793,9 @@ class TestSyncRepositoryMethod:
         }
 
         # Mock the S3 sync generator to simulate successful sync
-        async def mock_s3_sync(*args: Any, **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
+        async def mock_s3_sync(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[dict[str, Any], None]:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {
                 "type": "progress",
@@ -813,7 +854,10 @@ class TestSyncRepositoryMethod:
 
     @pytest.mark.asyncio
     async def test_sync_repository_s3_sync_failure(
-        self, rclone_service: RcloneService, test_repository: Repository, s3_cloud_sync_config: CloudSyncConfig
+        self,
+        rclone_service: RcloneService,
+        test_repository: Repository,
+        s3_cloud_sync_config: CloudSyncConfig,
     ) -> None:
         """Test S3 sync failure handling"""
         # Parse JSON configuration
@@ -830,7 +874,9 @@ class TestSyncRepositoryMethod:
         }
 
         # Mock the S3 sync generator to simulate failure
-        async def mock_s3_sync_failure(*args: Any, **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
+        async def mock_s3_sync_failure(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[dict[str, Any], None]:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {"type": "error", "message": "Access denied"}
 
@@ -848,7 +894,10 @@ class TestSyncRepositoryMethod:
 
     @pytest.mark.asyncio
     async def test_sync_repository_s3_process_failure(
-        self, rclone_service: RcloneService, test_repository: Repository, s3_cloud_sync_config: CloudSyncConfig
+        self,
+        rclone_service: RcloneService,
+        test_repository: Repository,
+        s3_cloud_sync_config: CloudSyncConfig,
     ) -> None:
         """Test S3 sync when rclone process fails"""
         # Parse JSON configuration
@@ -865,7 +914,9 @@ class TestSyncRepositoryMethod:
         }
 
         # Mock the S3 sync generator to simulate process failure
-        async def mock_s3_sync_process_failure(*args: Any, **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
+        async def mock_s3_sync_process_failure(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[dict[str, Any], None]:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {
                 "type": "progress",
@@ -891,7 +942,10 @@ class TestSyncRepositoryMethod:
 
     @pytest.mark.asyncio
     async def test_sync_repository_sftp_success(
-        self, rclone_service: RcloneService, test_repository: Repository, sftp_cloud_sync_config: CloudSyncConfig
+        self,
+        rclone_service: RcloneService,
+        test_repository: Repository,
+        sftp_cloud_sync_config: CloudSyncConfig,
     ) -> None:
         """Test successful SFTP sync using sync_repository method"""
         # Parse JSON configuration
@@ -910,7 +964,9 @@ class TestSyncRepositoryMethod:
         }
 
         # Mock the SFTP sync generator to simulate successful sync
-        async def mock_sftp_sync(*args: Any, **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
+        async def mock_sftp_sync(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[dict[str, Any], None]:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {
                 "type": "progress",
@@ -992,7 +1048,9 @@ class TestSyncRepositoryMethod:
         }
 
         # Mock the SFTP sync generator to simulate successful sync
-        async def mock_sftp_sync(*args: Any, **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
+        async def mock_sftp_sync(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[dict[str, Any], None]:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {"type": "completed", "return_code": 0, "status": "success"}
 
@@ -1025,7 +1083,10 @@ class TestSyncRepositoryMethod:
 
     @pytest.mark.asyncio
     async def test_sync_repository_exception_handling(
-        self, rclone_service: RcloneService, test_repository: Repository, s3_cloud_sync_config: CloudSyncConfig
+        self,
+        rclone_service: RcloneService,
+        test_repository: Repository,
+        s3_cloud_sync_config: CloudSyncConfig,
     ) -> None:
         """Test sync_repository exception handling"""
         # Parse JSON configuration
@@ -1057,7 +1118,10 @@ class TestSyncRepositoryMethod:
 
     @pytest.mark.asyncio
     async def test_sync_repository_progress_callback_integration(
-        self, rclone_service: RcloneService, test_repository: Repository, s3_cloud_sync_config: CloudSyncConfig
+        self,
+        rclone_service: RcloneService,
+        test_repository: Repository,
+        s3_cloud_sync_config: CloudSyncConfig,
     ) -> None:
         """Test sync_repository progress callback functionality"""
         # Parse JSON configuration
@@ -1073,7 +1137,9 @@ class TestSyncRepositoryMethod:
         }
 
         # Mock the S3 sync generator with detailed progress updates
-        async def mock_s3_sync_with_progress(*args: Any, **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
+        async def mock_s3_sync_with_progress(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[dict[str, Any], None]:
             yield {
                 "type": "started",
                 "command": "rclone sync /test/repo/path :s3:test-bucket",
@@ -1142,7 +1208,10 @@ class TestSyncRepositoryMethod:
 
     @pytest.mark.asyncio
     async def test_sync_repository_with_real_database_config(
-        self, rclone_service: RcloneService, test_repository: Repository, s3_cloud_sync_config: CloudSyncConfig
+        self,
+        rclone_service: RcloneService,
+        test_repository: Repository,
+        s3_cloud_sync_config: CloudSyncConfig,
     ) -> None:
         """Test sync_repository using actual CloudSyncConfig from database"""
         # Parse JSON configuration
@@ -1161,7 +1230,11 @@ class TestSyncRepositoryMethod:
 
         # Mock the S3 sync to verify the config values are passed correctly
         async def mock_s3_sync(
-            repository: Repository, access_key_id: str, secret_access_key: str, bucket_name: str, path_prefix: str
+            repository: Repository,
+            access_key_id: str,
+            secret_access_key: str,
+            bucket_name: str,
+            path_prefix: str,
         ) -> AsyncGenerator[dict[str, Any], None]:
             # Verify that the real database values are passed through
             assert repository.path == test_repository.path

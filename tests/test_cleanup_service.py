@@ -61,7 +61,9 @@ class TestCleanupService:
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_cleanup_configs_with_pagination(self, service, test_db: Session) -> None:
+    def test_get_cleanup_configs_with_pagination(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting cleanup configs with pagination."""
         for i in range(5):
             config = CleanupConfig(
@@ -118,7 +120,9 @@ class TestCleanupService:
         assert saved_config is not None
         assert saved_config.strategy == "simple"
 
-    def test_create_cleanup_config_duplicate_name(self, service, test_db: Session) -> None:
+    def test_create_cleanup_config_duplicate_name(
+        self, service, test_db: Session
+    ) -> None:
         """Test cleanup config creation with duplicate name."""
         existing_config = CleanupConfig(
             name="duplicate-name", strategy="simple", keep_within_days=30, enabled=True
@@ -136,7 +140,9 @@ class TestCleanupService:
         assert config is None
         assert "A prune policy with this name already exists" in error
 
-    def test_create_cleanup_config_database_error(self, service, test_db: Session) -> None:
+    def test_create_cleanup_config_database_error(
+        self, service, test_db: Session
+    ) -> None:
         """Test cleanup config creation with database error."""
         config_data = CleanupConfigCreate(
             name="error-config", strategy="simple", keep_within_days=30
@@ -179,7 +185,9 @@ class TestCleanupService:
         assert config is None
         assert "Cleanup configuration not found" in error
 
-    def test_update_cleanup_config_duplicate_name(self, service, test_db: Session) -> None:
+    def test_update_cleanup_config_duplicate_name(
+        self, service, test_db: Session
+    ) -> None:
         """Test updating cleanup config with duplicate name."""
         config1 = CleanupConfig(
             name="config-1", strategy="simple", keep_within_days=30, enabled=True
@@ -276,7 +284,9 @@ class TestCleanupService:
         assert config_name is None
         assert "Cleanup configuration not found" in error
 
-    def test_get_configs_with_descriptions_simple_strategy(self, service, test_db: Session) -> None:
+    def test_get_configs_with_descriptions_simple_strategy(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with descriptions for simple strategy."""
         config = CleanupConfig(
             name="simple-config", strategy="simple", keep_within_days=30, enabled=True
@@ -289,7 +299,9 @@ class TestCleanupService:
         assert len(result) == 1
         assert result[0]["description"] == "Keep archives within 30 days"
 
-    def test_get_configs_with_descriptions_advanced_strategy(self, service, test_db: Session) -> None:
+    def test_get_configs_with_descriptions_advanced_strategy(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with descriptions for advanced strategy."""
         config = CleanupConfig(
             name="advanced-config",
@@ -309,7 +321,9 @@ class TestCleanupService:
         expected_desc = "7 daily, 4 weekly, 12 monthly, 2 yearly"
         assert result[0]["description"] == expected_desc
 
-    def test_get_configs_with_descriptions_partial_advanced(self, service, test_db: Session) -> None:
+    def test_get_configs_with_descriptions_partial_advanced(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with descriptions for partial advanced strategy."""
         config = CleanupConfig(
             name="partial-config",
@@ -327,7 +341,9 @@ class TestCleanupService:
         expected_desc = "7 daily, 12 monthly"
         assert result[0]["description"] == expected_desc
 
-    def test_get_configs_with_descriptions_no_rules(self, service, test_db: Session) -> None:
+    def test_get_configs_with_descriptions_no_rules(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with descriptions for no retention rules."""
         config = CleanupConfig(name="empty-config", strategy="advanced", enabled=True)
         test_db.add(config)

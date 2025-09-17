@@ -138,7 +138,9 @@ class TestJobManagerTaskExecution:
         return manager
 
     @pytest.mark.asyncio
-    async def test_create_composite_job(self, job_manager_with_db, sample_repository) -> None:
+    async def test_create_composite_job(
+        self, job_manager_with_db, sample_repository
+    ) -> None:
         """Test creating a composite job with multiple tasks"""
         task_definitions = [
             {
@@ -603,7 +605,9 @@ class TestJobManagerTaskExecution:
         assert len(task.output_lines) > 0
 
     @pytest.mark.asyncio
-    async def test_execute_notification_task_no_config(self, job_manager_with_db) -> None:
+    async def test_execute_notification_task_no_config(
+        self, job_manager_with_db
+    ) -> None:
         """Test notification task with missing config"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(

@@ -127,7 +127,9 @@ def sample_database_job(test_db: Session, sample_repository: Repository) -> Job:
 
 
 @pytest.fixture
-def sample_database_job_with_tasks(test_db: Session, sample_repository: Repository) -> Job:
+def sample_database_job_with_tasks(
+    test_db: Session, sample_repository: Repository
+) -> Job:
     """Create a Job with JobTasks in the test database."""
     job = Job(
         id=str(uuid.uuid4()),

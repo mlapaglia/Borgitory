@@ -10,12 +10,25 @@ import logging
 import uuid
 import os
 from datetime import datetime, UTC
-from typing import Union, Dict, Optional, List, AsyncGenerator, Any, Callable, TYPE_CHECKING
+from typing import (
+    Union,
+    Dict,
+    Optional,
+    List,
+    AsyncGenerator,
+    Any,
+    Callable,
+    TYPE_CHECKING,
+)
 from dataclasses import dataclass, field
 
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
-from borgitory.services.jobs.job_queue_manager import QueuedJob, JobQueueManager, JobPriority
+from borgitory.services.jobs.job_queue_manager import (
+    QueuedJob,
+    JobQueueManager,
+    JobPriority,
+)
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
     EventType,
@@ -1689,7 +1702,10 @@ class JobManager:
 
 
 # Factory function for creating JobManager instances (no singleton)
-def create_job_manager(config: Optional[Union[JobManagerConfig, Mock]]=None, rclone_service: RcloneService = None) -> JobManager:
+def create_job_manager(
+    config: Optional[Union[JobManagerConfig, Mock]] = None,
+    rclone_service: RcloneService = None,
+) -> JobManager:
     """Factory function for creating JobManager instances"""
     if config is None:
         # Use environment variables or defaults

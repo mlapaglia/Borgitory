@@ -251,7 +251,9 @@ class TestJobRenderServiceUUIDIntegration:
         assert mock_job_with_uuid.id in html
         assert html != ""  # Should not return empty string
 
-    def test_format_database_job_creates_context_with_uuid(self, mock_job_with_uuid) -> None:
+    def test_format_database_job_creates_context_with_uuid(
+        self, mock_job_with_uuid
+    ) -> None:
         """Test that database job formatting creates context with UUID"""
         from borgitory.services.jobs.job_render_service import JobRenderService
         from unittest.mock import Mock

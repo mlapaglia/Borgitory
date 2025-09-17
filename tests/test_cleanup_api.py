@@ -90,7 +90,9 @@ class TestCleanupAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_strategy_fields_success(self, mock_request, mock_templates) -> None:
+    async def test_get_strategy_fields_success(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test getting strategy fields returns correct template response."""
         from borgitory.api.cleanup import get_strategy_fields
 

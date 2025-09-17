@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, Union, Any, Dict, List
+from typing import Union, Any, Dict, List
 from fastapi import (
     APIRouter,
     Depends,
@@ -46,12 +46,6 @@ from borgitory.utils.path_prefix import (
     normalize_path_with_mnt_prefix,
     parse_path_for_autocomplete,
 )
-import fastapi.datastructures
-import sqlalchemy.orm.session
-import starlette.requests
-from borgitory.services.borg_service import BorgService
-from borgitory.services.repositories.repository_service import RepositoryService
-from borgitory.services.volumes.volume_service import VolumeService
 from starlette.templating import _TemplateResponse
 
 router = APIRouter()
@@ -84,7 +78,9 @@ async def create_repository(
 
 
 @router.get("/", response_model=List[RepositorySchema])
-def list_repositories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)) -> List[Repository]:
+def list_repositories(
+    skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
+) -> List[Repository]:
     repositories = db.query(Repository).offset(skip).limit(limit).all()
     return repositories
 
@@ -103,7 +99,9 @@ async def scan_repositories(request: Request, repo_svc: RepositoryServiceDep):
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_repositories_html(request: Request, db: Session = Depends(get_db)) -> _TemplateResponse:
+def get_repositories_html(
+    request: Request, db: Session = Depends(get_db)
+) -> _TemplateResponse:
     """Get repositories as HTML for frontend display"""
     try:
         repositories = db.query(Repository).all()
@@ -123,7 +121,9 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)) -> _T
 
 
 @router.get("/directories")
-async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt") -> Dict[str, Any]:
+async def list_directories(
+    volume_svc: VolumeServiceDep, path: str = "/mnt"
+) -> Dict[str, Any]:
     """List directories at the given path for autocomplete functionality. All paths must be under /mnt."""
 
     try:
@@ -152,7 +152,7 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt") -> 
 async def list_directories_autocomplete(
     request: Request,
     volume_svc: VolumeServiceDep,
-    current_user: User=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """List directories as HTML for autocomplete functionality."""
 
@@ -558,7 +558,9 @@ async def get_archives_loading(request: Request) -> _TemplateResponse:
 
 
 @router.post("/archives/load-with-spinner")
-async def load_archives_with_spinner(request: Request, repository_id: str = Form("")) -> _TemplateResponse:
+async def load_archives_with_spinner(
+    request: Request, repository_id: str = Form("")
+) -> _TemplateResponse:
     """Show loading spinner then trigger loading actual archives"""
     if not repository_id or repository_id == "":
         return templates.TemplateResponse(

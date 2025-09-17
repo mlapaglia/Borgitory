@@ -88,7 +88,9 @@ class TestCloudSyncAPIHTMX:
             assert response.headers["HX-Trigger"] == "cloudSyncUpdate"
 
     @pytest.mark.asyncio
-    async def test_create_config_validation_error_html(self, async_client: AsyncClient) -> None:
+    async def test_create_config_validation_error_html(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test config creation validation error returns HTML."""
         # Send as form data with missing required fields
         form_data = {
@@ -104,7 +106,9 @@ class TestCloudSyncAPIHTMX:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_create_config_service_error_html(self, async_client: AsyncClient) -> None:
+    async def test_create_config_service_error_html(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test config creation service error returns HTML."""
         # Send as form data
         form_data = {

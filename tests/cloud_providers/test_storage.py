@@ -446,7 +446,9 @@ class TestS3Storage:
         assert isinstance(fields, list)
 
     @pytest.mark.asyncio
-    async def test_upload_repository_success(self, s3_storage, mock_rclone_service) -> None:
+    async def test_upload_repository_success(
+        self, s3_storage, mock_rclone_service
+    ) -> None:
         """Test successful repository upload"""
 
         # Setup mock progress
@@ -493,7 +495,9 @@ class TestS3Storage:
         await s3_storage.upload_repository("/test/repo", "backups/")
 
     @pytest.mark.asyncio
-    async def test_upload_repository_error(self, s3_storage, mock_rclone_service) -> None:
+    async def test_upload_repository_error(
+        self, s3_storage, mock_rclone_service
+    ) -> None:
         """Test upload with error"""
 
         async def mock_error_generator(*args, **kwargs):
@@ -521,7 +525,9 @@ class TestS3Storage:
         assert events[1].error == "Network timeout"
 
     @pytest.mark.asyncio
-    async def test_test_connection_success(self, s3_storage, mock_rclone_service) -> None:
+    async def test_test_connection_success(
+        self, s3_storage, mock_rclone_service
+    ) -> None:
         """Test successful connection test"""
         mock_rclone_service.test_s3_connection.return_value = {"status": "success"}
 
@@ -537,7 +543,9 @@ class TestS3Storage:
         )
 
     @pytest.mark.asyncio
-    async def test_test_connection_failure(self, s3_storage, mock_rclone_service) -> None:
+    async def test_test_connection_failure(
+        self, s3_storage, mock_rclone_service
+    ) -> None:
         """Test failed connection test"""
         mock_rclone_service.test_s3_connection.return_value = {"status": "error"}
 
@@ -545,7 +553,9 @@ class TestS3Storage:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_test_connection_exception(self, s3_storage, mock_rclone_service) -> None:
+    async def test_test_connection_exception(
+        self, s3_storage, mock_rclone_service
+    ) -> None:
         """Test connection test with exception"""
         mock_rclone_service.test_s3_connection.side_effect = Exception("Network error")
 
@@ -618,7 +628,9 @@ class TestSFTPStorage:
         assert isinstance(fields, list)
 
     @pytest.mark.asyncio
-    async def test_upload_repository_success(self, sftp_storage, mock_rclone_service) -> None:
+    async def test_upload_repository_success(
+        self, sftp_storage, mock_rclone_service
+    ) -> None:
         """Test successful repository upload"""
 
         async def mock_sync_generator(*args, **kwargs):
@@ -641,7 +653,9 @@ class TestSFTPStorage:
         assert events[3].type == SyncEventType.COMPLETED
 
     @pytest.mark.asyncio
-    async def test_upload_repository_error(self, sftp_storage, mock_rclone_service) -> None:
+    async def test_upload_repository_error(
+        self, sftp_storage, mock_rclone_service
+    ) -> None:
         """Test upload with error"""
 
         async def mock_error_generator(*args, **kwargs):
@@ -667,7 +681,9 @@ class TestSFTPStorage:
         assert events[1].error == "SSH connection refused"
 
     @pytest.mark.asyncio
-    async def test_test_connection_success(self, sftp_storage, mock_rclone_service) -> None:
+    async def test_test_connection_success(
+        self, sftp_storage, mock_rclone_service
+    ) -> None:
         """Test successful connection test"""
         mock_rclone_service.test_sftp_connection.return_value = {"status": "success"}
 
@@ -684,7 +700,9 @@ class TestSFTPStorage:
         )
 
     @pytest.mark.asyncio
-    async def test_test_connection_failure(self, sftp_storage, mock_rclone_service) -> None:
+    async def test_test_connection_failure(
+        self, sftp_storage, mock_rclone_service
+    ) -> None:
         """Test failed connection test"""
         mock_rclone_service.test_sftp_connection.return_value = {"status": "error"}
 
@@ -692,7 +710,9 @@ class TestSFTPStorage:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_test_connection_exception(self, sftp_storage, mock_rclone_service) -> None:
+    async def test_test_connection_exception(
+        self, sftp_storage, mock_rclone_service
+    ) -> None:
         """Test connection test with exception"""
         mock_rclone_service.test_sftp_connection.side_effect = Exception("Timeout")
 

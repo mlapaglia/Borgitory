@@ -164,7 +164,9 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_prune_task_from_config_not_found(self, task_builder, mock_db) -> None:
+    def test_build_prune_task_from_config_not_found(
+        self, task_builder, mock_db
+    ) -> None:
         """Test building prune task when config not found"""
         mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -250,7 +252,9 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_check_task_from_config_not_found(self, task_builder, mock_db) -> None:
+    def test_build_check_task_from_config_not_found(
+        self, task_builder, mock_db
+    ) -> None:
         """Test building check task when config not found"""
         mock_db.query.return_value.filter.return_value.first.return_value = None
 

@@ -168,7 +168,9 @@ class TestArchiveBrowserHTMX:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_list_archives_htmx_not_found(self, async_client: AsyncClient) -> None:
+    async def test_list_archives_htmx_not_found(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test listing archives for non-existent repository."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -389,7 +391,9 @@ class TestArchiveBrowserHTMX:
                 del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
-    async def test_archive_contents_htmx_not_found(self, async_client: AsyncClient) -> None:
+    async def test_archive_contents_htmx_not_found(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test archive contents for non-existent repository."""
         response = await async_client.get(
             "/api/repositories/9999/archives/test-archive/contents",

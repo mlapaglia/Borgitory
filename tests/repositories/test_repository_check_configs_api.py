@@ -163,7 +163,9 @@ class TestRepositoryCheckConfigsAPI:
             status_code=500,
         )
 
-    def test_get_configs_html_success(self, mock_request, mock_templates, mock_service) -> None:
+    def test_get_configs_html_success(
+        self, mock_request, mock_templates, mock_service
+    ) -> None:
         """Test getting configs HTML returns correct template response."""
         from borgitory.api.repository_check_configs import (
             get_repository_check_configs_html,
@@ -226,7 +228,9 @@ class TestRepositoryCheckConfigsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_policy_form_htmx_response(self, mock_request, mock_templates) -> None:
+    async def test_get_policy_form_htmx_response(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test getting policy form returns correct HTMX template response."""
         from borgitory.api.repository_check_configs import get_policy_form
 
@@ -482,7 +486,9 @@ class TestRepositoryCheckConfigsAPI:
         assert exc_info.value.status_code == 404
         assert "Check policy not found" in str(exc_info.value.detail)
 
-    def test_toggle_custom_options_show_custom(self, mock_request, mock_templates) -> None:
+    def test_toggle_custom_options_show_custom(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test toggling custom options shows custom options when no config selected."""
         from borgitory.api.repository_check_configs import toggle_custom_options
 
@@ -495,7 +501,9 @@ class TestRepositoryCheckConfigsAPI:
             {"show_custom": True},
         )
 
-    def test_toggle_custom_options_hide_custom(self, mock_request, mock_templates) -> None:
+    def test_toggle_custom_options_hide_custom(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test toggling custom options hides custom options when config selected."""
         from borgitory.api.repository_check_configs import toggle_custom_options
 
@@ -532,7 +540,9 @@ class TestRepositoryCheckConfigsAPI:
         assert context["time_limit_display"] == "block"
         assert context["archive_filters_display"] == "none"
 
-    def test_update_check_options_full_check_type(self, mock_request, mock_templates) -> None:
+    def test_update_check_options_full_check_type(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test update check options for full check type."""
         from borgitory.api.repository_check_configs import update_check_options
 

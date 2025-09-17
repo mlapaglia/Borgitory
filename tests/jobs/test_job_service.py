@@ -108,7 +108,9 @@ class TestJobService:
         assert task_definitions[1]["keep_within"] == "30d"
 
     @pytest.mark.asyncio
-    async def test_create_backup_job_repository_not_found(self, test_db: Session) -> None:
+    async def test_create_backup_job_repository_not_found(
+        self, test_db: Session
+    ) -> None:
         """Test backup job creation with non-existent repository."""
         backup_request = BackupRequest(
             repository_id=999, source_path="/data", compression="lz4", dry_run=False

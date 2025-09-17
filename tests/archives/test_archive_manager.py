@@ -257,7 +257,9 @@ class TestArchiveManager:
         assert names == ["adir", "bdir", "alpha.txt", "zebra.txt"]
 
     @pytest.mark.asyncio
-    async def test_extract_file_stream_success(self, archive_manager, test_repository) -> None:
+    async def test_extract_file_stream_success(
+        self, archive_manager, test_repository
+    ) -> None:
         """Test successful file extraction streaming."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
             # Mock process
@@ -278,7 +280,9 @@ class TestArchiveManager:
             mock_subprocess.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_extract_file_stream_error(self, archive_manager, test_repository) -> None:
+    async def test_extract_file_stream_error(
+        self, archive_manager, test_repository
+    ) -> None:
         """Test file extraction with Borg error."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = Mock()

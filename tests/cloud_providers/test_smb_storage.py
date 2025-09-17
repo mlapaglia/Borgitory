@@ -198,7 +198,9 @@ class TestSMBStorage:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_upload_repository_success(self, storage, mock_rclone_service) -> None:
+    async def test_upload_repository_success(
+        self, storage, mock_rclone_service
+    ) -> None:
         """Test successful repository upload"""
 
         # Mock the async generator
@@ -228,7 +230,9 @@ class TestSMBStorage:
         assert any(event.type.value == "completed" for event in progress_events)
 
     @pytest.mark.asyncio
-    async def test_upload_repository_failure(self, storage, mock_rclone_service) -> None:
+    async def test_upload_repository_failure(
+        self, storage, mock_rclone_service
+    ) -> None:
         """Test repository upload failure"""
 
         async def mock_failing_generator(*args, **kwargs):

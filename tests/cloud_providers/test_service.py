@@ -719,7 +719,9 @@ class TestCloudSyncService:
 
         assert result == decrypted_config
 
-    def test_service_with_default_encryption_service(self, service_with_defaults) -> None:
+    def test_service_with_default_encryption_service(
+        self, service_with_defaults
+    ) -> None:
         """Test that service creates default encryption service when none provided"""
         # This tests the default parameter handling in __init__
         assert service_with_defaults._encryption_service is not None

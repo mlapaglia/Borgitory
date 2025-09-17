@@ -120,7 +120,9 @@ class TestCloudSyncService:
         saved_config_data = json.loads(saved_config.provider_config)
         assert saved_config_data["host"] == "sftp.example.com"
 
-    def test_create_sftp_config_with_private_key(self, service, test_db: Session) -> None:
+    def test_create_sftp_config_with_private_key(
+        self, service, test_db: Session
+    ) -> None:
         """Test successful SFTP config creation with private key."""
         config_data = CloudSyncConfigCreate(
             name="test-sftp-key",
@@ -184,7 +186,9 @@ class TestCloudSyncService:
         assert exc_info.value.status_code == 400
         assert "already exists" in str(exc_info.value.detail)
 
-    def test_create_s3_config_missing_credentials(self, service, test_db: Session) -> None:
+    def test_create_s3_config_missing_credentials(
+        self, service, test_db: Session
+    ) -> None:
         """Test S3 config creation with missing credentials - schema validation."""
         # This test verifies that Pydantic schema validation catches missing credentials
         with pytest.raises(ValueError) as exc_info:
@@ -199,7 +203,9 @@ class TestCloudSyncService:
 
         assert "Invalid s3 configuration" in str(exc_info.value)
 
-    def test_create_sftp_config_missing_required_fields(self, service, test_db: Session) -> None:
+    def test_create_sftp_config_missing_required_fields(
+        self, service, test_db: Session
+    ) -> None:
         """Test SFTP config creation with missing required fields - schema validation."""
         # This test verifies that Pydantic schema validation catches missing username
         with pytest.raises(ValueError) as exc_info:
@@ -231,7 +237,9 @@ class TestCloudSyncService:
 
         assert "Invalid sftp configuration" in str(exc_info.value)
 
-    def test_create_config_unsupported_provider(self, service, test_db: Session) -> None:
+    def test_create_config_unsupported_provider(
+        self, service, test_db: Session
+    ) -> None:
         """Test config creation with unsupported provider."""
         from pydantic_core import ValidationError
 

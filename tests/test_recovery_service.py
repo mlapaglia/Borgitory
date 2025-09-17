@@ -123,7 +123,9 @@ class TestRecoveryService:
             mock_release_lock.assert_called_once_with(mock_repository)
 
     @pytest.mark.asyncio
-    async def test_recover_database_job_records_non_backup_job(self, recovery_service) -> None:
+    async def test_recover_database_job_records_non_backup_job(
+        self, recovery_service
+    ) -> None:
         """Test recovery with non-backup job (no lock release needed)"""
         mock_db = MagicMock()
 

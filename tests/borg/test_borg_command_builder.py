@@ -101,7 +101,9 @@ class TestBorgCommandBuilder:
         assert "/test/repo/path::custom-archive-name" in additional_args
 
     @patch("borgitory.services.borg_command_builder.validate_compression")
-    def test_build_backup_command_validation_failure(self, mock_validate_compression) -> None:
+    def test_build_backup_command_validation_failure(
+        self, mock_validate_compression
+    ) -> None:
         """Test backup command building fails with invalid compression"""
         mock_validate_compression.side_effect = Exception("Invalid compression")
 
@@ -436,7 +438,9 @@ class TestBorgCommandBuilder:
 
     @patch("borgitory.services.borg_command_builder.datetime")
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
-    def test_generate_archive_name_default(self, mock_validate_archive, mock_datetime) -> None:
+    def test_generate_archive_name_default(
+        self, mock_validate_archive, mock_datetime
+    ) -> None:
         """Test generating default archive name"""
         mock_datetime.now.return_value.strftime.return_value = "2024-01-15_14-30-45"
 
@@ -512,7 +516,9 @@ class TestBorgCommandBuilder:
         assert "repository" in errors
 
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
-    def test_validate_command_parameters_invalid_archive(self, mock_validate_archive) -> None:
+    def test_validate_command_parameters_invalid_archive(
+        self, mock_validate_archive
+    ) -> None:
         """Test parameter validation with invalid archive name"""
         mock_validate_archive.side_effect = Exception("Invalid archive name")
 

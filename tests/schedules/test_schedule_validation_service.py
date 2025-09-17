@@ -28,7 +28,9 @@ class TestScheduleValidationService:
         """Create a ScheduleService instance with mocked dependencies."""
         return ScheduleService(mock_db, mock_scheduler_service)
 
-    def test_validate_schedule_creation_data_valid_input(self, schedule_service) -> None:
+    def test_validate_schedule_creation_data_valid_input(
+        self, schedule_service
+    ) -> None:
         """Test validation with valid input data."""
         valid_data = {
             "name": "Daily Backup",
@@ -86,7 +88,9 @@ class TestScheduleValidationService:
             "notification_config_id": None,
         }
 
-    def test_validate_schedule_creation_data_missing_name(self, schedule_service) -> None:
+    def test_validate_schedule_creation_data_missing_name(
+        self, schedule_service
+    ) -> None:
         """Test validation with missing name."""
         invalid_data = {
             "name": "",
@@ -271,7 +275,9 @@ class TestScheduleValidationService:
             assert is_valid is True
             assert processed_data["cloud_sync_config_id"] == expected_output
 
-    def test_validate_schedule_creation_data_exception_handling(self, schedule_service) -> None:
+    def test_validate_schedule_creation_data_exception_handling(
+        self, schedule_service
+    ) -> None:
         """Test validation handles exceptions gracefully."""
         # Pass None instead of dict to trigger exception
         is_valid, processed_data, error_msg = (

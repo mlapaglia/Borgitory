@@ -329,14 +329,18 @@ class TestBackupsAPI:
         assert len(content) > 0
 
     @pytest.mark.asyncio
-    async def test_get_backup_form_invalid_route(self, async_client: AsyncClient) -> None:
+    async def test_get_backup_form_invalid_route(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test that invalid routes return 404."""
         response = await async_client.get("/api/backups/invalid")
 
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_get_backup_form_method_not_allowed(self, async_client: AsyncClient) -> None:
+    async def test_get_backup_form_method_not_allowed(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test that non-GET methods return 405."""
         response = await async_client.post("/api/backups/form")
 

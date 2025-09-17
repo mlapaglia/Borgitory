@@ -179,7 +179,9 @@ class TestDebugService:
             assert result["database_size_bytes"] == 1024 * 1024
             assert result["database_accessible"] is True
 
-    def test_get_database_info_size_formatting(self, debug_service, mock_db_session) -> None:
+    def test_get_database_info_size_formatting(
+        self, debug_service, mock_db_session
+    ) -> None:
         """Test database size formatting for different sizes"""
         mock_db_session.query.return_value.count.return_value = 1
 
@@ -204,7 +206,9 @@ class TestDebugService:
             result = debug_service._get_database_info(mock_db_session)
             assert result["database_size"] == "2.0 GB"
 
-    def test_get_database_info_exception_handling(self, debug_service, mock_db_session) -> None:
+    def test_get_database_info_exception_handling(
+        self, debug_service, mock_db_session
+    ) -> None:
         """Test database info exception handling"""
         mock_db_session.query.side_effect = Exception("Database error")
 
@@ -343,7 +347,9 @@ class TestDebugService:
             assert "SECRET_KEY" not in result  # Not in safe list
             assert "PASSWORD" not in result  # Not in safe list
 
-    def test_get_environment_info_hides_sensitive_database_url(self, debug_service) -> None:
+    def test_get_environment_info_hides_sensitive_database_url(
+        self, debug_service
+    ) -> None:
         """Test that non-sqlite database URLs are hidden"""
         mock_env = {"DATABASE_URL": "postgresql://user:pass@localhost/db"}
 

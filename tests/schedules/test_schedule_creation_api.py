@@ -116,7 +116,9 @@ class TestScheduleCreationAPI:
         error_message = extract_error_message(html_content)
         assert "Schedule name is required" in error_message
 
-    def test_create_schedule_missing_repository(self, client, setup_dependencies) -> None:
+    def test_create_schedule_missing_repository(
+        self, client, setup_dependencies
+    ) -> None:
         """Test creating a schedule without a repository."""
         invalid_data = {
             "name": "Test Schedule",
@@ -132,7 +134,9 @@ class TestScheduleCreationAPI:
         error_message = extract_error_message(html_content)
         assert "Repository is required" in error_message
 
-    def test_create_schedule_invalid_repository_id(self, client, setup_dependencies) -> None:
+    def test_create_schedule_invalid_repository_id(
+        self, client, setup_dependencies
+    ) -> None:
         """Test creating a schedule with invalid repository ID."""
         invalid_data = {
             "name": "Test Schedule",
@@ -148,7 +152,9 @@ class TestScheduleCreationAPI:
         error_message = extract_error_message(html_content)
         assert "Invalid repository ID" in error_message
 
-    def test_create_schedule_missing_cron_expression(self, client, setup_dependencies) -> None:
+    def test_create_schedule_missing_cron_expression(
+        self, client, setup_dependencies
+    ) -> None:
         """Test creating a schedule without cron expression."""
         invalid_data = {
             "name": "Test Schedule",
@@ -231,7 +237,9 @@ class TestScheduleCreationAPI:
                 or description in html_content
             )
 
-    def test_create_schedule_whitespace_handling(self, client, setup_dependencies) -> None:
+    def test_create_schedule_whitespace_handling(
+        self, client, setup_dependencies
+    ) -> None:
         """Test creating a schedule with whitespace in inputs."""
         data_with_whitespace = {
             "name": "  Test Schedule  ",
@@ -249,7 +257,9 @@ class TestScheduleCreationAPI:
             or "Test Schedule" in html_content
         )
 
-    def test_create_schedule_optional_fields_handling(self, client, setup_dependencies) -> None:
+    def test_create_schedule_optional_fields_handling(
+        self, client, setup_dependencies
+    ) -> None:
         """Test creating a schedule with various optional field values."""
         test_cases = [
             {"cloud_sync_config_id": ""},
@@ -274,7 +284,9 @@ class TestScheduleCreationAPI:
                 f"Failed for optional fields: {optional_fields}"
             )
 
-    def test_create_schedule_nonexistent_repository(self, client, setup_dependencies) -> None:
+    def test_create_schedule_nonexistent_repository(
+        self, client, setup_dependencies
+    ) -> None:
         """Test creating a schedule with non-existent repository."""
         invalid_data = {
             "name": "Test Schedule",

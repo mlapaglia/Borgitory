@@ -286,7 +286,9 @@ class TestNotificationConfigService:
         assert name is None
         assert "not found" in error
 
-    def test_get_configs_with_descriptions_success(self, service, test_db: Session) -> None:
+    def test_get_configs_with_descriptions_success(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with computed descriptions."""
         # Config that notifies on both success and failure
         config1 = NotificationConfig(
@@ -360,7 +362,9 @@ class TestNotificationConfigService:
         assert app_token is None
         assert "not found" in error
 
-    def test_get_config_credentials_unsupported_provider(self, service, test_db: Session) -> None:
+    def test_get_config_credentials_unsupported_provider(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting credentials for unsupported provider."""
         # Create config with unsupported provider (shouldn't happen normally)
         config = NotificationConfig(

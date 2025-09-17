@@ -63,7 +63,9 @@ class TestJobDatabaseManager:
         assert not hasattr(manager, "_db_session_factory")
         assert manager.db_session_factory is not None
 
-    def test_initialization_with_custom_dependencies(self, mock_db_session_factory) -> None:
+    def test_initialization_with_custom_dependencies(
+        self, mock_db_session_factory
+    ) -> None:
         """Test initialization with custom dependencies"""
         factory, _ = mock_db_session_factory
 

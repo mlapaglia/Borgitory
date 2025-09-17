@@ -61,7 +61,9 @@ class TestVolumeService:
     """Test the VolumeService class"""
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_success(self, volume_service, mock_filesystem) -> None:
+    async def test_get_mounted_volumes_success(
+        self, volume_service, mock_filesystem
+    ) -> None:
         """Test successful discovery of volumes under /mnt"""
         # Set up mock filesystem
         mock_filesystem.add_directory("/mnt")
@@ -115,7 +117,9 @@ class TestVolumeService:
         assert len(volumes) == 2
 
     @pytest.mark.asyncio
-    async def test_get_mounted_volumes_exception_handling(self, mock_filesystem) -> None:
+    async def test_get_mounted_volumes_exception_handling(
+        self, mock_filesystem
+    ) -> None:
         """Test handling of exceptions during directory listing"""
 
         # Create a filesystem that throws exceptions
@@ -158,7 +162,9 @@ class TestVolumeService:
             assert info["accessible"] is False
 
     @pytest.mark.asyncio
-    async def test_volumes_sorted_consistently(self, volume_service, mock_filesystem) -> None:
+    async def test_volumes_sorted_consistently(
+        self, volume_service, mock_filesystem
+    ) -> None:
         """Test that volumes are returned in sorted order"""
         # Set up mock filesystem with unsorted directories
         mock_filesystem.add_directory("/mnt")

@@ -14,7 +14,9 @@ from borgitory.api.cloud_sync import _get_supported_providers
 class TestRegistryBusinessLogic:
     """Test registry functions directly (business logic)"""
 
-    def test_get_all_provider_info_with_registered_providers(self, production_registry) -> None:
+    def test_get_all_provider_info_with_registered_providers(
+        self, production_registry
+    ) -> None:
         """Test getting all provider info when providers are registered"""
         provider_info = production_registry.get_all_provider_info()
 
@@ -41,7 +43,9 @@ class TestRegistryBusinessLogic:
         assert smb_info["supports_encryption"] is True
         assert smb_info["supports_versioning"] is False
 
-    def test_get_supported_providers_returns_sorted_list(self, production_registry) -> None:
+    def test_get_supported_providers_returns_sorted_list(
+        self, production_registry
+    ) -> None:
         """Test that supported providers are returned in sorted order"""
         providers = production_registry.get_supported_providers()
 
@@ -53,7 +57,9 @@ class TestRegistryBusinessLogic:
         # Should be sorted
         assert providers == sorted(providers)
 
-    def test_get_config_class_returns_correct_classes(self, production_registry) -> None:
+    def test_get_config_class_returns_correct_classes(
+        self, production_registry
+    ) -> None:
         """Test that config classes are returned correctly"""
         # Test by class name to avoid identity issues after module reloading
         s3_config_class = production_registry.get_config_class("s3")
@@ -68,7 +74,9 @@ class TestRegistryBusinessLogic:
         assert smb_config_class.__name__ == "SMBStorageConfig"
         assert production_registry.get_config_class("unknown") is None
 
-    def test_get_storage_class_returns_correct_classes(self, production_registry) -> None:
+    def test_get_storage_class_returns_correct_classes(
+        self, production_registry
+    ) -> None:
         """Test that storage classes are returned correctly"""
         # Test by class name to avoid identity issues after module reloading
         s3_storage_class = production_registry.get_storage_class("s3")

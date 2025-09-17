@@ -8,9 +8,13 @@ preventing cross-test contamination and enabling reliable test execution.
 import pytest
 from typing import List
 from unittest.mock import Mock
-from borgitory.services.cloud_providers.registry_factory import ProviderRegistry, RegistryFactory
+from borgitory.services.cloud_providers.registry_factory import (
+    ProviderRegistry,
+    RegistryFactory,
+)
 from borgitory.services.jobs.job_manager import JobManagerDependencies
 from borgitory.services.jobs.job_executor import JobExecutor
+
 
 @pytest.fixture
 def clean_registry() -> ProviderRegistry:

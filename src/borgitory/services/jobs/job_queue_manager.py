@@ -231,7 +231,9 @@ class JobQueueManager:
                 logger.error(f"Error in operation queue processor: {e}")
                 await asyncio.sleep(1)
 
-    async def _execute_and_cleanup_job(self, queued_job: QueuedJob, is_backup: bool) -> None:
+    async def _execute_and_cleanup_job(
+        self, queued_job: QueuedJob, is_backup: bool
+    ) -> None:
         """Execute job and clean up resources when complete"""
         job_id = queued_job.job_id
         success = False

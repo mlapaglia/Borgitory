@@ -36,7 +36,9 @@ class TestDatabaseConfigLoadService:
         return DatabaseConfigLoadService(db_session_factory)
 
     @pytest.mark.asyncio
-    async def test_load_config_success_with_json_config(self, service, test_db: Session) -> None:
+    async def test_load_config_success_with_json_config(
+        self, service, test_db: Session
+    ) -> None:
         """Test loading config with new JSON-based configuration"""
         # Create config with JSON provider_config
         provider_config = {
@@ -90,7 +92,9 @@ class TestDatabaseConfigLoadService:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_load_config_with_empty_path_prefix(self, service, test_db: Session) -> None:
+    async def test_load_config_with_empty_path_prefix(
+        self, service, test_db: Session
+    ) -> None:
         """Test loading config with empty path prefix"""
         provider_config = {
             "bucket_name": "test-bucket",
@@ -129,7 +133,9 @@ class TestDatabaseConfigLoadService:
         assert result is None  # Should handle error gracefully
 
     @pytest.mark.asyncio
-    async def test_load_config_json_parse_error(self, service, test_db: Session) -> None:
+    async def test_load_config_json_parse_error(
+        self, service, test_db: Session
+    ) -> None:
         """Test handling invalid JSON in provider_config"""
         db_config = DbCloudSyncConfig(
             name="invalid-json",
@@ -213,7 +219,9 @@ class TestDatabaseConfigLoadService:
             assert result.config["bucket_name"] == f"bucket-{i}"
 
     @pytest.mark.asyncio
-    async def test_load_config_with_sftp_provider(self, service, test_db: Session) -> None:
+    async def test_load_config_with_sftp_provider(
+        self, service, test_db: Session
+    ) -> None:
         """Test loading SFTP config with JSON configuration"""
         provider_config = {
             "host": "sftp.example.com",
@@ -389,7 +397,9 @@ class TestMockConfigLoadService:
         assert sftp_result.config["max_connections"] == 5
 
     @pytest.mark.asyncio
-    async def test_mock_service_returns_same_reference(self, service, sample_configs) -> None:
+    async def test_mock_service_returns_same_reference(
+        self, service, sample_configs
+    ) -> None:
         """Test that mock service returns the same object reference"""
         result1 = await service.load_config(1)
         result2 = await service.load_config(1)

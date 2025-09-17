@@ -321,7 +321,9 @@ class TestCloudSyncer:
         assert len(storage._upload_calls) == 0
 
     @pytest.mark.asyncio
-    async def test_sync_upload_failure(self, syncer_upload_fail, mock_event_handler) -> None:
+    async def test_sync_upload_failure(
+        self, syncer_upload_fail, mock_event_handler
+    ) -> None:
         """Test sync when upload fails with exception"""
         repository_path = "/test/repo"
 
@@ -386,7 +388,9 @@ class TestCloudSyncer:
         assert 0 < result.duration_seconds < (end_time - start_time + 1)
 
     @pytest.mark.asyncio
-    async def test_test_connection_success(self, syncer_success, mock_event_handler) -> None:
+    async def test_test_connection_success(
+        self, syncer_success, mock_event_handler
+    ) -> None:
         """Test successful connection test"""
         result = await syncer_success.test_connection()
 
@@ -502,7 +506,9 @@ class TestCloudSyncer:
         assert storage._upload_calls[0][1] == ""
 
     @pytest.mark.asyncio
-    async def test_progress_callback_asyncio_task_creation(self, syncer_success) -> None:
+    async def test_progress_callback_asyncio_task_creation(
+        self, syncer_success
+    ) -> None:
         """Test that progress callback properly creates asyncio tasks"""
         # This test verifies the asyncio.create_task line in the progress callback
         repository_path = "/test/repo"

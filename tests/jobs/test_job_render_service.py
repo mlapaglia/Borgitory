@@ -72,7 +72,9 @@ class TestJobRenderService:
         assert job_context["job"].id in html
         assert html != ""
 
-    def test_format_database_job_creates_context_with_uuid(self, mock_job_manager) -> None:
+    def test_format_database_job_creates_context_with_uuid(
+        self, mock_job_manager
+    ) -> None:
         """Test that database job formatting creates context with UUID"""
         job_context = create_mock_job_context(
             job_type="composite", tasks=[Mock(task_name="backup", status="completed")]
@@ -97,7 +99,9 @@ class TestJobRenderService:
         assert result is not None  # All jobs are now composite
         assert "sorted_tasks" in result
 
-    def test_job_context_maintains_backward_compatibility(self, mock_job_manager) -> None:
+    def test_job_context_maintains_backward_compatibility(
+        self, mock_job_manager
+    ) -> None:
         """Test that job context provides job_uuid for template compatibility"""
         job_context = create_mock_job_context()
         mock_job = job_context["job"]
@@ -225,7 +229,9 @@ class TestJobRenderServiceCurrentJobs:
 
         assert "No operations currently running" in result
 
-    def test_render_current_jobs_html_with_composite_jobs(self, mock_job_manager) -> None:
+    def test_render_current_jobs_html_with_composite_jobs(
+        self, mock_job_manager
+    ) -> None:
         """Test rendering with composite jobs that have tasks"""
         # Create mock composite job
         mock_task = Mock()
@@ -249,7 +255,9 @@ class TestJobRenderServiceCurrentJobs:
         assert "backup" in result
         assert "1/1" in result  # Progress indicator
 
-    def test_render_current_jobs_html_with_simple_borg_jobs(self, mock_job_manager) -> None:
+    def test_render_current_jobs_html_with_simple_borg_jobs(
+        self, mock_job_manager
+    ) -> None:
         """Test rendering with simple borg jobs (not part of composite)"""
         mock_job = Mock()
         mock_job.status = "running"
@@ -267,7 +275,9 @@ class TestJobRenderServiceCurrentJobs:
         assert "Files: 100" in result
         assert "1GB" in result
 
-    def test_render_current_jobs_html_filters_child_jobs(self, mock_job_manager) -> None:
+    def test_render_current_jobs_html_filters_child_jobs(
+        self, mock_job_manager
+    ) -> None:
         """Test that child jobs of composite jobs are filtered out"""
         # Composite job with tasks
         composite_job = Mock()
@@ -613,7 +623,9 @@ class TestJobRenderServiceTaskStatusFixes:
         assert result[2].status == "skipped"  # After failed task
         assert result[3].status == "skipped"  # After failed task
 
-    def test_fix_task_statuses_with_running_task_in_failed_job(self, mock_job_manager) -> None:
+    def test_fix_task_statuses_with_running_task_in_failed_job(
+        self, mock_job_manager
+    ) -> None:
         """Test fixing when a running task exists in failed job (likely failed)"""
         task1 = Mock()
         task1.status = "completed"
@@ -665,7 +677,9 @@ class TestJobRenderServiceStreaming:
     """Test streaming functionality"""
 
     @pytest.mark.asyncio
-    async def test_stream_current_jobs_html_initial_render(self, mock_job_manager) -> None:
+    async def test_stream_current_jobs_html_initial_render(
+        self, mock_job_manager
+    ) -> None:
         """Test initial HTML stream for current jobs"""
         mock_job_manager.jobs = {}
         mock_job_manager.stream_all_job_updates = AsyncMock()
@@ -684,7 +698,9 @@ class TestJobRenderServiceStreaming:
         assert first_chunk.endswith("\n\n")
 
     @pytest.mark.asyncio
-    async def test_stream_current_jobs_html_with_updates(self, mock_job_manager) -> None:
+    async def test_stream_current_jobs_html_with_updates(
+        self, mock_job_manager
+    ) -> None:
         """Test streaming with job updates"""
         mock_job_manager.jobs = {}
 
@@ -720,7 +736,9 @@ class TestJobRenderServiceStreaming:
         assert all(chunk.endswith("\n\n") for chunk in chunks)
 
     @pytest.mark.asyncio
-    async def test_stream_current_jobs_html_error_in_update(self, mock_job_manager) -> None:
+    async def test_stream_current_jobs_html_error_in_update(
+        self, mock_job_manager
+    ) -> None:
         """Test handling errors during stream updates"""
         mock_job_manager.jobs = {}
 
@@ -754,7 +772,9 @@ class TestJobRenderServiceStreaming:
             assert "Error" in chunks[-1] or "data: " in chunks[-1]
 
     @pytest.mark.asyncio
-    async def test_stream_current_jobs_html_initial_error(self, mock_job_manager) -> None:
+    async def test_stream_current_jobs_html_initial_error(
+        self, mock_job_manager
+    ) -> None:
         """Test handling error in initial render"""
         # Make initial render fail
         mock_job_manager.jobs = {"bad-job": None}

@@ -424,7 +424,9 @@ version = 2
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_get_scan_results_job_completed_no_output(self, repository_parser) -> None:
+    async def test_get_scan_results_job_completed_no_output(
+        self, repository_parser
+    ) -> None:
         """Test getting results from completed job with no output."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.return_value = {
@@ -525,7 +527,9 @@ version = 2
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_parse_scan_output_invalid_repositories(self, repository_parser) -> None:
+    async def test_parse_scan_output_invalid_repositories(
+        self, repository_parser
+    ) -> None:
         """Test parsing scan output where paths exist but aren't valid Borg repos."""
         scan_output = "/path/to/invalid1\n/path/to/invalid2"
 
@@ -597,7 +601,9 @@ version = 2
             assert "Metadata unavailable: Metadata error" in result[0]["preview"]
 
     @pytest.mark.asyncio
-    async def test_parse_scan_output_unnamed_repository(self, repository_parser) -> None:
+    async def test_parse_scan_output_unnamed_repository(
+        self, repository_parser
+    ) -> None:
         """Test parsing scan output with repository that has no name."""
         scan_output = "/"  # Root path edge case
 
@@ -620,7 +626,9 @@ class TestRepositoryParserMetadata:
     """Test metadata collection functionality."""
 
     @pytest.mark.asyncio
-    async def test_get_repository_metadata_size_success(self, repository_parser) -> None:
+    async def test_get_repository_metadata_size_success(
+        self, repository_parser
+    ) -> None:
         """Test successful size collection."""
         mock_result = Mock()
         mock_result.return_code = 0
@@ -657,7 +665,9 @@ class TestRepositoryParserMetadata:
         assert "size" not in metadata
 
     @pytest.mark.asyncio
-    async def test_get_repository_metadata_size_exception(self, repository_parser) -> None:
+    async def test_get_repository_metadata_size_exception(
+        self, repository_parser
+    ) -> None:
         """Test size collection when du command raises exception."""
         repository_parser.command_runner.run_command = AsyncMock(
             side_effect=Exception("Command failed")
@@ -669,7 +679,9 @@ class TestRepositoryParserMetadata:
         assert "size" not in metadata
 
     @pytest.mark.asyncio
-    async def test_get_repository_metadata_last_backup_success(self, repository_parser) -> None:
+    async def test_get_repository_metadata_last_backup_success(
+        self, repository_parser
+    ) -> None:
         """Test successful last backup time collection."""
         test_time = 1640995200.0  # 2022-01-01 00:00:00 UTC
 
@@ -800,7 +812,9 @@ class TestRepositoryParserMetadata:
         assert metadata["last_backup"] == "2023-01-01T00:00:00+00:00"
 
     @pytest.mark.asyncio
-    async def test_get_repository_metadata_repo_not_exist(self, repository_parser) -> None:
+    async def test_get_repository_metadata_repo_not_exist(
+        self, repository_parser
+    ) -> None:
         """Test metadata collection when repository path doesn't exist."""
         repository_parser.command_runner.run_command = AsyncMock(
             side_effect=Exception("No du")
@@ -1261,7 +1275,9 @@ class TestRepositoryParserErrorHandling:
     """Test error handling in RepositoryParser."""
 
     @pytest.mark.asyncio
-    async def test_start_repository_scan_no_job_manager(self, repository_parser) -> None:
+    async def test_start_repository_scan_no_job_manager(
+        self, repository_parser
+    ) -> None:
         """Test scan start without job manager."""
         repository_parser.job_manager = None
 
@@ -1269,7 +1285,9 @@ class TestRepositoryParserErrorHandling:
             await repository_parser.start_repository_scan()
 
     @pytest.mark.asyncio
-    async def test_start_repository_scan_job_manager_error(self, repository_parser) -> None:
+    async def test_start_repository_scan_job_manager_error(
+        self, repository_parser
+    ) -> None:
         """Test handling job manager errors during scan start."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(

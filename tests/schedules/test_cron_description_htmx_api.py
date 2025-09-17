@@ -157,7 +157,9 @@ class TestCronDescriptionHTMXAPI:
     @patch(
         "borgitory.services.cron_description_service.CronDescriptionService.get_human_description"
     )
-    def test_describe_cron_expression_service_integration(self, mock_service, client) -> None:
+    def test_describe_cron_expression_service_integration(
+        self, mock_service, client
+    ) -> None:
         """Test that the endpoint integrates correctly with the service."""
         # Mock service response
         mock_service.return_value = {"description": "Mocked description", "error": None}

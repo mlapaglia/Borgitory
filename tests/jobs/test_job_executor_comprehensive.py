@@ -55,7 +55,9 @@ class TestJobExecutorPruneTask:
         assert b"Prune completed successfully" in result.stdout
 
     @pytest.mark.asyncio
-    async def test_execute_prune_task_with_all_retention_options(self, executor) -> None:
+    async def test_execute_prune_task_with_all_retention_options(
+        self, executor
+    ) -> None:
         """Test prune task with all retention options"""
         repository_path = "/test/repo"
         passphrase = "test-passphrase"
@@ -573,7 +575,9 @@ class TestJobExecutorParseProgressLine:
     def executor(self):
         return JobExecutor()
 
-    def test_parse_progress_line_with_special_characters_in_path(self, executor) -> None:
+    def test_parse_progress_line_with_special_characters_in_path(
+        self, executor
+    ) -> None:
         """Test parsing progress line with special characters in path"""
         line = "1000000 500000 300000 50 /path/with spaces/and-special_chars/file.txt"
 

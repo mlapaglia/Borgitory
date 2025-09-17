@@ -168,7 +168,9 @@ class TestPushoverService:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_send_backup_success_notification_basic(self, pushover_service) -> None:
+    async def test_send_backup_success_notification_basic(
+        self, pushover_service
+    ) -> None:
         """Test backup success notification with basic parameters"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -219,7 +221,9 @@ class TestPushoverService:
             )
 
     @pytest.mark.asyncio
-    async def test_send_backup_failure_notification_basic(self, pushover_service) -> None:
+    async def test_send_backup_failure_notification_basic(
+        self, pushover_service
+    ) -> None:
         """Test backup failure notification with basic parameters"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -242,7 +246,9 @@ class TestPushoverService:
             )
 
     @pytest.mark.asyncio
-    async def test_send_backup_failure_notification_with_error(self, pushover_service) -> None:
+    async def test_send_backup_failure_notification_with_error(
+        self, pushover_service
+    ) -> None:
         """Test backup failure notification with error message"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -377,7 +383,9 @@ class TestPushoverService:
         )
 
     @pytest.mark.asyncio
-    async def test_job_type_formatting_in_success_notification(self, pushover_service) -> None:
+    async def test_job_type_formatting_in_success_notification(
+        self, pushover_service
+    ) -> None:
         """Test that job types are properly formatted in success notifications"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -394,7 +402,9 @@ class TestPushoverService:
             assert "Backup Prune Compact completed successfully" in kwargs["message"]
 
     @pytest.mark.asyncio
-    async def test_job_type_formatting_in_failure_notification(self, pushover_service) -> None:
+    async def test_job_type_formatting_in_failure_notification(
+        self, pushover_service
+    ) -> None:
         """Test that job types are properly formatted in failure notifications"""
         with patch.object(
             pushover_service, "send_notification", return_value=True

@@ -56,7 +56,9 @@ class TestScheduleService:
         assert is_valid is False
         assert "Invalid cron expression" in error
 
-    def test_get_schedule_by_id_success(self, service, test_db, sample_repository) -> None:
+    def test_get_schedule_by_id_success(
+        self, service, test_db, sample_repository
+    ) -> None:
         """Test getting schedule by ID successfully."""
         schedule = Schedule(
             name="test-schedule",
@@ -107,7 +109,9 @@ class TestScheduleService:
         assert "schedule-1" in names
         assert "schedule-2" in names
 
-    def test_get_schedules_with_pagination(self, service, test_db, sample_repository) -> None:
+    def test_get_schedules_with_pagination(
+        self, service, test_db, sample_repository
+    ) -> None:
         """Test getting schedules with pagination."""
         for i in range(5):
             schedule = Schedule(
@@ -180,7 +184,9 @@ class TestScheduleService:
         assert "Repository not found" in error
 
     @pytest.mark.asyncio
-    async def test_create_schedule_invalid_cron(self, service, sample_repository) -> None:
+    async def test_create_schedule_invalid_cron(
+        self, service, sample_repository
+    ) -> None:
         """Test schedule creation with invalid cron expression."""
         success, schedule, error = await service.create_schedule(
             name="test-schedule",
