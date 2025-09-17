@@ -16,13 +16,13 @@ from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
 class TestJobEventBroadcaster:
     """Test JobEventBroadcaster functionality"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures"""
         self.broadcaster = JobEventBroadcaster(
             max_queue_size=5, keepalive_timeout=1.0, cleanup_interval=0.5
         )
 
-    def test_job_event_creation(self):
+    def test_job_event_creation(self) -> None:
         """Test JobEvent creation and serialization"""
         event = JobEvent(
             event_type=EventType.JOB_STARTED,
@@ -37,7 +37,7 @@ class TestJobEventBroadcaster:
         assert event_dict["data"]["status"] == "running"
         assert "timestamp" in event_dict
 
-    def test_job_event_defaults(self):
+    def test_job_event_defaults(self) -> None:
         """Test JobEvent with default values"""
         event = JobEvent(event_type=EventType.KEEPALIVE)
 
@@ -48,7 +48,7 @@ class TestJobEventBroadcaster:
         assert event_dict["data"] == {}
         assert event_dict["timestamp"] is not None
 
-    def test_subscribe_client(self):
+    def test_subscribe_client(self) -> None:
         """Test client subscription"""
         queue = self.broadcaster.subscribe_client(client_id="test-client-1")
 
@@ -62,14 +62,14 @@ class TestJobEventBroadcaster:
         assert "connected_at" in metadata
         assert metadata["events_sent"] == 0
 
-    def test_subscribe_client_auto_id(self):
+    def test_subscribe_client_auto_id(self) -> None:
         """Test client subscription with auto-generated ID"""
         queue = self.broadcaster.subscribe_client()
 
         metadata = self.broadcaster._client_queue_metadata[queue]
         assert metadata["client_id"] == "client_0"
 
-    def test_unsubscribe_client(self):
+    def test_unsubscribe_client(self) -> None:
         """Test client unsubscription"""
         queue = self.broadcaster.subscribe_client(client_id="test-client-1")
 
@@ -79,7 +79,7 @@ class TestJobEventBroadcaster:
         assert len(self.broadcaster._client_queues) == 0
         assert queue not in self.broadcaster._client_queue_metadata
 
-    def test_broadcast_event_no_clients(self):
+    def test_broadcast_event_no_clients(self) -> None:
         """Test broadcasting event with no subscribed clients"""
         self.broadcaster.broadcast_event(
             EventType.JOB_STARTED, job_id="test-job", data={"status": "running"}
@@ -89,7 +89,7 @@ class TestJobEventBroadcaster:
         assert len(self.broadcaster._recent_events) == 1
         assert self.broadcaster._recent_events[0].event_type == EventType.JOB_STARTED
 
-    def test_broadcast_event_with_clients(self):
+    def test_broadcast_event_with_clients(self) -> None:
         """Test broadcasting event to subscribed clients"""
         # Subscribe two clients
         queue1 = self.broadcaster.subscribe_client(client_id="client-1")
@@ -109,7 +109,7 @@ class TestJobEventBroadcaster:
         assert event1["job_id"] == "test-job"
         assert event1["data"]["result"] == "success"
 
-    def test_broadcast_event_full_queue(self):
+    def test_broadcast_event_full_queue(self) -> None:
         """Test broadcasting to full client queue"""
         # Create queue at max capacity
         queue = self.broadcaster.subscribe_client()
@@ -124,7 +124,7 @@ class TestJobEventBroadcaster:
         # Queue should be removed due to being full
         assert len(self.broadcaster._client_queues) < initial_client_count
 
-    def test_recent_events_limit(self):
+    def test_recent_events_limit(self) -> None:
         """Test recent events list respects size limit"""
         # Broadcast more events than max_recent_events (50)
         for i in range(60):
@@ -137,7 +137,7 @@ class TestJobEventBroadcaster:
         assert self.broadcaster._recent_events[-1].data["progress"] == 59
 
     @pytest.mark.asyncio
-    async def test_stream_events_for_client(self):
+    async def test_stream_events_for_client(self) -> None:
         """Test streaming events for a specific client"""
         queue = asyncio.Queue(maxsize=2)
         queue.put_nowait({"type": "test", "data": "event1"})
@@ -153,7 +153,7 @@ class TestJobEventBroadcaster:
         assert event2["data"] == "event2"
 
     @pytest.mark.asyncio
-    async def test_stream_events_timeout_keepalive(self):
+    async def test_stream_events_timeout_keepalive(self) -> None:
         """Test streaming events sends keepalive on timeout"""
         empty_queue = asyncio.Queue()
 
@@ -167,7 +167,7 @@ class TestJobEventBroadcaster:
         assert "timestamp" in event
 
     @pytest.mark.asyncio
-    async def test_stream_all_events(self):
+    async def test_stream_all_events(self) -> None:
         """Test streaming all events creates and manages client subscription"""
         # Create a real queue with test events instead of mocking
         test_queue = asyncio.Queue(maxsize=5)
@@ -189,7 +189,7 @@ class TestJobEventBroadcaster:
         assert len(events) == 1
         assert events[0]["type"] == "test"
 
-    def test_get_client_stats(self):
+    def test_get_client_stats(self) -> None:
         """Test getting client statistics"""
         # Subscribe multiple clients
         queue1 = self.broadcaster.subscribe_client(client_id="client-1")
@@ -210,7 +210,7 @@ class TestJobEventBroadcaster:
         assert client_details["client-1"]["events_sent"] == 5
         assert client_details["client-2"]["events_sent"] == 3
 
-    def test_get_event_history(self):
+    def test_get_event_history(self) -> None:
         """Test getting event history"""
         # Add some events
         for i in range(5):
@@ -225,7 +225,7 @@ class TestJobEventBroadcaster:
         assert history[0]["data"]["step"] == 2
 
     @pytest.mark.asyncio
-    async def test_initialize(self):
+    async def test_initialize(self) -> None:
         """Test broadcaster initialization"""
         await self.broadcaster.initialize()
 
@@ -236,7 +236,7 @@ class TestJobEventBroadcaster:
         assert not self.broadcaster._keepalive_task.done()
 
     @pytest.mark.asyncio
-    async def test_shutdown(self):
+    async def test_shutdown(self) -> None:
         """Test broadcaster shutdown"""
         await self.broadcaster.initialize()
 

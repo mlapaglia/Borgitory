@@ -3,6 +3,7 @@ Tests for NotificationConfigService - Business logic tests
 """
 
 import pytest
+from sqlalchemy.orm import Session
 from borgitory.services.notifications.notification_config_service import (
     NotificationConfigService,
 )
@@ -10,13 +11,13 @@ from borgitory.models.database import NotificationConfig
 
 
 @pytest.fixture
-def service(test_db):
+def service(test_db: Session):
     """NotificationConfigService instance with real database session."""
     return NotificationConfigService(test_db)
 
 
 @pytest.fixture
-def sample_config(test_db):
+def sample_config(test_db: Session):
     """Create a sample notification config for testing."""
     config = NotificationConfig(
         name="test-config",
@@ -35,12 +36,12 @@ def sample_config(test_db):
 class TestNotificationConfigService:
     """Test class for NotificationConfigService business logic."""
 
-    def test_get_all_configs_empty(self, service):
+    def test_get_all_configs_empty(self, service) -> None:
         """Test getting configs when none exist."""
         result = service.get_all_configs()
         assert result == []
 
-    def test_get_all_configs_with_data(self, service, test_db):
+    def test_get_all_configs_with_data(self, service, test_db: Session) -> None:
         """Test getting configs with data."""
         config1 = NotificationConfig(
             name="config-1",
@@ -70,7 +71,7 @@ class TestNotificationConfigService:
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_all_configs_pagination(self, service, test_db):
+    def test_get_all_configs_pagination(self, service, test_db: Session) -> None:
         """Test getting configs with pagination."""
         for i in range(5):
             config = NotificationConfig(
@@ -87,19 +88,19 @@ class TestNotificationConfigService:
         result = service.get_all_configs(skip=2, limit=2)
         assert len(result) == 2
 
-    def test_get_config_by_id_success(self, service, sample_config):
+    def test_get_config_by_id_success(self, service, sample_config) -> None:
         """Test getting config by ID successfully."""
         result = service.get_config_by_id(sample_config.id)
         assert result is not None
         assert result.name == "test-config"
         assert result.id == sample_config.id
 
-    def test_get_config_by_id_not_found(self, service):
+    def test_get_config_by_id_not_found(self, service) -> None:
         """Test getting non-existent config by ID."""
         result = service.get_config_by_id(999)
         assert result is None
 
-    def test_create_config_success(self, service, test_db):
+    def test_create_config_success(self, service, test_db: Session) -> None:
         """Test successful config creation."""
         success, config, error = service.create_config(
             name="new-config",
@@ -132,7 +133,7 @@ class TestNotificationConfigService:
         assert user_key == "new-user"
         assert app_token == "new-token"
 
-    def test_create_config_database_error(self, service, test_db):
+    def test_create_config_database_error(self, service, test_db: Session) -> None:
         """Test config creation with database error."""
         from unittest.mock import patch
 
@@ -151,7 +152,7 @@ class TestNotificationConfigService:
             assert config is None
             assert "Failed to create notification configuration" in error
 
-    def test_update_config_success(self, service, test_db, sample_config):
+    def test_update_config_success(self, service, test_db, sample_config) -> None:
         """Test successful config update."""
         success, updated_config, error = service.update_config(
             config_id=sample_config.id,
@@ -174,7 +175,7 @@ class TestNotificationConfigService:
         assert user_key == "updated-user"
         assert app_token == "updated-token"
 
-    def test_update_config_not_found(self, service):
+    def test_update_config_not_found(self, service) -> None:
         """Test updating non-existent config."""
         success, config, error = service.update_config(
             config_id=999,
@@ -190,7 +191,7 @@ class TestNotificationConfigService:
         assert config is None
         assert "not found" in error
 
-    def test_enable_config_success(self, service, test_db):
+    def test_enable_config_success(self, service, test_db: Session) -> None:
         """Test successful config enabling."""
         # Create disabled config
         config = NotificationConfig(
@@ -216,7 +217,7 @@ class TestNotificationConfigService:
         test_db.refresh(config)
         assert config.enabled is True
 
-    def test_enable_config_not_found(self, service):
+    def test_enable_config_not_found(self, service) -> None:
         """Test enabling non-existent config."""
         success, success_msg, error = service.enable_config(999)
 
@@ -224,7 +225,7 @@ class TestNotificationConfigService:
         assert success_msg is None
         assert "not found" in error
 
-    def test_disable_config_success(self, service, test_db):
+    def test_disable_config_success(self, service, test_db: Session) -> None:
         """Test successful config disabling."""
         # Create enabled config
         config = NotificationConfig(
@@ -250,7 +251,7 @@ class TestNotificationConfigService:
         test_db.refresh(config)
         assert config.enabled is False
 
-    def test_disable_config_not_found(self, service):
+    def test_disable_config_not_found(self, service) -> None:
         """Test disabling non-existent config."""
         success, success_msg, error = service.disable_config(999)
 
@@ -258,7 +259,7 @@ class TestNotificationConfigService:
         assert success_msg is None
         assert "not found" in error
 
-    def test_delete_config_success(self, service, test_db, sample_config):
+    def test_delete_config_success(self, service, test_db, sample_config) -> None:
         """Test successful config deletion."""
         config_id = sample_config.id
         config_name = sample_config.name
@@ -277,7 +278,7 @@ class TestNotificationConfigService:
         )
         assert deleted_config is None
 
-    def test_delete_config_not_found(self, service):
+    def test_delete_config_not_found(self, service) -> None:
         """Test deleting non-existent config."""
         success, name, error = service.delete_config(999)
 
@@ -285,7 +286,7 @@ class TestNotificationConfigService:
         assert name is None
         assert "not found" in error
 
-    def test_get_configs_with_descriptions_success(self, service, test_db):
+    def test_get_configs_with_descriptions_success(self, service, test_db: Session) -> None:
         """Test getting configs with computed descriptions."""
         # Config that notifies on both success and failure
         config1 = NotificationConfig(
@@ -334,12 +335,12 @@ class TestNotificationConfigService:
         none_config = next(c for c in result if c["name"] == "no-notifications")
         assert none_config["notification_desc"] == "No notifications"
 
-    def test_get_configs_with_descriptions_empty(self, service):
+    def test_get_configs_with_descriptions_empty(self, service) -> None:
         """Test getting config descriptions when database is empty."""
         result = service.get_configs_with_descriptions()
         assert result == []
 
-    def test_get_config_credentials_success(self, service, sample_config):
+    def test_get_config_credentials_success(self, service, sample_config) -> None:
         """Test getting config credentials successfully."""
         success, user_key, app_token, error = service.get_config_credentials(
             sample_config.id
@@ -350,7 +351,7 @@ class TestNotificationConfigService:
         assert app_token == "test-token"
         assert error is None
 
-    def test_get_config_credentials_not_found(self, service):
+    def test_get_config_credentials_not_found(self, service) -> None:
         """Test getting credentials for non-existent config."""
         success, user_key, app_token, error = service.get_config_credentials(999)
 
@@ -359,7 +360,7 @@ class TestNotificationConfigService:
         assert app_token is None
         assert "not found" in error
 
-    def test_get_config_credentials_unsupported_provider(self, service, test_db):
+    def test_get_config_credentials_unsupported_provider(self, service, test_db: Session) -> None:
         """Test getting credentials for unsupported provider."""
         # Create config with unsupported provider (shouldn't happen normally)
         config = NotificationConfig(
@@ -380,7 +381,7 @@ class TestNotificationConfigService:
         assert app_token is None
         assert "Unsupported notification provider" in error
 
-    def test_config_lifecycle(self, service, test_db):
+    def test_config_lifecycle(self, service, test_db: Session) -> None:
         """Test complete config lifecycle: create, update, enable/disable, delete."""
         # Create
         success, created_config, error = service.create_config(

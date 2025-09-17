@@ -35,7 +35,7 @@ class TestProgressStreaming:
         return db
 
     @pytest.mark.asyncio
-    async def test_progress_streaming_basic_flow(self, mock_repository, mock_db):
+    async def test_progress_streaming_basic_flow(self, mock_repository, mock_db) -> None:
         """Test that progress streaming sends expected SSE events"""
 
         # Override database dependency
@@ -147,7 +147,7 @@ class TestProgressStreaming:
                 del app.dependency_overrides[get_repository_stats_service]
 
     @pytest.mark.asyncio
-    async def test_progress_streaming_error_handling(self, mock_repository, mock_db):
+    async def test_progress_streaming_error_handling(self, mock_repository, mock_db) -> None:
         """Test that errors are properly streamed via SSE"""
 
         # Override database dependency
@@ -213,7 +213,7 @@ class TestProgressStreaming:
                 del app.dependency_overrides[get_repository_stats_service]
 
     @pytest.mark.asyncio
-    async def test_progress_streaming_repository_not_found(self, mock_db):
+    async def test_progress_streaming_repository_not_found(self, mock_db) -> None:
         """Test handling of non-existent repository"""
 
         # Override database dependency
@@ -235,7 +235,7 @@ class TestProgressStreaming:
             # Clean up dependency override
             app.dependency_overrides.clear()
 
-    def test_progress_streaming_html_template_elements(self):
+    def test_progress_streaming_html_template_elements(self) -> None:
         """Test that loading template has correct SSE swap elements"""
         from fastapi.templating import Jinja2Templates
         from fastapi import Request
@@ -298,7 +298,7 @@ class TestProgressStreaming:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_full_progress_streaming_integration(self):
+    async def test_full_progress_streaming_integration(self) -> None:
         """
         Integration test that verifies the complete progress streaming flow
         This test requires a test repository to be available

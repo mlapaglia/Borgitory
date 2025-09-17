@@ -21,7 +21,7 @@ from borgitory.services.cloud_providers.types import SyncEventType, ConnectionIn
 class TestS3StorageConfig:
     """Test S3 storage configuration validation"""
 
-    def test_valid_s3_config(self):
+    def test_valid_s3_config(self) -> None:
         """Test creating valid S3 config"""
         config = S3StorageConfig(
             bucket_name="my-backup-bucket",
@@ -38,7 +38,7 @@ class TestS3StorageConfig:
         assert config.storage_class == "GLACIER"
         assert config.endpoint_url is None
 
-    def test_s3_config_with_defaults(self):
+    def test_s3_config_with_defaults(self) -> None:
         """Test S3 config with default values"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
@@ -50,7 +50,7 @@ class TestS3StorageConfig:
         assert config.storage_class == "STANDARD"  # Default
         assert config.endpoint_url is None
 
-    def test_s3_config_with_custom_endpoint(self):
+    def test_s3_config_with_custom_endpoint(self) -> None:
         """Test S3 config with custom endpoint (MinIO, etc.)"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
@@ -61,7 +61,7 @@ class TestS3StorageConfig:
 
         assert config.endpoint_url == "https://minio.example.com:9000"
 
-    def test_bucket_name_normalization(self):
+    def test_bucket_name_normalization(self) -> None:
         """Test that bucket names are normalized to lowercase"""
         config = S3StorageConfig(
             bucket_name="MY-UPPERCASE-BUCKET",
@@ -71,7 +71,7 @@ class TestS3StorageConfig:
 
         assert config.bucket_name == "my-uppercase-bucket"
 
-    def test_invalid_bucket_name_too_short(self):
+    def test_invalid_bucket_name_too_short(self) -> None:
         """Test validation of bucket name too short"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
@@ -82,7 +82,7 @@ class TestS3StorageConfig:
 
         assert "at least 3 characters" in str(exc_info.value)
 
-    def test_invalid_bucket_name_too_long(self):
+    def test_invalid_bucket_name_too_long(self) -> None:
         """Test validation of bucket name too long"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
@@ -93,7 +93,7 @@ class TestS3StorageConfig:
 
         assert "at most 63 characters" in str(exc_info.value)
 
-    def test_invalid_storage_class(self):
+    def test_invalid_storage_class(self) -> None:
         """Test validation of invalid storage class"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
@@ -105,7 +105,7 @@ class TestS3StorageConfig:
 
         assert "Invalid storage class" in str(exc_info.value)
 
-    def test_storage_class_normalization(self):
+    def test_storage_class_normalization(self) -> None:
         """Test that storage class is normalized to uppercase"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
@@ -116,7 +116,7 @@ class TestS3StorageConfig:
 
         assert config.storage_class == "GLACIER"
 
-    def test_all_valid_storage_classes(self):
+    def test_all_valid_storage_classes(self) -> None:
         """Test all valid storage classes"""
         valid_classes = [
             "STANDARD",
@@ -137,7 +137,7 @@ class TestS3StorageConfig:
             )
             assert config.storage_class == storage_class
 
-    def test_empty_access_key(self):
+    def test_empty_access_key(self) -> None:
         """Test validation of empty access key"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
@@ -148,7 +148,7 @@ class TestS3StorageConfig:
 
         assert "at least 16 characters" in str(exc_info.value)
 
-    def test_empty_secret_key(self):
+    def test_empty_secret_key(self) -> None:
         """Test validation of empty secret key"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
@@ -159,7 +159,7 @@ class TestS3StorageConfig:
 
         assert "at least 40 characters" in str(exc_info.value)
 
-    def test_invalid_access_key_format(self):
+    def test_invalid_access_key_format(self) -> None:
         """Test validation of access key format"""
         # Test key not starting with AKIA
         with pytest.raises(ValidationError) as exc_info:
@@ -197,7 +197,7 @@ class TestS3StorageConfig:
             )
         assert "must start with 'AKIA'" in str(exc_info.value)
 
-    def test_invalid_secret_key_format(self):
+    def test_invalid_secret_key_format(self) -> None:
         """Test validation of secret key format"""
         # Test key with wrong length (too short)
         with pytest.raises(ValidationError) as exc_info:
@@ -230,7 +230,7 @@ class TestS3StorageConfig:
 class TestSFTPStorageConfig:
     """Test SFTP storage configuration validation"""
 
-    def test_valid_sftp_config_with_password(self):
+    def test_valid_sftp_config_with_password(self) -> None:
         """Test creating valid SFTP config with password"""
         config = SFTPStorageConfig(
             host="backup.example.com",
@@ -248,7 +248,7 @@ class TestSFTPStorageConfig:
         assert config.port == 2222
         assert config.host_key_checking is True
 
-    def test_valid_sftp_config_with_private_key(self):
+    def test_valid_sftp_config_with_private_key(self) -> None:
         """Test creating valid SFTP config with private key"""
         private_key = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC..."
         config = SFTPStorageConfig(
@@ -265,7 +265,7 @@ class TestSFTPStorageConfig:
         assert config.remote_path == "/backups"
         assert config.port == 22  # Default
 
-    def test_sftp_config_with_both_auth_methods(self):
+    def test_sftp_config_with_both_auth_methods(self) -> None:
         """Test SFTP config with both password and private key"""
         config = SFTPStorageConfig(
             host="backup.example.com",
@@ -279,7 +279,7 @@ class TestSFTPStorageConfig:
         assert config.password == "password"
         assert config.private_key == "private_key_content"
 
-    def test_remote_path_normalization(self):
+    def test_remote_path_normalization(self) -> None:
         """Test remote path normalization"""
         test_cases = [
             ("backups", "/backups"),
@@ -298,7 +298,7 @@ class TestSFTPStorageConfig:
             )
             assert config.remote_path == expected
 
-    def test_missing_authentication(self):
+    def test_missing_authentication(self) -> None:
         """Test that missing authentication fails validation"""
         with pytest.raises(ValidationError) as exc_info:
             SFTPStorageConfig(
@@ -310,7 +310,7 @@ class TestSFTPStorageConfig:
 
         assert "Either password or private_key must be provided" in str(exc_info.value)
 
-    def test_invalid_port_range(self):
+    def test_invalid_port_range(self) -> None:
         """Test port validation"""
         # Port too low
         with pytest.raises(ValidationError):
@@ -332,7 +332,7 @@ class TestSFTPStorageConfig:
                 port=65536,
             )
 
-    def test_valid_port_range(self):
+    def test_valid_port_range(self) -> None:
         """Test valid port values"""
         valid_ports = [1, 22, 443, 2222, 65535]
 
@@ -346,7 +346,7 @@ class TestSFTPStorageConfig:
             )
             assert config.port == port
 
-    def test_empty_host(self):
+    def test_empty_host(self) -> None:
         """Test validation of empty host"""
         with pytest.raises(ValidationError):
             SFTPStorageConfig(
@@ -356,7 +356,7 @@ class TestSFTPStorageConfig:
                 remote_path="/backups",
             )
 
-    def test_empty_username(self):
+    def test_empty_username(self) -> None:
         """Test validation of empty username"""
         with pytest.raises(ValidationError):
             SFTPStorageConfig(
@@ -366,7 +366,7 @@ class TestSFTPStorageConfig:
                 remote_path="/backups",
             )
 
-    def test_empty_remote_path(self):
+    def test_empty_remote_path(self) -> None:
         """Test validation of empty remote path"""
         with pytest.raises(ValidationError):
             SFTPStorageConfig(
@@ -400,14 +400,14 @@ class TestS3Storage:
         """S3Storage instance with mocked dependencies"""
         return S3Storage(s3_config, mock_rclone_service)
 
-    def test_initialization(self, s3_config, mock_rclone_service):
+    def test_initialization(self, s3_config, mock_rclone_service) -> None:
         """Test S3Storage initialization"""
         storage = S3Storage(s3_config, mock_rclone_service)
 
         assert storage._config is s3_config
         assert storage._rclone_service is mock_rclone_service
 
-    def test_get_connection_info(self, s3_storage):
+    def test_get_connection_info(self, s3_storage) -> None:
         """Test getting connection info"""
         info = s3_storage.get_connection_info()
 
@@ -425,7 +425,7 @@ class TestS3Storage:
             "AKIATESTKEY123456789"
         )  # Could be same length if masking pattern changes
 
-    def test_get_connection_info_short_access_key(self, mock_rclone_service):
+    def test_get_connection_info_short_access_key(self, mock_rclone_service) -> None:
         """Test connection info with short access key that still meets validation"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
@@ -438,7 +438,7 @@ class TestS3Storage:
         # Should still mask the key
         assert "***" in info.details["access_key"]
 
-    def test_get_sensitive_fields(self, s3_storage):
+    def test_get_sensitive_fields(self, s3_storage) -> None:
         """Test getting sensitive field names"""
         fields = s3_storage.get_sensitive_fields()
 
@@ -446,7 +446,7 @@ class TestS3Storage:
         assert isinstance(fields, list)
 
     @pytest.mark.asyncio
-    async def test_upload_repository_success(self, s3_storage, mock_rclone_service):
+    async def test_upload_repository_success(self, s3_storage, mock_rclone_service) -> None:
         """Test successful repository upload"""
 
         # Setup mock progress
@@ -459,7 +459,7 @@ class TestS3Storage:
         # Capture progress events
         events = []
 
-        def progress_callback(event):
+        def progress_callback(event) -> None:
             events.append(event)
 
         # Execute upload
@@ -481,7 +481,7 @@ class TestS3Storage:
     @pytest.mark.asyncio
     async def test_upload_repository_without_callback(
         self, s3_storage, mock_rclone_service
-    ):
+    ) -> None:
         """Test upload without progress callback"""
 
         async def mock_sync_generator(*args, **kwargs):
@@ -493,7 +493,7 @@ class TestS3Storage:
         await s3_storage.upload_repository("/test/repo", "backups/")
 
     @pytest.mark.asyncio
-    async def test_upload_repository_error(self, s3_storage, mock_rclone_service):
+    async def test_upload_repository_error(self, s3_storage, mock_rclone_service) -> None:
         """Test upload with error"""
 
         async def mock_error_generator(*args, **kwargs):
@@ -504,7 +504,7 @@ class TestS3Storage:
 
         events = []
 
-        def progress_callback(event):
+        def progress_callback(event) -> None:
             events.append(event)
 
         # Should raise exception
@@ -521,7 +521,7 @@ class TestS3Storage:
         assert events[1].error == "Network timeout"
 
     @pytest.mark.asyncio
-    async def test_test_connection_success(self, s3_storage, mock_rclone_service):
+    async def test_test_connection_success(self, s3_storage, mock_rclone_service) -> None:
         """Test successful connection test"""
         mock_rclone_service.test_s3_connection.return_value = {"status": "success"}
 
@@ -537,7 +537,7 @@ class TestS3Storage:
         )
 
     @pytest.mark.asyncio
-    async def test_test_connection_failure(self, s3_storage, mock_rclone_service):
+    async def test_test_connection_failure(self, s3_storage, mock_rclone_service) -> None:
         """Test failed connection test"""
         mock_rclone_service.test_s3_connection.return_value = {"status": "error"}
 
@@ -545,7 +545,7 @@ class TestS3Storage:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_test_connection_exception(self, s3_storage, mock_rclone_service):
+    async def test_test_connection_exception(self, s3_storage, mock_rclone_service) -> None:
         """Test connection test with exception"""
         mock_rclone_service.test_s3_connection.side_effect = Exception("Network error")
 
@@ -577,14 +577,14 @@ class TestSFTPStorage:
         """SFTPStorage instance with mocked dependencies"""
         return SFTPStorage(sftp_config, mock_rclone_service)
 
-    def test_initialization(self, sftp_config, mock_rclone_service):
+    def test_initialization(self, sftp_config, mock_rclone_service) -> None:
         """Test SFTPStorage initialization"""
         storage = SFTPStorage(sftp_config, mock_rclone_service)
 
         assert storage._config is sftp_config
         assert storage._rclone_service is mock_rclone_service
 
-    def test_get_connection_info_password_auth(self, sftp_storage):
+    def test_get_connection_info_password_auth(self, sftp_storage) -> None:
         """Test getting connection info with password auth"""
         info = sftp_storage.get_connection_info()
 
@@ -597,7 +597,7 @@ class TestSFTPStorage:
         assert info.details["auth_method"] == "password"
         assert info.details["host_key_checking"] is True
 
-    def test_get_connection_info_private_key_auth(self, mock_rclone_service):
+    def test_get_connection_info_private_key_auth(self, mock_rclone_service) -> None:
         """Test getting connection info with private key auth"""
         config = SFTPStorageConfig(
             host="backup.example.com",
@@ -610,7 +610,7 @@ class TestSFTPStorage:
         info = storage.get_connection_info()
         assert info.details["auth_method"] == "private_key"
 
-    def test_get_sensitive_fields(self, sftp_storage):
+    def test_get_sensitive_fields(self, sftp_storage) -> None:
         """Test getting sensitive field names"""
         fields = sftp_storage.get_sensitive_fields()
 
@@ -618,7 +618,7 @@ class TestSFTPStorage:
         assert isinstance(fields, list)
 
     @pytest.mark.asyncio
-    async def test_upload_repository_success(self, sftp_storage, mock_rclone_service):
+    async def test_upload_repository_success(self, sftp_storage, mock_rclone_service) -> None:
         """Test successful repository upload"""
 
         async def mock_sync_generator(*args, **kwargs):
@@ -629,7 +629,7 @@ class TestSFTPStorage:
 
         events = []
 
-        def progress_callback(event):
+        def progress_callback(event) -> None:
             events.append(event)
 
         await sftp_storage.upload_repository("/test/repo", "daily/", progress_callback)
@@ -641,7 +641,7 @@ class TestSFTPStorage:
         assert events[3].type == SyncEventType.COMPLETED
 
     @pytest.mark.asyncio
-    async def test_upload_repository_error(self, sftp_storage, mock_rclone_service):
+    async def test_upload_repository_error(self, sftp_storage, mock_rclone_service) -> None:
         """Test upload with error"""
 
         async def mock_error_generator(*args, **kwargs):
@@ -652,7 +652,7 @@ class TestSFTPStorage:
 
         events = []
 
-        def progress_callback(event):
+        def progress_callback(event) -> None:
             events.append(event)
 
         with pytest.raises(
@@ -667,7 +667,7 @@ class TestSFTPStorage:
         assert events[1].error == "SSH connection refused"
 
     @pytest.mark.asyncio
-    async def test_test_connection_success(self, sftp_storage, mock_rclone_service):
+    async def test_test_connection_success(self, sftp_storage, mock_rclone_service) -> None:
         """Test successful connection test"""
         mock_rclone_service.test_sftp_connection.return_value = {"status": "success"}
 
@@ -684,7 +684,7 @@ class TestSFTPStorage:
         )
 
     @pytest.mark.asyncio
-    async def test_test_connection_failure(self, sftp_storage, mock_rclone_service):
+    async def test_test_connection_failure(self, sftp_storage, mock_rclone_service) -> None:
         """Test failed connection test"""
         mock_rclone_service.test_sftp_connection.return_value = {"status": "error"}
 
@@ -692,7 +692,7 @@ class TestSFTPStorage:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_test_connection_exception(self, sftp_storage, mock_rclone_service):
+    async def test_test_connection_exception(self, sftp_storage, mock_rclone_service) -> None:
         """Test connection test with exception"""
         mock_rclone_service.test_sftp_connection.side_effect = Exception("Timeout")
 

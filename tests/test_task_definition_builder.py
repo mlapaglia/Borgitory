@@ -87,7 +87,7 @@ def mock_notification_config():
 class TestTaskDefinitionBuilder:
     """Test the TaskDefinitionBuilder class"""
 
-    def test_build_backup_task_defaults(self, task_builder):
+    def test_build_backup_task_defaults(self, task_builder) -> None:
         """Test building backup task with default parameters"""
         task = task_builder.build_backup_task("test-repo")
 
@@ -101,7 +101,7 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_backup_task_custom_params(self, task_builder):
+    def test_build_backup_task_custom_params(self, task_builder) -> None:
         """Test building backup task with custom parameters"""
         task = task_builder.build_backup_task(
             "custom-repo", source_path="/custom/path", compression="lz4", dry_run=True
@@ -119,7 +119,7 @@ class TestTaskDefinitionBuilder:
 
     def test_build_prune_task_from_config_simple_strategy(
         self, task_builder, mock_db, mock_cleanup_config
-    ):
+    ) -> None:
         """Test building prune task from simple strategy config"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
             mock_cleanup_config
@@ -141,7 +141,7 @@ class TestTaskDefinitionBuilder:
 
     def test_build_prune_task_from_config_advanced_strategy(
         self, task_builder, mock_db, mock_advanced_cleanup_config
-    ):
+    ) -> None:
         """Test building prune task from advanced strategy config"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
             mock_advanced_cleanup_config
@@ -164,7 +164,7 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_prune_task_from_config_not_found(self, task_builder, mock_db):
+    def test_build_prune_task_from_config_not_found(self, task_builder, mock_db) -> None:
         """Test building prune task when config not found"""
         mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -172,7 +172,7 @@ class TestTaskDefinitionBuilder:
 
         assert task is None
 
-    def test_build_prune_task_from_request_simple(self, task_builder):
+    def test_build_prune_task_from_request_simple(self, task_builder) -> None:
         """Test building prune task from simple strategy request"""
         prune_request = MagicMock(spec=PruneRequest)
         prune_request.strategy = "simple"
@@ -196,7 +196,7 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_prune_task_from_request_advanced(self, task_builder):
+    def test_build_prune_task_from_request_advanced(self, task_builder) -> None:
         """Test building prune task from advanced strategy request"""
         prune_request = MagicMock(spec=PruneRequest)
         prune_request.strategy = "advanced"
@@ -226,7 +226,7 @@ class TestTaskDefinitionBuilder:
 
     def test_build_check_task_from_config(
         self, task_builder, mock_db, mock_check_config
-    ):
+    ) -> None:
         """Test building check task from borgitory.configuration"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
             mock_check_config
@@ -250,7 +250,7 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_check_task_from_config_not_found(self, task_builder, mock_db):
+    def test_build_check_task_from_config_not_found(self, task_builder, mock_db) -> None:
         """Test building check task when config not found"""
         mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -258,7 +258,7 @@ class TestTaskDefinitionBuilder:
 
         assert task is None
 
-    def test_build_check_task_from_request(self, task_builder):
+    def test_build_check_task_from_request(self, task_builder) -> None:
         """Test building check task from request"""
         check_request = MagicMock(spec=CheckRequest)
         check_request.check_type = "repository_only"
@@ -289,7 +289,7 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_cloud_sync_task_with_repo_name(self, task_builder):
+    def test_build_cloud_sync_task_with_repo_name(self, task_builder) -> None:
         """Test building cloud sync task with repository name"""
         task = task_builder.build_cloud_sync_task("test-repo")
 
@@ -301,7 +301,7 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_cloud_sync_task_without_repo_name(self, task_builder):
+    def test_build_cloud_sync_task_without_repo_name(self, task_builder) -> None:
         """Test building cloud sync task without repository name"""
         task = task_builder.build_cloud_sync_task()
 
@@ -313,7 +313,7 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_cloud_sync_task_with_config_id(self, task_builder):
+    def test_build_cloud_sync_task_with_config_id(self, task_builder) -> None:
         """Test building cloud sync task with config ID"""
         task = task_builder.build_cloud_sync_task("test-repo", cloud_sync_config_id=123)
 
@@ -327,7 +327,7 @@ class TestTaskDefinitionBuilder:
 
     def test_build_notification_task(
         self, task_builder, mock_db, mock_notification_config
-    ):
+    ) -> None:
         """Test building notification task"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
             mock_notification_config
@@ -346,7 +346,7 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_notification_task_not_found(self, task_builder, mock_db):
+    def test_build_notification_task_not_found(self, task_builder, mock_db) -> None:
         """Test building notification task when config not found"""
         mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -361,7 +361,7 @@ class TestTaskDefinitionBuilder:
         mock_cleanup_config,
         mock_check_config,
         mock_notification_config,
-    ):
+    ) -> None:
         """Test building comprehensive task list with all task types"""
 
         # Setup mock returns for different configs
@@ -404,7 +404,7 @@ class TestTaskDefinitionBuilder:
         assert backup_task["source_path"] == "/custom"
         assert backup_task["compression"] == "lz4"
 
-    def test_build_task_list_minimal(self, task_builder):
+    def test_build_task_list_minimal(self, task_builder) -> None:
         """Test building minimal task list with only backup"""
         tasks = task_builder.build_task_list(
             repository_name="test-repo", include_backup=True
@@ -416,7 +416,7 @@ class TestTaskDefinitionBuilder:
 
     def test_build_task_list_no_backup(
         self, task_builder, mock_db, mock_cleanup_config
-    ):
+    ) -> None:
         """Test building task list without backup task"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
             mock_cleanup_config
@@ -435,7 +435,7 @@ class TestTaskDefinitionBuilder:
         assert "prune" in task_types
         assert "cloud_sync" in task_types
 
-    def test_build_task_list_prune_request_over_config(self, task_builder):
+    def test_build_task_list_prune_request_over_config(self, task_builder) -> None:
         """Test that prune request takes precedence over config when both provided"""
         prune_request = MagicMock(spec=PruneRequest)
         prune_request.strategy = "simple"
@@ -455,7 +455,7 @@ class TestTaskDefinitionBuilder:
         assert prune_task["dry_run"] is True
         assert prune_task["keep_within"] == "14d"
 
-    def test_build_task_list_check_request_over_config(self, task_builder):
+    def test_build_task_list_check_request_over_config(self, task_builder) -> None:
         """Test that check request takes precedence over config when both provided"""
         check_request = MagicMock(spec=CheckRequest)
         check_request.check_type = "archives_only"

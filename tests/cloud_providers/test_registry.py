@@ -24,7 +24,7 @@ class MockConfigClass(BaseModel):
 
 
 class MockStorageClass:
-    def __init__(self, config, rclone_service: RcloneService):
+    def __init__(self, config, rclone_service: RcloneService) -> None:
         self.config = config
         self.rclone_service = rclone_service
 
@@ -32,7 +32,7 @@ class MockStorageClass:
 class TestProviderMetadata:
     """Test ProviderMetadata dataclass"""
 
-    def test_create_metadata_with_defaults(self):
+    def test_create_metadata_with_defaults(self) -> None:
         """Test creating metadata with default values"""
         metadata = ProviderMetadata(
             name="test", label="Test Provider", description="Test description"
@@ -46,7 +46,7 @@ class TestProviderMetadata:
         assert metadata.requires_credentials is True
         assert metadata.additional_info == {}
 
-    def test_create_metadata_with_custom_values(self):
+    def test_create_metadata_with_custom_values(self) -> None:
         """Test creating metadata with custom values"""
         metadata = ProviderMetadata(
             name="test",
@@ -79,7 +79,7 @@ class TestProviderRegistry:
             name="test", label="Test Provider", description="Test storage provider"
         )
 
-    def test_register_provider(self, registry, sample_metadata):
+    def test_register_provider(self, registry, sample_metadata) -> None:
         """Test registering a provider"""
         registry.register_provider(
             name="test",
@@ -93,7 +93,7 @@ class TestProviderRegistry:
         assert registry.get_metadata("test") == sample_metadata
         assert "test" in registry.get_supported_providers()
 
-    def test_register_duplicate_provider(self, registry, sample_metadata):
+    def test_register_duplicate_provider(self, registry, sample_metadata) -> None:
         """Test registering a provider with the same name twice"""
         # First registration
         registry.register_provider(
@@ -116,13 +116,13 @@ class TestProviderRegistry:
 
         assert registry.get_config_class("test") == AnotherConfigClass
 
-    def test_get_nonexistent_provider(self, registry):
+    def test_get_nonexistent_provider(self, registry) -> None:
         """Test getting a provider that doesn't exist"""
         assert registry.get_config_class("nonexistent") is None
         assert registry.get_storage_class("nonexistent") is None
         assert registry.get_metadata("nonexistent") is None
 
-    def test_get_provider_info(self, registry, sample_metadata):
+    def test_get_provider_info(self, registry, sample_metadata) -> None:
         """Test getting provider info"""
         registry.register_provider(
             name="test",
@@ -142,7 +142,7 @@ class TestProviderRegistry:
         assert info["supports_versioning"] is False
         assert info["requires_credentials"] is True
 
-    def test_get_all_provider_info(self, registry):
+    def test_get_all_provider_info(self, registry) -> None:
         """Test getting info for all providers"""
         metadata1 = ProviderMetadata(
             name="test1", label="Test 1", description="First test"
@@ -165,7 +165,7 @@ class TestProviderRegistry:
         assert all_info["test1"]["label"] == "Test 1"
         assert all_info["test2"]["label"] == "Test 2"
 
-    def test_is_provider_registered(self, registry, sample_metadata):
+    def test_is_provider_registered(self, registry, sample_metadata) -> None:
         """Test checking if provider is registered"""
         assert not registry.is_provider_registered("test")
 
@@ -175,7 +175,7 @@ class TestProviderRegistry:
 
         assert registry.is_provider_registered("test")
 
-    def test_unregister_provider(self, registry, sample_metadata):
+    def test_unregister_provider(self, registry, sample_metadata) -> None:
         """Test unregistering a provider"""
         registry.register_provider(
             "test", MockConfigClass, MockStorageClass, sample_metadata
@@ -194,15 +194,15 @@ class TestProviderRegistry:
 class TestRegisterProviderDecorator:
     """Test the @register_provider decorator"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Clear registry before each test"""
         clear_registry()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clear registry after each test"""
         clear_registry()
 
-    def test_register_provider_decorator(self):
+    def test_register_provider_decorator(self) -> None:
         """Test using the @register_provider decorator"""
 
         @register_provider(
@@ -222,7 +222,7 @@ class TestRegisterProviderDecorator:
         assert metadata.label == "Test Provider"
         assert metadata.description == "Test storage provider"
 
-    def test_register_provider_decorator_with_defaults(self):
+    def test_register_provider_decorator_with_defaults(self) -> None:
         """Test decorator with default values"""
 
         @register_provider(name="test")
@@ -237,7 +237,7 @@ class TestRegisterProviderDecorator:
         assert metadata.supports_encryption is True
         assert metadata.supports_versioning is False
 
-    def test_register_provider_decorator_with_custom_metadata(self):
+    def test_register_provider_decorator_with_custom_metadata(self) -> None:
         """Test decorator with custom metadata"""
 
         @register_provider(
@@ -256,7 +256,7 @@ class TestRegisterProviderDecorator:
         assert metadata.supports_versioning is True
         assert metadata.additional_info["custom_field"] == "custom_value"
 
-    def test_register_provider_missing_config_class(self):
+    def test_register_provider_missing_config_class(self) -> None:
         """Test decorator with missing config_class"""
         with pytest.raises(ValueError, match="must have 'config_class' attribute"):
 
@@ -264,7 +264,7 @@ class TestRegisterProviderDecorator:
             class TestProvider:
                 storage_class = MockStorageClass
 
-    def test_register_provider_missing_storage_class(self):
+    def test_register_provider_missing_storage_class(self) -> None:
         """Test decorator with missing storage_class"""
         with pytest.raises(ValueError, match="must have 'storage_class' attribute"):
 
@@ -276,15 +276,15 @@ class TestRegisterProviderDecorator:
 class TestGlobalRegistryFunctions:
     """Test global registry convenience functions"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Clear registry before each test"""
         clear_registry()
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clear registry after each test"""
         clear_registry()
 
-    def test_global_functions(self):
+    def test_global_functions(self) -> None:
         """Test that global functions work with the global registry"""
 
         @register_provider(name="test", label="Test")
@@ -305,12 +305,12 @@ class TestGlobalRegistryFunctions:
         assert "test" in get_all_provider_info()
         assert is_provider_registered("test")
 
-    def test_get_registry(self):
+    def test_get_registry(self) -> None:
         """Test getting the global registry instance"""
         registry = get_registry()
         assert isinstance(registry, ProviderRegistry)
 
-    def test_clear_registry(self):
+    def test_clear_registry(self) -> None:
         """Test clearing the global registry"""
 
         @register_provider(name="test")

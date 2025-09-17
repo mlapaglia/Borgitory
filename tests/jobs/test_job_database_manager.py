@@ -54,7 +54,7 @@ class TestJobDatabaseManager:
             cloud_sync_config_id=123,
         )
 
-    def test_initialization_with_default_session_factory(self):
+    def test_initialization_with_default_session_factory(self) -> None:
         """Test that JobDatabaseManager initializes correctly with default session factory"""
         manager = JobDatabaseManager()
 
@@ -63,7 +63,7 @@ class TestJobDatabaseManager:
         assert not hasattr(manager, "_db_session_factory")
         assert manager.db_session_factory is not None
 
-    def test_initialization_with_custom_dependencies(self, mock_db_session_factory):
+    def test_initialization_with_custom_dependencies(self, mock_db_session_factory) -> None:
         """Test initialization with custom dependencies"""
         factory, _ = mock_db_session_factory
 
@@ -73,7 +73,7 @@ class TestJobDatabaseManager:
 
         assert manager.db_session_factory == factory
 
-    def test_attribute_access_compatibility(self, job_database_manager):
+    def test_attribute_access_compatibility(self, job_database_manager) -> None:
         """
         Critical test: Ensure the correct attribute name is used
         This prevents the AttributeError: 'JobDatabaseManager' object has no attribute '_db_session_factory'
@@ -88,7 +88,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_create_database_job_happy_path(
         self, job_database_manager, mock_db_session_factory, sample_job_data
-    ):
+    ) -> None:
         """Test successful job creation"""
         factory, mock_session = mock_db_session_factory
 
@@ -115,7 +115,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_update_job_status_happy_path(
         self, job_database_manager, mock_db_session_factory
-    ):
+    ) -> None:
         """Test successful job status update"""
         factory, mock_session = mock_db_session_factory
         job_uuid = str(uuid.uuid4())
@@ -150,7 +150,7 @@ class TestJobDatabaseManager:
         self,
         job_database_manager_with_coordinator,
         mock_db_session_factory,
-    ):
+    ) -> None:
         """Test that completed jobs with cloud sync config trigger cloud backup"""
         factory, mock_session = mock_db_session_factory
         job_uuid = str(uuid.uuid4())
@@ -189,7 +189,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_get_job_by_uuid_happy_path(
         self, job_database_manager, mock_db_session_factory
-    ):
+    ) -> None:
         """Test successful job retrieval by UUID"""
         factory, mock_session = mock_db_session_factory
         job_uuid = str(uuid.uuid4())
@@ -226,7 +226,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_get_jobs_by_repository_happy_path(
         self, job_database_manager, mock_db_session_factory
-    ):
+    ) -> None:
         """Test successful job retrieval by repository"""
         factory, mock_session = mock_db_session_factory
         repository_id = 1
@@ -269,7 +269,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_save_job_tasks_happy_path(
         self, job_database_manager, mock_db_session_factory
-    ):
+    ) -> None:
         """Test successful task saving"""
         factory, mock_session = mock_db_session_factory
         job_uuid = str(uuid.uuid4())
@@ -322,7 +322,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_get_job_statistics_error_handling(
         self, job_database_manager, mock_db_session_factory
-    ):
+    ) -> None:
         """Test job statistics error handling"""
         factory, mock_session = mock_db_session_factory
 
@@ -335,7 +335,7 @@ class TestJobDatabaseManager:
         # Verify error handling returns empty dict
         assert result == {}
 
-    def test_session_factory_usage_in_external_code(self, job_database_manager):
+    def test_session_factory_usage_in_external_code(self, job_database_manager) -> None:
         """
         Critical test: Verify that external code can access the session factory
         This test simulates how job_manager_modular.py accesses the attribute
@@ -351,7 +351,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_error_handling_create_job(
         self, job_database_manager, mock_db_session_factory
-    ):
+    ) -> None:
         """Test error handling in job creation"""
         factory, mock_session = mock_db_session_factory
 
@@ -373,7 +373,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_error_handling_update_job_status(
         self, job_database_manager, mock_db_session_factory
-    ):
+    ) -> None:
         """Test error handling in job status update"""
         factory, mock_session = mock_db_session_factory
 
@@ -394,7 +394,7 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_job_not_found_scenarios(
         self, job_database_manager, mock_db_session_factory
-    ):
+    ) -> None:
         """Test scenarios where job is not found"""
         factory, mock_session = mock_db_session_factory
 

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class ConfigurationService:
     """Service for configuration and form data operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def get_schedule_form_data(self, db: Session) -> Dict[str, List[Any]]:

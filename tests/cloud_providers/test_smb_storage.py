@@ -9,7 +9,7 @@ from borgitory.services.cloud_providers.storage.smb_storage import (
 class TestSMBStorageConfig:
     """Test SMB storage configuration validation"""
 
-    def test_valid_config(self):
+    def test_valid_config(self) -> None:
         """Test valid configuration passes validation"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -26,7 +26,7 @@ class TestSMBStorageConfig:
         assert config.port == 445
         assert config.domain == "WORKGROUP"
 
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         """Test default values are set correctly"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -40,7 +40,7 @@ class TestSMBStorageConfig:
         assert config.case_insensitive is True
         assert config.use_kerberos is False
 
-    def test_invalid_host(self):
+    def test_invalid_host(self) -> None:
         """Test invalid host raises validation error"""
         with pytest.raises(ValueError, match="Host cannot start or end with a period"):
             SMBStorageConfig(
@@ -48,7 +48,7 @@ class TestSMBStorageConfig:
                 share_name="backup-share",
             )
 
-    def test_invalid_host_consecutive_periods(self):
+    def test_invalid_host_consecutive_periods(self) -> None:
         """Test host with consecutive periods raises validation error"""
         with pytest.raises(ValueError, match="Host cannot contain consecutive periods"):
             SMBStorageConfig(
@@ -56,7 +56,7 @@ class TestSMBStorageConfig:
                 share_name="backup-share",
             )
 
-    def test_invalid_user(self):
+    def test_invalid_user(self) -> None:
         """Test invalid username raises validation error"""
         with pytest.raises(ValueError, match="Username must contain only"):
             SMBStorageConfig(
@@ -65,7 +65,7 @@ class TestSMBStorageConfig:
                 user="invalid@user",
             )
 
-    def test_invalid_share_name(self):
+    def test_invalid_share_name(self) -> None:
         """Test invalid share name raises validation error"""
         with pytest.raises(ValueError, match="Share name can only contain"):
             SMBStorageConfig(
@@ -73,7 +73,7 @@ class TestSMBStorageConfig:
                 share_name="invalid/share",
             )
 
-    def test_invalid_domain(self):
+    def test_invalid_domain(self) -> None:
         """Test invalid domain raises validation error"""
         with pytest.raises(ValueError, match="Domain must contain only"):
             SMBStorageConfig(
@@ -82,7 +82,7 @@ class TestSMBStorageConfig:
                 domain="invalid@domain",
             )
 
-    def test_invalid_idle_timeout(self):
+    def test_invalid_idle_timeout(self) -> None:
         """Test invalid idle timeout raises validation error"""
         with pytest.raises(ValueError, match="Idle timeout must be in duration format"):
             SMBStorageConfig(
@@ -91,7 +91,7 @@ class TestSMBStorageConfig:
                 idle_timeout="invalid",
             )
 
-    def test_valid_idle_timeout_formats(self):
+    def test_valid_idle_timeout_formats(self) -> None:
         """Test various valid idle timeout formats"""
         valid_timeouts = ["30s", "1m", "1m30s", "2h", "1h30m", "1h30m45s"]
         for timeout in valid_timeouts:
@@ -102,7 +102,7 @@ class TestSMBStorageConfig:
             )
             assert config.idle_timeout == timeout
 
-    def test_kerberos_with_password_validation(self):
+    def test_kerberos_with_password_validation(self) -> None:
         """Test that Kerberos and password cannot be used together"""
         with pytest.raises(
             ValueError, match="Cannot use both Kerberos and password authentication"
@@ -114,7 +114,7 @@ class TestSMBStorageConfig:
                 **{"pass": "password123"},
             )
 
-    def test_kerberos_without_ccache_allowed(self):
+    def test_kerberos_without_ccache_allowed(self) -> None:
         """Test that Kerberos without explicit ccache is allowed"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -124,7 +124,7 @@ class TestSMBStorageConfig:
         assert config.use_kerberos is True
         assert config.kerberos_ccache is None
 
-    def test_host_normalization(self):
+    def test_host_normalization(self) -> None:
         """Test that host is normalized to lowercase"""
         config = SMBStorageConfig(
             host="SERVER.EXAMPLE.COM",
@@ -132,7 +132,7 @@ class TestSMBStorageConfig:
         )
         assert config.host == "server.example.com"
 
-    def test_domain_normalization(self):
+    def test_domain_normalization(self) -> None:
         """Test that domain is normalized to uppercase"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -165,7 +165,7 @@ class TestSMBStorage:
         return SMBStorage(storage_config, mock_rclone_service)
 
     @pytest.mark.asyncio
-    async def test_test_connection_success(self, storage, mock_rclone_service):
+    async def test_test_connection_success(self, storage, mock_rclone_service) -> None:
         """Test successful connection test"""
         mock_rclone_service.test_smb_connection.return_value = {"status": "success"}
 
@@ -188,7 +188,7 @@ class TestSMBStorage:
         )
 
     @pytest.mark.asyncio
-    async def test_test_connection_failure(self, storage, mock_rclone_service):
+    async def test_test_connection_failure(self, storage, mock_rclone_service) -> None:
         """Test failed connection test"""
         mock_rclone_service.test_smb_connection.side_effect = Exception(
             "Connection failed"
@@ -198,7 +198,7 @@ class TestSMBStorage:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_upload_repository_success(self, storage, mock_rclone_service):
+    async def test_upload_repository_success(self, storage, mock_rclone_service) -> None:
         """Test successful repository upload"""
 
         # Mock the async generator
@@ -210,7 +210,7 @@ class TestSMBStorage:
 
         progress_events = []
 
-        def progress_callback(event):
+        def progress_callback(event) -> None:
             progress_events.append(event)
 
         await storage.upload_repository(
@@ -228,7 +228,7 @@ class TestSMBStorage:
         assert any(event.type.value == "completed" for event in progress_events)
 
     @pytest.mark.asyncio
-    async def test_upload_repository_failure(self, storage, mock_rclone_service):
+    async def test_upload_repository_failure(self, storage, mock_rclone_service) -> None:
         """Test repository upload failure"""
 
         async def mock_failing_generator(*args, **kwargs):
@@ -239,7 +239,7 @@ class TestSMBStorage:
 
         progress_events = []
 
-        def progress_callback(event):
+        def progress_callback(event) -> None:
             progress_events.append(event)
 
         with pytest.raises(Exception, match="SMB upload failed: Upload failed"):
@@ -252,13 +252,13 @@ class TestSMBStorage:
         # Verify error event was fired
         assert any(event.type.value == "error" for event in progress_events)
 
-    def test_get_sensitive_fields(self, storage):
+    def test_get_sensitive_fields(self, storage) -> None:
         """Test sensitive fields are correctly identified"""
         sensitive_fields = storage.get_sensitive_fields()
         assert "pass" in sensitive_fields
         assert len(sensitive_fields) == 1
 
-    def test_get_connection_info(self, storage):
+    def test_get_connection_info(self, storage) -> None:
         """Test connection info formatting"""
         info = storage.get_connection_info()
         assert info.provider == "smb"
@@ -271,7 +271,7 @@ class TestSMBStorage:
         assert info.details["case_insensitive"] is True
         assert "***" in info.details["password"]  # Should be masked
 
-    def test_get_connection_info_kerberos(self, mock_rclone_service):
+    def test_get_connection_info_kerberos(self, mock_rclone_service) -> None:
         """Test connection info formatting with Kerberos"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -284,7 +284,7 @@ class TestSMBStorage:
         assert info.details["auth_method"] == "kerberos"
         assert info.details["password"] is None
 
-    def test_get_connection_info_short_password(self, mock_rclone_service):
+    def test_get_connection_info_short_password(self, mock_rclone_service) -> None:
         """Test connection info formatting with short password"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -296,7 +296,7 @@ class TestSMBStorage:
         info = storage.get_connection_info()
         assert info.details["password"] == "***"
 
-    def test_get_connection_info_no_password(self, mock_rclone_service):
+    def test_get_connection_info_no_password(self, mock_rclone_service) -> None:
         """Test connection info formatting with no password"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -315,7 +315,7 @@ class TestSMBStorageAdvancedOptions:
     def mock_rclone_service(self):
         return AsyncMock()
 
-    def test_advanced_config_options(self):
+    def test_advanced_config_options(self) -> None:
         """Test configuration with all advanced options"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -336,7 +336,7 @@ class TestSMBStorageAdvancedOptions:
         assert config.kerberos_ccache == "FILE:/path/to/ccache"
 
     @pytest.mark.asyncio
-    async def test_upload_with_advanced_options(self, mock_rclone_service):
+    async def test_upload_with_advanced_options(self, mock_rclone_service) -> None:
         """Test upload with advanced configuration options"""
         config = SMBStorageConfig(
             host="server.example.com",

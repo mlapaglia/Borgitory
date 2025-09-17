@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class CleanupService:
     """Service for cleanup configuration business logic operations."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session) -> None:
         self.db = db
 
     def get_cleanup_configs(

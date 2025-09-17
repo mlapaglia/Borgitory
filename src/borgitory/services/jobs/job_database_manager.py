@@ -35,7 +35,7 @@ class JobDatabaseManager:
     def __init__(
         self,
         db_session_factory: Optional[Callable] = None,
-    ):
+    ) -> None:
         self.db_session_factory = db_session_factory or self._default_db_session_factory
 
     def _default_db_session_factory(self):

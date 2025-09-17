@@ -71,7 +71,7 @@ class CloudSyncService:
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
         get_metadata_func,
-    ):
+    ) -> None:
         self.db = db
         self._rclone_service = rclone_service
         self._storage_factory = storage_factory

@@ -23,7 +23,7 @@ import borgitory.services.archives.archive_mount_manager
 class TestArchiveMountManager:
     """Test ArchiveMountManager core functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         # Create a temporary directory for testing
         self.test_mount_dir = tempfile.mkdtemp()
@@ -46,7 +46,7 @@ class TestArchiveMountManager:
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clean up test fixtures."""
         # Clean up temporary directory
         import shutil
@@ -56,7 +56,7 @@ class TestArchiveMountManager:
         except (OSError, PermissionError):
             pass
 
-    def test_initialization_with_defaults(self):
+    def test_initialization_with_defaults(self) -> None:
         """Test ArchiveMountManager initialization with defaults."""
         manager = ArchiveMountManager()
         assert manager.base_mount_dir.exists()
@@ -65,7 +65,7 @@ class TestArchiveMountManager:
         assert isinstance(manager.job_executor, JobExecutor)
         assert len(manager.active_mounts) == 0
 
-    def test_initialization_with_custom_params(self):
+    def test_initialization_with_custom_params(self) -> None:
         """Test ArchiveMountManager initialization with custom parameters."""
         custom_job_executor = Mock(spec=JobExecutor)
 
@@ -84,7 +84,7 @@ class TestArchiveMountManager:
             assert manager.mount_timeout == 600
             assert manager.job_executor is custom_job_executor
 
-    def test_initialization_cross_platform_paths(self):
+    def test_initialization_cross_platform_paths(self) -> None:
         """Test that path handling works across platforms."""
         # Test that explicit path setting always works regardless of OS
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -116,13 +116,13 @@ class TestArchiveMountManager:
             elif "TEMP" in os.environ:
                 del os.environ["TEMP"]
 
-    def test_get_mount_key(self):
+    def test_get_mount_key(self) -> None:
         """Test mount key generation."""
         key = self.manager._get_mount_key(self.mock_repository, "test-archive")
         expected = "/path/to/repo::test-archive"
         assert key == expected
 
-    def test_get_mount_point(self):
+    def test_get_mount_point(self) -> None:
         """Test mount point path generation."""
         mount_point = self.manager._get_mount_point(
             self.mock_repository, "test-archive"
@@ -130,7 +130,7 @@ class TestArchiveMountManager:
         expected = self.manager.base_mount_dir / "test-repo_test-archive"
         assert mount_point == expected
 
-    def test_get_mount_point_sanitization(self):
+    def test_get_mount_point_sanitization(self) -> None:
         """Test mount point path sanitization for special characters."""
         self.mock_repository.name = "test/repo with spaces"
         mount_point = self.manager._get_mount_point(
@@ -142,7 +142,7 @@ class TestArchiveMountManager:
         assert mount_point == expected
 
     @pytest.mark.asyncio
-    async def test_mount_archive_success(self):
+    async def test_mount_archive_success(self) -> None:
         """Test successful archive mounting."""
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=0)
@@ -174,7 +174,7 @@ class TestArchiveMountManager:
             assert mount_info.job_executor_process is mock_process
 
     @pytest.mark.asyncio
-    async def test_mount_archive_already_mounted(self):
+    async def test_mount_archive_already_mounted(self) -> None:
         """Test mounting an already mounted archive."""
         # Pre-populate active mounts
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
@@ -199,7 +199,7 @@ class TestArchiveMountManager:
         assert updated_info.last_accessed >= existing_mount_info.last_accessed
 
     @pytest.mark.asyncio
-    async def test_mount_archive_failure(self):
+    async def test_mount_archive_failure(self) -> None:
         """Test archive mounting failure."""
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=1)
@@ -217,7 +217,7 @@ class TestArchiveMountManager:
             assert "Mount failed: Archive not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_mount_archive_timeout(self):
+    async def test_mount_archive_timeout(self) -> None:
         """Test archive mounting timeout."""
         mock_process = Mock()
         mock_process.returncode = None
@@ -242,7 +242,7 @@ class TestArchiveMountManager:
             mock_process.terminate.assert_called_once()
             mock_process.kill.assert_called_once()
 
-    def test_is_mounted_success(self):
+    def test_is_mounted_success(self) -> None:
         """Test successful mount check."""
         # Create a temporary directory with some files
         test_dir = Path(self.test_mount_dir) / "test_mount"
@@ -251,13 +251,13 @@ class TestArchiveMountManager:
 
         assert self.manager._is_mounted(test_dir) is True
 
-    def test_is_mounted_failure(self):
+    def test_is_mounted_failure(self) -> None:
         """Test mount check failure."""
         non_existent_dir = Path(self.test_mount_dir) / "non_existent"
         assert self.manager._is_mounted(non_existent_dir) is False
 
     @pytest.mark.asyncio
-    async def test_wait_for_mount_ready_success(self):
+    async def test_wait_for_mount_ready_success(self) -> None:
         """Test successful mount readiness waiting."""
         # Create a test directory with some content
         test_dir = Path(self.test_mount_dir) / "test_mount"
@@ -275,7 +275,7 @@ class TestArchiveMountManager:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_wait_for_mount_ready_timeout(self):
+    async def test_wait_for_mount_ready_timeout(self) -> None:
         """Test mount readiness waiting timeout."""
         # Use non-existent directory
         non_existent_dir = Path(self.test_mount_dir) / "non_existent"
@@ -291,7 +291,7 @@ class TestArchiveMountManager:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_wait_for_mount_ready_process_exit(self):
+    async def test_wait_for_mount_ready_process_exit(self) -> None:
         """Test mount readiness when process exits with error."""
         test_dir = Path(self.test_mount_dir) / "test_mount"
         test_dir.mkdir(exist_ok=True)
@@ -307,7 +307,7 @@ class TestArchiveMountManager:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_unmount_archive_success(self):
+    async def test_unmount_archive_success(self) -> None:
         """Test successful archive unmounting."""
         # Setup mounted archive
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
@@ -340,7 +340,7 @@ class TestArchiveMountManager:
             mock_process.terminate.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_unmount_archive_not_mounted(self):
+    async def test_unmount_archive_not_mounted(self) -> None:
         """Test unmounting an archive that's not mounted."""
         result = await self.manager.unmount_archive(
             self.mock_repository, "test-archive"
@@ -348,7 +348,7 @@ class TestArchiveMountManager:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_unmount_path_success(self):
+    async def test_unmount_path_success(self) -> None:
         """Test successful path unmounting."""
         test_mount_point = Path(self.test_mount_dir) / "test_mount"
         test_mount_point.mkdir(exist_ok=True)
@@ -362,7 +362,7 @@ class TestArchiveMountManager:
             assert result is True
 
     @pytest.mark.asyncio
-    async def test_unmount_path_failure(self):
+    async def test_unmount_path_failure(self) -> None:
         """Test path unmounting failure."""
         test_mount_point = Path(self.test_mount_dir) / "test_mount"
         test_mount_point.mkdir(exist_ok=True)
@@ -376,14 +376,14 @@ class TestArchiveMountManager:
             result = await self.manager._unmount_path(test_mount_point)
             assert result is False
 
-    def test_list_directory_not_mounted(self):
+    def test_list_directory_not_mounted(self) -> None:
         """Test listing directory when archive is not mounted."""
         with pytest.raises(Exception) as exc_info:
             self.manager.list_directory(self.mock_repository, "test-archive", "")
 
         assert "Archive test-archive is not mounted" in str(exc_info.value)
 
-    def test_list_directory_success(self):
+    def test_list_directory_success(self) -> None:
         """Test successful directory listing."""
         # Setup mounted archive
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
@@ -425,7 +425,7 @@ class TestArchiveMountManager:
         assert file_entry["type"] == "f"
         assert file_entry["size"] == 0  # Empty file
 
-    def test_list_directory_with_path(self):
+    def test_list_directory_with_path(self) -> None:
         """Test directory listing with specific path."""
         # Setup mounted archive with subdirectory
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
@@ -455,7 +455,7 @@ class TestArchiveMountManager:
         expected_path = str(Path("data") / "nested_file.txt")
         assert contents[0]["path"] == expected_path
 
-    def test_list_directory_path_not_exists(self):
+    def test_list_directory_path_not_exists(self) -> None:
         """Test listing non-existent directory."""
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
         test_mount_point = Path(self.test_mount_dir) / "test_mount"
@@ -477,7 +477,7 @@ class TestArchiveMountManager:
 
         assert "Path does not exist: nonexistent" in str(exc_info.value)
 
-    def test_list_directory_path_not_directory(self):
+    def test_list_directory_path_not_directory(self) -> None:
         """Test listing a file path instead of directory."""
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
         test_mount_point = Path(self.test_mount_dir) / "test_mount"
@@ -501,7 +501,7 @@ class TestArchiveMountManager:
         assert "Path is not a directory: file.txt" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_cleanup_old_mounts(self):
+    async def test_cleanup_old_mounts(self) -> None:
         """Test cleanup of old unused mounts."""
         # Setup old mount
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
@@ -531,7 +531,7 @@ class TestArchiveMountManager:
             mock_process.terminate.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_cleanup_old_mounts_recent_access(self):
+    async def test_cleanup_old_mounts_recent_access(self) -> None:
         """Test that recently accessed mounts are not cleaned up."""
         # Setup recent mount
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
@@ -554,7 +554,7 @@ class TestArchiveMountManager:
         assert mount_key in self.manager.active_mounts
 
     @pytest.mark.asyncio
-    async def test_unmount_all(self):
+    async def test_unmount_all(self) -> None:
         """Test unmounting all active mounts."""
         # Setup multiple mounts
         for i in range(3):
@@ -580,7 +580,7 @@ class TestArchiveMountManager:
 
             assert len(self.manager.active_mounts) == 0
 
-    def test_get_mount_stats(self):
+    def test_get_mount_stats(self) -> None:
         """Test getting mount statistics."""
         # Setup mount
         mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
@@ -612,12 +612,12 @@ class TestArchiveMountManager:
 class TestGetArchiveMountManagerGlobal:
     """Test the global get_archive_mount_manager function."""
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Reset global state."""
         # Reset global instance
         borgitory.services.archives.archive_mount_manager._mount_manager = None
 
-    def test_get_archive_mount_manager_default(self):
+    def test_get_archive_mount_manager_default(self) -> None:
         """Test getting default global instance."""
         manager = get_archive_mount_manager()
         assert isinstance(manager, ArchiveMountManager)
@@ -626,7 +626,7 @@ class TestGetArchiveMountManagerGlobal:
         manager2 = get_archive_mount_manager()
         assert manager is manager2
 
-    def test_get_archive_mount_manager_with_params(self):
+    def test_get_archive_mount_manager_with_params(self) -> None:
         """Test getting global instance with custom parameters."""
         custom_job_executor = Mock(spec=JobExecutor)
 
@@ -650,7 +650,7 @@ class TestGetArchiveMountManagerGlobal:
 class TestMountInfoDataclass:
     """Test the MountInfo dataclass."""
 
-    def test_mount_info_creation(self):
+    def test_mount_info_creation(self) -> None:
         """Test MountInfo dataclass creation."""
         now = datetime.now()
         mount_point = Path("/test/mount")
@@ -670,7 +670,7 @@ class TestMountInfoDataclass:
         assert mount_info.last_accessed == now
         assert mount_info.job_executor_process is None
 
-    def test_mount_info_with_process(self):
+    def test_mount_info_with_process(self) -> None:
         """Test MountInfo with process."""
         mock_process = Mock()
         now = datetime.now()
@@ -690,12 +690,12 @@ class TestMountInfoDataclass:
 class TestArchiveMountManagerIntegration:
     """Integration tests for ArchiveMountManager."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up integration test fixtures."""
         self.test_mount_dir = tempfile.mkdtemp()
         self.mock_job_executor = Mock(spec=JobExecutor)
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clean up integration test fixtures."""
         import shutil
 
@@ -704,7 +704,7 @@ class TestArchiveMountManagerIntegration:
         except (OSError, PermissionError):
             pass
 
-    def test_dependency_injection_pattern(self):
+    def test_dependency_injection_pattern(self) -> None:
         """Test that dependency injection works properly."""
         custom_job_executor = Mock(spec=JobExecutor)
 
@@ -716,7 +716,7 @@ class TestArchiveMountManagerIntegration:
         assert str(manager.base_mount_dir) == self.test_mount_dir
 
     @pytest.mark.asyncio
-    async def test_mount_unmount_lifecycle(self):
+    async def test_mount_unmount_lifecycle(self) -> None:
         """Test complete mount/unmount lifecycle."""
         manager = ArchiveMountManager(
             base_mount_dir=self.test_mount_dir, job_executor=self.mock_job_executor
@@ -757,7 +757,7 @@ class TestArchiveMountManagerIntegration:
                 stats = manager.get_mount_stats()
                 assert stats["active_mounts"] == 0
 
-    def test_error_handling_robustness(self):
+    def test_error_handling_robustness(self) -> None:
         """Test error handling in various scenarios."""
         # Use a path that will be created but may have permission issues
         with tempfile.TemporaryDirectory() as temp_dir:

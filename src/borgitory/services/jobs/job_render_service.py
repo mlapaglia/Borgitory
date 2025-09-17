@@ -17,7 +17,7 @@ class JobRenderService:
         self,
         job_manager: JobManager,
         templates_dir: str = "src/borgitory/templates",
-    ):
+    ) -> None:
         self.templates = Jinja2Templates(directory=templates_dir)
         self.job_manager = job_manager
 

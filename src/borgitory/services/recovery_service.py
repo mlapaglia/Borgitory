@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class RecoveryService:
     """Service to recover from application crashes during backup operations"""
 
-    async def recover_stale_jobs(self):
+    async def recover_stale_jobs(self) -> None:
         """
         Find backup jobs that were running when the app was shut down and clean them up.
         This should be called on application startup.
@@ -36,7 +36,7 @@ class RecoveryService:
             "Recovery complete - all interrupted backup jobs cancelled and locks released"
         )
 
-    async def recover_database_job_records(self):
+    async def recover_database_job_records(self) -> None:
         """
         Find database Job records that are marked as 'running' and mark them as failed.
         This handles the case where the app restarted and jobs are cleared from memory,
@@ -116,7 +116,7 @@ class RecoveryService:
         except Exception as e:
             logger.error(f"Error recovering database job records: {e}")
 
-    async def _release_repository_lock(self, repository: Repository):
+    async def _release_repository_lock(self, repository: Repository) -> None:
         """Use borg break-lock to release any stale locks on a repository"""
         try:
             logger.info(f"Attempting to release lock on repository: {repository.name}")

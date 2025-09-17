@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class RcloneService:
-    def __init__(self):
+    def __init__(self) -> None:
         pass  # No longer need config file management
 
     def _build_s3_flags(

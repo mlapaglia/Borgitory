@@ -21,7 +21,7 @@ class JobEventBroadcaster:
         max_queue_size: int = 100,
         keepalive_timeout: float = 30.0,
         cleanup_interval: float = 60.0,
-    ):
+    ) -> None:
         self.max_queue_size = max_queue_size
         self.keepalive_timeout = keepalive_timeout
         self.cleanup_interval = cleanup_interval
@@ -39,7 +39,7 @@ class JobEventBroadcaster:
         self._keepalive_task: Optional[asyncio.Task] = None
         self._shutdown_requested = False
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize background tasks"""
         if not self._cleanup_task or self._cleanup_task.done():
             self._cleanup_task = asyncio.create_task(
@@ -180,7 +180,7 @@ class JobEventBroadcaster:
         finally:
             self.unsubscribe_client(client_queue)
 
-    async def _cleanup_disconnected_clients(self):
+    async def _cleanup_disconnected_clients(self) -> None:
         """Background task to clean up disconnected clients"""
         while not self._shutdown_requested:
             try:
@@ -216,7 +216,7 @@ class JobEventBroadcaster:
                 logger.error(f"Error in client cleanup task: {e}")
                 await asyncio.sleep(self.cleanup_interval)
 
-    async def _send_keepalives(self):
+    async def _send_keepalives(self) -> None:
         """Background task to send periodic keepalives"""
         while not self._shutdown_requested:
             try:
@@ -263,7 +263,7 @@ class JobEventBroadcaster:
         """Get recent event history"""
         return [event.to_dict() for event in self._recent_events[-limit:]]
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Shutdown the event broadcaster"""
         logger.info("Shutting down job event broadcaster")
         self._shutdown_requested = True

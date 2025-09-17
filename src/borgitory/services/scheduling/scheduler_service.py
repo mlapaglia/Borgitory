@@ -22,7 +22,7 @@ _job_manager: Optional[JobManager] = None
 _job_service_factory = None
 
 
-def set_scheduler_dependencies(job_manager: JobManager, job_service_factory):
+def set_scheduler_dependencies(job_manager: JobManager, job_service_factory) -> None:
     """Set the dependencies for the scheduler context"""
     global _job_manager, _job_service_factory
     _job_manager = job_manager
@@ -108,7 +108,7 @@ async def execute_scheduled_backup(schedule_id: int):
 class SchedulerService:
     def __init__(
         self, job_manager: Optional[JobManager] = None, job_service_factory=None
-    ):
+    ) -> None:
         """
         Initialize the scheduler service with proper dependency injection.
 
@@ -130,7 +130,7 @@ class SchedulerService:
 
         set_scheduler_dependencies(self.job_manager, self.job_service_factory)
 
-    async def start(self):
+    async def start(self) -> None:
         """Start the scheduler"""
         if self._running:
             logger.warning("Scheduler is already running")
@@ -149,7 +149,7 @@ class SchedulerService:
 
         logger.info("APScheduler v3 started successfully")
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Stop the scheduler gracefully"""
         if not self._running:
             return
@@ -159,14 +159,14 @@ class SchedulerService:
         self._running = False
         logger.info("APScheduler v3 stopped successfully")
 
-    def _handle_job_event(self, event):
+    def _handle_job_event(self, event) -> None:
         """Handle job execution events"""
         if event.exception:
             logger.error(f"Job {event.job_id} failed: {event.exception}")
         else:
             logger.info(f"Job {event.job_id} executed successfully")
 
-    async def _reload_schedules(self):
+    async def _reload_schedules(self) -> None:
         """Reload all schedules from database"""
         with get_db_session() as db:
             try:
@@ -237,7 +237,7 @@ class SchedulerService:
             logger.error(f"Failed to add schedule {schedule_id}: {str(e)}")
             raise Exception(f"Failed to add schedule: {str(e)}")
 
-    async def _update_next_run_time(self, schedule_id: int, job_id: str):
+    async def _update_next_run_time(self, schedule_id: int, job_id: str) -> None:
         """Update the next run time in the database"""
         try:
             job = self.scheduler.get_job(job_id)
@@ -259,7 +259,7 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"Error updating next run time: {str(e)}")
 
-    async def remove_schedule(self, schedule_id: int):
+    async def remove_schedule(self, schedule_id: int) -> None:
         """Remove a scheduled backup job"""
         if not self._running:
             return

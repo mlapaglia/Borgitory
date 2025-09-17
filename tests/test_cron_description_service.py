@@ -6,7 +6,7 @@ from borgitory.services.cron_description_service import CronDescriptionService
 class TestCronDescriptionService:
     """Test suite for CronDescriptionService business logic."""
 
-    def test_get_human_description_valid_expressions(self):
+    def test_get_human_description_valid_expressions(self) -> None:
         """Test valid cron expressions return proper descriptions."""
         test_cases = [
             # Basic expressions
@@ -46,7 +46,7 @@ class TestCronDescriptionService:
                 f"Description too short for '{cron_expr}'"
             )
 
-    def test_get_human_description_invalid_expressions(self):
+    def test_get_human_description_invalid_expressions(self) -> None:
         """Test invalid cron expressions return appropriate errors."""
         invalid_expressions = [
             "invalid",
@@ -64,7 +64,7 @@ class TestCronDescriptionService:
             assert result["error"] is not None, f"Expected error for '{invalid_expr}'"
             assert len(result["error"]) > 0, f"Error message empty for '{invalid_expr}'"
 
-    def test_get_human_description_empty_input(self):
+    def test_get_human_description_empty_input(self) -> None:
         """Test empty or whitespace-only input."""
         empty_inputs = ["", "   ", "\t", "\n", None]
 
@@ -82,7 +82,7 @@ class TestCronDescriptionService:
                 f"Expected no error for empty input: '{empty_input}'"
             )
 
-    def test_get_human_description_whitespace_handling(self):
+    def test_get_human_description_whitespace_handling(self) -> None:
         """Test that whitespace is properly handled."""
         # Test with leading/trailing whitespace
         result = CronDescriptionService.get_human_description("  0 12 * * *  ")
@@ -91,7 +91,7 @@ class TestCronDescriptionService:
         assert result["description"] is not None, "Expected description with whitespace"
         assert "12:00" in result["description"], "Expected proper time parsing"
 
-    def test_error_message_format(self):
+    def test_error_message_format(self) -> None:
         """Test that error messages are properly formatted."""
         result = CronDescriptionService.get_human_description("invalid")
 
@@ -99,7 +99,7 @@ class TestCronDescriptionService:
         # Should contain helpful information
         assert "Invalid" in result["error"] or "invalid" in result["error"]
 
-    def test_six_part_cron_expressions(self):
+    def test_six_part_cron_expressions(self) -> None:
         """Test 6-part cron expressions (with seconds)."""
         # Note: cron-descriptor supports 6-part expressions
         six_part_expressions = [
@@ -116,7 +116,7 @@ class TestCronDescriptionService:
                 assert result["description"] is not None
                 assert len(result["description"]) > 5
 
-    def test_special_cron_nicknames(self):
+    def test_special_cron_nicknames(self) -> None:
         """Test special cron expression nicknames."""
         # Note: Some versions of cron-descriptor support these
         special_expressions = [

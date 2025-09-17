@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 class RepositoryService:
     """Service for repository business logic operations."""
 
-    def __init__(self, borg_service, scheduler_service, volume_service):
+    def __init__(self, borg_service, scheduler_service, volume_service) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service
         self.volume_service = volume_service

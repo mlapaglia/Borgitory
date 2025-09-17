@@ -28,7 +28,7 @@ class BorgCommandBuilder:
     - Apply security and validation rules consistently
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def build_backup_command(

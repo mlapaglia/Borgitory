@@ -56,7 +56,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_get_cleanup_form_success(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting cleanup form returns correct template response."""
         from borgitory.api.cleanup import get_cleanup_form
 
@@ -76,7 +76,7 @@ class TestCleanupAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_policy_form_success(self, mock_request, mock_templates):
+    async def test_get_policy_form_success(self, mock_request, mock_templates) -> None:
         """Test getting policy form returns correct template response."""
         from borgitory.api.cleanup import get_policy_form
 
@@ -90,7 +90,7 @@ class TestCleanupAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_strategy_fields_success(self, mock_request, mock_templates):
+    async def test_get_strategy_fields_success(self, mock_request, mock_templates) -> None:
         """Test getting strategy fields returns correct template response."""
         from borgitory.api.cleanup import get_strategy_fields
 
@@ -106,7 +106,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_create_cleanup_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_create
-    ):
+    ) -> None:
         """Test successful config creation returns correct HTMX response."""
         from borgitory.api.cleanup import create_cleanup_config
 
@@ -135,7 +135,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_create_cleanup_config_failure_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_create
-    ):
+    ) -> None:
         """Test failed config creation returns correct HTMX error response."""
         from borgitory.api.cleanup import create_cleanup_config
 
@@ -158,7 +158,7 @@ class TestCleanupAPI:
             status_code=400,
         )
 
-    def test_list_cleanup_configs_success(self, mock_service):
+    def test_list_cleanup_configs_success(self, mock_service) -> None:
         """Test listing configs returns service result."""
         from borgitory.api.cleanup import list_cleanup_configs
 
@@ -175,7 +175,7 @@ class TestCleanupAPI:
 
     def test_get_cleanup_configs_html_success(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting configs HTML returns correct template response."""
         from borgitory.api.cleanup import get_cleanup_configs_html
 
@@ -197,7 +197,7 @@ class TestCleanupAPI:
 
     def test_get_cleanup_configs_html_exception(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting configs HTML with exception returns error template."""
         from borgitory.api.cleanup import get_cleanup_configs_html
 
@@ -213,7 +213,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_enable_cleanup_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test successful config enable returns correct HTMX response."""
         from borgitory.api.cleanup import enable_cleanup_config
 
@@ -241,7 +241,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_enable_cleanup_config_not_found_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test enabling non-existent config returns correct HTMX error response."""
         from borgitory.api.cleanup import enable_cleanup_config
 
@@ -264,7 +264,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_disable_cleanup_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test successful config disable returns correct HTMX response."""
         from borgitory.api.cleanup import disable_cleanup_config
 
@@ -292,7 +292,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_disable_cleanup_config_not_found_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test disabling non-existent config returns correct HTMX error response."""
         from borgitory.api.cleanup import disable_cleanup_config
 
@@ -315,7 +315,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_get_cleanup_config_edit_form_success(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting edit form returns correct template response."""
         from borgitory.api.cleanup import get_cleanup_config_edit_form
 
@@ -342,7 +342,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_get_cleanup_config_edit_form_not_found(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting edit form for non-existent config raises HTTPException."""
         from borgitory.api.cleanup import get_cleanup_config_edit_form
         from fastapi import HTTPException
@@ -360,7 +360,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_update_cleanup_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_update
-    ):
+    ) -> None:
         """Test successful config update returns correct HTMX response."""
         from borgitory.api.cleanup import update_cleanup_config
 
@@ -390,7 +390,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_update_cleanup_config_failure_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_update
-    ):
+    ) -> None:
         """Test failed config update returns correct HTMX error response."""
         from borgitory.api.cleanup import update_cleanup_config
 
@@ -415,7 +415,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_delete_cleanup_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test successful config deletion returns correct HTMX response."""
         from borgitory.api.cleanup import delete_cleanup_config
 
@@ -441,7 +441,7 @@ class TestCleanupAPI:
     @pytest.mark.asyncio
     async def test_delete_cleanup_config_failure_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test failed config deletion returns correct HTMX error response."""
         from borgitory.api.cleanup import delete_cleanup_config
 

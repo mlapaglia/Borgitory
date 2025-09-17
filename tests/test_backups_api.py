@@ -22,7 +22,7 @@ class TestBackupsAPI:
     @pytest.mark.asyncio
     async def test_get_backup_form_empty_database(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting backup form when database is empty."""
         response = await async_client.get("/api/backups/form")
 
@@ -36,7 +36,7 @@ class TestBackupsAPI:
     @pytest.mark.asyncio
     async def test_get_backup_form_with_repository(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting backup form with a repository in database."""
         # Create test repository
         repository = Repository(
@@ -58,7 +58,7 @@ class TestBackupsAPI:
     @pytest.mark.asyncio
     async def test_get_backup_form_with_all_configs(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting backup form with all configuration types present."""
         # Create test repository
         repository = Repository(
@@ -127,7 +127,7 @@ class TestBackupsAPI:
     @pytest.mark.asyncio
     async def test_get_backup_form_only_enabled_configs(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test that only enabled configs are returned in the form."""
         # Create disabled cleanup config
         disabled_cleanup = CleanupConfig(
@@ -162,7 +162,7 @@ class TestBackupsAPI:
     @pytest.mark.asyncio
     async def test_get_backup_form_mixed_enabled_disabled(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test form generation with mix of enabled and disabled configurations."""
         # Create multiple configs of each type with different enabled states
         configs = [
@@ -248,7 +248,7 @@ class TestBackupsAPI:
     @pytest.mark.asyncio
     async def test_get_backup_form_database_error_handling(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test backup form endpoint handles database errors gracefully."""
         # This test would require mocking database failures
         # For now, we test that the endpoint at least responds
@@ -261,7 +261,7 @@ class TestBackupsAPI:
     @pytest.mark.asyncio
     async def test_get_backup_form_response_headers(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test that backup form endpoint returns correct response headers."""
         response = await async_client.get("/api/backups/form")
 
@@ -275,7 +275,7 @@ class TestBackupsAPI:
     @pytest.mark.asyncio
     async def test_get_backup_form_template_context(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test that all expected context variables are available to template."""
         # Create one of each config type
         repository = Repository(name="context-repo", path="/tmp/context-repo")
@@ -329,14 +329,14 @@ class TestBackupsAPI:
         assert len(content) > 0
 
     @pytest.mark.asyncio
-    async def test_get_backup_form_invalid_route(self, async_client: AsyncClient):
+    async def test_get_backup_form_invalid_route(self, async_client: AsyncClient) -> None:
         """Test that invalid routes return 404."""
         response = await async_client.get("/api/backups/invalid")
 
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_get_backup_form_method_not_allowed(self, async_client: AsyncClient):
+    async def test_get_backup_form_method_not_allowed(self, async_client: AsyncClient) -> None:
         """Test that non-GET methods return 405."""
         response = await async_client.post("/api/backups/form")
 

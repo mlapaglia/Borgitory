@@ -46,7 +46,7 @@ class BackupConfig:
     show_stats: bool = True
     show_list: bool = True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.excludes is None:
             self.excludes = []
         if self.archive_name is None:
@@ -92,7 +92,7 @@ class BackupExecutor:
     JobExecutor, JobOutputManager, and JobEventBroadcaster services.
     """
 
-    def __init__(self, subprocess_executor: Optional[Callable] = None):
+    def __init__(self, subprocess_executor: Optional[Callable] = None) -> None:
         self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"

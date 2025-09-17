@@ -20,7 +20,7 @@ class TestPushoverService:
     @patch("aiohttp.ClientSession")
     async def test_send_notification_success(
         self, mock_session_class, pushover_service
-    ):
+    ) -> None:
         """Test successful notification sending"""
         # Mock response
         mock_response = MagicMock()
@@ -62,7 +62,7 @@ class TestPushoverService:
     @patch("aiohttp.ClientSession")
     async def test_send_notification_custom_priority_sound(
         self, mock_session_class, pushover_service
-    ):
+    ) -> None:
         """Test notification with custom priority and sound"""
         # Mock response
         mock_response = MagicMock()
@@ -103,7 +103,7 @@ class TestPushoverService:
         )
 
     @pytest.mark.asyncio
-    async def test_send_notification_api_error_response(self, pushover_service):
+    async def test_send_notification_api_error_response(self, pushover_service) -> None:
         """Test handling of API error response"""
         mock_response = MagicMock(spec=ClientResponse)
         mock_response.status = 200
@@ -130,7 +130,7 @@ class TestPushoverService:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_send_notification_http_error(self, pushover_service):
+    async def test_send_notification_http_error(self, pushover_service) -> None:
         """Test handling of HTTP error status codes"""
         mock_response = MagicMock(spec=ClientResponse)
         mock_response.status = 400
@@ -155,7 +155,7 @@ class TestPushoverService:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_send_notification_exception_handling(self, pushover_service):
+    async def test_send_notification_exception_handling(self, pushover_service) -> None:
         """Test exception handling in send_notification"""
         with patch("aiohttp.ClientSession", side_effect=Exception("Connection error")):
             result = await pushover_service.send_notification(
@@ -168,7 +168,7 @@ class TestPushoverService:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_send_backup_success_notification_basic(self, pushover_service):
+    async def test_send_backup_success_notification_basic(self, pushover_service) -> None:
         """Test backup success notification with basic parameters"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -193,7 +193,7 @@ class TestPushoverService:
     @pytest.mark.asyncio
     async def test_send_backup_success_notification_with_details(
         self, pushover_service
-    ):
+    ) -> None:
         """Test backup success notification with duration and archive count"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -219,7 +219,7 @@ class TestPushoverService:
             )
 
     @pytest.mark.asyncio
-    async def test_send_backup_failure_notification_basic(self, pushover_service):
+    async def test_send_backup_failure_notification_basic(self, pushover_service) -> None:
         """Test backup failure notification with basic parameters"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -242,7 +242,7 @@ class TestPushoverService:
             )
 
     @pytest.mark.asyncio
-    async def test_send_backup_failure_notification_with_error(self, pushover_service):
+    async def test_send_backup_failure_notification_with_error(self, pushover_service) -> None:
         """Test backup failure notification with error message"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -269,7 +269,7 @@ class TestPushoverService:
     @pytest.mark.asyncio
     async def test_send_backup_failure_notification_truncate_long_error(
         self, pushover_service
-    ):
+    ) -> None:
         """Test that long error messages are truncated"""
         long_error = "A" * 250  # 250 characters, should be truncated
 
@@ -296,7 +296,7 @@ class TestPushoverService:
             )
 
     @pytest.mark.asyncio
-    async def test_test_pushover_connection_success(self, pushover_service):
+    async def test_test_pushover_connection_success(self, pushover_service) -> None:
         """Test successful Pushover connection test"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -317,7 +317,7 @@ class TestPushoverService:
             )
 
     @pytest.mark.asyncio
-    async def test_test_pushover_connection_failure(self, pushover_service):
+    async def test_test_pushover_connection_failure(self, pushover_service) -> None:
         """Test failed Pushover connection test"""
         with patch.object(pushover_service, "send_notification", return_value=False):
             result = await pushover_service.test_pushover_connection(
@@ -328,7 +328,7 @@ class TestPushoverService:
             assert "Failed to send test notification" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_test_pushover_connection_exception(self, pushover_service):
+    async def test_test_pushover_connection_exception(self, pushover_service) -> None:
         """Test connection test with exception"""
         with patch.object(
             pushover_service,
@@ -345,7 +345,7 @@ class TestPushoverService:
     @pytest.mark.asyncio
     async def test_send_notification_api_error_without_errors_field(
         self, pushover_service
-    ):
+    ) -> None:
         """Test handling API error response without errors field"""
         mock_response = MagicMock(spec=ClientResponse)
         mock_response.status = 200
@@ -369,7 +369,7 @@ class TestPushoverService:
 
             assert result is False
 
-    def test_pushover_api_url_constant(self, pushover_service):
+    def test_pushover_api_url_constant(self, pushover_service) -> None:
         """Test that the Pushover API URL is correctly set"""
         assert (
             pushover_service.PUSHOVER_API_URL
@@ -377,7 +377,7 @@ class TestPushoverService:
         )
 
     @pytest.mark.asyncio
-    async def test_job_type_formatting_in_success_notification(self, pushover_service):
+    async def test_job_type_formatting_in_success_notification(self, pushover_service) -> None:
         """Test that job types are properly formatted in success notifications"""
         with patch.object(
             pushover_service, "send_notification", return_value=True
@@ -394,7 +394,7 @@ class TestPushoverService:
             assert "Backup Prune Compact completed successfully" in kwargs["message"]
 
     @pytest.mark.asyncio
-    async def test_job_type_formatting_in_failure_notification(self, pushover_service):
+    async def test_job_type_formatting_in_failure_notification(self, pushover_service) -> None:
         """Test that job types are properly formatted in failure notifications"""
         with patch.object(
             pushover_service, "send_notification", return_value=True

@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
 
         import asyncio
 
-        async def cleanup_task():
+        async def cleanup_task() -> None:
             while True:
                 try:
                     await asyncio.sleep(300)  # 5 minutes

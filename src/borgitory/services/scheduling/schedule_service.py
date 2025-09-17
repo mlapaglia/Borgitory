@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ScheduleService:
     """Service for schedule business logic operations."""
 
-    def __init__(self, db: Session, scheduler_service):
+    def __init__(self, db: Session, scheduler_service) -> None:
         self.db = db
         self.scheduler_service = scheduler_service
 

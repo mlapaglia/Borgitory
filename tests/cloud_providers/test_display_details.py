@@ -13,7 +13,7 @@ from borgitory.services.cloud_providers.storage.smb_storage import SMBStorage
 class TestS3DisplayDetails:
     """Test S3 display details functionality"""
 
-    def test_s3_display_details_basic(self):
+    def test_s3_display_details_basic(self) -> None:
         """Test S3 display details with basic configuration"""
         storage = S3Storage(None, None)  # Mock dependencies not needed for this method
         config = {
@@ -30,7 +30,7 @@ class TestS3DisplayDetails:
         assert "GLACIER" in result["provider_details"]
         assert "<div><strong>Bucket:</strong>" in result["provider_details"]
 
-    def test_s3_display_details_defaults(self):
+    def test_s3_display_details_defaults(self) -> None:
         """Test S3 display details with default values"""
         storage = S3Storage(None, None)
         config = {"bucket_name": "test-bucket"}  # Minimal config
@@ -42,7 +42,7 @@ class TestS3DisplayDetails:
         assert "us-east-1" in result["provider_details"]  # Default region
         assert "STANDARD" in result["provider_details"]  # Default storage class
 
-    def test_s3_display_details_missing_values(self):
+    def test_s3_display_details_missing_values(self) -> None:
         """Test S3 display details with missing values"""
         storage = S3Storage(None, None)
         config = {}  # Empty config
@@ -56,7 +56,7 @@ class TestS3DisplayDetails:
 class TestSFTPDisplayDetails:
     """Test SFTP display details functionality"""
 
-    def test_sftp_display_details_basic(self):
+    def test_sftp_display_details_basic(self) -> None:
         """Test SFTP display details with basic configuration"""
         storage = SFTPStorage(None, None)
         config = {
@@ -75,7 +75,7 @@ class TestSFTPDisplayDetails:
         assert "/backups/borgitory" in result["provider_details"]
         assert "password" in result["provider_details"]  # Auth method
 
-    def test_sftp_display_details_private_key_auth(self):
+    def test_sftp_display_details_private_key_auth(self) -> None:
         """Test SFTP display details with private key authentication"""
         storage = SFTPStorage(None, None)
         config = {
@@ -92,7 +92,7 @@ class TestSFTPDisplayDetails:
         assert "server.example.com:22" in result["provider_details"]
         assert "private_key" in result["provider_details"]  # Auth method
 
-    def test_sftp_display_details_defaults(self):
+    def test_sftp_display_details_defaults(self) -> None:
         """Test SFTP display details with default values"""
         storage = SFTPStorage(None, None)
         config = {"host": "test.example.com", "username": "testuser"}
@@ -109,7 +109,7 @@ class TestSFTPDisplayDetails:
 class TestSMBDisplayDetails:
     """Test SMB display details functionality"""
 
-    def test_smb_display_details_basic(self):
+    def test_smb_display_details_basic(self) -> None:
         """Test SMB display details with basic configuration"""
         storage = SMBStorage(None, None)
         config = {
@@ -129,7 +129,7 @@ class TestSMBDisplayDetails:
         assert "COMPANY\\backup-service" in result["provider_details"]
         assert "password" in result["provider_details"]  # Auth method
 
-    def test_smb_display_details_kerberos(self):
+    def test_smb_display_details_kerberos(self) -> None:
         """Test SMB display details with Kerberos authentication"""
         storage = SMBStorage(None, None)
         config = {
@@ -149,7 +149,7 @@ class TestSMBDisplayDetails:
         assert "DOMAIN\\service-account" in result["provider_details"]
         assert "kerberos" in result["provider_details"]  # Auth method
 
-    def test_smb_display_details_defaults(self):
+    def test_smb_display_details_defaults(self) -> None:
         """Test SMB display details with default values"""
         storage = SMBStorage(None, None)
         config = {"host": "nas.local", "user": "admin", "share_name": "backup"}
@@ -165,7 +165,7 @@ class TestSMBDisplayDetails:
 class TestDisplayDetailsIntegration:
     """Test display details integration with the API helper function"""
 
-    def test_get_provider_display_details_function(self):
+    def test_get_provider_display_details_function(self) -> None:
         """Test the _get_provider_display_details function from cloud_sync.py"""
         from borgitory.api.cloud_sync import _get_provider_display_details
         from borgitory.services.cloud_providers.registry import get_registry
@@ -180,7 +180,7 @@ class TestDisplayDetailsIntegration:
         assert "test-bucket" in result["provider_details"]
         assert "eu-west-1" in result["provider_details"]
 
-    def test_get_provider_display_details_unknown_provider(self):
+    def test_get_provider_display_details_unknown_provider(self) -> None:
         """Test display details function with unknown provider"""
         from borgitory.api.cloud_sync import _get_provider_display_details
         from borgitory.services.cloud_providers.registry import get_registry
@@ -191,7 +191,7 @@ class TestDisplayDetailsIntegration:
         assert result["provider_name"] == "UNKNOWN"
         assert "Unknown provider" in result["provider_details"]
 
-    def test_get_provider_display_details_empty_provider(self):
+    def test_get_provider_display_details_empty_provider(self) -> None:
         """Test display details function with empty provider"""
         from borgitory.api.cloud_sync import _get_provider_display_details
         from borgitory.services.cloud_providers.registry import get_registry

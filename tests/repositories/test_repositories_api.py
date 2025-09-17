@@ -19,7 +19,7 @@ class TestRepositoriesAPI:
     """Test class for repositories API endpoints."""
 
     @pytest.mark.asyncio
-    async def test_list_repositories_empty(self, async_client: AsyncClient):
+    async def test_list_repositories_empty(self, async_client: AsyncClient) -> None:
         """Test listing repositories when empty."""
         response = await async_client.get("/api/repositories/")
 
@@ -29,7 +29,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_list_repositories_with_data(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test listing repositories with data."""
         # Create test repositories
         repo1 = Repository(name="repo-1", path="/tmp/repo-1")
@@ -51,7 +51,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_list_repositories_pagination(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test listing repositories with pagination."""
         # Create multiple repositories
         for i in range(5):
@@ -68,7 +68,7 @@ class TestRepositoriesAPI:
         assert len(response_data) == 2
 
     @pytest.mark.asyncio
-    async def test_scan_repositories_success(self, async_client: AsyncClient):
+    async def test_scan_repositories_success(self, async_client: AsyncClient) -> None:
         """Test successful repository scanning."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -121,7 +121,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_scan_repositories_htmx_response(self, async_client: AsyncClient):
+    async def test_scan_repositories_htmx_response(self, async_client: AsyncClient) -> None:
         """Test repository scanning with HTMX request."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -165,7 +165,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_scan_repositories_service_error(self, async_client: AsyncClient):
+    async def test_scan_repositories_service_error(self, async_client: AsyncClient) -> None:
         """Test repository scanning with service error."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -194,7 +194,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_scan_repositories_htmx_error(self, async_client: AsyncClient):
+    async def test_scan_repositories_htmx_error(self, async_client: AsyncClient) -> None:
         """Test repository scanning error with HTMX."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -225,7 +225,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_get_repositories_html_empty(self, async_client: AsyncClient):
+    async def test_get_repositories_html_empty(self, async_client: AsyncClient) -> None:
         """Test getting repositories as HTML when empty."""
         response = await async_client.get("/api/repositories/html")
 
@@ -235,7 +235,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_repositories_html_with_data(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting repositories as HTML with data."""
         repo = Repository(name="html-test-repo", path="/tmp/html-test")
         repo.set_passphrase("test-passphrase")
@@ -250,7 +250,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_repositories_html_error_handling(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test HTML endpoint error handling."""
         with patch("sqlalchemy.orm.Query.all", side_effect=Exception("Database error")):
             response = await async_client.get("/api/repositories/html")
@@ -260,7 +260,7 @@ class TestRepositoriesAPI:
             assert "Error loading repositories" in content
 
     @pytest.mark.asyncio
-    async def test_list_directories_root(self, async_client: AsyncClient):
+    async def test_list_directories_root(self, async_client: AsyncClient) -> None:
         """Test listing directories at /mnt root."""
         mock_volumes = ["/mnt/data", "/mnt/backups"]
 
@@ -307,7 +307,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
-    async def test_list_directories_valid_path(self, async_client: AsyncClient):
+    async def test_list_directories_valid_path(self, async_client: AsyncClient) -> None:
         """Test listing directories at valid path under /mnt."""
         mock_volumes = ["/mnt/data"]
 
@@ -353,7 +353,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
-    async def test_list_directories_nonexistent_path(self, async_client: AsyncClient):
+    async def test_list_directories_nonexistent_path(self, async_client: AsyncClient) -> None:
         """Test listing directories for non-existent path."""
         mock_volumes = ["/data"]
 
@@ -379,7 +379,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
-    async def test_list_directories_permission_denied(self, async_client: AsyncClient):
+    async def test_list_directories_permission_denied(self, async_client: AsyncClient) -> None:
         """Test listing directories with permission denied."""
         mock_volumes = ["/data"]
 
@@ -409,7 +409,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_list_directories_not_under_mounted_volume(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test listing directories outside mounted volumes."""
         mock_volumes = ["/data"]
 
@@ -434,7 +434,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_volume_service]
 
     @pytest.mark.asyncio
-    async def test_update_import_form_no_path(self, async_client: AsyncClient):
+    async def test_update_import_form_no_path(self, async_client: AsyncClient) -> None:
         """Test import form update with empty path parameter."""
         response = await async_client.get("/api/repositories/import-form-update?path=")
 
@@ -442,7 +442,7 @@ class TestRepositoriesAPI:
         assert "text/html" in response.headers["content-type"]
 
     @pytest.mark.asyncio
-    async def test_update_import_form_loading_state(self, async_client: AsyncClient):
+    async def test_update_import_form_loading_state(self, async_client: AsyncClient) -> None:
         """Test import form update loading state."""
         response = await async_client.get(
             "/api/repositories/import-form-update?path=/test&loading=true"
@@ -452,7 +452,7 @@ class TestRepositoriesAPI:
         assert "text/html" in response.headers["content-type"]
 
     @pytest.mark.asyncio
-    async def test_update_import_form_valid_repo(self, async_client: AsyncClient):
+    async def test_update_import_form_valid_repo(self, async_client: AsyncClient) -> None:
         """Test import form update with valid repository."""
         mock_repos = [
             {
@@ -483,7 +483,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
-    async def test_update_import_form_repo_not_found(self, async_client: AsyncClient):
+    async def test_update_import_form_repo_not_found(self, async_client: AsyncClient) -> None:
         """Test import form update with repository not found."""
         # Create mock service
         mock_borg_service = AsyncMock(spec=BorgService)
@@ -507,7 +507,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_import_repository_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test successful repository import."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -550,7 +550,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_import_repository_htmx_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test successful repository import via HTMX."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -596,7 +596,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_import_repository_duplicate_name(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test repository import with duplicate name."""
         # Create existing repository
         existing_repo = Repository(name="existing-import", path="/tmp/existing")
@@ -618,7 +618,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_import_repository_with_keyfile(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test repository import with keyfile."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -668,7 +668,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_import_repository_verification_failure(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test repository import with verification failure."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -709,7 +709,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_repository_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting repository by ID."""
         repo = Repository(name="get-test-repo", path="/tmp/get-test")
         repo.set_passphrase("get-test-passphrase")
@@ -724,7 +724,7 @@ class TestRepositoriesAPI:
         assert response_data["id"] == repo.id
 
     @pytest.mark.asyncio
-    async def test_get_repository_not_found(self, async_client: AsyncClient):
+    async def test_get_repository_not_found(self, async_client: AsyncClient) -> None:
         """Test getting non-existent repository."""
         response = await async_client.get("/api/repositories/999")
 
@@ -734,7 +734,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_update_repository_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test updating repository."""
         repo = Repository(name="update-test-repo", path="/tmp/update-test")
         repo.set_passphrase("old-passphrase")
@@ -752,7 +752,7 @@ class TestRepositoriesAPI:
         assert response_data["name"] == "updated-repo-name"
 
     @pytest.mark.asyncio
-    async def test_update_repository_not_found(self, async_client: AsyncClient):
+    async def test_update_repository_not_found(self, async_client: AsyncClient) -> None:
         """Test updating non-existent repository."""
         update_data = {"name": "new-name"}
 
@@ -763,7 +763,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_delete_repository_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test deleting repository returns HTMX success response."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -803,7 +803,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_delete_repository_not_found(self, async_client: AsyncClient):
+    async def test_delete_repository_not_found(self, async_client: AsyncClient) -> None:
         """Test deleting non-existent repository."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -835,7 +835,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_delete_repository_with_active_jobs(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test deleting repository with active jobs."""
         repo = Repository(name="active-jobs-repo", path="/tmp/active-jobs")
         repo.set_passphrase("active-passphrase")
@@ -856,7 +856,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_delete_repository_schedule_cleanup(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test repository deletion HTMX response includes schedule cleanup information."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -898,7 +898,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_list_archives_repository_not_found(self, async_client: AsyncClient):
+    async def test_list_archives_repository_not_found(self, async_client: AsyncClient) -> None:
         """Test listing archives for non-existent repository."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -933,7 +933,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_list_archives_html_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test listing archives as HTML."""
         repo = Repository(name="html-archives-repo", path="/tmp/html-archives")
         repo.set_passphrase("html-archives-passphrase")
@@ -970,7 +970,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_list_archives_html_error_handling(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test archives HTML with error handling."""
         repo = Repository(name="html-error-repo", path="/tmp/html-error")
         repo.set_passphrase("html-error-passphrase")
@@ -999,7 +999,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_archives_repository_selector(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting archives repository selector."""
         repo = Repository(name="selector-repo", path="/tmp/selector")
         repo.set_passphrase("selector-passphrase")
@@ -1012,7 +1012,7 @@ class TestRepositoriesAPI:
         assert "text/html" in response.headers["content-type"]
 
     @pytest.mark.asyncio
-    async def test_get_archives_list_empty(self, async_client: AsyncClient):
+    async def test_get_archives_list_empty(self, async_client: AsyncClient) -> None:
         """Test getting archives list without repository ID."""
         response = await async_client.get("/api/repositories/archives/list")
 
@@ -1022,7 +1022,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_archives_list_with_repo(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting archives list with repository ID."""
         repo = Repository(name="list-repo", path="/tmp/list")
         repo.set_passphrase("list-passphrase")
@@ -1051,7 +1051,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_repository_info_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting repository info."""
         repo = Repository(name="info-repo", path="/tmp/info")
         repo.set_passphrase("info-passphrase")
@@ -1083,14 +1083,14 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
-    async def test_get_repository_info_not_found(self, async_client: AsyncClient):
+    async def test_get_repository_info_not_found(self, async_client: AsyncClient) -> None:
         """Test getting info for non-existent repository."""
         response = await async_client.get("/api/repositories/999/info")
 
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_get_archive_contents_not_found(self, async_client: AsyncClient):
+    async def test_get_archive_contents_not_found(self, async_client: AsyncClient) -> None:
         """Test getting contents for non-existent repository."""
         response = await async_client.get(
             "/api/repositories/999/archives/test-archive/contents"
@@ -1101,7 +1101,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_extract_file_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test extracting file from archive."""
         repo = Repository(name="extract-repo", path="/tmp/extract")
         repo.set_passphrase("extract-passphrase")
@@ -1129,7 +1129,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
-    async def test_extract_file_not_found(self, async_client: AsyncClient):
+    async def test_extract_file_not_found(self, async_client: AsyncClient) -> None:
         """Test extracting file from non-existent repository."""
         response = await async_client.get(
             "/api/repositories/999/archives/test-archive/extract?file=test.txt"
@@ -1140,7 +1140,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_stats_selector(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting repository selector for statistics."""
         # Create test repositories
         repo1 = Repository(name="stats-repo-1", path="/tmp/stats1")
@@ -1160,7 +1160,7 @@ class TestRepositoriesAPI:
         assert "stats-repo-2" in content
 
     @pytest.mark.asyncio
-    async def test_get_stats_loading(self, async_client: AsyncClient):
+    async def test_get_stats_loading(self, async_client: AsyncClient) -> None:
         """Test getting loading state for statistics."""
         response = await async_client.get(
             "/api/repositories/stats/loading?repository_id=1"
@@ -1172,14 +1172,14 @@ class TestRepositoriesAPI:
         assert "repository_id" in content or "loading" in content.lower()
 
     @pytest.mark.asyncio
-    async def test_get_stats_loading_no_repository(self, async_client: AsyncClient):
+    async def test_get_stats_loading_no_repository(self, async_client: AsyncClient) -> None:
         """Test getting loading state without repository ID."""
         response = await async_client.get("/api/repositories/stats/loading")
 
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_get_stats_content_no_repository(self, async_client: AsyncClient):
+    async def test_get_stats_content_no_repository(self, async_client: AsyncClient) -> None:
         """Test getting stats content without repository ID shows empty state."""
         from borgitory.dependencies import get_repository_stats_service
         from borgitory.services.repositories.repository_stats_service import (
@@ -1206,7 +1206,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_stats_content_with_repository(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting stats content with valid repository ID."""
         from borgitory.dependencies import get_repository_stats_service
         from borgitory.services.repositories.repository_stats_service import (
@@ -1269,7 +1269,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_stats_content_repository_not_found(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test getting stats content with non-existent repository ID."""
         from borgitory.dependencies import get_repository_stats_service
         from borgitory.services.repositories.repository_stats_service import (
@@ -1297,7 +1297,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_get_repository_statistics_direct(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test the direct repository statistics endpoint."""
         from borgitory.dependencies import get_repository_stats_service
         from borgitory.services.repositories.repository_stats_service import (
@@ -1362,7 +1362,7 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_repository_stats_service]
 
     @pytest.mark.asyncio
-    async def test_get_repository_statistics_not_found(self, async_client: AsyncClient):
+    async def test_get_repository_statistics_not_found(self, async_client: AsyncClient) -> None:
         """Test repository statistics endpoint with non-existent repository."""
         from borgitory.dependencies import get_repository_stats_service
         from borgitory.services.repositories.repository_stats_service import (
@@ -1387,7 +1387,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_directories_autocomplete_htmx_response(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test that autocomplete endpoint returns proper HTMX HTML response."""
         from borgitory.api.auth import get_current_user
         from borgitory.models.database import User
@@ -1449,7 +1449,7 @@ class TestRepositoriesAPI:
     @pytest.mark.asyncio
     async def test_stats_content_dependency_injection_regression(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """
         Regression test to ensure /api/repositories/stats/content doesn't fail
         with AttributeError: 'Depends' object has no attribute 'query'

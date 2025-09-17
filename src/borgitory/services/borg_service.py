@@ -28,7 +28,7 @@ class BorgService:
         command_runner: Optional[SimpleCommandRunner] = None,
         job_manager: Optional[JobManager] = None,
         volume_service=None,
-    ):
+    ) -> None:
         self.job_executor = job_executor or JobExecutor()
         self.command_runner = command_runner or SimpleCommandRunner()
         self.job_manager = job_manager
@@ -46,7 +46,7 @@ class BorgService:
             )
         return self.job_manager
 
-    def _parse_borg_config(self, repo_path: str) -> Dict[str, any]:
+    def _parse_borg_config(self, repo_path: str) -> Dict[str, Any]:
         """Parse a Borg repository config file to determine encryption mode"""
         config_path = os.path.join(repo_path, "config")
 
@@ -167,7 +167,7 @@ class BorgService:
                 "preview": f"Error reading config: {str(e)}",
             }
 
-    async def initialize_repository(self, repository: Repository) -> Dict[str, any]:
+    async def initialize_repository(self, repository: Repository) -> Dict[str, Any]:
         """Initialize a new Borg repository"""
         logger.info(f"Initializing Borg repository at {repository.path}")
 
@@ -291,7 +291,7 @@ class BorgService:
             logger.error(f"Failed to start backup: {e}")
             raise Exception(f"Failed to start backup: {str(e)}")
 
-    async def list_archives(self, repository: Repository) -> List[Dict[str, any]]:
+    async def list_archives(self, repository: Repository) -> List[Dict[str, Any]]:
         """List all archives in a repository"""
         try:
             command, env = build_secure_borg_command(
@@ -400,7 +400,7 @@ class BorgService:
         except Exception as e:
             raise Exception(f"Failed to list archives: {str(e)}")
 
-    async def get_repo_info(self, repository: Repository) -> Dict[str, any]:
+    async def get_repo_info(self, repository: Repository) -> Dict[str, Any]:
         """Get repository information using direct process execution"""
         try:
             command, env = build_secure_borg_command(
@@ -444,7 +444,7 @@ class BorgService:
 
     async def list_archive_contents(
         self, repository: Repository, archive_name: str
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """List contents of a specific archive"""
         try:
             validate_archive_name(archive_name)

@@ -150,7 +150,7 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
 class RepositoryStatsService:
     """Service to gather repository statistics from Borg commands"""
 
-    def __init__(self, command_executor: CommandExecutorInterface = None):
+    def __init__(self, command_executor: CommandExecutorInterface = None) -> None:
         self.command_executor = command_executor or SubprocessCommandExecutor()
 
     async def get_repository_statistics(

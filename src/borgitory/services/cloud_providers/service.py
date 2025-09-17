@@ -50,7 +50,7 @@ class ConfigValidator:
 class StorageFactory:
     """Factory for creating cloud storage instances"""
 
-    def __init__(self, rclone_service: RcloneService):
+    def __init__(self, rclone_service: RcloneService) -> None:
         """
         Initialize storage factory.
 
@@ -167,7 +167,7 @@ class CloudSyncService:
         self,
         storage_factory: StorageFactory,
         encryption_service: Optional[EncryptionService] = None,
-    ):
+    ) -> None:
         """
         Initialize cloud sync service.
 

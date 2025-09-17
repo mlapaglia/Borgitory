@@ -207,12 +207,12 @@ class TestCloudSyncDependencyInjection:
         test_db,
         mock_encryption_service,
         mock_storage_factory,
-    ):
+    ) -> None:
         """Test that cloud sync uses the injected RcloneService, not hardcoded imports"""
 
         output_messages = []
 
-        def output_callback(message, metadata):
+        def output_callback(message, metadata) -> None:
             output_messages.append(message)
 
         # Execute cloud sync with injected dependencies
@@ -263,7 +263,7 @@ class TestCloudSyncDependencyInjection:
         test_db,
         mock_encryption_service,
         mock_storage_factory,
-    ):
+    ) -> None:
         """Test cloud sync works with SFTP provider using generic dispatcher"""
 
         # Update mock to return SFTP config
@@ -305,7 +305,7 @@ class TestCloudSyncDependencyInjection:
         test_db,
         mock_encryption_service,
         mock_storage_factory,
-    ):
+    ) -> None:
         """Test that configurations with invalid provider_config are handled with clear error messages"""
 
         result = await self._execute_cloud_sync_with_di(
@@ -331,7 +331,7 @@ class TestCloudSyncDependencyInjection:
         test_db,
         mock_encryption_service,
         mock_storage_factory,
-    ):
+    ) -> None:
         """Test that configurations with missing provider_config are handled with clear error messages"""
 
         result = await self._execute_cloud_sync_with_di(
@@ -356,7 +356,7 @@ class TestCloudSyncDependencyInjection:
         test_db,
         mock_encryption_service,
         mock_storage_factory,
-    ):
+    ) -> None:
         """Test proper error handling when rclone service throws exception"""
 
         # Mock rclone service that throws exception
@@ -391,7 +391,7 @@ class TestCloudSyncDependencyInjection:
         test_db,
         mock_encryption_service,
         mock_storage_factory,
-    ):
+    ) -> None:
         """Test that cloud sync is skipped when config is disabled"""
 
         # Disable the configuration
@@ -417,7 +417,7 @@ class TestCloudSyncDependencyInjection:
 class TestNoDeprecatedImports:
     """Test that deprecated imports are not used"""
 
-    def test_no_cloud_provider_factory_import(self):
+    def test_no_cloud_provider_factory_import(self) -> None:
         """Test that CloudProviderFactory is not imported anywhere in job executor"""
 
         # Read the job executor file
@@ -434,7 +434,7 @@ class TestNoDeprecatedImports:
             "JobExecutor should use the generic rclone dispatcher methods"
         )
 
-    def test_proper_rclone_service_usage(self):
+    def test_proper_rclone_service_usage(self) -> None:
         """Test that RcloneService is used via dependency injection"""
 
         with open("src/borgitory/services/jobs/job_executor.py", "r") as f:
@@ -446,7 +446,7 @@ class TestNoDeprecatedImports:
         )
 
     @pytest.mark.asyncio
-    async def test_registry_integration_works(self, production_registry):
+    async def test_registry_integration_works(self, production_registry) -> None:
         """Test that the registry system is properly integrated"""
         # Use isolated registry fixture instead of global registry
         providers = production_registry.get_supported_providers()
@@ -455,7 +455,7 @@ class TestNoDeprecatedImports:
         for provider in expected_providers:
             assert provider in providers, f"Provider {provider} should be registered"
 
-    def test_rclone_service_has_generic_dispatchers(self):
+    def test_rclone_service_has_generic_dispatchers(self) -> None:
         """Test that RcloneService has the required generic dispatcher methods"""
         from borgitory.services.rclone_service import RcloneService
 
@@ -518,7 +518,7 @@ class TestCloudSyncProgressHandling:
         test_db,
         mock_encryption_service,
         mock_storage_factory,
-    ):
+    ) -> None:
         """Test that progress is properly streamed from rclone service"""
 
         # Create a mock rclone service with detailed progress
@@ -539,7 +539,7 @@ class TestCloudSyncProgressHandling:
 
         progress_events = []
 
-        def progress_callback(message, metadata):
+        def progress_callback(message, metadata) -> None:
             progress_events.append((message, metadata))
 
         result = await self._execute_cloud_sync_with_di(
@@ -571,7 +571,7 @@ class TestCloudSyncProgressHandling:
         test_db,
         mock_encryption_service,
         mock_storage_factory,
-    ):
+    ) -> None:
         """Test handling when rclone process fails"""
 
         mock_rclone_service = MagicMock(spec=RcloneService)

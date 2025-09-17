@@ -5,6 +5,8 @@ Tests for ScheduleService - Business logic tests
 import pytest
 from unittest.mock import AsyncMock
 
+from sqlalchemy.orm import Session
+
 from borgitory.services.scheduling.schedule_service import ScheduleService
 from borgitory.models.database import Schedule, Repository
 
@@ -26,7 +28,7 @@ def service(test_db, mock_scheduler_service):
 
 
 @pytest.fixture
-def sample_repository(test_db):
+def sample_repository(test_db: Session):
     """Create a sample repository for testing."""
     repository = Repository(
         name="test-repo",
@@ -42,19 +44,19 @@ def sample_repository(test_db):
 class TestScheduleService:
     """Test class for ScheduleService business logic."""
 
-    def test_validate_cron_expression_valid(self, service):
+    def test_validate_cron_expression_valid(self, service) -> None:
         """Test valid cron expression validation."""
         is_valid, error = service.validate_cron_expression("0 2 * * *")
         assert is_valid is True
         assert error is None
 
-    def test_validate_cron_expression_invalid(self, service):
+    def test_validate_cron_expression_invalid(self, service) -> None:
         """Test invalid cron expression validation."""
         is_valid, error = service.validate_cron_expression("invalid cron")
         assert is_valid is False
         assert "Invalid cron expression" in error
 
-    def test_get_schedule_by_id_success(self, service, test_db, sample_repository):
+    def test_get_schedule_by_id_success(self, service, test_db, sample_repository) -> None:
         """Test getting schedule by ID successfully."""
         schedule = Schedule(
             name="test-schedule",
@@ -71,17 +73,17 @@ class TestScheduleService:
         assert result.name == "test-schedule"
         assert result.id == schedule.id
 
-    def test_get_schedule_by_id_not_found(self, service):
+    def test_get_schedule_by_id_not_found(self, service) -> None:
         """Test getting non-existent schedule."""
         result = service.get_schedule_by_id(999)
         assert result is None
 
-    def test_get_schedules_empty(self, service):
+    def test_get_schedules_empty(self, service) -> None:
         """Test getting schedules when none exist."""
         result = service.get_schedules()
         assert result == []
 
-    def test_get_schedules_with_data(self, service, test_db, sample_repository):
+    def test_get_schedules_with_data(self, service, test_db, sample_repository) -> None:
         """Test getting schedules with data."""
         schedule1 = Schedule(
             name="schedule-1",
@@ -105,7 +107,7 @@ class TestScheduleService:
         assert "schedule-1" in names
         assert "schedule-2" in names
 
-    def test_get_schedules_with_pagination(self, service, test_db, sample_repository):
+    def test_get_schedules_with_pagination(self, service, test_db, sample_repository) -> None:
         """Test getting schedules with pagination."""
         for i in range(5):
             schedule = Schedule(
@@ -120,7 +122,7 @@ class TestScheduleService:
         result = service.get_schedules(skip=2, limit=2)
         assert len(result) == 2
 
-    def test_get_all_schedules(self, service, test_db, sample_repository):
+    def test_get_all_schedules(self, service, test_db, sample_repository) -> None:
         """Test getting all schedules."""
         schedule = Schedule(
             name="test-schedule",
@@ -138,7 +140,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_create_schedule_success(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test successful schedule creation."""
         success, schedule, error = await service.create_schedule(
             name="new-schedule",
@@ -164,7 +166,7 @@ class TestScheduleService:
         mock_scheduler_service.add_schedule.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_schedule_repository_not_found(self, service):
+    async def test_create_schedule_repository_not_found(self, service) -> None:
         """Test schedule creation with non-existent repository."""
         success, schedule, error = await service.create_schedule(
             name="test-schedule",
@@ -178,7 +180,7 @@ class TestScheduleService:
         assert "Repository not found" in error
 
     @pytest.mark.asyncio
-    async def test_create_schedule_invalid_cron(self, service, sample_repository):
+    async def test_create_schedule_invalid_cron(self, service, sample_repository) -> None:
         """Test schedule creation with invalid cron expression."""
         success, schedule, error = await service.create_schedule(
             name="test-schedule",
@@ -194,7 +196,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_create_schedule_scheduler_failure(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test schedule creation when scheduler fails."""
         mock_scheduler_service.add_schedule.side_effect = Exception("Scheduler error")
 
@@ -218,7 +220,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_update_schedule_success(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test successful schedule update."""
         # Create initial schedule
         schedule = Schedule(
@@ -247,7 +249,7 @@ class TestScheduleService:
         mock_scheduler_service.update_schedule.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_update_schedule_not_found(self, service):
+    async def test_update_schedule_not_found(self, service) -> None:
         """Test updating non-existent schedule."""
         success, schedule, error = await service.update_schedule(
             999, {"name": "new-name"}
@@ -260,7 +262,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_toggle_schedule_enable(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test enabling a disabled schedule."""
         schedule = Schedule(
             name="test-schedule",
@@ -285,7 +287,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_toggle_schedule_disable(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test disabling an enabled schedule."""
         schedule = Schedule(
             name="test-schedule",
@@ -308,7 +310,7 @@ class TestScheduleService:
         mock_scheduler_service.update_schedule.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_toggle_schedule_not_found(self, service):
+    async def test_toggle_schedule_not_found(self, service) -> None:
         """Test toggling non-existent schedule."""
         success, schedule, error = await service.toggle_schedule(999)
 
@@ -319,7 +321,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_toggle_schedule_scheduler_error(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test toggle schedule when scheduler fails."""
         schedule = Schedule(
             name="test-schedule",
@@ -345,7 +347,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_delete_schedule_success(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test successful schedule deletion."""
         schedule = Schedule(
             name="test-schedule",
@@ -374,7 +376,7 @@ class TestScheduleService:
         mock_scheduler_service.remove_schedule.assert_called_once_with(schedule_id)
 
     @pytest.mark.asyncio
-    async def test_delete_schedule_not_found(self, service):
+    async def test_delete_schedule_not_found(self, service) -> None:
         """Test deleting non-existent schedule."""
         success, schedule_name, error = await service.delete_schedule(999)
 
@@ -385,7 +387,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_delete_schedule_scheduler_error(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test delete schedule when scheduler fails."""
         schedule = Schedule(
             name="test-schedule",
@@ -410,7 +412,7 @@ class TestScheduleService:
     @pytest.mark.asyncio
     async def test_schedule_lifecycle(
         self, service, test_db, sample_repository, mock_scheduler_service
-    ):
+    ) -> None:
         """Test complete schedule lifecycle: create, update, toggle, delete."""
         # Create
         success, created_schedule, error = await service.create_schedule(

@@ -30,7 +30,7 @@ def format_time_until(time_diff_ms: int) -> str:
 class UpcomingBackupsService:
     """Service for processing upcoming backup job data."""
 
-    def __init__(self, cron_description_service: CronDescriptionService):
+    def __init__(self, cron_description_service: CronDescriptionService) -> None:
         self.cron_description_service = cron_description_service
 
     def process_jobs(self, jobs_raw: List[Dict[str, Any]]) -> List[Dict[str, str]]:

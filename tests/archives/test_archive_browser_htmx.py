@@ -19,7 +19,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_list_archives_htmx_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test listing archives via HTMX returns HTML template."""
         repo = Repository(name="htmx-test-repo", path="/tmp/htmx-test")
         repo.set_passphrase("htmx-passphrase")
@@ -77,7 +77,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_list_archives_htmx_empty(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test listing archives when repository has no archives."""
         repo = Repository(name="empty-repo", path="/tmp/empty")
         repo.set_passphrase("empty-passphrase")
@@ -124,7 +124,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_list_archives_htmx_error(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test listing archives when service throws error."""
         repo = Repository(name="error-repo", path="/tmp/error")
         repo.set_passphrase("error-passphrase")
@@ -168,7 +168,7 @@ class TestArchiveBrowserHTMX:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_list_archives_htmx_not_found(self, async_client: AsyncClient):
+    async def test_list_archives_htmx_not_found(self, async_client: AsyncClient) -> None:
         """Test listing archives for non-existent repository."""
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -209,7 +209,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_archive_contents_htmx_success(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting archive contents via HTMX returns HTML template."""
         repo = Repository(name="contents-repo", path="/tmp/contents")
         repo.set_passphrase("contents-passphrase")
@@ -276,7 +276,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_archive_contents_htmx_with_path(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting archive contents with specific path."""
         repo = Repository(name="contents-path-repo", path="/tmp/contents-path")
         repo.set_passphrase("contents-path-passphrase")
@@ -324,7 +324,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_archive_contents_htmx_empty_directory(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test getting contents of empty directory."""
         repo = Repository(name="empty-dir-repo", path="/tmp/empty-dir")
         repo.set_passphrase("empty-dir-passphrase")
@@ -356,7 +356,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_archive_contents_htmx_error(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test archive contents when service throws error."""
         repo = Repository(name="contents-error-repo", path="/tmp/contents-error")
         repo.set_passphrase("contents-error-passphrase")
@@ -389,7 +389,7 @@ class TestArchiveBrowserHTMX:
                 del app.dependency_overrides[get_borg_service]
 
     @pytest.mark.asyncio
-    async def test_archive_contents_htmx_not_found(self, async_client: AsyncClient):
+    async def test_archive_contents_htmx_not_found(self, async_client: AsyncClient) -> None:
         """Test archive contents for non-existent repository."""
         response = await async_client.get(
             "/api/repositories/9999/archives/test-archive/contents",
@@ -401,7 +401,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_file_size_formatting(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test various file size formatting in templates."""
         repo = Repository(name="size-repo", path="/tmp/size")
         repo.set_passphrase("size-passphrase")
@@ -469,7 +469,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_archive_repository_selector(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test the repository selector for archives."""
         # Create test repositories
         repo1 = Repository(name="repo-1", path="/tmp/repo-1")
@@ -503,7 +503,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_archives_list_endpoint_form_data(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test archives/list endpoint handles form data from selector."""
         repo = Repository(name="form-repo", path="/tmp/form")
         repo.set_passphrase("form-passphrase")
@@ -545,7 +545,7 @@ class TestArchiveBrowserHTMX:
     @pytest.mark.asyncio
     async def test_htmx_navigation_attributes(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test that HTMX navigation attributes are present in archive browser."""
         repo = Repository(name="nav-repo", path="/tmp/nav")
         repo.set_passphrase("nav-passphrase")

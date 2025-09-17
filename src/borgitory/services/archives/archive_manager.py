@@ -31,7 +31,7 @@ class ArchiveManager:
         self,
         job_executor: Optional[JobExecutor] = None,
         command_builder: Optional[BorgCommandBuilder] = None,
-    ):
+    ) -> None:
         self.job_executor = job_executor or JobExecutor()
         self.command_builder = command_builder or BorgCommandBuilder()
 

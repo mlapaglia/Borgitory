@@ -35,7 +35,7 @@ class ConfigLoadService(ABC):
 class DatabaseConfigLoadService(ConfigLoadService):
     """Service that loads configurations from database"""
 
-    def __init__(self, db_session_factory: Callable):
+    def __init__(self, db_session_factory: Callable) -> None:
         """
         Initialize with database session factory.
 
@@ -112,7 +112,7 @@ class DatabaseConfigLoadService(ConfigLoadService):
 class MockConfigLoadService(ConfigLoadService):
     """Mock service for testing - returns predefined configurations"""
 
-    def __init__(self, configs: dict[int, CloudSyncConfig]):
+    def __init__(self, configs: dict[int, CloudSyncConfig]) -> None:
         """
         Initialize with predefined configurations.
 

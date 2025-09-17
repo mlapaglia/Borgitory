@@ -102,7 +102,7 @@ class S3Storage(CloudStorage):
     CloudStorage interface for easy testing and integration.
     """
 
-    def __init__(self, config: S3StorageConfig, rclone_service: RcloneService):
+    def __init__(self, config: S3StorageConfig, rclone_service: RcloneService) -> None:
         """
         Initialize S3 storage.
 

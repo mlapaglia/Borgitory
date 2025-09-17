@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock
 from typing import List
+from sqlalchemy.orm import Session
 
 from borgitory.services.jobs.job_manager import BorgJob, BorgJobTask, JobManagerConfig
 from borgitory.models.database import Repository, Job, JobTask
@@ -95,7 +96,7 @@ def sample_composite_job():
 
 
 @pytest.fixture
-def sample_repository(test_db):
+def sample_repository(test_db: Session):
     """Create a sample repository in the test database."""
     repository = Repository(
         name="test-repo",

@@ -3,6 +3,7 @@ import pytest
 from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
+from sqlalchemy.orm import Session
 
 from borgitory.services.backups.backup_executor import (
     BackupExecutor,
@@ -17,7 +18,7 @@ from borgitory.models.database import Repository
 class TestBackupStatus:
     """Test BackupStatus enum"""
 
-    def test_backup_status_enum_values(self):
+    def test_backup_status_enum_values(self) -> None:
         """Test all backup status enum values"""
         assert BackupStatus.PENDING.value == "pending"
         assert BackupStatus.RUNNING.value == "running"
@@ -28,7 +29,7 @@ class TestBackupStatus:
 class TestBackupConfig:
     """Test BackupConfig dataclass"""
 
-    def test_backup_config_default_values(self):
+    def test_backup_config_default_values(self) -> None:
         """Test BackupConfig with default values"""
         config = BackupConfig(source_paths=["/data", "/home"])
 
@@ -41,7 +42,7 @@ class TestBackupConfig:
         assert config.archive_name is not None
         assert "backup-" in config.archive_name
 
-    def test_backup_config_custom_values(self):
+    def test_backup_config_custom_values(self) -> None:
         """Test BackupConfig with custom values"""
         config = BackupConfig(
             source_paths=["/custom"],
@@ -61,12 +62,12 @@ class TestBackupConfig:
         assert config.show_stats is False
         assert config.show_list is False
 
-    def test_backup_config_none_excludes_becomes_empty_list(self):
+    def test_backup_config_none_excludes_becomes_empty_list(self) -> None:
         """Test that None excludes becomes empty list"""
         config = BackupConfig(source_paths=["/data"], excludes=None)
         assert config.excludes == []
 
-    def test_backup_config_auto_generated_archive_name(self):
+    def test_backup_config_auto_generated_archive_name(self) -> None:
         """Test archive name auto-generation"""
         config = BackupConfig(source_paths=["/data"], archive_name=None)
         assert config.archive_name is not None
@@ -77,7 +78,7 @@ class TestBackupConfig:
 class TestPruneConfig:
     """Test PruneConfig dataclass"""
 
-    def test_prune_config_default_values(self):
+    def test_prune_config_default_values(self) -> None:
         """Test PruneConfig with default values"""
         config = PruneConfig()
 
@@ -90,7 +91,7 @@ class TestPruneConfig:
         assert config.show_stats is True
         assert config.show_list is False
 
-    def test_prune_config_custom_values(self):
+    def test_prune_config_custom_values(self) -> None:
         """Test PruneConfig with custom values"""
         config = PruneConfig(
             keep_within="7d",
@@ -116,7 +117,7 @@ class TestPruneConfig:
 class TestBackupResult:
     """Test BackupResult dataclass"""
 
-    def test_backup_result_creation(self):
+    def test_backup_result_creation(self) -> None:
         """Test BackupResult creation"""
         started = datetime.now(UTC)
         completed = datetime.now(UTC)
@@ -137,7 +138,7 @@ class TestBackupResult:
         assert result.started_at == started
         assert result.completed_at == completed
 
-    def test_backup_result_success_property_true(self):
+    def test_backup_result_success_property_true(self) -> None:
         """Test success property returns True for completed with return code 0"""
         result = BackupResult(
             status=BackupStatus.COMPLETED,
@@ -146,7 +147,7 @@ class TestBackupResult:
         )
         assert result.success is True
 
-    def test_backup_result_success_property_false_failed_status(self):
+    def test_backup_result_success_property_false_failed_status(self) -> None:
         """Test success property returns False for failed status"""
         result = BackupResult(
             status=BackupStatus.FAILED,
@@ -155,7 +156,7 @@ class TestBackupResult:
         )
         assert result.success is False
 
-    def test_backup_result_success_property_false_nonzero_return_code(self):
+    def test_backup_result_success_property_false_nonzero_return_code(self) -> None:
         """Test success property returns False for non-zero return code"""
         result = BackupResult(
             status=BackupStatus.COMPLETED,
@@ -164,7 +165,7 @@ class TestBackupResult:
         )
         assert result.success is False
 
-    def test_backup_result_default_values(self):
+    def test_backup_result_default_values(self) -> None:
         """Test BackupResult with minimal required arguments"""
         result = BackupResult(
             status=BackupStatus.RUNNING,
@@ -189,7 +190,7 @@ class TestBackupExecutor:
         return BackupExecutor()
 
     @pytest.fixture
-    def test_repository(self, test_db):
+    def test_repository(self, test_db: Session):
         """Create test repository using real database"""
 
         @contextmanager
@@ -211,28 +212,28 @@ class TestBackupExecutor:
             db.refresh(repo)
             return repo
 
-    def test_backup_executor_initialization(self, backup_executor):
+    def test_backup_executor_initialization(self, backup_executor) -> None:
         """Test BackupExecutor initialization"""
         assert backup_executor.subprocess_executor is not None
         assert backup_executor.progress_pattern is not None
         assert backup_executor.active_operations == {}
 
-    def test_backup_executor_custom_subprocess_executor(self):
+    def test_backup_executor_custom_subprocess_executor(self) -> None:
         """Test BackupExecutor with custom subprocess executor"""
         mock_executor = Mock()
         executor = BackupExecutor(subprocess_executor=mock_executor)
         assert executor.subprocess_executor == mock_executor
 
-    def test_get_active_operations_empty(self, backup_executor):
+    def test_get_active_operations_empty(self, backup_executor) -> None:
         """Test get_active_operations returns empty list initially"""
         operations = backup_executor.get_active_operations()
         assert operations == []
 
-    def test_is_operation_active_false(self, backup_executor):
+    def test_is_operation_active_false(self, backup_executor) -> None:
         """Test is_operation_active returns False for non-existent operation"""
         assert backup_executor.is_operation_active("nonexistent") is False
 
-    def test_parse_progress_line_borg_pattern(self, backup_executor):
+    def test_parse_progress_line_borg_pattern(self, backup_executor) -> None:
         """Test _parse_progress_line with Borg progress pattern"""
         # Borg progress line pattern: original_size compressed_size deduplicated_size nfiles path
         line = "1048576 524288 262144 10 /home/user/documents"
@@ -246,7 +247,7 @@ class TestBackupExecutor:
         assert progress["path"] == "/home/user/documents"
         assert "timestamp" in progress
 
-    def test_parse_progress_line_archive_name(self, backup_executor):
+    def test_parse_progress_line_archive_name(self, backup_executor) -> None:
         """Test _parse_progress_line with archive name"""
         line = "Archive name: backup-20231201-120000"
 
@@ -254,7 +255,7 @@ class TestBackupExecutor:
 
         assert progress["archive_name"] == "backup-20231201-120000"
 
-    def test_parse_progress_line_fingerprint(self, backup_executor):
+    def test_parse_progress_line_fingerprint(self, backup_executor) -> None:
         """Test _parse_progress_line with fingerprint"""
         line = "Archive fingerprint: abc123def456"
 
@@ -262,7 +263,7 @@ class TestBackupExecutor:
 
         assert progress["fingerprint"] == "abc123def456"
 
-    def test_parse_progress_line_start_time(self, backup_executor):
+    def test_parse_progress_line_start_time(self, backup_executor) -> None:
         """Test _parse_progress_line with start time"""
         line = "Time (start): Thu, 2023-12-01 12:00:00"
 
@@ -270,7 +271,7 @@ class TestBackupExecutor:
 
         assert progress["start_time"] == "Thu, 2023-12-01 12:00:00"
 
-    def test_parse_progress_line_end_time(self, backup_executor):
+    def test_parse_progress_line_end_time(self, backup_executor) -> None:
         """Test _parse_progress_line with end time"""
         line = "Time (end): Thu, 2023-12-01 12:05:00"
 
@@ -278,7 +279,7 @@ class TestBackupExecutor:
 
         assert progress["end_time"] == "Thu, 2023-12-01 12:05:00"
 
-    def test_parse_progress_line_no_match(self, backup_executor):
+    def test_parse_progress_line_no_match(self, backup_executor) -> None:
         """Test _parse_progress_line with line that doesn't match any pattern"""
         line = "Some random log line"
 
@@ -286,7 +287,7 @@ class TestBackupExecutor:
 
         assert progress == {}
 
-    def test_parse_progress_line_error_handling(self, backup_executor):
+    def test_parse_progress_line_error_handling(self, backup_executor) -> None:
         """Test _parse_progress_line handles errors gracefully"""
         # Line that might cause parsing errors
         line = "Archive name: "  # Empty after colon
@@ -296,7 +297,7 @@ class TestBackupExecutor:
         # Should handle gracefully and return empty dict or partial data
         assert isinstance(progress, dict)
 
-    def test_build_backup_command(self, backup_executor, test_repository):
+    def test_build_backup_command(self, backup_executor, test_repository) -> None:
         """Test _build_backup_command method"""
         config = BackupConfig(
             source_paths=["/data", "/home"],
@@ -320,7 +321,7 @@ class TestBackupExecutor:
         assert len(command) > 0
         assert "BORG_PASSPHRASE" in env
 
-    def test_build_backup_command_dry_run(self, backup_executor, test_repository):
+    def test_build_backup_command_dry_run(self, backup_executor, test_repository) -> None:
         """Test _build_backup_command with dry run"""
         config = BackupConfig(
             source_paths=["/data"],
@@ -339,7 +340,7 @@ class TestBackupExecutor:
         assert isinstance(command, list)
         assert isinstance(env, dict)
 
-    def test_build_prune_command(self, backup_executor, test_repository):
+    def test_build_prune_command(self, backup_executor, test_repository) -> None:
         """Test _build_prune_command method"""
         config = PruneConfig(
             keep_daily=7,
@@ -361,7 +362,7 @@ class TestBackupExecutor:
 
     def test_build_prune_command_with_all_retention_options(
         self, backup_executor, test_repository
-    ):
+    ) -> None:
         """Test _build_prune_command with all retention options"""
         config = PruneConfig(
             keep_within="7d",
@@ -385,7 +386,7 @@ class TestBackupExecutor:
     @pytest.mark.asyncio
     async def test_execute_backup_validation_error(
         self, backup_executor, test_repository
-    ):
+    ) -> None:
         """Test execute_backup with validation error"""
         config = BackupConfig(source_paths=[])  # Empty source paths
 
@@ -397,7 +398,7 @@ class TestBackupExecutor:
         assert "No source paths specified" in result.error_message
 
     @pytest.mark.asyncio
-    async def test_execute_backup_success(self, backup_executor, test_repository):
+    async def test_execute_backup_success(self, backup_executor, test_repository) -> None:
         """Test successful backup execution"""
         config = BackupConfig(source_paths=["/data"])
 
@@ -427,7 +428,7 @@ class TestBackupExecutor:
         assert result.completed_at is not None
 
     @pytest.mark.asyncio
-    async def test_execute_backup_failure(self, backup_executor, test_repository):
+    async def test_execute_backup_failure(self, backup_executor, test_repository) -> None:
         """Test failed backup execution"""
         config = BackupConfig(source_paths=["/data"])
 
@@ -457,16 +458,16 @@ class TestBackupExecutor:
     @pytest.mark.asyncio
     async def test_execute_backup_with_callbacks(
         self, backup_executor, test_repository
-    ):
+    ) -> None:
         """Test backup execution with callbacks"""
         config = BackupConfig(source_paths=["/data"])
         output_lines = []
         progress_data = []
 
-        def output_callback(line):
+        def output_callback(line: str) -> None:
             output_lines.append(line)
 
-        def progress_callback(progress):
+        def progress_callback(progress: dict) -> None:
             progress_data.append(progress)
 
         # Create a proper async iterator
@@ -502,7 +503,7 @@ class TestBackupExecutor:
     @pytest.mark.asyncio
     async def test_execute_backup_exception_handling(
         self, backup_executor, test_repository
-    ):
+    ) -> None:
         """Test backup execution exception handling"""
         config = BackupConfig(source_paths=["/data"])
 
@@ -519,7 +520,7 @@ class TestBackupExecutor:
         assert "Backup operation failed: Process failed" in result.error_message
 
     @pytest.mark.asyncio
-    async def test_execute_prune_success(self, backup_executor, test_repository):
+    async def test_execute_prune_success(self, backup_executor, test_repository) -> None:
         """Test successful prune execution"""
         config = PruneConfig(keep_daily=7)
 
@@ -546,7 +547,7 @@ class TestBackupExecutor:
         assert result.success is True
 
     @pytest.mark.asyncio
-    async def test_execute_prune_failure(self, backup_executor, test_repository):
+    async def test_execute_prune_failure(self, backup_executor, test_repository) -> None:
         """Test failed prune execution"""
         config = PruneConfig(keep_daily=7)
 
@@ -573,7 +574,7 @@ class TestBackupExecutor:
         assert "Prune failed (exit code 2)" in result.error_message
 
     @pytest.mark.asyncio
-    async def test_start_process(self, backup_executor):
+    async def test_start_process(self, backup_executor) -> None:
         """Test _start_process method"""
         command = ["echo", "test"]
 
@@ -590,7 +591,7 @@ class TestBackupExecutor:
         mock_exec.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_start_process_with_env_and_cwd(self, backup_executor):
+    async def test_start_process_with_env_and_cwd(self, backup_executor) -> None:
         """Test _start_process with environment and working directory"""
         command = ["echo", "test"]
         env = {"TEST": "value"}
@@ -608,7 +609,7 @@ class TestBackupExecutor:
         mock_exec.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_start_process_exception(self, backup_executor):
+    async def test_start_process_exception(self, backup_executor) -> None:
         """Test _start_process exception handling"""
         command = ["nonexistent-command"]
 
@@ -621,7 +622,7 @@ class TestBackupExecutor:
                 await backup_executor._start_process(command)
 
     @pytest.mark.asyncio
-    async def test_monitor_process_output(self, backup_executor):
+    async def test_monitor_process_output(self, backup_executor) -> None:
         """Test _monitor_process_output method"""
 
         # Create a proper async iterator
@@ -646,7 +647,7 @@ class TestBackupExecutor:
         assert len(output_data) > 0
 
     @pytest.mark.asyncio
-    async def test_monitor_process_output_with_callbacks(self, backup_executor):
+    async def test_monitor_process_output_with_callbacks(self, backup_executor) -> None:
         """Test _monitor_process_output with callbacks"""
 
         # Create a proper async iterator
@@ -672,7 +673,7 @@ class TestBackupExecutor:
         progress_callback.assert_called()
 
     @pytest.mark.asyncio
-    async def test_monitor_process_output_exception(self, backup_executor):
+    async def test_monitor_process_output_exception(self, backup_executor) -> None:
         """Test _monitor_process_output exception handling"""
 
         # Create a proper async iterator that raises exception on iteration
@@ -696,7 +697,7 @@ class TestBackupExecutor:
         assert "Process monitoring error" in result.error_message
 
     @pytest.mark.asyncio
-    async def test_terminate_operation_success(self, backup_executor):
+    async def test_terminate_operation_success(self, backup_executor) -> None:
         """Test successful operation termination"""
         operation_id = "test-op-123"
 
@@ -715,7 +716,7 @@ class TestBackupExecutor:
         mock_process.terminate.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_terminate_operation_force_kill(self, backup_executor):
+    async def test_terminate_operation_force_kill(self, backup_executor) -> None:
         """Test operation termination with force kill"""
         operation_id = "test-op-456"
 
@@ -739,13 +740,13 @@ class TestBackupExecutor:
         mock_process.kill.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_terminate_operation_not_found(self, backup_executor):
+    async def test_terminate_operation_not_found(self, backup_executor) -> None:
         """Test terminating non-existent operation"""
         result = await backup_executor.terminate_operation("nonexistent")
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_terminate_operation_already_finished(self, backup_executor):
+    async def test_terminate_operation_already_finished(self, backup_executor) -> None:
         """Test terminating already finished operation"""
         operation_id = "finished-op"
 
@@ -761,7 +762,7 @@ class TestBackupExecutor:
         assert operation_id not in backup_executor.active_operations
 
     @pytest.mark.asyncio
-    async def test_terminate_operation_exception(self, backup_executor):
+    async def test_terminate_operation_exception(self, backup_executor) -> None:
         """Test terminate_operation exception handling"""
         operation_id = "error-op"
 
@@ -776,7 +777,7 @@ class TestBackupExecutor:
 
         assert result is False
 
-    def test_active_operations_tracking(self, backup_executor):
+    def test_active_operations_tracking(self, backup_executor) -> None:
         """Test active operations tracking"""
         # Initially empty
         assert backup_executor.get_active_operations() == []
@@ -793,7 +794,7 @@ class TestBackupExecutor:
     @pytest.mark.asyncio
     async def test_full_backup_workflow_with_operation_tracking(
         self, backup_executor, test_repository
-    ):
+    ) -> None:
         """Test complete backup workflow with operation tracking"""
         config = BackupConfig(source_paths=["/data"])
         operation_id = "backup-workflow-test"
@@ -826,7 +827,7 @@ class TestBackupExecutor:
     @pytest.mark.asyncio
     async def test_full_prune_workflow_with_operation_tracking(
         self, backup_executor, test_repository
-    ):
+    ) -> None:
         """Test complete prune workflow with operation tracking"""
         config = PruneConfig(keep_daily=7)
         operation_id = "prune-workflow-test"

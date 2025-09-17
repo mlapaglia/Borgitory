@@ -11,7 +11,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Set SECRET_KEY before importing the app to avoid RuntimeError
@@ -119,7 +119,7 @@ def mock_rclone_service():
 
 
 @pytest_asyncio.fixture
-async def async_client(test_db) -> AsyncGenerator[AsyncClient, None]:
+async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client with proper resource management."""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"

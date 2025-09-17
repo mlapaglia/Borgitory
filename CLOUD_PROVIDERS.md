@@ -487,7 +487,7 @@ class Test{ProviderName}Storage:
 Add tests to the service layer in `tests/cloud_sync/test_cloud_sync_service.py`:
 
 ```python
-def test_create_{provider_name}_config_success(self, service, test_db):
+def test_create_{provider_name}_config_success(self, service, test_db: Session):
     """Test successful {Provider Name} config creation."""
     config_data = CloudSyncConfigCreate(
         name="test-{provider_name}",

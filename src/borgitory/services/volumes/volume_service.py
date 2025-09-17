@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class VolumeService:
     """Service to discover mounted volumes under /mnt"""
 
-    def __init__(self, filesystem: FileSystemInterface = None):
+    def __init__(self, filesystem: FileSystemInterface = None) -> None:
         self.filesystem = filesystem or OsFileSystem()
 
     async def get_mounted_volumes(self) -> List[str]:

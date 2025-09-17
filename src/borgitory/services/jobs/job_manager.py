@@ -79,7 +79,7 @@ class JobManagerDependencies:
     storage_factory: Optional[Any] = None
     provider_registry: Optional[Any] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize default dependencies if not provided"""
         if self.db_session_factory is None:
             self.db_session_factory = self._default_db_session_factory
@@ -288,7 +288,7 @@ class JobManager:
         self,
         config: Optional[JobManagerConfig] = None,
         dependencies: Optional[JobManagerDependencies] = None,
-    ):
+    ) -> None:
         self.config = config or JobManagerConfig()
 
         if dependencies is None:
@@ -311,7 +311,7 @@ class JobManager:
 
         self._setup_callbacks()
 
-    def _setup_callbacks(self):
+    def _setup_callbacks(self) -> None:
         """Set up callbacks between modules"""
         if self.queue_manager:
             self.queue_manager.set_callbacks(
@@ -319,7 +319,7 @@ class JobManager:
                 job_complete_callback=self._on_job_complete,
             )
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize all modules"""
         if self._initialized:
             return
@@ -384,7 +384,7 @@ class JobManager:
         task: BorgJobTask,
         command: List[str],
         env: Optional[Dict] = None,
-    ):
+    ) -> None:
         """Execute a single task within a composite job"""
         job.status = "running"
         task.status = "running"
@@ -393,7 +393,7 @@ class JobManager:
             process = await self.executor.start_process(command, env)
             self._processes[job.id] = process
 
-            def output_callback(line: str, progress: Dict):
+            def output_callback(line: str, progress: Dict) -> None:
                 # Add output to both the task and the output manager
                 task.output_lines.append(line)
                 asyncio.create_task(
@@ -460,13 +460,13 @@ class JobManager:
             if job.id in self._processes:
                 del self._processes[job.id]
 
-    def _on_job_start(self, job_id: str, queued_job):
+    def _on_job_start(self, job_id: str, queued_job) -> None:
         """Callback when queue manager starts a job"""
         job = self.jobs.get(job_id)
         if job and job.command:
             asyncio.create_task(self._execute_simple_job(job, job.command))
 
-    def _on_job_complete(self, job_id: str, success: bool):
+    def _on_job_complete(self, job_id: str, success: bool) -> None:
         """Callback when queue manager completes a job"""
         job = self.jobs.get(job_id)
         if job:
@@ -536,7 +536,7 @@ class JobManager:
 
         return job_id
 
-    async def _execute_composite_job(self, job: BorgJob):
+    async def _execute_composite_job(self, job: BorgJob) -> None:
         """Execute a composite job with multiple sequential tasks"""
         job.status = "running"
 
@@ -701,7 +701,7 @@ class JobManager:
 
     async def _execute_simple_job(
         self, job: BorgJob, command: List[str], env: Optional[Dict] = None
-    ):
+    ) -> None:
         """Execute a simple single-command job (for test compatibility)"""
         job.status = "running"
 
@@ -709,7 +709,7 @@ class JobManager:
             process = await self.executor.start_process(command, env)
             self._processes[job.id] = process
 
-            def output_callback(line: str, progress: Dict):
+            def output_callback(line: str, progress: Dict) -> None:
                 asyncio.create_task(
                     self.output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -775,7 +775,7 @@ class JobManager:
             repository_path = repo_data.get("path") or params.get("repository_path")
             passphrase = repo_data.get("passphrase") or params.get("passphrase")
 
-            def task_output_callback(line: str, progress: Dict):
+            def task_output_callback(line: str, progress: Dict) -> None:
                 task.output_lines.append(line)
                 asyncio.create_task(
                     self.output_manager.add_output_line(
@@ -914,7 +914,7 @@ class JobManager:
             repository_path = repo_data.get("path") or params.get("repository_path")
             passphrase = repo_data.get("passphrase") or params.get("passphrase")
 
-            def task_output_callback(line: str, progress: Dict):
+            def task_output_callback(line: str, progress: Dict) -> None:
                 task.output_lines.append(line)
                 asyncio.create_task(
                     self.output_manager.add_output_line(
@@ -974,7 +974,7 @@ class JobManager:
             repository_path = repo_data.get("path") or params.get("repository_path")
             passphrase = repo_data.get("passphrase") or params.get("passphrase")
 
-            def task_output_callback(line: str, progress: Dict):
+            def task_output_callback(line: str, progress: Dict) -> None:
                 task.output_lines.append(line)
                 asyncio.create_task(
                     self.output_manager.add_output_line(
@@ -1087,7 +1087,7 @@ class JobManager:
             task.completed_at = datetime.now(UTC)
             return False
 
-        def task_output_callback(line: str, progress: Dict):
+        def task_output_callback(line: str, progress: Dict) -> None:
             task.output_lines.append(line)
             asyncio.create_task(
                 self.output_manager.add_output_line(job.id, line, "stdout", progress)
@@ -1492,7 +1492,7 @@ class JobManager:
             return
             yield  # type: ignore[unreachable]
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Shutdown the job manager"""
         self._shutdown_requested = True
         logger.info("Shutting down job manager...")

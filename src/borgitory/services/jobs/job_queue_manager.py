@@ -31,7 +31,7 @@ class QueuedJob:
     queued_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.queued_at is None:
             self.queued_at = datetime.now()
         if self.metadata is None:
@@ -57,7 +57,7 @@ class JobQueueManager:
         max_concurrent_backups: int = 5,
         max_concurrent_operations: int = 10,
         queue_poll_interval: float = 0.1,
-    ):
+    ) -> None:
         self.max_concurrent_backups = max_concurrent_backups
         self.max_concurrent_operations = max_concurrent_operations
         self.queue_poll_interval = queue_poll_interval
@@ -82,7 +82,7 @@ class JobQueueManager:
         self._job_start_callback: Optional[Callable[[str, QueuedJob], None]] = None
         self._job_complete_callback: Optional[Callable[[str, bool], None]] = None
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize async resources"""
         if self._backup_semaphore is None:
             self._backup_semaphore = asyncio.Semaphore(self.max_concurrent_backups)
@@ -99,7 +99,7 @@ class JobQueueManager:
         self,
         job_start_callback: Optional[Callable[[str, QueuedJob], None]] = None,
         job_complete_callback: Optional[Callable[[str, bool], None]] = None,
-    ):
+    ) -> None:
         """Set callbacks for job lifecycle events"""
         self._job_start_callback = job_start_callback
         self._job_complete_callback = job_complete_callback
@@ -137,7 +137,7 @@ class JobQueueManager:
 
         return True
 
-    async def _start_queue_processors(self):
+    async def _start_queue_processors(self) -> None:
         """Start the queue processor tasks"""
         if not self._queue_processors_started:
             asyncio.create_task(self._process_backup_queue())
@@ -145,7 +145,7 @@ class JobQueueManager:
             self._queue_processors_started = True
             logger.info("Queue processors started")
 
-    async def _process_backup_queue(self):
+    async def _process_backup_queue(self) -> None:
         """Process backup jobs with concurrency control"""
         logger.info("Backup queue processor started")
 
@@ -187,7 +187,7 @@ class JobQueueManager:
                 logger.error(f"Error in backup queue processor: {e}")
                 await asyncio.sleep(1)
 
-    async def _process_operation_queue(self):
+    async def _process_operation_queue(self) -> None:
         """Process operation jobs with concurrency control"""
         logger.info("Operation queue processor started")
 
@@ -231,7 +231,7 @@ class JobQueueManager:
                 logger.error(f"Error in operation queue processor: {e}")
                 await asyncio.sleep(1)
 
-    async def _execute_and_cleanup_job(self, queued_job: QueuedJob, is_backup: bool):
+    async def _execute_and_cleanup_job(self, queued_job: QueuedJob, is_backup: bool) -> None:
         """Execute job and clean up resources when complete"""
         job_id = queued_job.job_id
         success = False
@@ -262,7 +262,7 @@ class JobQueueManager:
             if self._job_complete_callback:
                 self._job_complete_callback(job_id, success)
 
-    def _cleanup_running_job(self, job_id: str, is_backup: bool):
+    def _cleanup_running_job(self, job_id: str, is_backup: bool) -> None:
         """Clean up tracking for a running job"""
         if job_id in self._running_jobs:
             del self._running_jobs[job_id]
@@ -311,7 +311,7 @@ class JobQueueManager:
             for job in self._running_jobs.values()
         ]
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Shutdown queue processors and clean up"""
         logger.info("Shutting down job queue manager")
         self._shutdown_requested = True

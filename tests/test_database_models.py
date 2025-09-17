@@ -19,7 +19,7 @@ import borgitory.models.database
 class TestCipherSuite:
     """Test encryption cipher suite functionality."""
 
-    def test_get_cipher_suite_creates_instance(self):
+    def test_get_cipher_suite_creates_instance(self) -> None:
         """Test that cipher suite is created properly."""
         with patch(
             "borgitory.config.get_secret_key",
@@ -29,7 +29,7 @@ class TestCipherSuite:
             assert cipher is not None
             assert isinstance(cipher, Fernet)
 
-    def test_get_cipher_suite_caches_instance(self):
+    def test_get_cipher_suite_caches_instance(self) -> None:
         """Test that cipher suite is cached and reused."""
         with patch(
             "borgitory.config.get_secret_key",
@@ -42,7 +42,7 @@ class TestCipherSuite:
             cipher2 = get_cipher_suite()
             assert cipher1 is cipher2  # Should be the same instance
 
-    def test_cipher_suite_key_derivation(self):
+    def test_cipher_suite_key_derivation(self) -> None:
         """Test that cipher suite properly derives key from secret."""
         test_secret = "test_secret_key_for_derivation"
 
@@ -54,7 +54,7 @@ class TestCipherSuite:
             # The Fernet instance should be created with the derived key
             assert isinstance(cipher, Fernet)
 
-    def test_cipher_suite_with_invalid_key(self):
+    def test_cipher_suite_with_invalid_key(self) -> None:
         """Test cipher suite behavior with invalid key."""
         # Fernet keys must be 32 URL-safe base64-encoded bytes
         with patch("borgitory.config.get_secret_key", return_value="short"):
@@ -69,7 +69,7 @@ class TestCipherSuite:
 class TestRepositoryModel:
     """Test Repository model encryption and data integrity."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         # Mock the cipher suite to avoid config dependencies
         self.mock_cipher = Mock()
@@ -81,14 +81,14 @@ class TestRepositoryModel:
         ):
             self.repository = Repository(name="test-repo", path="/path/to/repo")
 
-    def test_repository_creation(self):
+    def test_repository_creation(self) -> None:
         """Test basic repository creation."""
         repo = Repository(name="test", path="/test/path")
         assert repo.name == "test"
         assert repo.path == "/test/path"
         assert repo.created_at is None  # Not set until added to session
 
-    def test_set_passphrase_encryption(self):
+    def test_set_passphrase_encryption(self) -> None:
         """Test that passphrase is properly encrypted."""
         test_passphrase = "my_secret_passphrase_123!"
 
@@ -102,7 +102,7 @@ class TestRepositoryModel:
             # Should store the decoded result
             assert self.repository.encrypted_passphrase == "encrypted_data"
 
-    def test_get_passphrase_decryption(self):
+    def test_get_passphrase_decryption(self) -> None:
         """Test that passphrase is properly decrypted."""
         self.repository.encrypted_passphrase = "stored_encrypted_data"
 
@@ -116,7 +116,7 @@ class TestRepositoryModel:
             # Should return the decoded result
             assert result == "decrypted_data"
 
-    def test_passphrase_roundtrip_encryption(self):
+    def test_passphrase_roundtrip_encryption(self) -> None:
         """Test complete encryption/decryption cycle."""
         original_passphrase = "test_passphrase_with_special_chars!@#$%"
 
@@ -139,7 +139,7 @@ class TestRepositoryModel:
             decrypted = repo.get_passphrase()
             assert decrypted == original_passphrase
 
-    def test_passphrase_encryption_with_unicode(self):
+    def test_passphrase_encryption_with_unicode(self) -> None:
         """Test passphrase encryption with unicode characters."""
         unicode_passphrase = "pässwörd_with_ünicöde_çhars_日本語"
 
@@ -155,7 +155,7 @@ class TestRepositoryModel:
 
             assert decrypted == unicode_passphrase
 
-    def test_passphrase_encryption_empty_string(self):
+    def test_passphrase_encryption_empty_string(self) -> None:
         """Test passphrase encryption with empty string."""
         with patch(
             "borgitory.config.get_secret_key",
@@ -169,7 +169,7 @@ class TestRepositoryModel:
 
             assert decrypted == ""
 
-    def test_passphrase_decryption_invalid_data(self):
+    def test_passphrase_decryption_invalid_data(self) -> None:
         """Test handling of invalid encrypted data."""
         repo = Repository(name="test", path="/test")
         repo.encrypted_passphrase = "invalid_encrypted_data"
@@ -183,7 +183,7 @@ class TestRepositoryModel:
             with pytest.raises(InvalidToken):
                 repo.get_passphrase()
 
-    def test_passphrase_encryption_with_long_passphrase(self):
+    def test_passphrase_encryption_with_long_passphrase(self) -> None:
         """Test encryption with very long passphrase."""
         long_passphrase = "a" * 1000  # 1000 character passphrase
 
@@ -203,13 +203,13 @@ class TestRepositoryModel:
 class TestUserModel:
     """Test User model password hashing and authentication."""
 
-    def test_user_creation(self):
+    def test_user_creation(self) -> None:
         """Test basic user creation."""
         user = User(username="testuser")
         assert user.username == "testuser"
         assert user.password_hash is None
 
-    def test_set_password_hashing(self):
+    def test_set_password_hashing(self) -> None:
         """Test that password is properly hashed."""
         user = User(username="testuser")
         password = "my_secure_password_123!"
@@ -222,7 +222,7 @@ class TestUserModel:
         assert len(user.password_hash) > 20  # Bcrypt hashes are long
         assert user.password_hash.startswith("$2b$")  # Bcrypt identifier
 
-    def test_verify_password_correct(self):
+    def test_verify_password_correct(self) -> None:
         """Test password verification with correct password."""
         user = User(username="testuser")
         password = "my_secure_password_123!"
@@ -230,7 +230,7 @@ class TestUserModel:
         user.set_password(password)
         assert user.verify_password(password) is True
 
-    def test_verify_password_incorrect(self):
+    def test_verify_password_incorrect(self) -> None:
         """Test password verification with incorrect password."""
         user = User(username="testuser")
         password = "my_secure_password_123!"
@@ -239,7 +239,7 @@ class TestUserModel:
         user.set_password(password)
         assert user.verify_password(wrong_password) is False
 
-    def test_password_hashing_consistency(self):
+    def test_password_hashing_consistency(self) -> None:
         """Test that same password produces different hashes (due to salt)."""
         user1 = User(username="user1")
         user2 = User(username="user2")
@@ -255,7 +255,7 @@ class TestUserModel:
         assert user1.verify_password(same_password) is True
         assert user2.verify_password(same_password) is True
 
-    def test_password_with_unicode_characters(self):
+    def test_password_with_unicode_characters(self) -> None:
         """Test password hashing with unicode characters."""
         user = User(username="testuser")
         unicode_password = "pässwörd_ünicöde_日本語"
@@ -264,7 +264,7 @@ class TestUserModel:
         assert user.verify_password(unicode_password) is True
         assert user.verify_password("wrong_password") is False
 
-    def test_empty_password_handling(self):
+    def test_empty_password_handling(self) -> None:
         """Test handling of empty password."""
         user = User(username="testuser")
 
@@ -273,7 +273,7 @@ class TestUserModel:
         assert user.verify_password("") is True
         assert user.verify_password("not_empty") is False
 
-    def test_very_long_password(self):
+    def test_very_long_password(self) -> None:
         """Test password hashing with very long password."""
         user = User(username="testuser")
         long_password = "a" * 1000  # 1000 character password
@@ -281,7 +281,7 @@ class TestUserModel:
         user.set_password(long_password)
         assert user.verify_password(long_password) is True
 
-    def test_password_with_special_characters(self):
+    def test_password_with_special_characters(self) -> None:
         """Test password with various special characters."""
         user = User(username="testuser")
         special_password = "!@#$%^&*()_+-=[]{}|;:'\",.<>?/`~"
@@ -293,7 +293,7 @@ class TestUserModel:
 class TestNotificationConfigModel:
     """Test NotificationConfig model credential encryption."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.mock_cipher = Mock()
         self.mock_cipher.encrypt.side_effect = (
@@ -303,7 +303,7 @@ class TestNotificationConfigModel:
             lambda x: x.decode().replace("encrypted_", "").encode()
         )
 
-    def test_pushover_credentials_encryption(self):
+    def test_pushover_credentials_encryption(self) -> None:
         """Test Pushover credentials are properly encrypted."""
         config = NotificationConfig(name="test-pushover", provider="pushover")
 
@@ -318,7 +318,7 @@ class TestNotificationConfigModel:
             assert config.encrypted_user_key == f"encrypted_{user_key}"
             assert config.encrypted_app_token == f"encrypted_{app_token}"
 
-    def test_pushover_credentials_decryption(self):
+    def test_pushover_credentials_decryption(self) -> None:
         """Test Pushover credentials are properly decrypted."""
         config = NotificationConfig(name="test-pushover", provider="pushover")
         config.encrypted_user_key = "encrypted_u4t8z5j2k9x7m1n3q6r8s4v2w9y5z7a2"
@@ -332,7 +332,7 @@ class TestNotificationConfigModel:
             assert user_key == "u4t8z5j2k9x7m1n3q6r8s4v2w9y5z7a2"
             assert app_token == "a3g7h2j5k8l4m9n6p1q4r7s2t5v8w3x6"
 
-    def test_pushover_credentials_roundtrip(self):
+    def test_pushover_credentials_roundtrip(self) -> None:
         """Test complete Pushover credential encryption/decryption cycle."""
         original_user_key = "test_user_key_12345"
         original_app_token = "test_app_token_67890"
@@ -359,7 +359,7 @@ class TestNotificationConfigModel:
 class TestEncryptionSecurity:
     """Test encryption security aspects and edge cases."""
 
-    def test_encryption_with_different_keys(self):
+    def test_encryption_with_different_keys(self) -> None:
         """Test that different keys produce different encrypted data."""
         test_data = "sensitive_information"
 
@@ -386,7 +386,7 @@ class TestEncryptionSecurity:
         # Different keys should produce different encrypted data
         assert encrypted1 != encrypted2
 
-    def test_encryption_with_same_data_different_instances(self):
+    def test_encryption_with_same_data_different_instances(self) -> None:
         """Test that same data produces different encrypted results (due to randomness)."""
         test_data = "identical_data"
 
@@ -409,7 +409,7 @@ class TestEncryptionSecurity:
             assert repo1.get_passphrase() == test_data
             assert repo2.get_passphrase() == test_data
 
-    def test_encryption_invalid_token_handling(self):
+    def test_encryption_invalid_token_handling(self) -> None:
         """Test handling of corrupted encrypted data."""
         repo = Repository(name="test", path="/test")
 
@@ -429,7 +429,7 @@ class TestEncryptionSecurity:
             with pytest.raises(InvalidToken):
                 repo.get_passphrase()
 
-    def test_encryption_with_binary_data(self):
+    def test_encryption_with_binary_data(self) -> None:
         """Test encryption with data containing binary characters."""
         binary_like_data = "data_with_\x00_null_\xff_bytes"
 
@@ -449,7 +449,7 @@ class TestEncryptionSecurity:
 class TestModelRelationships:
     """Test database model relationships and constraints."""
 
-    def test_repository_model_fields(self):
+    def test_repository_model_fields(self) -> None:
         """Test Repository model has all required fields."""
         repo = Repository(name="test", path="/test")
 
@@ -464,7 +464,7 @@ class TestModelRelationships:
         assert hasattr(repo, "jobs")
         assert hasattr(repo, "schedules")
 
-    def test_user_model_fields(self):
+    def test_user_model_fields(self) -> None:
         """Test User model has all required fields."""
         user = User(username="test")
 
@@ -478,7 +478,7 @@ class TestModelRelationships:
         # Test relationships exist
         assert hasattr(user, "sessions")
 
-    def test_cloud_sync_config_model_fields(self):
+    def test_cloud_sync_config_model_fields(self) -> None:
         """Test CloudSyncConfig model has all required fields."""
         import json
 
@@ -504,7 +504,7 @@ class TestModelRelationships:
         assert hasattr(config, "created_at")
         assert hasattr(config, "updated_at")
 
-    def test_notification_config_model_fields(self):
+    def test_notification_config_model_fields(self) -> None:
         """Test NotificationConfig model has all required fields."""
         config = NotificationConfig(name="test", provider="pushover")
 

@@ -90,7 +90,7 @@ class SFTPStorage(CloudStorage):
     CloudStorage interface for easy testing and integration.
     """
 
-    def __init__(self, config: SFTPStorageConfig, rclone_service: RcloneService):
+    def __init__(self, config: SFTPStorageConfig, rclone_service: RcloneService) -> None:
         """
         Initialize SFTP storage.
 

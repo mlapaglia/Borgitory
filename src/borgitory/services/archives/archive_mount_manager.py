@@ -38,7 +38,7 @@ class ArchiveMountManager:
         job_executor: Optional[JobExecutor] = None,
         cleanup_interval: int = 300,
         mount_timeout: int = 1800,
-    ):
+    ) -> None:
         # Use environment variable or sensible default based on platform
         if base_mount_dir is None:
             if os.name == "nt":  # Windows
@@ -307,7 +307,7 @@ class ArchiveMountManager:
             logger.error(f"Error listing directory {path}: {e}")
             raise Exception(f"Failed to list directory: {str(e)}")
 
-    async def cleanup_old_mounts(self):
+    async def cleanup_old_mounts(self) -> None:
         """Remove old unused mounts"""
         cutoff_time = datetime.now() - timedelta(seconds=self.mount_timeout)
         to_remove = []
@@ -333,7 +333,7 @@ class ArchiveMountManager:
 
             del self.active_mounts[mount_key]
 
-    async def unmount_all(self):
+    async def unmount_all(self) -> None:
         """Unmount all active mounts"""
         logger.info(f"Unmounting {len(self.active_mounts)} active mounts")
 

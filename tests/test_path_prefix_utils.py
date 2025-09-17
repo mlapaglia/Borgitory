@@ -12,11 +12,11 @@ from borgitory.utils.path_prefix import (
 class TestNormalizePathWithMntPrefix:
     """Test normalize_path_with_mnt_prefix function."""
 
-    def test_empty_input(self):
+    def test_empty_input(self) -> None:
         """Test empty input returns /mnt/."""
         assert normalize_path_with_mnt_prefix("") == "/mnt/"
 
-    def test_relative_path(self):
+    def test_relative_path(self) -> None:
         """Test relative paths get /mnt/ prepended."""
         assert normalize_path_with_mnt_prefix("data") == "/mnt/data"
         assert normalize_path_with_mnt_prefix("data/subfolder") == "/mnt/data/subfolder"
@@ -25,7 +25,7 @@ class TestNormalizePathWithMntPrefix:
             == "/mnt/folder/subfolder/deep"
         )
 
-    def test_absolute_path_without_mnt(self):
+    def test_absolute_path_without_mnt(self) -> None:
         """Test absolute paths without /mnt/ get /mnt prepended."""
         assert normalize_path_with_mnt_prefix("/data") == "/mnt/data"
         assert (
@@ -36,7 +36,7 @@ class TestNormalizePathWithMntPrefix:
             == "/mnt/folder/subfolder/deep"
         )
 
-    def test_path_already_has_mnt_prefix(self):
+    def test_path_already_has_mnt_prefix(self) -> None:
         """Test paths that already have /mnt/ prefix remain unchanged."""
         assert normalize_path_with_mnt_prefix("/mnt/") == "/mnt/"
         assert normalize_path_with_mnt_prefix("/mnt/data") == "/mnt/data"
@@ -45,11 +45,11 @@ class TestNormalizePathWithMntPrefix:
             == "/mnt/data/subfolder"
         )
 
-    def test_root_path(self):
+    def test_root_path(self) -> None:
         """Test root path gets converted to /mnt/."""
         assert normalize_path_with_mnt_prefix("/") == "/mnt/"
 
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> None:
         """Test edge cases."""
         # Multiple slashes
         assert normalize_path_with_mnt_prefix("//data") == "/mnt//data"
@@ -66,17 +66,17 @@ class TestNormalizePathWithMntPrefix:
 class TestParsePathForAutocomplete:
     """Test parse_path_for_autocomplete function."""
 
-    def test_empty_or_invalid_input(self):
+    def test_empty_or_invalid_input(self) -> None:
         """Test empty or invalid input."""
         assert parse_path_for_autocomplete("") == ("/mnt/", "")
         assert parse_path_for_autocomplete("relative") == ("/mnt/", "")
 
-    def test_root_path_with_search_term(self):
+    def test_root_path_with_search_term(self) -> None:
         """Test root path with search term."""
         assert parse_path_for_autocomplete("/search") == ("/", "search")
         assert parse_path_for_autocomplete("/mnt") == ("/", "mnt")
 
-    def test_directory_path_with_search_term(self):
+    def test_directory_path_with_search_term(self) -> None:
         """Test directory path with search term."""
         assert parse_path_for_autocomplete("/mnt/data") == ("/mnt/", "data")
         assert parse_path_for_autocomplete("/mnt/data/search") == (
@@ -88,7 +88,7 @@ class TestParsePathForAutocomplete:
             "sub",
         )
 
-    def test_directory_path_with_trailing_slash(self):
+    def test_directory_path_with_trailing_slash(self) -> None:
         """Test directory path with trailing slash (no search term)."""
         assert parse_path_for_autocomplete("/mnt/") == ("/mnt/", "")
         assert parse_path_for_autocomplete("/mnt/data/") == ("/mnt/data", "")
@@ -97,7 +97,7 @@ class TestParsePathForAutocomplete:
             "",
         )
 
-    def test_complex_paths(self):
+    def test_complex_paths(self) -> None:
         """Test complex path scenarios."""
         assert parse_path_for_autocomplete("/mnt/backup/daily") == (
             "/mnt/backup",
@@ -112,7 +112,7 @@ class TestParsePathForAutocomplete:
 class TestRemoveMntPrefixForDisplay:
     """Test remove_mnt_prefix_for_display function."""
 
-    def test_paths_with_mnt_prefix(self):
+    def test_paths_with_mnt_prefix(self) -> None:
         """Test paths that have /mnt/ prefix get it removed."""
         assert remove_mnt_prefix_for_display("/mnt/data/folder") == "data/folder"
         assert remove_mnt_prefix_for_display("/mnt/") == ""
@@ -122,14 +122,14 @@ class TestRemoveMntPrefixForDisplay:
             == "documents/projects"
         )
 
-    def test_paths_without_mnt_prefix(self):
+    def test_paths_without_mnt_prefix(self) -> None:
         """Test paths without /mnt/ prefix remain unchanged."""
         assert remove_mnt_prefix_for_display("/data/folder") == "/data/folder"
         assert remove_mnt_prefix_for_display("data/folder") == "data/folder"
         assert remove_mnt_prefix_for_display("/") == "/"
         assert remove_mnt_prefix_for_display("") == ""
 
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> None:
         """Test edge cases."""
         # Path that starts with /mnt but not /mnt/
         assert remove_mnt_prefix_for_display("/mntdata") == "/mntdata"
@@ -141,7 +141,7 @@ class TestRemoveMntPrefixForDisplay:
 class TestIntegrationScenarios:
     """Test integration scenarios combining multiple functions."""
 
-    def test_full_autocomplete_flow(self):
+    def test_full_autocomplete_flow(self) -> None:
         """Test the full flow from user input to parsed components."""
         # User types "data" in the input
         user_input = "data"
@@ -155,7 +155,7 @@ class TestIntegrationScenarios:
         assert dir_path == "/mnt/"
         assert search_term == "data"
 
-    def test_nested_path_flow(self):
+    def test_nested_path_flow(self) -> None:
         """Test flow with nested path."""
         # User types "data/backup" in the input
         user_input = "data/backup"
@@ -169,7 +169,7 @@ class TestIntegrationScenarios:
         assert dir_path == "/mnt/data"
         assert search_term == "backup"
 
-    def test_display_path_flow(self):
+    def test_display_path_flow(self) -> None:
         """Test flow for displaying paths in dropdown."""
         # Backend returns full path
         full_path = "/mnt/data/documents"
@@ -178,7 +178,7 @@ class TestIntegrationScenarios:
         display_path = remove_mnt_prefix_for_display(full_path)
         assert display_path == "data/documents"
 
-    def test_already_normalized_input(self):
+    def test_already_normalized_input(self) -> None:
         """Test flow when user input is already normalized."""
         # User somehow enters full path
         user_input = "/mnt/data/search"

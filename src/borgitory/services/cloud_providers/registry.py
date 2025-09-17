@@ -23,7 +23,7 @@ class RcloneMethodMapping:
     required_params: List[str]
     optional_params: Optional[Dict[str, Any]] = None  # param -> default_value
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.optional_params is None:
             self.optional_params = {}
 
@@ -41,7 +41,7 @@ class ProviderMetadata:
     additional_info: Optional[Dict[str, Any]] = None
     rclone_mapping: Optional[RcloneMethodMapping] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.additional_info is None:
             self.additional_info = {}
 
@@ -54,7 +54,7 @@ class ProviderRegistry:
     storage classes, and metadata.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config_classes: Dict[str, Type] = {}
         self._storage_classes: Dict[str, Type] = {}
         self._metadata: Dict[str, ProviderMetadata] = {}

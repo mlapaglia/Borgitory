@@ -23,7 +23,7 @@ class TaskDefinitionBuilder:
     Eliminates duplication between manual and scheduled job creation.
     """
 
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: Session) -> None:
         """
         Initialize the builder with a database session for configuration lookups.
 

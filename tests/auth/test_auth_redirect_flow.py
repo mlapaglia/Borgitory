@@ -13,7 +13,7 @@ class TestAuthRedirectFlow:
     """Test class for auth redirect flow debugging."""
 
     @pytest.mark.asyncio
-    async def test_login_htmx_flow(self, async_client: AsyncClient, test_db: Session):
+    async def test_login_htmx_flow(self, async_client: AsyncClient, test_db: Session) -> None:
         """Test the complete HTMX login flow with cookie authentication."""
         # Create a test user
         user = User(username="testuser")
@@ -67,7 +67,7 @@ class TestAuthRedirectFlow:
     @pytest.mark.asyncio
     async def test_login_sets_cookie_correctly(
         self, async_client: AsyncClient, test_db: Session
-    ):
+    ) -> None:
         """Test that login sets the cookie with correct attributes via HTMX."""
         # Create a test user
         user = User(username="cookietest")

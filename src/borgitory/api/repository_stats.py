@@ -93,7 +93,7 @@ async def get_repository_statistics_progress(
     async def generate_progress():
         progress_queue = asyncio.Queue()
 
-        def progress_callback(message: str, percent: int = None):
+        def progress_callback(message: str, percent: int = None) -> None:
             # Put progress data in queue (non-blocking)
             try:
                 progress_data = {"message": message, "percent": percent}

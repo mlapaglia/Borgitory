@@ -32,7 +32,7 @@ class RepositoryParser:
         self,
         command_runner: Optional[SimpleCommandRunner] = None,
         job_manager: Optional[JobManager] = None,
-    ):
+    ) -> None:
         self.command_runner = command_runner or SimpleCommandRunner()
         self.job_manager = job_manager
 

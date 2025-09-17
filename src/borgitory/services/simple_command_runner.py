@@ -27,7 +27,7 @@ class CommandResult(NamedTuple):
 class SimpleCommandRunner:
     """Simple command runner that executes commands and returns results directly"""
 
-    def __init__(self, timeout: int = 300):
+    def __init__(self, timeout: int = 300) -> None:
         """
         Initialize the command runner.
 

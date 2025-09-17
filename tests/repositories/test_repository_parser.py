@@ -43,7 +43,7 @@ def test_repository():
 class TestRepositoryParser:
     """Test RepositoryParser functionality."""
 
-    def test_parse_borg_config_file_not_found(self, repository_parser):
+    def test_parse_borg_config_file_not_found(self, repository_parser) -> None:
         """Test handling missing config file."""
         with patch("os.path.exists", return_value=False):
             result = repository_parser.parse_borg_config("/fake/path")
@@ -54,7 +54,7 @@ class TestRepositoryParser:
 
     def test_parse_borg_config_valid_repository_with_encryption(
         self, repository_parser
-    ):
+    ) -> None:
         """Test parsing valid Borg repository with encryption."""
         config_content = """[repository]
 version = 2
@@ -99,7 +99,7 @@ key = some-key-value
             assert "Key type: blake2-chacha20-poly1305" in result["preview"]
             assert "Version: 2" in result["preview"]
 
-    def test_parse_borg_config_keyfile_encryption(self, repository_parser):
+    def test_parse_borg_config_keyfile_encryption(self, repository_parser) -> None:
         """Test parsing repository with keyfile encryption."""
         config_content = """[repository]
 version = 2
@@ -130,7 +130,7 @@ segments_per_dir = 1000
             assert result["requires_keyfile"] is True  # keyfile mode
             assert "Key type: blake2-aes256-ctr-hmac-sha256" in result["preview"]
 
-    def test_parse_borg_config_no_repository_section(self, repository_parser):
+    def test_parse_borg_config_no_repository_section(self, repository_parser) -> None:
         """Test parsing config without repository section."""
         config_content = """[cache]
 version = 1
@@ -145,7 +145,7 @@ version = 1
             assert "Not a valid Borg repository" in result["preview"]
             assert result["requires_keyfile"] is False
 
-    def test_parse_borg_config_unencrypted_repository(self, repository_parser):
+    def test_parse_borg_config_unencrypted_repository(self, repository_parser) -> None:
         """Test parsing unencrypted repository."""
         config_content = """[repository]
 version = 2
@@ -171,7 +171,7 @@ segments_per_dir = 1000
             assert result["requires_keyfile"] is False
             assert "Security files: 0 files" in result["preview"]
 
-    def test_parse_borg_config_unknown_key_type(self, repository_parser):
+    def test_parse_borg_config_unknown_key_type(self, repository_parser) -> None:
         """Test parsing with unknown key type."""
         config_content = """[repository]
 version = 2
@@ -201,7 +201,7 @@ version = 2
             assert result["requires_keyfile"] is False  # defaults to passphrase
             assert "Key type: unknown-encryption-type" in result["preview"]
 
-    def test_parse_borg_config_file_read_error(self, repository_parser):
+    def test_parse_borg_config_file_read_error(self, repository_parser) -> None:
         """Test handling file read errors."""
         with patch("os.path.exists", return_value=True), patch(
             "builtins.open", side_effect=IOError("Permission denied")
@@ -212,7 +212,7 @@ version = 2
             assert "Parse error: Permission denied" in result["preview"]
             assert result["requires_keyfile"] is False
 
-    def test_parse_borg_config_invalid_config_format(self, repository_parser):
+    def test_parse_borg_config_invalid_config_format(self, repository_parser) -> None:
         """Test handling invalid config file format."""
         invalid_config = "This is not a valid config file\nJust some random text"
 
@@ -225,7 +225,7 @@ version = 2
             assert "Parse error:" in result["preview"]
             assert result["requires_keyfile"] is False
 
-    def test_parse_borg_config_key_type_read_error(self, repository_parser):
+    def test_parse_borg_config_key_type_read_error(self, repository_parser) -> None:
         """Test handling key-type file read error."""
         config_content = """[repository]
 version = 2
@@ -258,7 +258,7 @@ version = 2
             )
             assert "Security files: 2 files" in result["preview"]
 
-    def test_parse_borg_config_security_dir_error(self, repository_parser):
+    def test_parse_borg_config_security_dir_error(self, repository_parser) -> None:
         """Test handling security directory read error."""
         config_content = """[repository]
 version = 2
@@ -281,7 +281,7 @@ version = 2
             )
 
     @pytest.mark.asyncio
-    async def test_start_repository_scan_default_path(self, repository_parser):
+    async def test_start_repository_scan_default_path(self, repository_parser) -> None:
         """Test starting repository scan with default path."""
         # Set up mock job manager
         mock_job_manager = Mock()
@@ -297,7 +297,7 @@ version = 2
         assert "/mnt" in call_args
 
     @pytest.mark.asyncio
-    async def test_start_repository_scan_custom_path(self, repository_parser):
+    async def test_start_repository_scan_custom_path(self, repository_parser) -> None:
         """Test starting repository scan with custom path."""
         # Set up mock job manager
         mock_job_manager = Mock()
@@ -312,7 +312,7 @@ version = 2
         assert "/custom/path" in call_args
 
     @pytest.mark.asyncio
-    async def test_check_scan_status_job_not_found(self, repository_parser):
+    async def test_check_scan_status_job_not_found(self, repository_parser) -> None:
         """Test checking status of non-existent job."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.return_value = None
@@ -326,7 +326,7 @@ version = 2
         assert result["error"] == "Job not found"
 
     @pytest.mark.asyncio
-    async def test_check_scan_status_job_running(self, repository_parser):
+    async def test_check_scan_status_job_running(self, repository_parser) -> None:
         """Test checking status of running job."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.return_value = {
@@ -346,7 +346,7 @@ version = 2
         assert result["error"] is None
 
     @pytest.mark.asyncio
-    async def test_check_scan_status_job_completed(self, repository_parser):
+    async def test_check_scan_status_job_completed(self, repository_parser) -> None:
         """Test checking status of completed job."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.return_value = {
@@ -365,7 +365,7 @@ version = 2
         assert "/path/repo1" in result["output"]
 
     @pytest.mark.asyncio
-    async def test_check_scan_status_job_with_error(self, repository_parser):
+    async def test_check_scan_status_job_with_error(self, repository_parser) -> None:
         """Test checking status of job with error."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.return_value = {
@@ -384,7 +384,7 @@ version = 2
         assert result["error"] == "Permission denied"
 
     @pytest.mark.asyncio
-    async def test_check_scan_status_no_job_manager(self, repository_parser):
+    async def test_check_scan_status_no_job_manager(self, repository_parser) -> None:
         """Test checking status without job manager."""
         repository_parser.job_manager = None
 
@@ -396,7 +396,7 @@ version = 2
         assert "JobManager not provided" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_check_scan_status_job_manager_error(self, repository_parser):
+    async def test_check_scan_status_job_manager_error(self, repository_parser) -> None:
         """Test handling job manager errors during status check."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.side_effect = Exception("Job manager error")
@@ -410,7 +410,7 @@ version = 2
         assert "Job manager error" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_get_scan_results_job_not_completed(self, repository_parser):
+    async def test_get_scan_results_job_not_completed(self, repository_parser) -> None:
         """Test getting results from incomplete job."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.return_value = {
@@ -424,7 +424,7 @@ version = 2
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_get_scan_results_job_completed_no_output(self, repository_parser):
+    async def test_get_scan_results_job_completed_no_output(self, repository_parser) -> None:
         """Test getting results from completed job with no output."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.return_value = {
@@ -442,7 +442,7 @@ version = 2
     @pytest.mark.asyncio
     async def test_get_scan_results_job_completed_with_repositories(
         self, repository_parser
-    ):
+    ) -> None:
         """Test getting results from completed job with repository output."""
         scan_output = "/path/to/repo1\n/path/to/repo2\n/path/to/repo3"
 
@@ -474,7 +474,7 @@ version = 2
             assert result[0]["requires_keyfile"] is False
 
     @pytest.mark.asyncio
-    async def test_get_scan_results_job_with_error(self, repository_parser):
+    async def test_get_scan_results_job_with_error(self, repository_parser) -> None:
         """Test getting results from job that had errors."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.return_value = {
@@ -499,7 +499,7 @@ version = 2
             assert len(result) == 1
 
     @pytest.mark.asyncio
-    async def test_get_scan_results_no_job_manager(self, repository_parser):
+    async def test_get_scan_results_no_job_manager(self, repository_parser) -> None:
         """Test getting results without job manager."""
         repository_parser.job_manager = None
 
@@ -508,14 +508,14 @@ version = 2
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_parse_scan_output_empty(self, repository_parser):
+    async def test_parse_scan_output_empty(self, repository_parser) -> None:
         """Test parsing empty scan output."""
         result = await repository_parser._parse_scan_output("")
 
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_parse_scan_output_invalid_paths(self, repository_parser):
+    async def test_parse_scan_output_invalid_paths(self, repository_parser) -> None:
         """Test parsing scan output with invalid paths."""
         scan_output = "/nonexistent/path1\n\n/nonexistent/path2"
 
@@ -525,7 +525,7 @@ version = 2
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_parse_scan_output_invalid_repositories(self, repository_parser):
+    async def test_parse_scan_output_invalid_repositories(self, repository_parser) -> None:
         """Test parsing scan output where paths exist but aren't valid Borg repos."""
         scan_output = "/path/to/invalid1\n/path/to/invalid2"
 
@@ -543,7 +543,7 @@ version = 2
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_parse_scan_output_with_metadata(self, repository_parser):
+    async def test_parse_scan_output_with_metadata(self, repository_parser) -> None:
         """Test parsing scan output with metadata collection."""
         scan_output = "/path/to/repo1\n/path/to/repo2"
 
@@ -572,7 +572,7 @@ version = 2
             assert result[0]["last_backup"] == "2023-01-01T00:00:00Z"
 
     @pytest.mark.asyncio
-    async def test_parse_scan_output_metadata_error(self, repository_parser):
+    async def test_parse_scan_output_metadata_error(self, repository_parser) -> None:
         """Test parsing scan output when metadata collection fails."""
         scan_output = "/path/to/repo1"
 
@@ -597,7 +597,7 @@ version = 2
             assert "Metadata unavailable: Metadata error" in result[0]["preview"]
 
     @pytest.mark.asyncio
-    async def test_parse_scan_output_unnamed_repository(self, repository_parser):
+    async def test_parse_scan_output_unnamed_repository(self, repository_parser) -> None:
         """Test parsing scan output with repository that has no name."""
         scan_output = "/"  # Root path edge case
 
@@ -620,7 +620,7 @@ class TestRepositoryParserMetadata:
     """Test metadata collection functionality."""
 
     @pytest.mark.asyncio
-    async def test_get_repository_metadata_size_success(self, repository_parser):
+    async def test_get_repository_metadata_size_success(self, repository_parser) -> None:
         """Test successful size collection."""
         mock_result = Mock()
         mock_result.return_code = 0
@@ -641,7 +641,7 @@ class TestRepositoryParserMetadata:
     @pytest.mark.asyncio
     async def test_get_repository_metadata_size_command_failure(
         self, repository_parser
-    ):
+    ) -> None:
         """Test size collection when du command fails."""
         mock_result = Mock()
         mock_result.returncode = 1
@@ -657,7 +657,7 @@ class TestRepositoryParserMetadata:
         assert "size" not in metadata
 
     @pytest.mark.asyncio
-    async def test_get_repository_metadata_size_exception(self, repository_parser):
+    async def test_get_repository_metadata_size_exception(self, repository_parser) -> None:
         """Test size collection when du command raises exception."""
         repository_parser.command_runner.run_command = AsyncMock(
             side_effect=Exception("Command failed")
@@ -669,7 +669,7 @@ class TestRepositoryParserMetadata:
         assert "size" not in metadata
 
     @pytest.mark.asyncio
-    async def test_get_repository_metadata_last_backup_success(self, repository_parser):
+    async def test_get_repository_metadata_last_backup_success(self, repository_parser) -> None:
         """Test successful last backup time collection."""
         test_time = 1640995200.0  # 2022-01-01 00:00:00 UTC
 
@@ -695,7 +695,7 @@ class TestRepositoryParserMetadata:
     @pytest.mark.asyncio
     async def test_get_repository_metadata_last_backup_no_data_dir(
         self, repository_parser
-    ):
+    ) -> None:
         """Test last backup time when data directory doesn't exist."""
         repository_parser.command_runner.run_command = AsyncMock(
             side_effect=Exception("No du")
@@ -715,7 +715,7 @@ class TestRepositoryParserMetadata:
     @pytest.mark.asyncio
     async def test_get_repository_metadata_last_backup_empty_data_dir(
         self, repository_parser
-    ):
+    ) -> None:
         """Test last backup time when data directory is empty."""
         repository_parser.command_runner.run_command = AsyncMock(
             side_effect=Exception("No du")
@@ -731,7 +731,7 @@ class TestRepositoryParserMetadata:
     @pytest.mark.asyncio
     async def test_get_repository_metadata_last_backup_file_access_error(
         self, repository_parser
-    ):
+    ) -> None:
         """Test last backup time when file access fails."""
         repository_parser.command_runner.run_command = AsyncMock(
             side_effect=Exception("No du")
@@ -752,7 +752,7 @@ class TestRepositoryParserMetadata:
     @pytest.mark.asyncio
     async def test_get_repository_metadata_last_backup_walk_exception(
         self, repository_parser
-    ):
+    ) -> None:
         """Test last backup time when os.walk raises exception."""
         repository_parser.command_runner.run_command = AsyncMock(
             side_effect=Exception("No du")
@@ -768,7 +768,7 @@ class TestRepositoryParserMetadata:
     @pytest.mark.asyncio
     async def test_get_repository_metadata_multiple_files_latest(
         self, repository_parser
-    ):
+    ) -> None:
         """Test last backup time with multiple files, should get latest."""
         old_time = 1640995200.0  # 2022-01-01
         new_time = 1672531200.0  # 2023-01-01
@@ -800,7 +800,7 @@ class TestRepositoryParserMetadata:
         assert metadata["last_backup"] == "2023-01-01T00:00:00+00:00"
 
     @pytest.mark.asyncio
-    async def test_get_repository_metadata_repo_not_exist(self, repository_parser):
+    async def test_get_repository_metadata_repo_not_exist(self, repository_parser) -> None:
         """Test metadata collection when repository path doesn't exist."""
         repository_parser.command_runner.run_command = AsyncMock(
             side_effect=Exception("No du")
@@ -820,7 +820,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_success(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test successful repository access verification."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="verify-job-123")
@@ -855,7 +855,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_with_custom_passphrase(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification with custom passphrase."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="verify-job-123")
@@ -889,7 +889,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_wrong_passphrase(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification with wrong passphrase."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="verify-job-123")
@@ -922,7 +922,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_repo_not_exist(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification when repository doesn't exist."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="verify-job-123")
@@ -953,7 +953,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_general_error(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification with general error."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="verify-job-123")
@@ -987,7 +987,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_job_not_found(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification when job is not found."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="verify-job-123")
@@ -1011,7 +1011,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_timeout(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification timeout."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="verify-job-123")
@@ -1047,7 +1047,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_no_job_manager(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification without job manager."""
         repository_parser.job_manager = None
 
@@ -1068,7 +1068,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_security_validation_error(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification when security validation fails."""
         with patch(
             "borgitory.services.repositories.repository_parser.build_secure_borg_command"
@@ -1084,7 +1084,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_job_start_error(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification when job start fails."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(
@@ -1109,7 +1109,7 @@ class TestRepositoryParserVerification:
     @pytest.mark.asyncio
     async def test_verify_repository_access_invalid_json_output(
         self, repository_parser, test_repository
-    ):
+    ) -> None:
         """Test repository verification with invalid JSON output."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="verify-job-123")
@@ -1143,7 +1143,7 @@ class TestRepositoryParserLegacyScan:
     """Test legacy scan_for_repositories method."""
 
     @pytest.mark.asyncio
-    async def test_scan_for_repositories_success(self, repository_parser):
+    async def test_scan_for_repositories_success(self, repository_parser) -> None:
         """Test successful legacy repository scan."""
         scan_output = "/path/to/repo1\n/path/to/repo2"
 
@@ -1196,7 +1196,7 @@ class TestRepositoryParserLegacyScan:
         assert result[1]["path"] == "/path/to/repo2"
 
     @pytest.mark.asyncio
-    async def test_scan_for_repositories_timeout(self, repository_parser):
+    async def test_scan_for_repositories_timeout(self, repository_parser) -> None:
         """Test legacy scan timeout."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-123")
@@ -1216,7 +1216,7 @@ class TestRepositoryParserLegacyScan:
                 await repository_parser.scan_for_repositories("/test/path")
 
     @pytest.mark.asyncio
-    async def test_scan_for_repositories_with_error(self, repository_parser):
+    async def test_scan_for_repositories_with_error(self, repository_parser) -> None:
         """Test legacy scan with job error."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-123")
@@ -1235,7 +1235,7 @@ class TestRepositoryParserLegacyScan:
                 await repository_parser.scan_for_repositories("/test/path")
 
     @pytest.mark.asyncio
-    async def test_scan_for_repositories_default_path(self, repository_parser):
+    async def test_scan_for_repositories_default_path(self, repository_parser) -> None:
         """Test legacy scan with default path."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(return_value="scan-job-123")
@@ -1261,7 +1261,7 @@ class TestRepositoryParserErrorHandling:
     """Test error handling in RepositoryParser."""
 
     @pytest.mark.asyncio
-    async def test_start_repository_scan_no_job_manager(self, repository_parser):
+    async def test_start_repository_scan_no_job_manager(self, repository_parser) -> None:
         """Test scan start without job manager."""
         repository_parser.job_manager = None
 
@@ -1269,7 +1269,7 @@ class TestRepositoryParserErrorHandling:
             await repository_parser.start_repository_scan()
 
     @pytest.mark.asyncio
-    async def test_start_repository_scan_job_manager_error(self, repository_parser):
+    async def test_start_repository_scan_job_manager_error(self, repository_parser) -> None:
         """Test handling job manager errors during scan start."""
         mock_job_manager = Mock()
         mock_job_manager.start_borg_command = AsyncMock(
@@ -1281,7 +1281,7 @@ class TestRepositoryParserErrorHandling:
             await repository_parser.start_repository_scan()
 
     @pytest.mark.asyncio
-    async def test_get_scan_results_job_manager_error(self, repository_parser):
+    async def test_get_scan_results_job_manager_error(self, repository_parser) -> None:
         """Test handling job manager errors during results retrieval."""
         mock_job_manager = Mock()
         mock_job_manager.get_job_status.side_effect = Exception("Job manager error")
@@ -1291,14 +1291,14 @@ class TestRepositoryParserErrorHandling:
 
         assert result == []
 
-    def test_constructor_with_no_dependencies(self):
+    def test_constructor_with_no_dependencies(self) -> None:
         """Test RepositoryParser constructor with default dependencies."""
         parser = RepositoryParser()
 
         assert parser.command_runner is not None
         assert parser.job_manager is None  # Should be None by default
 
-    def test_constructor_with_custom_dependencies(self, mock_command_runner):
+    def test_constructor_with_custom_dependencies(self, mock_command_runner) -> None:
         """Test RepositoryParser constructor with custom dependencies."""
         mock_job_manager = Mock()
 

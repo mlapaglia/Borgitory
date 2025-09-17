@@ -21,7 +21,7 @@ class TestJobExecutorPruneTask:
         return JobExecutor()
 
     @pytest.mark.asyncio
-    async def test_execute_prune_task_success_basic(self, executor):
+    async def test_execute_prune_task_success_basic(self, executor) -> None:
         """Test successful prune task with basic parameters"""
         repository_path = "/test/repo"
         passphrase = "test-passphrase"
@@ -55,7 +55,7 @@ class TestJobExecutorPruneTask:
         assert b"Prune completed successfully" in result.stdout
 
     @pytest.mark.asyncio
-    async def test_execute_prune_task_with_all_retention_options(self, executor):
+    async def test_execute_prune_task_with_all_retention_options(self, executor) -> None:
         """Test prune task with all retention options"""
         repository_path = "/test/repo"
         passphrase = "test-passphrase"
@@ -102,7 +102,7 @@ class TestJobExecutorPruneTask:
         assert repository_path in command_args
 
     @pytest.mark.asyncio
-    async def test_execute_prune_task_with_optional_flags(self, executor):
+    async def test_execute_prune_task_with_optional_flags(self, executor) -> None:
         """Test prune task with optional flags"""
         repository_path = "/test/repo"
         passphrase = "test-passphrase"
@@ -137,7 +137,7 @@ class TestJobExecutorPruneTask:
         assert "--dry-run" in command_args
 
     @pytest.mark.asyncio
-    async def test_execute_prune_task_failure(self, executor):
+    async def test_execute_prune_task_failure(self, executor) -> None:
         """Test prune task failure handling"""
         repository_path = "/test/repo"
         passphrase = "test-passphrase"
@@ -159,13 +159,13 @@ class TestJobExecutorPruneTask:
         assert b"Repository locked" in result.stderr
 
     @pytest.mark.asyncio
-    async def test_execute_prune_task_with_output_callback(self, executor):
+    async def test_execute_prune_task_with_output_callback(self, executor) -> None:
         """Test prune task with output callback"""
         repository_path = "/test/repo"
         passphrase = "test-passphrase"
         output_messages = []
 
-        def output_callback(message, progress_info):
+        def output_callback(message, progress_info) -> None:
             output_messages.append((message, progress_info))
 
         callback_passed = []
@@ -191,7 +191,7 @@ class TestJobExecutorPruneTask:
         assert callback_passed[0] is True
 
     @pytest.mark.asyncio
-    async def test_execute_prune_task_exception_handling(self, executor):
+    async def test_execute_prune_task_exception_handling(self, executor) -> None:
         """Test prune task exception handling"""
         repository_path = "/test/repo"
         passphrase = "test-passphrase"
@@ -228,7 +228,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_no_config_id(
         self, executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+    ) -> None:
         """Test cloud sync task v2 - this test should be removed since config_id is now required"""
         # This test is no longer valid since cloud_sync_config_id is now required (int, not Optional[int])
         # The skip logic has been moved to the job manager level
@@ -254,7 +254,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_config_not_found(
         self, executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+    ) -> None:
         """Test cloud sync task v2 when config is not found"""
         mock_config_load_service.load_config.return_value = None
 
@@ -276,7 +276,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_success(
         self, executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+    ) -> None:
         """Test successful cloud sync task v2"""
         from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
@@ -315,7 +315,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_sync_failure(
         self, executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+    ) -> None:
         """Test cloud sync task v2 when sync fails"""
         from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
@@ -342,7 +342,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_with_output_callback(
         self, executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+    ) -> None:
         """Test cloud sync task v2 with output callback"""
         from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
@@ -354,7 +354,7 @@ class TestJobExecutorCloudSyncTaskV2:
 
         output_messages = []
 
-        def output_callback(message):
+        def output_callback(message) -> None:
             output_messages.append(message)
 
         result = await executor.execute_cloud_sync_task_v2(
@@ -375,7 +375,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_config_load_exception(
         self, executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+    ) -> None:
         """Test cloud sync task v2 when config loading fails"""
         mock_config_load_service.load_config.side_effect = Exception("Database error")
 
@@ -396,7 +396,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_sync_service_exception(
         self, executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+    ) -> None:
         """Test cloud sync task v2 when sync service raises exception"""
         from borgitory.services.cloud_providers.types import CloudSyncConfig
 
@@ -421,7 +421,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_with_real_database_config(
         self, executor, test_db
-    ):
+    ) -> None:
         """Test cloud sync task v2 with real database configuration"""
         from borgitory.services.cloud_providers.config_service import (
             DatabaseConfigLoadService,
@@ -465,7 +465,7 @@ class TestJobExecutorCloudSyncTaskV2:
     @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_v2_disabled_config_in_database(
         self, executor, test_db
-    ):
+    ) -> None:
         """Test cloud sync task v2 with disabled config in database"""
         from borgitory.services.cloud_providers.config_service import (
             DatabaseConfigLoadService,
@@ -510,7 +510,7 @@ class TestJobExecutorFormatCommandForLogging:
     def executor(self):
         return JobExecutor()
 
-    def test_format_command_complex_repository_path(self, executor):
+    def test_format_command_complex_repository_path(self, executor) -> None:
         """Test command formatting with complex repository path"""
         command = [
             "borg",
@@ -525,7 +525,7 @@ class TestJobExecutorFormatCommandForLogging:
         assert "ssh://user@host:port/path/to/repo::[ARCHIVE]" in result
         assert "archive-2023-01-01" not in result
 
-    def test_format_command_multiple_sensitive_args(self, executor):
+    def test_format_command_multiple_sensitive_args(self, executor) -> None:
         """Test command formatting with multiple sensitive arguments"""
         command = [
             "borg",
@@ -548,7 +548,7 @@ class TestJobExecutorFormatCommandForLogging:
         assert "secret2" not in result
         assert "secret3" not in result
 
-    def test_format_command_no_sensitive_data(self, executor):
+    def test_format_command_no_sensitive_data(self, executor) -> None:
         """Test command formatting with no sensitive data"""
         command = ["borg", "list", "repo", "--short"]
 
@@ -557,7 +557,7 @@ class TestJobExecutorFormatCommandForLogging:
         assert result == "borg list repo --short"
         assert "[REDACTED]" not in result
 
-    def test_format_command_empty_command(self, executor):
+    def test_format_command_empty_command(self, executor) -> None:
         """Test command formatting with empty command"""
         command = []
 
@@ -573,7 +573,7 @@ class TestJobExecutorParseProgressLine:
     def executor(self):
         return JobExecutor()
 
-    def test_parse_progress_line_with_special_characters_in_path(self, executor):
+    def test_parse_progress_line_with_special_characters_in_path(self, executor) -> None:
         """Test parsing progress line with special characters in path"""
         line = "1000000 500000 300000 50 /path/with spaces/and-special_chars/file.txt"
 
@@ -586,7 +586,7 @@ class TestJobExecutorParseProgressLine:
         assert progress["path"] == "/path/with spaces/and-special_chars/file.txt"
         assert "timestamp" in progress
 
-    def test_parse_progress_line_multiple_info_types(self, executor):
+    def test_parse_progress_line_multiple_info_types(self, executor) -> None:
         """Test parsing different types of info lines"""
         lines_and_expected = [
             (
@@ -609,7 +609,7 @@ class TestJobExecutorParseProgressLine:
             for key, value in expected.items():
                 assert progress[key] == value
 
-    def test_parse_progress_line_malformed_input(self, executor):
+    def test_parse_progress_line_malformed_input(self, executor) -> None:
         """Test parsing malformed progress lines"""
         malformed_lines = [
             "not a progress line at all",

@@ -67,7 +67,7 @@ class Repository(Base):
         "Schedule", back_populates="repository", cascade="all, delete-orphan"
     )
 
-    def set_passphrase(self, passphrase: str):
+    def set_passphrase(self, passphrase: str) -> None:
         self.encrypted_passphrase = (
             get_cipher_suite().encrypt(passphrase.encode()).decode()
         )
@@ -198,7 +198,7 @@ class User(Base):
 
     sessions = relationship("UserSession", back_populates="user")
 
-    def set_password(self, password: str):
+    def set_password(self, password: str) -> None:
         """Hash and store the password"""
         self.password_hash = pwd_context.hash(password)
 
@@ -296,7 +296,7 @@ class NotificationConfig(Base):
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
-    def set_pushover_credentials(self, user_key: str, app_token: str):
+    def set_pushover_credentials(self, user_key: str, app_token: str) -> None:
         """Encrypt and store Pushover credentials"""
         self.encrypted_user_key = get_cipher_suite().encrypt(user_key.encode()).decode()
         self.encrypted_app_token = (
@@ -373,7 +373,7 @@ class RepositoryCheckConfig(Base):
     )
 
 
-async def init_db():
+async def init_db() -> None:
     """Initialize database - assumes migrations have already been run"""
 
     try:
@@ -423,7 +423,7 @@ async def init_db():
         raise
 
 
-def reset_db():
+def reset_db() -> None:
     """Reset the entire database - USE WITH CAUTION"""
     logger.info("Resetting database...")
     Base.metadata.drop_all(bind=engine)

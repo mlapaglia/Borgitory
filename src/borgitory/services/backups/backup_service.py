@@ -37,7 +37,7 @@ class BackupService:
 
     def __init__(
         self, db_session: Session, backup_executor: Optional[BackupExecutor] = None
-    ):
+    ) -> None:
         """
         Initialize the backup service.
 
@@ -90,7 +90,7 @@ class BackupService:
             backup_task = self._create_backup_task(job)
 
             # Prepare output callback that updates task and passes to external callback
-            def combined_output_callback(line: str):
+            def combined_output_callback(line: str) -> None:
                 self._handle_output_line(backup_task, line)
                 if output_callback:
                     output_callback(line)
@@ -365,7 +365,7 @@ class BackupService:
 
         return task
 
-    def _handle_output_line(self, task: JobTask, line: str):
+    def _handle_output_line(self, task: JobTask, line: str) -> None:
         """Handle a line of output from the backup process"""
         # Append to task output (we'll store as text)
         if not task.output:
@@ -379,7 +379,7 @@ class BackupService:
         if task.output.count("\n") % 10 == 0:
             self.db.commit()
 
-    def _update_task_from_result(self, task: JobTask, result: BackupResult):
+    def _update_task_from_result(self, task: JobTask, result: BackupResult) -> None:
         """Update task record with backup result"""
         task.status = "completed" if result.success else "failed"
         task.return_code = result.return_code
@@ -400,7 +400,7 @@ class BackupService:
         repository: Repository,
         backup_request: BackupRequest,
         backup_success: bool,
-    ):
+    ) -> None:
         """Handle post-backup operations like prune, check, cloud sync, notifications"""
         # Only run post-backup operations if backup succeeded
         if not backup_success:
@@ -421,7 +421,7 @@ class BackupService:
             job.total_tasks += tasks_added
             self.db.commit()
 
-    def _finalize_job(self, job: Job):
+    def _finalize_job(self, job: Job) -> None:
         """Finalize job status based on task results"""
         # Get all tasks for this job
         tasks = self.db.query(JobTask).filter(JobTask.job_id == job.id).all()

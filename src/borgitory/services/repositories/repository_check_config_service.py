@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class RepositoryCheckConfigService:
     """Service for repository check configuration business logic operations."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session) -> None:
         self.db = db
 
     def get_all_configs(

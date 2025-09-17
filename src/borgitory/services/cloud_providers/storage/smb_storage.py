@@ -126,7 +126,7 @@ class SMBStorage(CloudStorage):
     CloudStorage interface for easy testing and integration.
     """
 
-    def __init__(self, config: SMBStorageConfig, rclone_service: RcloneService):
+    def __init__(self, config: SMBStorageConfig, rclone_service: RcloneService) -> None:
         """
         Initialize SMB storage.
 

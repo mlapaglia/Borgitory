@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Any, Dict, List
 from fastapi import (
     APIRouter,
     Depends,
@@ -116,7 +116,7 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/directories")
-async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt"):
+async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt") -> Dict[str, Any]:
     """List directories at the given path for autocomplete functionality. All paths must be under /mnt."""
 
     try:

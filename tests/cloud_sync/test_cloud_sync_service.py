@@ -4,6 +4,7 @@ Tests for CloudSyncService - Business logic tests migrated from API tests
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from borgitory.services.cloud_sync_service import CloudSyncService
 from borgitory.models.database import CloudSyncConfig
@@ -12,7 +13,7 @@ from tests.conftest import create_s3_cloud_sync_config, create_sftp_cloud_sync_c
 
 
 @pytest.fixture
-def service(test_db):
+def service(test_db: Session):
     """CloudSyncService instance with real database session."""
     from borgitory.services.cloud_providers.registry import get_metadata
     from borgitory.services.rclone_service import RcloneService
@@ -34,7 +35,7 @@ def service(test_db):
 class TestCloudSyncService:
     """Test class for CloudSyncService business logic."""
 
-    def test_create_s3_config_success(self, service, test_db):
+    def test_create_s3_config_success(self, service, test_db: Session) -> None:
         """Test successful S3 config creation."""
         config_data = CloudSyncConfigCreate(
             name="test-s3",
@@ -75,7 +76,7 @@ class TestCloudSyncService:
         saved_config_data = json.loads(saved_config.provider_config)
         assert saved_config_data["bucket_name"] == "test-bucket"
 
-    def test_create_sftp_config_success(self, service, test_db):
+    def test_create_sftp_config_success(self, service, test_db: Session) -> None:
         """Test successful SFTP config creation with password."""
         config_data = CloudSyncConfigCreate(
             name="test-sftp",
@@ -119,7 +120,7 @@ class TestCloudSyncService:
         saved_config_data = json.loads(saved_config.provider_config)
         assert saved_config_data["host"] == "sftp.example.com"
 
-    def test_create_sftp_config_with_private_key(self, service, test_db):
+    def test_create_sftp_config_with_private_key(self, service, test_db: Session) -> None:
         """Test successful SFTP config creation with private key."""
         config_data = CloudSyncConfigCreate(
             name="test-sftp-key",
@@ -155,7 +156,7 @@ class TestCloudSyncService:
         assert saved_config is not None
         assert saved_config.provider == "sftp"
 
-    def test_create_config_duplicate_name(self, service, test_db):
+    def test_create_config_duplicate_name(self, service, test_db: Session) -> None:
         """Test creating config with duplicate name."""
         # First, create a config
         first_config = create_s3_cloud_sync_config(
@@ -183,7 +184,7 @@ class TestCloudSyncService:
         assert exc_info.value.status_code == 400
         assert "already exists" in str(exc_info.value.detail)
 
-    def test_create_s3_config_missing_credentials(self, service, test_db):
+    def test_create_s3_config_missing_credentials(self, service, test_db: Session) -> None:
         """Test S3 config creation with missing credentials - schema validation."""
         # This test verifies that Pydantic schema validation catches missing credentials
         with pytest.raises(ValueError) as exc_info:
@@ -198,7 +199,7 @@ class TestCloudSyncService:
 
         assert "Invalid s3 configuration" in str(exc_info.value)
 
-    def test_create_sftp_config_missing_required_fields(self, service, test_db):
+    def test_create_sftp_config_missing_required_fields(self, service, test_db: Session) -> None:
         """Test SFTP config creation with missing required fields - schema validation."""
         # This test verifies that Pydantic schema validation catches missing username
         with pytest.raises(ValueError) as exc_info:
@@ -213,7 +214,7 @@ class TestCloudSyncService:
 
         assert "Invalid sftp configuration" in str(exc_info.value)
 
-    def test_create_sftp_config_missing_auth(self, service, test_db):
+    def test_create_sftp_config_missing_auth(self, service, test_db: Session) -> None:
         """Test SFTP config creation with missing authentication - schema validation."""
         # This test verifies that Pydantic schema validation catches missing auth
         with pytest.raises(ValueError) as exc_info:
@@ -230,7 +231,7 @@ class TestCloudSyncService:
 
         assert "Invalid sftp configuration" in str(exc_info.value)
 
-    def test_create_config_unsupported_provider(self, service, test_db):
+    def test_create_config_unsupported_provider(self, service, test_db: Session) -> None:
         """Test config creation with unsupported provider."""
         from pydantic_core import ValidationError
 
@@ -244,13 +245,13 @@ class TestCloudSyncService:
 
         assert "azure" in str(exc_info.value).lower()
 
-    def test_list_configs_empty(self, service, test_db):
+    def test_list_configs_empty(self, service, test_db: Session) -> None:
         """Test listing configs when empty."""
         result = service.get_cloud_sync_configs()
 
         assert result == []
 
-    def test_list_configs_with_data(self, service, test_db):
+    def test_list_configs_with_data(self, service, test_db: Session) -> None:
         """Test listing configs with data."""
         # Create real configs in database
         config1 = create_s3_cloud_sync_config(
@@ -274,7 +275,7 @@ class TestCloudSyncService:
         assert result[0].name == "s3-config"
         assert result[1].name == "sftp-config"
 
-    def test_get_config_by_id_success(self, service, test_db):
+    def test_get_config_by_id_success(self, service, test_db: Session) -> None:
         """Test getting specific config by ID."""
         config = create_s3_cloud_sync_config(
             name="get-test", bucket_name="test-bucket", enabled=True
@@ -288,14 +289,14 @@ class TestCloudSyncService:
         assert result.name == "get-test"
         assert result.id == config.id
 
-    def test_get_config_by_id_not_found(self, service, test_db):
+    def test_get_config_by_id_not_found(self, service, test_db: Session) -> None:
         """Test getting non-existent config."""
         with pytest.raises(HTTPException) as exc_info:
             service.get_cloud_sync_config_by_id(999)
 
         assert exc_info.value.status_code == 404
 
-    def test_update_config_success(self, service, test_db):
+    def test_update_config_success(self, service, test_db: Session) -> None:
         """Test successful config update."""
         # Create existing config
         existing_config = create_s3_cloud_sync_config(name="update-test", enabled=True)
@@ -333,7 +334,7 @@ class TestCloudSyncService:
         assert updated_provider_config["bucket_name"] == "new-bucket"
         assert updated_config.path_prefix == "updated/"
 
-    def test_update_config_duplicate_name(self, service, test_db):
+    def test_update_config_duplicate_name(self, service, test_db: Session) -> None:
         """Test updating config with duplicate name."""
         # Create two configs
         config1 = create_s3_cloud_sync_config(name="config1", bucket_name="bucket1")
@@ -353,7 +354,7 @@ class TestCloudSyncService:
         assert exc_info.value.status_code == 400
         assert "already exists" in str(exc_info.value.detail)
 
-    def test_delete_config_success(self, service, test_db):
+    def test_delete_config_success(self, service, test_db: Session) -> None:
         """Test successful config deletion."""
         config = create_s3_cloud_sync_config(
             name="delete-test", bucket_name="delete-bucket"
@@ -373,14 +374,14 @@ class TestCloudSyncService:
         )
         assert deleted_config is None
 
-    def test_delete_config_not_found(self, service, test_db):
+    def test_delete_config_not_found(self, service, test_db: Session) -> None:
         """Test deleting non-existent config."""
         with pytest.raises(HTTPException) as exc_info:
             service.delete_cloud_sync_config(999)
 
         assert exc_info.value.status_code == 404
 
-    def test_enable_config_success(self, service, test_db):
+    def test_enable_config_success(self, service, test_db: Session) -> None:
         """Test enabling config."""
         config = create_s3_cloud_sync_config(
             name="enable-test", bucket_name="test-bucket", enabled=False
@@ -401,7 +402,7 @@ class TestCloudSyncService:
         )
         assert updated_config.enabled is True
 
-    def test_disable_config_success(self, service, test_db):
+    def test_disable_config_success(self, service, test_db: Session) -> None:
         """Test disabling config."""
         config = create_s3_cloud_sync_config(
             name="disable-test", bucket_name="test-bucket", enabled=True
@@ -422,7 +423,7 @@ class TestCloudSyncService:
         )
         assert updated_config.enabled is False
 
-    def test_config_lifecycle(self, service, test_db):
+    def test_config_lifecycle(self, service, test_db: Session) -> None:
         """Test complete config lifecycle: create, update, enable/disable, delete."""
         # Create
         config_data = CloudSyncConfigCreate(

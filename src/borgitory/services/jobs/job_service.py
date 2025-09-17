@@ -24,7 +24,7 @@ class JobService:
 
     def __init__(
         self, db: Session, job_manager: JobManager, backup_service: BackupService = None
-    ):
+    ) -> None:
         self.db = db
         self.job_manager = job_manager
         self.backup_service = backup_service or BackupService(db)

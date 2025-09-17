@@ -61,7 +61,7 @@ class TestJobStreamingFixes:
     @pytest.mark.asyncio
     async def test_task_streaming_sends_individual_lines(
         self, job_stream_service, mock_job_manager, mock_composite_job
-    ):
+    ) -> None:
         """Test that task streaming sends individual lines wrapped in divs"""
         job_id = mock_composite_job.id
         task_order = 0
@@ -98,7 +98,7 @@ class TestJobStreamingFixes:
     @pytest.mark.asyncio
     async def test_task_streaming_handles_new_output_events(
         self, job_stream_service, mock_job_manager, mock_composite_job
-    ):
+    ) -> None:
         """Test that new output events are properly formatted"""
         job_id = mock_composite_job.id
         task_order = 1
@@ -136,7 +136,7 @@ class TestJobStreamingFixes:
     @pytest.mark.asyncio
     async def test_completed_task_streaming_from_database(
         self, job_stream_service, mock_job_manager
-    ):
+    ) -> None:
         """Test streaming completed task output from database"""
         job_id = str(uuid.uuid4())
         task_order = 0
@@ -176,7 +176,7 @@ class TestJobStreamingFixes:
 class TestUUIDSystemFixes:
     """Test the UUID system improvements"""
 
-    def test_job_model_auto_generates_uuid(self):
+    def test_job_model_auto_generates_uuid(self) -> None:
         """Test that Job model has UUID auto-generation configured"""
         # SQLAlchemy defaults only trigger during database operations
         # Test that the default is configured correctly
@@ -198,14 +198,14 @@ class TestUUIDSystemFixes:
         except ValueError:
             pytest.fail("Generated ID is not a valid UUID")
 
-    def test_job_model_respects_explicit_uuid(self):
+    def test_job_model_respects_explicit_uuid(self) -> None:
         """Test that Job model uses explicitly provided UUID"""
         explicit_id = str(uuid.uuid4())
         job = Job(id=explicit_id, repository_id=1, type="backup", status="pending")
 
         assert job.id == explicit_id
 
-    def test_job_task_foreign_key_uses_string_uuid(self):
+    def test_job_task_foreign_key_uses_string_uuid(self) -> None:
         """Test that JobTask foreign key references string UUID"""
         job_id = str(uuid.uuid4())
         task = JobTask(
@@ -238,7 +238,7 @@ class TestJobRenderServiceUUIDIntegration:
 
         return job
 
-    def test_render_job_html_uses_uuid_as_primary_id(self, mock_job_with_uuid):
+    def test_render_job_html_uses_uuid_as_primary_id(self, mock_job_with_uuid) -> None:
         """Test that job rendering uses UUID as primary identifier"""
         from borgitory.services.jobs.job_render_service import JobRenderService
         from unittest.mock import Mock
@@ -251,7 +251,7 @@ class TestJobRenderServiceUUIDIntegration:
         assert mock_job_with_uuid.id in html
         assert html != ""  # Should not return empty string
 
-    def test_format_database_job_creates_context_with_uuid(self, mock_job_with_uuid):
+    def test_format_database_job_creates_context_with_uuid(self, mock_job_with_uuid) -> None:
         """Test that database job formatting creates context with UUID"""
         from borgitory.services.jobs.job_render_service import JobRenderService
         from unittest.mock import Mock
@@ -268,7 +268,7 @@ class TestJobRenderServiceUUIDIntegration:
 class TestStreamingEfficiency:
     """Test streaming efficiency improvements"""
 
-    def test_individual_line_streaming_reduces_data_transfer(self):
+    def test_individual_line_streaming_reduces_data_transfer(self) -> None:
         """Test that individual line streaming is more efficient than full output"""
 
         # Simulate a job with many output lines
@@ -293,7 +293,7 @@ class TestStreamingEfficiency:
             individual_events[0]
         )  # Single accumulated is larger than single line
 
-    def test_htmx_beforeend_swap_compatibility(self):
+    def test_htmx_beforeend_swap_compatibility(self) -> None:
         """Test that output format is compatible with HTMX beforeend swap"""
         line_text = "Test output line"
         formatted_output = f"<div>{line_text}</div>"
@@ -309,7 +309,7 @@ class TestBackwardCompatibility:
 
     # test_job_context_maintains_job_uuid_field removed - was failing due to service changes
 
-    def test_task_streaming_maintains_sse_event_format(self):
+    def test_task_streaming_maintains_sse_event_format(self) -> None:
         """Test that streaming maintains proper SSE event format"""
         line_text = "Test line"
         sse_event = f"event: output\ndata: <div>{line_text}</div>\n\n"
@@ -325,14 +325,14 @@ class TestStreamingIntegration:
     """Integration tests for streaming functionality"""
 
     @pytest.mark.asyncio
-    async def test_complete_task_streaming_workflow(self):
+    async def test_complete_task_streaming_workflow(self) -> None:
         """Test complete workflow from job creation to streaming completion"""
         # This would be a more comprehensive integration test
         # that tests the entire streaming pipeline
         pass  # Implementation would require more setup
 
     @pytest.mark.asyncio
-    async def test_database_to_memory_job_transition(self):
+    async def test_database_to_memory_job_transition(self) -> None:
         """Test transition from database job to memory job during streaming"""
         # Test the handoff between completed jobs in database
         # and running jobs in memory

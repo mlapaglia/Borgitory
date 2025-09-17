@@ -32,7 +32,7 @@ class JobOutput:
     total_lines: int = 0
     max_lines: int = 1000
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize deque with proper maxlen"""
         if not isinstance(self.lines, deque) or self.lines.maxlen != self.max_lines:
             self.lines = deque(maxlen=self.max_lines)
@@ -41,7 +41,7 @@ class JobOutput:
 class JobOutputManager:
     """Manages job output collection, storage, and streaming"""
 
-    def __init__(self, max_lines_per_job: int = 1000):
+    def __init__(self, max_lines_per_job: int = 1000) -> None:
         self.max_lines_per_job = max_lines_per_job
         self._job_outputs: Dict[str, JobOutput] = {}
         self._output_locks: Dict[str, asyncio.Lock] = {}

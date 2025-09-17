@@ -8,6 +8,8 @@ proper DI patterns and real database usage where appropriate.
 import pytest
 import json
 
+from typing import Callable
+from sqlalchemy.orm import Session
 from borgitory.services.cloud_providers.config_service import (
     DatabaseConfigLoadService,
     MockConfigLoadService,
@@ -21,7 +23,7 @@ class TestDatabaseConfigLoadService:
     """Test DatabaseConfigLoadService with real database operations"""
 
     @pytest.fixture
-    def db_session_factory(self, test_db):
+    def db_session_factory(self, test_db: Session) -> Callable:
         """Factory that returns test database session"""
 
         def factory():
@@ -30,11 +32,11 @@ class TestDatabaseConfigLoadService:
         return factory
 
     @pytest.fixture
-    def service(self, db_session_factory):
+    def service(self, db_session_factory) -> DatabaseConfigLoadService:
         return DatabaseConfigLoadService(db_session_factory)
 
     @pytest.mark.asyncio
-    async def test_load_config_success_with_json_config(self, service, test_db):
+    async def test_load_config_success_with_json_config(self, service, test_db: Session) -> None:
         """Test loading config with new JSON-based configuration"""
         # Create config with JSON provider_config
         provider_config = {
@@ -65,14 +67,14 @@ class TestDatabaseConfigLoadService:
         assert result.name == "test-s3"
 
     @pytest.mark.asyncio
-    async def test_load_config_not_found(self, service, test_db):
+    async def test_load_config_not_found(self, service, test_db: Session) -> None:
         """Test loading non-existent config"""
         result = await service.load_config(999)
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_load_config_disabled(self, service, test_db):
+    async def test_load_config_disabled(self, service, test_db: Session) -> None:
         """Test loading disabled config returns None"""
         db_config = create_s3_cloud_sync_config(
             name="disabled-config",
@@ -88,7 +90,7 @@ class TestDatabaseConfigLoadService:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_load_config_with_empty_path_prefix(self, service, test_db):
+    async def test_load_config_with_empty_path_prefix(self, service, test_db: Session) -> None:
         """Test loading config with empty path prefix"""
         provider_config = {
             "bucket_name": "test-bucket",
@@ -113,11 +115,11 @@ class TestDatabaseConfigLoadService:
         assert result.path_prefix == ""  # Should default to empty string
 
     @pytest.mark.asyncio
-    async def test_load_config_database_error(self, service):
+    async def test_load_config_database_error(self, service) -> None:
         """Test handling database errors gracefully"""
 
         # Create a service with a broken session factory
-        def broken_factory():
+        def broken_factory() -> None:
             raise Exception("Database connection failed")
 
         broken_service = DatabaseConfigLoadService(broken_factory)
@@ -127,7 +129,7 @@ class TestDatabaseConfigLoadService:
         assert result is None  # Should handle error gracefully
 
     @pytest.mark.asyncio
-    async def test_load_config_json_parse_error(self, service, test_db):
+    async def test_load_config_json_parse_error(self, service, test_db: Session) -> None:
         """Test handling invalid JSON in provider_config"""
         db_config = DbCloudSyncConfig(
             name="invalid-json",
@@ -144,7 +146,7 @@ class TestDatabaseConfigLoadService:
         assert result is None  # Should handle JSON error gracefully
 
     @pytest.mark.asyncio
-    async def test_load_config_with_all_fields(self, service, test_db):
+    async def test_load_config_with_all_fields(self, service, test_db: Session) -> None:
         """Test loading config with all possible fields populated"""
         provider_config = {
             "bucket_name": "comprehensive-bucket",
@@ -174,7 +176,7 @@ class TestDatabaseConfigLoadService:
         assert result.name == "comprehensive-config"
 
     @pytest.mark.asyncio
-    async def test_multiple_config_loads(self, service, test_db):
+    async def test_multiple_config_loads(self, service, test_db: Session) -> None:
         """Test loading multiple configs in sequence"""
         # Create multiple configs
         configs = []
@@ -211,7 +213,7 @@ class TestDatabaseConfigLoadService:
             assert result.config["bucket_name"] == f"bucket-{i}"
 
     @pytest.mark.asyncio
-    async def test_load_config_with_sftp_provider(self, service, test_db):
+    async def test_load_config_with_sftp_provider(self, service, test_db: Session) -> None:
         """Test loading SFTP config with JSON configuration"""
         provider_config = {
             "host": "sftp.example.com",
@@ -246,7 +248,7 @@ class TestMockConfigLoadService:
     """Test MockConfigLoadService for testing scenarios"""
 
     @pytest.fixture
-    def sample_configs(self):
+    def sample_configs(self) -> dict[int, CloudSyncConfig]:
         return {
             1: CloudSyncConfig(
                 provider="s3",
@@ -268,11 +270,11 @@ class TestMockConfigLoadService:
         }
 
     @pytest.fixture
-    def service(self, sample_configs):
+    def service(self, sample_configs) -> MockConfigLoadService:
         return MockConfigLoadService(sample_configs)
 
     @pytest.mark.asyncio
-    async def test_load_existing_config(self, service, sample_configs):
+    async def test_load_existing_config(self, service, sample_configs) -> None:
         """Test loading existing config from mock service"""
         result = await service.load_config(1)
 
@@ -283,7 +285,7 @@ class TestMockConfigLoadService:
         assert result.path_prefix == "test1/"
 
     @pytest.mark.asyncio
-    async def test_load_different_configs(self, service, sample_configs):
+    async def test_load_different_configs(self, service, sample_configs) -> None:
         """Test loading different configs by ID"""
         result1 = await service.load_config(1)
         result2 = await service.load_config(2)
@@ -300,14 +302,14 @@ class TestMockConfigLoadService:
         assert result5.path_prefix == "prod/"
 
     @pytest.mark.asyncio
-    async def test_load_nonexistent_config(self, service):
+    async def test_load_nonexistent_config(self, service) -> None:
         """Test loading config that doesn't exist"""
         result = await service.load_config(999)
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_load_config_with_zero_id(self, service, sample_configs):
+    async def test_load_config_with_zero_id(self, service, sample_configs) -> None:
         """Test loading config with ID 0 (edge case)"""
         # Add config with ID 0
         sample_configs[0] = CloudSyncConfig(
@@ -320,7 +322,7 @@ class TestMockConfigLoadService:
         assert result is not None
         assert result.name == "zero-config"
 
-    def test_empty_configs(self):
+    def test_empty_configs(self) -> None:
         """Test mock service with no configs"""
         empty_service = MockConfigLoadService({})
 
@@ -328,7 +330,7 @@ class TestMockConfigLoadService:
         assert empty_service._configs == {}
 
     @pytest.mark.asyncio
-    async def test_empty_configs_load(self):
+    async def test_empty_configs_load(self) -> None:
         """Test loading from empty config service"""
         empty_service = MockConfigLoadService({})
 
@@ -337,7 +339,7 @@ class TestMockConfigLoadService:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_mock_service_with_complex_configs(self):
+    async def test_mock_service_with_complex_configs(self, service) -> None:
         """Test mock service with complex configuration data"""
         complex_configs = {
             100: CloudSyncConfig(
@@ -373,19 +375,21 @@ class TestMockConfigLoadService:
 
         # Load complex S3 config
         s3_result = await service.load_config(100)
+        assert s3_result is not None
         assert s3_result.provider == "s3"
         assert s3_result.config["storage_class"] == "INTELLIGENT_TIERING"
         assert s3_result.path_prefix == "complex/nested/path/"
 
         # Load complex SFTP config
         sftp_result = await service.load_config(200)
+        assert sftp_result is not None
         assert sftp_result.provider == "sftp"
         assert sftp_result.config["port"] == 2222
         assert sftp_result.config["host_key_checking"] is False
         assert sftp_result.config["max_connections"] == 5
 
     @pytest.mark.asyncio
-    async def test_mock_service_returns_same_reference(self, service, sample_configs):
+    async def test_mock_service_returns_same_reference(self, service, sample_configs) -> None:
         """Test that mock service returns the same object reference"""
         result1 = await service.load_config(1)
         result2 = await service.load_config(1)
@@ -395,7 +399,7 @@ class TestMockConfigLoadService:
         assert result1 is sample_configs[1]
 
     @pytest.mark.asyncio
-    async def test_mock_service_with_different_provider_types(self, service):
+    async def test_mock_service_with_different_provider_types(self, service) -> None:
         """Test mock service handles different provider types correctly"""
         # Test S3 config
         s3_result = await service.load_config(1)

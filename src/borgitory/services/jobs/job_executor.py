@@ -33,7 +33,7 @@ class ProcessResult:
 class JobExecutor:
     """Handles subprocess execution and output monitoring"""
 
-    def __init__(self, subprocess_executor: Optional[Callable] = None):
+    def __init__(self, subprocess_executor: Optional[Callable] = None) -> None:
         self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
