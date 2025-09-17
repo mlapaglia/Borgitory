@@ -10,12 +10,12 @@ import logging
 import uuid
 import os
 from datetime import datetime, UTC
-from typing import Dict, Optional, List, AsyncGenerator, Any, Callable, TYPE_CHECKING
+from typing import Union, Dict, Optional, List, AsyncGenerator, Any, Callable, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
-from borgitory.services.jobs.job_queue_manager import JobQueueManager, JobPriority
+from borgitory.services.jobs.job_queue_manager import QueuedJob, JobQueueManager, JobPriority
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
     EventType,
@@ -26,6 +26,8 @@ from borgitory.services.jobs.job_database_manager import (
 )
 from borgitory.services.rclone_service import RcloneService
 from borgitory.utils.db_session import get_db_session
+from contextlib import _GeneratorContextManager
+from unittest.mock import Mock
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
@@ -84,7 +86,7 @@ class JobManagerDependencies:
         if self.db_session_factory is None:
             self.db_session_factory = self._default_db_session_factory
 
-    def _default_db_session_factory(self):
+    def _default_db_session_factory(self) -> _GeneratorContextManager:
         """Default database session factory"""
         return get_db_session()
 
@@ -460,7 +462,7 @@ class JobManager:
             if job.id in self._processes:
                 del self._processes[job.id]
 
-    def _on_job_start(self, job_id: str, queued_job) -> None:
+    def _on_job_start(self, job_id: str, queued_job: QueuedJob) -> None:
         """Callback when queue manager starts a job"""
         job = self.jobs.get(job_id)
         if job and job.command:
@@ -1366,7 +1368,7 @@ class JobManager:
             return True
         return False
 
-    def get_queue_status(self):
+    def get_queue_status(self) -> Dict[str, int]:
         """Get queue manager status"""
         if self.queue_manager:
             stats = self.queue_manager.get_queue_stats()
@@ -1420,7 +1422,7 @@ class JobManager:
 
         return {"lines": [], "progress": {}}
 
-    def get_queue_stats(self):
+    def get_queue_stats(self) -> Dict[str, int]:
         """Get queue statistics (alias for get_queue_status)"""
         return self.get_queue_status()
 
@@ -1687,7 +1689,7 @@ class JobManager:
 
 
 # Factory function for creating JobManager instances (no singleton)
-def create_job_manager(config=None, rclone_service: RcloneService = None) -> JobManager:
+def create_job_manager(config: Optional[Union[JobManagerConfig, Mock]]=None, rclone_service: RcloneService = None) -> JobManager:
     """Factory function for creating JobManager instances"""
     if config is None:
         # Use environment variables or defaults
