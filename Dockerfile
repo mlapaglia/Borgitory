@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.13.7-slim-trixie AS builder
 
 ARG VERSION
 ENV BORGITORY_VERSION=${VERSION}
@@ -8,7 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     pkg-config \
-    libfuse3-dev \
+    libfuse3-dev=3.17.2-3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
@@ -18,15 +18,17 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir .[dev]
 
-FROM python:3.12-slim-bookworm AS test
+FROM python:3.13.7-slim-trixie AS test
+
+ENV BORGITORY_VERSION=${VERSION}
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    rclone \
-    borgbackup \
-    fuse3 \
-    python3-pyfuse3 \
+    rclone=1.60.1+dfsg-4 \
+    borgbackup=1.4.0-5 \
+    fuse3=3.17.2-3 \
+    python3-pyfuse3=3.4.0-3+b3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -43,15 +45,16 @@ COPY alembic.ini lint.py ./
 
 CMD ["pytest"]
 
-FROM python:3.12-slim-bookworm
+FROM python:3.13.7-slim-trixie
 
+ENV BORGITORY_VERSION=${VERSION}
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    rclone \
-    borgbackup \
-    fuse3 \
-    python3-pyfuse3 \
+    rclone=1.60.1+dfsg-4 \
+    borgbackup=1.4.0-5 \
+    fuse3=3.17.2-3 \
+    python3-pyfuse3=3.4.0-3+b3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir -p /app/data

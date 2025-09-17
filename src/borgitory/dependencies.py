@@ -212,7 +212,10 @@ def get_debug_service() -> DebugService:
     global _debug_service_instance
     if _debug_service_instance is None:
         volume_service = get_volume_service()
-        _debug_service_instance = DebugService(volume_service=volume_service)
+        job_manager = get_job_manager_dependency()
+        _debug_service_instance = DebugService(
+            volume_service=volume_service, job_manager=job_manager
+        )
     return _debug_service_instance
 
 
