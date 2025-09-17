@@ -1,11 +1,16 @@
 import logging
 import os
 import sys
+from typing import AsyncGenerator
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 from fastapi import FastAPI, Request, Depends
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from starlette.templating import _TemplateResponse
+from borgitory.models.database import User
 
 from borgitory.utils.security import get_or_generate_secret_key
 from borgitory.models.database import init_db, get_db
@@ -36,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         logger.info("Starting Borgitory application...")
 
@@ -209,8 +214,8 @@ VALID_TABS = {
 
 
 def _render_page_with_tab(
-    request: Request, current_user, active_tab: str, initial_content_url: str
-):
+    request: Request, current_user: User, active_tab: str, initial_content_url: str
+) -> _TemplateResponse:
     """Helper to render the main page with a specific tab active."""
     return templates.TemplateResponse(
         request,
@@ -224,11 +229,8 @@ def _render_page_with_tab(
 
 
 @app.get("/")
-async def root(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from borgitory.api.auth import get_current_user_optional
-
-    current_user = get_current_user_optional(request, db)
+async def root(request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
+    current_user = auth.get_current_user_optional(request, db)
 
     if not current_user:
         return RedirectResponse(url="/login?next=/repositories", status_code=302)
@@ -237,13 +239,11 @@ async def root(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse(url="/repositories", status_code=302)
 
 
-@app.get("/login")
-async def login_page(request: Request, db: Session = Depends(get_db)):
-    from fastapi.responses import RedirectResponse
-    from borgitory.api.auth import get_current_user_optional
-    from urllib.parse import urlparse
-
-    current_user = get_current_user_optional(request, db)
+@app.get("/login", response_model=None)
+async def login_page(
+    request: Request, db: Session = Depends(get_db)
+) -> RedirectResponse | _TemplateResponse:
+    current_user = auth.get_current_user_optional(request, db)
     next_url = request.query_params.get("next", "/repositories")
     # Strip backslashes, and validate redirect target is internal
     cleaned_next_url = next_url.replace("\\", "")
@@ -261,8 +261,10 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
 
 
 # Dynamic route for all tab pages
-@app.get("/{tab_name}")
-async def tab_page(tab_name: str, request: Request, db: Session = Depends(get_db)):
+@app.get("/{tab_name}", response_model=None)
+async def tab_page(
+    tab_name: str, request: Request, db: Session = Depends(get_db)
+) -> RedirectResponse | _TemplateResponse:
     from fastapi.responses import RedirectResponse
     from fastapi import HTTPException
     from borgitory.api.auth import get_current_user_optional

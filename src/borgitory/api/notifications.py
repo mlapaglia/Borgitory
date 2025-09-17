@@ -3,9 +3,12 @@ API endpoints for managing notification configurations (Pushover, etc.)
 """
 
 import logging
+from typing import List
 
 from fastapi import APIRouter, HTTPException, status, Request
 from fastapi.responses import HTMLResponse
+from starlette.templating import _TemplateResponse
+
 from borgitory.models.schemas import NotificationConfigCreate
 
 from borgitory.dependencies import (
@@ -24,7 +27,7 @@ async def create_notification_config(
     templates: TemplatesDep,
     notification_config: NotificationConfigCreate,
     service: NotificationConfigServiceDep,
-):
+) -> _TemplateResponse:
     """Create a new notification configuration"""
     success, created_config, error_msg = service.create_config(
         name=notification_config.name,
@@ -35,7 +38,7 @@ async def create_notification_config(
         app_token=notification_config.app_token,
     )
 
-    if not success:
+    if not success or not created_config:
         return templates.TemplateResponse(
             request,
             "partials/notifications/create_error.html",
@@ -57,7 +60,7 @@ def list_notification_configs(
     service: NotificationConfigServiceDep,
     skip: int = 0,
     limit: int = 100,
-):
+) -> List:
     """List all notification configurations"""
     return service.get_all_configs(skip=skip, limit=limit)
 
@@ -67,7 +70,7 @@ def get_notification_configs_html(
     request: Request,
     templates: TemplatesDep,
     service: NotificationConfigServiceDep,
-):
+) -> _TemplateResponse:
     """Get notification configurations as formatted HTML"""
     try:
         processed_configs_data = service.get_configs_with_descriptions()
@@ -94,7 +97,7 @@ async def test_notification_config(
     pushover_svc: PushoverServiceDep,
     templates: TemplatesDep,
     service: NotificationConfigServiceDep,
-):
+) -> _TemplateResponse:
     """Test a notification configuration"""
     try:
         success, user_key, app_token, error_msg = service.get_config_credentials(
@@ -102,7 +105,7 @@ async def test_notification_config(
         )
 
         if not success:
-            status_code = 404 if "not found" in error_msg else 400
+            status_code = 404 if error_msg and "not found" in error_msg else 400
             return templates.TemplateResponse(
                 request,
                 "partials/notifications/test_error.html",
@@ -155,7 +158,7 @@ async def enable_notification_config(
     config_id: int,
     templates: TemplatesDep,
     service: NotificationConfigServiceDep,
-):
+) -> _TemplateResponse:
     """Enable a notification configuration"""
     success, success_msg, error_msg = service.enable_config(config_id)
 
@@ -164,7 +167,7 @@ async def enable_notification_config(
             request,
             "partials/notifications/action_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     response = templates.TemplateResponse(
@@ -182,11 +185,11 @@ async def disable_notification_config(
     config_id: int,
     templates: TemplatesDep,
     service: NotificationConfigServiceDep,
-):
+) -> _TemplateResponse:
     """Disable a notification configuration"""
     success, success_msg, error_msg = service.disable_config(config_id)
 
-    if not success:
+    if not success and error_msg:
         return templates.TemplateResponse(
             request,
             "partials/notifications/action_error.html",
@@ -248,7 +251,7 @@ async def update_notification_config(
     notification_config: NotificationConfigCreate,
     templates: TemplatesDep,
     service: NotificationConfigServiceDep,
-):
+) -> _TemplateResponse:
     """Update a notification configuration"""
     success, updated_config, error_msg = service.update_config(
         config_id=config_id,
@@ -260,12 +263,12 @@ async def update_notification_config(
         app_token=notification_config.app_token,
     )
 
-    if not success:
+    if not success or not updated_config:
         return templates.TemplateResponse(
             request,
             "partials/notifications/update_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     response = templates.TemplateResponse(
@@ -295,7 +298,7 @@ async def delete_notification_config(
     config_id: int,
     templates: TemplatesDep,
     service: NotificationConfigServiceDep,
-):
+) -> _TemplateResponse:
     """Delete a notification configuration"""
     success, config_name, error_msg = service.delete_config(config_id)
 
@@ -304,7 +307,7 @@ async def delete_notification_config(
             request,
             "partials/notifications/action_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     message = f"Notification configuration '{config_name}' deleted successfully!"
