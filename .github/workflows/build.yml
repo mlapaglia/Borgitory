@@ -148,6 +148,14 @@ jobs:
       with:
         fetch-depth: 1
     
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          gcc \
+          pkg-config \
+          libfuse3-dev
+    
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
