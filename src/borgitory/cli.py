@@ -7,9 +7,12 @@ import sys
 import subprocess
 import argparse
 import logging
+import os
+from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from importlib.metadata import version
+from importlib import resources
 
 
 def get_version() -> str:
@@ -32,9 +35,39 @@ def run_migrations() -> bool:
     print("Running database migrations...")
 
     try:
-        # Run alembic upgrade head
+        # Ensure data directory exists
+        data_dir = Path("data")
+        data_dir.mkdir(exist_ok=True)
+
+        # Find the alembic.ini file in the installed package
+        try:
+            # Try to find alembic.ini in the package data
+            package_dir = resources.files("borgitory")
+            alembic_ini_path = package_dir / "alembic.ini"
+
+            # Convert to string and check if file exists
+            config_path_str = str(alembic_ini_path)
+            if os.path.exists(config_path_str):
+                config_path = config_path_str
+            else:
+                # Try checking with is_file() if available
+                try:
+                    if alembic_ini_path.is_file():
+                        config_path = config_path_str
+                    else:
+                        config_path = "alembic.ini"
+                except (AttributeError, OSError):
+                    config_path = "alembic.ini"
+        except (ImportError, AttributeError, TypeError, OSError):
+            # Fallback for older Python versions or if resources not available
+            config_path = "alembic.ini"
+
+        # Run alembic upgrade head with explicit config
         subprocess.run(
-            ["alembic", "upgrade", "head"], check=True, capture_output=True, text=True
+            ["alembic", "-c", config_path, "upgrade", "head"],
+            check=True,
+            capture_output=True,
+            text=True,
         )
         print("Database migrations completed successfully")
         return True

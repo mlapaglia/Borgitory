@@ -3,15 +3,14 @@ from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from fastapi import Request
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import get_db
-from borgitory.dependencies import DebugServiceDep
+from borgitory.dependencies import DebugServiceDep, get_templates
 
 router = APIRouter(prefix="/api/debug", tags=["debug"])
-templates = Jinja2Templates(directory="src/borgitory/templates")
+templates = get_templates()
 logger = logging.getLogger(__name__)
 
 

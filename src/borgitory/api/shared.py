@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Request
-from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from borgitory.dependencies import get_templates
 
 
 router = APIRouter()
-templates = Jinja2Templates(directory="src/borgitory/templates")
+templates = get_templates()
 
 
 @router.get("/notification", response_class=HTMLResponse)

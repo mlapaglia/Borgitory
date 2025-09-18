@@ -21,6 +21,7 @@ from borgitory.dependencies import (
     EncryptionServiceDep,
     StorageFactoryDep,
     ProviderRegistryDep,
+    get_templates,
 )
 
 router = APIRouter()
@@ -163,10 +164,6 @@ def _parse_form_data_to_config_update(
         path_prefix=regular_fields.get("path_prefix"),
         provider_config=provider_config if provider_config else None,
     )
-
-
-def get_templates() -> Jinja2Templates:
-    return Jinja2Templates(directory="src/borgitory/templates")
 
 
 def get_cloud_sync_service(

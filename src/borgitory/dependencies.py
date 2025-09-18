@@ -7,8 +7,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from borgitory.models.database import get_db
-import os
-
+from borgitory.utils.template_paths import get_template_directory
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
@@ -48,7 +47,6 @@ from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
 from borgitory.services.cloud_providers import EncryptionService, StorageFactory
-
 
 # Global singleton instances
 _simple_command_runner_instance = None
@@ -387,8 +385,7 @@ def get_templates() -> Jinja2Templates:
     """
     global _templates_instance
     if _templates_instance is None:
-        base_path = "" if os.path.exists("templates") else "src/borgitory/"
-        template_path = f"{base_path}templates"
+        template_path = get_template_directory()
         _templates_instance = Jinja2Templates(directory=template_path)
     return _templates_instance
 

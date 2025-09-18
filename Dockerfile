@@ -13,8 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY pyproject.toml LICENSE README.md MANIFEST.in ./
 COPY src/ ./src/
-COPY alembic/ ./alembic/
-COPY alembic.ini .
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -43,8 +41,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 COPY src/ ./src/
 COPY tests/ ./tests/
-COPY alembic/ ./alembic/
-COPY alembic.ini lint.py ./
+COPY lint.py ./
 
 CMD ["pytest"]
 
@@ -65,8 +62,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 
 COPY src/ ./src/
-COPY alembic/ ./alembic/
-COPY alembic.ini start.sh ./
+COPY start.sh ./
 
 RUN chmod +x start.sh
 

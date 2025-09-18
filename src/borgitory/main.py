@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from starlette.templating import _TemplateResponse
 from borgitory.models.database import User
-
+from borgitory.utils.template_paths import get_static_directory, get_template_directory
 from borgitory.utils.security import get_or_generate_secret_key
 from borgitory.models.database import init_db, get_db
 from borgitory.api import (
@@ -105,13 +105,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(title="Borgitory - BorgBackup Web Manager", lifespan=lifespan)
 
 
-# Determine base path - in Docker we copy to root, in dev we use src/borgitory/
-base_path = "" if os.path.exists("templates") else "src/borgitory/"
+# Configure static files and templates using centralized path resolution
 
-# Static files and templates
-static_path = f"{base_path}static"
-template_path = f"{base_path}templates"
+static_path = get_static_directory()
+template_path = get_template_directory()
 
+logger.info(f"Resolved paths - static: {static_path}, template: {template_path}")
+
+# Mount static files if directory exists
 if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 else:
@@ -119,6 +120,7 @@ else:
         f"Static directory '{static_path}' not found - static files will not be served"
     )
 
+# Initialize templates
 templates = Jinja2Templates(directory=template_path)
 
 app.include_router(

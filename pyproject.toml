@@ -75,8 +75,6 @@ packages = ["src/borgitory"]
 include = [
     "/src",
     "/tests",
-    "/alembic",
-    "/alembic.ini",
     "/README.md",
     "/LICENSE",
     "/pyproject.toml"

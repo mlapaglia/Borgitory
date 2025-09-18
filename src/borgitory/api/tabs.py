@@ -6,14 +6,13 @@ import logging
 from typing import Any, Dict
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 
 from borgitory.api.auth import get_current_user
-from borgitory.dependencies import ProviderRegistryDep
+from borgitory.dependencies import ProviderRegistryDep, get_templates
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-templates = Jinja2Templates(directory="src/borgitory/templates")
+templates = get_templates()
 
 
 def _render_tab_with_nav(

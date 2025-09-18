@@ -5,7 +5,6 @@ Provides consistent response formatting for API endpoints.
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 
 from borgitory.models.repository_dtos import (
     RepositoryOperationResult,
@@ -14,8 +13,11 @@ from borgitory.models.repository_dtos import (
     DeleteRepositoryResult,
 )
 
-# Initialize templates
-templates = Jinja2Templates(directory="src/borgitory/templates")
+# Import templates from dependency injection
+from borgitory.dependencies import get_templates
+
+# Get templates instance using dependency injection
+templates = get_templates()
 
 
 class ResponseType:
