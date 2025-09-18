@@ -3,6 +3,7 @@ FastAPI dependency providers for the application.
 """
 
 from typing import Annotated
+from functools import lru_cache
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -49,7 +50,6 @@ from fastapi.templating import Jinja2Templates
 from borgitory.services.cloud_providers import EncryptionService, StorageFactory
 
 # Global singleton instances
-_simple_command_runner_instance = None
 _job_manager_instance = None
 
 
@@ -80,16 +80,14 @@ def get_job_manager_dependency() -> JobManager:
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager_dependency)]
 
 
+@lru_cache()
 def get_simple_command_runner() -> SimpleCommandRunner:
     """
     Provide a SimpleCommandRunner singleton instance.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Uses FastAPI's built-in caching for singleton behavior.
     """
-    global _simple_command_runner_instance
-    if _simple_command_runner_instance is None:
-        _simple_command_runner_instance = SimpleCommandRunner()
-    return _simple_command_runner_instance
+    return SimpleCommandRunner()
 
 
 _borg_service_instance = None
@@ -217,19 +215,14 @@ def get_debug_service() -> DebugService:
     return _debug_service_instance
 
 
-_rclone_service_instance = None
-
-
+@lru_cache()
 def get_rclone_service() -> RcloneService:
     """
     Provide a RcloneService singleton instance.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Uses FastAPI's built-in caching for singleton behavior.
     """
-    global _rclone_service_instance
-    if _rclone_service_instance is None:
-        _rclone_service_instance = RcloneService()
-    return _rclone_service_instance
+    return RcloneService()
 
 
 _repository_stats_service_instance = None
@@ -266,19 +259,14 @@ def get_scheduler_service() -> SchedulerService:
     return _scheduler_service_instance
 
 
-_volume_service_instance = None
-
-
+@lru_cache()
 def get_volume_service() -> VolumeService:
     """
     Provide a VolumeService singleton instance.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Uses FastAPI's built-in caching for singleton behavior.
     """
-    global _volume_service_instance
-    if _volume_service_instance is None:
-        _volume_service_instance = VolumeService()
-    return _volume_service_instance
+    return VolumeService()
 
 
 def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinitionBuilder:
@@ -420,19 +408,14 @@ def get_schedule_service(
     return ScheduleService(db=db, scheduler_service=scheduler_service)
 
 
-_configuration_service_instance = None
-
-
+@lru_cache()
 def get_configuration_service() -> ConfigurationService:
     """
     Provide a ConfigurationService singleton instance.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Uses FastAPI's built-in caching for singleton behavior.
     """
-    global _configuration_service_instance
-    if _configuration_service_instance is None:
-        _configuration_service_instance = ConfigurationService()
-    return _configuration_service_instance
+    return ConfigurationService()
 
 
 def get_repository_check_config_service(
@@ -466,19 +449,14 @@ def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
     return CleanupService(db=db)
 
 
-_cron_description_service_instance = None
-
-
+@lru_cache()
 def get_cron_description_service() -> CronDescriptionService:
     """
     Provide a CronDescriptionService singleton instance.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Uses FastAPI's built-in caching for singleton behavior.
     """
-    global _cron_description_service_instance
-    if _cron_description_service_instance is None:
-        _cron_description_service_instance = CronDescriptionService()
-    return _cron_description_service_instance
+    return CronDescriptionService()
 
 
 def get_upcoming_backups_service(
