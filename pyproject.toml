@@ -71,10 +71,6 @@ borgitory = "borgitory.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/borgitory"]
 
-[tool.hatch.build.targets.wheel.shared-data]
-"alembic" = "borgitory/alembic"
-"alembic.ini" = "borgitory/alembic.ini"
-
 [tool.hatch.build.targets.sdist]
 include = [
     "/src",
