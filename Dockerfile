@@ -11,7 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfuse3-dev=3.17.2-3 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
+COPY pyproject.toml LICENSE README.md MANIFEST.in ./
+COPY src/ ./src/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
