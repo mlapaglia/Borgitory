@@ -49,9 +49,6 @@ Install Borgitory directly from PyPI:
 # Install stable release from PyPI
 pip install borgitory
 
-# Or install pre-release from TestPyPI (for testing new features)
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ borgitory
-
 # Start the server
 borgitory serve
 
