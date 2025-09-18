@@ -33,6 +33,7 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 - **Mobile Responsive**: HTMX + Alpine.js + Tailwind CSS interface
 
 ## Quick Start
+- documentation is available at https://borgitory.com
 
 ### Prerequisites
 
