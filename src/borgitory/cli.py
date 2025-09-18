@@ -9,6 +9,12 @@ import argparse
 import logging
 import uvicorn
 from dotenv import load_dotenv
+from importlib.metadata import version
+
+
+def get_version() -> str:
+    """Get the current version of borgitory."""
+    return version("borgitory")
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -72,7 +78,9 @@ def main() -> None:
         description="Borgitory - Web-based BorgBackup management interface",
         prog="borgitory",
     )
-    parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {get_version()}"
+    )
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose logging"
     )
