@@ -9,6 +9,61 @@ env:
   IMAGE_NAME: mlapaglia/borgitory
 
 jobs:
+  pypi-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for trusted publishing to PyPI
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Extract version
+      id: version
+      run: |
+        VERSION=${{ github.event.release.tag_name }}
+        # Remove 'v' prefix if present
+        VERSION=${VERSION#v}
+        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Extracted version: ${VERSION}"
+        
+        # Check if version contains prerelease indicators OR if GitHub release is marked as prerelease
+        if [[ "$VERSION" =~ (alpha|beta|rc|dev|pre) ]] || [ "${{ github.event.release.prerelease }}" == "true" ]; then
+          echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
+          echo "This is a prerelease (will not publish to PyPI)"
+        else
+          echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
+          echo "This is a stable release (will publish to PyPI)"
+        fi
+
+    - name: Update pyproject.toml version
+      run: |
+        VERSION=${{ steps.version.outputs.VERSION }}
+        echo "Updating pyproject.toml version to: ${VERSION}"
+        sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+        echo "Updated pyproject.toml:"
+        grep "^version = " pyproject.toml
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install build
+
+    - name: Build package
+      run: python -m build
+
+    - name: Publish to PyPI
+      if: steps.version.outputs.IS_PRERELEASE == 'false'
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        print-hash: true
+
   docker-release:
     runs-on: ubuntu-latest
     permissions:

@@ -1,0 +1,43 @@
+# Include package metadata and documentation
+include README.md
+include LICENSE
+include pyproject.toml
+include alembic.ini
+
+# Include source code and tests
+recursive-include src *.py
+recursive-include src *.typed
+recursive-include tests *.py
+
+# Include static web assets
+recursive-include src/borgitory/static *.css *.js *.png *.ico *.webmanifest
+recursive-include src/borgitory/templates *.html
+
+# Include database migration files
+recursive-include alembic *.py *.mako
+include alembic/README
+recursive-include alembic/versions *.py
+
+# Exclude compiled Python files and caches
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude .pytest_cache
+global-exclude *.egg-info
+
+# Exclude development and build artifacts
+exclude .gitignore
+exclude docker-compose.yml
+exclude Dockerfile
+exclude start.sh
+exclude run.py
+exclude lint.py
+exclude monkeytype.sqlite3
+
+# Exclude local data and backup directories
+recursive-exclude data *
+recursive-exclude local-data *
+recursive-exclude backup-sources *
+recursive-exclude borg-repos *
+recursive-exclude assets *

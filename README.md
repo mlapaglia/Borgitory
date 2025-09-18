@@ -31,9 +31,32 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ### Prerequisites
 
-- Docker (Docker Compose optional but recommended)
+- **Docker Installation (Recommended)**: Docker with Docker Compose for containerized deployment
+- **PyPI Installation**: Python 3.11+ for direct installation from PyPI
 
 ### Installation
+
+#### Option 1: PyPI Installation (New!)
+
+Install Borgitory directly from PyPI:
+
+```bash
+# Install from PyPI
+pip install borgitory
+
+# Start the server
+borgitory serve
+
+# Or run with custom settings
+borgitory serve --host 0.0.0.0 --port 8000
+```
+
+**PyPI Installation Requirements:**
+- Python 3.11 or higher
+- BorgBackup installed and available in PATH
+- Rclone (optional, for cloud sync features)
+
+#### Option 2: Docker Installation
 
 1. **Pull and run the Docker image**
 
@@ -103,9 +126,12 @@ A comprehensive web-based management interface for BorgBackup repositories with 
    
    # Install with development dependencies (testing, linting, etc.)
    pip install -e .[dev]
+   
+   # Or install from PyPI for testing
+   pip install borgitory
    ```
 
-   > **Note**: This project uses modern Python packaging with `pyproject.toml` following PEP 518 standards. All dependencies and project metadata are defined in a single configuration file.
+   > **Note**: This project uses modern Python packaging with `pyproject.toml` following PEP 518 standards and is available on PyPI. All dependencies and project metadata are defined in a single configuration file.
 
 3. **Install Rclone** (for cloud sync)
 

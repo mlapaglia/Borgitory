@@ -6,9 +6,12 @@ build-backend = "hatchling.build"
 name = "borgitory"
 version = "1.0.0"
 description = "A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities."
+readme = "README.md"
+license = {file = "LICENSE"}
 authors = [
     {name = "mlapaglia", email = "mlapaglia@users.noreply.github.com"},
 ]
+keywords = ["borgbackup", "backup", "web-interface", "scheduling", "cloud-sync", "archive-management"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: System Administrators",
@@ -62,8 +65,26 @@ Homepage = "https://github.com/mlapaglia/Borgitory"
 Repository = "https://github.com/mlapaglia/Borgitory"
 Issues = "https://github.com/mlapaglia/Borgitory/issues"
 
+[project.scripts]
+borgitory = "borgitory.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/borgitory"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"alembic" = "borgitory/alembic"
+"alembic.ini" = "borgitory/alembic.ini"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/alembic",
+    "/alembic.ini",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml"
+]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
