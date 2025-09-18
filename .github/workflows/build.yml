@@ -123,13 +123,20 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test \
-          sh -c "pip install -e .[dev] && pytest tests/ --cov=src/borgitory --cov-report=xml:coverage.xml --cov-report=html:htmlcov --junitxml=junit.xml -o junit_family=legacy"
+          sh -c "pip install -e .[dev] && pytest tests/ --ignore=tests/integration \
+            --cov=src/borgitory \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --junitxml=junit.xml \
+            -o junit_family=legacy"
 
-    - name: Upload coverage to Codecov
+    - name: Upload unit test coverage to Codecov
       if: always()
       uses: codecov/codecov-action@v5
       with:
         files: ./coverage.xml
+        flags: unit
+        name: unit-tests
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
 
@@ -161,7 +168,7 @@ jobs:
         tags: borgitory-test
         cache-from: type=gha
     
-    - name: Run integration tests
+    - name: Run integration tests with coverage
       run: |
         docker run --rm \
           --cap-add SYS_ADMIN \
@@ -169,7 +176,21 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test \
-          pytest tests/integration/ -v --tb=short --timeout=60
+          pytest tests/integration/ -v --tb=short --timeout=60 \
+            --cov=src/borgitory \
+            --cov-report=xml:integration-coverage.xml \
+            --cov-report=html:integration-htmlcov \
+            --cov-append
+
+    - name: Upload integration test coverage to Codecov
+      if: always()
+      uses: codecov/codecov-action@v5
+      with:
+        files: ./integration-coverage.xml
+        flags: integration
+        name: integration-tests
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
 
   build-python-production-package:
     runs-on: ubuntu-latest
