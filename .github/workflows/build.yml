@@ -93,7 +93,7 @@ jobs:
       run: |
         docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test python lint.py mypy
 
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
     needs: build-docker-test-image
     
@@ -115,7 +115,7 @@ jobs:
         tags: borgitory-test
         cache-from: type=gha
     
-    - name: Run tests
+    - name: Run unit tests
       run: |
         docker run --rm \
           --cap-add SYS_ADMIN \
@@ -138,6 +138,38 @@ jobs:
       uses: codecov/test-results-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: build-docker-test-image
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 2
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Load test image from cache
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        target: test
+        load: true
+        tags: borgitory-test
+        cache-from: type=gha
+    
+    - name: Run integration tests
+      run: |
+        docker run --rm \
+          --cap-add SYS_ADMIN \
+          --device /dev/fuse:/dev/fuse:rwm \
+          -v $(pwd):/app \
+          -w /app \
+          borgitory-test \
+          pytest tests/integration/ -v --tb=short --timeout=60
 
   build-python-production-package:
     runs-on: ubuntu-latest
@@ -188,7 +220,7 @@ jobs:
 
   build-docker-production-image:
     runs-on: ubuntu-latest
-    needs: [lint, mypy, test]
+    needs: [lint, mypy, test, integration-test]
     
     steps:
     - name: Checkout repository
