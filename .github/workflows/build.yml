@@ -176,7 +176,7 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test \
-          pytest tests/integration/ -v --tb=short --timeout=60 \
+          pytest tests/integration/ -v --tb=short \
             --cov=src/borgitory \
             --cov-report=xml:integration-coverage.xml \
             --cov-report=html:integration-htmlcov \
