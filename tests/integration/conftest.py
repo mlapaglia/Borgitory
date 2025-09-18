@@ -4,7 +4,6 @@ import pytest
 import tempfile
 import os
 import shutil
-from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -55,14 +54,14 @@ def test_env_vars(temp_data_dir):
         "BORGITORY_DATABASE_URL": f"sqlite:///{os.path.join(temp_data_dir, 'test_borgitory.db')}",
         "BORGITORY_SECRET_KEY": "test-secret-key-for-integration-tests-only",
     }
-    
+
     # Store original values and set test values
     for key, value in test_vars.items():
         original_env[key] = os.environ.get(key)
         os.environ[key] = value
-    
+
     yield test_vars
-    
+
     # Restore original values
     for key, original_value in original_env.items():
         if original_value is None:
