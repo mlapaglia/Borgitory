@@ -19,7 +19,7 @@ env:
   IMAGE_NAME: mlapaglia/borgitory
 
 jobs:
-  build-test-image:
+  build-docker-test-image:
     runs-on: ubuntu-latest
     
     steps:
@@ -43,7 +43,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    needs: build-test-image
+    needs: build-docker-test-image
     
     steps:
     - name: Checkout repository
@@ -69,7 +69,7 @@ jobs:
 
   mypy:
     runs-on: ubuntu-latest
-    needs: build-test-image
+    needs: build-docker-test-image
     
     steps:
     - name: Checkout repository
@@ -95,7 +95,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: build-test-image
+    needs: build-docker-test-image
     
     steps:
     - name: Checkout repository
@@ -141,6 +141,7 @@ jobs:
 
   build-python-production-package:
     runs-on: ubuntu-latest
+    needs: [lint, mypy, test]
     
     steps:
     - name: Checkout repository
