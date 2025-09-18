@@ -1,9 +1,10 @@
 # Borgitory
 
 [![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
-[![build](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/release.yml)](https://github.com/mlapaglia/Borgitory/actions/workflows/release.yml)
-[![sponsors](https://img.shields.io/github/sponsors/mlapaglia)](https://github.com/sponsors/mlapaglia)
-[![sponsors](https://img.shields.io/docker/pulls/mlapaglia/borgitory)](https://hub.docker.com/r/mlapaglia/borgitory)
+[![build](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/build.yml?logo=github)](https://github.com/mlapaglia/Borgitory/actions/workflows/release.yml)
+[![sponsors](https://img.shields.io/github/sponsors/mlapaglia?logo=githubsponsors)](https://github.com/sponsors/mlapaglia)
+[![docker pulls](https://img.shields.io/docker/pulls/mlapaglia/borgitory?logo=docker)](https://hub.docker.com/r/mlapaglia/borgitory)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/borgitory?style=flat&logo=pypi&logoColor=%23ffd343&label=PyPi%20Downloads&labelColor=%23ffd343&link=https%3A%2F%2Fpypi.org%2Fproject%2Fborgitory%2F)](https://pypi.org/project/borgitory/)
 
 <img alt="borgitory logo" src="./assets/logo.png" width="400">
 
