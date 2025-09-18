@@ -4,11 +4,9 @@ Command-line interface for Borgitory
 """
 
 import sys
-import os
 import subprocess
 import argparse
 import logging
-from typing import NoReturn
 import uvicorn
 from dotenv import load_dotenv
 
@@ -26,7 +24,7 @@ def setup_logging(verbose: bool = False) -> None:
 def run_migrations() -> bool:
     """Run database migrations before starting the app."""
     print("Running database migrations...")
-    
+
     try:
         # Run alembic upgrade head
         subprocess.run(
@@ -53,22 +51,18 @@ def start_server(
     port: int = 8000,
     reload: bool = False,
     log_level: str = "info",
-) -> NoReturn:
+) -> None:
     """Start the Borgitory web server."""
     load_dotenv()
-    
+
     # Run migrations first
     if not run_migrations():
         print("Exiting due to migration failure")
         sys.exit(1)
-    
+
     print(f"Starting Borgitory server on {host}:{port}")
     uvicorn.run(
-        "borgitory.main:app",
-        host=host,
-        port=port,
-        reload=reload,
-        log_level=log_level
+        "borgitory.main:app", host=host, port=port, reload=reload, log_level=log_level
     )
 
 
@@ -76,59 +70,43 @@ def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         description="Borgitory - Web-based BorgBackup management interface",
-        prog="borgitory"
+        prog="borgitory",
     )
+    parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
     parser.add_argument(
-        "--version", 
-        action="version", 
-        version="%(prog)s 1.0.0"
+        "--verbose", "-v", action="store_true", help="Enable verbose logging"
     )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Enable verbose logging"
-    )
-    
+
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
+
     # Server command
     server_parser = subparsers.add_parser("serve", help="Start the web server")
     server_parser.add_argument(
-        "--host",
-        default="0.0.0.0",
-        help="Host to bind to (default: 0.0.0.0)"
+        "--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)"
     )
     server_parser.add_argument(
-        "--port", "-p",
-        type=int,
-        default=8000,
-        help="Port to bind to (default: 8000)"
+        "--port", "-p", type=int, default=8000, help="Port to bind to (default: 8000)"
     )
     server_parser.add_argument(
-        "--reload",
-        action="store_true",
-        help="Enable auto-reload for development"
+        "--reload", action="store_true", help="Enable auto-reload for development"
     )
     server_parser.add_argument(
         "--log-level",
         choices=["critical", "error", "warning", "info", "debug"],
         default="info",
-        help="Log level (default: info)"
+        help="Log level (default: info)",
     )
-    
+
     # Migration command
-    migrate_parser = subparsers.add_parser("migrate", help="Run database migrations")
-    
+    subparsers.add_parser("migrate", help="Run database migrations")
+
     args = parser.parse_args()
-    
+
     setup_logging(args.verbose)
-    
+
     if args.command == "serve":
         start_server(
-            host=args.host,
-            port=args.port,
-            reload=args.reload,
-            log_level=args.log_level
+            host=args.host, port=args.port, reload=args.reload, log_level=args.log_level
         )
     elif args.command == "migrate":
         if run_migrations():
