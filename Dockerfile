@@ -1,6 +1,10 @@
+ARG VERSION
+ARG BORGBACKUP_VERSION=1.4.0-5
+ARG RCLONE_VERSION=1.60.1+dfsg-4
+ARG FUSE3_VERSION=3.17.2-3
+
 FROM python:3.13.7-slim-trixie AS builder
 
-ARG VERSION
 ENV BORGITORY_VERSION=${VERSION}
 
 WORKDIR /app
@@ -8,7 +12,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     pkg-config \
-    libfuse3-dev=3.17.2-3 \
+    libfuse3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml LICENSE README.md MANIFEST.in ./
@@ -21,14 +25,18 @@ RUN pip install --upgrade pip && \
 
 FROM python:3.13.7-slim-trixie AS test
 
+ARG VERSION
+ARG BORGBACKUP_VERSION
+ARG RCLONE_VERSION
+ARG FUSE3_VERSION
 ENV BORGITORY_VERSION=${VERSION}
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    rclone=1.60.1+dfsg-4 \
-    borgbackup=1.4.0-5 \
-    fuse3=3.17.2-3 \
+    rclone=${RCLONE_VERSION} \
+    borgbackup=${BORGBACKUP_VERSION} \
+    fuse3=${FUSE3_VERSION} \
     python3-pyfuse3=3.4.0-3+b3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -47,13 +55,17 @@ CMD ["pytest"]
 
 FROM python:3.13.7-slim-trixie
 
+ARG VERSION
+ARG BORGBACKUP_VERSION
+ARG RCLONE_VERSION
+ARG FUSE3_VERSION
 ENV BORGITORY_VERSION=${VERSION}
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    rclone=1.60.1+dfsg-4 \
-    borgbackup=1.4.0-5 \
-    fuse3=3.17.2-3 \
+    rclone=${RCLONE_VERSION} \
+    borgbackup=${BORGBACKUP_VERSION} \
+    fuse3=${FUSE3_VERSION} \
     python3-pyfuse3=3.4.0-3+b3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \

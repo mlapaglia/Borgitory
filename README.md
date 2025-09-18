@@ -1,9 +1,14 @@
-# Borgitory
 
+# Borgitory
 [![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
-[![build](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/release.yml)](https://github.com/mlapaglia/Borgitory/actions/workflows/release.yml)
-[![sponsors](https://img.shields.io/github/sponsors/mlapaglia)](https://github.com/sponsors/mlapaglia)
-[![sponsors](https://img.shields.io/docker/pulls/mlapaglia/borgitory)](https://hub.docker.com/r/mlapaglia/borgitory)
+[![build](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/build.yml?logo=github)](https://github.com/mlapaglia/Borgitory/actions/workflows/release.yml)
+[![sponsors](https://img.shields.io/github/sponsors/mlapaglia?logo=githubsponsors)](https://github.com/sponsors/mlapaglia)
+[![docker pulls](https://img.shields.io/docker/pulls/mlapaglia/borgitory?logo=docker&label=pulls)](https://hub.docker.com/r/mlapaglia/borgitory)
+[![pypi downloads](https://img.shields.io/pypi/dm/borgitory?style=flat&logo=pypi&logoColor=%23ffd343&label=downloads&labelColor=%23ffd343&link=https%3A%2F%2Fpypi.org%2Fproject%2Fborgitory%2F)](https://pypi.org/project/borgitory/)
+
+[![borgbackup version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmlapaglia%2FBorgitory%2Frefs%2Fheads%2Fmain%2FDockerfile&search=ARG%20BORGBACKUP_VERSION%3D(.%2B)&replace=%241&logo=borgbackup&label=BorgBackup)](https://borgbackup.readthedocs.io/)
+[![rclone version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmlapaglia%2FBorgitory%2Frefs%2Fheads%2Fmain%2FDockerfile&search=ARG%20RCLONE_VERSION%3D(.%2B)&replace=%241&logo=rclone&label=Rclone)](https://rclone.org/)
+[![fuse3 version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmlapaglia%2FBorgitory%2Frefs%2Fheads%2Fmain%2FDockerfile&search=ARG%20FUSE3_VERSION%3D(.%2B)&replace=%241&logo=python&label=pfuse3)](https://github.com/libfuse/libfuse)
 
 <img alt="borgitory logo" src="./assets/logo.png" width="400">
 
@@ -43,9 +48,6 @@ Install Borgitory directly from PyPI:
 ```bash
 # Install stable release from PyPI
 pip install borgitory
-
-# Or install pre-release from TestPyPI (for testing new features)
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ borgitory
 
 # Start the server
 borgitory serve
