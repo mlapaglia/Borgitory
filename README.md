@@ -5,6 +5,7 @@
 [![sponsors](https://img.shields.io/github/sponsors/mlapaglia?logo=githubsponsors)](https://github.com/sponsors/mlapaglia)
 [![docker pulls](https://img.shields.io/docker/pulls/mlapaglia/borgitory?logo=docker&label=pulls)](https://hub.docker.com/r/mlapaglia/borgitory)
 [![pypi downloads](https://img.shields.io/pypi/dm/borgitory?style=flat&logo=pypi&logoColor=%23ffd343&label=downloads&labelColor=%23ffd343&link=https%3A%2F%2Fpypi.org%2Fproject%2Fborgitory%2F)](https://pypi.org/project/borgitory/)
+[![Read the Docs](https://img.shields.io/readthedocs/borgitory?logo=readthedocs)](https://borgitory.com)
 
 [![borgbackup version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmlapaglia%2FBorgitory%2Frefs%2Fheads%2Fmain%2FDockerfile&search=ARG%20BORGBACKUP_VERSION%3D(.%2B)&replace=%241&logo=borgbackup&label=BorgBackup)](https://borgbackup.readthedocs.io/)
 [![rclone version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmlapaglia%2FBorgitory%2Frefs%2Fheads%2Fmain%2FDockerfile&search=ARG%20RCLONE_VERSION%3D(.%2B)&replace=%241&logo=rclone&label=Rclone)](https://rclone.org/)
