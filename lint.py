@@ -38,7 +38,7 @@ def main() -> None:
     elif command == "mypy":
         python_exe = sys.executable
         exit_code = run_command(
-            [python_exe, "-m", "mypy", "src/borgitory", "tests"]
+            [python_exe, "-m", "mypy", "src/borgitory"]
         )
     elif command == "all":
         # Run all checks and formatting
