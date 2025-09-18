@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 
-def run_migrations():
+def run_migrations() -> bool:
     """Run database migrations before starting the app"""
     print("Running database migrations...")
 

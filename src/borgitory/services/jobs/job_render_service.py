@@ -19,7 +19,13 @@ class JobRenderService:
         job_manager: JobManager,
         templates_dir: str = "src/borgitory/templates",
     ) -> None:
-        self.templates = Jinja2Templates(directory=templates_dir)
+        # Use dependency injection if templates_dir is the default
+        if templates_dir == "src/borgitory/templates":
+            from borgitory.dependencies import get_templates
+
+            self.templates = get_templates()
+        else:
+            self.templates = Jinja2Templates(directory=templates_dir)
         self.job_manager = job_manager
 
     def render_jobs_html(self, db: Session, expand: str = "") -> str:

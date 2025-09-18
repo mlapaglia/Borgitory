@@ -36,7 +36,7 @@ target_metadata = Base.metadata
 # ... etc.
 
 
-def get_database_url():
+def get_database_url() -> str:
     """Get database URL, preferring environment variable over config."""
     # For local development, use local-data path if the file exists
     local_db_path = "local-data/borgitory.db"

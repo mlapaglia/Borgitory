@@ -10,7 +10,6 @@ from fastapi import (
     Request,
 )
 from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, User, get_db
@@ -23,6 +22,7 @@ from borgitory.dependencies import (
     BorgServiceDep,
     VolumeServiceDep,
     RepositoryServiceDep,
+    get_templates,
 )
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
@@ -50,7 +50,7 @@ from starlette.templating import _TemplateResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-templates = Jinja2Templates(directory="src/borgitory/templates")
+templates = get_templates()
 
 
 @router.post("/")

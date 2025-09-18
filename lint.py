@@ -37,9 +37,7 @@ def main() -> None:
         exit_code = run_command(["ruff", "format"])
     elif command == "mypy":
         python_exe = sys.executable
-        exit_code = run_command(
-            [python_exe, "-m", "mypy", "src/borgitory"]
-        )
+        exit_code = run_command([python_exe, "-m", "mypy", "src/borgitory"])
     elif command == "all":
         # Run all checks and formatting
         print("Running ruff check...")

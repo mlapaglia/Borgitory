@@ -31,9 +31,38 @@ A comprehensive web-based management interface for BorgBackup repositories with 
 
 ### Prerequisites
 
-- Docker (Docker Compose optional but recommended)
+- **Docker Installation (Recommended)**: Docker with Docker Compose for containerized deployment
+- **PyPI Installation**: Python 3.11+ for direct installation from PyPI
 
 ### Installation
+
+#### Option 1: PyPI Installation (New!)
+
+Install Borgitory directly from PyPI:
+
+```bash
+# Install stable release from PyPI
+pip install borgitory
+
+# Or install pre-release from TestPyPI (for testing new features)
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ borgitory
+
+# Start the server
+borgitory serve
+
+# Or run with custom settings
+borgitory serve --host 0.0.0.0 --port 8000
+```
+
+**PyPI Installation Requirements:**
+
+- Python 3.11 or higher
+- BorgBackup installed and available in PATH
+- Rclone (optional, for cloud sync features)
+
+**Note**: Pre-release versions are published to [TestPyPI](https://test.pypi.org/project/borgitory/) for testing before stable release.
+
+#### Option 2: Docker Installation
 
 1. **Pull and run the Docker image**
 
@@ -79,55 +108,6 @@ A comprehensive web-based management interface for BorgBackup repositories with 
    - Create your first admin account on initial setup
 
 **Docker Hub**: Available at [mlapaglia/borgitory](https://hub.docker.com/r/mlapaglia/borgitory)
-
-### Development Setup
-
-1. **Set up Python virtual environment**
-
-   ```bash
-   # Create virtual environment
-   python -m venv .env_borg
-   
-   # Activate virtual environment
-   # On Windows:
-   .env_borg\Scripts\activate
-   # On macOS/Linux:
-   source .env_borg/bin/activate
-   ```
-
-2. **Install Python dependencies**
-
-   ```bash
-   # Install runtime dependencies only
-   pip install -e .
-   
-   # Install with development dependencies (testing, linting, etc.)
-   pip install -e .[dev]
-   ```
-
-   > **Note**: This project uses modern Python packaging with `pyproject.toml` following PEP 518 standards. All dependencies and project metadata are defined in a single configuration file.
-
-3. **Install Rclone** (for cloud sync)
-
-   ```bash
-   # On Ubuntu/Debian
-   curl https://rclone.org/install.sh | sudo bash
-   
-   # On macOS
-   brew install rclone
-   ```
-
-4. **Run development server**
-
-   ```bash
-   python run.py
-   ```
-
-5. **Run tests**
-
-   ```bash
-   pytest
-   ```
 
 ### Docker Volumes
 
@@ -331,3 +311,58 @@ docker logs <container-id>
 ### Adding additional cloud destinations
 
 - Refer to [CLOUD_PROVIDERS.md](https://github.com/mlapaglia/borgitory/blob/main/CLOUD_PROVIDERS.md) for adding additional cloud destinations.
+
+### Development Setup
+
+1. **Set up Python virtual environment**
+
+   ```bash
+   # Create virtual environment
+   python -m venv .env_borg
+   
+   # Activate virtual environment
+   # On Windows:
+   .env_borg\Scripts\activate
+   # On macOS/Linux:
+   source .env_borg/bin/activate
+   ```
+
+2. **Install Python dependencies**
+
+   ```bash
+   # Install runtime dependencies only
+   pip install -e .
+   
+   # Install with development dependencies (testing, linting, etc.)
+   pip install -e .[dev]
+   
+   # Or install stable release from PyPI for testing
+   pip install borgitory
+   
+   # Or install pre-release from TestPyPI for testing new features
+   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ borgitory
+   ```
+
+   > **Note**: This project uses modern Python packaging with `pyproject.toml` following PEP 518 standards and is available on PyPI. All dependencies and project metadata are defined in a single configuration file.
+
+3. **Install Rclone** (for cloud sync)
+
+   ```bash
+   # On Ubuntu/Debian
+   curl https://rclone.org/install.sh | sudo bash
+   
+   # On macOS
+   brew install rclone
+   ```
+
+4. **Run development server**
+
+   ```bash
+   python run.py
+   ```
+
+5. **Run tests**
+
+   ```bash
+   pytest
+   ```

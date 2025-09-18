@@ -4,20 +4,83 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   REGISTRY: docker.io
   IMAGE_NAME: mlapaglia/borgitory
 
 jobs:
-  docker-release:
+  prepare-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+    
+    steps:
+    - name: Extract version
+      id: version
+      run: |
+        VERSION=${{ github.event.release.tag_name }}
+        # Remove 'v' prefix if present
+        VERSION=${VERSION#v}
+        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Extracted version: ${VERSION}"
+
+  pypi-release:
+    runs-on: ubuntu-latest
+    needs: prepare-release
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
+      with:
+        fetch-depth: 1
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Update pyproject.toml version
+      uses: jacobtomlinson/gha-find-replace@v3
+      with:
+        find: 'version = ".*"'
+        replace: 'version = "${{ needs.prepare-release.outputs.version }}"'
+        regex: true
+        include: "pyproject.toml"
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install build
+
+    - name: Build package
+      run: python -m build
+
+    - name: Publish to PyPI
+      if: github.event.release.prerelease == false
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        print-hash: true
+
+    - name: Publish to TestPyPI
+      if: github.event.release.prerelease == true
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        print-hash: true
+
+  docker-release:
+    runs-on: ubuntu-latest
+    needs: prepare-release
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 1
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -29,33 +92,13 @@ jobs:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
-    - name: Extract version and determine release type
-      id: version
-      run: |
-        VERSION=${{ github.event.release.tag_name }}
-        # Remove 'v' prefix if present
-        VERSION=${VERSION#v}
-        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-        echo "Extracted version: ${VERSION}"
-        
-        # Check if version contains prerelease indicators OR if GitHub release is marked as prerelease
-        if [[ "$VERSION" =~ (alpha|beta|rc|dev|pre) ]] || [ "${{ github.event.release.prerelease }}" == "true" ]; then
-          echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
-          echo "PRERELEASE_TAG=alpha" >> $GITHUB_OUTPUT
-          echo "This is a prerelease (detected from version string or GitHub flag)"
-        else
-          echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
-          echo "PRERELEASE_TAG=" >> $GITHUB_OUTPUT
-          echo "This is a stable release"
-        fi
-
     - name: Update pyproject.toml version
-      run: |
-        VERSION=${{ steps.version.outputs.VERSION }}
-        echo "Updating pyproject.toml version to: ${VERSION}"
-        sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
-        echo "Updated pyproject.toml:"
-        grep "^version = " pyproject.toml
+      uses: jacobtomlinson/gha-find-replace@v3
+      with:
+        find: 'version = ".*"'
+        replace: 'version = "${{ needs.prepare-release.outputs.version }}"'
+        regex: true
+        include: "pyproject.toml"
 
     - name: Extract metadata
       id: meta
@@ -64,15 +107,15 @@ jobs:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
           # For stable releases: tag with version and latest
-          type=raw,value=${{ steps.version.outputs.VERSION }},enable=${{ steps.version.outputs.IS_PRERELEASE == 'false' }}
-          type=raw,value=latest,enable=${{ steps.version.outputs.IS_PRERELEASE == 'false' }}
-          # For prereleases: tag with exact version (already contains alpha/beta/etc) and alpha
-          type=raw,value=${{ steps.version.outputs.VERSION }},enable=${{ steps.version.outputs.IS_PRERELEASE == 'true' }}
-          type=raw,value=alpha,enable=${{ steps.version.outputs.IS_PRERELEASE == 'true' }}
+          type=raw,value=${{ needs.prepare-release.outputs.version }},enable=${{ github.event.release.prerelease == false }}
+          type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+          # For prereleases: tag with exact version and alpha
+          type=raw,value=${{ needs.prepare-release.outputs.version }},enable=${{ github.event.release.prerelease == true }}
+          type=raw,value=alpha,enable=${{ github.event.release.prerelease == true }}
         labels: |
           org.opencontainers.image.title=Borgitory
-          org.opencontainers.image.description=BorgBackup Manager with Web UI
-          org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+          org.opencontainers.image.description=A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities
+          org.opencontainers.image.version=${{ needs.prepare-release.outputs.version }}
           org.opencontainers.image.url=https://github.com/mlapaglia/borgitory
           org.opencontainers.image.source=https://github.com/mlapaglia/borgitory
           org.opencontainers.image.vendor=mlapaglia
@@ -89,10 +132,11 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         build-args: |
-          VERSION=${{ steps.version.outputs.VERSION }}
-          BORGITORY_VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION=${{ needs.prepare-release.outputs.version }}
+          BORGITORY_VERSION=${{ needs.prepare-release.outputs.version }}
 
     - name: Update Docker Hub description
+      if: always()
       uses: peter-evans/dockerhub-description@v4
       with:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}

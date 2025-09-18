@@ -1,15 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
 import asyncio
 from typing import Dict, Any, AsyncGenerator
 
 from borgitory.models.database import get_db, Repository
-from borgitory.dependencies import RepositoryStatsServiceDep
+from borgitory.dependencies import RepositoryStatsServiceDep, get_templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="src/borgitory/templates")
+templates = get_templates()
 
 
 @router.get("/stats/selector")
@@ -161,7 +160,7 @@ async def get_repository_statistics_html(
 ) -> HTMLResponse:
     """Get repository statistics as HTML partial"""
 
-    templates = Jinja2Templates(directory="src/borgitory/templates")
+    templates = get_templates()
 
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
     if not repository:
