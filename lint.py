@@ -36,8 +36,9 @@ def main() -> None:
     elif command == "format":
         exit_code = run_command(["ruff", "format"])
     elif command == "mypy":
+        python_exe = sys.executable
         exit_code = run_command(
-            [".env_borg\\Scripts\\python.exe", "-m", "mypy", "src/borgitory", "tests"]
+            [python_exe, "-m", "mypy", "src/borgitory", "tests"]
         )
     elif command == "all":
         # Run all checks and formatting
@@ -50,9 +51,10 @@ def main() -> None:
             print("Running mypy type checking...")
             env = os.environ.copy()
             env["PYTHONPATH"] = "src"
+            python_exe = sys.executable
             exit_code = run_command(
                 [
-                    ".env_borg\\Scripts\\python.exe",
+                    python_exe,
                     "-m",
                     "mypy",
                     "src/borgitory",
