@@ -2,14 +2,14 @@ import json
 import logging
 import os
 import re
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
-from borgitory.models.database import get_db
+from borgitory.models.database import get_db, CloudSyncConfig
 from borgitory.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
@@ -27,7 +27,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _get_supported_providers(registry: ProviderRegistryDep) -> List[dict]:
+def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, Any]]:
     """Get supported providers from the registry."""
     provider_info = registry.get_all_provider_info()
     supported_providers = []
@@ -97,8 +97,8 @@ def _get_submit_button_text(
 
 
 def _get_provider_display_details(
-    registry: ProviderRegistryDep, provider: str, provider_config: dict
-) -> dict:
+    registry: ProviderRegistryDep, provider: str, provider_config: Dict[str, Any]
+) -> Dict[str, Any]:
     """Get provider display details using registry and storage classes"""
     try:
         storage_class = registry.get_storage_class(provider)
@@ -108,7 +108,8 @@ def _get_provider_display_details(
             temp_storage = storage_class(
                 None, None
             )  # rclone_service and config not needed
-            return temp_storage.get_display_details(provider_config)
+            result = temp_storage.get_display_details(provider_config)
+            return result  # type: ignore
     except Exception as e:
         logger.warning(f"Error getting display details for provider '{provider}': {e}")
 
@@ -119,7 +120,7 @@ def _get_provider_display_details(
     return {"provider_name": provider_name, "provider_details": provider_details}
 
 
-def _parse_form_data_to_config(form_data: dict) -> CloudSyncConfigCreate:
+def _parse_form_data_to_config(form_data: Dict[str, Any]) -> CloudSyncConfigCreate:
     """Parse form data with bracket notation into CloudSyncConfigCreate object"""
     provider_config = {}
     regular_fields = {}
@@ -141,7 +142,9 @@ def _parse_form_data_to_config(form_data: dict) -> CloudSyncConfigCreate:
     )
 
 
-def _parse_form_data_to_config_update(form_data: dict) -> CloudSyncConfigUpdate:
+def _parse_form_data_to_config_update(
+    form_data: Dict[str, Any],
+) -> CloudSyncConfigUpdate:
     """Parse form data with bracket notation into CloudSyncConfigUpdate object"""
     provider_config = {}
     regular_fields = {}
@@ -227,8 +230,8 @@ async def create_cloud_sync_config(
     """Create a new cloud sync configuration"""
     try:
         form_data = await request.form()
-        form_data = dict(form_data)
-        config = _parse_form_data_to_config(form_data)
+        form_dict = dict(form_data)
+        config = _parse_form_data_to_config(form_dict)
 
         cloud_sync_service.create_cloud_sync_config(config)
 
@@ -306,7 +309,7 @@ def get_cloud_sync_configs_html(
 @router.get("/", response_model=List[CloudSyncConfigSchema])
 def list_cloud_sync_configs(
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
-) -> List:
+) -> List[Any]:
     """List all cloud sync configurations"""
     return cloud_sync_service.get_cloud_sync_configs()
 
@@ -315,7 +318,7 @@ def list_cloud_sync_configs(
 def get_cloud_sync_config(
     config_id: int,
     cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
-) -> CloudSyncConfigSchema:
+) -> CloudSyncConfig:
     """Get a specific cloud sync configuration"""
     return cloud_sync_service.get_cloud_sync_config_by_id(config_id)
 
@@ -370,8 +373,8 @@ async def update_cloud_sync_config(
     """Update a cloud sync configuration"""
     try:
         form_data = await request.form()
-        form_data = dict(form_data)
-        config_update = _parse_form_data_to_config_update(form_data)
+        form_dict = dict(form_data)
+        config_update = _parse_form_data_to_config_update(form_dict)
 
         result = cloud_sync_service.update_cloud_sync_config(config_id, config_update)
 
@@ -553,6 +556,6 @@ def disable_cloud_sync_config(
 
 
 @router.get("/providers")
-def get_supported_providers(registry: ProviderRegistryDep) -> List[dict]:
+def get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, Any]]:
     """Get list of supported cloud providers from the registry."""
     return _get_supported_providers(registry)

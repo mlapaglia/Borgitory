@@ -5,7 +5,7 @@ ArchiveManager - Handles Borg archive operations and content management
 import asyncio
 import json
 import logging
-from typing import Dict, List, Optional, AsyncGenerator
+from typing import Dict, List, Optional, AsyncGenerator, Any
 
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -37,7 +37,7 @@ class ArchiveManager:
 
     async def list_archive_contents(
         self, repository: Repository, archive_name: str
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """List contents of a specific archive"""
         try:
             command, env = self.command_builder.build_list_archive_contents_command(
@@ -81,7 +81,7 @@ class ArchiveManager:
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """List contents of a specific directory within an archive using FUSE mount"""
         logger.info(
             f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
@@ -105,8 +105,8 @@ class ArchiveManager:
         return contents
 
     def _filter_directory_contents(
-        self, all_entries: List[Dict], target_path: str = ""
-    ) -> List[Dict]:
+        self, all_entries: List[Dict[str, Any]], target_path: str = ""
+    ) -> List[Dict[str, Any]]:
         """Filter entries to show only immediate children of target_path"""
         target_path = target_path.strip().strip("/")
 
@@ -209,6 +209,8 @@ class ArchiveManager:
         try:
             while True:
                 # Read chunk from Borg process - this already yields control to event loop
+                if not process.stdout:
+                    break
                 chunk = await process.stdout.read(65536)  # 64KB chunks for efficiency
                 if not chunk:
                     break
@@ -220,7 +222,7 @@ class ArchiveManager:
             return_code = await process.wait()
             if return_code != 0:
                 # Read any error messages
-                stderr_data = await process.stderr.read()
+                stderr_data = await process.stderr.read() if process.stderr else b""
                 error_msg = stderr_data.decode("utf-8", errors="replace")
                 raise Exception(
                     f"Borg extract failed with code {return_code}: {error_msg}"
@@ -239,7 +241,7 @@ class ArchiveManager:
 
     async def get_archive_metadata(
         self, repository: Repository, archive_name: str
-    ) -> Optional[Dict[str, any]]:
+    ) -> Optional[Dict[str, Any]]:
         """Get metadata for a specific archive"""
         try:
             # Get repository info which includes archive information
@@ -258,7 +260,7 @@ class ArchiveManager:
                     # Find the specific archive
                     for archive in archives:
                         if archive.get("name") == archive_name:
-                            return archive
+                            return archive  # type: ignore
 
                     return None  # Archive not found
                 except json.JSONDecodeError:
@@ -278,7 +280,7 @@ class ArchiveManager:
             return None
 
     def calculate_directory_size(
-        self, entries: List[Dict], directory_path: str = ""
+        self, entries: List[Dict[str, Any]], directory_path: str = ""
     ) -> int:
         """Calculate the total size of all files in a directory path"""
         total_size = 0
@@ -302,8 +304,8 @@ class ArchiveManager:
         return total_size
 
     def find_entries_by_pattern(
-        self, entries: List[Dict], pattern: str, case_sensitive: bool = False
-    ) -> List[Dict]:
+        self, entries: List[Dict[str, Any]], pattern: str, case_sensitive: bool = False
+    ) -> List[Dict[str, Any]]:
         """Find archive entries matching a pattern"""
         import re
 
@@ -325,9 +327,9 @@ class ArchiveManager:
 
         return matching_entries
 
-    def get_file_type_summary(self, entries: List[Dict]) -> Dict[str, int]:
+    def get_file_type_summary(self, entries: List[Dict[str, Any]]) -> Dict[str, int]:
         """Get a summary of file types in the archive"""
-        type_counts = {}
+        type_counts: Dict[str, int] = {}
 
         for entry in entries:
             if entry.get("type") == "d":

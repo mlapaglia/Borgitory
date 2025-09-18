@@ -3,7 +3,7 @@ Pushover notification service for sending backup status notifications
 """
 
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 import aiohttp
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,9 @@ class PushoverService:
             sound="siren",  # Alert sound for failures
         )
 
-    async def test_pushover_connection(self, user_key: str, app_token: str) -> dict:
+    async def test_pushover_connection(
+        self, user_key: str, app_token: str
+    ) -> Dict[str, Any]:
         """Test Pushover connection and validate credentials"""
         try:
             success = await self.send_notification(

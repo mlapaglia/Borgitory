@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 import os
 import time
-from typing import AsyncGenerator, Dict, Optional, Callable, Any
+from typing import AsyncGenerator, Dict, Optional, Callable, Any, List
 
 from borgitory.models.database import Repository
 
@@ -22,7 +22,7 @@ class RcloneService:
         region: str = "us-east-1",
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
-    ) -> list:
+    ) -> List[str]:
         """Build S3 configuration flags for rclone command"""
         flags = [
             "--s3-access-key-id",
@@ -53,7 +53,7 @@ class RcloneService:
         region: str = "us-east-1",
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
-    ) -> AsyncGenerator[Dict, None]:
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
 
         # Build S3 path
@@ -86,7 +86,9 @@ class RcloneService:
 
             yield {"type": "started", "command": " ".join(command), "pid": process.pid}
 
-            async def read_stream(stream, stream_type):
+            async def read_stream(
+                stream: Any, stream_type: str
+            ) -> AsyncGenerator[Dict[str, Any], None]:
                 while True:
                     line = await stream.readline()
                     if not line:
@@ -129,7 +131,7 @@ class RcloneService:
         region: str = "us-east-1",
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """Test S3 connection by checking bucket access"""
         try:
             s3_path = f":s3:{bucket_name}"
@@ -206,7 +208,7 @@ class RcloneService:
 
     async def _test_s3_write_permissions(
         self, access_key_id: str, secret_access_key: str, bucket_name: str
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """Test write permissions by creating and deleting a small test file"""
         try:
             from datetime import datetime
@@ -269,7 +271,7 @@ class RcloneService:
         except Exception as e:
             return {"status": "failed", "message": f"Write test failed: {str(e)}"}
 
-    def parse_rclone_progress(self, line: str) -> Optional[Dict]:
+    def parse_rclone_progress(self, line: str) -> Optional[Dict[str, Any]]:
         """Parse Rclone progress output"""
         # Look for progress statistics
         if "Transferred:" in line:
@@ -308,9 +310,9 @@ class RcloneService:
         host: str,
         username: str,
         port: int = 22,
-        password: str = None,
-        private_key: str = None,
-    ) -> list:
+        password: Optional[str] = None,
+        private_key: Optional[str] = None,
+    ) -> List[str]:
         """Build SFTP configuration flags for rclone command"""
         flags = ["--sftp-host", host, "--sftp-user", username, "--sftp-port", str(port)]
 
@@ -357,10 +359,10 @@ class RcloneService:
         username: str,
         remote_path: str,
         port: int = 22,
-        password: str = None,
-        private_key: str = None,
+        password: Optional[str] = None,
+        private_key: Optional[str] = None,
         path_prefix: str = "",
-    ) -> AsyncGenerator[Dict, None]:
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """Sync a Borg repository to SFTP using Rclone with SFTP backend"""
 
         # Build SFTP path
@@ -403,7 +405,9 @@ class RcloneService:
                 "pid": process.pid,
             }
 
-            async def read_stream(stream, stream_type):
+            async def read_stream(
+                stream: Any, stream_type: str
+            ) -> AsyncGenerator[Dict[str, Any], None]:
                 while True:
                     line = await stream.readline()
                     if not line:
@@ -450,9 +454,9 @@ class RcloneService:
         username: str,
         remote_path: str,
         port: int = 22,
-        password: str = None,
-        private_key: str = None,
-    ) -> Dict:
+        password: Optional[str] = None,
+        private_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Test SFTP connection by listing remote directory"""
         key_file_path = None
         try:
@@ -551,9 +555,9 @@ class RcloneService:
         username: str,
         remote_path: str,
         port: int = 22,
-        password: str = None,
-        private_key: str = None,
-    ) -> Dict:
+        password: Optional[str] = None,
+        private_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Test write permissions by creating and deleting a small test file"""
         key_file_path = None
         temp_file_path = None
@@ -633,12 +637,16 @@ class RcloneService:
                 except OSError:
                     pass
 
-    async def _merge_async_generators(self, *async_generators):
+    async def _merge_async_generators(
+        self, *async_generators: AsyncGenerator[Any, None]
+    ) -> AsyncGenerator[Any, None]:
         """Merge multiple async generators into one"""
         tasks = []
         for gen in async_generators:
 
-            async def wrapper(g):
+            async def wrapper(
+                g: AsyncGenerator[Any, None],
+            ) -> AsyncGenerator[Any, None]:
                 async for item in g:
                     yield item
 
@@ -677,12 +685,12 @@ class RcloneService:
                 mock_repo = Repository()
                 mock_repo.path = source_path
 
-                stats = {}
+                stats: Dict[str, Any] = {}
                 async for progress_data in self.sync_repository_to_s3(
                     repository=mock_repo,
-                    access_key_id=access_key_id,
-                    secret_access_key=secret_access_key,
-                    bucket_name=bucket_name,
+                    access_key_id=str(access_key_id),
+                    secret_access_key=str(secret_access_key),
+                    bucket_name=str(bucket_name),
                     path_prefix=path_prefix,
                 ):
                     if progress_callback:
@@ -732,11 +740,11 @@ class RcloneService:
                 mock_repo = Repository()
                 mock_repo.path = source_path
 
-                stats = {}
+                sftp_stats: Dict[str, Any] = {}
                 async for progress_data in self.sync_repository_to_sftp(
                     repository=mock_repo,
-                    host=host,
-                    username=username,
+                    host=str(host),
+                    username=str(username),
                     remote_path=remote_path.replace(
                         f"{config.get('remote_name', '')}:", ""
                     ),
@@ -750,14 +758,14 @@ class RcloneService:
 
                     if progress_data.get("type") == "completed":
                         if progress_data.get("status") == "success":
-                            return {"success": True, "stats": stats}
+                            return {"success": True, "stats": sftp_stats}
                         else:
                             return {
                                 "success": False,
                                 "error": f"Rclone process failed with return code {progress_data.get('return_code')}",
                             }
                     elif progress_data.get("type") == "progress":
-                        stats.update(progress_data)
+                        sftp_stats.update(progress_data)
                     elif progress_data.get("type") == "error":
                         return {
                             "success": False,
@@ -792,7 +800,7 @@ class RcloneService:
         hide_special_share: bool = True,
         case_insensitive: bool = True,
         kerberos_ccache: Optional[str] = None,
-    ) -> list:
+    ) -> List[str]:
         """Build SMB configuration flags for rclone command"""
         flags = [
             "--smb-host",
@@ -844,8 +852,8 @@ class RcloneService:
         hide_special_share: bool = True,
         case_insensitive: bool = True,
         kerberos_ccache: Optional[str] = None,
-        progress_callback: Optional[Callable] = None,
-    ) -> AsyncGenerator[Dict, None]:
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """Sync a Borg repository to SMB using Rclone with SMB backend"""
 
         smb_path = f":smb:{share_name}"
@@ -891,7 +899,9 @@ class RcloneService:
                 "pid": process.pid,
             }
 
-            async def read_stream(stream, stream_type):
+            async def read_stream(
+                stream: Any, stream_type: str
+            ) -> AsyncGenerator[Dict[str, Any], None]:
                 while True:
                     line = await stream.readline()
                     if not line:
@@ -940,7 +950,7 @@ class RcloneService:
         hide_special_share: bool = True,
         case_insensitive: bool = True,
         kerberos_ccache: Optional[str] = None,
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """Test SMB connection by listing share contents"""
         try:
             smb_path = f":smb:{share_name}"
@@ -1046,7 +1056,7 @@ class RcloneService:
         hide_special_share: bool = True,
         case_insensitive: bool = True,
         kerberos_ccache: Optional[str] = None,
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """Test write permissions on SMB share"""
 
         temp_file = None
@@ -1126,8 +1136,8 @@ class RcloneService:
 
     # Generic dispatcher methods using registry-based mapping
     async def sync_repository_to_provider(
-        self, provider: str, repository: Repository, **provider_config
-    ) -> AsyncGenerator[Dict, None]:
+        self, provider: str, repository: Repository, **provider_config: Any
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Truly generic provider sync dispatcher using registry.
 
@@ -1157,7 +1167,7 @@ class RcloneService:
             raise ValueError(f"Rclone method '{mapping.sync_method}' not found")
 
         # Map parameters from borgitory.config to rclone method parameters
-        rclone_params = {"repository": repository}
+        rclone_params: Dict[str, Any] = {"repository": repository}
 
         # Apply parameter mapping
         for config_field, rclone_param in mapping.parameter_mapping.items():
@@ -1171,9 +1181,10 @@ class RcloneService:
                     rclone_params[rclone_param] = repository
 
         # Add optional parameters with defaults
-        for param, default_value in mapping.optional_params.items():
-            if param not in rclone_params:
-                rclone_params[param] = provider_config.get(param, default_value)
+        if mapping.optional_params:
+            for param, default_value in mapping.optional_params.items():
+                if param not in rclone_params:
+                    rclone_params[param] = provider_config.get(param, default_value)
 
         # Remove the original repository key if it was mapped to a different name
         if (
@@ -1200,7 +1211,9 @@ class RcloneService:
         async for result in sync_method(**rclone_params):
             yield result
 
-    async def test_provider_connection(self, provider: str, **provider_config) -> Dict:
+    async def test_provider_connection(
+        self, provider: str, **provider_config: Any
+    ) -> Dict[str, Any]:
         """
         Generic provider connection test dispatcher using registry.
 
@@ -1237,9 +1250,10 @@ class RcloneService:
                 rclone_params[rclone_param] = provider_config[config_field]
 
         # Add optional parameters with defaults (excluding repository and path_prefix for connection tests)
-        for param, default_value in mapping.optional_params.items():
-            if param not in ["path_prefix"] and param not in rclone_params:
-                rclone_params[param] = provider_config.get(param, default_value)
+        if mapping.optional_params:
+            for param, default_value in mapping.optional_params.items():
+                if param not in ["path_prefix"] and param not in rclone_params:
+                    rclone_params[param] = provider_config.get(param, default_value)
 
         # Validate required parameters (excluding repository for connection tests)
         test_required_params = [p for p in mapping.required_params if p != "repository"]
@@ -1250,4 +1264,5 @@ class RcloneService:
             )
 
         # Call the test method
-        return await test_method(**rclone_params)
+        result = await test_method(**rclone_params)
+        return result  # type: ignore

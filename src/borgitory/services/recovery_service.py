@@ -68,7 +68,7 @@ class RecoveryService:
 
                     # Mark job as failed
                     job.status = "failed"
-                    job.completed_at = datetime.now()
+                    job.finished_at = datetime.now()
                     job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {job.started_at})"
 
                     # Mark all running tasks as failed

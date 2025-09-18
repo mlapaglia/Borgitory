@@ -86,7 +86,7 @@ class JobStreamService:
                             else None,
                             "return_code": job.return_code,
                             "error": job.error,
-                            "progress": job.current_progress,
+                            "progress": None,
                             "command": command_display,
                         }
                     )
@@ -132,6 +132,8 @@ class JobStreamService:
                     # Stream events
                     while True:
                         try:
+                            if event_queue is None:
+                                break
                             event = await asyncio.wait_for(
                                 event_queue.get(), timeout=30.0
                             )
@@ -197,7 +199,8 @@ class JobStreamService:
                             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
                             break
                 finally:
-                    self.job_manager.unsubscribe_from_events(event_queue)
+                    if event_queue:
+                        self.job_manager.unsubscribe_from_events(event_queue)
             else:
                 # Stream regular borg job output
                 logger.info(f"Starting regular job output stream for {job_id}")
@@ -311,6 +314,8 @@ class JobStreamService:
                 # Stream live updates
                 while task.status == "running":
                     try:
+                        if event_queue is None:
+                            break
                         event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
                         logger.debug(
                             f"Task streaming received event: {event.get('type')} for job {event.get('job_id', 'unknown')}"
@@ -359,7 +364,8 @@ class JobStreamService:
                     yield f"event: complete\ndata: {task.status}\n\n"
 
             finally:
-                self.job_manager.unsubscribe_from_events(event_queue)
+                if event_queue:
+                    self.job_manager.unsubscribe_from_events(event_queue)
 
         except Exception as e:
             logger.error(
@@ -394,13 +400,6 @@ class JobStreamService:
 
                 # Calculate progress info
                 progress_info = ""
-                if borg_job.current_progress:
-                    if "files" in borg_job.current_progress:
-                        progress_info = f"Files: {borg_job.current_progress['files']}"
-                    if "transferred" in borg_job.current_progress:
-                        progress_info += (
-                            f" | {borg_job.current_progress['transferred']}"
-                        )
 
                 current_jobs.append(
                     {
@@ -408,7 +407,7 @@ class JobStreamService:
                         "type": job_type,
                         "status": borg_job.status,
                         "started_at": borg_job.started_at.strftime("%H:%M:%S"),
-                        "progress": borg_job.current_progress,
+                        "progress": None,
                         "progress_info": progress_info,
                     }
                 )
@@ -427,12 +426,10 @@ class JobStreamService:
                         "type": getattr(job, "job_type", "composite"),
                         "status": job.status,
                         "started_at": job.started_at.strftime("%H:%M:%S"),
-                        "progress": {
-                            "current_task": current_task.task_name
-                            if current_task
-                            else "Unknown",
-                            "task_progress": f"{job.current_task_index + 1}/{len(job.tasks)}",
-                        },
+                        "current_task": current_task.task_name
+                        if current_task
+                        else "Unknown",
+                        "task_progress": f"{job.current_task_index + 1}/{len(job.tasks)}",
                         "progress_info": progress_info,
                     }
                 )

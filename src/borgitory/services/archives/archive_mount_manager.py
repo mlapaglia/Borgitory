@@ -6,7 +6,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -114,14 +114,18 @@ class ArchiveMountManager:
                 try:
                     # Check if process has already exited with error
                     if process.returncode is not None:
-                        stderr_data = await process.stderr.read()
+                        stderr_data = (
+                            await process.stderr.read() if process.stderr else b""
+                        )
                         error_msg = stderr_data.decode("utf-8", errors="replace")
                         raise Exception(f"Mount failed: {error_msg}")
                     else:
                         # Process is still running but mount not ready - terminate it
                         process.terminate()
                         await asyncio.wait_for(process.wait(), timeout=5)
-                        stderr_data = await process.stderr.read()
+                        stderr_data = (
+                            await process.stderr.read() if process.stderr else b""
+                        )
                         error_msg = stderr_data.decode("utf-8", errors="replace")
                         raise Exception(f"Mount timed out: {error_msg}")
                 except asyncio.TimeoutError:
@@ -238,7 +242,7 @@ class ArchiveMountManager:
                     pass  # Directory might not be empty or have permissions issues
                 return True
             else:
-                stderr_data = await process.stderr.read()
+                stderr_data = await process.stderr.read() if process.stderr else b""
                 error_msg = stderr_data.decode("utf-8", errors="replace")
                 logger.error(f"Failed to unmount {mount_point}: {error_msg}")
                 return False
@@ -249,7 +253,7 @@ class ArchiveMountManager:
 
     def list_directory(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """List directory contents from mounted filesystem"""
         mount_key = self._get_mount_key(repository, archive_name)
 
@@ -298,7 +302,7 @@ class ArchiveMountManager:
                     continue
 
             # Sort: directories first, then files, both alphabetically
-            entries.sort(key=lambda x: (not x["is_directory"], x["name"].lower()))
+            entries.sort(key=lambda x: (not x["is_directory"], str(x["name"]).lower()))
 
             logger.info(f"Listed {len(entries)} items from {target_path}")
             return entries
@@ -352,7 +356,7 @@ class ArchiveMountManager:
 
         self.active_mounts.clear()
 
-    def get_mount_stats(self) -> Dict[str, any]:
+    def get_mount_stats(self) -> Dict[str, Any]:
         """Get statistics about active mounts"""
         return {
             "active_mounts": len(self.active_mounts),

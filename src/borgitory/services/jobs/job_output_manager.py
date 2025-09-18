@@ -27,7 +27,7 @@ class JobOutput:
     """Container for job output data"""
 
     job_id: str
-    lines: deque = field(default_factory=deque)
+    lines: deque[str] = field(default_factory=deque)
     current_progress: Dict[str, Any] = field(default_factory=dict)
     total_lines: int = 0
     max_lines: int = 1000

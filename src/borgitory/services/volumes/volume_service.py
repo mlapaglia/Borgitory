@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from borgitory.services.volumes.file_system_interface import FileSystemInterface
 from borgitory.services.volumes.os_file_system import OsFileSystem
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class VolumeService:
     """Service to discover mounted volumes under /mnt"""
 
-    def __init__(self, filesystem: FileSystemInterface = None) -> None:
+    def __init__(self, filesystem: Optional[FileSystemInterface] = None) -> None:
         self.filesystem = filesystem or OsFileSystem()
 
     async def get_mounted_volumes(self) -> List[str]:

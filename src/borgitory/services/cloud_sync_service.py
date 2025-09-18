@@ -35,14 +35,16 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
         if hasattr(storage_class, "get_sensitive_fields"):
             # Try to call it as a static method first
             try:
-                return storage_class.get_sensitive_fields(None)
+                result = storage_class.get_sensitive_fields(None)
+                return result  # type: ignore
             except TypeError:
                 # It's an instance method, so we need to create a temporary instance
                 # Since we only need the get_sensitive_fields method, we can pass None
                 # for both config and rclone_service - storage classes should handle this
                 try:
                     temp_storage = storage_class(None, None)
-                    return temp_storage.get_sensitive_fields()
+                    result = temp_storage.get_sensitive_fields()
+                    return result  # type: ignore
                 except Exception as e:
                     logger.warning(
                         f"Failed to create temp storage instance for {provider}: {e}"
@@ -70,7 +72,7 @@ class CloudSyncService:
         rclone_service: RcloneService,
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
-        get_metadata_func: Callable,
+        get_metadata_func: Callable[[], Any],
     ):
         self.db = db
         self._rclone_service = rclone_service
@@ -116,12 +118,11 @@ class CloudSyncService:
             config.provider_config, sensitive_fields
         )
 
-        db_config = CloudSyncConfig(
-            name=config.name,
-            provider=config.provider,
-            provider_config=json.dumps(encrypted_config),
-            path_prefix=config.path_prefix or "",
-        )
+        db_config = CloudSyncConfig()
+        db_config.name = config.name
+        db_config.provider = config.provider
+        db_config.provider_config = json.dumps(encrypted_config)
+        db_config.path_prefix = config.path_prefix or ""
 
         self.db.add(db_config)
         self.db.commit()
@@ -317,7 +318,7 @@ class CloudSyncService:
         try:
             result = await test_method(**filtered_params)
             logger.info(f"Test method result: {result}")
-            return result
+            return result  # type: ignore
         except Exception as e:
             logger.error(f"Error calling {test_method_name}: {e}", exc_info=True)
             raise

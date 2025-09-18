@@ -6,10 +6,11 @@ from business logic and easy testability.
 """
 
 import re
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional
 from pydantic import Field, field_validator, model_validator
 
 from borgitory.services.rclone_service import RcloneService
+from borgitory.models.database import Repository
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
@@ -75,7 +76,7 @@ class SFTPStorageConfig(CloudStorageConfig):
         return v
 
     @model_validator(mode="after")
-    def validate_auth_method(self):
+    def validate_auth_method(self) -> "SFTPStorageConfig":
         """Ensure at least one authentication method is provided"""
         if not self.password and not self.private_key:
             raise ValueError("Either password or private_key must be provided")
@@ -120,9 +121,9 @@ class SFTPStorage(CloudStorage):
 
         try:
             # Create a simple repository object with the path
-            from types import SimpleNamespace
 
-            repository_obj = SimpleNamespace(path=repository_path)
+            repository_obj = Repository()
+            repository_obj.path = repository_path
 
             async for progress in self._rclone_service.sync_repository_to_sftp(
                 repository=repository_obj,
@@ -193,7 +194,7 @@ class SFTPStorage(CloudStorage):
         """SFTP sensitive fields"""
         return ["password", "private_key"]
 
-    def get_display_details(self, config_dict: dict) -> dict:
+    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
         """Get SFTP-specific display details for the UI"""
         host = config_dict.get("host", "Unknown")
         port = config_dict.get("port", 22)

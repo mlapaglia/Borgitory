@@ -266,7 +266,7 @@ class RepositoryParser:
                 "error": str(e),
             }
 
-    async def get_scan_results(self, job_id: str) -> List[Dict]:
+    async def get_scan_results(self, job_id: str) -> List[Dict[str, Any]]:
         """Get the results of a completed repository scan"""
         try:
             if not self.job_manager:
@@ -289,9 +289,9 @@ class RepositoryParser:
             logger.error(f"Error getting scan results for job {job_id}: {e}")
             return []
 
-    async def _parse_scan_output(self, output: str) -> List[Dict]:
+    async def _parse_scan_output(self, output: str) -> List[Dict[str, Any]]:
         """Parse the output from find command to identify potential Borg repositories"""
-        repositories = []
+        repositories: List[Dict[str, Any]] = []
 
         if not output.strip():
             logger.warning("Scan output is empty")
@@ -367,7 +367,7 @@ class RepositoryParser:
             data_dir = os.path.join(repo_path, "data")
             if os.path.exists(data_dir):
                 # Get the most recent modification time in the data directory
-                latest_mtime = 0
+                latest_mtime = 0.0
                 for root, dirs, files in os.walk(data_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
@@ -423,7 +423,7 @@ class RepositoryParser:
 
             # Wait for completion with a reasonable timeout
             max_wait = 15  # 15 seconds should be enough for info command
-            wait_time = 0
+            wait_time = 0.0
 
             while wait_time < max_wait:
                 status = job_manager.get_job_status(job_id)
@@ -497,7 +497,9 @@ class RepositoryParser:
                 "requires_passphrase": True,
             }
 
-    async def scan_for_repositories(self, scan_path: str = "/mnt") -> List[Dict]:
+    async def scan_for_repositories(
+        self, scan_path: str = "/mnt"
+    ) -> List[Dict[str, Any]]:
         """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
         job_id = await self.start_repository_scan(scan_path)
 

@@ -84,7 +84,8 @@ class StorageFactory:
                 f"Supported providers: {', '.join(sorted(supported))}"
             )
 
-        return storage_class(validated_config, self._rclone_service)
+        storage_instance = storage_class(validated_config, self._rclone_service)
+        return storage_instance  # type: ignore
 
     def get_supported_providers(self) -> list[str]:
         """Get list of supported provider names."""

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Any
+from typing import Dict, Optional, Any
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
@@ -462,7 +462,7 @@ class CloudSyncConfigBase(BaseModel):
     path_prefix: str = Field(
         default="", max_length=255, description="Optional path prefix for cloud storage"
     )
-    provider_config: dict = Field(
+    provider_config: Dict[str, Any] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
 
@@ -506,7 +506,7 @@ class CloudSyncConfigUpdate(BaseModel):
     )
     provider: Optional[str] = None
     path_prefix: Optional[str] = Field(None, max_length=255)
-    provider_config: Optional[dict] = Field(
+    provider_config: Optional[Dict[str, Any]] = Field(
         None, description="Provider-specific configuration"
     )
     enabled: Optional[bool] = None

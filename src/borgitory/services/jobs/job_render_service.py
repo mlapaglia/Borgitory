@@ -111,7 +111,7 @@ class JobRenderService:
                                     "type": job_type,
                                     "status": job.status,
                                     "started_at": job.started_at.strftime("%H:%M:%S"),
-                                    "progress": getattr(job, "current_progress", None),
+                                    "progress": "",
                                     "progress_info": progress_info,
                                 }
                             )
@@ -173,9 +173,8 @@ class JobRenderService:
         )
 
         # Debug logging
-        logger.info(
-            f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks"
-        )
+        task_count = len(list(job.tasks)) if job.tasks else 0
+        logger.info(f"Job {job.id[:8]}...: has {task_count} tasks")
         if job.tasks:
             for i, task in enumerate(job.tasks):
                 logger.info(
@@ -188,7 +187,7 @@ class JobRenderService:
         job_title += f" {progress_text}"
 
         # Sort tasks by order if composite
-        sorted_tasks = sorted(job.tasks or [], key=lambda t: t.task_order)
+        sorted_tasks: List[Any] = sorted(job.tasks or [], key=lambda t: t.task_order)
 
         # Fix task statuses for failed jobs
         if job.status == "failed":
@@ -247,7 +246,8 @@ class JobRenderService:
             if job_id in self.job_manager.jobs:
                 logger.info(f"Found running job {job_id} in job manager")
                 manager_job = self.job_manager.jobs[job_id]
-                return self._format_manager_job_for_render(manager_job, job_id, job)
+                result = self._format_manager_job_for_render(manager_job, job_id, job)
+                return result if result is not None else {}
 
             # If job exists in database but not completed (edge case), still show it
             if job:
@@ -288,12 +288,11 @@ class JobRenderService:
             )
 
             # All jobs are now composite with tasks
-            has_tasks = bool(job.tasks and len(job.tasks) > 0)
+            task_count = len(list(job.tasks)) if job.tasks else 0
+            has_tasks = bool(job.tasks and task_count > 0)
 
             # Debug logging
-            logger.info(
-                f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks"
-            )
+            logger.info(f"Job {job.id[:8]}...: has {task_count} tasks")
             if job.tasks:
                 for i, task in enumerate(job.tasks):
                     logger.info(
@@ -309,7 +308,7 @@ class JobRenderService:
                 job_title += f" {progress_text}"
 
             # Sort tasks by order (all jobs have tasks now)
-            sorted_tasks = (
+            sorted_tasks: List[Any] = (
                 sorted(job.tasks or [], key=lambda t: t.task_order) if has_tasks else []
             )
 
@@ -349,7 +348,7 @@ class JobRenderService:
 
     def _format_manager_job_for_render(
         self, manager_job: Any, job_id: str, db_job: Any = None
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Any] | None:
         """Format a job manager job for template rendering"""
         try:
             # Use database job data if available, otherwise create from manager job

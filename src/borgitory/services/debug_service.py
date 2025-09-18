@@ -17,7 +17,7 @@ class DebugService:
     """Service to gather system and application debug information"""
 
     def __init__(
-        self, volume_service=None, job_manager: Optional[JobManager] = None
+        self, volume_service: Any = None, job_manager: Optional[JobManager] = None
     ) -> None:
         self.volume_service = volume_service
         self.job_manager = job_manager

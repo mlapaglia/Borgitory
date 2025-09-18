@@ -54,19 +54,18 @@ class CleanupService:
                 return False, None, "A prune policy with this name already exists"
 
             # Create new configuration
-            db_config = CleanupConfig(
-                name=cleanup_config.name,
-                strategy=cleanup_config.strategy,
-                keep_within_days=cleanup_config.keep_within_days,
-                keep_daily=cleanup_config.keep_daily,
-                keep_weekly=cleanup_config.keep_weekly,
-                keep_monthly=cleanup_config.keep_monthly,
-                keep_yearly=cleanup_config.keep_yearly,
-                show_list=cleanup_config.show_list,
-                show_stats=cleanup_config.show_stats,
-                save_space=cleanup_config.save_space,
-                enabled=True,
-            )
+            db_config = CleanupConfig()
+            db_config.name = cleanup_config.name
+            db_config.strategy = cleanup_config.strategy
+            db_config.keep_within_days = cleanup_config.keep_within_days
+            db_config.keep_daily = cleanup_config.keep_daily
+            db_config.keep_weekly = cleanup_config.keep_weekly
+            db_config.keep_monthly = cleanup_config.keep_monthly
+            db_config.keep_yearly = cleanup_config.keep_yearly
+            db_config.show_list = cleanup_config.show_list
+            db_config.show_stats = cleanup_config.show_stats
+            db_config.save_space = cleanup_config.save_space
+            db_config.enabled = True
 
             self.db.add(db_config)
             self.db.commit()

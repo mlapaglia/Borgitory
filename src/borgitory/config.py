@@ -8,7 +8,7 @@ DATABASE_PATH = str("data/borgitory.db")
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 
-def get_secret_key():
+def get_secret_key() -> str:
     """Get SECRET_KEY from environment, raising error if not available."""
     secret_key = os.getenv("SECRET_KEY")
     if secret_key is None:

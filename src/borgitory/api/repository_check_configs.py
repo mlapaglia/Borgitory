@@ -1,10 +1,11 @@
+from typing import Any, List
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from borgitory.models.schemas import (
     RepositoryCheckConfigCreate,
     RepositoryCheckConfigUpdate,
-    RepositoryCheckConfig,
 )
+from borgitory.models.database import RepositoryCheckConfig
 
 from borgitory.dependencies import TemplatesDep, RepositoryCheckConfigServiceDep
 
@@ -51,7 +52,7 @@ async def create_repository_check_config(
 
 
 @router.get("/", response_class=HTMLResponse)
-def get_repository_check_configs(service: RepositoryCheckConfigServiceDep) -> list:
+def get_repository_check_configs(service: RepositoryCheckConfigServiceDep) -> List[Any]:
     """Get all repository check configurations"""
     return service.get_all_configs()
 
@@ -169,7 +170,7 @@ def update_check_options(
     )
 
 
-@router.get("/{config_id}", response_class=HTMLResponse)
+@router.get("/{config_id}", response_class=HTMLResponse, response_model=None)
 def get_repository_check_config(
     config_id: int, service: RepositoryCheckConfigServiceDep
 ) -> RepositoryCheckConfig:
@@ -234,7 +235,7 @@ async def update_repository_check_config(
     return response
 
 
-@router.patch("/{config_id}", response_class=HTMLResponse)
+@router.patch("/{config_id}", response_class=HTMLResponse, response_model=None)
 def patch_repository_check_config(
     config_id: int,
     update_data: RepositoryCheckConfigUpdate,
@@ -249,6 +250,11 @@ def patch_repository_check_config(
             raise HTTPException(status_code=404, detail=error_msg)
         else:
             raise HTTPException(status_code=400, detail=error_msg)
+
+    if updated_config is None:
+        raise HTTPException(
+            status_code=500, detail="Update succeeded but config is None"
+        )
 
     return updated_config
 

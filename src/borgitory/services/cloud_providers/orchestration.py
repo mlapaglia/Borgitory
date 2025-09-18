@@ -8,7 +8,7 @@ with clean separation of concerns and easy testability.
 import asyncio
 import time
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 from .types import SyncEvent, SyncEventType, SyncResult
 from .storage import CloudStorage
@@ -37,7 +37,7 @@ class LoggingSyncEventHandler(SyncEventHandler):
     """Event handler that logs sync events"""
 
     def __init__(
-        self, logger, output_callback: Optional[Callable[[str], None]] = None
+        self, logger: Any, output_callback: Optional[Callable[[str], None]] = None
     ) -> None:
         """
         Initialize logging event handler.

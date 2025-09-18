@@ -7,7 +7,7 @@ keeping the JobExecutor clean and testable.
 
 import json
 import logging
-from typing import Optional, Callable
+from typing import Optional, Callable, Any, Dict
 from abc import ABC, abstractmethod
 
 from .types import CloudSyncConfig
@@ -35,7 +35,7 @@ class ConfigLoadService(ABC):
 class DatabaseConfigLoadService(ConfigLoadService):
     """Service that loads configurations from database"""
 
-    def __init__(self, db_session_factory: Callable) -> None:
+    def __init__(self, db_session_factory: Callable[[], Any]) -> None:
         """
         Initialize with database session factory.
 
@@ -80,7 +80,7 @@ class DatabaseConfigLoadService(ConfigLoadService):
             logger.error(f"Failed to load config {config_id}: {str(e)}")
             return None
 
-    def _convert_legacy_config(self, db_config) -> dict:
+    def _convert_legacy_config(self, db_config: Any) -> Dict[str, Any]:
         """Convert legacy database configuration to new format"""
         if db_config.provider == "s3":
             access_key, secret_key = db_config.get_credentials()

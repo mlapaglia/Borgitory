@@ -93,7 +93,9 @@ class SimpleCommandRunner:
 
                 return CommandResult(
                     success=success,
-                    return_code=process.returncode,
+                    return_code=process.returncode
+                    if process.returncode is not None
+                    else -1,
                     stdout=stdout,
                     stderr=stderr,
                     duration=duration,

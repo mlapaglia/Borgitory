@@ -107,9 +107,11 @@ def get_schedules_html(
     """Get schedules as formatted HTML"""
     schedules = schedule_service.get_schedules(skip=skip, limit=limit)
 
-    return templates.get_template(
-        "partials/schedules/schedule_list_content.html"
-    ).render(schedules=schedules)
+    return HTMLResponse(
+        templates.get_template("partials/schedules/schedule_list_content.html").render(
+            schedules=schedules
+        )
+    )
 
 
 @router.get("/upcoming/html", response_class=HTMLResponse)
@@ -123,13 +125,17 @@ async def get_upcoming_backups_html(
         jobs_raw = await scheduler_service.get_scheduled_jobs()
         processed_jobs = upcoming_backups_service.process_jobs(jobs_raw)
 
-        return templates.get_template(
-            "partials/schedules/upcoming_backups_content.html"
-        ).render(jobs=processed_jobs)
+        return HTMLResponse(
+            templates.get_template(
+                "partials/schedules/upcoming_backups_content.html"
+            ).render(jobs=processed_jobs)
+        )
 
     except Exception as e:
-        return templates.get_template("partials/jobs/error_state.html").render(
-            message=f"Error loading upcoming backups: {str(e)}", padding="4"
+        return HTMLResponse(
+            templates.get_template("partials/jobs/error_state.html").render(
+                message=f"Error loading upcoming backups: {str(e)}", padding="4"
+            )
         )
 
 
@@ -156,9 +162,11 @@ def list_schedules(
     limit: int = 100,
 ) -> HTMLResponse:
     schedules = schedule_service.get_schedules(skip=skip, limit=limit)
-    return templates.get_template(
-        "partials/schedules/schedule_list_content.html"
-    ).render(schedules=schedules)
+    return HTMLResponse(
+        templates.get_template("partials/schedules/schedule_list_content.html").render(
+            schedules=schedules
+        )
+    )
 
 
 @router.get("/{schedule_id}", response_class=HTMLResponse)
@@ -169,11 +177,15 @@ def get_schedule(
 ) -> HTMLResponse:
     schedule = schedule_service.get_schedule_by_id(schedule_id)
     if schedule is None:
-        return templates.get_template("partials/common/error_message.html").render(
-            error_message="Schedule not found"
+        return HTMLResponse(
+            templates.get_template("partials/common/error_message.html").render(
+                error_message="Schedule not found"
+            )
         )
-    return templates.get_template("partials/schedules/schedule_detail.html").render(
-        schedule=schedule
+    return HTMLResponse(
+        templates.get_template("partials/schedules/schedule_detail.html").render(
+            schedule=schedule
+        )
     )
 
 
@@ -295,8 +307,8 @@ async def get_active_scheduled_jobs(
 ) -> HTMLResponse:
     """Get all active scheduled jobs"""
     jobs = await scheduler_service.get_scheduled_jobs()
-    return templates.get_template("partials/schedules/active_jobs.html").render(
-        jobs=jobs
+    return HTMLResponse(
+        templates.get_template("partials/schedules/active_jobs.html").render(jobs=jobs)
     )
 
 

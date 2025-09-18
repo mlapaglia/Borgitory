@@ -27,16 +27,16 @@ class JobEventBroadcaster:
         self.cleanup_interval = cleanup_interval
 
         # Client event queues for SSE streaming
-        self._client_queues: List[asyncio.Queue] = []
-        self._client_queue_metadata: Dict[asyncio.Queue, Dict[str, Any]] = {}
+        self._client_queues: List[asyncio.Queue[JobEvent]] = []
+        self._client_queue_metadata: Dict[asyncio.Queue[JobEvent], Dict[str, Any]] = {}
 
         # Event history for new clients
         self._recent_events: List[JobEvent] = []
         self._max_recent_events = 50
 
         # Background tasks
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._keepalive_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task[None]] = None
+        self._keepalive_task: Optional[asyncio.Task[None]] = None
         self._shutdown_requested = False
 
     async def initialize(self) -> None:
@@ -90,9 +90,9 @@ class JobEventBroadcaster:
 
     def subscribe_client(
         self, client_id: Optional[str] = None, send_recent_events: bool = True
-    ) -> asyncio.Queue:
+    ) -> asyncio.Queue[JobEvent]:
         """Subscribe a new client to events"""
-        queue = asyncio.Queue(maxsize=self.max_queue_size)
+        queue: asyncio.Queue[JobEvent] = asyncio.Queue(maxsize=self.max_queue_size)
 
         # Store client metadata
         self._client_queue_metadata[queue] = {
@@ -119,11 +119,11 @@ class JobEventBroadcaster:
 
         return queue
 
-    def unsubscribe_client(self, queue: asyncio.Queue) -> bool:
+    def unsubscribe_client(self, queue: asyncio.Queue[JobEvent]) -> bool:
         """Unsubscribe a client from events"""
         return self._remove_client_queue(queue)
 
-    def _remove_client_queue(self, queue: asyncio.Queue) -> bool:
+    def _remove_client_queue(self, queue: asyncio.Queue[JobEvent]) -> bool:
         """Remove a client queue and its metadata"""
         try:
             if queue in self._client_queues:
@@ -139,7 +139,7 @@ class JobEventBroadcaster:
             return False
 
     async def stream_events_for_client(
-        self, client_queue: asyncio.Queue
+        self, client_queue: asyncio.Queue[JobEvent]
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream events for a specific client"""
         try:
@@ -235,11 +235,11 @@ class JobEventBroadcaster:
                 logger.error(f"Error in keepalive task: {e}")
                 await asyncio.sleep(self.keepalive_timeout)
 
-    def subscribe_to_events(self) -> asyncio.Queue:
+    def subscribe_to_events(self) -> asyncio.Queue[JobEvent]:
         """Subscribe to job events for streaming (compatibility method)"""
         return self.subscribe_client()
 
-    def unsubscribe_from_events(self, queue: asyncio.Queue) -> None:
+    def unsubscribe_from_events(self, queue: asyncio.Queue[JobEvent]) -> None:
         """Unsubscribe from job events (compatibility method)"""
         self.unsubscribe_client(queue)
 
@@ -291,10 +291,12 @@ class JobEventBroadcaster:
         logger.info("Job event broadcaster shutdown complete")
 
 
-_global_broadcaster: JobEventBroadcaster = None
+_global_broadcaster: Optional[JobEventBroadcaster] = None
 
 
 def get_job_event_broadcaster() -> JobEventBroadcaster:
     """Get the global JobEventBroadcaster instance"""
     global _global_broadcaster
+    if _global_broadcaster is None:
+        _global_broadcaster = JobEventBroadcaster()
     return _global_broadcaster

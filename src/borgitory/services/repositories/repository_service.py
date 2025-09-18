@@ -46,7 +46,9 @@ logger = logging.getLogger(__name__)
 class RepositoryService:
     """Service for repository business logic operations."""
 
-    def __init__(self, borg_service, scheduler_service, volume_service) -> None:
+    def __init__(
+        self, borg_service: Any, scheduler_service: Any, volume_service: Any
+    ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service
         self.volume_service = volume_service
@@ -63,7 +65,9 @@ class RepositoryService:
                     success=False, validation_errors=validation_errors
                 )
 
-            db_repo = Repository(name=request.name, path=request.path)
+            db_repo = Repository()
+            db_repo.name = request.name
+            db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
 
             # Initialize repository with Borg
@@ -125,7 +129,9 @@ class RepositoryService:
                     )
                 keyfile_path = keyfile_result["path"]
 
-            db_repo = Repository(name=request.name, path=request.path)
+            db_repo = Repository()
+            db_repo.name = request.name
+            db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
 
             db.add(db_repo)
@@ -292,12 +298,15 @@ class RepositoryService:
                     success=True, path=request.path, directories=[]
                 )
 
-            directories = user_get_directory_listing(
+            directory_data = user_get_directory_listing(
                 request.path, include_files=request.include_files
             )
 
             if request.max_items > 0:
-                directories = directories[: request.max_items]
+                directory_data = directory_data[: request.max_items]
+
+            # Extract just the names for the result
+            directories = [item["name"] for item in directory_data]
 
             return DirectoryListingResult(
                 success=True, path=request.path, directories=directories
@@ -556,7 +565,7 @@ class RepositoryService:
         else:
             return f"Failed to initialize repository: {borg_error}"
 
-    async def _save_keyfile(self, repository_name: str, keyfile) -> Dict[str, Any]:
+    async def _save_keyfile(self, repository_name: str, keyfile: Any) -> Dict[str, Any]:
         """Save uploaded keyfile securely."""
         try:
             keyfiles_dir = "/app/data/keyfiles"

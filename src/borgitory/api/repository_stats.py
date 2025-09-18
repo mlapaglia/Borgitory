@@ -92,7 +92,7 @@ async def get_repository_statistics_progress(
         raise HTTPException(status_code=404, detail="Repository not found")
 
     async def generate_progress() -> AsyncGenerator[str, None]:
-        progress_queue = asyncio.Queue()
+        progress_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
 
         def progress_callback(message: str, percent: int = 0) -> None:
             # Put progress data in queue (non-blocking)

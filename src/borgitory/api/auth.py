@@ -72,7 +72,8 @@ def register_user(
                 status_code=400,
             )
 
-        user = User(username=username.strip())
+        user = User()
+        user.username = username.strip()
         user.set_password(password)
 
         db.add(user)
@@ -140,16 +141,15 @@ def login_user(
         )
         current_time = datetime.now(UTC)
 
-        db_session = UserSession(
-            user_id=user.id,
-            session_token=auth_token,
-            expires_at=expires_at,
-            remember_me=remember_me,
-            user_agent=user_agent,
-            ip_address=client_ip,
-            created_at=current_time,
-            last_activity=current_time,
-        )
+        db_session = UserSession()
+        db_session.user_id = user.id
+        db_session.session_token = auth_token
+        db_session.expires_at = expires_at
+        db_session.remember_me = remember_me
+        db_session.user_agent = user_agent
+        db_session.ip_address = client_ip
+        db_session.created_at = current_time
+        db_session.last_activity = current_time
         db.add(db_session)
 
         user.last_login = current_time

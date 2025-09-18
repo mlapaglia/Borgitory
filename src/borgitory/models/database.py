@@ -4,6 +4,7 @@ import logging
 import uuid
 import os
 from datetime import datetime, UTC
+from typing import List
 
 from cryptography.fernet import Fernet
 from passlib.context import CryptContext
@@ -17,7 +18,8 @@ from sqlalchemy import (
     ForeignKey,
 )
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, Session
+from typing import Generator
 
 from borgitory.config import DATABASE_URL, get_secret_key, DATA_DIR
 
@@ -33,7 +35,7 @@ Base = declarative_base()
 _cipher_suite = None
 
 
-def get_cipher_suite():
+def get_cipher_suite() -> Fernet:
     """Get or create the Fernet cipher suite."""
     global _cipher_suite
     if _cipher_suite is None:
@@ -60,10 +62,10 @@ class Repository(Base):
         DateTime, default=lambda: datetime.now(UTC)
     )
 
-    jobs = relationship(
+    jobs: Mapped[List["Job"]] = relationship(
         "Job", back_populates="repository", cascade="all, delete-orphan"
     )
-    schedules = relationship(
+    schedules: Mapped[List["Schedule"]] = relationship(
         "Schedule", back_populates="repository", cascade="all, delete-orphan"
     )
 
@@ -115,10 +117,14 @@ class Job(Base):
     total_tasks: Mapped[int] = mapped_column(Integer, default=1)
     completed_tasks: Mapped[int] = mapped_column(Integer, default=0)
 
-    repository = relationship("Repository", back_populates="jobs")
-    cloud_backup_config = relationship("CloudSyncConfig")
-    check_config = relationship("RepositoryCheckConfig")
-    tasks = relationship("JobTask", back_populates="job", cascade="all, delete-orphan")
+    repository: Mapped["Repository"] = relationship("Repository", back_populates="jobs")
+    cloud_backup_config: Mapped["CloudSyncConfig"] = relationship("CloudSyncConfig")
+    check_config: Mapped["RepositoryCheckConfig"] = relationship(
+        "RepositoryCheckConfig"
+    )
+    tasks: Mapped[List["JobTask"]] = relationship(
+        "JobTask", back_populates="job", cascade="all, delete-orphan"
+    )
 
 
 class JobTask(Base):
@@ -144,7 +150,7 @@ class JobTask(Base):
         Integer, nullable=False
     )  # Order of execution within the job
 
-    job = relationship("Job", back_populates="tasks")
+    job: Mapped["Job"] = relationship("Job", back_populates="tasks")
 
 
 class Schedule(Base):
@@ -176,11 +182,17 @@ class Schedule(Base):
         Integer, ForeignKey("notification_configs.id"), nullable=True
     )
 
-    repository = relationship("Repository", back_populates="schedules")
-    cloud_sync_config = relationship("CloudSyncConfig")
-    cleanup_config = relationship("CleanupConfig")
-    check_config = relationship("RepositoryCheckConfig")
-    notification_config = relationship("NotificationConfig")
+    repository: Mapped["Repository"] = relationship(
+        "Repository", back_populates="schedules"
+    )
+    cloud_sync_config: Mapped["CloudSyncConfig"] = relationship("CloudSyncConfig")
+    cleanup_config: Mapped["CleanupConfig"] = relationship("CleanupConfig")
+    check_config: Mapped["RepositoryCheckConfig"] = relationship(
+        "RepositoryCheckConfig"
+    )
+    notification_config: Mapped["NotificationConfig"] = relationship(
+        "NotificationConfig"
+    )
 
 
 class User(Base):
@@ -196,7 +208,9 @@ class User(Base):
     )
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    sessions = relationship("UserSession", back_populates="user")
+    sessions: Mapped[List["UserSession"]] = relationship(
+        "UserSession", back_populates="user"
+    )
 
     def set_password(self, password: str) -> None:
         """Hash and store the password"""
@@ -228,7 +242,7 @@ class UserSession(Base):
     user_agent: Mapped[str | None] = mapped_column(String, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    user = relationship("User", back_populates="sessions")
+    user: Mapped["User"] = relationship("User", back_populates="sessions")
 
 
 class Setting(Base):
@@ -431,7 +445,7 @@ def reset_db() -> None:
     logger.info("Database reset complete")
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db

@@ -174,7 +174,7 @@ async def list_directories_autocomplete(
             "backup-source-path",
             "schedule-source-path",
         ]:
-            input_value = form_data.get(param_name, "")
+            input_value = str(form_data.get(param_name, ""))
             break
 
     # Normalize the path with /mnt/ prefix
@@ -185,7 +185,7 @@ async def list_directories_autocomplete(
 
     try:
         if not user_secure_exists(dir_path):
-            directories = []
+            directories: List[Dict[str, str]] = []
         elif not user_secure_isdir(dir_path):
             directories = []
         else:

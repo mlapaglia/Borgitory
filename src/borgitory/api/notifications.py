@@ -3,7 +3,7 @@ API endpoints for managing notification configurations (Pushover, etc.)
 """
 
 import logging
-from typing import List
+from typing import Any, List
 
 from fastapi import APIRouter, HTTPException, status, Request
 from fastapi.responses import HTMLResponse
@@ -60,7 +60,7 @@ def list_notification_configs(
     service: NotificationConfigServiceDep,
     skip: int = 0,
     limit: int = 100,
-) -> List:
+) -> List[Any]:
     """List all notification configurations"""
     return service.get_all_configs(skip=skip, limit=limit)
 
@@ -70,7 +70,7 @@ def get_notification_configs_html(
     request: Request,
     templates: TemplatesDep,
     service: NotificationConfigServiceDep,
-) -> _TemplateResponse:
+) -> HTMLResponse:
     """Get notification configurations as formatted HTML"""
     try:
         processed_configs_data = service.get_configs_with_descriptions()
@@ -80,13 +80,18 @@ def get_notification_configs_html(
         for config_data in processed_configs_data:
             processed_configs.append(type("Config", (), config_data)())
 
-        return templates.get_template(
-            "partials/notifications/config_list_content.html"
-        ).render(request=request, configs=processed_configs)
+        return HTMLResponse(
+            templates.get_template(
+                "partials/notifications/config_list_content.html"
+            ).render(request=request, configs=processed_configs)
+        )
 
     except Exception as e:
-        return templates.get_template("partials/jobs/error_state.html").render(
-            message=f"Error loading notification configurations: {str(e)}", padding="4"
+        return HTMLResponse(
+            templates.get_template("partials/jobs/error_state.html").render(
+                message=f"Error loading notification configurations: {str(e)}",
+                padding="4",
+            )
         )
 
 

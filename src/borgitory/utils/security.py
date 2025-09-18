@@ -1,7 +1,7 @@
 import re
 import secrets
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -76,8 +76,8 @@ def build_secure_borg_command(
     base_command: str,
     repository_path: str,
     passphrase: str,
-    additional_args: List[str] = None,
-    environment_overrides: Dict[str, str] = None,
+    additional_args: Optional[List[str]] = None,
+    environment_overrides: Optional[Dict[str, str]] = None,
 ) -> tuple[List[str], Dict[str, str]]:
     """
     Build a secure Borg command with proper escaping and validation.

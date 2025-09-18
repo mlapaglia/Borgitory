@@ -6,7 +6,7 @@ from business logic and easy testability.
 """
 
 import re
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional
 from pydantic import Field, field_validator
 
 from borgitory.services.rclone_service import RcloneService
@@ -129,8 +129,14 @@ class S3Storage(CloudStorage):
             )
 
         try:
+            # Create a simple repository object with the path
+            from borgitory.models.database import Repository
+
+            repository_obj = Repository()
+            repository_obj.path = repository_path
+
             async for progress in self._rclone_service.sync_repository_to_s3(
-                repository_path=repository_path,
+                repository=repository_obj,
                 access_key_id=self._config.access_key,
                 secret_access_key=self._config.secret_key,
                 bucket_name=self._config.bucket_name,
@@ -197,7 +203,7 @@ class S3Storage(CloudStorage):
         """S3 sensitive fields"""
         return ["access_key", "secret_key"]
 
-    def get_display_details(self, config_dict: dict) -> dict:
+    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
         """Get S3-specific display details for the UI"""
         bucket_name = config_dict.get("bucket_name", "Unknown")
         region = config_dict.get("region", "us-east-1")

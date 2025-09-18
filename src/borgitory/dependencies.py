@@ -262,10 +262,8 @@ def get_scheduler_service() -> SchedulerService:
     if _scheduler_service_instance is None:
         job_manager = get_job_manager_dependency()
 
-        from borgitory.services.jobs.job_service import JobService
-
         _scheduler_service_instance = SchedulerService(
-            job_manager=job_manager, job_service_factory=JobService
+            job_manager=job_manager, job_service_factory=None
         )
     return _scheduler_service_instance
 

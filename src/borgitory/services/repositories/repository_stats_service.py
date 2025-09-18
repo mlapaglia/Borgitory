@@ -150,7 +150,9 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
 class RepositoryStatsService:
     """Service to gather repository statistics from Borg commands"""
 
-    def __init__(self, command_executor: CommandExecutorInterface = None) -> None:
+    def __init__(
+        self, command_executor: Optional[CommandExecutorInterface] = None
+    ) -> None:
         self.command_executor = command_executor or SubprocessCommandExecutor()
 
     async def get_repository_statistics(
@@ -329,7 +331,7 @@ class RepositoryStatsService:
         self, archive_stats: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Build size over time data for charting"""
-        timeline_data = {
+        timeline_data: Dict[str, Any] = {
             "labels": [],
             "datasets": [
                 {
@@ -380,7 +382,7 @@ class RepositoryStatsService:
         self, archive_stats: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Build deduplication and compression statistics"""
-        dedup_data = {
+        dedup_data: Dict[str, Any] = {
             "labels": [],
             "datasets": [
                 {
@@ -431,7 +433,11 @@ class RepositoryStatsService:
         progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> Dict[str, Any]:
         """Get file type statistics over time"""
-        file_type_timeline = {"labels": [], "count_data": {}, "size_data": {}}
+        file_type_timeline: Dict[str, Any] = {
+            "labels": [],
+            "count_data": {},
+            "size_data": {},
+        }
 
         # Limit to recent archives for performance (last 10)
         recent_archives = archives[-10:] if len(archives) > 10 else archives
@@ -467,8 +473,8 @@ class RepositoryStatsService:
 
                 if process.returncode == 0:
                     # Parse file types and sizes
-                    ext_count = {}
-                    ext_size = {}
+                    ext_count: Dict[str, int] = {}
+                    ext_size: Dict[str, int] = {}
 
                     for line in stdout.decode().strip().split("\n"):
                         if not line.strip():

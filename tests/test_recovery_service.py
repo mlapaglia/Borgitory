@@ -111,7 +111,7 @@ class TestRecoveryService:
 
             # Should mark job as failed
             assert mock_job.status == "failed"
-            assert mock_job.completed_at is not None
+            assert mock_job.finished_at is not None
             assert "Job cancelled on startup" in mock_job.error
 
             # Should mark task as failed

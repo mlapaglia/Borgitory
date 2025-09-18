@@ -33,7 +33,9 @@ class ProcessResult:
 class JobExecutor:
     """Handles subprocess execution and output monitoring"""
 
-    def __init__(self, subprocess_executor: Optional[Callable] = None) -> None:
+    def __init__(
+        self, subprocess_executor: Optional[Callable[..., Any]] = None
+    ) -> None:
         self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
@@ -72,31 +74,32 @@ class JobExecutor:
     async def monitor_process_output(
         self,
         process: asyncio.subprocess.Process,
-        output_callback: Optional[Callable[[str, Dict], None]] = None,
-        progress_callback: Optional[Callable[[Dict], None]] = None,
+        output_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> ProcessResult:
         """Monitor process output and return final result"""
         stdout_data = b""
         stderr_data = b""
 
         try:
-            async for line in process.stdout:
-                line_text = line.decode("utf-8", errors="replace").rstrip()
-                stdout_data += line
+            if process.stdout:
+                async for line in process.stdout:
+                    line_text = line.decode("utf-8", errors="replace").rstrip()
+                    stdout_data += line
 
-                progress_info = self.parse_progress_line(line_text)
+                    progress_info = self.parse_progress_line(line_text)
 
-                if output_callback:
-                    if inspect.iscoroutinefunction(output_callback):
-                        await output_callback(line_text, progress_info)
-                    else:
-                        output_callback(line_text, progress_info)
+                    if output_callback:
+                        if inspect.iscoroutinefunction(output_callback):
+                            await output_callback(line_text, progress_info)
+                        else:
+                            output_callback(line_text, progress_info)
 
-                if progress_callback and progress_info:
-                    if inspect.iscoroutinefunction(progress_callback):
-                        await progress_callback(progress_info)
-                    else:
-                        progress_callback(progress_info)
+                    if progress_callback and progress_info:
+                        if inspect.iscoroutinefunction(progress_callback):
+                            await progress_callback(progress_info)
+                        else:
+                            progress_callback(progress_info)
 
             return_code = await process.wait()
 
@@ -213,7 +216,7 @@ class JobExecutor:
         save_space: bool = False,
         force_prune: bool = False,
         dry_run: bool = False,
-        output_callback: Optional[Callable] = None,
+        output_callback: Optional[Callable[..., Any]] = None,
     ) -> ProcessResult:
         """
         Execute a borg prune task with the job executor's proper streaming
@@ -296,12 +299,12 @@ class JobExecutor:
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        db_session_factory: Callable,
+        db_session_factory: Callable[[], Any],
         rclone_service: RcloneService,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
         provider_registry: ProviderRegistry,
-        output_callback: Optional[Callable] = None,
+        output_callback: Optional[Callable[..., Any]] = None,
     ) -> ProcessResult:
         """
         Execute a cloud sync task with the job executor's proper streaming
@@ -513,8 +516,8 @@ class JobExecutor:
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        cloud_sync_service,
-        config_load_service,
+        cloud_sync_service: Any,
+        config_load_service: Any,
         output_callback: Optional[Callable[[str], None]] = None,
     ) -> ProcessResult:
         """

@@ -293,7 +293,7 @@ class SchedulerService:
             logger.error(f"Failed to update schedule {schedule_id}: {str(e)}")
             raise
 
-    async def get_scheduled_jobs(self) -> List[Dict]:
+    async def get_scheduled_jobs(self) -> List[Dict[str, Any]]:
         """Get all scheduled jobs with their next run times"""
         if not self._running:
             return []

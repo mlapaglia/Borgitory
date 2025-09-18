@@ -63,8 +63,10 @@ class JobQueueManager:
         self.queue_poll_interval = queue_poll_interval
 
         # Separate queues for different job types
-        self._backup_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
-        self._operation_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        self._backup_queue: asyncio.PriorityQueue[QueuedJob] = asyncio.PriorityQueue()
+        self._operation_queue: asyncio.PriorityQueue[QueuedJob] = (
+            asyncio.PriorityQueue()
+        )
 
         # Semaphores for concurrency control
         self._backup_semaphore: Optional[asyncio.Semaphore] = None
@@ -160,6 +162,10 @@ class JobQueueManager:
                     continue
 
                 # Acquire semaphore (blocks if at max concurrency)
+                if self._backup_semaphore is None:
+                    raise RuntimeError(
+                        "JobQueueManager not initialized - call initialize() first"
+                    )
                 await self._backup_semaphore.acquire()
 
                 try:
@@ -180,7 +186,8 @@ class JobQueueManager:
 
                 except Exception as e:
                     logger.error(f"Error starting backup job {queued_job.job_id}: {e}")
-                    self._backup_semaphore.release()
+                    if self._backup_semaphore is not None:
+                        self._backup_semaphore.release()
                     self._cleanup_running_job(queued_job.job_id, is_backup=True)
 
             except Exception as e:
@@ -203,6 +210,10 @@ class JobQueueManager:
                     continue
 
                 # Acquire semaphore (blocks if at max concurrency)
+                if self._operation_semaphore is None:
+                    raise RuntimeError(
+                        "JobQueueManager not initialized - call initialize() first"
+                    )
                 await self._operation_semaphore.acquire()
 
                 try:
@@ -224,7 +235,8 @@ class JobQueueManager:
                     logger.error(
                         f"Error starting operation job {queued_job.job_id}: {e}"
                     )
-                    self._operation_semaphore.release()
+                    if self._operation_semaphore is not None:
+                        self._operation_semaphore.release()
                     self._cleanup_running_job(queued_job.job_id, is_backup=False)
 
             except Exception as e:
@@ -254,9 +266,11 @@ class JobQueueManager:
         finally:
             # Clean up resources
             if is_backup:
-                self._backup_semaphore.release()
+                if self._backup_semaphore is not None:
+                    self._backup_semaphore.release()
             else:
-                self._operation_semaphore.release()
+                if self._operation_semaphore is not None:
+                    self._operation_semaphore.release()
 
             self._cleanup_running_job(job_id, is_backup)
 
@@ -307,7 +321,7 @@ class JobQueueManager:
                 "job_id": job.job_id,
                 "job_type": job.job_type,
                 "priority": job.priority.name,
-                "queued_at": job.queued_at.isoformat(),
+                "queued_at": job.queued_at.isoformat() if job.queued_at else None,
                 "metadata": job.metadata,
             }
             for job in self._running_jobs.values()

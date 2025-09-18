@@ -298,21 +298,20 @@ class BackupService:
         return self.db.query(Repository).filter(Repository.id == repository_id).first()
 
     def _create_job_record(
-        self, repository: Repository, job_type: JobType, request
+        self, repository: Repository, job_type: JobType, request: Any
     ) -> Job:
         """Create a new job record in the database"""
         import uuid
 
-        job = Job(
-            id=str(uuid.uuid4()),
-            repository_id=repository.id,
-            type=job_type.value,
-            status="running",
-            started_at=datetime.now(UTC),
-            job_type=job_type.value,  # For compatibility
-            total_tasks=1,  # Will be updated if more tasks are added
-            completed_tasks=0,
-        )
+        job = Job()
+        job.id = str(uuid.uuid4())
+        job.repository_id = repository.id
+        job.type = job_type.value
+        job.status = "running"
+        job.started_at = datetime.now(UTC)
+        job.job_type = job_type.value  # For compatibility
+        job.total_tasks = 1  # Will be updated if more tasks are added
+        job.completed_tasks = 0
 
         # Add optional configurations
         if hasattr(request, "cloud_sync_config_id"):
@@ -333,14 +332,13 @@ class BackupService:
 
     def _create_backup_task(self, job: Job) -> JobTask:
         """Create a backup task record"""
-        task = JobTask(
-            job_id=job.id,
-            task_type="backup",
-            task_name=f"Backup {job.repository.name}",
-            status="running",
-            started_at=datetime.now(UTC),
-            task_order=0,
-        )
+        task = JobTask()
+        task.job_id = job.id
+        task.task_type = "backup"
+        task.task_name = f"Backup {job.repository.name}"
+        task.status = "running"
+        task.started_at = datetime.now(UTC)
+        task.task_order = 0
 
         self.db.add(task)
         self.db.commit()
@@ -350,14 +348,13 @@ class BackupService:
 
     def _create_prune_task(self, job: Job) -> JobTask:
         """Create a prune task record"""
-        task = JobTask(
-            job_id=job.id,
-            task_type="prune",
-            task_name=f"Prune {job.repository.name}",
-            status="running",
-            started_at=datetime.now(UTC),
-            task_order=0,
-        )
+        task = JobTask()
+        task.job_id = job.id
+        task.task_type = "prune"
+        task.task_name = f"Prune {job.repository.name}"
+        task.status = "running"
+        task.started_at = datetime.now(UTC)
+        task.task_order = 0
 
         self.db.add(task)
         self.db.commit()

@@ -92,7 +92,9 @@ class BackupExecutor:
     JobExecutor, JobOutputManager, and JobEventBroadcaster services.
     """
 
-    def __init__(self, subprocess_executor: Optional[Callable] = None) -> None:
+    def __init__(
+        self, subprocess_executor: Optional[Callable[..., Any]] = None
+    ) -> None:
         self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
@@ -107,7 +109,7 @@ class BackupExecutor:
         config: BackupConfig,
         operation_id: Optional[str] = None,
         output_callback: Optional[Callable[[str], None]] = None,
-        progress_callback: Optional[Callable[[Dict], None]] = None,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> BackupResult:
         """
         Execute a backup operation with integrated output handling.
@@ -321,35 +323,36 @@ class BackupExecutor:
         process: asyncio.subprocess.Process,
         result: BackupResult,
         output_callback: Optional[Callable[[str], None]] = None,
-        progress_callback: Optional[Callable[[Dict], None]] = None,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> bytes:
         """Monitor process output and capture it in the result"""
         stdout_data = b""
 
         try:
             # Read output line by line
-            async for line in process.stdout:
-                line_text = line.decode("utf-8", errors="replace").rstrip()
-                stdout_data += line
+            if process.stdout:
+                async for line in process.stdout:
+                    line_text = line.decode("utf-8", errors="replace").rstrip()
+                    stdout_data += line
 
-                # Store in result
-                result.output_lines.append(line_text)
+                    # Store in result
+                    result.output_lines.append(line_text)
 
-                # Parse progress information for backup operations
-                progress_info = self._parse_progress_line(line_text)
+                    # Parse progress information for backup operations
+                    progress_info = self._parse_progress_line(line_text)
 
-                # Call callbacks if provided
-                if output_callback:
-                    if inspect.iscoroutinefunction(output_callback):
-                        await output_callback(line_text)
-                    else:
-                        output_callback(line_text)
+                    # Call callbacks if provided
+                    if output_callback:
+                        if inspect.iscoroutinefunction(output_callback):
+                            await output_callback(line_text)
+                        else:
+                            output_callback(line_text)
 
-                if progress_callback and progress_info:
-                    if inspect.iscoroutinefunction(progress_callback):
-                        await progress_callback(progress_info)
-                    else:
-                        progress_callback(progress_info)
+                    if progress_callback and progress_info:
+                        if inspect.iscoroutinefunction(progress_callback):
+                            await progress_callback(progress_info)
+                        else:
+                            progress_callback(progress_info)
 
             return stdout_data
 
@@ -412,8 +415,9 @@ class BackupExecutor:
             additional_args.extend(["--compression", config.compression])
 
         # Add excludes
-        for exclude in config.excludes:
-            additional_args.extend(["--exclude", exclude])
+        if config.excludes:
+            for exclude in config.excludes:
+                additional_args.extend(["--exclude", exclude])
 
         # Add dry run if requested
         if config.dry_run:

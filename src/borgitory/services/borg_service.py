@@ -276,14 +276,13 @@ class BorgService:
             from borgitory.utils.db_session import get_db_session
 
             with get_db_session() as db:
-                job = Job(
-                    id=job_id,  # Store the JobManager UUID as the primary key
-                    repository_id=repository.id,
-                    type="backup",
-                    status="queued",  # Will be updated to 'running' when started
-                    started_at=datetime.now(),
-                    cloud_sync_config_id=cloud_sync_config_id,
-                )
+                job = Job()
+                job.id = job_id  # Store the JobManager UUID as the primary key
+                job.repository_id = repository.id
+                job.type = "backup"
+                job.status = "queued"  # Will be updated to 'running' when started
+                job.started_at = datetime.now()
+                job.cloud_sync_config_id = cloud_sync_config_id
                 db.add(job)
                 db.refresh(job)
                 logger.info(f"Created job record {job.id} for backup job {job_id}")
@@ -313,20 +312,19 @@ class BorgService:
 
             # Create database job record for tracking
             with get_db_session() as db:
-                db_job = Job(
-                    id=job_id,  # Store the JobManager UUID as the primary key
-                    repository_id=repository.id,
-                    type="list",
-                    status="running",
-                    started_at=datetime.now(UTC),
-                )
+                db_job = Job()
+                db_job.id = job_id  # Store the JobManager UUID as the primary key
+                db_job.repository_id = repository.id
+                db_job.type = "list"
+                db_job.status = "running"
+                db_job.started_at = datetime.now(UTC)
                 db.add(db_job)
                 db.commit()  # Commit the job record
                 logger.info(f"Created database record for list archives job {job_id}")
 
             # Wait for completion (list is usually quick)
             max_wait = 30  # 30 seconds max
-            wait_time = 0
+            wait_time = 0.0
             final_status = None
 
             while wait_time < max_wait:
@@ -356,14 +354,18 @@ class BorgService:
 
             # Single database update at the end
             with get_db_session() as db:
-                db_job = db.query(Job).filter(Job.id == job_id).first()
-                if db_job:
-                    db_job.status = (
+                existing_job: Optional[Job] = (
+                    db.query(Job).filter(Job.id == job_id).first()
+                )
+                if existing_job:
+                    existing_job.status = (
                         "completed" if final_status["return_code"] == 0 else "failed"
                     )
-                    db_job.finished_at = datetime.now(UTC)
+                    existing_job.finished_at = datetime.now(UTC)
                     if final_status["return_code"] != 0:
-                        db_job.error = final_status.get("error", "Unknown error")
+                        existing_job.error = str(
+                            final_status.get("error", "Unknown error")
+                        )
                     db.commit()
 
             # Handle the result
@@ -389,7 +391,7 @@ class BorgService:
                     logger.info(
                         f"Successfully parsed {len(data['archives'])} archives from repository"
                     )
-                    return data["archives"]
+                    return data["archives"]  # type: ignore
             except json.JSONDecodeError as je:
                 logger.error(f"JSON decode error: {je}")
                 logger.error(f"Raw output: {full_json[:500]}...")  # Log first 500 chars
@@ -427,7 +429,7 @@ class BorgService:
                     line = line.strip()
                     if line.startswith("{"):
                         try:
-                            return json.loads(line)
+                            return json.loads(line)  # type: ignore
                         except json.JSONDecodeError:
                             continue
 
@@ -608,7 +610,7 @@ class BorgService:
 
             # Wait for completion
             max_wait = 30
-            wait_time = 0
+            wait_time = 0.0
 
             while wait_time < max_wait:
                 status = job_manager.get_job_status(job_id)
@@ -620,7 +622,7 @@ class BorgService:
                     success = status["return_code"] == 0
                     # Clean up job
                     self._get_job_manager().cleanup_job(job_id)
-                    return success
+                    return success  # type: ignore
 
                 await asyncio.sleep(0.5)
                 wait_time += 0.5
@@ -658,7 +660,7 @@ class BorgService:
             volume_service = get_volume_service()
             return await volume_service.get_mounted_volumes()
 
-    async def scan_for_repositories(self) -> List[Dict]:
+    async def scan_for_repositories(self) -> List[Dict[str, Any]]:
         """Scan for Borg repositories using SimpleCommandRunner"""
         logger.info("Starting repository scan")
 
