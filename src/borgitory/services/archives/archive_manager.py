@@ -260,7 +260,7 @@ class ArchiveManager:
                     # Find the specific archive
                     for archive in archives:
                         if archive.get("name") == archive_name:
-                            return archive  # type: ignore
+                            return archive
 
                     return None  # Archive not found
                 except json.JSONDecodeError:

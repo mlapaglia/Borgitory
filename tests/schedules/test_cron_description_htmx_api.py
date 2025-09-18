@@ -12,22 +12,23 @@ class TestCronDescriptionHTMXAPI:
     """Test suite for cron description HTMX endpoints."""
 
     @pytest.fixture
-    def client(self):
+    def client(self) -> TestClient:
         """Create test client."""
         return TestClient(app)
 
     @pytest.fixture
-    def mock_templates(self):
+    def mock_templates(self) -> Mock:
         """Create mock templates dependency."""
         mock = Mock()
         mock.TemplateResponse.return_value = Mock()
         return mock
 
     @pytest.fixture
-    def setup_auth(self, test_db: pytest.Session):
+    def setup_auth(self, test_db: pytest.Session) -> User:
         """Set up authentication for tests."""
         # Create a test user
-        user = User(username="testuser", is_active=True)
+        user = User()
+        user.username = "testuser"
         user.set_password("testpass")
         test_db.add(user)
         test_db.commit()

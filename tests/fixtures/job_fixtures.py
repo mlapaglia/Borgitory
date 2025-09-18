@@ -98,11 +98,10 @@ def sample_composite_job() -> BorgJob:
 @pytest.fixture
 def sample_repository(test_db: Session) -> Repository:
     """Create a sample repository in the test database."""
-    repository = Repository(
-        name="test-repo",
-        path="/tmp/test-repo",
-        encrypted_passphrase="test-encrypted-passphrase",
-    )
+    repository = Repository()
+    repository.name = "test-repo"
+    repository.path = "/tmp/test-repo"
+    repository.encrypted_passphrase = "test-encrypted-passphrase"
     test_db.add(repository)
     test_db.commit()
     test_db.refresh(repository)
@@ -112,14 +111,13 @@ def sample_repository(test_db: Session) -> Repository:
 @pytest.fixture
 def sample_database_job(test_db: Session, sample_repository: Repository) -> Job:
     """Create a sample Job record in the test database."""
-    job = Job(
-        id=str(uuid.uuid4()),
-        repository_id=sample_repository.id,
-        type="backup",
-        status="completed",
-        started_at=datetime.now(UTC),
-        finished_at=datetime.now(UTC),
-    )
+    job = Job()
+    job.id = str(uuid.uuid4())
+    job.repository_id = sample_repository.id
+    job.type = "backup"
+    job.status = "completed"
+    job.started_at = datetime.now(UTC)
+    job.finished_at = datetime.now(UTC)
     test_db.add(job)
     test_db.commit()
     test_db.refresh(job)
@@ -131,35 +129,32 @@ def sample_database_job_with_tasks(
     test_db: Session, sample_repository: Repository
 ) -> Job:
     """Create a Job with JobTasks in the test database."""
-    job = Job(
-        id=str(uuid.uuid4()),
-        repository_id=sample_repository.id,
-        type="backup",
-        status="completed",
-        started_at=datetime.now(UTC),
-        finished_at=datetime.now(UTC),
-    )
+    job = Job()
+    job.id = str(uuid.uuid4())
+    job.repository_id = sample_repository.id
+    job.type = "backup"
+    job.status = "completed"
+    job.started_at = datetime.now(UTC)
+    job.finished_at = datetime.now(UTC)
     test_db.add(job)
     test_db.flush()  # Get the job ID
 
-    task1 = JobTask(
-        job_id=job.id,
-        task_type="backup",
-        task_name="Backup Task",
-        task_order=0,
-        status="completed",
-        return_code=0,
-        output="Backup completed successfully\nFiles processed: 100",
-    )
-    task2 = JobTask(
-        job_id=job.id,
-        task_type="prune",
-        task_name="Prune Task",
-        task_order=1,
-        status="completed",
-        return_code=0,
-        output="Prune completed\nRemoved 5 archives",
-    )
+    task1 = JobTask()
+    task1.job_id = job.id
+    task1.task_type = "backup"
+    task1.task_name = "Backup Task"
+    task1.task_order = 0
+    task1.status = "completed"
+    task1.return_code = 0
+    task1.output = "Backup completed successfully\nFiles processed: 100"
+    task2 = JobTask()
+    task2.job_id = job.id
+    task2.task_type = "prune"
+    task2.task_name = "Prune Task"
+    task2.task_order = 1
+    task2.status = "completed"
+    task2.return_code = 0
+    task2.output = "Prune completed\nRemoved 5 archives"
 
     test_db.add_all([task1, task2])
     test_db.commit()
@@ -202,8 +197,8 @@ def create_mock_job_context(
     job_id: str = "",
     status: str = "completed",
     job_type: str = "simple",
-    tasks: List = [],
-) -> dict:
+    tasks: List[Dict[str, Any]] = [],
+) -> Dict[str, Any]:
     """Factory function to create mock job context for rendering tests."""
 
     mock_job = Mock()

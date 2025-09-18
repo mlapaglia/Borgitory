@@ -1265,4 +1265,4 @@ class RcloneService:
 
         # Call the test method
         result = await test_method(**rclone_params)
-        return result  # type: ignore
+        return result

@@ -21,7 +21,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test listing archives via HTMX returns HTML template."""
-        repo = Repository(name="htmx-test-repo", path="/tmp/htmx-test")
+        repo = Repository()
+        repo.name = "htmx-test-repo"
+        repo.path = "/tmp/htmx-test"
         repo.set_passphrase("htmx-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -79,7 +81,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test listing archives when repository has no archives."""
-        repo = Repository(name="empty-repo", path="/tmp/empty")
+        repo = Repository()
+        repo.name = "empty-repo"
+        repo.path = "/tmp/empty"
         repo.set_passphrase("empty-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -126,7 +130,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test listing archives when service throws error."""
-        repo = Repository(name="error-repo", path="/tmp/error")
+        repo = Repository()
+        repo.name = "error-repo"
+        repo.path = "/tmp/error"
         repo.set_passphrase("error-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -213,7 +219,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test getting archive contents via HTMX returns HTML template."""
-        repo = Repository(name="contents-repo", path="/tmp/contents")
+        repo = Repository()
+        repo.name = "contents-repo"
+        repo.path = "/tmp/contents"
         repo.set_passphrase("contents-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -280,7 +288,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test getting archive contents with specific path."""
-        repo = Repository(name="contents-path-repo", path="/tmp/contents-path")
+        repo = Repository()
+        repo.name = "contents-path-repo"
+        repo.path = "/tmp/contents-path"
         repo.set_passphrase("contents-path-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -328,7 +338,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test getting contents of empty directory."""
-        repo = Repository(name="empty-dir-repo", path="/tmp/empty-dir")
+        repo = Repository()
+        repo.name = "empty-dir-repo"
+        repo.path = "/tmp/empty-dir"
         repo.set_passphrase("empty-dir-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -360,7 +372,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test archive contents when service throws error."""
-        repo = Repository(name="contents-error-repo", path="/tmp/contents-error")
+        repo = Repository()
+        repo.name = "contents-error-repo"
+        repo.path = "/tmp/contents-error"
         repo.set_passphrase("contents-error-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -407,7 +421,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test various file size formatting in templates."""
-        repo = Repository(name="size-repo", path="/tmp/size")
+        repo = Repository()
+        repo.name = "size-repo"
+        repo.path = "/tmp/size"
         repo.set_passphrase("size-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -476,9 +492,13 @@ class TestArchiveBrowserHTMX:
     ) -> None:
         """Test the repository selector for archives."""
         # Create test repositories
-        repo1 = Repository(name="repo-1", path="/tmp/repo-1")
+        repo1 = Repository()
+        repo1.name = "repo-1"
+        repo1.path = "/tmp/repo-1"
         repo1.set_passphrase("pass1")
-        repo2 = Repository(name="repo-2", path="/tmp/repo-2")
+        repo2 = Repository()
+        repo2.name = "repo-2"
+        repo2.path = "/tmp/repo-2"
         repo2.set_passphrase("pass2")
 
         test_db.add_all([repo1, repo2])
@@ -509,7 +529,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test archives/list endpoint handles form data from selector."""
-        repo = Repository(name="form-repo", path="/tmp/form")
+        repo = Repository()
+        repo.name = "form-repo"
+        repo.path = "/tmp/form"
         repo.set_passphrase("form-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -551,7 +573,9 @@ class TestArchiveBrowserHTMX:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test that HTMX navigation attributes are present in archive browser."""
-        repo = Repository(name="nav-repo", path="/tmp/nav")
+        repo = Repository()
+        repo.name = "nav-repo"
+        repo.path = "/tmp/nav"
         repo.set_passphrase("nav-passphrase")
         test_db.add(repo)
         test_db.commit()

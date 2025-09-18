@@ -32,9 +32,13 @@ class TestRepositoriesAPI:
     ) -> None:
         """Test listing repositories with data."""
         # Create test repositories
-        repo1 = Repository(name="repo-1", path="/tmp/repo-1")
+        repo1 = Repository()
+        repo1.name = "repo-1"
+        repo1.path = "/tmp/repo-1"
         repo1.set_passphrase("passphrase-1")
-        repo2 = Repository(name="repo-2", path="/tmp/repo-2")
+        repo2 = Repository()
+        repo2.name = "repo-2"
+        repo2.path = "/tmp/repo-2"
         repo2.set_passphrase("passphrase-2")
 
         test_db.add_all([repo1, repo2])
@@ -55,7 +59,9 @@ class TestRepositoriesAPI:
         """Test listing repositories with pagination."""
         # Create multiple repositories
         for i in range(5):
-            repo = Repository(name=f"repo-{i}", path=f"/tmp/repo-{i}")
+            repo = Repository()
+            repo.name = f"repo-{i}"
+            repo.path = f"/tmp/repo-{i}"
             repo.set_passphrase(f"passphrase-{i}")
             test_db.add(repo)
         test_db.commit()
@@ -241,7 +247,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test getting repositories as HTML with data."""
-        repo = Repository(name="html-test-repo", path="/tmp/html-test")
+        repo = Repository()
+        repo.name = "html-test-repo"
+        repo.path = "/tmp/html-test"
         repo.set_passphrase("test-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -276,24 +284,20 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
 
         try:
-            from unittest.mock import Mock
+            # Mock the secure path functions that the endpoint actually uses
+            mock_directories = [
+                {"name": "data", "path": "/mnt/data"},
+                {"name": "backups", "path": "/mnt/backups"},
+            ]
 
-            # Mock pathlib.Path methods
-            mock_data = Mock()
-            mock_data.name = "data"
-            mock_data.is_dir.return_value = True
-            mock_data.is_file.return_value = False
-            mock_data.__str__ = Mock(return_value="/mnt/data")
-
-            mock_backups = Mock()
-            mock_backups.name = "backups"
-            mock_backups.is_dir.return_value = True
-            mock_backups.is_file.return_value = False
-            mock_backups.__str__ = Mock(return_value="/mnt/backups")
-
-            with patch("pathlib.Path.exists", return_value=True), patch(
-                "pathlib.Path.is_dir", return_value=True
-            ), patch("pathlib.Path.iterdir", return_value=[mock_data, mock_backups]):
+            with patch(
+                "borgitory.api.repositories.user_secure_exists", return_value=True
+            ), patch(
+                "borgitory.api.repositories.user_secure_isdir", return_value=True
+            ), patch(
+                "borgitory.api.repositories.user_get_directory_listing",
+                return_value=mock_directories,
+            ):
                 response = await async_client.get(
                     "/api/repositories/directories?path=/mnt"
                 )
@@ -323,24 +327,20 @@ class TestRepositoriesAPI:
         app.dependency_overrides[get_volume_service] = lambda: mock_volume_service
 
         try:
-            from unittest.mock import Mock
+            # Mock the secure path functions that the endpoint actually uses
+            mock_directories = [
+                {"name": "subdir1", "path": "/mnt/data/subdir1"},
+                {"name": "subdir2", "path": "/mnt/data/subdir2"},
+            ]
 
-            # Mock pathlib.Path methods
-            mock_subdir1 = Mock()
-            mock_subdir1.name = "subdir1"
-            mock_subdir1.is_dir.return_value = True
-            mock_subdir1.is_file.return_value = False
-            mock_subdir1.__str__ = Mock(return_value="/mnt/data/subdir1")
-
-            mock_subdir2 = Mock()
-            mock_subdir2.name = "subdir2"
-            mock_subdir2.is_dir.return_value = True
-            mock_subdir2.is_file.return_value = False
-            mock_subdir2.__str__ = Mock(return_value="/mnt/data/subdir2")
-
-            with patch("pathlib.Path.exists", return_value=True), patch(
-                "pathlib.Path.is_dir", return_value=True
-            ), patch("pathlib.Path.iterdir", return_value=[mock_subdir1, mock_subdir2]):
+            with patch(
+                "borgitory.api.repositories.user_secure_exists", return_value=True
+            ), patch(
+                "borgitory.api.repositories.user_secure_isdir", return_value=True
+            ), patch(
+                "borgitory.api.repositories.user_get_directory_listing",
+                return_value=mock_directories,
+            ):
                 response = await async_client.get(
                     "/api/repositories/directories?path=/mnt/data"
                 )
@@ -612,7 +612,9 @@ class TestRepositoriesAPI:
     ) -> None:
         """Test repository import with duplicate name."""
         # Create existing repository
-        existing_repo = Repository(name="existing-import", path="/tmp/existing")
+        existing_repo = Repository()
+        existing_repo.name = "existing-import"
+        existing_repo.path = "/tmp/existing"
         existing_repo.set_passphrase("existing-passphrase")
         test_db.add(existing_repo)
         test_db.commit()
@@ -724,7 +726,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test getting repository by ID."""
-        repo = Repository(name="get-test-repo", path="/tmp/get-test")
+        repo = Repository()
+        repo.name = "get-test-repo"
+        repo.path = "/tmp/get-test"
         repo.set_passphrase("get-test-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -749,7 +753,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test updating repository."""
-        repo = Repository(name="update-test-repo", path="/tmp/update-test")
+        repo = Repository()
+        repo.name = "update-test-repo"
+        repo.path = "/tmp/update-test"
         repo.set_passphrase("old-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -851,13 +857,18 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test deleting repository with active jobs."""
-        repo = Repository(name="active-jobs-repo", path="/tmp/active-jobs")
+        repo = Repository()
+        repo.name = "active-jobs-repo"
+        repo.path = "/tmp/active-jobs"
         repo.set_passphrase("active-passphrase")
         test_db.add(repo)
         test_db.commit()
 
         # Create active job
-        active_job = Job(repository_id=repo.id, type="backup", status="running")
+        active_job = Job()
+        active_job.repository_id = repo.id
+        active_job.type = "backup"
+        active_job.status = "running"
         test_db.add(active_job)
         test_db.commit()
 
@@ -950,7 +961,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test listing archives as HTML."""
-        repo = Repository(name="html-archives-repo", path="/tmp/html-archives")
+        repo = Repository()
+        repo.name = "html-archives-repo"
+        repo.path = "/tmp/html-archives"
         repo.set_passphrase("html-archives-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -987,7 +1000,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test archives HTML with error handling."""
-        repo = Repository(name="html-error-repo", path="/tmp/html-error")
+        repo = Repository()
+        repo.name = "html-error-repo"
+        repo.path = "/tmp/html-error"
         repo.set_passphrase("html-error-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -1016,7 +1031,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test getting archives repository selector."""
-        repo = Repository(name="selector-repo", path="/tmp/selector")
+        repo = Repository()
+        repo.name = "selector-repo"
+        repo.path = "/tmp/selector"
         repo.set_passphrase("selector-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -1039,7 +1056,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test getting archives list with repository ID."""
-        repo = Repository(name="list-repo", path="/tmp/list")
+        repo = Repository()
+        repo.name = "list-repo"
+        repo.path = "/tmp/list"
         repo.set_passphrase("list-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -1068,7 +1087,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test getting repository info."""
-        repo = Repository(name="info-repo", path="/tmp/info")
+        repo = Repository()
+        repo.name = "info-repo"
+        repo.path = "/tmp/info"
         repo.set_passphrase("info-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -1122,7 +1143,9 @@ class TestRepositoriesAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test extracting file from archive."""
-        repo = Repository(name="extract-repo", path="/tmp/extract")
+        repo = Repository()
+        repo.name = "extract-repo"
+        repo.path = "/tmp/extract"
         repo.set_passphrase("extract-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -1162,9 +1185,13 @@ class TestRepositoriesAPI:
     ) -> None:
         """Test getting repository selector for statistics."""
         # Create test repositories
-        repo1 = Repository(name="stats-repo-1", path="/tmp/stats1")
+        repo1 = Repository()
+        repo1.name = "stats-repo-1"
+        repo1.path = "/tmp/stats1"
         repo1.set_passphrase("pass1")
-        repo2 = Repository(name="stats-repo-2", path="/tmp/stats2")
+        repo2 = Repository()
+        repo2.name = "stats-repo-2"
+        repo2.path = "/tmp/stats2"
         repo2.set_passphrase("pass2")
 
         test_db.add_all([repo1, repo2])
@@ -1237,7 +1264,9 @@ class TestRepositoriesAPI:
         )
 
         # Create test repository
-        repo = Repository(name="stats-test-repo", path="/tmp/stats-test")
+        repo = Repository()
+        repo.name = "stats-test-repo"
+        repo.path = "/tmp/stats-test"
         repo.set_passphrase("stats-pass")
         test_db.add(repo)
         test_db.commit()
@@ -1328,7 +1357,9 @@ class TestRepositoriesAPI:
         )
 
         # Create test repository
-        repo = Repository(name="direct-stats-repo", path="/tmp/direct-stats")
+        repo = Repository()
+        repo.name = "direct-stats-repo"
+        repo.path = "/tmp/direct-stats"
         repo.set_passphrase("direct-pass")
         test_db.add(repo)
         test_db.commit()
@@ -1418,7 +1449,8 @@ class TestRepositoriesAPI:
         from borgitory.models.database import User
 
         # Create a test user and mock authentication
-        test_user = User(username="testuser")
+        test_user = User()
+        test_user.username = "testuser"
         test_user.set_password("testpass")
         test_db.add(test_user)
         test_db.commit()
@@ -1488,7 +1520,9 @@ class TestRepositoriesAPI:
         )
 
         # Create test repository
-        repo = Repository(name="regression-test-repo", path="/tmp/regression-test")
+        repo = Repository()
+        repo.name = "regression-test-repo"
+        repo.path = "/tmp/regression-test"
         repo.set_passphrase("regression-pass")
         test_db.add(repo)
         test_db.commit()

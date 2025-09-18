@@ -286,7 +286,7 @@ class TestArchiveMountManager:
 
         # Should return False after timeout
         result = await self.manager._wait_for_mount_ready(
-            non_existent_dir, mock_process, timeout=0.1
+            non_existent_dir, mock_process, timeout=1
         )
         assert result is False
 

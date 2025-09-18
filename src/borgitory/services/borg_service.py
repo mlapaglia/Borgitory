@@ -391,7 +391,7 @@ class BorgService:
                     logger.info(
                         f"Successfully parsed {len(data['archives'])} archives from repository"
                     )
-                    return data["archives"]  # type: ignore
+                    return data["archives"]
             except json.JSONDecodeError as je:
                 logger.error(f"JSON decode error: {je}")
                 logger.error(f"Raw output: {full_json[:500]}...")  # Log first 500 chars
@@ -429,7 +429,7 @@ class BorgService:
                     line = line.strip()
                     if line.startswith("{"):
                         try:
-                            return json.loads(line)  # type: ignore
+                            return json.loads(line)
                         except json.JSONDecodeError:
                             continue
 
@@ -622,7 +622,7 @@ class BorgService:
                     success = status["return_code"] == 0
                     # Clean up job
                     self._get_job_manager().cleanup_job(job_id)
-                    return success  # type: ignore
+                    return success
 
                 await asyncio.sleep(0.5)
                 wait_time += 0.5

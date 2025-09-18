@@ -109,7 +109,7 @@ def _get_provider_display_details(
                 None, None
             )  # rclone_service and config not needed
             result = temp_storage.get_display_details(provider_config)
-            return result  # type: ignore
+            return result
     except Exception as e:
         logger.warning(f"Error getting display details for provider '{provider}': {e}")
 

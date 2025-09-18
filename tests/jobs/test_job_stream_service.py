@@ -108,9 +108,8 @@ class TestJobStreamService:
 
         # Mock streaming method to raise an exception
         async def mock_error_generator():
-            if False:  # Make it a generator without yielding
-                yield  # type: ignore[unreachable]
             raise RuntimeError("Test streaming error")
+            yield  # pyright: ignore[reportUnreachable]
 
         self.mock_job_manager.stream_all_job_updates = Mock(
             return_value=mock_error_generator()

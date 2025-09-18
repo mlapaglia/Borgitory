@@ -17,9 +17,33 @@ class OutputLine:
     """Represents a single line of job output"""
 
     text: str
-    timestamp: datetime
-    line_type: str = "stdout"  # stdout, stderr, progress, status
+    timestamp: str
+    type: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-like access for backward compatibility"""
+        if key == "text":
+            return self.text
+        elif key == "timestamp":
+            return self.timestamp
+        elif key == "type":
+            return self.type
+        elif key == "metadata":
+            return self.metadata
+        elif key in self.metadata:
+            return self.metadata[key]
+        return default
+
+    def __getitem__(self, key: str) -> Any:
+        """Dict-like access for backward compatibility"""
+        result = self.get(key)
+        if result is None and key not in ["text", "timestamp", "type", "metadata"]:
+            raise KeyError(key)
+        return result
+
+
+# Removed duplicate OutputLine definition - using the one above with dict-like interface
 
 
 @dataclass
@@ -27,7 +51,7 @@ class JobOutput:
     """Container for job output data"""
 
     job_id: str
-    lines: deque[str] = field(default_factory=deque)
+    lines: deque[OutputLine] = field(default_factory=deque)
     current_progress: Dict[str, Any] = field(default_factory=dict)
     total_lines: int = 0
     max_lines: int = 1000
@@ -73,19 +97,12 @@ class JobOutputManager:
         async with self._output_locks[job_id]:
             output_line = OutputLine(
                 text=text,
-                timestamp=datetime.now(),
-                line_type=line_type,
+                timestamp=datetime.now().isoformat(),
+                type=line_type,
                 metadata=progress_info or {},
             )
 
-            job_output.lines.append(
-                {
-                    "text": text,
-                    "timestamp": output_line.timestamp.isoformat(),
-                    "type": line_type,
-                    "metadata": progress_info or {},
-                }
-            )
+            job_output.lines.append(output_line)
 
             job_output.total_lines += 1
 

@@ -502,7 +502,7 @@ class TestS3Storage:
 
         async def mock_error_generator(*args, **kwargs):
             raise Exception("Network timeout")
-            yield  # type: ignore[unreachable]
+            yield  # unreachable
 
         mock_rclone_service.sync_repository_to_s3 = mock_error_generator
 
@@ -660,7 +660,7 @@ class TestSFTPStorage:
 
         async def mock_error_generator(*args, **kwargs):
             raise Exception("SSH connection refused")
-            yield  # type: ignore[unreachable]
+            yield  # unreachable
 
         mock_rclone_service.sync_repository_to_sftp = mock_error_generator
 

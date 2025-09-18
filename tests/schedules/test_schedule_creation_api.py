@@ -2,6 +2,7 @@
 
 from _pytest.main import Session
 import pytest
+from typing import Any, Dict
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from urllib.parse import unquote
@@ -31,12 +32,12 @@ class TestScheduleCreationAPI:
     """Test suite for schedule creation API with validation."""
 
     @pytest.fixture
-    def client(self):
+    def client(self) -> TestClient:
         """Create test client."""
         return TestClient(app)
 
     @pytest.fixture(scope="function")
-    def setup_dependencies(self, test_db: Session):
+    def setup_dependencies(self, test_db: Session) -> Dict[str, Any]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -57,11 +58,14 @@ class TestScheduleCreationAPI:
         app.dependency_overrides[get_scheduler_service] = lambda: mock_scheduler_service
 
         # Create test data
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         user.set_password("testpass")
         test_db.add(user)
 
-        repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
         test_db.commit()

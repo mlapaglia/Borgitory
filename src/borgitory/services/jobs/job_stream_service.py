@@ -207,12 +207,15 @@ class JobStreamService:
                 output_buffer = []
 
                 try:
-                    async for event in self.job_manager.stream_job_output(job_id):
-                        logger.debug(f"Job {job_id} received event: {event}")
+                    async for output_event in self.job_manager.stream_job_output(
+                        job_id
+                    ):
+                        # output_event is Dict[str, Any] from stream_job_output method
+                        logger.debug(f"Job {job_id} received event: {output_event}")
 
-                        if event.get("type") == "output":
+                        if output_event.get("type") == "output":
                             # Accumulate output lines
-                            line_data = event.get("data", "")
+                            line_data = output_event.get("data", "")
                             if isinstance(line_data, dict):
                                 output_buffer.append(line_data.get("text", ""))
                             else:
@@ -223,9 +226,9 @@ class JobStreamService:
                             yield f"event: output\ndata: {full_output}\n\n"
 
                             # Also send status update if there's progress
-                            if event.get("progress"):
+                            if output_event.get("progress"):
                                 yield "event: output-status\ndata: Streaming\n\n"
-                        elif event.get("type") == "complete":
+                        elif output_event.get("type") == "complete":
                             # Send completion event to trigger switch to static view
                             logger.info(
                                 f"Job {job_id} completed, sending completion event"
@@ -407,7 +410,7 @@ class JobStreamService:
                         "type": job_type,
                         "status": borg_job.status,
                         "started_at": borg_job.started_at.strftime("%H:%M:%S"),
-                        "progress": None,
+                        "progress": {},
                         "progress_info": progress_info,
                     }
                 )
@@ -426,10 +429,12 @@ class JobStreamService:
                         "type": getattr(job, "job_type", "composite"),
                         "status": job.status,
                         "started_at": job.started_at.strftime("%H:%M:%S"),
-                        "current_task": current_task.task_name
-                        if current_task
-                        else "Unknown",
-                        "task_progress": f"{job.current_task_index + 1}/{len(job.tasks)}",
+                        "progress": {
+                            "current_task": current_task.task_name
+                            if current_task
+                            else "Unknown",
+                            "task_progress": f"{job.current_task_index + 1}/{len(job.tasks)}",
+                        },
                         "progress_info": progress_info,
                     }
                 )

@@ -117,7 +117,9 @@ class BorgJobTask:
     return_code: Optional[int] = None
     error: Optional[str] = None
     parameters: Dict[str, Any] = field(default_factory=dict)
-    output_lines: List[str] = field(default_factory=list)  # Store task output
+    output_lines: List[Union[str, Dict[str, str]]] = field(
+        default_factory=list
+    )  # Store task output
 
 
 @dataclass
@@ -434,7 +436,7 @@ class JobManager:
         job: BorgJob,
         task: BorgJobTask,
         command: List[str],
-        env: Optional[Dict] = None,
+        env: Optional[Dict[str, str]] = None,
     ) -> None:
         """Execute a single task within a composite job"""
         job.status = "running"
@@ -526,7 +528,7 @@ class JobManager:
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict],
+        task_definitions: List[Dict[str, Any]],
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
@@ -751,7 +753,7 @@ class JobManager:
             )
 
     async def _execute_simple_job(
-        self, job: BorgJob, command: List[str], env: Optional[Dict] = None
+        self, job: BorgJob, command: List[str], env: Optional[Dict[str, str]] = None
     ) -> None:
         """Execute a simple single-command job (for test compatibility)"""
         job.status = "running"
@@ -1215,11 +1217,11 @@ class JobManager:
         result = await self.safe_executor.execute_cloud_sync_task(
             repository_path=str(repository_path or ""),
             cloud_sync_config_id=cloud_sync_config_id,
-            db_session_factory=self.dependencies.db_session_factory,  # type: ignore
-            rclone_service=self.dependencies.rclone_service,  # type: ignore
-            encryption_service=self.dependencies.encryption_service,  # type: ignore
-            storage_factory=self.dependencies.storage_factory,  # type: ignore
-            provider_registry=self.dependencies.provider_registry,  # type: ignore
+            db_session_factory=self.dependencies.db_session_factory,
+            rclone_service=self.dependencies.rclone_service,
+            encryption_service=self.dependencies.encryption_service,
+            storage_factory=self.dependencies.storage_factory,
+            provider_registry=self.dependencies.provider_registry,
             output_callback=task_output_callback,
         )
 
@@ -1278,11 +1280,11 @@ class JobManager:
                     priority = params.get("priority", 0)
 
                     task.output_lines.append(
-                        {"text": f"Sending Pushover notification to {config.name}"}
+                        f"Sending Pushover notification to {config.name}"
                     )
-                    task.output_lines.append({"text": f"Title: {title}"})
-                    task.output_lines.append({"text": f"Message: {message}"})
-                    task.output_lines.append({"text": f"Priority: {priority}"})
+                    task.output_lines.append(f"Title: {title}")
+                    task.output_lines.append(f"Message: {message}")
+                    task.output_lines.append(f"Priority: {priority}")
 
                     self.safe_event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
@@ -1310,16 +1312,14 @@ class JobManager:
 
                     if success:
                         result_message = "✓ Notification sent successfully"
-                        task.output_lines.append({"text": result_message})
+                        task.output_lines.append(result_message)
                         if response_message:
-                            task.output_lines.append(
-                                {"text": f"Response: {response_message}"}
-                            )
+                            task.output_lines.append(f"Response: {response_message}")
                     else:
                         result_message = (
                             f"✗ Failed to send notification: {response_message}"
                         )
-                        task.output_lines.append({"text": result_message})
+                        task.output_lines.append(result_message)
 
                     self.safe_event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
@@ -1582,7 +1582,7 @@ class JobManager:
 
         return None
 
-    async def stream_all_job_updates(self) -> AsyncGenerator[Any, None]:
+    async def stream_all_job_updates(self) -> AsyncGenerator[JobEvent, None]:
         """Stream all job updates via event broadcaster"""
         if self.event_broadcaster:
             async for event in self.safe_event_broadcaster.stream_all_events():
@@ -1749,7 +1749,7 @@ class JobManager:
         # Add output to the main task
         if job.tasks:
             main_task = job.tasks[0]
-            # Store output in dictionary format for consistency with task streaming
+            # Store output in dict format for backward compatibility
             main_task.output_lines.append({"text": output_line})
 
         # Also add output through output manager for streaming

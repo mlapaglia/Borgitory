@@ -11,7 +11,7 @@ class TestCronDescriptionAPI:
     """Test suite for the cron description HTMX endpoint."""
 
     @pytest.fixture
-    def client(self):
+    def client(self) -> TestClient:
         """Create test client."""
         return TestClient(app)
 

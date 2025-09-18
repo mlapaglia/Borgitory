@@ -4,7 +4,7 @@ Test configuration and fixtures
 
 import asyncio
 import os
-from typing import AsyncGenerator, Generator
+from typing import Any, AsyncGenerator, Dict, Generator, Optional
 from unittest.mock import Mock
 
 import pytest
@@ -47,7 +47,7 @@ from tests.fixtures.registry_fixtures import (  # noqa: F401
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator:
+def event_loop() -> Generator[Any, None, None]:
     """Create an instance of the default event loop for test session."""
     try:
         loop = asyncio.get_running_loop()
@@ -58,7 +58,7 @@ def event_loop() -> Generator:
 
 
 @pytest.fixture
-def test_db():
+def test_db() -> Generator[Session, None, None]:
     """Create a test database with proper isolation."""
     # Use in-memory SQLite for testing
     SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -73,7 +73,7 @@ def test_db():
     # Create ALL tables at once
     Base.metadata.create_all(bind=engine)
 
-    def override_get_db():
+    def override_get_db() -> Generator[Session, None, None]:
         db_session = TestingSessionLocal()
         try:
             yield db_session
@@ -97,7 +97,7 @@ def test_db():
 
 
 @pytest.fixture
-def mock_rclone_service():
+def mock_rclone_service() -> Mock:
     """Create a mock RcloneService."""
     mock = Mock()
 
@@ -107,7 +107,7 @@ def mock_rclone_service():
         "message": "Connection successful",
     }
 
-    async def mock_sync_generator():
+    async def mock_sync_generator() -> AsyncGenerator[Dict[str, str], None]:
         """Mock async generator for sync progress."""
         yield {"type": "log", "stream": "stdout", "message": "Starting sync"}
         yield {"type": "log", "stream": "stdout", "message": "Syncing files"}
@@ -128,7 +128,7 @@ async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest.fixture
-def sample_repository_data():
+def sample_repository_data() -> Dict[str, str]:
     """Sample repository data for testing."""
     return {
         "name": "test-repo",
@@ -138,7 +138,7 @@ def sample_repository_data():
 
 
 @pytest.fixture
-def sample_sync_request():
+def sample_sync_request() -> Dict[str, Any]:
     """Sample sync request data for testing."""
     return {
         "repository_id": 1,
@@ -149,7 +149,7 @@ def sample_sync_request():
 
 
 @pytest.fixture
-def sample_s3_config():
+def sample_s3_config() -> Dict[str, str]:
     """Sample S3 configuration for testing."""
     return {
         "remote_name": "test-s3",
@@ -161,10 +161,10 @@ def sample_s3_config():
 def create_cloud_sync_config_with_json(
     name: str,
     provider: str,
-    provider_config: dict,
+    provider_config: Dict[str, Any],
     enabled: bool = True,
     path_prefix: str = "",
-    **kwargs,
+    **kwargs: Any,
 ) -> CloudSyncConfig:
     """Helper function to create CloudSyncConfig with JSON provider_config.
 
@@ -181,14 +181,13 @@ def create_cloud_sync_config_with_json(
     """
     import json
 
-    return CloudSyncConfig(
-        name=name,
-        provider=provider,
-        provider_config=json.dumps(provider_config),
-        enabled=enabled,
-        path_prefix=path_prefix,
-        **kwargs,
-    )
+    config = CloudSyncConfig()
+    config.name = name
+    config.provider = provider
+    config.provider_config = json.dumps(provider_config)
+    config.enabled = enabled
+    config.path_prefix = path_prefix
+    return config
 
 
 def create_s3_cloud_sync_config(
@@ -197,7 +196,7 @@ def create_s3_cloud_sync_config(
     access_key: str = "test_access_key",
     secret_key: str = "test_secret_key",
     enabled: bool = True,
-    **kwargs,
+    **kwargs: Any,
 ) -> CloudSyncConfig:
     """Helper to create S3 CloudSyncConfig with proper JSON structure."""
     s3_config = {
@@ -215,11 +214,11 @@ def create_sftp_cloud_sync_config(
     host: str = "sftp.example.com",
     port: int = 22,
     username: str = "testuser",
-    password: str = None,
-    private_key: str = None,
+    password: Optional[str] = None,
+    private_key: Optional[str] = None,
     remote_path: str = "/backups",
     enabled: bool = True,
-    **kwargs,
+    **kwargs: Any,
 ) -> CloudSyncConfig:
     """Helper to create SFTP CloudSyncConfig with proper JSON structure."""
     sftp_config = {

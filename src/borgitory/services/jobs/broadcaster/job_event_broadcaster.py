@@ -70,7 +70,7 @@ class JobEventBroadcaster:
         for queue in self._client_queues:
             try:
                 if not queue.full():
-                    queue.put_nowait(event.to_dict())
+                    queue.put_nowait(event)
                     sent_count += 1
                 else:
                     logger.warning("Client queue is full, marking for cleanup")
@@ -112,7 +112,7 @@ class JobEventBroadcaster:
         if send_recent_events:
             for event in self._recent_events[-10:]:  # Send last 10 events
                 try:
-                    queue.put_nowait(event.to_dict())
+                    queue.put_nowait(event)
                 except asyncio.QueueFull:
                     logger.warning("New client queue is already full")
                     break
@@ -140,7 +140,7 @@ class JobEventBroadcaster:
 
     async def stream_events_for_client(
         self, client_queue: asyncio.Queue[JobEvent]
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[JobEvent, None]:
         """Stream events for a specific client"""
         try:
             while not self._shutdown_requested:
@@ -158,11 +158,12 @@ class JobEventBroadcaster:
 
                 except asyncio.TimeoutError:
                     # Send keepalive if no events
-                    yield {
-                        "type": EventType.KEEPALIVE.value,
-                        "timestamp": datetime.now().isoformat(),
-                        "data": {"message": "keepalive"},
-                    }
+                    from borgitory.services.jobs.broadcaster.job_event import JobEvent
+
+                    keepalive_event = JobEvent(
+                        event_type=EventType.KEEPALIVE, data={"message": "keepalive"}
+                    )
+                    yield keepalive_event
 
         except Exception as e:
             logger.error(f"Error in client event stream: {e}")
@@ -170,7 +171,7 @@ class JobEventBroadcaster:
             # Clean up client on disconnect
             self._remove_client_queue(client_queue)
 
-    async def stream_all_events(self) -> AsyncGenerator[Dict[str, Any], None]:
+    async def stream_all_events(self) -> AsyncGenerator[JobEvent, None]:
         """Stream all events for a new client connection"""
         client_queue = self.subscribe_client()
 

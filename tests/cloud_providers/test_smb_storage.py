@@ -237,7 +237,7 @@ class TestSMBStorage:
 
         async def mock_failing_generator(*args, **kwargs):
             raise Exception("Upload failed")
-            yield  # type: ignore[unreachable]
+            yield  # pyright: ignore[reportUnreachable]
 
         mock_rclone_service.sync_repository_to_smb = mock_failing_generator
 

@@ -85,7 +85,7 @@ class StorageFactory:
             )
 
         storage_instance = storage_class(validated_config, self._rclone_service)
-        return storage_instance  # type: ignore
+        return storage_instance
 
     def get_supported_providers(self) -> list[str]:
         """Get list of supported provider names."""

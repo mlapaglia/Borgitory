@@ -181,10 +181,9 @@ plugins = ["sqlalchemy.ext.mypy.plugin"]
 exclude = [
     "^alembic/",
     "^htmlcov/",
-    "^tests/",
     "^\\.",
 ]
-files = ["src/borgitory"]
+files = ["src/borgitory", "tests"]
 
 [[tool.mypy.overrides]]
 module = [

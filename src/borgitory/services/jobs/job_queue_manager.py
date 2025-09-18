@@ -39,6 +39,38 @@ class QueuedJob:
 
 
 @dataclass
+class PriorityQueueItem:
+    """Wrapper for items in PriorityQueue to handle comparison"""
+
+    priority: int
+    timestamp: Optional[datetime]
+    job: QueuedJob
+
+    def __lt__(self, other: "PriorityQueueItem") -> bool:
+        """Compare items for priority queue ordering"""
+        if self.priority != other.priority:
+            return self.priority < other.priority
+        # If priorities are equal, use timestamp (earlier timestamp = higher priority)
+        self_time = self.timestamp or datetime.min
+        other_time = other.timestamp or datetime.min
+        return self_time < other_time
+
+    def __gt__(self, other: "PriorityQueueItem") -> bool:
+        """Compare items for priority queue ordering"""
+        return not self.__lt__(other) and self != other
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality"""
+        if not isinstance(other, PriorityQueueItem):
+            return False
+        return (
+            self.priority == other.priority
+            and self.timestamp == other.timestamp
+            and self.job.job_id == other.job.job_id
+        )
+
+
+@dataclass
 class QueueStats:
     """Queue statistics"""
 
@@ -63,8 +95,10 @@ class JobQueueManager:
         self.queue_poll_interval = queue_poll_interval
 
         # Separate queues for different job types
-        self._backup_queue: asyncio.PriorityQueue[QueuedJob] = asyncio.PriorityQueue()
-        self._operation_queue: asyncio.PriorityQueue[QueuedJob] = (
+        self._backup_queue: asyncio.PriorityQueue[PriorityQueueItem] = (
+            asyncio.PriorityQueue()
+        )
+        self._operation_queue: asyncio.PriorityQueue[PriorityQueueItem] = (
             asyncio.PriorityQueue()
         )
 
@@ -126,7 +160,10 @@ class JobQueueManager:
 
         # Priority queue uses negative priority for correct ordering (higher priority = lower number)
         priority_value = -priority.value
-        await queue.put((priority_value, queued_job.queued_at, queued_job))
+        queue_item = PriorityQueueItem(
+            priority=priority_value, timestamp=queued_job.queued_at, job=queued_job
+        )
+        await queue.put(queue_item)
 
         logger.info(
             f"Queued {job_type} job {job_id} with priority {priority.name} "
@@ -155,9 +192,10 @@ class JobQueueManager:
             try:
                 # Get next job from queue with timeout
                 try:
-                    _, _, queued_job = await asyncio.wait_for(
+                    queue_item = await asyncio.wait_for(
                         self._backup_queue.get(), timeout=self.queue_poll_interval * 10
                     )
+                    queued_job = queue_item.job
                 except asyncio.TimeoutError:
                     continue
 
@@ -202,10 +240,11 @@ class JobQueueManager:
             try:
                 # Get next job from queue with timeout
                 try:
-                    _, _, queued_job = await asyncio.wait_for(
+                    queue_item = await asyncio.wait_for(
                         self._operation_queue.get(),
                         timeout=self.queue_poll_interval * 10,
                     )
+                    queued_job = queue_item.job
                 except asyncio.TimeoutError:
                     continue
 

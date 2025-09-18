@@ -1,5 +1,6 @@
 import pytest
 from datetime import datetime
+from typing import Any, Dict
 from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -29,7 +30,7 @@ class TestSchedulesAPI:
     """Test the Schedules API endpoints - HTMX/HTTP behavior"""
 
     @pytest.fixture(scope="function")
-    def setup_test_dependencies(self, test_db: Session):
+    def setup_test_dependencies(self, test_db: Session) -> Dict[str, Any]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -59,13 +60,12 @@ class TestSchedulesAPI:
         app.dependency_overrides.clear()
 
     @pytest.fixture
-    def sample_repository(self, test_db: Session):
+    def sample_repository(self, test_db: Session) -> Repository:
         """Create a sample repository for testing."""
-        repository = Repository(
-            name="test-repo",
-            path="/tmp/test-repo",
-            encrypted_passphrase="test-encrypted-passphrase",
-        )
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/tmp/test-repo"
+        repository.encrypted_passphrase = "test-encrypted-passphrase"
         test_db.add(repository)
         test_db.commit()
         test_db.refresh(repository)
@@ -76,30 +76,30 @@ class TestSchedulesAPI:
     ) -> None:
         """Test getting schedules form returns HTML template."""
         # Create some test configurations with required fields
-        cleanup_config = CleanupConfig(
-            name="test-cleanup", strategy="simple", keep_daily=7, enabled=True
-        )
+        cleanup_config = CleanupConfig()
+        cleanup_config.name = "test-cleanup"
+        cleanup_config.strategy = "simple"
+        cleanup_config.keep_daily = 7
+        cleanup_config.enabled = True
         import json
 
-        cloud_config = CloudSyncConfig(
-            name="test-cloud",
-            provider="s3",
-            provider_config=json.dumps(
-                {
-                    "bucket_name": "test",
-                    "access_key": "test-access-key",
-                    "secret_key": "test-secret-key",
-                }
-            ),
-            enabled=True,
+        cloud_config = CloudSyncConfig()
+        cloud_config.name = "test-cloud"
+        cloud_config.provider = "s3"
+        cloud_config.provider_config = json.dumps(
+            {
+                "bucket_name": "test",
+                "access_key": "test-access-key",
+                "secret_key": "test-secret-key",
+            }
         )
-        notification_config = NotificationConfig(
-            name="test-notif",
-            provider="pushover",
-            encrypted_user_key="test-encrypted-user",
-            encrypted_app_token="test-encrypted-token",
-            enabled=True,
-        )
+        cloud_config.enabled = True
+        notification_config = NotificationConfig()
+        notification_config.name = "test-notif"
+        notification_config.provider = "pushover"
+        notification_config.encrypted_user_key = "test-encrypted-user"
+        notification_config.encrypted_app_token = "test-encrypted-token"
+        notification_config.enabled = True
 
         test_db.add_all([cleanup_config, cloud_config, notification_config])
         test_db.commit()
@@ -178,18 +178,17 @@ class TestSchedulesAPI:
     ) -> None:
         """Test getting schedules as HTML."""
         # Create test schedules
-        schedule1 = Schedule(
-            name="schedule-1",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data1",
-        )
-        schedule2 = Schedule(
-            name="schedule-2",
-            repository_id=sample_repository.id,
-            cron_expression="0 3 * * *",
-            source_path="/data2",
-        )
+        schedule1 = Schedule()
+        schedule1.name = "schedule-1"
+        schedule1.repository_id = sample_repository.id
+        schedule1.cron_expression = "0 2 * * *"
+        schedule1.source_path = "/data1"
+
+        schedule2 = Schedule()
+        schedule2.name = "schedule-2"
+        schedule2.repository_id = sample_repository.id
+        schedule2.cron_expression = "0 3 * * *"
+        schedule2.source_path = "/data2"
         test_db.add_all([schedule1, schedule2])
         test_db.commit()
 
@@ -207,12 +206,11 @@ class TestSchedulesAPI:
         """Test getting schedules with pagination parameters."""
         # Create multiple schedules
         for i in range(5):
-            schedule = Schedule(
-                name=f"schedule-{i}",
-                repository_id=sample_repository.id,
-                cron_expression="0 2 * * *",
-                source_path=f"/data{i}",
-            )
+            schedule = Schedule()
+            schedule.name = f"schedule-{i}"
+            schedule.repository_id = sample_repository.id
+            schedule.cron_expression = "0 2 * * *"
+            schedule.source_path = f"/data{i}"
             test_db.add(schedule)
         test_db.commit()
 
@@ -272,12 +270,11 @@ class TestSchedulesAPI:
     ) -> None:
         """Test listing schedules."""
         # Create test schedules
-        schedule1 = Schedule(
-            name="schedule-1",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data1",
-        )
+        schedule1 = Schedule()
+        schedule1.name = "schedule-1"
+        schedule1.repository_id = sample_repository.id
+        schedule1.cron_expression = "0 2 * * *"
+        schedule1.source_path = "/data1"
         test_db.add(schedule1)
         test_db.commit()
 
@@ -307,12 +304,11 @@ class TestSchedulesAPI:
         self, setup_test_dependencies, test_db, sample_repository
     ) -> None:
         """Test getting schedule edit form."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -328,12 +324,11 @@ class TestSchedulesAPI:
         self, setup_test_dependencies, test_db, sample_repository
     ) -> None:
         """Test successful schedule update."""
-        schedule = Schedule(
-            name="original-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-        )
+        schedule = Schedule()
+        schedule.name = "original-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -357,13 +352,12 @@ class TestSchedulesAPI:
         self, setup_test_dependencies, test_db, sample_repository
     ) -> None:
         """Test successfully toggling schedule."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-            enabled=False,
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = False
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -391,12 +385,11 @@ class TestSchedulesAPI:
         self, setup_test_dependencies, test_db, sample_repository
     ) -> None:
         """Test successfully deleting schedule."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -434,7 +427,7 @@ class TestScheduleUtilityFunctions:
     """Test utility functions for schedule processing"""
 
     @pytest.fixture
-    def cron_description_service(self):
+    def cron_description_service(self) -> CronDescriptionService:
         """Provide CronDescriptionService instance for tests"""
         return CronDescriptionService()
 

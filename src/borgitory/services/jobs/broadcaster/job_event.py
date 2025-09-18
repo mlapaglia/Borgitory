@@ -28,3 +28,40 @@ class JobEvent:
             "data": self.data,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
         }
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-like access for backward compatibility"""
+        if key == "job_id":
+            return self.job_id
+        elif key == "type":
+            return self.event_type.value
+        elif key == "timestamp":
+            return self.timestamp.isoformat() if self.timestamp else None
+        elif key == "data":
+            return self.data
+        elif self.data and key in self.data:
+            return self.data[key]
+        return default
+
+    def __getitem__(self, key: str) -> Any:
+        """Dict-like access for backward compatibility"""
+        # Handle integer keys by converting to string (for cases like event[0])
+        if isinstance(key, int):
+            raise TypeError("JobEvent indices must be strings, not integers")
+
+        result = self.get(key)
+        if (
+            result is None
+            and key not in ["job_id", "data", "timestamp"]
+            and (not self.data or key not in self.data)
+        ):
+            raise KeyError(key)
+        return result
+
+    def __contains__(self, key: str) -> bool:
+        """Dict-like 'in' operator for backward compatibility"""
+        if key in ["job_id", "type", "timestamp", "data"]:
+            return True
+        if self.data and key in self.data:
+            return True
+        return False
