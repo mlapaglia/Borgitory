@@ -149,19 +149,14 @@ def get_recovery_service() -> RecoveryService:
     return _recovery_service_instance
 
 
-_pushover_service_instance = None
-
-
+@lru_cache()
 def get_pushover_service() -> PushoverService:
     """
     Provide a PushoverService singleton instance.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Uses FastAPI's built-in caching for singleton behavior.
     """
-    global _pushover_service_instance
-    if _pushover_service_instance is None:
-        _pushover_service_instance = PushoverService()
-    return _pushover_service_instance
+    return PushoverService()
 
 
 _job_stream_service_instance = None
@@ -278,35 +273,25 @@ def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinition
     return TaskDefinitionBuilder(db)
 
 
-_repository_parser_instance = None
-
-
-def get_repository_parser() -> RepositoryParser:
+def get_repository_parser(
+    command_runner: SimpleCommandRunner = Depends(get_simple_command_runner),
+) -> RepositoryParser:
     """
     Provide a RepositoryParser singleton instance with proper dependency injection.
 
-    Uses module-level singleton pattern with dependency injection.
+    Uses FastAPI's dependency injection for clean separation of concerns.
     """
-    global _repository_parser_instance
-    if _repository_parser_instance is None:
-        command_runner = get_simple_command_runner()
-        _repository_parser_instance = RepositoryParser(command_runner=command_runner)
-    return _repository_parser_instance
+    return RepositoryParser(command_runner=command_runner)
 
 
-_borg_command_builder_instance = None
-
-
+@lru_cache()
 def get_borg_command_builder() -> BorgCommandBuilder:
     """
     Provide a BorgCommandBuilder singleton instance.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Uses FastAPI's built-in caching for singleton behavior.
     """
-    global _borg_command_builder_instance
-    if _borg_command_builder_instance is None:
-        _borg_command_builder_instance = BorgCommandBuilder()
-    return _borg_command_builder_instance
+    return BorgCommandBuilder()
 
 
 _archive_manager_instance = None
@@ -362,20 +347,15 @@ def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
     return get_job_event_broadcaster()
 
 
-_templates_instance = None
-
-
+@lru_cache()
 def get_templates() -> Jinja2Templates:
     """
     Provide a Jinja2Templates singleton instance.
 
-    Uses module-level singleton pattern for application-wide persistence.
+    Uses FastAPI's built-in caching for singleton behavior.
     """
-    global _templates_instance
-    if _templates_instance is None:
-        template_path = get_template_directory()
-        _templates_instance = Jinja2Templates(directory=template_path)
-    return _templates_instance
+    template_path = get_template_directory()
+    return Jinja2Templates(directory=template_path)
 
 
 _provider_registry_instance = None
