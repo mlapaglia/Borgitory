@@ -1228,14 +1228,21 @@ class JobManager:
                 "Required dependencies for cloud sync task are not available"
             )
 
+        # Type assertions after validation
+        assert self.dependencies.db_session_factory is not None
+        assert self.dependencies.rclone_service is not None
+        assert self.dependencies.encryption_service is not None
+        assert self.dependencies.storage_factory is not None
+        assert self.dependencies.provider_registry is not None
+
         result = await self.safe_executor.execute_cloud_sync_task(
             repository_path=str(repository_path or ""),
             cloud_sync_config_id=cloud_sync_config_id,
-            db_session_factory=self.dependencies.db_session_factory,  # type: ignore
-            rclone_service=self.dependencies.rclone_service,  # type: ignore
-            encryption_service=self.dependencies.encryption_service,  # type: ignore
-            storage_factory=self.dependencies.storage_factory,  # type: ignore
-            provider_registry=self.dependencies.provider_registry,  # type: ignore
+            db_session_factory=self.dependencies.db_session_factory,
+            rclone_service=self.dependencies.rclone_service,
+            encryption_service=self.dependencies.encryption_service,
+            storage_factory=self.dependencies.storage_factory,
+            provider_registry=self.dependencies.provider_registry,
             output_callback=task_output_callback,
         )
 

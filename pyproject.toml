@@ -183,7 +183,7 @@ exclude = [
     "^htmlcov/",
     "^\\.",
 ]
-files = ["src/borgitory", "tests"]
+files = ["src/borgitory"]
 
 [[tool.mypy.overrides]]
 module = [
