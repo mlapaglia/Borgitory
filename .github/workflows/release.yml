@@ -36,7 +36,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v5
       with:
-        fetch-depth: 1
+        fetch-depth: 2
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -80,7 +80,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v5
       with:
-        fetch-depth: 1
+        fetch-depth: 2
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
