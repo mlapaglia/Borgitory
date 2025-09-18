@@ -2,7 +2,7 @@ import inspect
 import json
 import logging
 from datetime import datetime, UTC
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, cast
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -36,7 +36,7 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
             # Try to call it as a static method first
             try:
                 result = storage_class.get_sensitive_fields(None)
-                return result
+                return cast(list[str], result)
             except TypeError:
                 # It's an instance method, so we need to create a temporary instance
                 # Since we only need the get_sensitive_fields method, we can pass None
@@ -44,7 +44,7 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
                 try:
                     temp_storage = storage_class(None, None)
                     result = temp_storage.get_sensitive_fields()
-                    return result
+                    return cast(list[str], result)
                 except Exception as e:
                     logger.warning(
                         f"Failed to create temp storage instance for {provider}: {e}"
@@ -318,7 +318,7 @@ class CloudSyncService:
         try:
             result = await test_method(**filtered_params)
             logger.info(f"Test method result: {result}")
-            return result
+            return cast(Dict[str, Any], result)
         except Exception as e:
             logger.error(f"Error calling {test_method_name}: {e}", exc_info=True)
             raise

@@ -5,7 +5,7 @@ ArchiveManager - Handles Borg archive operations and content management
 import asyncio
 import json
 import logging
-from typing import Dict, List, Optional, AsyncGenerator, Any
+from typing import Dict, List, Optional, AsyncGenerator, Any, cast
 
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -260,7 +260,7 @@ class ArchiveManager:
                     # Find the specific archive
                     for archive in archives:
                         if archive.get("name") == archive_name:
-                            return archive
+                            return cast(Dict[str, Any], archive)
 
                     return None  # Archive not found
                 except json.JSONDecodeError:

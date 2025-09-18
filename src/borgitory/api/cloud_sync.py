@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -109,7 +109,7 @@ def _get_provider_display_details(
                 None, None
             )  # rclone_service and config not needed
             result = temp_storage.get_display_details(provider_config)
-            return result
+            return cast(Dict[str, Any], result)
     except Exception as e:
         logger.warning(f"Error getting display details for provider '{provider}': {e}")
 

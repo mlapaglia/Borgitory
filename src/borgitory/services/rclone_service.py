@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 import os
 import time
-from typing import AsyncGenerator, Dict, Optional, Callable, Any, List
+from typing import AsyncGenerator, Dict, Optional, Callable, Any, List, cast
 
 from borgitory.models.database import Repository
 
@@ -1265,4 +1265,4 @@ class RcloneService:
 
         # Call the test method
         result = await test_method(**rclone_params)
-        return result
+        return cast(Dict[str, Any], result)

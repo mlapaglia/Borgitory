@@ -3,15 +3,16 @@ Tests for notification configs API endpoints - HTMX and response validation focu
 """
 
 import pytest
+from typing import Any
 from unittest.mock import MagicMock, AsyncMock
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 
-from borgitory.models.schemas import NotificationConfigCreate
+from borgitory.models.schemas import NotificationConfigCreate, NotificationProvider
 
 
 @pytest.fixture
-def mock_request():
+def mock_request() -> MagicMock:
     """Mock FastAPI request"""
     request = MagicMock(spec=Request)
     request.headers = {}
@@ -19,7 +20,7 @@ def mock_request():
 
 
 @pytest.fixture
-def mock_templates():
+def mock_templates() -> MagicMock:
     """Mock templates dependency"""
     templates = MagicMock()
     mock_response = MagicMock(spec=HTMLResponse)
@@ -30,25 +31,25 @@ def mock_templates():
 
 
 @pytest.fixture
-def mock_service():
+def mock_service() -> MagicMock:
     """Mock NotificationConfigService"""
     service = MagicMock()
     return service
 
 
 @pytest.fixture
-def mock_pushover_service():
+def mock_pushover_service() -> MagicMock:
     """Mock PushoverService"""
     pushover_service = AsyncMock()
     return pushover_service
 
 
 @pytest.fixture
-def sample_config_create():
+def sample_config_create() -> NotificationConfigCreate:
     """Sample config creation data"""
     return NotificationConfigCreate(
         name="test-config",
-        provider="pushover",
+        provider=NotificationProvider.PUSHOVER,
         notify_on_success=True,
         notify_on_failure=False,
         user_key="test-user",
@@ -61,7 +62,11 @@ class TestNotificationConfigsAPI:
 
     @pytest.mark.asyncio
     async def test_create_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service, sample_config_create
+        self,
+        mock_request: Any,
+        mock_templates: Any,
+        mock_service: Any,
+        sample_config_create: Any,
     ) -> None:
         """Test successful config creation returns correct HTMX response."""
         from borgitory.api.notifications import create_notification_config
@@ -97,7 +102,11 @@ class TestNotificationConfigsAPI:
 
     @pytest.mark.asyncio
     async def test_create_config_failure_htmx_response(
-        self, mock_request, mock_templates, mock_service, sample_config_create
+        self,
+        mock_request: Any,
+        mock_templates: Any,
+        mock_service: Any,
+        sample_config_create: Any,
     ) -> None:
         """Test failed config creation returns correct HTMX error response."""
         from borgitory.api.notifications import create_notification_config
@@ -121,7 +130,7 @@ class TestNotificationConfigsAPI:
             status_code=500,
         )
 
-    def test_list_configs_success(self, mock_service) -> None:
+    def test_list_configs_success(self, mock_service: Any) -> None:
         """Test listing configs returns service result."""
         from borgitory.api.notifications import list_notification_configs
 
@@ -137,7 +146,7 @@ class TestNotificationConfigsAPI:
         assert result == mock_configs
 
     def test_get_configs_html_success(
-        self, mock_request, mock_templates, mock_service
+        self, mock_request: Any, mock_templates: Any, mock_service: Any
     ) -> None:
         """Test getting configs HTML returns correct template response."""
         from borgitory.api.notifications import get_notification_configs_html
@@ -159,7 +168,7 @@ class TestNotificationConfigsAPI:
         )
 
     def test_get_configs_html_exception(
-        self, mock_request, mock_templates, mock_service
+        self, mock_request: Any, mock_templates: Any, mock_service: Any
     ) -> None:
         """Test getting configs HTML with exception returns error template."""
         from borgitory.api.notifications import get_notification_configs_html
@@ -175,7 +184,11 @@ class TestNotificationConfigsAPI:
 
     @pytest.mark.asyncio
     async def test_test_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service, mock_pushover_service
+        self,
+        mock_request: Any,
+        mock_templates: Any,
+        mock_service: Any,
+        mock_pushover_service: Any,
     ) -> None:
         """Test successful config test returns correct HTMX response."""
         from borgitory.api.notifications import test_notification_config
@@ -213,7 +226,11 @@ class TestNotificationConfigsAPI:
 
     @pytest.mark.asyncio
     async def test_test_config_not_found_htmx_response(
-        self, mock_request, mock_templates, mock_service, mock_pushover_service
+        self,
+        mock_request: Any,
+        mock_templates: Any,
+        mock_service: Any,
+        mock_pushover_service: Any,
     ) -> None:
         """Test testing non-existent config returns correct HTMX error response."""
         from borgitory.api.notifications import test_notification_config
@@ -240,7 +257,11 @@ class TestNotificationConfigsAPI:
 
     @pytest.mark.asyncio
     async def test_test_config_pushover_failure_htmx_response(
-        self, mock_request, mock_templates, mock_service, mock_pushover_service
+        self,
+        mock_request: Any,
+        mock_templates: Any,
+        mock_service: Any,
+        mock_pushover_service: Any,
     ) -> None:
         """Test failed pushover test returns correct HTMX error response."""
         from borgitory.api.notifications import test_notification_config
@@ -271,7 +292,7 @@ class TestNotificationConfigsAPI:
 
     @pytest.mark.asyncio
     async def test_enable_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self, mock_request: Any, mock_templates: Any, mock_service: Any
     ) -> None:
         """Test successful config enable returns correct HTMX response."""
         from borgitory.api.notifications import enable_notification_config
@@ -301,7 +322,7 @@ class TestNotificationConfigsAPI:
 
     @pytest.mark.asyncio
     async def test_enable_config_not_found_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self, mock_request: Any, mock_templates: Any, mock_service: Any
     ) -> None:
         """Test enabling non-existent config returns correct HTMX error response."""
         from borgitory.api.notifications import enable_notification_config
@@ -326,7 +347,7 @@ class TestNotificationConfigsAPI:
 
     @pytest.mark.asyncio
     async def test_disable_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self, mock_request: Any, mock_templates: Any, mock_service: Any
     ) -> None:
         """Test successful config disable returns correct HTMX response."""
         from borgitory.api.notifications import disable_notification_config

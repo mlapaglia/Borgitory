@@ -4,7 +4,7 @@ import logging
 import re
 import os
 from datetime import datetime, UTC
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, cast
 
 from starlette.responses import StreamingResponse
 
@@ -391,7 +391,7 @@ class BorgService:
                     logger.info(
                         f"Successfully parsed {len(data['archives'])} archives from repository"
                     )
-                    return data["archives"]
+                    return cast(List[Dict[str, Any]], data["archives"])
             except json.JSONDecodeError as je:
                 logger.error(f"JSON decode error: {je}")
                 logger.error(f"Raw output: {full_json[:500]}...")  # Log first 500 chars
@@ -429,7 +429,7 @@ class BorgService:
                     line = line.strip()
                     if line.startswith("{"):
                         try:
-                            return json.loads(line)
+                            return cast(Dict[str, Any], json.loads(line))
                         except json.JSONDecodeError:
                             continue
 
@@ -622,7 +622,7 @@ class BorgService:
                     success = status["return_code"] == 0
                     # Clean up job
                     self._get_job_manager().cleanup_job(job_id)
-                    return success
+                    return cast(bool, success)
 
                 await asyncio.sleep(0.5)
                 wait_time += 0.5

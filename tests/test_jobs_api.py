@@ -3,6 +3,7 @@ Tests for jobs API endpoints
 """
 
 import pytest
+from typing import Generator
 from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi import Request
@@ -29,9 +30,11 @@ class TestJobsAPI:
     """Test class for jobs API endpoints."""
 
     @pytest.fixture
-    def sample_repository(self, test_db: Session):
+    def sample_repository(self, test_db: Session) -> Repository:
         """Create a sample repository for testing."""
-        repo = Repository(name="test-repo", path="/tmp/test-repo")
+        repo = Repository()
+        repo.name = "test-repo"
+        repo.path = "/tmp/test-repo"
         repo.set_passphrase("test-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -39,27 +42,28 @@ class TestJobsAPI:
         return repo
 
     @pytest.fixture
-    def sample_database_job(self, test_db: Session, sample_repository):
+    def sample_database_job(
+        self, test_db: Session, sample_repository: Repository
+    ) -> Job:
         """Create a sample database job for testing."""
-        job = Job(
-            id="test-job-123",
-            repository_id=sample_repository.id,
-            type="backup",
-            status="completed",
-            started_at=datetime.now(UTC),
-            finished_at=datetime.now(UTC),
-            log_output="Test job output",
-            job_type="composite",
-            total_tasks=1,
-            completed_tasks=1,
-        )
+        job = Job()
+        job.id = "test-job-123"
+        job.repository_id = sample_repository.id
+        job.type = "backup"
+        job.status = "completed"
+        job.started_at = datetime.now(UTC)
+        job.finished_at = datetime.now(UTC)
+        job.log_output = "Test job output"
+        job.job_type = "composite"
+        job.total_tasks = 1
+        job.completed_tasks = 1
         test_db.add(job)
         test_db.commit()
         test_db.refresh(job)
         return job
 
     @pytest.fixture
-    def mock_job_service(self):
+    def mock_job_service(self) -> Mock:
         """Mock JobService for testing."""
         mock = Mock(spec=JobService)
         mock.db = Mock()
@@ -75,7 +79,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_job_stream_service(self):
+    def mock_job_stream_service(self) -> Mock:
         """Mock JobStreamService for testing."""
         mock = Mock(spec=JobStreamService)
         mock.stream_all_jobs = AsyncMock()
@@ -84,7 +88,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_job_render_service(self):
+    def mock_job_render_service(self) -> Mock:
         """Mock JobRenderService for testing."""
         mock = Mock(spec=JobRenderService)
         mock.render_jobs_html = Mock()
@@ -94,7 +98,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_job_manager(self):
+    def mock_job_manager(self) -> Mock:
         """Mock JobManager for testing."""
         mock = Mock(spec=JobManager)
         mock.jobs = {}
@@ -104,7 +108,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_templates(self):
+    def mock_templates(self) -> Mock:
         """Mock templates dependency."""
         mock = Mock()
         mock.TemplateResponse = Mock()
@@ -112,7 +116,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_request(self):
+    def mock_request(self) -> Mock:
         """Mock FastAPI request."""
         request = Mock(spec=Request)
         request.headers = {}
@@ -121,12 +125,12 @@ class TestJobsAPI:
     @pytest.fixture
     def setup_dependencies(
         self,
-        mock_job_service,
-        mock_job_stream_service,
-        mock_job_render_service,
-        mock_job_manager,
-        mock_templates,
-    ):
+        mock_job_service: Mock,
+        mock_job_stream_service: Mock,
+        mock_job_render_service: Mock,
+        mock_job_manager: Mock,
+        mock_templates: Mock,
+    ) -> Generator[None, None, None]:
         """Setup dependency overrides for testing."""
         from borgitory.api.jobs import get_job_manager_dependency as local_get_jm_dep
 
@@ -155,7 +159,10 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_backup_success(
-        self, async_client: AsyncClient, setup_dependencies, sample_repository
+        self,
+        async_client: AsyncClient,
+        setup_dependencies: dict[str, Mock],
+        sample_repository: Repository,
     ) -> None:
         """Test successful backup job creation."""
         setup_dependencies["job_service"].create_backup_job.return_value = {
@@ -178,7 +185,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_backup_repository_not_found(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test backup job creation with non-existent repository."""
         setup_dependencies["job_service"].create_backup_job.side_effect = ValueError(
@@ -824,7 +831,7 @@ class TestJobsAPI:
 
         # Test invalid repository_id (must be > 0)
         invalid_request = {
-            "repository_id": 0,
+            "repository_id": "0",
             "source_path": "/test/path",
             "compression": "zstd",
         }

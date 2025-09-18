@@ -7,7 +7,7 @@ including configuration validation, storage creation, and encryption handling.
 
 import json
 import logging
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, Optional, cast
 
 from borgitory.services.rclone_service import RcloneService
 
@@ -85,7 +85,7 @@ class StorageFactory:
             )
 
         storage_instance = storage_class(validated_config, self._rclone_service)
-        return storage_instance
+        return cast(CloudStorage, storage_instance)
 
     def get_supported_providers(self) -> list[str]:
         """Get list of supported provider names."""

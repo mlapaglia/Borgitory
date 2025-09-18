@@ -1214,14 +1214,28 @@ class JobManager:
             task.error = "Missing required cloud sync dependencies"
             return False
 
+        # Ensure required dependencies are available
+        if not all(
+            [
+                self.dependencies.db_session_factory,
+                self.dependencies.rclone_service,
+                self.dependencies.encryption_service,
+                self.dependencies.storage_factory,
+                self.dependencies.provider_registry,
+            ]
+        ):
+            raise RuntimeError(
+                "Required dependencies for cloud sync task are not available"
+            )
+
         result = await self.safe_executor.execute_cloud_sync_task(
             repository_path=str(repository_path or ""),
             cloud_sync_config_id=cloud_sync_config_id,
-            db_session_factory=self.dependencies.db_session_factory,
-            rclone_service=self.dependencies.rclone_service,
-            encryption_service=self.dependencies.encryption_service,
-            storage_factory=self.dependencies.storage_factory,
-            provider_registry=self.dependencies.provider_registry,
+            db_session_factory=self.dependencies.db_session_factory,  # type: ignore
+            rclone_service=self.dependencies.rclone_service,  # type: ignore
+            encryption_service=self.dependencies.encryption_service,  # type: ignore
+            storage_factory=self.dependencies.storage_factory,  # type: ignore
+            provider_registry=self.dependencies.provider_registry,  # type: ignore
             output_callback=task_output_callback,
         )
 
