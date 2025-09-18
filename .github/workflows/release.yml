@@ -64,6 +64,13 @@ jobs:
       with:
         print-hash: true
 
+    - name: Publish to TestPyPI
+      if: steps.version.outputs.IS_PRERELEASE == 'true'
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        print-hash: true
+
   docker-release:
     runs-on: ubuntu-latest
     permissions:
