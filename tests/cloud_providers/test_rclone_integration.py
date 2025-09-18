@@ -27,7 +27,7 @@ from borgitory.models.database import Repository
 class TestRcloneMethodMapping:
     """Test RcloneMethodMapping dataclass"""
 
-    def test_create_mapping_with_all_fields(self):
+    def test_create_mapping_with_all_fields(self) -> None:
         """Test creating mapping with all fields"""
         mapping = RcloneMethodMapping(
             sync_method="sync_repo_to_test",
@@ -43,7 +43,7 @@ class TestRcloneMethodMapping:
         assert mapping.required_params == ["param1", "param2"]
         assert mapping.optional_params == {"opt1": "default1"}
 
-    def test_create_mapping_with_minimal_fields(self):
+    def test_create_mapping_with_minimal_fields(self) -> None:
         """Test creating mapping with minimal required fields"""
         mapping = RcloneMethodMapping(
             sync_method="sync_method",
@@ -54,7 +54,7 @@ class TestRcloneMethodMapping:
 
         assert mapping.optional_params == {}  # Should default to empty dict
 
-    def test_mapping_optional_params_default(self):
+    def test_mapping_optional_params_default(self) -> None:
         """Test that optional_params defaults to empty dict"""
         mapping = RcloneMethodMapping(
             sync_method="sync",
@@ -70,7 +70,7 @@ class TestRcloneMethodMapping:
 class TestProviderMetadataWithRclone:
     """Test ProviderMetadata with rclone mapping"""
 
-    def test_metadata_with_rclone_mapping(self):
+    def test_metadata_with_rclone_mapping(self) -> None:
         """Test creating metadata with rclone mapping"""
         mapping = RcloneMethodMapping(
             sync_method="sync_test",
@@ -89,7 +89,7 @@ class TestProviderMetadataWithRclone:
         assert metadata.rclone_mapping is not None
         assert metadata.rclone_mapping.sync_method == "sync_test"
 
-    def test_metadata_without_rclone_mapping(self):
+    def test_metadata_without_rclone_mapping(self) -> None:
         """Test creating metadata without rclone mapping"""
         metadata = ProviderMetadata(
             name="test", label="Test Provider", description="Test provider"
@@ -101,11 +101,11 @@ class TestProviderMetadataWithRclone:
 class TestRegistryRcloneIntegration:
     """Test registry integration with rclone mappings"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Clear registry before each test"""
         clear_registry()
 
-    def test_register_provider_with_explicit_rclone_mapping(self):
+    def test_register_provider_with_explicit_rclone_mapping(self) -> None:
         """Test registering provider with explicit rclone mapping"""
         mapping = RcloneMethodMapping(
             sync_method="sync_test",
@@ -126,7 +126,7 @@ class TestRegistryRcloneIntegration:
         assert metadata.rclone_mapping is not None
         assert metadata.rclone_mapping.sync_method == "sync_test"
 
-    def test_register_provider_with_auto_discovery(self):
+    def test_register_provider_with_auto_discovery(self) -> None:
         """Test registering provider with auto-discovery from storage class"""
 
         # Create a mock storage class with get_rclone_mapping method
@@ -150,7 +150,7 @@ class TestRegistryRcloneIntegration:
         assert metadata.rclone_mapping.sync_method == "auto_sync"
         mock_storage_class.get_rclone_mapping.assert_called_once()
 
-    def test_register_provider_auto_discovery_failure(self):
+    def test_register_provider_auto_discovery_failure(self) -> None:
         """Test auto-discovery gracefully handles failures"""
 
         # Create a mock storage class that raises exception
@@ -172,11 +172,11 @@ class TestRegistryRcloneIntegration:
 class TestRcloneValidation:
     """Test rclone integration validation"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Clear registry before each test"""
         clear_registry()
 
-    def test_validate_valid_provider(self):
+    def test_validate_valid_provider(self) -> None:
         """Test validating a properly configured provider"""
         mapping = RcloneMethodMapping(
             sync_method="sync_repository_to_s3",  # This method exists in RcloneService
@@ -194,7 +194,7 @@ class TestRcloneValidation:
         errors = validate_rclone_integration("valid_provider", rclone_service)
         assert len(errors) == 0
 
-    def test_validate_provider_missing_mapping(self):
+    def test_validate_provider_missing_mapping(self) -> None:
         """Test validating provider without rclone mapping"""
         # Create proper mock classes
         mock_config_class = type("MockConfig", (), {})
@@ -210,7 +210,7 @@ class TestRcloneValidation:
         assert len(errors) > 0
         assert any("no rclone mapping configured" in error for error in errors)
 
-    def test_validate_provider_missing_sync_method(self):
+    def test_validate_provider_missing_sync_method(self) -> None:
         """Test validating provider with missing sync method"""
         mapping = RcloneMethodMapping(
             sync_method="nonexistent_sync_method",
@@ -229,7 +229,7 @@ class TestRcloneValidation:
         assert len(errors) > 0
         assert any("sync method" in error and "not found" in error for error in errors)
 
-    def test_validate_provider_missing_test_method(self):
+    def test_validate_provider_missing_test_method(self) -> None:
         """Test validating provider with missing test method"""
         mapping = RcloneMethodMapping(
             sync_method="sync_repository_to_s3",
@@ -248,14 +248,14 @@ class TestRcloneValidation:
         assert len(errors) > 0
         assert any("test method" in error and "not found" in error for error in errors)
 
-    def test_validate_nonexistent_provider(self):
+    def test_validate_nonexistent_provider(self) -> None:
         """Test validating a provider that doesn't exist"""
         rclone_service = RcloneService()
         errors = validate_rclone_integration("nonexistent_provider", rclone_service)
         assert len(errors) > 0
         assert any("not registered" in error for error in errors)
 
-    def test_validate_requires_rclone_service(self):
+    def test_validate_requires_rclone_service(self) -> None:
         """Test that validation requires rclone service"""
         errors = validate_rclone_integration("any_provider", None)
         assert len(errors) > 0
@@ -266,11 +266,11 @@ class TestGenericRcloneDispatchers:
     """Test the generic rclone dispatcher methods"""
 
     @pytest.fixture(autouse=True)
-    def ensure_providers_registered(self):
+    def ensure_providers_registered(self) -> None:
         """Ensure real providers are registered for dispatcher tests"""
         # Import to trigger registration
 
-    def test_generic_dispatchers_exist(self):
+    def test_generic_dispatchers_exist(self) -> None:
         """Test that generic dispatcher methods exist on RcloneService"""
         rclone_service = RcloneService()
 
@@ -283,7 +283,7 @@ class TestGenericRcloneDispatchers:
         assert callable(rclone_service.test_provider_connection)
 
     @pytest.mark.asyncio
-    async def test_sync_repository_to_provider_missing_provider(self):
+    async def test_sync_repository_to_provider_missing_provider(self) -> None:
         """Test sync with nonexistent provider"""
         rclone_service = RcloneService()
         repository = MagicMock(spec=Repository)
@@ -295,7 +295,7 @@ class TestGenericRcloneDispatchers:
                 pass
 
     @pytest.mark.asyncio
-    async def test_test_provider_connection_missing_method(self):
+    async def test_test_provider_connection_missing_method(self) -> None:
         """Test connection test with missing rclone method"""
         # Register a provider with a non-existent test method
         mapping = RcloneMethodMapping(
@@ -324,12 +324,12 @@ class TestGenericRcloneDispatchers:
 class TestIsolatedRcloneDispatchers:
     """Test rclone dispatchers in isolation with registry clearing"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Clear registry before each test"""
         clear_registry()
 
     @pytest.mark.asyncio
-    async def test_sync_repository_to_provider_missing_parameters(self):
+    async def test_sync_repository_to_provider_missing_parameters(self) -> None:
         """Test sync with missing required parameters"""
         # Register a test provider with strict requirements
         mapping = RcloneMethodMapping(
@@ -362,11 +362,11 @@ class TestRealProviderIntegration:
     """Test integration with real providers (S3, SFTP, SMB)"""
 
     @pytest.fixture(autouse=True)
-    def ensure_providers_registered(self):
+    def ensure_providers_registered(self) -> None:
         """Ensure real providers are registered for these tests"""
         # Import to trigger registration
 
-    def test_real_providers_have_rclone_mappings_via_storage_classes(self):
+    def test_real_providers_have_rclone_mappings_via_storage_classes(self) -> None:
         """Test that real providers have rclone mappings via their storage classes"""
         # Test that storage classes can provide mappings directly
         from borgitory.services.cloud_providers.storage.s3_storage import S3Storage
@@ -403,7 +403,7 @@ class TestRealProviderIntegration:
                 f"{provider_name} has no required params"
             )
 
-    def test_real_providers_validation(self):
+    def test_real_providers_validation(self) -> None:
         """Test that all real providers pass validation"""
         from borgitory.services.rclone_service import RcloneService
         from borgitory.services.cloud_providers.registry import get_supported_providers
@@ -419,7 +419,7 @@ class TestRealProviderIntegration:
                     f"Provider {provider} has validation errors: {errors}"
                 )
 
-    def test_storage_classes_have_get_rclone_mapping(self):
+    def test_storage_classes_have_get_rclone_mapping(self) -> None:
         """Test that all storage classes have get_rclone_mapping method"""
         from borgitory.services.cloud_providers.storage.s3_storage import S3Storage
         from borgitory.services.cloud_providers.storage.sftp_storage import SFTPStorage

@@ -11,11 +11,11 @@ from borgitory.main import app
 class TestJobsAPISSEEndpoint:
     """Test SSE endpoint registration and basic functionality"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures"""
         self.client = TestClient(app)
 
-    def test_sse_endpoint_registration(self):
+    def test_sse_endpoint_registration(self) -> None:
         """Test that SSE endpoint is properly registered"""
         # This test just verifies the endpoint exists and can be called
         # without actually consuming the stream
@@ -25,7 +25,7 @@ class TestJobsAPISSEEndpoint:
         routes = [route.path for route in router.routes]
         assert "/current/stream" in routes
 
-    def test_sse_endpoint_function_signature(self):
+    def test_sse_endpoint_function_signature(self) -> None:
         """Test that SSE endpoint function has correct signature"""
         from borgitory.api.jobs import stream_current_jobs_html
         import inspect
@@ -37,7 +37,7 @@ class TestJobsAPISSEEndpoint:
         # Check that it's an async function
         assert inspect.iscoroutinefunction(stream_current_jobs_html)
 
-    def test_sse_endpoint_imports(self):
+    def test_sse_endpoint_imports(self) -> None:
         """Test that SSE endpoint has all necessary imports"""
         from borgitory.api.jobs import stream_current_jobs_html
         import inspect

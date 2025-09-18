@@ -3,6 +3,7 @@ Tests for jobs API endpoints
 """
 
 import pytest
+from typing import Generator
 from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi import Request
@@ -29,9 +30,11 @@ class TestJobsAPI:
     """Test class for jobs API endpoints."""
 
     @pytest.fixture
-    def sample_repository(self, test_db: Session):
+    def sample_repository(self, test_db: Session) -> Repository:
         """Create a sample repository for testing."""
-        repo = Repository(name="test-repo", path="/tmp/test-repo")
+        repo = Repository()
+        repo.name = "test-repo"
+        repo.path = "/tmp/test-repo"
         repo.set_passphrase("test-passphrase")
         test_db.add(repo)
         test_db.commit()
@@ -39,27 +42,28 @@ class TestJobsAPI:
         return repo
 
     @pytest.fixture
-    def sample_database_job(self, test_db: Session, sample_repository):
+    def sample_database_job(
+        self, test_db: Session, sample_repository: Repository
+    ) -> Job:
         """Create a sample database job for testing."""
-        job = Job(
-            id="test-job-123",
-            repository_id=sample_repository.id,
-            type="backup",
-            status="completed",
-            started_at=datetime.now(UTC),
-            finished_at=datetime.now(UTC),
-            log_output="Test job output",
-            job_type="composite",
-            total_tasks=1,
-            completed_tasks=1,
-        )
+        job = Job()
+        job.id = "test-job-123"
+        job.repository_id = sample_repository.id
+        job.type = "backup"
+        job.status = "completed"
+        job.started_at = datetime.now(UTC)
+        job.finished_at = datetime.now(UTC)
+        job.log_output = "Test job output"
+        job.job_type = "composite"
+        job.total_tasks = 1
+        job.completed_tasks = 1
         test_db.add(job)
         test_db.commit()
         test_db.refresh(job)
         return job
 
     @pytest.fixture
-    def mock_job_service(self):
+    def mock_job_service(self) -> Mock:
         """Mock JobService for testing."""
         mock = Mock(spec=JobService)
         mock.db = Mock()
@@ -75,7 +79,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_job_stream_service(self):
+    def mock_job_stream_service(self) -> Mock:
         """Mock JobStreamService for testing."""
         mock = Mock(spec=JobStreamService)
         mock.stream_all_jobs = AsyncMock()
@@ -84,7 +88,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_job_render_service(self):
+    def mock_job_render_service(self) -> Mock:
         """Mock JobRenderService for testing."""
         mock = Mock(spec=JobRenderService)
         mock.render_jobs_html = Mock()
@@ -94,7 +98,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_job_manager(self):
+    def mock_job_manager(self) -> Mock:
         """Mock JobManager for testing."""
         mock = Mock(spec=JobManager)
         mock.jobs = {}
@@ -104,7 +108,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_templates(self):
+    def mock_templates(self) -> Mock:
         """Mock templates dependency."""
         mock = Mock()
         mock.TemplateResponse = Mock()
@@ -112,7 +116,7 @@ class TestJobsAPI:
         return mock
 
     @pytest.fixture
-    def mock_request(self):
+    def mock_request(self) -> Mock:
         """Mock FastAPI request."""
         request = Mock(spec=Request)
         request.headers = {}
@@ -121,12 +125,12 @@ class TestJobsAPI:
     @pytest.fixture
     def setup_dependencies(
         self,
-        mock_job_service,
-        mock_job_stream_service,
-        mock_job_render_service,
-        mock_job_manager,
-        mock_templates,
-    ):
+        mock_job_service: Mock,
+        mock_job_stream_service: Mock,
+        mock_job_render_service: Mock,
+        mock_job_manager: Mock,
+        mock_templates: Mock,
+    ) -> Generator[None, None, None]:
         """Setup dependency overrides for testing."""
         from borgitory.api.jobs import get_job_manager_dependency as local_get_jm_dep
 
@@ -155,8 +159,11 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_backup_success(
-        self, async_client: AsyncClient, setup_dependencies, sample_repository
-    ):
+        self,
+        async_client: AsyncClient,
+        setup_dependencies: dict[str, Mock],
+        sample_repository: Repository,
+    ) -> None:
         """Test successful backup job creation."""
         setup_dependencies["job_service"].create_backup_job.return_value = {
             "job_id": "test-job-123",
@@ -178,8 +185,8 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_backup_repository_not_found(
-        self, async_client: AsyncClient, setup_dependencies
-    ):
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
+    ) -> None:
         """Test backup job creation with non-existent repository."""
         setup_dependencies["job_service"].create_backup_job.side_effect = ValueError(
             "Repository not found"
@@ -201,7 +208,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_create_backup_general_error(
         self, async_client: AsyncClient, setup_dependencies, sample_repository
-    ):
+    ) -> None:
         """Test backup job creation with general error."""
         setup_dependencies["job_service"].create_backup_job.side_effect = Exception(
             "General error"
@@ -223,7 +230,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_create_prune_success(
         self, async_client: AsyncClient, setup_dependencies, sample_repository
-    ):
+    ) -> None:
         """Test successful prune job creation."""
         setup_dependencies["job_service"].create_prune_job.return_value = {
             "job_id": "prune-job-123"
@@ -245,7 +252,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_create_prune_error(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test prune job creation with error."""
         setup_dependencies["job_service"].create_prune_job.side_effect = ValueError(
             "Invalid prune configuration"
@@ -267,7 +274,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_create_check_success(
         self, async_client: AsyncClient, setup_dependencies, sample_repository
-    ):
+    ) -> None:
         """Test successful check job creation."""
         setup_dependencies["job_service"].create_check_job.return_value = {
             "job_id": "check-job-123"
@@ -288,7 +295,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_create_check_error(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test check job creation with error."""
         setup_dependencies["job_service"].create_check_job.side_effect = Exception(
             "Check job failed"
@@ -309,7 +316,9 @@ class TestJobsAPI:
     # Test job retrieval endpoints
 
     @pytest.mark.asyncio
-    async def test_list_jobs(self, async_client: AsyncClient, setup_dependencies):
+    async def test_list_jobs(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test listing jobs."""
         setup_dependencies["job_service"].list_jobs.return_value = [
             {"id": "job-1", "type": "backup", "status": "completed"},
@@ -329,7 +338,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_list_jobs_with_params(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test listing jobs with query parameters."""
         setup_dependencies["job_service"].list_jobs.return_value = []
 
@@ -341,7 +350,9 @@ class TestJobsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_jobs_html(self, async_client: AsyncClient, setup_dependencies):
+    async def test_get_jobs_html(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test getting jobs as HTML."""
         setup_dependencies[
             "job_render_service"
@@ -356,7 +367,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_get_current_jobs_html(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test getting current jobs as HTML."""
         setup_dependencies[
             "job_render_service"
@@ -371,7 +382,9 @@ class TestJobsAPI:
         ].render_current_jobs_html.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_job_success(self, async_client: AsyncClient, setup_dependencies):
+    async def test_get_job_success(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test getting specific job details."""
         job_data = {"id": "test-job-123", "type": "backup", "status": "completed"}
         setup_dependencies["job_service"].get_job.return_value = job_data
@@ -387,7 +400,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_get_job_not_found(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test getting non-existent job."""
         setup_dependencies["job_service"].get_job.return_value = None
 
@@ -398,7 +411,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_get_job_status_success(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test getting job status."""
         status_data = {"status": "running", "progress": 50}
         setup_dependencies["job_service"].get_job_status.return_value = status_data
@@ -414,7 +427,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_get_job_status_error(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test getting job status with error."""
         setup_dependencies["job_service"].get_job_status.return_value = {
             "error": "Job not found"
@@ -427,7 +440,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_get_job_output_success(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test getting job output."""
         output_data = {"output": ["line 1", "line 2"], "total_lines": 2}
         setup_dependencies["job_service"].get_job_output.return_value = output_data
@@ -443,7 +456,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_get_job_output_with_limit(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test getting job output with custom limit."""
         output_data = {"output": ["line 1"], "total_lines": 1}
         setup_dependencies["job_service"].get_job_output.return_value = output_data
@@ -460,7 +473,9 @@ class TestJobsAPI:
     # Test streaming endpoints
 
     @pytest.mark.asyncio
-    async def test_stream_all_jobs(self, async_client: AsyncClient, setup_dependencies):
+    async def test_stream_all_jobs(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test streaming all jobs endpoint."""
         from fastapi.responses import StreamingResponse
 
@@ -479,7 +494,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_stream_job_output(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test streaming specific job output."""
         from fastapi.responses import StreamingResponse
 
@@ -500,7 +515,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_stream_task_output(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test streaming specific task output."""
         from fastapi.responses import StreamingResponse
 
@@ -523,7 +538,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_cancel_job_success(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test successful job cancellation."""
         setup_dependencies["job_service"].cancel_job.return_value = True
 
@@ -538,7 +553,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_cancel_job_not_found(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test cancelling non-existent job."""
         setup_dependencies["job_service"].cancel_job.return_value = False
 
@@ -549,7 +564,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_get_job_manager_stats(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test getting job manager statistics."""
         # Setup mock job manager with some test data
         from borgitory.services.jobs.job_manager import BorgJob
@@ -592,7 +607,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_cleanup_completed_jobs(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test cleaning up completed jobs."""
         # Setup mock job manager with completed jobs
         from borgitory.services.jobs.job_manager import BorgJob
@@ -631,7 +646,9 @@ class TestJobsAPI:
         assert setup_dependencies["job_manager"].cleanup_job.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_get_queue_stats(self, async_client: AsyncClient, setup_dependencies):
+    async def test_get_queue_stats(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test getting queue statistics."""
         # The actual queue stats structure from the real implementation
         queue_stats = {
@@ -655,7 +672,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_run_database_migration_success(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test successful database migration."""
         migration_result = {"status": "success", "message": "Migration completed"}
         setup_dependencies[
@@ -671,7 +688,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_run_database_migration_error(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test database migration with error."""
         setup_dependencies[
             "job_service"
@@ -686,7 +703,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_toggle_job_details(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test toggling job details visibility."""
         job_data = {
             "job": {"id": "test-job-123", "status": "completed"},
@@ -707,7 +724,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_toggle_job_details_not_found(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test toggling details for non-existent job."""
         setup_dependencies["job_render_service"].get_job_for_render.return_value = None
 
@@ -718,7 +735,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_get_job_details_static(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test getting static job details."""
         job_data = {"job": {"id": "test-job-123", "status": "completed"}}
         setup_dependencies[
@@ -733,7 +750,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_toggle_task_details(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test toggling task details visibility."""
         from types import SimpleNamespace
 
@@ -760,7 +777,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_toggle_task_details_task_not_found(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test toggling details for non-existent task."""
         job_data = {
             "job": {"id": "test-job-123", "status": "completed"},
@@ -777,7 +794,9 @@ class TestJobsAPI:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_copy_job_output(self, async_client: AsyncClient, setup_dependencies):
+    async def test_copy_job_output(
+        self, async_client: AsyncClient, setup_dependencies
+    ) -> None:
         """Test copying job output to clipboard."""
         response = await async_client.post("/api/jobs/test-job-123/copy-output")
 
@@ -787,7 +806,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_copy_task_output(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test copying task output to clipboard."""
         response = await async_client.post("/api/jobs/test-job-123/tasks/1/copy-output")
 
@@ -799,7 +818,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_backup_request_validation(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test backup request validation."""
         # Test missing repository_id
         invalid_request = {
@@ -812,7 +831,7 @@ class TestJobsAPI:
 
         # Test invalid repository_id (must be > 0)
         invalid_request = {
-            "repository_id": 0,
+            "repository_id": "0",
             "source_path": "/test/path",
             "compression": "zstd",
         }
@@ -823,7 +842,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_prune_request_validation(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test prune request validation."""
         # Test missing repository_id
         invalid_request = {
@@ -837,7 +856,7 @@ class TestJobsAPI:
     @pytest.mark.asyncio
     async def test_check_request_validation(
         self, async_client: AsyncClient, setup_dependencies
-    ):
+    ) -> None:
         """Test check request validation."""
         # Test missing repository_id
         invalid_request = {
@@ -853,7 +872,7 @@ class TestJobsAPIIntegration:
     """Integration tests for jobs API with real database."""
 
     @pytest.mark.asyncio
-    async def test_job_endpoint_registration(self, async_client: AsyncClient):
+    async def test_job_endpoint_registration(self, async_client: AsyncClient) -> None:
         """Test that job endpoints are properly registered."""
         # Test that endpoints exist by checking for proper error responses
         # rather than trying to execute the full job creation flow

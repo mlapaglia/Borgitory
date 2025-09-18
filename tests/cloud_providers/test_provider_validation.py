@@ -27,10 +27,10 @@ class MockStorageConfig(CloudStorageConfig):
 class MockStorage(CloudStorage):
     """Mock storage for testing"""
 
-    def __init__(self, rclone_service: RcloneService, config):
+    def __init__(self, rclone_service: RcloneService, config) -> None:
         super().__init__()
 
-    async def sync_to_cloud(self, source_path: str, destination_path: str):
+    async def sync_to_cloud(self, source_path: str, destination_path: str) -> None:
         pass
 
     def get_rclone_config_section(self) -> dict:
@@ -66,7 +66,7 @@ def clean_registry():
 class TestProviderValidation:
     """Test provider validation using registry"""
 
-    def test_is_provider_registered_function(self, clean_registry):
+    def test_is_provider_registered_function(self, clean_registry) -> None:
         """Test is_provider_registered helper function"""
         # Should return False for unregistered provider
         assert not is_provider_registered("nonexistent")
@@ -94,7 +94,7 @@ class TestProviderValidation:
 class TestPydanticValidation:
     """Test Pydantic schema validation with registry"""
 
-    def test_create_config_with_valid_provider(self, clean_registry):
+    def test_create_config_with_valid_provider(self, clean_registry) -> None:
         """Test CloudSyncConfigCreate with valid registered provider"""
         config_data = {
             "name": "Test Config",
@@ -113,7 +113,7 @@ class TestPydanticValidation:
         assert config.provider == "s3"
         assert config.name == "Test Config"
 
-    def test_create_config_with_invalid_provider(self, clean_registry):
+    def test_create_config_with_invalid_provider(self, clean_registry) -> None:
         """Test CloudSyncConfigCreate with invalid provider"""
         config_data = {
             "name": "Test Config",
@@ -130,7 +130,7 @@ class TestPydanticValidation:
         assert "Unknown provider" in error_msg
         assert "Supported providers:" in error_msg
 
-    def test_create_config_with_empty_provider(self, clean_registry):
+    def test_create_config_with_empty_provider(self, clean_registry) -> None:
         """Test CloudSyncConfigCreate with empty provider"""
         config_data = {
             "name": "Test Config",
@@ -145,7 +145,7 @@ class TestPydanticValidation:
         error_msg = str(exc_info.value)
         assert "Provider is required" in error_msg
 
-    def test_update_config_with_valid_provider(self, clean_registry):
+    def test_update_config_with_valid_provider(self, clean_registry) -> None:
         """Test CloudSyncConfigUpdate with valid provider"""
         update_data = {
             "provider": "sftp",
@@ -163,7 +163,7 @@ class TestPydanticValidation:
         config = CloudSyncConfigUpdate(**update_data)
         assert config.provider == "sftp"
 
-    def test_update_config_with_invalid_provider(self, clean_registry):
+    def test_update_config_with_invalid_provider(self, clean_registry) -> None:
         """Test CloudSyncConfigUpdate with invalid provider"""
         update_data = {
             "provider": "nonexistent_provider",
@@ -178,7 +178,7 @@ class TestPydanticValidation:
         assert "nonexistent_provider" in error_msg
         assert "Unknown provider" in error_msg
 
-    def test_update_config_with_none_provider(self, clean_registry):
+    def test_update_config_with_none_provider(self, clean_registry) -> None:
         """Test CloudSyncConfigUpdate with None provider (should be allowed)"""
         update_data = {"name": "Updated Name"}
 
@@ -187,7 +187,7 @@ class TestPydanticValidation:
         assert config.provider is None
         assert config.name == "Updated Name"
 
-    def test_validation_reflects_registry_changes(self, clean_registry):
+    def test_validation_reflects_registry_changes(self, clean_registry) -> None:
         """Test that validation reflects changes in registry"""
 
         # Register a custom provider
@@ -213,7 +213,7 @@ class TestPydanticValidation:
         config = CloudSyncConfigCreate(**config_data)
         assert config.provider == "custom"
 
-    def test_base_config_provider_validation(self, clean_registry):
+    def test_base_config_provider_validation(self, clean_registry) -> None:
         """Test that base config also validates provider"""
         # Test with valid provider
         config_data = {
@@ -237,7 +237,7 @@ class TestPydanticValidation:
 
         assert "Unknown provider 'invalid'" in str(exc_info.value)
 
-    def test_error_message_includes_supported_providers(self, clean_registry):
+    def test_error_message_includes_supported_providers(self, clean_registry) -> None:
         """Test that error messages include list of supported providers"""
         config_data = {
             "name": "Test Config",

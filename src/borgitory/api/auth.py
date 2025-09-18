@@ -2,10 +2,11 @@ from fastapi import APIRouter, Request, HTTPException, Depends, Response, Form
 from sqlalchemy.orm import Session
 import secrets
 from datetime import datetime, timedelta, UTC
-from typing import Optional
+from typing import Dict, Optional
 
 from borgitory.models.database import User, UserSession, get_db
 from borgitory.dependencies import TemplatesDep
+from starlette.templating import _TemplateResponse
 
 router = APIRouter()
 
@@ -13,7 +14,7 @@ router = APIRouter()
 @router.get("/check-users")
 def check_users_exist(
     request: Request, templates: TemplatesDep, db: Session = Depends(get_db)
-):
+) -> _TemplateResponse:
     user_count = db.query(User).count()
     has_users = user_count > 0
     next_url = request.query_params.get("next", "/repositories")
@@ -35,7 +36,7 @@ def register_user(
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
-):
+) -> _TemplateResponse:
     try:
         user_count = db.query(User).count()
         if user_count > 0:
@@ -71,7 +72,8 @@ def register_user(
                 status_code=400,
             )
 
-        user = User(username=username.strip())
+        user = User()
+        user.username = username.strip()
         user.set_password(password)
 
         db.add(user)
@@ -107,7 +109,7 @@ def login_user(
     remember_me: bool = Form(False),
     next: str = Form("/repositories"),
     db: Session = Depends(get_db),
-):
+) -> _TemplateResponse:
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user or not user.verify_password(password):
@@ -133,20 +135,21 @@ def login_user(
 
         user_agent = request.headers.get("user-agent") if request else None
         client_ip = (
-            request.client.host if request and hasattr(request, "client") else None
+            request.client.host
+            if request and hasattr(request, "client") and request.client
+            else None
         )
         current_time = datetime.now(UTC)
 
-        db_session = UserSession(
-            user_id=user.id,
-            session_token=auth_token,
-            expires_at=expires_at,
-            remember_me=remember_me,
-            user_agent=user_agent,
-            ip_address=client_ip,
-            created_at=current_time,
-            last_activity=current_time,
-        )
+        db_session = UserSession()
+        db_session.user_id = user.id
+        db_session.session_token = auth_token
+        db_session.expires_at = expires_at
+        db_session.remember_me = remember_me
+        db_session.user_agent = user_agent
+        db_session.ip_address = client_ip
+        db_session.created_at = current_time
+        db_session.last_activity = current_time
         db.add(db_session)
 
         user.last_login = current_time
@@ -181,7 +184,9 @@ def login_user(
 
 
 @router.post("/logout")
-def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+def logout(
+    request: Request, response: Response, db: Session = Depends(get_db)
+) -> Dict[str, str]:
     auth_token = request.cookies.get("auth_token")
     if auth_token:
         db.query(UserSession).filter(UserSession.session_token == auth_token).delete()
@@ -191,7 +196,7 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     return {"status": "logged out"}
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db)):
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     auth_token = request.cookies.get("auth_token")
     if not auth_token:
         raise HTTPException(status_code=401, detail="Not authenticated")

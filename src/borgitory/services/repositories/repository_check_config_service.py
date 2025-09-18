@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class RepositoryCheckConfigService:
     """Service for repository check configuration business logic operations."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session) -> None:
         self.db = db
 
     def get_all_configs(
@@ -79,19 +79,18 @@ class RepositoryCheckConfigService:
                 return False, None, "A check policy with this name already exists"
 
             # Create new configuration
-            db_config = RepositoryCheckConfig(
-                name=name,
-                description=description,
-                check_type=check_type,
-                verify_data=verify_data,
-                repair_mode=repair_mode,
-                save_space=save_space,
-                max_duration=max_duration,
-                archive_prefix=archive_prefix,
-                archive_glob=archive_glob,
-                first_n_archives=first_n_archives,
-                last_n_archives=last_n_archives,
-            )
+            db_config = RepositoryCheckConfig()
+            db_config.name = name
+            db_config.description = description
+            db_config.check_type = check_type
+            db_config.verify_data = verify_data
+            db_config.repair_mode = repair_mode
+            db_config.save_space = save_space
+            db_config.max_duration = max_duration
+            db_config.archive_prefix = archive_prefix
+            db_config.archive_glob = archive_glob
+            db_config.first_n_archives = first_n_archives
+            db_config.last_n_archives = last_n_archives
 
             self.db.add(db_config)
             self.db.commit()

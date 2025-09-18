@@ -21,25 +21,25 @@ class JobEventBroadcaster:
         max_queue_size: int = 100,
         keepalive_timeout: float = 30.0,
         cleanup_interval: float = 60.0,
-    ):
+    ) -> None:
         self.max_queue_size = max_queue_size
         self.keepalive_timeout = keepalive_timeout
         self.cleanup_interval = cleanup_interval
 
         # Client event queues for SSE streaming
-        self._client_queues: List[asyncio.Queue] = []
-        self._client_queue_metadata: Dict[asyncio.Queue, Dict[str, Any]] = {}
+        self._client_queues: List[asyncio.Queue[JobEvent]] = []
+        self._client_queue_metadata: Dict[asyncio.Queue[JobEvent], Dict[str, Any]] = {}
 
         # Event history for new clients
         self._recent_events: List[JobEvent] = []
         self._max_recent_events = 50
 
         # Background tasks
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._keepalive_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task[None]] = None
+        self._keepalive_task: Optional[asyncio.Task[None]] = None
         self._shutdown_requested = False
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize background tasks"""
         if not self._cleanup_task or self._cleanup_task.done():
             self._cleanup_task = asyncio.create_task(
@@ -70,7 +70,7 @@ class JobEventBroadcaster:
         for queue in self._client_queues:
             try:
                 if not queue.full():
-                    queue.put_nowait(event.to_dict())
+                    queue.put_nowait(event)
                     sent_count += 1
                 else:
                     logger.warning("Client queue is full, marking for cleanup")
@@ -90,9 +90,9 @@ class JobEventBroadcaster:
 
     def subscribe_client(
         self, client_id: Optional[str] = None, send_recent_events: bool = True
-    ) -> asyncio.Queue:
+    ) -> asyncio.Queue[JobEvent]:
         """Subscribe a new client to events"""
-        queue = asyncio.Queue(maxsize=self.max_queue_size)
+        queue: asyncio.Queue[JobEvent] = asyncio.Queue(maxsize=self.max_queue_size)
 
         # Store client metadata
         self._client_queue_metadata[queue] = {
@@ -112,18 +112,18 @@ class JobEventBroadcaster:
         if send_recent_events:
             for event in self._recent_events[-10:]:  # Send last 10 events
                 try:
-                    queue.put_nowait(event.to_dict())
+                    queue.put_nowait(event)
                 except asyncio.QueueFull:
                     logger.warning("New client queue is already full")
                     break
 
         return queue
 
-    def unsubscribe_client(self, queue: asyncio.Queue) -> bool:
+    def unsubscribe_client(self, queue: asyncio.Queue[JobEvent]) -> bool:
         """Unsubscribe a client from events"""
         return self._remove_client_queue(queue)
 
-    def _remove_client_queue(self, queue: asyncio.Queue) -> bool:
+    def _remove_client_queue(self, queue: asyncio.Queue[JobEvent]) -> bool:
         """Remove a client queue and its metadata"""
         try:
             if queue in self._client_queues:
@@ -139,8 +139,8 @@ class JobEventBroadcaster:
             return False
 
     async def stream_events_for_client(
-        self, client_queue: asyncio.Queue
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+        self, client_queue: asyncio.Queue[JobEvent]
+    ) -> AsyncGenerator[JobEvent, None]:
         """Stream events for a specific client"""
         try:
             while not self._shutdown_requested:
@@ -158,11 +158,12 @@ class JobEventBroadcaster:
 
                 except asyncio.TimeoutError:
                     # Send keepalive if no events
-                    yield {
-                        "type": EventType.KEEPALIVE.value,
-                        "timestamp": datetime.now().isoformat(),
-                        "data": {"message": "keepalive"},
-                    }
+                    from borgitory.services.jobs.broadcaster.job_event import JobEvent
+
+                    keepalive_event = JobEvent(
+                        event_type=EventType.KEEPALIVE, data={"message": "keepalive"}
+                    )
+                    yield keepalive_event
 
         except Exception as e:
             logger.error(f"Error in client event stream: {e}")
@@ -170,7 +171,7 @@ class JobEventBroadcaster:
             # Clean up client on disconnect
             self._remove_client_queue(client_queue)
 
-    async def stream_all_events(self) -> AsyncGenerator[Dict[str, Any], None]:
+    async def stream_all_events(self) -> AsyncGenerator[JobEvent, None]:
         """Stream all events for a new client connection"""
         client_queue = self.subscribe_client()
 
@@ -180,7 +181,7 @@ class JobEventBroadcaster:
         finally:
             self.unsubscribe_client(client_queue)
 
-    async def _cleanup_disconnected_clients(self):
+    async def _cleanup_disconnected_clients(self) -> None:
         """Background task to clean up disconnected clients"""
         while not self._shutdown_requested:
             try:
@@ -216,7 +217,7 @@ class JobEventBroadcaster:
                 logger.error(f"Error in client cleanup task: {e}")
                 await asyncio.sleep(self.cleanup_interval)
 
-    async def _send_keepalives(self):
+    async def _send_keepalives(self) -> None:
         """Background task to send periodic keepalives"""
         while not self._shutdown_requested:
             try:
@@ -235,11 +236,11 @@ class JobEventBroadcaster:
                 logger.error(f"Error in keepalive task: {e}")
                 await asyncio.sleep(self.keepalive_timeout)
 
-    def subscribe_to_events(self) -> asyncio.Queue:
+    def subscribe_to_events(self) -> asyncio.Queue[JobEvent]:
         """Subscribe to job events for streaming (compatibility method)"""
         return self.subscribe_client()
 
-    def unsubscribe_from_events(self, queue: asyncio.Queue) -> None:
+    def unsubscribe_from_events(self, queue: asyncio.Queue[JobEvent]) -> None:
         """Unsubscribe from job events (compatibility method)"""
         self.unsubscribe_client(queue)
 
@@ -263,7 +264,7 @@ class JobEventBroadcaster:
         """Get recent event history"""
         return [event.to_dict() for event in self._recent_events[-limit:]]
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Shutdown the event broadcaster"""
         logger.info("Shutting down job event broadcaster")
         self._shutdown_requested = True
@@ -291,7 +292,7 @@ class JobEventBroadcaster:
         logger.info("Job event broadcaster shutdown complete")
 
 
-_global_broadcaster: JobEventBroadcaster = None
+_global_broadcaster: Optional[JobEventBroadcaster] = None
 
 
 def get_job_event_broadcaster() -> JobEventBroadcaster:

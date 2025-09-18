@@ -11,11 +11,11 @@ from borgitory.services.jobs.job_output_manager import JobOutputManager
 class TestJobOutputManager:
     """Test JobOutputManager functionality"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures"""
         self.output_manager = JobOutputManager(max_lines_per_job=10)
 
-    def test_create_job_output(self):
+    def test_create_job_output(self) -> None:
         """Test creating job output container"""
         job_id = "test-job-123"
 
@@ -28,7 +28,7 @@ class TestJobOutputManager:
         assert job_id in self.output_manager._job_outputs
 
     @pytest.mark.asyncio
-    async def test_add_output_line(self):
+    async def test_add_output_line(self) -> None:
         """Test adding output lines to a job"""
         job_id = "test-job-123"
         self.output_manager.create_job_output(job_id)
@@ -47,7 +47,7 @@ class TestJobOutputManager:
         assert line["metadata"]["key"] == "value"
 
     @pytest.mark.asyncio
-    async def test_add_output_line_auto_create(self):
+    async def test_add_output_line_auto_create(self) -> None:
         """Test adding output line automatically creates job output"""
         job_id = "test-job-456"
 
@@ -58,7 +58,7 @@ class TestJobOutputManager:
         assert job_output.total_lines == 1
 
     @pytest.mark.asyncio
-    async def test_add_output_line_with_progress(self):
+    async def test_add_output_line_with_progress(self) -> None:
         """Test adding output line with progress information"""
         job_id = "test-job-789"
         progress_info = {"bytes_processed": 1000, "percentage": 50}
@@ -72,7 +72,7 @@ class TestJobOutputManager:
         assert job_output.current_progress["percentage"] == 50
 
     @pytest.mark.asyncio
-    async def test_max_lines_limit(self):
+    async def test_max_lines_limit(self) -> None:
         """Test that output lines respect max limit"""
         job_id = "test-job-limit"
         self.output_manager.create_job_output(job_id)
@@ -91,7 +91,7 @@ class TestJobOutputManager:
         assert lines[-1]["text"] == "Line 14"  # Last line
 
     @pytest.mark.asyncio
-    async def test_get_job_output_stream(self):
+    async def test_get_job_output_stream(self) -> None:
         """Test getting formatted job output stream"""
         job_id = "test-job-stream"
 
@@ -107,7 +107,7 @@ class TestJobOutputManager:
         assert output_stream["lines"][1]["text"] == "Line 2"
 
     @pytest.mark.asyncio
-    async def test_get_job_output_stream_nonexistent(self):
+    async def test_get_job_output_stream_nonexistent(self) -> None:
         """Test getting output stream for nonexistent job"""
         output_stream = await self.output_manager.get_job_output_stream("nonexistent")
 
@@ -116,7 +116,7 @@ class TestJobOutputManager:
         assert output_stream["progress"] == {}
 
     @pytest.mark.asyncio
-    async def test_stream_job_output(self):
+    async def test_stream_job_output(self) -> None:
         """Test streaming job output"""
         job_id = "test-job-streaming"
         self.output_manager.create_job_output(job_id)
@@ -136,7 +136,7 @@ class TestJobOutputManager:
         assert outputs[0]["type"] == "output"
         assert outputs[0]["data"]["text"] == "Initial line"
 
-    def test_get_output_summary(self):
+    def test_get_output_summary(self) -> None:
         """Test getting output summary"""
         job_id = "test-job-summary"
         job_output = self.output_manager.create_job_output(job_id)
@@ -151,13 +151,13 @@ class TestJobOutputManager:
         assert summary["current_progress"]["status"] == "running"
         assert summary["max_lines"] == 10
 
-    def test_get_output_summary_nonexistent(self):
+    def test_get_output_summary_nonexistent(self) -> None:
         """Test getting summary for nonexistent job"""
         summary = self.output_manager.get_output_summary("nonexistent")
 
         assert summary == {}
 
-    def test_clear_job_output(self):
+    def test_clear_job_output(self) -> None:
         """Test clearing job output"""
         job_id = "test-job-clear"
         self.output_manager.create_job_output(job_id)
@@ -168,7 +168,7 @@ class TestJobOutputManager:
         assert job_id not in self.output_manager._job_outputs
         assert job_id not in self.output_manager._output_locks
 
-    def test_get_all_job_outputs(self):
+    def test_get_all_job_outputs(self) -> None:
         """Test getting all job output summaries"""
         self.output_manager.create_job_output("job1")
         self.output_manager.create_job_output("job2")
@@ -182,7 +182,7 @@ class TestJobOutputManager:
         assert all_outputs["job2"]["job_id"] == "job2"
 
     @pytest.mark.asyncio
-    async def test_format_output_for_display(self):
+    async def test_format_output_for_display(self) -> None:
         """Test formatting output for display"""
         job_id = "test-job-display"
 
@@ -209,7 +209,7 @@ class TestJobOutputManager:
         assert len(limited_lines) == 2
         assert limited_lines == ["Error line", "Line 3"]  # Last 2 lines
 
-    def test_cleanup_old_outputs(self):
+    def test_cleanup_old_outputs(self) -> None:
         """Test cleaning up old job outputs"""
         # Create job outputs with different ages
         old_job = self.output_manager.create_job_output("old-job")

@@ -16,7 +16,7 @@ from borgitory.models.database import Job
 class TestJobRenderService:
     """Test JobRenderService functionality with proper DI patterns"""
 
-    def test_initialization_with_job_manager(self, mock_job_manager):
+    def test_initialization_with_job_manager(self, mock_job_manager) -> None:
         """Test JobRenderService initialization with injected JobManager"""
         service = JobRenderService(job_manager=mock_job_manager)
 
@@ -24,7 +24,7 @@ class TestJobRenderService:
         assert service.job_manager == mock_job_manager
         assert service.templates is not None
 
-    def test_initialization_with_custom_templates_dir(self, mock_job_manager):
+    def test_initialization_with_custom_templates_dir(self, mock_job_manager) -> None:
         """Test initialization with custom templates directory"""
         custom_dir = "/custom/templates"
         service = JobRenderService(
@@ -35,7 +35,7 @@ class TestJobRenderService:
         assert service.templates is not None
         assert service.job_manager == mock_job_manager
 
-    def test_render_jobs_html_no_jobs(self, mock_job_manager):
+    def test_render_jobs_html_no_jobs(self, mock_job_manager) -> None:
         """Test rendering HTML when no jobs exist"""
         service = JobRenderService(job_manager=mock_job_manager)
         mock_db = Mock()
@@ -47,7 +47,7 @@ class TestJobRenderService:
 
     def test_render_jobs_html_with_database_jobs(
         self, mock_job_manager, sample_database_job_with_tasks
-    ):
+    ) -> None:
         """Test rendering HTML with database jobs containing tasks"""
         service = JobRenderService(job_manager=mock_job_manager)
         mock_db = Mock()
@@ -62,7 +62,7 @@ class TestJobRenderService:
         assert result != ""
         assert "No job history available" not in result
 
-    def test_render_job_html_with_uuid(self, mock_job_manager):
+    def test_render_job_html_with_uuid(self, mock_job_manager) -> None:
         """Test rendering individual job HTML uses UUID as primary identifier"""
         job_context = create_mock_job_context(job_type="simple")
         service = JobRenderService(job_manager=mock_job_manager)
@@ -72,17 +72,9 @@ class TestJobRenderService:
         assert job_context["job"].id in html
         assert html != ""
 
-    def test_render_job_html_skips_jobs_without_uuid(self, mock_job_manager):
-        """Test that jobs without UUID are skipped"""
-        job_without_id = Mock()
-        job_without_id.id = None
-
-        service = JobRenderService(job_manager=mock_job_manager)
-        html = service._render_job_html(job_without_id)
-
-        assert html == ""
-
-    def test_format_database_job_creates_context_with_uuid(self, mock_job_manager):
+    def test_format_database_job_creates_context_with_uuid(
+        self, mock_job_manager
+    ) -> None:
         """Test that database job formatting creates context with UUID"""
         job_context = create_mock_job_context(
             job_type="composite", tasks=[Mock(task_name="backup", status="completed")]
@@ -96,7 +88,7 @@ class TestJobRenderService:
         assert result["job"].id == mock_job.id
         assert result["job"].job_uuid == mock_job.id
 
-    def test_format_database_job_handles_simple_jobs(self, mock_job_manager):
+    def test_format_database_job_handles_simple_jobs(self, mock_job_manager) -> None:
         """Test formatting simple jobs without tasks"""
         job_context = create_mock_job_context(job_type="simple", tasks=[])
         mock_job = job_context["job"]
@@ -107,7 +99,9 @@ class TestJobRenderService:
         assert result is not None  # All jobs are now composite
         assert "sorted_tasks" in result
 
-    def test_job_context_maintains_backward_compatibility(self, mock_job_manager):
+    def test_job_context_maintains_backward_compatibility(
+        self, mock_job_manager
+    ) -> None:
         """Test that job context provides job_uuid for template compatibility"""
         job_context = create_mock_job_context()
         mock_job = job_context["job"]
@@ -119,7 +113,7 @@ class TestJobRenderService:
         assert result["job"].id == mock_job.id
         assert result["job"].job_uuid == mock_job.id
 
-    def test_composite_job_detection_logic(self, mock_job_manager):
+    def test_composite_job_detection_logic(self, mock_job_manager) -> None:
         # Test job with tasks
         mock_task = Mock()
         mock_task.task_name = "backup"
@@ -139,7 +133,7 @@ class TestJobRenderService:
 
         service._format_database_job_for_render(job_without_tasks)
 
-    def test_dependency_injection_service(self):
+    def test_dependency_injection_service(self) -> None:
         """Test that dependency injection service works"""
         from borgitory.dependencies import get_job_render_service
 
@@ -157,7 +151,7 @@ class TestJobRenderServiceIntegration:
 
     def test_render_with_real_database_job(
         self, mock_job_manager, sample_database_job_with_tasks
-    ):
+    ) -> None:
         """Test rendering with actual database job and tasks"""
         service = JobRenderService(job_manager=mock_job_manager)
 
@@ -178,7 +172,7 @@ class TestJobRenderServiceIntegration:
 
     def test_toggle_details_endpoint_compatibility(
         self, mock_job_manager, sample_database_job_with_tasks
-    ):
+    ) -> None:
         """Test compatibility with toggle-details endpoint"""
         service = JobRenderService(job_manager=mock_job_manager)
 
@@ -192,9 +186,9 @@ class TestJobRenderServiceIntegration:
 
 
 class TestJobRenderServiceErrorHandling:
-    """Test error handling in JobRenderService"""  # type: ignore
+    """Test error handling in JobRenderService"""
 
-    def test_handles_missing_repository_gracefully(self, mock_job_manager):
+    def test_handles_missing_repository_gracefully(self, mock_job_manager) -> None:
         """Test handling jobs with missing repository"""
         mock_job = Mock()
         mock_job.id = "test-job-id"
@@ -207,7 +201,7 @@ class TestJobRenderServiceErrorHandling:
         result = service._format_database_job_for_render(mock_job)
         assert result is not None
 
-    def test_handles_database_errors_gracefully(self, mock_job_manager):
+    def test_handles_database_errors_gracefully(self, mock_job_manager) -> None:
         """Test handling database connection errors"""
         service = JobRenderService(job_manager=mock_job_manager)
 
@@ -226,7 +220,7 @@ class TestJobRenderServiceErrorHandling:
 class TestJobRenderServiceCurrentJobs:
     """Test current jobs rendering functionality"""
 
-    def test_render_current_jobs_html_no_jobs(self, mock_job_manager):
+    def test_render_current_jobs_html_no_jobs(self, mock_job_manager) -> None:
         """Test rendering when no current jobs are running"""
         mock_job_manager.jobs = {}
         service = JobRenderService(job_manager=mock_job_manager)
@@ -235,7 +229,9 @@ class TestJobRenderServiceCurrentJobs:
 
         assert "No operations currently running" in result
 
-    def test_render_current_jobs_html_with_composite_jobs(self, mock_job_manager):
+    def test_render_current_jobs_html_with_composite_jobs(
+        self, mock_job_manager
+    ) -> None:
         """Test rendering with composite jobs that have tasks"""
         # Create mock composite job
         mock_task = Mock()
@@ -259,7 +255,9 @@ class TestJobRenderServiceCurrentJobs:
         assert "backup" in result
         assert "1/1" in result  # Progress indicator
 
-    def test_render_current_jobs_html_with_simple_borg_jobs(self, mock_job_manager):
+    def test_render_current_jobs_html_with_simple_borg_jobs(
+        self, mock_job_manager
+    ) -> None:
         """Test rendering with simple borg jobs (not part of composite)"""
         mock_job = Mock()
         mock_job.status = "running"
@@ -277,7 +275,9 @@ class TestJobRenderServiceCurrentJobs:
         assert "Files: 100" in result
         assert "1GB" in result
 
-    def test_render_current_jobs_html_filters_child_jobs(self, mock_job_manager):
+    def test_render_current_jobs_html_filters_child_jobs(
+        self, mock_job_manager
+    ) -> None:
         """Test that child jobs of composite jobs are filtered out"""
         # Composite job with tasks
         composite_job = Mock()
@@ -307,7 +307,7 @@ class TestJobRenderServiceCurrentJobs:
         assert "composite-123" in result
         assert "simple-456" not in result
 
-    def test_render_current_jobs_html_error_handling(self, mock_job_manager):
+    def test_render_current_jobs_html_error_handling(self, mock_job_manager) -> None:
         """Test error handling in current jobs rendering"""
         mock_job_manager.jobs = {"bad-job": None}  # This will cause an error
         service = JobRenderService(job_manager=mock_job_manager)
@@ -320,7 +320,7 @@ class TestJobRenderServiceCurrentJobs:
 class TestJobRenderServiceChildJobDetection:
     """Test child job detection logic"""
 
-    def test_is_child_of_composite_job_true(self, mock_job_manager):
+    def test_is_child_of_composite_job_true(self, mock_job_manager) -> None:
         """Test detection when job is child of composite job"""
         # Composite job running with tasks
         composite_job = Mock()
@@ -341,7 +341,7 @@ class TestJobRenderServiceChildJobDetection:
 
         assert result is True
 
-    def test_is_child_of_composite_job_false(self, mock_job_manager):
+    def test_is_child_of_composite_job_false(self, mock_job_manager) -> None:
         """Test detection when no composite jobs are running"""
         simple_job = Mock()
         simple_job.tasks = []
@@ -353,7 +353,7 @@ class TestJobRenderServiceChildJobDetection:
 
         assert result is False
 
-    def test_is_child_of_composite_job_self_exclusion(self, mock_job_manager):
+    def test_is_child_of_composite_job_self_exclusion(self, mock_job_manager) -> None:
         """Test that job doesn't consider itself as parent"""
         composite_job = Mock()
         composite_job.tasks = [Mock()]
@@ -370,7 +370,7 @@ class TestJobRenderServiceChildJobDetection:
 class TestJobRenderServiceJobRetrieval:
     """Test job retrieval for rendering"""
 
-    def test_get_job_for_render_completed_from_database(self, mock_job_manager):
+    def test_get_job_for_render_completed_from_database(self, mock_job_manager) -> None:
         """Test getting completed job prioritizes database data"""
         # Mock database job
         db_job = Mock(spec=Job)
@@ -399,7 +399,7 @@ class TestJobRenderServiceJobRetrieval:
         assert result["job"].id == "job-123"
         assert result["job"].status == "completed"
 
-    def test_get_job_for_render_running_from_manager(self, mock_job_manager):
+    def test_get_job_for_render_running_from_manager(self, mock_job_manager) -> None:
         """Test getting running job from job manager"""
         # Mock manager job
         manager_job = Mock()
@@ -427,7 +427,7 @@ class TestJobRenderServiceJobRetrieval:
         assert result["job"].id == "job-456"
         assert result["job"].status == "running"
 
-    def test_get_job_for_render_not_found(self, mock_job_manager):
+    def test_get_job_for_render_not_found(self, mock_job_manager) -> None:
         """Test getting non-existent job"""
         mock_job_manager.jobs = {}
 
@@ -438,9 +438,9 @@ class TestJobRenderServiceJobRetrieval:
 
         result = service.get_job_for_render("nonexistent", mock_db)
 
-        assert result is None
+        assert result == {}
 
-    def test_get_job_for_render_error_handling(self, mock_job_manager):
+    def test_get_job_for_render_error_handling(self, mock_job_manager) -> None:
         """Test error handling in job retrieval"""
         mock_db = Mock()
         mock_db.query.side_effect = Exception("Database error")
@@ -449,13 +449,13 @@ class TestJobRenderServiceJobRetrieval:
 
         result = service.get_job_for_render("job-123", mock_db)
 
-        assert result is None
+        assert result == {}
 
 
 class TestJobRenderServiceManagerJobFormatting:
     """Test manager job formatting for rendering"""
 
-    def test_format_manager_job_with_database_job(self, mock_job_manager):
+    def test_format_manager_job_with_database_job(self, mock_job_manager) -> None:
         """Test formatting manager job when database job is available"""
         # Database job
         db_job = Mock(spec=Job)
@@ -486,7 +486,7 @@ class TestJobRenderServiceManagerJobFormatting:
         # Only completed/failed jobs use database task counts
         assert "0/1 tasks" in result["job_title"]
 
-    def test_format_manager_job_without_database_job(self, mock_job_manager):
+    def test_format_manager_job_without_database_job(self, mock_job_manager) -> None:
         """Test formatting manager job without database job"""
         manager_job = Mock()
         manager_job.status = "running"
@@ -511,7 +511,7 @@ class TestJobRenderServiceManagerJobFormatting:
         # Check that output_lines were converted to output string
         assert result["sorted_tasks"][0].output == "line1\nline2"
 
-    def test_format_manager_job_status_priority(self, mock_job_manager):
+    def test_format_manager_job_status_priority(self, mock_job_manager) -> None:
         """Test status priority: database status for completed/failed jobs"""
         # Database job marked as completed
         db_job = Mock(spec=Job)
@@ -538,7 +538,7 @@ class TestJobRenderServiceManagerJobFormatting:
         assert result["status_class"] == "bg-green-100 text-green-800"
         assert result["status_icon"] == "✓"
 
-    def test_format_manager_job_task_order_assignment(self, mock_job_manager):
+    def test_format_manager_job_task_order_assignment(self, mock_job_manager) -> None:
         """Test that tasks without task_order get assigned proper order"""
         task1 = Mock()
         task1.task_name = "backup"
@@ -573,7 +573,7 @@ class TestJobRenderServiceManagerJobFormatting:
         assert task1 in result["sorted_tasks"]
         assert task2 in result["sorted_tasks"]
 
-    def test_format_manager_job_error_handling(self, mock_job_manager):
+    def test_format_manager_job_error_handling(self, mock_job_manager) -> None:
         """Test error handling in manager job formatting"""
         # Manager job with missing attributes
         manager_job = Mock()
@@ -591,7 +591,7 @@ class TestJobRenderServiceManagerJobFormatting:
 class TestJobRenderServiceTaskStatusFixes:
     """Test task status fixing for failed jobs"""
 
-    def test_fix_task_statuses_empty_tasks(self, mock_job_manager):
+    def test_fix_task_statuses_empty_tasks(self, mock_job_manager) -> None:
         """Test fixing task statuses with empty task list"""
         service = JobRenderService(job_manager=mock_job_manager)
 
@@ -599,7 +599,7 @@ class TestJobRenderServiceTaskStatusFixes:
 
         assert result == []
 
-    def test_fix_task_statuses_with_failed_task(self, mock_job_manager):
+    def test_fix_task_statuses_with_failed_task(self, mock_job_manager) -> None:
         """Test fixing task statuses when there's an explicit failed task"""
         task1 = Mock()
         task1.status = "completed"
@@ -623,7 +623,9 @@ class TestJobRenderServiceTaskStatusFixes:
         assert result[2].status == "skipped"  # After failed task
         assert result[3].status == "skipped"  # After failed task
 
-    def test_fix_task_statuses_with_running_task_in_failed_job(self, mock_job_manager):
+    def test_fix_task_statuses_with_running_task_in_failed_job(
+        self, mock_job_manager
+    ) -> None:
         """Test fixing when a running task exists in failed job (likely failed)"""
         task1 = Mock()
         task1.status = "completed"
@@ -643,7 +645,7 @@ class TestJobRenderServiceTaskStatusFixes:
         assert result[1].status == "failed"  # Running task marked as failed
         assert result[2].status == "skipped"  # Subsequent task skipped
 
-    def test_fix_task_statuses_no_explicit_failed_task(self, mock_job_manager):
+    def test_fix_task_statuses_no_explicit_failed_task(self, mock_job_manager) -> None:
         """Test fixing when no explicit failed task but job failed"""
         task1 = Mock()
         task1.status = "completed"
@@ -675,7 +677,9 @@ class TestJobRenderServiceStreaming:
     """Test streaming functionality"""
 
     @pytest.mark.asyncio
-    async def test_stream_current_jobs_html_initial_render(self, mock_job_manager):
+    async def test_stream_current_jobs_html_initial_render(
+        self, mock_job_manager
+    ) -> None:
         """Test initial HTML stream for current jobs"""
         mock_job_manager.jobs = {}
         mock_job_manager.stream_all_job_updates = AsyncMock()
@@ -694,7 +698,9 @@ class TestJobRenderServiceStreaming:
         assert first_chunk.endswith("\n\n")
 
     @pytest.mark.asyncio
-    async def test_stream_current_jobs_html_with_updates(self, mock_job_manager):
+    async def test_stream_current_jobs_html_with_updates(
+        self, mock_job_manager
+    ) -> None:
         """Test streaming with job updates"""
         mock_job_manager.jobs = {}
 
@@ -730,7 +736,9 @@ class TestJobRenderServiceStreaming:
         assert all(chunk.endswith("\n\n") for chunk in chunks)
 
     @pytest.mark.asyncio
-    async def test_stream_current_jobs_html_error_in_update(self, mock_job_manager):
+    async def test_stream_current_jobs_html_error_in_update(
+        self, mock_job_manager
+    ) -> None:
         """Test handling errors during stream updates"""
         mock_job_manager.jobs = {}
 
@@ -764,7 +772,9 @@ class TestJobRenderServiceStreaming:
             assert "Error" in chunks[-1] or "data: " in chunks[-1]
 
     @pytest.mark.asyncio
-    async def test_stream_current_jobs_html_initial_error(self, mock_job_manager):
+    async def test_stream_current_jobs_html_initial_error(
+        self, mock_job_manager
+    ) -> None:
         """Test handling error in initial render"""
         # Make initial render fail
         mock_job_manager.jobs = {"bad-job": None}
@@ -782,7 +792,7 @@ class TestJobRenderServiceStreaming:
 class TestJobRenderServiceStatusStyling:
     """Test status styling and formatting"""
 
-    def test_status_styling_completed(self, mock_job_manager):
+    def test_status_styling_completed(self, mock_job_manager) -> None:
         """Test styling for completed jobs"""
         job = Mock(spec=Job)
         job.id = "job-123"
@@ -803,7 +813,7 @@ class TestJobRenderServiceStatusStyling:
         assert result["status_class"] == "bg-green-100 text-green-800"
         assert result["status_icon"] == "✓"
 
-    def test_status_styling_failed(self, mock_job_manager):
+    def test_status_styling_failed(self, mock_job_manager) -> None:
         """Test styling for failed jobs"""
         job = Mock(spec=Job)
         job.id = "job-123"
@@ -824,7 +834,7 @@ class TestJobRenderServiceStatusStyling:
         assert result["status_class"] == "bg-red-100 text-red-800"
         assert result["status_icon"] == "✗"
 
-    def test_status_styling_running(self, mock_job_manager):
+    def test_status_styling_running(self, mock_job_manager) -> None:
         """Test styling for running jobs"""
         job = Mock(spec=Job)
         job.id = "job-123"
@@ -845,7 +855,7 @@ class TestJobRenderServiceStatusStyling:
         assert result["status_class"] == "bg-blue-100 text-blue-800"
         assert result["status_icon"] == "⟳"
 
-    def test_status_styling_unknown(self, mock_job_manager):
+    def test_status_styling_unknown(self, mock_job_manager) -> None:
         """Test styling for unknown status"""
         job = Mock(spec=Job)
         job.id = "job-123"
@@ -870,7 +880,7 @@ class TestJobRenderServiceStatusStyling:
 class TestJobRenderServiceEdgeCases:
     """Test edge cases and boundary conditions"""
 
-    def test_render_jobs_html_with_expand_parameter(self, mock_job_manager):
+    def test_render_jobs_html_with_expand_parameter(self, mock_job_manager) -> None:
         """Test rendering with expand parameter"""
         job = Mock(spec=Job)
         job.id = "job-to-expand"
@@ -892,7 +902,7 @@ class TestJobRenderServiceEdgeCases:
         assert "job-to-expand" in result
         # The expand parameter should be passed to _render_job_html
 
-    def test_render_jobs_html_database_error(self, mock_job_manager):
+    def test_render_jobs_html_database_error(self, mock_job_manager) -> None:
         """Test handling database errors in render_jobs_html"""
         mock_db = Mock()
         mock_db.query.side_effect = Exception("Database connection failed")
@@ -903,7 +913,7 @@ class TestJobRenderServiceEdgeCases:
         assert "Error loading jobs" in result
         assert "Database connection failed" in result
 
-    def test_format_database_job_missing_attributes(self, mock_job_manager):
+    def test_format_database_job_missing_attributes(self, mock_job_manager) -> None:
         """Test formatting job with missing optional attributes"""
         job = Mock(spec=Job)
         job.id = "job-123"
@@ -927,7 +937,7 @@ class TestJobRenderServiceEdgeCases:
         assert result["finished_at"] == "N/A"
         assert result["sorted_tasks"] == []
 
-    def test_format_database_job_error_handling(self, mock_job_manager):
+    def test_format_database_job_error_handling(self, mock_job_manager) -> None:
         """Test error handling in database job formatting"""
         job = Mock(spec=Job)
         job.id = "job-123"
@@ -937,9 +947,9 @@ class TestJobRenderServiceEdgeCases:
         service = JobRenderService(job_manager=mock_job_manager)
         result = service._format_database_job_for_render(job)
 
-        assert result is None
+        assert result == {}
 
-    def test_current_jobs_with_no_current_task(self, mock_job_manager):
+    def test_current_jobs_with_no_current_task(self, mock_job_manager) -> None:
         """Test current jobs rendering when get_current_task returns None"""
         mock_job = Mock()
         mock_job.status = "running"
@@ -957,7 +967,7 @@ class TestJobRenderServiceEdgeCases:
         assert "Unknown" in result  # Should handle None current task
         assert "1/1" in result  # Should still show progress
 
-    def test_job_title_formatting_edge_cases(self, mock_job_manager):
+    def test_job_title_formatting_edge_cases(self, mock_job_manager) -> None:
         """Test job title formatting with edge cases"""
         job = Mock(spec=Job)
         job.id = "job-123"

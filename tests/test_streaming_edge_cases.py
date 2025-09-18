@@ -28,7 +28,7 @@ class TestStreamingErrorHandling:
     @pytest.mark.asyncio
     async def test_task_streaming_nonexistent_job(
         self, job_stream_service, mock_job_manager
-    ):
+    ) -> None:
         """Test streaming for a job that doesn't exist"""
         job_id = str(uuid.uuid4())
         task_order = 0
@@ -59,7 +59,7 @@ class TestStreamingErrorHandling:
     @pytest.mark.asyncio
     async def test_task_streaming_job_with_mock_tasks(
         self, job_stream_service, mock_job_manager
-    ):
+    ) -> None:
         """Test streaming for a job with Mock tasks attribute (error handling)"""
         job_id = str(uuid.uuid4())
         task_order = 0
@@ -84,7 +84,7 @@ class TestStreamingErrorHandling:
     @pytest.mark.asyncio
     async def test_task_streaming_invalid_task_order(
         self, job_stream_service, mock_job_manager
-    ):
+    ) -> None:
         """Test streaming for invalid task order"""
         job_id = str(uuid.uuid4())
         task_order = 999  # Invalid task order
@@ -109,7 +109,7 @@ class TestStreamingErrorHandling:
     @pytest.mark.asyncio
     async def test_task_streaming_handles_timeout(
         self, job_stream_service, mock_job_manager
-    ):
+    ) -> None:
         """Test that streaming handles timeouts gracefully"""
         job_id = str(uuid.uuid4())
         task_order = 0
@@ -143,7 +143,7 @@ class TestStreamingErrorHandling:
     @pytest.mark.asyncio
     async def test_database_streaming_connection_error(
         self, job_stream_service, mock_job_manager
-    ):
+    ) -> None:
         """Test database streaming when connection fails"""
         job_id = str(uuid.uuid4())
         task_order = 0
@@ -180,7 +180,7 @@ class TestStreamingPerformance:
     def job_stream_service(self, mock_job_manager):
         return JobStreamService(job_manager=mock_job_manager)
 
-    def test_streaming_output_size_efficiency(self):
+    def test_streaming_output_size_efficiency(self) -> None:
         """Test that individual line streaming is more efficient than accumulated"""
         # Simulate 100 lines of output
         lines = [f"Output line {i} with some content" for i in range(100)]
@@ -203,7 +203,7 @@ class TestStreamingPerformance:
         assert len(first_line_event) < accumulated_event_size
         assert "Output line 0" in first_line_event
 
-    def test_html_div_wrapping_overhead(self):
+    def test_html_div_wrapping_overhead(self) -> None:
         """Test that HTML div wrapping doesn't add excessive overhead"""
         test_lines = [
             "",  # Empty line
@@ -239,7 +239,7 @@ class TestEventFiltering:
     @pytest.mark.asyncio
     async def test_event_filtering_correct_job_and_task(
         self, job_stream_service, mock_job_manager
-    ):
+    ) -> None:
         """Test that events are filtered correctly by job ID and task index"""
         job_id = str(uuid.uuid4())
         other_job_id = str(uuid.uuid4())
@@ -314,7 +314,7 @@ class TestEventFiltering:
 class TestBackwardCompatibilityEdgeCases:
     """Test edge cases for backward compatibility"""
 
-    def test_empty_output_lines_handling(self):
+    def test_empty_output_lines_handling(self) -> None:
         """Test handling of empty or None output_lines"""
         # Test various empty states
         empty_states = [
@@ -333,9 +333,7 @@ class TestBackwardCompatibilityEdgeCases:
             # This tests the robustness of our line processing logic
             if empty_state:
                 for line in empty_state:
-                    if isinstance(line, dict):
-                        text = line.get("text", "") or ""  # Handle None values
-                    else:
-                        text = str(line)
+                    text = line.get("text", "") or ""  # Handle None values
+
                     # Should not raise exception and should be string
                     assert isinstance(text, str)

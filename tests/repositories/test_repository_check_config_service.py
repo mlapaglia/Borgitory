@@ -3,6 +3,7 @@ Tests for RepositoryCheckConfigService - Business logic tests
 """
 
 import pytest
+from sqlalchemy.orm import Session
 from borgitory.services.repositories.repository_check_config_service import (
     RepositoryCheckConfigService,
 )
@@ -10,13 +11,13 @@ from borgitory.models.database import RepositoryCheckConfig, Repository
 
 
 @pytest.fixture
-def service(test_db):
+def service(test_db: Session):
     """RepositoryCheckConfigService instance with real database session."""
     return RepositoryCheckConfigService(test_db)
 
 
 @pytest.fixture
-def sample_repository(test_db):
+def sample_repository(test_db: Session):
     """Create a sample repository for testing."""
     repository = Repository(
         name="test-repo",
@@ -30,7 +31,7 @@ def sample_repository(test_db):
 
 
 @pytest.fixture
-def sample_config(test_db):
+def sample_config(test_db: Session):
     """Create a sample repository check config for testing."""
     config = RepositoryCheckConfig(
         name="test-config",
@@ -50,12 +51,12 @@ def sample_config(test_db):
 class TestRepositoryCheckConfigService:
     """Test class for RepositoryCheckConfigService business logic."""
 
-    def test_get_all_configs_empty(self, service):
+    def test_get_all_configs_empty(self, service) -> None:
         """Test getting configs when none exist."""
         result = service.get_all_configs()
         assert result == []
 
-    def test_get_all_configs_with_data(self, service, test_db):
+    def test_get_all_configs_with_data(self, service, test_db: Session) -> None:
         """Test getting configs with data."""
         config1 = RepositoryCheckConfig(
             name="config-1", description="First config", check_type="full", enabled=True
@@ -76,7 +77,7 @@ class TestRepositoryCheckConfigService:
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_all_configs_ordered_by_name(self, service, test_db):
+    def test_get_all_configs_ordered_by_name(self, service, test_db: Session) -> None:
         """Test configs are returned ordered by name."""
         config_z = RepositoryCheckConfig(name="z-config", check_type="full")
         config_a = RepositoryCheckConfig(name="a-config", check_type="full")
@@ -91,7 +92,7 @@ class TestRepositoryCheckConfigService:
         names = [c.name for c in result]
         assert names == ["a-config", "m-config", "z-config"]
 
-    def test_get_enabled_configs_only(self, service, test_db):
+    def test_get_enabled_configs_only(self, service, test_db: Session) -> None:
         """Test getting only enabled configs."""
         enabled_config = RepositoryCheckConfig(
             name="enabled-config", check_type="full", enabled=True
@@ -108,31 +109,31 @@ class TestRepositoryCheckConfigService:
         assert result[0].name == "enabled-config"
         assert result[0].enabled is True
 
-    def test_get_config_by_id_success(self, service, sample_config):
+    def test_get_config_by_id_success(self, service, sample_config) -> None:
         """Test getting config by ID successfully."""
         result = service.get_config_by_id(sample_config.id)
         assert result is not None
         assert result.name == "test-config"
         assert result.id == sample_config.id
 
-    def test_get_config_by_id_not_found(self, service):
+    def test_get_config_by_id_not_found(self, service) -> None:
         """Test getting non-existent config by ID."""
         result = service.get_config_by_id(999)
         assert result is None
 
-    def test_get_config_by_name_success(self, service, sample_config):
+    def test_get_config_by_name_success(self, service, sample_config) -> None:
         """Test getting config by name successfully."""
         result = service.get_config_by_name("test-config")
         assert result is not None
         assert result.name == "test-config"
         assert result.id == sample_config.id
 
-    def test_get_config_by_name_not_found(self, service):
+    def test_get_config_by_name_not_found(self, service) -> None:
         """Test getting non-existent config by name."""
         result = service.get_config_by_name("non-existent")
         assert result is None
 
-    def test_create_config_success(self, service, test_db):
+    def test_create_config_success(self, service, test_db: Session) -> None:
         """Test successful config creation."""
         success, config, error = service.create_config(
             name="new-config",
@@ -172,7 +173,7 @@ class TestRepositoryCheckConfigService:
         assert saved_config is not None
         assert saved_config.check_type == "repository_only"
 
-    def test_create_config_duplicate_name(self, service, sample_config):
+    def test_create_config_duplicate_name(self, service, sample_config) -> None:
         """Test config creation with duplicate name."""
         success, config, error = service.create_config(
             name="test-config",  # Same as sample_config
@@ -183,7 +184,7 @@ class TestRepositoryCheckConfigService:
         assert config is None
         assert "already exists" in error
 
-    def test_create_config_minimal_data(self, service):
+    def test_create_config_minimal_data(self, service) -> None:
         """Test config creation with minimal required data."""
         success, config, error = service.create_config(name="minimal-config")
 
@@ -194,7 +195,7 @@ class TestRepositoryCheckConfigService:
         assert config.verify_data is False  # Default
         assert config.enabled is True  # Default
 
-    def test_update_config_success(self, service, test_db, sample_config):
+    def test_update_config_success(self, service, test_db, sample_config) -> None:
         """Test successful config update."""
         update_data = {
             "description": "Updated description",
@@ -216,7 +217,7 @@ class TestRepositoryCheckConfigService:
         # Unchanged fields should remain the same
         assert updated_config.name == "test-config"
 
-    def test_update_config_not_found(self, service):
+    def test_update_config_not_found(self, service) -> None:
         """Test updating non-existent config."""
         success, config, error = service.update_config(999, {"name": "new-name"})
 
@@ -224,7 +225,7 @@ class TestRepositoryCheckConfigService:
         assert config is None
         assert "not found" in error
 
-    def test_update_config_name_conflict(self, service, test_db, sample_config):
+    def test_update_config_name_conflict(self, service, test_db, sample_config) -> None:
         """Test updating config name to an existing name."""
         # Create another config
         other_config = RepositoryCheckConfig(name="other-config", check_type="full")
@@ -239,7 +240,7 @@ class TestRepositoryCheckConfigService:
         assert config is None
         assert "already exists" in error
 
-    def test_update_config_same_name_allowed(self, service, sample_config):
+    def test_update_config_same_name_allowed(self, service, sample_config) -> None:
         """Test updating config with same name is allowed."""
         success, config, error = service.update_config(
             sample_config.id, {"name": "test-config", "description": "Updated"}
@@ -250,7 +251,7 @@ class TestRepositoryCheckConfigService:
         assert config.name == "test-config"
         assert config.description == "Updated"
 
-    def test_enable_config_success(self, service, test_db):
+    def test_enable_config_success(self, service, test_db: Session) -> None:
         """Test successful config enabling."""
         # Create disabled config
         config = RepositoryCheckConfig(
@@ -271,7 +272,7 @@ class TestRepositoryCheckConfigService:
         test_db.refresh(config)
         assert config.enabled is True
 
-    def test_enable_config_not_found(self, service):
+    def test_enable_config_not_found(self, service) -> None:
         """Test enabling non-existent config."""
         success, success_msg, error = service.enable_config(999)
 
@@ -279,7 +280,7 @@ class TestRepositoryCheckConfigService:
         assert success_msg is None
         assert "not found" in error
 
-    def test_disable_config_success(self, service, test_db):
+    def test_disable_config_success(self, service, test_db: Session) -> None:
         """Test successful config disabling."""
         # Create enabled config
         config = RepositoryCheckConfig(
@@ -300,7 +301,7 @@ class TestRepositoryCheckConfigService:
         test_db.refresh(config)
         assert config.enabled is False
 
-    def test_disable_config_not_found(self, service):
+    def test_disable_config_not_found(self, service) -> None:
         """Test disabling non-existent config."""
         success, success_msg, error = service.disable_config(999)
 
@@ -308,7 +309,7 @@ class TestRepositoryCheckConfigService:
         assert success_msg is None
         assert "not found" in error
 
-    def test_delete_config_success(self, service, test_db, sample_config):
+    def test_delete_config_success(self, service, test_db, sample_config) -> None:
         """Test successful config deletion."""
         config_id = sample_config.id
         config_name = sample_config.name
@@ -327,7 +328,7 @@ class TestRepositoryCheckConfigService:
         )
         assert deleted_config is None
 
-    def test_delete_config_not_found(self, service):
+    def test_delete_config_not_found(self, service) -> None:
         """Test deleting non-existent config."""
         success, name, error = service.delete_config(999)
 
@@ -335,7 +336,7 @@ class TestRepositoryCheckConfigService:
         assert name is None
         assert "not found" in error
 
-    def test_get_form_data_success(self, service, test_db, sample_repository):
+    def test_get_form_data_success(self, service, test_db, sample_repository) -> None:
         """Test getting form data successfully."""
         # Create some configs
         enabled_config = RepositoryCheckConfig(
@@ -361,7 +362,7 @@ class TestRepositoryCheckConfigService:
         assert len(result["check_configs"]) == 1
         assert result["check_configs"][0].name == "enabled-config"
 
-    def test_get_form_data_empty_database(self, service):
+    def test_get_form_data_empty_database(self, service) -> None:
         """Test getting form data when database is empty."""
         result = service.get_form_data()
 
@@ -370,7 +371,7 @@ class TestRepositoryCheckConfigService:
         assert result["repositories"] == []
         assert result["check_configs"] == []
 
-    def test_config_lifecycle(self, service, test_db):
+    def test_config_lifecycle(self, service, test_db: Session) -> None:
         """Test complete config lifecycle: create, update, enable/disable, delete."""
         # Create
         success, created_config, error = service.create_config(

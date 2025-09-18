@@ -25,7 +25,7 @@ async def get_schedules_form(
     templates: TemplatesDep,
     config_service: ConfigurationServiceDep,
     db: Session = Depends(get_db),
-):
+) -> HTMLResponse:
     """Get schedules form with all dropdowns populated"""
     form_data = config_service.get_schedule_form_data(db)
 
@@ -41,7 +41,7 @@ async def create_schedule(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
-):
+) -> HTMLResponse:
     try:
         json_data = await request.json()
 
@@ -74,13 +74,13 @@ async def create_schedule(
         name=schedule.name,
         repository_id=schedule.repository_id,
         cron_expression=schedule.cron_expression,
-        source_path=schedule.source_path,
+        source_path=schedule.source_path or "",
         cloud_sync_config_id=schedule.cloud_sync_config_id,
         cleanup_config_id=schedule.cleanup_config_id,
         notification_config_id=schedule.notification_config_id,
     )
 
-    if not success:
+    if not success or not created_schedule:
         return templates.TemplateResponse(
             request,
             "partials/schedules/create_error.html",
@@ -98,17 +98,20 @@ async def create_schedule(
 
 @router.get("/html", response_class=HTMLResponse)
 def get_schedules_html(
+    request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     skip: int = 0,
     limit: int = 100,
-):
+) -> HTMLResponse:
     """Get schedules as formatted HTML"""
     schedules = schedule_service.get_schedules(skip=skip, limit=limit)
 
-    return templates.get_template(
-        "partials/schedules/schedule_list_content.html"
-    ).render(schedules=schedules)
+    return HTMLResponse(
+        templates.get_template("partials/schedules/schedule_list_content.html").render(
+            schedules=schedules
+        )
+    )
 
 
 @router.get("/upcoming/html", response_class=HTMLResponse)
@@ -116,19 +119,23 @@ async def get_upcoming_backups_html(
     templates: TemplatesDep,
     scheduler_service: SchedulerServiceDep,
     upcoming_backups_service: UpcomingBackupsServiceDep,
-):
+) -> HTMLResponse:
     """Get upcoming scheduled backups as formatted HTML"""
     try:
         jobs_raw = await scheduler_service.get_scheduled_jobs()
         processed_jobs = upcoming_backups_service.process_jobs(jobs_raw)
 
-        return templates.get_template(
-            "partials/schedules/upcoming_backups_content.html"
-        ).render(jobs=processed_jobs)
+        return HTMLResponse(
+            templates.get_template(
+                "partials/schedules/upcoming_backups_content.html"
+            ).render(jobs=processed_jobs)
+        )
 
     except Exception as e:
-        return templates.get_template("partials/jobs/error_state.html").render(
-            message=f"Error loading upcoming backups: {str(e)}", padding="4"
+        return HTMLResponse(
+            templates.get_template("partials/jobs/error_state.html").render(
+                message=f"Error loading upcoming backups: {str(e)}", padding="4"
+            )
         )
 
 
@@ -138,7 +145,7 @@ async def get_cron_expression_form(
     templates: TemplatesDep,
     config_service: ConfigurationServiceDep,
     preset: str = "",
-):
+) -> HTMLResponse:
     """Get dynamic cron expression form elements based on preset selection"""
     context = config_service.get_cron_form_context(preset)
 
@@ -153,11 +160,13 @@ def list_schedules(
     schedule_service: ScheduleServiceDep,
     skip: int = 0,
     limit: int = 100,
-):
+) -> HTMLResponse:
     schedules = schedule_service.get_schedules(skip=skip, limit=limit)
-    return templates.get_template(
-        "partials/schedules/schedule_list_content.html"
-    ).render(schedules=schedules)
+    return HTMLResponse(
+        templates.get_template("partials/schedules/schedule_list_content.html").render(
+            schedules=schedules
+        )
+    )
 
 
 @router.get("/{schedule_id}", response_class=HTMLResponse)
@@ -165,14 +174,18 @@ def get_schedule(
     schedule_id: int,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
-):
+) -> HTMLResponse:
     schedule = schedule_service.get_schedule_by_id(schedule_id)
     if schedule is None:
-        return templates.get_template("partials/common/error_message.html").render(
-            error_message="Schedule not found"
+        return HTMLResponse(
+            templates.get_template("partials/common/error_message.html").render(
+                error_message="Schedule not found"
+            )
         )
-    return templates.get_template("partials/schedules/schedule_detail.html").render(
-        schedule=schedule
+    return HTMLResponse(
+        templates.get_template("partials/schedules/schedule_detail.html").render(
+            schedule=schedule
+        )
     )
 
 
@@ -192,11 +205,10 @@ async def get_schedule_edit_form(
             raise HTTPException(status_code=404, detail="Schedule not found")
 
         form_data = config_service.get_schedule_form_data(db)
-        form_data["schedule"] = schedule
-        form_data["is_edit_mode"] = True
+        context = {**form_data, "schedule": schedule, "is_edit_mode": True}
 
         return templates.TemplateResponse(
-            request, "partials/schedules/edit_form.html", form_data
+            request, "partials/schedules/edit_form.html", context
         )
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Schedule not found: {str(e)}")
@@ -209,19 +221,19 @@ async def update_schedule(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
-):
+) -> HTMLResponse:
     """Update a schedule"""
     update_data = schedule_update.model_dump(exclude_unset=True)
     success, updated_schedule, error_msg = await schedule_service.update_schedule(
         schedule_id, update_data
     )
 
-    if not success:
+    if not success or not updated_schedule:
         return templates.TemplateResponse(
             request,
             "partials/schedules/update_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     response = templates.TemplateResponse(
@@ -239,7 +251,7 @@ async def toggle_schedule(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
-):
+) -> HTMLResponse:
     success, updated_schedule, error_msg = await schedule_service.toggle_schedule(
         schedule_id
     )
@@ -249,7 +261,7 @@ async def toggle_schedule(
             request,
             "partials/common/error_message.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     schedules = schedule_service.get_all_schedules()
@@ -266,7 +278,7 @@ async def delete_schedule(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
-):
+) -> HTMLResponse:
     success, schedule_name, error_msg = await schedule_service.delete_schedule(
         schedule_id
     )
@@ -276,7 +288,7 @@ async def delete_schedule(
             request,
             "partials/schedules/delete_error.html",
             {"error_message": error_msg},
-            status_code=404 if "not found" in error_msg else 500,
+            status_code=404 if error_msg and "not found" in error_msg else 500,
         )
 
     response = templates.TemplateResponse(
@@ -292,11 +304,11 @@ async def delete_schedule(
 async def get_active_scheduled_jobs(
     templates: TemplatesDep,
     scheduler_service: SchedulerServiceDep,
-):
+) -> HTMLResponse:
     """Get all active scheduled jobs"""
     jobs = await scheduler_service.get_scheduled_jobs()
-    return templates.get_template("partials/schedules/active_jobs.html").render(
-        jobs=jobs
+    return HTMLResponse(
+        templates.get_template("partials/schedules/active_jobs.html").render(jobs=jobs)
     )
 
 
@@ -305,7 +317,7 @@ async def describe_cron_expression(
     request: Request,
     templates: TemplatesDep,
     custom_cron_input: str = Query(""),
-):
+) -> HTMLResponse:
     """Get human-readable description of a cron expression via HTMX."""
     cron_expression = custom_cron_input.strip()
 

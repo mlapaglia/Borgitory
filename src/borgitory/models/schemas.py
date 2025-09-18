@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional, Any
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
@@ -63,7 +63,7 @@ class RepositoryBase(BaseModel):
 
     @field_validator("path", mode="before")
     @classmethod
-    def validate_path(cls, v):
+    def validate_path(cls, v: str) -> str:
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
 
         return normalize_path_with_mnt_prefix(v)
@@ -84,7 +84,7 @@ class RepositoryUpdate(BaseModel):
 
     @field_validator("path", mode="before")
     @classmethod
-    def validate_path(cls, v):
+    def validate_path(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
@@ -139,7 +139,7 @@ class ScheduleBase(BaseModel):
 
     @field_validator("cron_expression")
     @classmethod
-    def validate_cron_expression(cls, v):
+    def validate_cron_expression(cls, v: str) -> str:
         """Basic cron expression validation"""
         parts = v.strip().split()
         if len(parts) != 5:
@@ -165,14 +165,14 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("source_path", mode="before")
     @classmethod
-    def validate_source_path(cls, v):
+    def validate_source_path(cls, v: Any) -> str:
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
 
         return normalize_path_with_mnt_prefix(v)
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
-    def validate_cloud_sync_config_id(cls, v):
+    def validate_cloud_sync_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -181,7 +181,7 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("cleanup_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v):
+    def validate_cleanup_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -190,7 +190,7 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("check_config_id", mode="before")
     @classmethod
-    def validate_check_config_id(cls, v):
+    def validate_check_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -199,7 +199,7 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("notification_config_id", mode="before")
     @classmethod
-    def validate_notification_config_id(cls, v):
+    def validate_notification_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -220,7 +220,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("source_path", mode="before")
     @classmethod
-    def validate_source_path(cls, v):
+    def validate_source_path(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
@@ -229,7 +229,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("cron_expression")
     @classmethod
-    def validate_cron_expression(cls, v):
+    def validate_cron_expression(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         parts = v.split()
@@ -244,7 +244,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
-    def validate_cloud_sync_config_id(cls, v):
+    def validate_cloud_sync_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -253,7 +253,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("cleanup_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v):
+    def validate_cleanup_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -262,7 +262,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("check_config_id", mode="before")
     @classmethod
-    def validate_check_config_id(cls, v):
+    def validate_check_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -271,7 +271,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("notification_config_id", mode="before")
     @classmethod
-    def validate_notification_config_id(cls, v):
+    def validate_notification_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -402,21 +402,21 @@ class BackupRequest(BaseModel):
 
     @field_validator("source_path", mode="before")
     @classmethod
-    def validate_source_path(cls, v):
+    def validate_source_path(cls, v: Any) -> str:
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
 
         return normalize_path_with_mnt_prefix(v)
 
     @field_validator("dry_run", mode="before")
     @classmethod
-    def validate_dry_run(cls, v):
+    def validate_dry_run(cls, v: Any) -> bool:
         if isinstance(v, str):
             return v.lower() in ("true", "1", "yes", "on")
         return bool(v)
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
-    def validate_cloud_sync_config_id(cls, v):
+    def validate_cloud_sync_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -425,7 +425,7 @@ class BackupRequest(BaseModel):
 
     @field_validator("cleanup_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v):
+    def validate_cleanup_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -434,7 +434,7 @@ class BackupRequest(BaseModel):
 
     @field_validator("check_config_id", mode="before")
     @classmethod
-    def validate_check_config_id(cls, v):
+    def validate_check_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -443,7 +443,7 @@ class BackupRequest(BaseModel):
 
     @field_validator("notification_config_id", mode="before")
     @classmethod
-    def validate_notification_config_id(cls, v):
+    def validate_notification_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -462,7 +462,7 @@ class CloudSyncConfigBase(BaseModel):
     path_prefix: str = Field(
         default="", max_length=255, description="Optional path prefix for cloud storage"
     )
-    provider_config: dict = Field(
+    provider_config: Dict[str, Any] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
 
@@ -489,7 +489,7 @@ class CloudSyncConfigBase(BaseModel):
 
 class CloudSyncConfigCreate(CloudSyncConfigBase):
     @model_validator(mode="after")
-    def validate_provider_config(self):
+    def validate_provider_config(self) -> "CloudSyncConfigCreate":
         """Validate provider_config using the registry"""
         from borgitory.services.cloud_providers.registry import validate_provider_config
 
@@ -506,7 +506,7 @@ class CloudSyncConfigUpdate(BaseModel):
     )
     provider: Optional[str] = None
     path_prefix: Optional[str] = Field(None, max_length=255)
-    provider_config: Optional[dict] = Field(
+    provider_config: Optional[Dict[str, Any]] = Field(
         None, description="Provider-specific configuration"
     )
     enabled: Optional[bool] = None
@@ -532,7 +532,7 @@ class CloudSyncConfigUpdate(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_provider_config(self):
+    def validate_provider_config(self) -> "CloudSyncConfigUpdate":
         """Validate provider_config if provided"""
 
         if self.provider and self.provider_config:
@@ -578,27 +578,27 @@ class RepositoryCheckConfigBase(BaseModel):
 
     @field_validator("max_duration", mode="before")
     @classmethod
-    def validate_max_duration(cls, v):
+    def validate_max_duration(cls, v: Any) -> Optional[int]:
         if v == "" or v is None:
             return None
         return int(v)
 
     @field_validator("first_n_archives", mode="before")
     @classmethod
-    def validate_first_n_archives(cls, v):
+    def validate_first_n_archives(cls, v: Any) -> Optional[int]:
         if v == "" or v is None:
             return None
         return int(v)
 
     @field_validator("last_n_archives", mode="before")
     @classmethod
-    def validate_last_n_archives(cls, v):
+    def validate_last_n_archives(cls, v: Any) -> Optional[int]:
         if v == "" or v is None:
             return None
         return int(v)
 
     @model_validator(mode="after")
-    def validate_check_constraints(self):
+    def validate_check_constraints(self) -> "RepositoryCheckConfigBase":
         """Validate check configuration constraints"""
         # Can't use verify_data with repository_only
         if self.check_type == CheckType.REPOSITORY_ONLY and self.verify_data:
@@ -690,7 +690,7 @@ class PruneRequest(BaseModel):
 
     @field_validator("dry_run", mode="before")
     @classmethod
-    def validate_dry_run(cls, v):
+    def validate_dry_run(cls, v: Any) -> bool:
         if isinstance(v, str):
             return v.lower() in ("true", "1", "yes", "on")
         return bool(v)
@@ -721,7 +721,7 @@ class CheckRequest(BaseModel):
 
     @field_validator("check_config_id", mode="before")
     @classmethod
-    def validate_check_config_id(cls, v):
+    def validate_check_config_id(cls, v: Any) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -729,7 +729,7 @@ class CheckRequest(BaseModel):
         return int(v)
 
     @model_validator(mode="after")
-    def validate_check_request(self):
+    def validate_check_request(self) -> "CheckRequest":
         """Validate check request constraints"""
         # If using a policy, don't allow custom parameters
         if self.check_config_id is not None:

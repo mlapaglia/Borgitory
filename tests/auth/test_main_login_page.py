@@ -36,7 +36,9 @@ class TestLoginPageEndpoint:
     """Test class for login_page endpoint in main.py."""
 
     @pytest.mark.asyncio
-    async def test_login_page_no_user_no_next_param(self, async_client: AsyncClient):
+    async def test_login_page_no_user_no_next_param(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test login page with no authenticated user and no next parameter."""
         response = await async_client.get("/login")
         assert response.status_code == 200
@@ -49,7 +51,9 @@ class TestLoginPageEndpoint:
         assert "/auth/check-users?next=/repositories" in response.text
 
     @pytest.mark.asyncio
-    async def test_login_page_no_user_with_next_param(self, async_client: AsyncClient):
+    async def test_login_page_no_user_with_next_param(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test login page with no authenticated user but with next parameter."""
         response = await async_client.get("/login?next=/backups")
         assert response.status_code == 200
@@ -61,7 +65,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_no_user_with_url_encoded_next(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test login page with URL encoded next parameter."""
         response = await async_client.get("/login?next=%2Fcloud-sync")
         assert response.status_code == 200
@@ -72,7 +76,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_authenticated_user_redirects_default(
         self, async_client: AsyncClient, authenticated_user
-    ):
+    ) -> None:
         """Test login page with authenticated user redirects to default location."""
         response = await async_client.get("/login", follow_redirects=False)
         assert response.status_code == 302
@@ -81,7 +85,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_authenticated_user_redirects_to_next(
         self, async_client: AsyncClient, authenticated_user
-    ):
+    ) -> None:
         """Test login page with authenticated user redirects to next parameter."""
         response = await async_client.get(
             "/login?next=/schedules", follow_redirects=False
@@ -92,7 +96,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_malicious_external_next_param_sanitized(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test that external URLs in next parameter are sanitized."""
         response = await async_client.get("/login?next=https://evil.com/steal-data")
         assert response.status_code == 200
@@ -102,7 +106,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_malicious_scheme_next_param_sanitized(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test that URLs with schemes in next parameter are sanitized."""
         response = await async_client.get("/login?next=javascript:alert('xss')")
         assert response.status_code == 200
@@ -112,7 +116,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_backslash_in_next_param_cleaned(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test that backslashes in next parameter are cleaned."""
         response = await async_client.get("/login?next=/archives\\..\\evil")
         assert response.status_code == 200
@@ -122,7 +126,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_authenticated_user_with_malicious_next_redirects_safely(
         self, async_client: AsyncClient, authenticated_user
-    ):
+    ) -> None:
         """Test authenticated user with malicious next param redirects safely."""
         response = await async_client.get(
             "/login?next=https://evil.com", follow_redirects=False
@@ -134,7 +138,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_empty_next_param_uses_default(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test login page with empty next parameter uses default."""
         response = await async_client.get("/login?next=")
         assert response.status_code == 200
@@ -144,7 +148,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_valid_internal_next_param(
         self, async_client: AsyncClient
-    ):
+    ) -> None:
         """Test login page with valid internal next parameter."""
         response = await async_client.get("/login?next=/debug")
         assert response.status_code == 200
@@ -154,7 +158,7 @@ class TestLoginPageEndpoint:
     @pytest.mark.asyncio
     async def test_login_page_authenticated_user_preserves_valid_next(
         self, async_client: AsyncClient, authenticated_user
-    ):
+    ) -> None:
         """Test authenticated user with valid next parameter gets redirected correctly."""
         response = await async_client.get(
             "/login?next=/notifications", follow_redirects=False

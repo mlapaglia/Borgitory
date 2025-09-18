@@ -8,12 +8,12 @@ from borgitory.services.scheduling.scheduler_service import SchedulerService
 class TestSchedulerService:
     """Test SchedulerService functionality"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures"""
         self.scheduler_service = SchedulerService()
 
     @pytest.mark.asyncio
-    async def test_start_scheduler(self):
+    async def test_start_scheduler(self) -> None:
         """Test starting the scheduler"""
         with patch.object(
             self.scheduler_service.scheduler, "start"
@@ -27,7 +27,7 @@ class TestSchedulerService:
             assert self.scheduler_service._running is True
 
     @pytest.mark.asyncio
-    async def test_start_scheduler_already_running(self):
+    async def test_start_scheduler_already_running(self) -> None:
         """Test starting scheduler when already running"""
         self.scheduler_service._running = True
 
@@ -38,7 +38,7 @@ class TestSchedulerService:
             mock_start.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_stop_scheduler(self):
+    async def test_stop_scheduler(self) -> None:
         """Test stopping the scheduler"""
         self.scheduler_service._running = True
 
@@ -51,7 +51,7 @@ class TestSchedulerService:
             assert self.scheduler_service._running is False
 
     @pytest.mark.asyncio
-    async def test_stop_scheduler_not_running(self):
+    async def test_stop_scheduler_not_running(self) -> None:
         """Test stopping scheduler when not running"""
         self.scheduler_service._running = False
 
@@ -64,7 +64,7 @@ class TestSchedulerService:
             mock_shutdown.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_add_schedule_success(self):
+    async def test_add_schedule_success(self) -> None:
         """Test successfully adding a schedule"""
         self.scheduler_service._running = True
         schedule_id = 123
@@ -90,7 +90,7 @@ class TestSchedulerService:
             mock_update.assert_called_once_with(schedule_id, job_id)
 
     @pytest.mark.asyncio
-    async def test_add_schedule_invalid_cron(self):
+    async def test_add_schedule_invalid_cron(self) -> None:
         """Test adding schedule with invalid cron expression"""
         self.scheduler_service._running = True
         schedule_id = 123
@@ -105,7 +105,7 @@ class TestSchedulerService:
         assert "Failed to add schedule" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_add_schedule_scheduler_not_running(self):
+    async def test_add_schedule_scheduler_not_running(self) -> None:
         """Test adding schedule when scheduler is not running"""
         self.scheduler_service._running = False
 
@@ -115,7 +115,7 @@ class TestSchedulerService:
         assert "Scheduler is not running" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_remove_schedule_success(self):
+    async def test_remove_schedule_success(self) -> None:
         """Test successfully removing a schedule"""
         self.scheduler_service._running = True
         schedule_id = 123
@@ -128,7 +128,7 @@ class TestSchedulerService:
             mock_remove.assert_called_once_with(f"backup_schedule_{schedule_id}")
 
     @pytest.mark.asyncio
-    async def test_remove_schedule_not_found(self):
+    async def test_remove_schedule_not_found(self) -> None:
         """Test removing a schedule that doesn't exist"""
         self.scheduler_service._running = True
         schedule_id = 123
@@ -142,7 +142,7 @@ class TestSchedulerService:
             await self.scheduler_service.remove_schedule(schedule_id)
 
     @pytest.mark.asyncio
-    async def test_update_schedule_enabled(self):
+    async def test_update_schedule_enabled(self) -> None:
         """Test updating an enabled schedule"""
         self.scheduler_service._running = True
         schedule_id = 123
@@ -165,7 +165,7 @@ class TestSchedulerService:
             )
 
     @pytest.mark.asyncio
-    async def test_update_schedule_disabled(self):
+    async def test_update_schedule_disabled(self) -> None:
         """Test updating a disabled schedule"""
         self.scheduler_service._running = True
         schedule_id = 123
@@ -187,7 +187,7 @@ class TestSchedulerService:
             mock_add.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_get_scheduled_jobs(self):
+    async def test_get_scheduled_jobs(self) -> None:
         """Test getting scheduled jobs"""
         self.scheduler_service._running = True
 
@@ -214,7 +214,7 @@ class TestSchedulerService:
             assert jobs[0]["next_run"] == mock_job1.next_run_time
 
     @pytest.mark.asyncio
-    async def test_get_scheduled_jobs_scheduler_not_running(self):
+    async def test_get_scheduled_jobs_scheduler_not_running(self) -> None:
         """Test getting jobs when scheduler is not running"""
         self.scheduler_service._running = False
 
@@ -223,7 +223,7 @@ class TestSchedulerService:
         assert jobs == []
 
     @pytest.mark.asyncio
-    async def test_reload_schedules_success(self):
+    async def test_reload_schedules_success(self) -> None:
         """Test successfully reloading schedules from database"""
         mock_db = Mock()
         mock_schedule1 = Mock()
@@ -255,7 +255,7 @@ class TestSchedulerService:
             mock_add.assert_any_call(456, "Schedule 2", "0 4 * * *", persist=False)
 
     @pytest.mark.asyncio
-    async def test_update_next_run_time_success(self):
+    async def test_update_next_run_time_success(self) -> None:
         """Test updating next run time in database"""
         schedule_id = 123
         job_id = "backup_schedule_123"
@@ -282,7 +282,7 @@ class TestSchedulerService:
 
             assert mock_schedule.next_run == next_run_time
 
-    def test_handle_job_event_success(self):
+    def test_handle_job_event_success(self) -> None:
         """Test handling successful job event"""
         mock_event = Mock()
         mock_event.job_id = "backup_schedule_123"
@@ -291,7 +291,7 @@ class TestSchedulerService:
         # Should not raise exception
         self.scheduler_service._handle_job_event(mock_event)
 
-    def test_handle_job_event_failure(self):
+    def test_handle_job_event_failure(self) -> None:
         """Test handling failed job event"""
         mock_event = Mock()
         mock_event.job_id = "backup_schedule_123"

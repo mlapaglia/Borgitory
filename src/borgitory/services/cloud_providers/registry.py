@@ -23,7 +23,7 @@ class RcloneMethodMapping:
     required_params: List[str]
     optional_params: Optional[Dict[str, Any]] = None  # param -> default_value
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.optional_params is None:
             self.optional_params = {}
 
@@ -38,10 +38,10 @@ class ProviderMetadata:
     supports_encryption: bool = True
     supports_versioning: bool = False
     requires_credentials: bool = True
-    additional_info: Dict[str, Any] = None
+    additional_info: Optional[Dict[str, Any]] = None
     rclone_mapping: Optional[RcloneMethodMapping] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.additional_info is None:
             self.additional_info = {}
 
@@ -54,16 +54,16 @@ class ProviderRegistry:
     storage classes, and metadata.
     """
 
-    def __init__(self):
-        self._config_classes: Dict[str, Type] = {}
-        self._storage_classes: Dict[str, Type] = {}
+    def __init__(self) -> None:
+        self._config_classes: Dict[str, Type[Any]] = {}
+        self._storage_classes: Dict[str, Type[Any]] = {}
         self._metadata: Dict[str, ProviderMetadata] = {}
 
     def register_provider(
         self,
         name: str,
-        config_class: Type,
-        storage_class: Type,
+        config_class: Type[Any],
+        storage_class: Type[Any],
         metadata: ProviderMetadata,
     ) -> None:
         """
@@ -84,11 +84,11 @@ class ProviderRegistry:
 
         logger.debug(f"Registered provider: {name}")
 
-    def get_config_class(self, provider: str) -> Optional[Type]:
+    def get_config_class(self, provider: str) -> Optional[Type[Any]]:
         """Get the configuration class for a provider."""
         return self._config_classes.get(provider)
 
-    def get_storage_class(self, provider: str) -> Optional[Type]:
+    def get_storage_class(self, provider: str) -> Optional[Type[Any]]:
         """Get the storage class for a provider."""
         return self._storage_classes.get(provider)
 
@@ -128,8 +128,9 @@ class ProviderRegistry:
     def get_all_provider_info(self) -> Dict[str, Dict[str, Any]]:
         """Get information for all registered providers."""
         return {
-            provider: self.get_provider_info(provider)
+            provider: info
             for provider in self.get_supported_providers()
+            if (info := self.get_provider_info(provider)) is not None
         }
 
     def is_provider_registered(self, provider: str) -> bool:
@@ -161,14 +162,14 @@ _registry = ProviderRegistry()
 
 def register_provider(
     name: str,
-    label: str = None,
-    description: str = None,
+    label: str = "",
+    description: str = "",
     supports_encryption: bool = True,
     supports_versioning: bool = False,
     requires_credentials: bool = True,
     rclone_mapping: Optional[RcloneMethodMapping] = None,
-    **metadata_kwargs,
-) -> Callable:
+    **metadata_kwargs: Any,
+) -> Callable[[Type[Any]], Type[Any]]:
     """
     Decorator to register a provider.
 
@@ -193,7 +194,7 @@ def register_provider(
         **metadata_kwargs: Additional metadata
     """
 
-    def decorator(provider_class):
+    def decorator(provider_class: Type[Any]) -> Type[Any]:
         # Extract config and storage classes from the provider class
         if not hasattr(provider_class, "config_class"):
             raise ValueError(
@@ -243,12 +244,12 @@ def register_provider(
 
 
 # Convenience functions that use the global registry
-def get_config_class(provider: str) -> Optional[Type]:
+def get_config_class(provider: str) -> Optional[Type[Any]]:
     """Get the configuration class for a provider."""
     return _registry.get_config_class(provider)
 
 
-def get_storage_class(provider: str) -> Optional[Type]:
+def get_storage_class(provider: str) -> Optional[Type[Any]]:
     """Get the storage class for a provider."""
     return _registry.get_storage_class(provider)
 
@@ -286,7 +287,7 @@ def is_provider_registered(provider: str) -> bool:
     return _registry.is_provider_registered(provider)
 
 
-def validate_provider_config(provider: str, config_dict: dict) -> None:
+def validate_provider_config(provider: str, config_dict: Dict[str, Any]) -> None:
     """
     Validate provider configuration using the registered config class.
 
@@ -328,7 +329,7 @@ def clear_registry() -> None:
     _registry._metadata.clear()
 
 
-def validate_rclone_integration(provider: str, rclone_service) -> List[str]:
+def validate_rclone_integration(provider: str, rclone_service: Any) -> List[str]:
     """
     Validate that provider has proper rclone integration.
 
@@ -339,7 +340,7 @@ def validate_rclone_integration(provider: str, rclone_service) -> List[str]:
     Returns:
         List of validation error messages (empty if valid)
     """
-    errors = []
+    errors: List[str] = []
 
     if rclone_service is None:
         errors.append("Rclone service is required for validation")

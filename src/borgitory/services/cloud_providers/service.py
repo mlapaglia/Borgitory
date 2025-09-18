@@ -7,7 +7,7 @@ including configuration validation, storage creation, and encryption handling.
 
 import json
 import logging
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, Optional, cast
 
 from borgitory.services.rclone_service import RcloneService
 
@@ -50,7 +50,7 @@ class ConfigValidator:
 class StorageFactory:
     """Factory for creating cloud storage instances"""
 
-    def __init__(self, rclone_service: RcloneService):
+    def __init__(self, rclone_service: RcloneService) -> None:
         """
         Initialize storage factory.
 
@@ -84,7 +84,8 @@ class StorageFactory:
                 f"Supported providers: {', '.join(sorted(supported))}"
             )
 
-        return storage_class(validated_config, self._rclone_service)
+        storage_instance = storage_class(validated_config, self._rclone_service)
+        return cast(CloudStorage, storage_instance)
 
     def get_supported_providers(self) -> list[str]:
         """Get list of supported provider names."""
@@ -167,7 +168,7 @@ class CloudSyncService:
         self,
         storage_factory: StorageFactory,
         encryption_service: Optional[EncryptionService] = None,
-    ):
+    ) -> None:
         """
         Initialize cloud sync service.
 

@@ -14,7 +14,7 @@ from borgitory.services.borg_command_builder import BorgCommandBuilder
 
 
 @pytest.fixture
-def mock_job_executor():
+def mock_job_executor() -> Mock:
     """Mock JobExecutor."""
     mock = Mock(spec=JobExecutor)
     mock.start_process = AsyncMock()
@@ -23,7 +23,7 @@ def mock_job_executor():
 
 
 @pytest.fixture
-def mock_command_builder():
+def mock_command_builder() -> Mock:
     """Mock BorgCommandBuilder."""
     mock = Mock(spec=BorgCommandBuilder)
     mock.build_list_archive_contents_command = Mock(
@@ -39,7 +39,9 @@ def mock_command_builder():
 
 
 @pytest.fixture
-def archive_manager(mock_job_executor, mock_command_builder):
+def archive_manager(
+    mock_job_executor: Mock, mock_command_builder: Mock
+) -> ArchiveManager:
     """ArchiveManager instance with mocked dependencies."""
     return ArchiveManager(
         job_executor=mock_job_executor, command_builder=mock_command_builder
@@ -47,15 +49,17 @@ def archive_manager(mock_job_executor, mock_command_builder):
 
 
 @pytest.fixture
-def test_repository():
+def test_repository() -> Repository:
     """Test repository object."""
-    repo = Repository(id=1, name="test-repo", path="/tmp/test-repo")
+    repo = Repository()
+    repo.name = "test-repo"
+    repo.path = "/tmp/test-repo"
     repo.set_passphrase("test-passphrase")
     return repo
 
 
 @pytest.fixture
-def mock_process_result():
+def mock_process_result() -> SimpleNamespace:
     """Mock process result."""
     result = SimpleNamespace()
     result.return_code = 0
@@ -67,7 +71,7 @@ def mock_process_result():
 class TestArchiveManager:
     """Test class for ArchiveManager."""
 
-    def test_init_with_dependencies(self):
+    def test_init_with_dependencies(self) -> None:
         """Test ArchiveManager initialization with provided dependencies."""
         mock_executor = Mock(spec=JobExecutor)
         mock_builder = Mock(spec=BorgCommandBuilder)
@@ -79,7 +83,7 @@ class TestArchiveManager:
         assert manager.job_executor is mock_executor
         assert manager.command_builder is mock_builder
 
-    def test_init_with_defaults(self):
+    def test_init_with_defaults(self) -> None:
         """Test ArchiveManager initialization with default dependencies."""
         manager = ArchiveManager()
 
@@ -88,8 +92,12 @@ class TestArchiveManager:
 
     @pytest.mark.asyncio
     async def test_list_archive_contents_success(
-        self, archive_manager, test_repository, mock_process_result, mock_job_executor
-    ):
+        self,
+        archive_manager: ArchiveManager,
+        test_repository: Repository,
+        mock_process_result: SimpleNamespace,
+        mock_job_executor: Mock,
+    ) -> None:
         """Test successful archive content listing."""
         # Setup mocks
         mock_process = Mock()
@@ -113,7 +121,7 @@ class TestArchiveManager:
     @pytest.mark.asyncio
     async def test_list_archive_contents_command_building_error(
         self, archive_manager, test_repository, mock_command_builder
-    ):
+    ) -> None:
         """Test error in command building."""
         mock_command_builder.build_list_archive_contents_command.side_effect = (
             Exception("Command build error")
@@ -127,7 +135,7 @@ class TestArchiveManager:
     @pytest.mark.asyncio
     async def test_list_archive_contents_borg_error(
         self, archive_manager, test_repository, mock_job_executor
-    ):
+    ) -> None:
         """Test Borg command failure."""
         # Setup error result
         error_result = SimpleNamespace()
@@ -147,7 +155,7 @@ class TestArchiveManager:
     @pytest.mark.asyncio
     async def test_list_archive_contents_invalid_json(
         self, archive_manager, test_repository, mock_job_executor
-    ):
+    ) -> None:
         """Test handling of invalid JSON in output."""
         # Setup result with invalid JSON
         invalid_result = SimpleNamespace()
@@ -170,7 +178,7 @@ class TestArchiveManager:
     @pytest.mark.asyncio
     async def test_list_archive_directory_contents_success(
         self, archive_manager, test_repository
-    ):
+    ) -> None:
         """Test listing directory contents using FUSE mount."""
         with patch(
             "borgitory.services.archives.archive_mount_manager.get_archive_mount_manager"
@@ -200,7 +208,9 @@ class TestArchiveManager:
                 test_repository, "test-archive", "/data"
             )
 
-    def test_filter_directory_contents_root(self, archive_manager):
+    def test_filter_directory_contents_root(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test filtering directory contents for root path."""
         all_entries = [
             {"path": "file1.txt", "type": "f", "size": 100},
@@ -223,7 +233,9 @@ class TestArchiveManager:
         assert dir1_item["type"] == "d"
         assert dir1_item["isdir"] is True
 
-    def test_filter_directory_contents_subdirectory(self, archive_manager):
+    def test_filter_directory_contents_subdirectory(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test filtering directory contents for subdirectory path."""
         all_entries = [
             {"path": "dir1/file1.txt", "type": "f", "size": 100},
@@ -241,7 +253,9 @@ class TestArchiveManager:
         assert "file2.txt" in names
         assert "subdir" in names
 
-    def test_filter_directory_contents_sorting(self, archive_manager):
+    def test_filter_directory_contents_sorting(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test that results are sorted correctly (directories first, then alphabetically)."""
         all_entries = [
             {"path": "zebra.txt", "type": "f", "size": 100},
@@ -257,7 +271,9 @@ class TestArchiveManager:
         assert names == ["adir", "bdir", "alpha.txt", "zebra.txt"]
 
     @pytest.mark.asyncio
-    async def test_extract_file_stream_success(self, archive_manager, test_repository):
+    async def test_extract_file_stream_success(
+        self, archive_manager, test_repository
+    ) -> None:
         """Test successful file extraction streaming."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
             # Mock process
@@ -278,7 +294,9 @@ class TestArchiveManager:
             mock_subprocess.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_extract_file_stream_error(self, archive_manager, test_repository):
+    async def test_extract_file_stream_error(
+        self, archive_manager, test_repository
+    ) -> None:
         """Test file extraction with Borg error."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = Mock()
@@ -299,7 +317,7 @@ class TestArchiveManager:
     @pytest.mark.asyncio
     async def test_extract_file_stream_process_cleanup(
         self, archive_manager, test_repository
-    ):
+    ) -> None:
         """Test process cleanup on exception during streaming."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = Mock()
@@ -321,7 +339,7 @@ class TestArchiveManager:
     @pytest.mark.asyncio
     async def test_get_archive_metadata_success(
         self, archive_manager, test_repository, mock_job_executor
-    ):
+    ) -> None:
         """Test successful archive metadata retrieval."""
         # Setup mock result
         repo_info = {
@@ -353,7 +371,7 @@ class TestArchiveManager:
     @pytest.mark.asyncio
     async def test_get_archive_metadata_not_found(
         self, archive_manager, test_repository, mock_job_executor
-    ):
+    ) -> None:
         """Test archive metadata when archive is not found."""
         # Setup mock result with different archives
         repo_info = {"archives": [{"name": "other-archive", "size": 1000}]}
@@ -376,7 +394,7 @@ class TestArchiveManager:
     @pytest.mark.asyncio
     async def test_get_archive_metadata_borg_error(
         self, archive_manager, test_repository, mock_job_executor
-    ):
+    ) -> None:
         """Test archive metadata retrieval with Borg error."""
         result = SimpleNamespace()
         result.return_code = 1
@@ -393,7 +411,9 @@ class TestArchiveManager:
 
         assert metadata is None
 
-    def test_calculate_directory_size_root(self, archive_manager):
+    def test_calculate_directory_size_root(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test calculating total size for root directory."""
         entries = [
             {"path": "file1.txt", "type": "f", "size": 100},
@@ -407,7 +427,9 @@ class TestArchiveManager:
         # Should sum all files (ignore directories)
         assert total_size == 600
 
-    def test_calculate_directory_size_subdirectory(self, archive_manager):
+    def test_calculate_directory_size_subdirectory(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test calculating size for specific subdirectory."""
         entries = [
             {"path": "file1.txt", "type": "f", "size": 100},
@@ -421,7 +443,9 @@ class TestArchiveManager:
         # Should sum only files in dir1
         assert total_size == 500
 
-    def test_find_entries_by_pattern_case_sensitive(self, archive_manager):
+    def test_find_entries_by_pattern_case_sensitive(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test finding entries by pattern (case sensitive)."""
         entries = [
             {"path": "Test.txt", "name": "Test.txt"},
@@ -438,7 +462,9 @@ class TestArchiveManager:
         assert "Test.txt" in names
         assert "Test.cfg" in names
 
-    def test_find_entries_by_pattern_case_insensitive(self, archive_manager):
+    def test_find_entries_by_pattern_case_insensitive(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test finding entries by pattern (case insensitive)."""
         entries = [
             {"path": "Test.txt", "name": "Test.txt"},
@@ -455,7 +481,9 @@ class TestArchiveManager:
         assert "Test.txt" in names
         assert "test.log" in names
 
-    def test_find_entries_by_pattern_regex(self, archive_manager):
+    def test_find_entries_by_pattern_regex(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test finding entries using regex pattern."""
         entries = [
             {"path": "file1.txt", "name": "file1.txt"},
@@ -468,7 +496,9 @@ class TestArchiveManager:
         assert len(matches) == 1
         assert matches[0]["name"] == "file1.txt"
 
-    def test_find_entries_by_pattern_invalid_regex(self, archive_manager):
+    def test_find_entries_by_pattern_invalid_regex(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test finding entries with invalid regex (fallback to literal)."""
         entries = [
             {"path": "test[.txt", "name": "test[.txt"},
@@ -481,7 +511,7 @@ class TestArchiveManager:
         assert len(matches) == 1
         assert matches[0]["name"] == "test[.txt"
 
-    def test_get_file_type_summary(self, archive_manager):
+    def test_get_file_type_summary(self, archive_manager: ArchiveManager) -> None:
         """Test generating file type summary."""
         entries = [
             {"path": "doc1.txt", "type": "f"},
@@ -502,7 +532,7 @@ class TestArchiveManager:
         assert summary[".jpg"] == 1
         assert summary["no extension"] == 1
 
-    def test_validate_archive_path_valid(self, archive_manager):
+    def test_validate_archive_path_valid(self, archive_manager: ArchiveManager) -> None:
         """Test validation of valid archive name and path."""
         with patch(
             "borgitory.services.archives.archive_manager.validate_archive_name"
@@ -521,7 +551,9 @@ class TestArchiveManager:
                 mock_validate_archive.assert_called_once_with("valid-archive")
                 mock_sanitize_path.assert_called_once_with("/safe/path")
 
-    def test_validate_archive_path_invalid(self, archive_manager):
+    def test_validate_archive_path_invalid(
+        self, archive_manager: ArchiveManager
+    ) -> None:
         """Test validation with invalid archive name and path."""
         with patch(
             "borgitory.services.archives.archive_manager.validate_archive_name"

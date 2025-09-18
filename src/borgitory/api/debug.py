@@ -1,4 +1,5 @@
 import logging
+from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -15,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/info")
-async def get_debug_info(debug_svc: DebugServiceDep, db: Session = Depends(get_db)):
+async def get_debug_info(
+    debug_svc: DebugServiceDep, db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """Get comprehensive debug information"""
     try:
         debug_info = await debug_svc.get_debug_info(db)
@@ -27,7 +30,7 @@ async def get_debug_info(debug_svc: DebugServiceDep, db: Session = Depends(get_d
 @router.get("/html", response_class=HTMLResponse)
 async def get_debug_html(
     request: Request, debug_svc: DebugServiceDep, db: Session = Depends(get_db)
-):
+) -> HTMLResponse:
     """Get debug information as HTML"""
     try:
         debug_info = await debug_svc.get_debug_info(db)

@@ -15,13 +15,13 @@ from borgitory.services.jobs.job_stream_service import JobStreamService
 class TestJobStreamService:
     """Test class for JobStreamService SSE functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.mock_job_manager = Mock()
         self.stream_service = JobStreamService(job_manager=self.mock_job_manager)
 
     @pytest.mark.asyncio
-    async def test_stream_all_jobs_empty(self):
+    async def test_stream_all_jobs_empty(self) -> None:
         """Test streaming all jobs when no jobs exist."""
         # Mock empty job manager
         self.mock_job_manager.jobs = {}
@@ -29,7 +29,7 @@ class TestJobStreamService:
         # Mock the streaming method to return empty async generator
         async def mock_stream_generator():
             return
-            yield  # unreachable but needed for generator syntax
+            yield  # pragma: no cover
 
         self.mock_job_manager.stream_all_job_updates = Mock(
             return_value=mock_stream_generator()
@@ -55,7 +55,7 @@ class TestJobStreamService:
         assert '"jobs": []' in events[0]
 
     @pytest.mark.asyncio
-    async def test_stream_all_jobs_with_composite_jobs(self):
+    async def test_stream_all_jobs_with_composite_jobs(self) -> None:
         """Test streaming all jobs with composite jobs (all jobs are now composite)."""
         # Create mock composite job
         mock_job = Mock()
@@ -102,14 +102,14 @@ class TestJobStreamService:
         assert "event: composite_job_status" in events[1]
 
     @pytest.mark.asyncio
-    async def test_stream_all_jobs_error_handling(self):
+    async def test_stream_all_jobs_error_handling(self) -> None:
         """Test error handling in all jobs streaming."""
         self.mock_job_manager.jobs = {}
 
         # Mock streaming method to raise an exception
         async def mock_error_generator():
             raise RuntimeError("Test streaming error")
-            yield  # unreachable but needed for generator syntax
+            yield  # pyright: ignore[reportUnreachable]
 
         self.mock_job_manager.stream_all_job_updates = Mock(
             return_value=mock_error_generator()
@@ -128,7 +128,7 @@ class TestJobStreamService:
         assert "Test streaming error" in events[1]
 
     @pytest.mark.asyncio
-    async def test_stream_job_output_composite_job_basic(self):
+    async def test_stream_job_output_composite_job_basic(self) -> None:
         """Test streaming output for a composite job (all jobs are now composite)."""
         job_id = "composite-job-789"
 
@@ -169,7 +169,7 @@ class TestJobStreamService:
         assert "initial_state" in first_event or "error" in first_event
 
     @pytest.mark.asyncio
-    async def test_stream_job_output_composite_job(self):
+    async def test_stream_job_output_composite_job(self) -> None:
         """Test streaming output for a composite job."""
         job_id = "composite-job-101"
 
@@ -276,7 +276,7 @@ class TestJobStreamService:
         self.mock_job_manager.unsubscribe_from_events.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_stream_job_output_composite_job_error(self):
+    async def test_stream_job_output_composite_job_error(self) -> None:
         """Test error handling in composite job streaming."""
         job_id = "composite-job-error"
 
@@ -313,7 +313,7 @@ class TestJobStreamService:
         assert "Queue error" in error_data["message"]
 
     @pytest.mark.asyncio
-    async def test_stream_job_output_nonexistent_job(self):
+    async def test_stream_job_output_nonexistent_job(self) -> None:
         """Test streaming output for a job that doesn't exist."""
         job_id = "nonexistent-job"
         self.mock_job_manager.jobs = {}
@@ -321,7 +321,7 @@ class TestJobStreamService:
         # Mock empty output stream
         async def mock_empty_generator():
             return
-            yield  # unreachable but needed for generator syntax
+            yield  # pragma: no cover
 
         self.mock_job_manager.stream_job_output = Mock(
             return_value=mock_empty_generator()
@@ -338,7 +338,7 @@ class TestJobStreamService:
         assert len(events) >= 0
 
     @pytest.mark.asyncio
-    async def test_get_job_status(self):
+    async def test_get_job_status(self) -> None:
         """Test getting job status for streaming."""
         job_id = "test-job-status"
         expected_output = {
@@ -358,7 +358,7 @@ class TestJobStreamService:
             job_id, last_n_lines=50
         )
 
-    def test_get_current_jobs_data_composite_jobs_basic(self):
+    def test_get_current_jobs_data_composite_jobs_basic(self) -> None:
         """Test getting current running composite jobs data for rendering."""
         # Mock a running composite job (all jobs are now composite)
         mock_task = Mock()
@@ -393,7 +393,7 @@ class TestJobStreamService:
         assert composite_job["progress"]["current_task"] == "backup_task"
         assert composite_job["progress"]["task_progress"] == "1/1"
 
-    def test_get_current_jobs_data_composite_jobs(self):
+    def test_get_current_jobs_data_composite_jobs(self) -> None:
         """Test getting current composite jobs data for rendering."""
         # Mock a running composite job
         mock_task = Mock()
@@ -433,7 +433,7 @@ class TestJobStreamService:
         assert composite_job["progress"]["task_progress"] == "1/3"
         assert "Task: backup_task (1/3)" in composite_job["progress_info"]
 
-    def test_get_current_jobs_data_mixed_jobs(self):
+    def test_get_current_jobs_data_mixed_jobs(self) -> None:
         """Test getting current jobs data with different types of composite jobs."""
         # Mock composite job with one task (previously would have been "simple")
         mock_single_task = Mock()
@@ -505,7 +505,7 @@ class TestJobStreamService:
         assert multi_task_job["type"] == "verification"
         assert multi_task_job["progress"]["task_progress"] == "3/3"
 
-    def test_get_current_jobs_data_no_running_jobs(self):
+    def test_get_current_jobs_data_no_running_jobs(self) -> None:
         """Test getting current jobs data when no jobs are running."""
         # Mock completed job (should not appear)
         mock_job = Mock()
@@ -518,7 +518,7 @@ class TestJobStreamService:
         # Should be empty since no jobs are running
         assert len(current_jobs) == 0
 
-    def test_dependency_injection_service_instance(self):
+    def test_dependency_injection_service_instance(self) -> None:
         """Test that dependency injection provides proper service instance."""
         from borgitory.dependencies import get_job_stream_service
 

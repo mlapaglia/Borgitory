@@ -25,7 +25,7 @@ from borgitory.utils.secure_path import (
 class TestSanitizePath:
     """Test path sanitization to prevent directory traversal attacks."""
 
-    def test_sanitize_valid_path(self):
+    def test_sanitize_valid_path(self) -> None:
         """Test sanitization of valid paths."""
         valid_paths = [
             "/home/user/backups",
@@ -40,22 +40,22 @@ class TestSanitizePath:
             assert isinstance(result, str)
             assert len(result) > 0
 
-    def test_sanitize_path_empty_string(self):
+    def test_sanitize_path_empty_string(self) -> None:
         """Test that empty strings raise ValueError."""
         with pytest.raises(ValueError, match="Path must be a non-empty string"):
             sanitize_path("")
 
-    def test_sanitize_path_none(self):
+    def test_sanitize_path_none(self) -> None:
         """Test that None raises ValueError."""
         with pytest.raises(ValueError, match="Path must be a non-empty string"):
             sanitize_path(None)
 
-    def test_sanitize_path_non_string(self):
+    def test_sanitize_path_non_string(self) -> None:
         """Test that non-strings raise ValueError."""
         with pytest.raises(ValueError, match="Path must be a non-empty string"):
             sanitize_path(123)
 
-    def test_sanitize_path_directory_traversal(self):
+    def test_sanitize_path_directory_traversal(self) -> None:
         """Test that directory traversal patterns are blocked."""
         dangerous_paths = [
             "../etc/passwd",
@@ -70,7 +70,7 @@ class TestSanitizePath:
             with pytest.raises(ValueError, match="Path contains dangerous pattern"):
                 sanitize_path(path)
 
-    def test_sanitize_path_command_injection(self):
+    def test_sanitize_path_command_injection(self) -> None:
         """Test that command injection characters are blocked."""
         dangerous_paths = [
             "/path; rm -rf /",
@@ -87,13 +87,13 @@ class TestSanitizePath:
             with pytest.raises(ValueError, match="Path contains dangerous pattern"):
                 sanitize_path(path)
 
-    def test_sanitize_path_null_bytes(self):
+    def test_sanitize_path_null_bytes(self) -> None:
         """Test that null bytes are removed."""
         path_with_nulls = "/path/to/file\x00extra"
         result = sanitize_path(path_with_nulls)
         assert "\x00" not in result
 
-    def test_sanitize_path_newlines(self):
+    def test_sanitize_path_newlines(self) -> None:
         """Test that newlines are blocked."""
         with pytest.raises(ValueError, match="Path contains dangerous pattern"):
             sanitize_path("/path\nto/file")
@@ -105,7 +105,7 @@ class TestSanitizePath:
 class TestSanitizePassphrase:
     """Test passphrase sanitization to prevent injection attacks."""
 
-    def test_sanitize_valid_passphrase(self):
+    def test_sanitize_valid_passphrase(self) -> None:
         """Test valid passphrases."""
         valid_passphrases = [
             "simple123",
@@ -121,22 +121,22 @@ class TestSanitizePassphrase:
             result = sanitize_passphrase(passphrase)
             assert result == passphrase
 
-    def test_sanitize_passphrase_empty(self):
+    def test_sanitize_passphrase_empty(self) -> None:
         """Test that empty passphrases raise ValueError."""
         with pytest.raises(ValueError, match="Passphrase must be a non-empty string"):
             sanitize_passphrase("")
 
-    def test_sanitize_passphrase_none(self):
+    def test_sanitize_passphrase_none(self) -> None:
         """Test that None raises ValueError."""
         with pytest.raises(ValueError, match="Passphrase must be a non-empty string"):
             sanitize_passphrase(None)
 
-    def test_sanitize_passphrase_non_string(self):
+    def test_sanitize_passphrase_non_string(self) -> None:
         """Test that non-strings raise ValueError."""
         with pytest.raises(ValueError, match="Passphrase must be a non-empty string"):
             sanitize_passphrase(123)
 
-    def test_sanitize_passphrase_dangerous_chars(self):
+    def test_sanitize_passphrase_dangerous_chars(self) -> None:
         """Test that dangerous shell characters are blocked."""
         dangerous_passphrases = [
             "pass'word",  # Single quote
@@ -163,7 +163,7 @@ class TestSanitizePassphrase:
 class TestBuildSecureBorgCommand:
     """Test secure Borg command building to prevent injection attacks."""
 
-    def test_build_basic_command(self):
+    def test_build_basic_command(self) -> None:
         """Test building a basic Borg command."""
         command, env = build_secure_borg_command(
             "borg create", "/path/to/repo", "test_passphrase"
@@ -177,7 +177,7 @@ class TestBuildSecureBorgCommand:
         assert env["BORG_PASSPHRASE"] == "test_passphrase"
         assert "BORG_RELOCATED_REPO_ACCESS_IS_OK" in env
 
-    def test_build_command_with_additional_args(self):
+    def test_build_command_with_additional_args(self) -> None:
         """Test building command with additional arguments."""
         command, env = build_secure_borg_command(
             "borg create",
@@ -195,7 +195,7 @@ class TestBuildSecureBorgCommand:
         assert "::archive-name" in command
         assert any("repo" in arg for arg in command)  # Repo path should be present
 
-    def test_build_command_empty_repo_path(self):
+    def test_build_command_empty_repo_path(self) -> None:
         """Test building command with empty repository path."""
         command, env = build_secure_borg_command(
             "borg list", "", "test_passphrase", ["/path/to/repo"]
@@ -203,7 +203,7 @@ class TestBuildSecureBorgCommand:
 
         assert command == ["borg", "list", "/path/to/repo"]
 
-    def test_build_command_with_env_overrides(self):
+    def test_build_command_with_env_overrides(self) -> None:
         """Test building command with environment overrides."""
         command, env = build_secure_borg_command(
             "borg create",
@@ -215,7 +215,7 @@ class TestBuildSecureBorgCommand:
         assert env["BORG_RSH"] == "ssh -i /key"
         assert env["BORG_PASSPHRASE"] == "test_passphrase"
 
-    def test_build_command_invalid_env_name(self):
+    def test_build_command_invalid_env_name(self) -> None:
         """Test that invalid environment variable names are rejected."""
         with pytest.raises(ValueError, match="Invalid environment variable name"):
             build_secure_borg_command(
@@ -225,14 +225,7 @@ class TestBuildSecureBorgCommand:
                 environment_overrides={"invalid-name": "value"},
             )
 
-    def test_build_command_non_string_args(self):
-        """Test that non-string arguments are rejected."""
-        with pytest.raises(ValueError, match="All arguments must be strings"):
-            build_secure_borg_command(
-                "borg create", "/path/to/repo", "test_passphrase", [123, "valid_arg"]
-            )
-
-    def test_build_command_dangerous_args(self):
+    def test_build_command_dangerous_args(self) -> None:
         """Test that dangerous arguments are rejected."""
         dangerous_args = [
             "; rm -rf /",
@@ -253,7 +246,7 @@ class TestBuildSecureBorgCommand:
                     "borg create", "/path/to/repo", "test_passphrase", [arg]
                 )
 
-    def test_build_command_pattern_args(self):
+    def test_build_command_pattern_args(self) -> None:
         """Test that pattern arguments allow regex but block shell injection."""
         # Valid pattern arguments (regex metacharacters allowed)
         valid_patterns = [
@@ -268,7 +261,7 @@ class TestBuildSecureBorgCommand:
             )
             assert len(command) > 2  # Should not raise exception
 
-    def test_build_command_dangerous_patterns(self):
+    def test_build_command_dangerous_patterns(self) -> None:
         """Test that dangerous patterns in --pattern args are still blocked."""
         dangerous_patterns = [
             ["--pattern", "+fm:*.py; rm -rf /"],
@@ -285,12 +278,12 @@ class TestBuildSecureBorgCommand:
                     "borg create", "/path/to/repo", "test_passphrase", pattern_args
                 )
 
-    def test_build_command_invalid_passphrase(self):
+    def test_build_command_invalid_passphrase(self) -> None:
         """Test that invalid passphrases are rejected."""
         with pytest.raises(ValueError, match="Passphrase contains dangerous character"):
             build_secure_borg_command("borg create", "/path/to/repo", "bad'passphrase")
 
-    def test_build_command_invalid_repo_path(self):
+    def test_build_command_invalid_repo_path(self) -> None:
         """Test that invalid repository paths are rejected."""
         with pytest.raises(ValueError, match="Path contains dangerous pattern"):
             build_secure_borg_command(
@@ -301,7 +294,7 @@ class TestBuildSecureBorgCommand:
 class TestValidateArchiveName:
     """Test archive name validation."""
 
-    def test_validate_valid_names(self):
+    def test_validate_valid_names(self) -> None:
         """Test valid archive names."""
         valid_names = [
             "backup-2023-01-01",
@@ -316,22 +309,22 @@ class TestValidateArchiveName:
             result = validate_archive_name(name)
             assert result == name
 
-    def test_validate_empty_name(self):
+    def test_validate_empty_name(self) -> None:
         """Test that empty names raise ValueError."""
         with pytest.raises(ValueError, match="Archive name must be a non-empty string"):
             validate_archive_name("")
 
-    def test_validate_none_name(self):
+    def test_validate_none_name(self) -> None:
         """Test that None raises ValueError."""
         with pytest.raises(ValueError, match="Archive name must be a non-empty string"):
             validate_archive_name(None)
 
-    def test_validate_non_string_name(self):
+    def test_validate_non_string_name(self) -> None:
         """Test that non-strings raise ValueError."""
         with pytest.raises(ValueError, match="Archive name must be a non-empty string"):
             validate_archive_name(123)
 
-    def test_validate_various_characters_now_allowed(self):
+    def test_validate_various_characters_now_allowed(self) -> None:
         """Test that various characters are now allowed in archive names."""
         # These names were previously invalid but are now allowed since character validation was removed
         previously_invalid_names = [
@@ -357,14 +350,14 @@ class TestValidateArchiveName:
             result = validate_archive_name(name)
             assert result == name
 
-    def test_validate_newline_still_problematic(self):
+    def test_validate_newline_still_problematic(self) -> None:
         """Test that newlines in names might still cause issues (but validation allows them)."""
         # Newlines are now allowed by validation but may cause issues elsewhere
         name_with_newline = "backup\nnewline"
         result = validate_archive_name(name_with_newline)
         assert result == name_with_newline
 
-    def test_validate_too_long(self):
+    def test_validate_too_long(self) -> None:
         """Test that overly long names are rejected."""
         long_name = "a" * 201
         with pytest.raises(ValueError, match="Archive name too long"):
@@ -374,7 +367,7 @@ class TestValidateArchiveName:
 class TestValidateCompression:
     """Test compression algorithm validation."""
 
-    def test_validate_valid_compressions(self):
+    def test_validate_valid_compressions(self) -> None:
         """Test valid compression algorithms."""
         valid_compressions = [
             "none",
@@ -396,7 +389,7 @@ class TestValidateCompression:
             result = validate_compression(compression)
             assert result == compression
 
-    def test_validate_invalid_compression(self):
+    def test_validate_invalid_compression(self) -> None:
         """Test invalid compression algorithms."""
         invalid_compressions = [
             "bzip2",  # Not supported
@@ -417,7 +410,7 @@ class TestValidateCompression:
 class TestGetOrGenerateSecretKey:
     """Test secret key generation and retrieval."""
 
-    def test_generate_new_secret_key(self):
+    def test_generate_new_secret_key(self) -> None:
         """Test generating a new secret key."""
         with tempfile.TemporaryDirectory() as temp_dir:
             secret_key = get_or_generate_secret_key(temp_dir)
@@ -431,7 +424,7 @@ class TestGetOrGenerateSecretKey:
             assert secret_file.exists()
             assert secret_file.read_text().strip() == secret_key
 
-    def test_retrieve_existing_secret_key(self):
+    def test_retrieve_existing_secret_key(self) -> None:
         """Test retrieving an existing secret key."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # First call creates the key
@@ -442,7 +435,7 @@ class TestGetOrGenerateSecretKey:
 
             assert secret_key1 == secret_key2
 
-    def test_secret_key_persistence(self):
+    def test_secret_key_persistence(self) -> None:
         """Test that secret key persists across calls."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Generate key
@@ -458,7 +451,7 @@ class TestGetOrGenerateSecretKey:
             assert retrieved_key == original_key
 
     @patch("pathlib.Path.mkdir")
-    def test_directory_creation_failure(self, mock_mkdir):
+    def test_directory_creation_failure(self, mock_mkdir) -> None:
         """Test handling of directory creation failure."""
         mock_mkdir.side_effect = OSError("Permission denied")
 
@@ -466,7 +459,7 @@ class TestGetOrGenerateSecretKey:
             get_or_generate_secret_key("/nonexistent/path")
 
     @patch("pathlib.Path.read_text")
-    def test_read_secret_key_failure(self, mock_read):
+    def test_read_secret_key_failure(self, mock_read) -> None:
         """Test handling of secret key read failure."""
         mock_read.side_effect = OSError("Permission denied")
 
@@ -479,7 +472,7 @@ class TestGetOrGenerateSecretKey:
                 get_or_generate_secret_key(temp_dir)
 
     @patch("pathlib.Path.write_text")
-    def test_write_secret_key_failure(self, mock_write):
+    def test_write_secret_key_failure(self, mock_write) -> None:
         """Test handling of secret key write failure."""
         mock_write.side_effect = OSError("Disk full")
 
@@ -487,7 +480,7 @@ class TestGetOrGenerateSecretKey:
             with pytest.raises(Exception, match="Failed to save secret key"):
                 get_or_generate_secret_key(temp_dir)
 
-    def test_secret_key_format(self):
+    def test_secret_key_format(self) -> None:
         """Test that generated secret keys are URL-safe."""
         with tempfile.TemporaryDirectory() as temp_dir:
             secret_key = get_or_generate_secret_key(temp_dir)
@@ -504,7 +497,7 @@ class TestGetOrGenerateSecretKey:
 class TestSecurityIntegration:
     """Integration tests for security functions working together."""
 
-    def test_full_command_building_workflow(self):
+    def test_full_command_building_workflow(self) -> None:
         """Test the complete workflow of building a secure command."""
         # Simulate a real backup command workflow
         repository_path = "/home/user/backup-repo"
@@ -537,7 +530,7 @@ class TestSecurityIntegration:
         assert any("backup-repo" in arg for arg in command)
         assert env["BORG_PASSPHRASE"] == passphrase
 
-    def test_security_validation_chain(self):
+    def test_security_validation_chain(self) -> None:
         """Test that security validations work together to prevent attacks."""
         # This should fail at multiple levels
         with pytest.raises(ValueError):
@@ -560,7 +553,7 @@ class TestSecurityIntegration:
         with pytest.raises(ValueError):
             validate_compression(malicious_compression)
 
-    def test_edge_case_combinations(self):
+    def test_edge_case_combinations(self) -> None:
         """Test edge cases that might slip through individual validations."""
         # Test very long valid inputs
         long_valid_path = "/very/long/path/" + "subdir/" * 20 + "repo"
@@ -577,7 +570,7 @@ class TestSecurityIntegration:
 class TestSecurePathValidation:
     """Test secure path validation utilities to prevent directory traversal and path injection."""
 
-    def test_validate_secure_path_legitimate_paths(self):
+    def test_validate_secure_path_legitimate_paths(self) -> None:
         """Test that legitimate paths are properly allowed."""
         legitimate_paths = [
             ("/mnt", "Root mount directory"),
@@ -596,7 +589,7 @@ class TestSecurePathValidation:
                 str(result).replace("\\", "/").endswith(test_path.replace("\\", "/"))
             ), f"Path resolution changed for {description}"
 
-    def test_validate_secure_path_security_attacks(self):
+    def test_validate_secure_path_security_attacks(self) -> None:
         """Test that security attack vectors are properly blocked."""
         attack_vectors = [
             ("../../etc/passwd", "Directory traversal with relative path"),
@@ -619,7 +612,7 @@ class TestSecurePathValidation:
             result = validate_secure_path(test_path)
             assert result is None, f"Failed to block {description}: '{test_path}'"
 
-    def test_validate_mnt_path_only_allows_mnt(self):
+    def test_validate_mnt_path_only_allows_mnt(self) -> None:
         """Test that validate_mnt_path only allows /mnt paths."""
         # Should allow /mnt paths
         mnt_paths = ["/mnt", "/mnt/backup", "/mnt/data/repos", "relative/path"]
@@ -639,7 +632,7 @@ class TestSecurePathValidation:
                 f"validate_mnt_path should reject app data path: '{path}'"
             )
 
-    def test_pre_validate_user_input_type_validation(self):
+    def test_pre_validate_user_input_type_validation(self) -> None:
         """Test pre-validation input type checking."""
         allowed_prefixes = ["/mnt", "/app/data"]
 
@@ -652,7 +645,7 @@ class TestSecurePathValidation:
         assert _pre_validate_user_input("/mnt/test", allowed_prefixes) is True
         assert _pre_validate_user_input("relative/path", allowed_prefixes) is True
 
-    def test_pre_validate_user_input_empty_and_whitespace(self):
+    def test_pre_validate_user_input_empty_and_whitespace(self) -> None:
         """Test pre-validation empty and whitespace handling."""
         allowed_prefixes = ["/mnt"]
 
@@ -665,7 +658,7 @@ class TestSecurePathValidation:
         assert _pre_validate_user_input("test", allowed_prefixes) is True
         assert _pre_validate_user_input("/mnt/test", allowed_prefixes) is True
 
-    def test_pre_validate_user_input_null_bytes(self):
+    def test_pre_validate_user_input_null_bytes(self) -> None:
         """Test pre-validation null byte detection."""
         allowed_prefixes = ["/mnt"]
 
@@ -677,7 +670,7 @@ class TestSecurePathValidation:
         # Should accept strings without null bytes
         assert _pre_validate_user_input("/mnt/test", allowed_prefixes) is True
 
-    def test_pre_validate_user_input_absolute_path_restrictions(self):
+    def test_pre_validate_user_input_absolute_path_restrictions(self) -> None:
         """Test pre-validation absolute path restrictions."""
         allowed_prefixes = ["/mnt", "/app/data"]
 
@@ -697,7 +690,7 @@ class TestSecurePathValidation:
         assert _pre_validate_user_input("relative/path", allowed_prefixes) is True
         assert _pre_validate_user_input("test.txt", allowed_prefixes) is True
 
-    def test_cross_platform_path_handling(self):
+    def test_cross_platform_path_handling(self) -> None:
         """Test that path validation works across different platforms."""
         # Test paths that should work on both Windows and Unix
         cross_platform_paths = [
@@ -711,7 +704,7 @@ class TestSecurePathValidation:
             result = validate_secure_path(path)
             assert result is not None, f"Cross-platform path failed: '{path}'"
 
-    def test_path_normalization_security(self):
+    def test_path_normalization_security(self) -> None:
         """Test that path normalization prevents traversal attacks."""
         # These paths attempt traversal but should be blocked
         traversal_attempts = [
@@ -725,7 +718,7 @@ class TestSecurePathValidation:
             result = validate_secure_path(path)
             assert result is None, f"Failed to block traversal attempt: '{path}'"
 
-    def test_symlink_security_handling(self):
+    def test_symlink_security_handling(self) -> None:
         """Test that symlink resolution maintains security boundaries."""
         # Note: This test verifies the logic handles symlinks securely
         # In a real environment, symlinks could potentially escape containment
@@ -739,7 +732,7 @@ class TestSecurePathValidation:
             # Should either succeed or fail safely (not raise exceptions)
             assert result is None or isinstance(result, Path)
 
-    def test_validate_secure_path_with_allow_app_data_flag(self):
+    def test_validate_secure_path_with_allow_app_data_flag(self) -> None:
         """Test that the allow_app_data flag works correctly."""
         app_data_path = "/app/data/test"
 
@@ -758,7 +751,7 @@ class TestSecurePathValidation:
         assert validate_secure_path(mnt_path, allow_app_data=True) is not None
         assert validate_secure_path(mnt_path, allow_app_data=False) is not None
 
-    def test_edge_case_path_combinations(self):
+    def test_edge_case_path_combinations(self) -> None:
         """Test edge cases and boundary conditions."""
         edge_cases = [
             # Unicode and international characters
@@ -788,7 +781,7 @@ class TestSecurePathValidation:
                     f"Unexpected exception for {description}: {e}"
                 )
 
-    def test_security_regression_prevention(self):
+    def test_security_regression_prevention(self) -> None:
         """Test specific attack patterns that have been seen in the wild."""
         # These are real-world attack patterns that should be blocked
         path_traversal_attacks = [

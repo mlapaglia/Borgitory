@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import List
 
 
 class JobType(StrEnum):
@@ -14,7 +15,7 @@ class JobType(StrEnum):
     UNKNOWN = "Unknown"
 
     @classmethod
-    def from_command(cls, command: list) -> "JobType":
+    def from_command(cls, command: List[str]) -> "JobType":
         """Infer job type from borg command"""
         if not command or len(command) < 2:
             return cls.UNKNOWN

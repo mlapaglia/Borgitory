@@ -6,6 +6,8 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, UTC
 
+from sqlalchemy.orm import Session
+
 from borgitory.services.jobs.job_service import JobService
 from borgitory.models.database import (
     Repository,
@@ -20,7 +22,7 @@ from borgitory.models.enums import JobType
 class TestJobService:
     """Test class for JobService."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.mock_job_manager = Mock()
         self.mock_db = Mock()
@@ -29,7 +31,7 @@ class TestJobService:
         )
 
     @pytest.mark.asyncio
-    async def test_create_backup_job_simple(self, test_db):
+    async def test_create_backup_job_simple(self, test_db: Session) -> None:
         """Test creating a simple backup job without additional tasks."""
         # Create test repository
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
@@ -61,7 +63,7 @@ class TestJobService:
         assert call_args.kwargs["task_definitions"][0]["type"] == "backup"
 
     @pytest.mark.asyncio
-    async def test_create_backup_job_with_cleanup(self, test_db):
+    async def test_create_backup_job_with_cleanup(self, test_db: Session) -> None:
         """Test creating a backup job with cleanup task."""
         # Create test data
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
@@ -106,7 +108,9 @@ class TestJobService:
         assert task_definitions[1]["keep_within"] == "30d"
 
     @pytest.mark.asyncio
-    async def test_create_backup_job_repository_not_found(self, test_db):
+    async def test_create_backup_job_repository_not_found(
+        self, test_db: Session
+    ) -> None:
         """Test backup job creation with non-existent repository."""
         backup_request = BackupRequest(
             repository_id=999, source_path="/data", compression="lz4", dry_run=False
@@ -120,7 +124,7 @@ class TestJobService:
             )
 
     @pytest.mark.asyncio
-    async def test_create_prune_job_simple_strategy(self, test_db):
+    async def test_create_prune_job_simple_strategy(self, test_db: Session) -> None:
         """Test creating a prune job with simple retention strategy."""
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
         repository.set_passphrase("test-passphrase")
@@ -157,7 +161,7 @@ class TestJobService:
             assert task_def["keep_within"] == "7d"
 
     @pytest.mark.asyncio
-    async def test_create_prune_job_advanced_strategy(self, test_db):
+    async def test_create_prune_job_advanced_strategy(self, test_db: Session) -> None:
         """Test creating a prune job with advanced retention strategy."""
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
         repository.set_passphrase("test-passphrase")
@@ -198,7 +202,7 @@ class TestJobService:
             assert task_def["keep_yearly"] == 1
 
     @pytest.mark.asyncio
-    async def test_create_check_job_with_config(self, test_db):
+    async def test_create_check_job_with_config(self, test_db: Session) -> None:
         """Test creating a check job with existing check policy."""
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
         repository.set_passphrase("test-passphrase")
@@ -238,7 +242,7 @@ class TestJobService:
             assert task_def["save_space"] is True
 
     @pytest.mark.asyncio
-    async def test_create_check_job_custom_parameters(self, test_db):
+    async def test_create_check_job_custom_parameters(self, test_db: Session) -> None:
         """Test creating a check job with custom parameters."""
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
         repository.set_passphrase("test-passphrase")
@@ -273,7 +277,7 @@ class TestJobService:
             assert task_def["repair_mode"] is False
             assert task_def["first_n_archives"] == 10
 
-    def test_list_jobs_database_only(self, test_db):
+    def test_list_jobs_database_only(self, test_db: Session) -> None:
         """Test listing jobs from database only."""
         # Create test jobs
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
@@ -296,7 +300,7 @@ class TestJobService:
         assert jobs[1]["type"] == "backup"
         assert jobs[1]["source"] == "database"
 
-    def test_list_jobs_with_jobmanager(self, test_db):
+    def test_list_jobs_with_jobmanager(self, test_db: Session) -> None:
         """Test listing jobs including JobManager jobs."""
         # Create mock JobManager job
         mock_borg_job = Mock()
@@ -318,7 +322,7 @@ class TestJobService:
         assert jm_job["type"] == JobType.BACKUP  # Inferred from "create" command
         assert jm_job["status"] == "running"
 
-    def test_get_job_from_database(self, test_db):
+    def test_get_job_from_database(self, test_db: Session) -> None:
         """Test getting a job from database by ID."""
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
         repository.set_passphrase("test-passphrase")
@@ -337,7 +341,7 @@ class TestJobService:
         assert result["source"] == "database"
         assert result["repository_name"] == "test-repo"
 
-    def test_get_job_from_jobmanager(self, test_db):
+    def test_get_job_from_jobmanager(self, test_db: Session) -> None:
         """Test getting a job from JobManager by UUID."""
         self.mock_job_manager.get_job_status.return_value = {
             "status": "running",
@@ -352,7 +356,7 @@ class TestJobService:
         assert result["status"] == "running"
         assert result["source"] == "jobmanager"
 
-    def test_get_job_not_found(self, test_db):
+    def test_get_job_not_found(self, test_db: Session) -> None:
         """Test getting a non-existent job."""
         self.mock_job_manager.get_job_status.return_value = None
         # Override mock db with real test_db for this test
@@ -363,7 +367,7 @@ class TestJobService:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_job_status(self):
+    async def test_get_job_status(self) -> None:
         """Test getting job status."""
         expected_output = {"status": "running", "progress": 50}
         self.mock_job_manager.get_job_output_stream = AsyncMock(
@@ -378,7 +382,7 @@ class TestJobService:
         )
 
     @pytest.mark.asyncio
-    async def test_cancel_job_jobmanager(self, test_db):
+    async def test_cancel_job_jobmanager(self, test_db: Session) -> None:
         """Test cancelling a JobManager job."""
         self.mock_job_manager.cancel_job = AsyncMock(return_value=True)
 
@@ -388,7 +392,7 @@ class TestJobService:
         self.mock_job_manager.cancel_job.assert_called_once_with("uuid-long-string")
 
     @pytest.mark.asyncio
-    async def test_cancel_job_database(self, test_db):
+    async def test_cancel_job_database(self, test_db: Session) -> None:
         """Test cancelling a database job."""
         repository = Repository(id=1, name="test-repo", path="/tmp/test-repo")
         repository.set_passphrase("test-passphrase")
@@ -409,7 +413,7 @@ class TestJobService:
         assert updated_job.status == "cancelled"
         assert updated_job.finished_at is not None
 
-    def test_get_manager_stats(self):
+    def test_get_manager_stats(self) -> None:
         """Test getting JobManager statistics."""
         # Mock job manager with different job statuses
         mock_running_job = Mock()
@@ -434,7 +438,7 @@ class TestJobService:
         assert stats["failed_jobs"] == 1
         assert stats["active_processes"] == 2
 
-    def test_cleanup_completed_jobs(self):
+    def test_cleanup_completed_jobs(self) -> None:
         """Test cleaning up completed jobs."""
         # Mock jobs with different statuses
         mock_running_job = Mock()
@@ -455,7 +459,7 @@ class TestJobService:
         assert cleaned == 2  # Should clean up completed and failed jobs
         assert self.mock_job_manager.cleanup_job.call_count == 2
 
-    def test_get_queue_stats(self):
+    def test_get_queue_stats(self) -> None:
         """Test getting queue statistics."""
         expected_stats = {"queued": 3, "processing": 1}
         self.mock_job_manager.get_queue_stats.return_value = expected_stats

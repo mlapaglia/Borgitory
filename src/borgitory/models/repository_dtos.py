@@ -144,7 +144,6 @@ class ArchiveContentsResult:
 class RepositoryScanRequest:
     """Request for repository scanning."""
 
-    scan_path: Optional[str] = None
     include_existing: bool = True
 
 
@@ -166,7 +165,6 @@ class RepositoryScanResult:
 
     success: bool
     repositories: List[ScannedRepository]
-    scan_path: Optional[str] = None
     error_message: Optional[str] = None
 
     @property

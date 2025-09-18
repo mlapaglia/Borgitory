@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ScheduleService:
     """Service for schedule business logic operations."""
 
-    def __init__(self, db: Session, scheduler_service):
+    def __init__(self, db: Session, scheduler_service: Any) -> None:
         self.db = db
         self.scheduler_service = scheduler_service
 
@@ -78,16 +78,15 @@ class ScheduleService:
                 return False, None, error_msg
 
             # Create schedule
-            db_schedule = Schedule(
-                name=name,
-                repository_id=repository_id,
-                cron_expression=cron_expression,
-                source_path=source_path,
-                enabled=True,
-                cloud_sync_config_id=cloud_sync_config_id,
-                cleanup_config_id=cleanup_config_id,
-                notification_config_id=notification_config_id,
-            )
+            db_schedule = Schedule()
+            db_schedule.name = name
+            db_schedule.repository_id = repository_id
+            db_schedule.cron_expression = cron_expression
+            db_schedule.source_path = source_path
+            db_schedule.enabled = True
+            db_schedule.cloud_sync_config_id = cloud_sync_config_id
+            db_schedule.cleanup_config_id = cleanup_config_id
+            db_schedule.notification_config_id = notification_config_id
 
             self.db.add(db_schedule)
             self.db.commit()
@@ -218,8 +217,8 @@ class ScheduleService:
             return False, None, f"Failed to delete schedule: {str(e)}"
 
     def validate_schedule_creation_data(
-        self, json_data: dict
-    ) -> tuple[bool, dict, Optional[str]]:
+        self, json_data: Dict[str, Any]
+    ) -> tuple[bool, Dict[str, Any], Optional[str]]:
         """
         Validate and process schedule creation data.
 
@@ -260,7 +259,7 @@ class ScheduleService:
                 return False, {}, "Schedule name is required"
 
             # Process optional fields
-            def safe_int(value):
+            def safe_int(value: Any) -> Optional[int]:
                 if not value or value == "":
                     return None
                 try:

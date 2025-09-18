@@ -14,7 +14,9 @@ from borgitory.api.cloud_sync import _get_supported_providers
 class TestRegistryBusinessLogic:
     """Test registry functions directly (business logic)"""
 
-    def test_get_all_provider_info_with_registered_providers(self, production_registry):
+    def test_get_all_provider_info_with_registered_providers(
+        self, production_registry
+    ) -> None:
         """Test getting all provider info when providers are registered"""
         provider_info = production_registry.get_all_provider_info()
 
@@ -41,7 +43,9 @@ class TestRegistryBusinessLogic:
         assert smb_info["supports_encryption"] is True
         assert smb_info["supports_versioning"] is False
 
-    def test_get_supported_providers_returns_sorted_list(self, production_registry):
+    def test_get_supported_providers_returns_sorted_list(
+        self, production_registry
+    ) -> None:
         """Test that supported providers are returned in sorted order"""
         providers = production_registry.get_supported_providers()
 
@@ -53,7 +57,9 @@ class TestRegistryBusinessLogic:
         # Should be sorted
         assert providers == sorted(providers)
 
-    def test_get_config_class_returns_correct_classes(self, production_registry):
+    def test_get_config_class_returns_correct_classes(
+        self, production_registry
+    ) -> None:
         """Test that config classes are returned correctly"""
         # Test by class name to avoid identity issues after module reloading
         s3_config_class = production_registry.get_config_class("s3")
@@ -68,7 +74,9 @@ class TestRegistryBusinessLogic:
         assert smb_config_class.__name__ == "SMBStorageConfig"
         assert production_registry.get_config_class("unknown") is None
 
-    def test_get_storage_class_returns_correct_classes(self, production_registry):
+    def test_get_storage_class_returns_correct_classes(
+        self, production_registry
+    ) -> None:
         """Test that storage classes are returned correctly"""
         # Test by class name to avoid identity issues after module reloading
         s3_storage_class = production_registry.get_storage_class("s3")
@@ -87,7 +95,7 @@ class TestRegistryBusinessLogic:
 class TestSensitiveFieldsIntegration:
     """Test sensitive fields detection using registry"""
 
-    def test_get_sensitive_fields_for_registered_providers(self):
+    def test_get_sensitive_fields_for_registered_providers(self) -> None:
         """Test that sensitive fields are correctly retrieved from registry"""
         # Import storage modules to trigger registration (if not already done)
 
@@ -101,7 +109,7 @@ class TestSensitiveFieldsIntegration:
         smb_fields = _get_sensitive_fields_for_provider("smb")
         assert set(smb_fields) == {"pass"}
 
-    def test_get_sensitive_fields_for_unknown_provider(self):
+    def test_get_sensitive_fields_for_unknown_provider(self) -> None:
         """Test that unknown providers return empty list with warning"""
         # Import storage modules to trigger registration
 
@@ -112,7 +120,7 @@ class TestSensitiveFieldsIntegration:
             mock_logger.warning.assert_called_once()
             assert "Unknown provider 'unknown'" in mock_logger.warning.call_args[0][0]
 
-    def test_get_sensitive_fields_fallback_on_error(self):
+    def test_get_sensitive_fields_fallback_on_error(self) -> None:
         """Test that fallback values are used when registry fails"""
         # Import storage modules to trigger registration (if not already done)
 
@@ -135,7 +143,7 @@ class TestSensitiveFieldsIntegration:
 class TestAPIProviderIntegration:
     """Test API layer integration with registry"""
 
-    def test_api_get_supported_providers_format(self):
+    def test_api_get_supported_providers_format(self) -> None:
         """Test that API returns providers in correct format"""
         # Import storage modules to trigger registration
         from borgitory.services.cloud_providers.registry import get_registry
@@ -162,7 +170,7 @@ class TestAPIProviderIntegration:
             assert isinstance(provider["label"], str)
             assert isinstance(provider["description"], str)
 
-    def test_api_providers_are_sorted(self):
+    def test_api_providers_are_sorted(self) -> None:
         """Test that API returns providers in sorted order"""
         # Import storage modules to trigger registration
         from borgitory.services.cloud_providers.registry import get_registry
@@ -178,7 +186,7 @@ class TestAPIProviderIntegration:
 class TestServiceLayerIntegration:
     """Test service layer integration with registry"""
 
-    def test_config_validator_uses_registry(self):
+    def test_config_validator_uses_registry(self) -> None:
         """Test that ConfigValidator uses registry for validation"""
         # Import storage modules to trigger registration (if not already done)
         from borgitory.services.cloud_providers.service import ConfigValidator
@@ -206,7 +214,7 @@ class TestServiceLayerIntegration:
         assert "Unknown provider: unknown" in error_msg
         assert "Supported providers:" in error_msg
 
-    def test_storage_factory_uses_registry(self):
+    def test_storage_factory_uses_registry(self) -> None:
         """Test that StorageFactory uses registry for creation"""
         # Import storage modules to trigger registration (if not already done)
         from borgitory.services.cloud_providers.service import StorageFactory
@@ -234,7 +242,7 @@ class TestServiceLayerIntegration:
         assert "Unknown provider: unknown" in error_msg
         assert "Supported providers:" in error_msg
 
-    def test_storage_factory_get_supported_providers(self):
+    def test_storage_factory_get_supported_providers(self) -> None:
         """Test that StorageFactory returns supported providers from registry"""
         # Import storage modules to trigger registration (if not already done)
         from borgitory.services.cloud_providers.service import StorageFactory
@@ -252,7 +260,7 @@ class TestServiceLayerIntegration:
 class TestCloudSyncServiceIntegration:
     """Test CloudSyncService integration with registry"""
 
-    def test_cloud_sync_service_validates_providers_using_registry(self):
+    def test_cloud_sync_service_validates_providers_using_registry(self) -> None:
         """Test that CloudSyncService validates providers using registry"""
         # Import storage modules to trigger registration (if not already done)
         from borgitory.services.cloud_sync_service import CloudSyncService

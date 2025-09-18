@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class NotificationConfigService:
     """Service for notification configuration business logic operations."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session) -> None:
         self.db = db
 
     def get_all_configs(
@@ -48,13 +48,12 @@ class NotificationConfigService:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
-            db_notification_config = NotificationConfig(
-                name=name,
-                provider=provider,
-                notify_on_success=notify_on_success,
-                notify_on_failure=notify_on_failure,
-                enabled=True,
-            )
+            db_notification_config = NotificationConfig()
+            db_notification_config.name = name
+            db_notification_config.provider = provider
+            db_notification_config.notify_on_success = notify_on_success
+            db_notification_config.notify_on_failure = notify_on_failure
+            db_notification_config.enabled = True
 
             # Encrypt and store credentials
             db_notification_config.set_pushover_credentials(user_key, app_token)

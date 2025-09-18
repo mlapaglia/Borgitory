@@ -27,7 +27,7 @@ class CommandResult(NamedTuple):
 class SimpleCommandRunner:
     """Simple command runner that executes commands and returns results directly"""
 
-    def __init__(self, timeout: int = 300):
+    def __init__(self, timeout: int = 300) -> None:
         """
         Initialize the command runner.
 
@@ -93,7 +93,9 @@ class SimpleCommandRunner:
 
                 return CommandResult(
                     success=success,
-                    return_code=process.returncode,
+                    return_code=process.returncode
+                    if process.returncode is not None
+                    else -1,
                     stdout=stdout,
                     stderr=stderr,
                     duration=duration,

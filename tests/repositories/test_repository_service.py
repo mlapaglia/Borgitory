@@ -72,7 +72,7 @@ class TestRepositoryService:
     @pytest.mark.asyncio
     async def test_create_repository_success(
         self, repository_service, mock_borg_service, mock_db_session
-    ):
+    ) -> None:
         """Test successful repository creation."""
         # Arrange
         request = CreateRepositoryRequest(
@@ -114,7 +114,7 @@ class TestRepositoryService:
     @pytest.mark.asyncio
     async def test_create_repository_name_already_exists(
         self, repository_service, mock_db_session
-    ):
+    ) -> None:
         """Test repository creation fails when name already exists."""
         # Arrange
         request = CreateRepositoryRequest(
@@ -148,7 +148,7 @@ class TestRepositoryService:
     @pytest.mark.asyncio
     async def test_create_repository_borg_initialization_fails(
         self, repository_service, mock_borg_service, mock_db_session
-    ):
+    ) -> None:
         """Test repository creation fails when Borg initialization fails."""
         # Arrange
         request = CreateRepositoryRequest(
@@ -186,7 +186,7 @@ class TestRepositoryService:
     @pytest.mark.asyncio
     async def test_scan_repositories_success(
         self, repository_service, mock_borg_service
-    ):
+    ) -> None:
         """Test successful repository scanning."""
         # Arrange
         request = RepositoryScanRequest()
@@ -224,7 +224,7 @@ class TestRepositoryService:
     @pytest.mark.asyncio
     async def test_delete_repository_blocked_by_active_jobs(
         self, repository_service, mock_db_session
-    ):
+    ) -> None:
         """Test repository deletion blocked by active jobs."""
         # Arrange
         request = DeleteRepositoryRequest(repository_id=123, user_id=1)
@@ -268,7 +268,7 @@ class TestRepositoryService:
     @pytest.mark.asyncio
     async def test_import_repository_success(
         self, repository_service, mock_borg_service, mock_db_session
-    ):
+    ) -> None:
         """Test successful repository import."""
         # Arrange
         request = ImportRepositoryRequest(
@@ -308,7 +308,7 @@ class TestRepositoryService:
             mock_db_session.add.assert_called_once()
             mock_db_session.commit.assert_called_once()
 
-    def test_validation_error_properties(self):
+    def test_validation_error_properties(self) -> None:
         """Test RepositoryOperationResult validation error properties."""
         # Arrange
         errors = [
@@ -323,7 +323,7 @@ class TestRepositoryService:
         assert result.is_borg_error is False
         assert len(result.validation_errors) == 2
 
-    def test_borg_error_properties(self):
+    def test_borg_error_properties(self) -> None:
         """Test RepositoryOperationResult Borg error properties."""
         # Arrange
         result = RepositoryOperationResult(

@@ -12,7 +12,7 @@ from borgitory.models.database import Repository
 class TestBorgCommandBuilder:
     """Test BorgCommandBuilder functionality"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures"""
         self.builder = BorgCommandBuilder()
 
@@ -21,7 +21,7 @@ class TestBorgCommandBuilder:
         self.mock_repository.path = "/test/repo/path"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test BorgCommandBuilder initialization"""
         builder = BorgCommandBuilder()
         assert builder is not None
@@ -31,7 +31,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     def test_build_backup_command_default(
         self, mock_validate_archive, mock_validate_compression, mock_build_secure
-    ):
+    ) -> None:
         """Test building basic backup command with defaults"""
         mock_build_secure.return_value = (
             ["borg", "create"],
@@ -73,7 +73,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     def test_build_backup_command_with_custom_options(
         self, mock_validate_archive, mock_validate_compression, mock_build_secure
-    ):
+    ) -> None:
         """Test building backup command with custom options"""
         mock_build_secure.return_value = (
             ["borg", "create"],
@@ -101,7 +101,9 @@ class TestBorgCommandBuilder:
         assert "/test/repo/path::custom-archive-name" in additional_args
 
     @patch("borgitory.services.borg_command_builder.validate_compression")
-    def test_build_backup_command_validation_failure(self, mock_validate_compression):
+    def test_build_backup_command_validation_failure(
+        self, mock_validate_compression
+    ) -> None:
         """Test backup command building fails with invalid compression"""
         mock_validate_compression.side_effect = Exception("Invalid compression")
 
@@ -113,7 +115,7 @@ class TestBorgCommandBuilder:
             )
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_backup_command_security_failure(self, mock_build_secure):
+    def test_build_backup_command_security_failure(self, mock_build_secure) -> None:
         """Test backup command building fails when security validation fails"""
         mock_build_secure.side_effect = Exception("Security validation failed")
 
@@ -123,7 +125,7 @@ class TestBorgCommandBuilder:
             )
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_list_archives_command(self, mock_build_secure):
+    def test_build_list_archives_command(self, mock_build_secure) -> None:
         """Test building list archives command"""
         mock_build_secure.return_value = (
             ["borg", "list"],
@@ -144,7 +146,7 @@ class TestBorgCommandBuilder:
         assert env == {"BORG_PASSPHRASE": "test_passphrase"}
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_repo_info_command(self, mock_build_secure):
+    def test_build_repo_info_command(self, mock_build_secure) -> None:
         """Test building repository info command"""
         mock_build_secure.return_value = (
             ["borg", "info"],
@@ -167,7 +169,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     def test_build_list_archive_contents_command(
         self, mock_validate_archive, mock_build_secure
-    ):
+    ) -> None:
         """Test building list archive contents command"""
         mock_build_secure.return_value = (
             ["borg", "list"],
@@ -191,7 +193,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.sanitize_path")
     def test_build_list_archive_contents_command_with_directory(
         self, mock_sanitize_path, mock_validate_archive, mock_build_secure
-    ):
+    ) -> None:
         """Test building list archive contents command with directory filter"""
         mock_build_secure.return_value = (
             ["borg", "list"],
@@ -215,7 +217,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     def test_build_list_archive_contents_command_invalid_archive(
         self, mock_validate_archive
-    ):
+    ) -> None:
         """Test list archive contents command fails with invalid archive name"""
         mock_validate_archive.side_effect = Exception("Invalid archive name")
 
@@ -229,7 +231,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.sanitize_path")
     def test_build_extract_command(
         self, mock_sanitize_path, mock_validate_archive, mock_build_secure
-    ):
+    ) -> None:
         """Test building extract command"""
         mock_build_secure.return_value = (
             ["borg", "extract"],
@@ -258,7 +260,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.sanitize_path")
     def test_build_extract_command_no_stdout(
         self, mock_sanitize_path, mock_validate_archive, mock_build_secure
-    ):
+    ) -> None:
         """Test building extract command without stdout option"""
         mock_build_secure.return_value = (
             ["borg", "extract"],
@@ -278,7 +280,7 @@ class TestBorgCommandBuilder:
         assert "--stdout" not in additional_args
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_initialize_repository_command(self, mock_build_secure):
+    def test_build_initialize_repository_command(self, mock_build_secure) -> None:
         """Test building repository initialization command"""
         mock_build_secure.return_value = (
             ["borg", "init"],
@@ -299,7 +301,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
     def test_build_initialize_repository_command_custom_encryption(
         self, mock_build_secure
-    ):
+    ) -> None:
         """Test building repository initialization command with custom encryption"""
         mock_build_secure.return_value = (
             ["borg", "init"],
@@ -315,7 +317,7 @@ class TestBorgCommandBuilder:
         assert "keyfile" in additional_args
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_prune_command_basic(self, mock_build_secure):
+    def test_build_prune_command_basic(self, mock_build_secure) -> None:
         """Test building basic prune command"""
         mock_build_secure.return_value = (
             ["borg", "prune"],
@@ -332,7 +334,7 @@ class TestBorgCommandBuilder:
         assert "/test/repo/path" in additional_args
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_prune_command_with_retention(self, mock_build_secure):
+    def test_build_prune_command_with_retention(self, mock_build_secure) -> None:
         """Test building prune command with retention policies"""
         mock_build_secure.return_value = (
             ["borg", "prune"],
@@ -368,7 +370,7 @@ class TestBorgCommandBuilder:
         assert "--force" in additional_args
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_check_command_repository_only(self, mock_build_secure):
+    def test_build_check_command_repository_only(self, mock_build_secure) -> None:
         """Test building check command for repository only"""
         mock_build_secure.return_value = (
             ["borg", "check"],
@@ -385,7 +387,7 @@ class TestBorgCommandBuilder:
         assert "--repository-only" in additional_args
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_check_command_with_options(self, mock_build_secure):
+    def test_build_check_command_with_options(self, mock_build_secure) -> None:
         """Test building check command with various options"""
         mock_build_secure.return_value = (
             ["borg", "check"],
@@ -416,7 +418,7 @@ class TestBorgCommandBuilder:
         assert "10" in additional_args
 
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
-    def test_build_check_command_with_glob(self, mock_build_secure):
+    def test_build_check_command_with_glob(self, mock_build_secure) -> None:
         """Test building check command with custom glob pattern"""
         mock_build_secure.return_value = (
             ["borg", "check"],
@@ -436,7 +438,9 @@ class TestBorgCommandBuilder:
 
     @patch("borgitory.services.borg_command_builder.datetime")
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
-    def test_generate_archive_name_default(self, mock_validate_archive, mock_datetime):
+    def test_generate_archive_name_default(
+        self, mock_validate_archive, mock_datetime
+    ) -> None:
         """Test generating default archive name"""
         mock_datetime.now.return_value.strftime.return_value = "2024-01-15_14-30-45"
 
@@ -449,7 +453,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     def test_generate_archive_name_custom_prefix(
         self, mock_validate_archive, mock_datetime
-    ):
+    ) -> None:
         """Test generating archive name with custom prefix"""
         mock_datetime.now.return_value.strftime.return_value = "2024-01-15_14-30-45"
 
@@ -463,7 +467,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.logger")
     def test_generate_archive_name_validation_fails(
         self, mock_logger, mock_validate_archive, mock_datetime
-    ):
+    ) -> None:
         """Test generating archive name when validation fails"""
         mock_datetime.now.return_value.strftime.side_effect = [
             "2024-01-15_14-30-45",
@@ -481,7 +485,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.validate_compression")
     def test_validate_command_parameters_success(
         self, mock_validate_compression, mock_sanitize_path, mock_validate_archive
-    ):
+    ) -> None:
         """Test parameter validation with all valid inputs"""
         errors = self.builder.validate_command_parameters(
             repository=self.mock_repository,
@@ -495,14 +499,14 @@ class TestBorgCommandBuilder:
         mock_sanitize_path.assert_called_once_with("/test/source")
         mock_validate_compression.assert_called_once_with("zstd")
 
-    def test_validate_command_parameters_no_repository(self):
+    def test_validate_command_parameters_no_repository(self) -> None:
         """Test parameter validation with missing repository"""
         errors = self.builder.validate_command_parameters(repository=None)
 
         assert "repository" in errors
         assert "Repository path is required" in errors["repository"]
 
-    def test_validate_command_parameters_empty_repository_path(self):
+    def test_validate_command_parameters_empty_repository_path(self) -> None:
         """Test parameter validation with empty repository path"""
         mock_repo = MagicMock(spec=Repository)
         mock_repo.path = ""
@@ -512,7 +516,9 @@ class TestBorgCommandBuilder:
         assert "repository" in errors
 
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
-    def test_validate_command_parameters_invalid_archive(self, mock_validate_archive):
+    def test_validate_command_parameters_invalid_archive(
+        self, mock_validate_archive
+    ) -> None:
         """Test parameter validation with invalid archive name"""
         mock_validate_archive.side_effect = Exception("Invalid archive name")
 
@@ -524,7 +530,7 @@ class TestBorgCommandBuilder:
         assert "Invalid archive name" in errors["archive_name"]
 
     @patch("borgitory.services.borg_command_builder.sanitize_path")
-    def test_validate_command_parameters_invalid_path(self, mock_sanitize_path):
+    def test_validate_command_parameters_invalid_path(self, mock_sanitize_path) -> None:
         """Test parameter validation with invalid source path"""
         mock_sanitize_path.side_effect = Exception("Invalid path")
 
@@ -538,7 +544,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.validate_compression")
     def test_validate_command_parameters_invalid_compression(
         self, mock_validate_compression
-    ):
+    ) -> None:
         """Test parameter validation with invalid compression"""
         mock_validate_compression.side_effect = Exception("Invalid compression")
 
@@ -554,7 +560,7 @@ class TestBorgCommandBuilder:
     @patch("borgitory.services.borg_command_builder.validate_compression")
     def test_validate_command_parameters_multiple_errors(
         self, mock_validate_compression, mock_sanitize_path, mock_validate_archive
-    ):
+    ) -> None:
         """Test parameter validation with multiple validation errors"""
         mock_validate_archive.side_effect = Exception("Bad archive")
         mock_sanitize_path.side_effect = Exception("Bad path")
@@ -573,7 +579,7 @@ class TestBorgCommandBuilder:
         assert "source_path" in errors
         assert "compression" in errors
 
-    def test_validate_command_parameters_minimal_valid(self):
+    def test_validate_command_parameters_minimal_valid(self) -> None:
         """Test parameter validation with only repository (minimal valid case)"""
         errors = self.builder.validate_command_parameters(
             repository=self.mock_repository

@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Union, Any, Dict, List
 from fastapi import (
     APIRouter,
     Depends,
@@ -9,7 +9,7 @@ from fastapi import (
     UploadFile,
     Request,
 )
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -46,6 +46,7 @@ from borgitory.utils.path_prefix import (
     normalize_path_with_mnt_prefix,
     parse_path_for_autocomplete,
 )
+from starlette.templating import _TemplateResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ async def create_repository(
     repo_svc: RepositoryServiceDep,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+) -> HTMLResponse:
     """Create a new repository - thin controller using business logic service."""
     # Convert to DTO
     create_request = CreateRepositoryRequest(
@@ -77,13 +78,17 @@ async def create_repository(
 
 
 @router.get("/", response_model=List[RepositorySchema])
-def list_repositories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def list_repositories(
+    skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
+) -> List[Repository]:
     repositories = db.query(Repository).offset(skip).limit(limit).all()
     return repositories
 
 
 @router.get("/scan")
-async def scan_repositories(request: Request, repo_svc: RepositoryServiceDep):
+async def scan_repositories(
+    request: Request, repo_svc: RepositoryServiceDep
+) -> HTMLResponse:
     """Scan for existing repositories - thin controller using business logic service."""
     # Create scan request
     scan_request = RepositoryScanRequest()
@@ -96,7 +101,9 @@ async def scan_repositories(request: Request, repo_svc: RepositoryServiceDep):
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_repositories_html(request: Request, db: Session = Depends(get_db)):
+def get_repositories_html(
+    request: Request, db: Session = Depends(get_db)
+) -> _TemplateResponse:
     """Get repositories as HTML for frontend display"""
     try:
         repositories = db.query(Repository).all()
@@ -116,7 +123,9 @@ def get_repositories_html(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/directories")
-async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt"):
+async def list_directories(
+    volume_svc: VolumeServiceDep, path: str = "/mnt"
+) -> Dict[str, Any]:
     """List directories at the given path for autocomplete functionality. All paths must be under /mnt."""
 
     try:
@@ -145,8 +154,8 @@ async def list_directories(volume_svc: VolumeServiceDep, path: str = "/mnt"):
 async def list_directories_autocomplete(
     request: Request,
     volume_svc: VolumeServiceDep,
-    current_user=Depends(get_current_user),
-):
+    current_user: User = Depends(get_current_user),
+) -> _TemplateResponse:
     """List directories as HTML for autocomplete functionality."""
 
     # Get the input value from the form data
@@ -165,18 +174,18 @@ async def list_directories_autocomplete(
             "backup-source-path",
             "schedule-source-path",
         ]:
-            input_value = form_data.get(param_name, "")
+            input_value = str(form_data.get(param_name, ""))
             break
 
     # Normalize the path with /mnt/ prefix
-    normalized_path = normalize_path_with_mnt_prefix(input_value)
+    normalized_path = normalize_path_with_mnt_prefix(str(input_value))
 
     # Parse the normalized path to get directory and search term
     dir_path, search_term = parse_path_for_autocomplete(normalized_path)
 
     try:
         if not user_secure_exists(dir_path):
-            directories = []
+            directories: List[Dict[str, str]] = []
         elif not user_secure_isdir(dir_path):
             directories = []
         else:
@@ -231,8 +240,8 @@ async def list_directories_autocomplete(
 
 @router.get("/import-form-update", response_class=HTMLResponse)
 async def update_import_form(
-    request: Request, borg_svc: BorgServiceDep, path: str = "", loading: str = ""
-):
+    request: Request, borg_svc: BorgServiceDep, path: str, loading: str = ""
+) -> _TemplateResponse:
     """Update import form fields based on selected repository path"""
 
     if not path:
@@ -315,13 +324,13 @@ async def update_import_form(
 
 
 @router.get("/import-form", response_class=HTMLResponse)
-async def get_import_form(request: Request):
+async def get_import_form(request: Request) -> _TemplateResponse:
     """Get the import repository form"""
     return templates.TemplateResponse(request, "partials/repositories/form_import.html")
 
 
 @router.get("/import-form-inner", response_class=HTMLResponse)
-async def get_import_form_inner(request: Request):
+async def get_import_form_inner(request: Request) -> _TemplateResponse:
     """Get the import repository form inner content (preserves tab state)"""
     return templates.TemplateResponse(
         request, "partials/repositories/form_import_inner.html"
@@ -329,7 +338,7 @@ async def get_import_form_inner(request: Request):
 
 
 @router.get("/import-form-clear", response_class=HTMLResponse)
-async def get_import_form_clear(request: Request):
+async def get_import_form_clear(request: Request) -> _TemplateResponse:
     """Clear the selected repository form after successful import"""
     return templates.TemplateResponse(
         request, "partials/repositories/import_form_clear.html"
@@ -337,7 +346,7 @@ async def get_import_form_clear(request: Request):
 
 
 @router.get("/create-form", response_class=HTMLResponse)
-async def get_create_form(request: Request):
+async def get_create_form(request: Request) -> _TemplateResponse:
     """Get the create repository form"""
     return templates.TemplateResponse(request, "partials/repositories/form_create.html")
 
@@ -351,7 +360,7 @@ async def import_repository(
     passphrase: str = Form(...),
     keyfile: UploadFile = File(None),
     db: Session = Depends(get_db),
-):
+) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
     # Convert to DTO
     import_request = ImportRepositoryRequest(
@@ -370,7 +379,7 @@ async def import_repository(
 
 
 @router.get("/{repo_id}", response_model=RepositorySchema)
-def get_repository(repo_id: int, db: Session = Depends(get_db)):
+def get_repository(repo_id: int, db: Session = Depends(get_db)) -> Repository:
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -380,7 +389,7 @@ def get_repository(repo_id: int, db: Session = Depends(get_db)):
 @router.put("/{repo_id}", response_model=RepositorySchema)
 def update_repository(
     repo_id: int, repo_update: RepositoryUpdate, db: Session = Depends(get_db)
-):
+) -> Repository:
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -405,7 +414,7 @@ async def delete_repository(
     repo_svc: RepositoryServiceDep,
     delete_borg_repo: bool = False,
     db: Session = Depends(get_db),
-):
+) -> HTMLResponse:
     """Delete a repository - thin controller using business logic service."""
     # Convert to DTO
     delete_request = DeleteRepositoryRequest(
@@ -427,7 +436,7 @@ async def list_archives(
     repo_id: int,
     repo_svc: RepositoryServiceDep,
     db: Session = Depends(get_db),
-):
+) -> HTMLResponse:
     """List repository archives - thin controller using business logic service."""
     # Call business service
     result = await repo_svc.list_archives(repo_id, db)
@@ -442,7 +451,7 @@ async def list_archives_html(
     request: Request,
     borg_svc: BorgServiceDep,
     db: Session = Depends(get_db),
-):
+) -> _TemplateResponse:
     """Get repository archives as HTML"""
     try:
         repository = db.query(Repository).filter(Repository.id == repo_id).first()
@@ -531,7 +540,7 @@ async def list_archives_html(
 @router.get("/archives/selector")
 async def get_archives_repository_selector(
     request: Request, db: Session = Depends(get_db)
-):
+) -> _TemplateResponse:
     """Get repository selector for archives with repositories populated"""
     repositories = db.query(Repository).all()
 
@@ -543,7 +552,7 @@ async def get_archives_repository_selector(
 
 
 @router.get("/archives/loading")
-async def get_archives_loading(request: Request):
+async def get_archives_loading(request: Request) -> _TemplateResponse:
     """Get loading state for archives"""
     return templates.TemplateResponse(
         request, "partials/archives/loading_state.html", {}
@@ -551,7 +560,9 @@ async def get_archives_loading(request: Request):
 
 
 @router.post("/archives/load-with-spinner")
-async def load_archives_with_spinner(request: Request, repository_id: str = Form("")):
+async def load_archives_with_spinner(
+    request: Request, repository_id: str = Form("")
+) -> _TemplateResponse:
     """Show loading spinner then trigger loading actual archives"""
     if not repository_id or repository_id == "":
         return templates.TemplateResponse(
@@ -577,7 +588,7 @@ async def get_archives_list(
     borg_svc: BorgServiceDep,
     repository_id: str = "",
     db: Session = Depends(get_db),
-):
+) -> _TemplateResponse:
     """Get archives list or empty state"""
     if not repository_id or repository_id == "":
         return templates.TemplateResponse(
@@ -596,7 +607,7 @@ async def get_archives_list(
 @router.get("/{repo_id}/info")
 async def get_repository_info(
     repo_id: int, borg_svc: BorgServiceDep, db: Session = Depends(get_db)
-):
+) -> Dict[str, Dict[str, Union[str, Dict[str, int]]]]:
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -615,7 +626,7 @@ async def load_archive_contents_with_spinner(
     archive_name: str,
     path: str = Form(""),
     db: Session = Depends(get_db),
-):
+) -> _TemplateResponse:
     """Show loading spinner then trigger loading actual directory contents"""
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
@@ -636,7 +647,7 @@ async def get_archive_contents(
     borg_svc: BorgServiceDep,
     path: str = "",
     db: Session = Depends(get_db),
-):
+) -> _TemplateResponse:
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -672,7 +683,7 @@ async def extract_file(
     file: str,
     borg_svc: BorgServiceDep,
     db: Session = Depends(get_db),
-):
+) -> StreamingResponse:
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")

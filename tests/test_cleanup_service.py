@@ -5,19 +5,21 @@ Tests for CleanupService - Business logic tests
 import pytest
 from unittest.mock import patch
 
+from sqlalchemy.orm import Session
+
 from borgitory.services.cleanup_service import CleanupService
 from borgitory.models.database import CleanupConfig, Repository
 from borgitory.models.schemas import CleanupConfigCreate, CleanupConfigUpdate
 
 
 @pytest.fixture
-def service(test_db):
+def service(test_db: Session):
     """CleanupService instance with real database session."""
     return CleanupService(test_db)
 
 
 @pytest.fixture
-def sample_repository(test_db):
+def sample_repository(test_db: Session):
     """Create a sample repository for testing."""
     repository = Repository(
         name="test-repo",
@@ -33,12 +35,12 @@ def sample_repository(test_db):
 class TestCleanupService:
     """Test class for CleanupService business logic."""
 
-    def test_get_cleanup_configs_empty(self, service):
+    def test_get_cleanup_configs_empty(self, service) -> None:
         """Test getting cleanup configs when none exist."""
         result = service.get_cleanup_configs()
         assert result == []
 
-    def test_get_cleanup_configs_with_data(self, service, test_db):
+    def test_get_cleanup_configs_with_data(self, service, test_db: Session) -> None:
         """Test getting cleanup configs with data."""
         config1 = CleanupConfig(
             name="config-1", strategy="simple", keep_within_days=30, enabled=True
@@ -59,7 +61,9 @@ class TestCleanupService:
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_cleanup_configs_with_pagination(self, service, test_db):
+    def test_get_cleanup_configs_with_pagination(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting cleanup configs with pagination."""
         for i in range(5):
             config = CleanupConfig(
@@ -71,7 +75,7 @@ class TestCleanupService:
         result = service.get_cleanup_configs(skip=2, limit=2)
         assert len(result) == 2
 
-    def test_get_cleanup_config_by_id_success(self, service, test_db):
+    def test_get_cleanup_config_by_id_success(self, service, test_db: Session) -> None:
         """Test getting cleanup config by ID successfully."""
         config = CleanupConfig(
             name="test-config", strategy="simple", keep_within_days=30, enabled=True
@@ -85,14 +89,14 @@ class TestCleanupService:
         assert result.name == "test-config"
         assert result.id == config.id
 
-    def test_get_cleanup_config_by_id_not_found(self, service):
+    def test_get_cleanup_config_by_id_not_found(self, service) -> None:
         """Test getting non-existent cleanup config raises exception."""
         with pytest.raises(
             Exception, match="Cleanup configuration with id 999 not found"
         ):
             service.get_cleanup_config_by_id(999)
 
-    def test_create_cleanup_config_success(self, service, test_db):
+    def test_create_cleanup_config_success(self, service, test_db: Session) -> None:
         """Test successful cleanup config creation."""
         config_data = CleanupConfigCreate(
             name="new-config", strategy="simple", keep_within_days=30
@@ -116,7 +120,9 @@ class TestCleanupService:
         assert saved_config is not None
         assert saved_config.strategy == "simple"
 
-    def test_create_cleanup_config_duplicate_name(self, service, test_db):
+    def test_create_cleanup_config_duplicate_name(
+        self, service, test_db: Session
+    ) -> None:
         """Test cleanup config creation with duplicate name."""
         existing_config = CleanupConfig(
             name="duplicate-name", strategy="simple", keep_within_days=30, enabled=True
@@ -134,7 +140,9 @@ class TestCleanupService:
         assert config is None
         assert "A prune policy with this name already exists" in error
 
-    def test_create_cleanup_config_database_error(self, service, test_db):
+    def test_create_cleanup_config_database_error(
+        self, service, test_db: Session
+    ) -> None:
         """Test cleanup config creation with database error."""
         config_data = CleanupConfigCreate(
             name="error-config", strategy="simple", keep_within_days=30
@@ -147,7 +155,7 @@ class TestCleanupService:
             assert config is None
             assert "Failed to create cleanup configuration" in error
 
-    def test_update_cleanup_config_success(self, service, test_db):
+    def test_update_cleanup_config_success(self, service, test_db: Session) -> None:
         """Test successful cleanup config update."""
         config = CleanupConfig(
             name="original-config", strategy="simple", keep_within_days=30, enabled=True
@@ -167,7 +175,7 @@ class TestCleanupService:
         assert updated_config.name == "updated-config"
         assert updated_config.keep_within_days == 60
 
-    def test_update_cleanup_config_not_found(self, service):
+    def test_update_cleanup_config_not_found(self, service) -> None:
         """Test updating non-existent cleanup config."""
         config_update = CleanupConfigUpdate(name="new-name")
 
@@ -177,7 +185,9 @@ class TestCleanupService:
         assert config is None
         assert "Cleanup configuration not found" in error
 
-    def test_update_cleanup_config_duplicate_name(self, service, test_db):
+    def test_update_cleanup_config_duplicate_name(
+        self, service, test_db: Session
+    ) -> None:
         """Test updating cleanup config with duplicate name."""
         config1 = CleanupConfig(
             name="config-1", strategy="simple", keep_within_days=30, enabled=True
@@ -198,7 +208,7 @@ class TestCleanupService:
         assert config is None
         assert "A prune policy with this name already exists" in error
 
-    def test_enable_cleanup_config_success(self, service, test_db):
+    def test_enable_cleanup_config_success(self, service, test_db: Session) -> None:
         """Test successfully enabling cleanup config."""
         config = CleanupConfig(
             name="test-config", strategy="simple", keep_within_days=30, enabled=False
@@ -213,7 +223,7 @@ class TestCleanupService:
         assert error is None
         assert updated_config.enabled is True
 
-    def test_enable_cleanup_config_not_found(self, service):
+    def test_enable_cleanup_config_not_found(self, service) -> None:
         """Test enabling non-existent cleanup config."""
         success, config, error = service.enable_cleanup_config(999)
 
@@ -221,7 +231,7 @@ class TestCleanupService:
         assert config is None
         assert "Cleanup configuration not found" in error
 
-    def test_disable_cleanup_config_success(self, service, test_db):
+    def test_disable_cleanup_config_success(self, service, test_db: Session) -> None:
         """Test successfully disabling cleanup config."""
         config = CleanupConfig(
             name="test-config", strategy="simple", keep_within_days=30, enabled=True
@@ -236,7 +246,7 @@ class TestCleanupService:
         assert error is None
         assert updated_config.enabled is False
 
-    def test_disable_cleanup_config_not_found(self, service):
+    def test_disable_cleanup_config_not_found(self, service) -> None:
         """Test disabling non-existent cleanup config."""
         success, config, error = service.disable_cleanup_config(999)
 
@@ -244,7 +254,7 @@ class TestCleanupService:
         assert config is None
         assert "Cleanup configuration not found" in error
 
-    def test_delete_cleanup_config_success(self, service, test_db):
+    def test_delete_cleanup_config_success(self, service, test_db: Session) -> None:
         """Test successful cleanup config deletion."""
         config = CleanupConfig(
             name="test-config", strategy="simple", keep_within_days=30, enabled=True
@@ -266,7 +276,7 @@ class TestCleanupService:
         )
         assert deleted_config is None
 
-    def test_delete_cleanup_config_not_found(self, service):
+    def test_delete_cleanup_config_not_found(self, service) -> None:
         """Test deleting non-existent cleanup config."""
         success, config_name, error = service.delete_cleanup_config(999)
 
@@ -274,7 +284,9 @@ class TestCleanupService:
         assert config_name is None
         assert "Cleanup configuration not found" in error
 
-    def test_get_configs_with_descriptions_simple_strategy(self, service, test_db):
+    def test_get_configs_with_descriptions_simple_strategy(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with descriptions for simple strategy."""
         config = CleanupConfig(
             name="simple-config", strategy="simple", keep_within_days=30, enabled=True
@@ -287,7 +299,9 @@ class TestCleanupService:
         assert len(result) == 1
         assert result[0]["description"] == "Keep archives within 30 days"
 
-    def test_get_configs_with_descriptions_advanced_strategy(self, service, test_db):
+    def test_get_configs_with_descriptions_advanced_strategy(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with descriptions for advanced strategy."""
         config = CleanupConfig(
             name="advanced-config",
@@ -307,7 +321,9 @@ class TestCleanupService:
         expected_desc = "7 daily, 4 weekly, 12 monthly, 2 yearly"
         assert result[0]["description"] == expected_desc
 
-    def test_get_configs_with_descriptions_partial_advanced(self, service, test_db):
+    def test_get_configs_with_descriptions_partial_advanced(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with descriptions for partial advanced strategy."""
         config = CleanupConfig(
             name="partial-config",
@@ -325,7 +341,9 @@ class TestCleanupService:
         expected_desc = "7 daily, 12 monthly"
         assert result[0]["description"] == expected_desc
 
-    def test_get_configs_with_descriptions_no_rules(self, service, test_db):
+    def test_get_configs_with_descriptions_no_rules(
+        self, service, test_db: Session
+    ) -> None:
         """Test getting configs with descriptions for no retention rules."""
         config = CleanupConfig(name="empty-config", strategy="advanced", enabled=True)
         test_db.add(config)
@@ -336,7 +354,7 @@ class TestCleanupService:
         assert len(result) == 1
         assert result[0]["description"] == "No retention rules"
 
-    def test_get_configs_with_descriptions_error_handling(self, service):
+    def test_get_configs_with_descriptions_error_handling(self, service) -> None:
         """Test error handling in get_configs_with_descriptions."""
         with patch.object(
             service, "get_cleanup_configs", side_effect=Exception("Database error")
@@ -344,7 +362,7 @@ class TestCleanupService:
             result = service.get_configs_with_descriptions()
             assert result == []
 
-    def test_get_form_data_success(self, service, test_db, sample_repository):
+    def test_get_form_data_success(self, service, test_db, sample_repository) -> None:
         """Test successful form data retrieval."""
         result = service.get_form_data()
 
@@ -352,13 +370,13 @@ class TestCleanupService:
         assert len(result["repositories"]) == 1
         assert result["repositories"][0].name == "test-repo"
 
-    def test_get_form_data_error_handling(self, service, test_db):
+    def test_get_form_data_error_handling(self, service, test_db: Session) -> None:
         """Test error handling in get_form_data."""
         with patch.object(test_db, "query", side_effect=Exception("Database error")):
             result = service.get_form_data()
             assert result == {"repositories": []}
 
-    def test_cleanup_config_lifecycle(self, service, test_db):
+    def test_cleanup_config_lifecycle(self, service, test_db: Session) -> None:
         """Test complete cleanup config lifecycle: create, update, enable/disable, delete."""
         # Create
         config_data = CleanupConfigCreate(

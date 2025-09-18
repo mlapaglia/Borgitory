@@ -37,7 +37,7 @@ class BackupService:
 
     def __init__(
         self, db_session: Session, backup_executor: Optional[BackupExecutor] = None
-    ):
+    ) -> None:
         """
         Initialize the backup service.
 
@@ -90,7 +90,7 @@ class BackupService:
             backup_task = self._create_backup_task(job)
 
             # Prepare output callback that updates task and passes to external callback
-            def combined_output_callback(line: str):
+            def combined_output_callback(line: str) -> None:
                 self._handle_output_line(backup_task, line)
                 if output_callback:
                     output_callback(line)
@@ -298,21 +298,20 @@ class BackupService:
         return self.db.query(Repository).filter(Repository.id == repository_id).first()
 
     def _create_job_record(
-        self, repository: Repository, job_type: JobType, request
+        self, repository: Repository, job_type: JobType, request: Any
     ) -> Job:
         """Create a new job record in the database"""
         import uuid
 
-        job = Job(
-            id=str(uuid.uuid4()),
-            repository_id=repository.id,
-            type=job_type.value,
-            status="running",
-            started_at=datetime.now(UTC),
-            job_type=job_type.value,  # For compatibility
-            total_tasks=1,  # Will be updated if more tasks are added
-            completed_tasks=0,
-        )
+        job = Job()
+        job.id = str(uuid.uuid4())
+        job.repository_id = repository.id
+        job.type = job_type.value
+        job.status = "running"
+        job.started_at = datetime.now(UTC)
+        job.job_type = job_type.value  # For compatibility
+        job.total_tasks = 1  # Will be updated if more tasks are added
+        job.completed_tasks = 0
 
         # Add optional configurations
         if hasattr(request, "cloud_sync_config_id"):
@@ -333,14 +332,13 @@ class BackupService:
 
     def _create_backup_task(self, job: Job) -> JobTask:
         """Create a backup task record"""
-        task = JobTask(
-            job_id=job.id,
-            task_type="backup",
-            task_name=f"Backup {job.repository.name}",
-            status="running",
-            started_at=datetime.now(UTC),
-            task_order=0,
-        )
+        task = JobTask()
+        task.job_id = job.id
+        task.task_type = "backup"
+        task.task_name = f"Backup {job.repository.name}"
+        task.status = "running"
+        task.started_at = datetime.now(UTC)
+        task.task_order = 0
 
         self.db.add(task)
         self.db.commit()
@@ -350,14 +348,13 @@ class BackupService:
 
     def _create_prune_task(self, job: Job) -> JobTask:
         """Create a prune task record"""
-        task = JobTask(
-            job_id=job.id,
-            task_type="prune",
-            task_name=f"Prune {job.repository.name}",
-            status="running",
-            started_at=datetime.now(UTC),
-            task_order=0,
-        )
+        task = JobTask()
+        task.job_id = job.id
+        task.task_type = "prune"
+        task.task_name = f"Prune {job.repository.name}"
+        task.status = "running"
+        task.started_at = datetime.now(UTC)
+        task.task_order = 0
 
         self.db.add(task)
         self.db.commit()
@@ -365,7 +362,7 @@ class BackupService:
 
         return task
 
-    def _handle_output_line(self, task: JobTask, line: str):
+    def _handle_output_line(self, task: JobTask, line: str) -> None:
         """Handle a line of output from the backup process"""
         # Append to task output (we'll store as text)
         if not task.output:
@@ -379,7 +376,7 @@ class BackupService:
         if task.output.count("\n") % 10 == 0:
             self.db.commit()
 
-    def _update_task_from_result(self, task: JobTask, result: BackupResult):
+    def _update_task_from_result(self, task: JobTask, result: BackupResult) -> None:
         """Update task record with backup result"""
         task.status = "completed" if result.success else "failed"
         task.return_code = result.return_code
@@ -400,7 +397,7 @@ class BackupService:
         repository: Repository,
         backup_request: BackupRequest,
         backup_success: bool,
-    ):
+    ) -> None:
         """Handle post-backup operations like prune, check, cloud sync, notifications"""
         # Only run post-backup operations if backup succeeded
         if not backup_success:
@@ -421,7 +418,7 @@ class BackupService:
             job.total_tasks += tasks_added
             self.db.commit()
 
-    def _finalize_job(self, job: Job):
+    def _finalize_job(self, job: Job) -> None:
         """Finalize job status based on task results"""
         # Get all tasks for this job
         tasks = self.db.query(JobTask).filter(JobTask.job_id == job.id).all()

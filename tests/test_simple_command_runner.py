@@ -17,7 +17,7 @@ class TestSimpleCommandRunner:
         """Create SimpleCommandRunner instance for testing."""
         return SimpleCommandRunner(timeout=30)
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test SimpleCommandRunner initialization."""
         runner = SimpleCommandRunner()
         assert runner.timeout == 300  # Default timeout
@@ -26,7 +26,7 @@ class TestSimpleCommandRunner:
         assert runner_custom.timeout == 60
 
     @pytest.mark.asyncio
-    async def test_run_command_success(self, runner):
+    async def test_run_command_success(self, runner) -> None:
         """Test successful command execution."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -48,7 +48,7 @@ class TestSimpleCommandRunner:
             assert result.error is None
 
     @pytest.mark.asyncio
-    async def test_run_command_failure(self, runner):
+    async def test_run_command_failure(self, runner) -> None:
         """Test failed command execution."""
         mock_process = AsyncMock()
         mock_process.returncode = 1
@@ -70,7 +70,7 @@ class TestSimpleCommandRunner:
             assert result.error == "error message"
 
     @pytest.mark.asyncio
-    async def test_run_command_timeout(self, runner):
+    async def test_run_command_timeout(self, runner) -> None:
         """Test command execution timeout."""
         mock_process = AsyncMock()
         mock_process.kill = Mock()
@@ -99,7 +99,7 @@ class TestSimpleCommandRunner:
             mock_process.wait.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_run_command_with_env(self, runner):
+    async def test_run_command_with_env(self, runner) -> None:
         """Test command execution with environment variables."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -123,7 +123,7 @@ class TestSimpleCommandRunner:
             assert call_args[1]["env"] == env_vars
 
     @pytest.mark.asyncio
-    async def test_run_command_custom_timeout(self, runner):
+    async def test_run_command_custom_timeout(self, runner) -> None:
         """Test command execution with custom timeout override."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -145,7 +145,7 @@ class TestSimpleCommandRunner:
             assert call_args[1]["timeout"] == 60
 
     @pytest.mark.asyncio
-    async def test_run_command_exception_during_creation(self, runner):
+    async def test_run_command_exception_during_creation(self, runner) -> None:
         """Test handling of exception during subprocess creation."""
         with patch(
             "asyncio.create_subprocess_exec", side_effect=OSError("Command not found")
@@ -161,7 +161,7 @@ class TestSimpleCommandRunner:
             assert "Failed to execute command: Command not found" in result.error
 
     @pytest.mark.asyncio
-    async def test_run_command_with_binary_output(self, runner):
+    async def test_run_command_with_binary_output(self, runner) -> None:
         """Test command execution with binary output."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -181,7 +181,7 @@ class TestSimpleCommandRunner:
             assert isinstance(result.stderr, str)
 
     @pytest.mark.asyncio
-    async def test_run_command_empty_output(self, runner):
+    async def test_run_command_empty_output(self, runner) -> None:
         """Test command execution with empty output."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -195,7 +195,7 @@ class TestSimpleCommandRunner:
             assert result.stderr == ""
 
     @pytest.mark.asyncio
-    async def test_run_command_logging(self, runner):
+    async def test_run_command_logging(self, runner) -> None:
         """Test that command execution produces appropriate log messages."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -219,7 +219,7 @@ class TestSimpleCommandRunner:
             assert len(completion_calls) > 0
 
     @pytest.mark.asyncio
-    async def test_run_command_failure_logging(self, runner):
+    async def test_run_command_failure_logging(self, runner) -> None:
         """Test that failed commands produce warning logs."""
         mock_process = AsyncMock()
         mock_process.returncode = 1
@@ -246,7 +246,7 @@ class TestSimpleCommandRunner:
             ]
             assert len(warning_calls) > 0
 
-    def test_command_result_namedtuple(self):
+    def test_command_result_namedtuple(self) -> None:
         """Test CommandResult NamedTuple functionality."""
         result = CommandResult(
             success=True,
@@ -269,7 +269,7 @@ class TestSimpleCommandRunner:
         with pytest.raises(AttributeError):
             result.success = False
 
-    def test_command_result_with_error(self):
+    def test_command_result_with_error(self) -> None:
         """Test CommandResult with error information."""
         result = CommandResult(
             success=False,

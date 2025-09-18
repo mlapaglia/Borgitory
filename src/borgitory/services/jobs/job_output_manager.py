@@ -17,9 +17,33 @@ class OutputLine:
     """Represents a single line of job output"""
 
     text: str
-    timestamp: datetime
-    line_type: str = "stdout"  # stdout, stderr, progress, status
+    timestamp: str
+    type: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-like access for backward compatibility"""
+        if key == "text":
+            return self.text
+        elif key == "timestamp":
+            return self.timestamp
+        elif key == "type":
+            return self.type
+        elif key == "metadata":
+            return self.metadata
+        elif key in self.metadata:
+            return self.metadata[key]
+        return default
+
+    def __getitem__(self, key: str) -> Any:
+        """Dict-like access for backward compatibility"""
+        result = self.get(key)
+        if result is None and key not in ["text", "timestamp", "type", "metadata"]:
+            raise KeyError(key)
+        return result
+
+
+# Removed duplicate OutputLine definition - using the one above with dict-like interface
 
 
 @dataclass
@@ -27,12 +51,12 @@ class JobOutput:
     """Container for job output data"""
 
     job_id: str
-    lines: deque = field(default_factory=deque)
+    lines: deque[OutputLine] = field(default_factory=deque)
     current_progress: Dict[str, Any] = field(default_factory=dict)
     total_lines: int = 0
     max_lines: int = 1000
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize deque with proper maxlen"""
         if not isinstance(self.lines, deque) or self.lines.maxlen != self.max_lines:
             self.lines = deque(maxlen=self.max_lines)
@@ -41,7 +65,7 @@ class JobOutput:
 class JobOutputManager:
     """Manages job output collection, storage, and streaming"""
 
-    def __init__(self, max_lines_per_job: int = 1000):
+    def __init__(self, max_lines_per_job: int = 1000) -> None:
         self.max_lines_per_job = max_lines_per_job
         self._job_outputs: Dict[str, JobOutput] = {}
         self._output_locks: Dict[str, asyncio.Lock] = {}
@@ -73,19 +97,12 @@ class JobOutputManager:
         async with self._output_locks[job_id]:
             output_line = OutputLine(
                 text=text,
-                timestamp=datetime.now(),
-                line_type=line_type,
+                timestamp=datetime.now().isoformat(),
+                type=line_type,
                 metadata=progress_info or {},
             )
 
-            job_output.lines.append(
-                {
-                    "text": text,
-                    "timestamp": output_line.timestamp.isoformat(),
-                    "type": line_type,
-                    "metadata": progress_info or {},
-                }
-            )
+            job_output.lines.append(output_line)
 
             job_output.total_lines += 1
 

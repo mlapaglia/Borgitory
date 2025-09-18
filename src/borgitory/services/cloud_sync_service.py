@@ -2,7 +2,7 @@ import inspect
 import json
 import logging
 from datetime import datetime, UTC
-from typing import List
+from typing import List, Dict, Any, Callable, cast
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -35,14 +35,16 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
         if hasattr(storage_class, "get_sensitive_fields"):
             # Try to call it as a static method first
             try:
-                return storage_class.get_sensitive_fields(None)
+                result = storage_class.get_sensitive_fields(None)
+                return cast(list[str], result)
             except TypeError:
                 # It's an instance method, so we need to create a temporary instance
                 # Since we only need the get_sensitive_fields method, we can pass None
                 # for both config and rclone_service - storage classes should handle this
                 try:
                     temp_storage = storage_class(None, None)
-                    return temp_storage.get_sensitive_fields()
+                    result = temp_storage.get_sensitive_fields()
+                    return cast(list[str], result)
                 except Exception as e:
                     logger.warning(
                         f"Failed to create temp storage instance for {provider}: {e}"
@@ -70,7 +72,7 @@ class CloudSyncService:
         rclone_service: RcloneService,
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
-        get_metadata_func,
+        get_metadata_func: Callable[[str], Any],
     ):
         self.db = db
         self._rclone_service = rclone_service
@@ -116,12 +118,11 @@ class CloudSyncService:
             config.provider_config, sensitive_fields
         )
 
-        db_config = CloudSyncConfig(
-            name=config.name,
-            provider=config.provider,
-            provider_config=json.dumps(encrypted_config),
-            path_prefix=config.path_prefix or "",
-        )
+        db_config = CloudSyncConfig()
+        db_config.name = config.name
+        db_config.provider = config.provider
+        db_config.provider_config = json.dumps(encrypted_config)
+        db_config.path_prefix = config.path_prefix or ""
 
         self.db.add(db_config)
         self.db.commit()
@@ -170,13 +171,13 @@ class CloudSyncService:
                 )
 
         if config_update.name is not None:
-            config.name = config_update.name  # type: ignore
+            config.name = config_update.name
         if config_update.provider is not None:
-            config.provider = config_update.provider  # type: ignore
+            config.provider = config_update.provider
         if config_update.path_prefix is not None:
-            config.path_prefix = config_update.path_prefix  # type: ignore
+            config.path_prefix = config_update.path_prefix
         if config_update.enabled is not None:
-            config.enabled = config_update.enabled  # type: ignore
+            config.enabled = config_update.enabled
 
         if config_update.provider_config is not None:
             provider = (
@@ -198,9 +199,9 @@ class CloudSyncService:
                 config_update.provider_config, sensitive_fields
             )
 
-            config.provider_config = json.dumps(encrypted_config)  # type: ignore
+            config.provider_config = json.dumps(encrypted_config)
 
-        config.updated_at = datetime.now(UTC)  # type: ignore
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         self.db.refresh(config)
 
@@ -215,16 +216,16 @@ class CloudSyncService:
     def enable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
         """Enable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
-        config.enabled = True  # type: ignore
-        config.updated_at = datetime.now(UTC)  # type: ignore
+        config.enabled = True
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         return config
 
     def disable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
         """Disable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
-        config.enabled = False  # type: ignore
-        config.updated_at = datetime.now(UTC)  # type: ignore
+        config.enabled = False
+        config.updated_at = datetime.now(UTC)
         self.db.commit()
         return config
 
@@ -232,9 +233,9 @@ class CloudSyncService:
         self,
         config_id: int,
         rclone: RcloneService,
-        encryption_service=None,
-        storage_factory=None,
-    ) -> dict:
+        encryption_service: EncryptionService,
+        storage_factory: StorageFactory,
+    ) -> Dict[str, Any]:
         """Test a cloud sync configuration using dynamic provider registry."""
         logger.info(f"Starting test for cloud sync config {config_id}")
 
@@ -244,11 +245,6 @@ class CloudSyncService:
         )
 
         provider_config = json.loads(str(config.provider_config))
-
-        if encryption_service is None:
-            encryption_service = self._encryption_service
-        if storage_factory is None:
-            storage_factory = self._storage_factory
 
         sensitive_fields = _get_sensitive_fields_for_provider(str(config.provider))
 
@@ -322,14 +318,17 @@ class CloudSyncService:
         try:
             result = await test_method(**filtered_params)
             logger.info(f"Test method result: {result}")
-            return result
+            return cast(Dict[str, Any], result)
         except Exception as e:
             logger.error(f"Error calling {test_method_name}: {e}", exc_info=True)
             raise
 
     def get_decrypted_config_for_editing(
-        self, config_id: int, encryption_service, storage_factory
-    ) -> dict:
+        self,
+        config_id: int,
+        encryption_service: EncryptionService,
+        storage_factory: StorageFactory,
+    ) -> Dict[str, Any]:
         """Get decrypted configuration for editing in forms."""
         config = self.get_cloud_sync_config_by_id(config_id)
 

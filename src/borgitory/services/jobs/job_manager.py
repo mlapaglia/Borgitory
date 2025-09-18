@@ -10,22 +10,38 @@ import logging
 import uuid
 import os
 from datetime import datetime, UTC
-from typing import Dict, Optional, List, AsyncGenerator, Any, Callable, TYPE_CHECKING
+from typing import (
+    Union,
+    Dict,
+    Optional,
+    List,
+    AsyncGenerator,
+    Any,
+    Callable,
+    TYPE_CHECKING,
+)
 from dataclasses import dataclass, field
 
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
-from borgitory.services.jobs.job_queue_manager import JobQueueManager, JobPriority
+from borgitory.services.jobs.job_queue_manager import (
+    QueuedJob,
+    JobQueueManager,
+    JobPriority,
+)
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
-    EventType,
 )
+from borgitory.services.jobs.broadcaster.event_type import EventType
+from borgitory.services.jobs.broadcaster.job_event import JobEvent
 from borgitory.services.jobs.job_database_manager import (
     JobDatabaseManager,
     DatabaseJobData,
 )
 from borgitory.services.rclone_service import RcloneService
 from borgitory.utils.db_session import get_db_session
+from contextlib import _GeneratorContextManager
+from unittest.mock import Mock
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
@@ -69,22 +85,22 @@ class JobManagerDependencies:
     pushover_service: Optional["PushoverService"] = None
 
     # External dependencies (for testing/customization)
-    subprocess_executor: Optional[Callable] = field(
+    subprocess_executor: Optional[Callable[..., Any]] = field(
         default_factory=lambda: asyncio.create_subprocess_exec
     )
-    db_session_factory: Optional[Callable] = None
+    db_session_factory: Optional[Callable[[], Any]] = None
     rclone_service: Optional[Any] = None
-    http_client_factory: Optional[Callable] = None
+    http_client_factory: Optional[Callable[[], Any]] = None
     encryption_service: Optional[Any] = None
     storage_factory: Optional[Any] = None
     provider_registry: Optional[Any] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize default dependencies if not provided"""
         if self.db_session_factory is None:
             self.db_session_factory = self._default_db_session_factory
 
-    def _default_db_session_factory(self):
+    def _default_db_session_factory(self) -> _GeneratorContextManager[Any]:
         """Default database session factory"""
         return get_db_session()
 
@@ -100,8 +116,10 @@ class BorgJobTask:
     completed_at: Optional[datetime] = None
     return_code: Optional[int] = None
     error: Optional[str] = None
-    parameters: Dict = field(default_factory=dict)
-    output_lines: List = field(default_factory=list)  # Store task output
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    output_lines: List[Union[str, Dict[str, str]]] = field(
+        default_factory=list
+    )  # Store task output
 
 
 @dataclass
@@ -248,10 +266,10 @@ class JobManagerFactory:
     @classmethod
     def create_for_testing(
         cls,
-        mock_subprocess: Optional[Callable] = None,
-        mock_db_session: Optional[Callable] = None,
+        mock_subprocess: Optional[Callable[..., Any]] = None,
+        mock_db_session: Optional[Callable[[], Any]] = None,
         mock_rclone_service: Optional[Any] = None,
-        mock_http_client: Optional[Callable] = None,
+        mock_http_client: Optional[Callable[[], Any]] = None,
         config: Optional[JobManagerConfig] = None,
     ) -> JobManagerDependencies:
         """Create dependencies with mocked services for testing"""
@@ -288,7 +306,7 @@ class JobManager:
         self,
         config: Optional[JobManagerConfig] = None,
         dependencies: Optional[JobManagerDependencies] = None,
-    ):
+    ) -> None:
         self.config = config or JobManagerConfig()
 
         if dependencies is None:
@@ -311,7 +329,39 @@ class JobManager:
 
         self._setup_callbacks()
 
-    def _setup_callbacks(self):
+    @property
+    def safe_executor(self) -> JobExecutor:
+        if self.executor is None:
+            raise RuntimeError(
+                "JobManager executor is None - ensure proper initialization"
+            )
+        return self.executor
+
+    @property
+    def safe_output_manager(self) -> JobOutputManager:
+        if self.output_manager is None:
+            raise RuntimeError(
+                "JobManager output_manager is None - ensure proper initialization"
+            )
+        return self.output_manager
+
+    @property
+    def safe_queue_manager(self) -> JobQueueManager:
+        if self.queue_manager is None:
+            raise RuntimeError(
+                "JobManager queue_manager is None - ensure proper initialization"
+            )
+        return self.queue_manager
+
+    @property
+    def safe_event_broadcaster(self) -> JobEventBroadcaster:
+        if self.event_broadcaster is None:
+            raise RuntimeError(
+                "JobManager event_broadcaster is None - ensure proper initialization"
+            )
+        return self.event_broadcaster
+
+    def _setup_callbacks(self) -> None:
         """Set up callbacks between modules"""
         if self.queue_manager:
             self.queue_manager.set_callbacks(
@@ -319,7 +369,7 @@ class JobManager:
                 job_complete_callback=self._on_job_complete,
             )
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize all modules"""
         if self._initialized:
             return
@@ -328,13 +378,16 @@ class JobManager:
             await self.queue_manager.initialize()
 
         if self.event_broadcaster:
-            await self.event_broadcaster.initialize()
+            await self.safe_event_broadcaster.initialize()
 
         self._initialized = True
         logger.info("Job manager initialized successfully")
 
     async def start_borg_command(
-        self, command: List[str], env: Optional[Dict] = None, is_backup: bool = False
+        self,
+        command: List[str],
+        env: Optional[Dict[str, str]] = None,
+        is_backup: bool = False,
     ) -> str:
         """Start a Borg command (now always creates composite job with one task)"""
         await self.initialize()
@@ -361,16 +414,16 @@ class JobManager:
         )
         self.jobs[job_id] = job
 
-        self.output_manager.create_job_output(job_id)
+        self.safe_output_manager.create_job_output(job_id)
 
         if is_backup:
-            await self.queue_manager.enqueue_job(
+            await self.safe_queue_manager.enqueue_job(
                 job_id=job_id, job_type="backup", priority=JobPriority.NORMAL
             )
         else:
             await self._execute_composite_task(job, main_task, command, env)
 
-        self.event_broadcaster.broadcast_event(
+        self.safe_event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
             data={"command": command_str, "is_backup": is_backup},
@@ -383,32 +436,32 @@ class JobManager:
         job: BorgJob,
         task: BorgJobTask,
         command: List[str],
-        env: Optional[Dict] = None,
-    ):
+        env: Optional[Dict[str, str]] = None,
+    ) -> None:
         """Execute a single task within a composite job"""
         job.status = "running"
         task.status = "running"
 
         try:
-            process = await self.executor.start_process(command, env)
+            process = await self.safe_executor.start_process(command, env)
             self._processes[job.id] = process
 
-            def output_callback(line: str, progress: Dict):
+            def output_callback(line: str, progress: Dict[str, Any]) -> None:
                 # Add output to both the task and the output manager
                 task.output_lines.append(line)
                 asyncio.create_task(
-                    self.output_manager.add_output_line(
+                    self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
                     )
                 )
 
-                self.event_broadcaster.broadcast_event(
+                self.safe_event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={"line": line, "progress": progress},
                 )
 
-            result = await self.executor.monitor_process_output(
+            result = await self.safe_executor.monitor_process_output(
                 process, output_callback=output_callback
             )
 
@@ -435,7 +488,7 @@ class JobManager:
                 task.error = result.error
                 job.error = result.error
 
-            self.event_broadcaster.broadcast_event(
+            self.safe_event_broadcaster.broadcast_event(
                 EventType.JOB_COMPLETED
                 if job.status == "completed"
                 else EventType.JOB_FAILED,
@@ -452,7 +505,7 @@ class JobManager:
             job.completed_at = datetime.now(UTC)
             logger.error(f"Composite job task {job.id} execution failed: {e}")
 
-            self.event_broadcaster.broadcast_event(
+            self.safe_event_broadcaster.broadcast_event(
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
             )
 
@@ -460,13 +513,13 @@ class JobManager:
             if job.id in self._processes:
                 del self._processes[job.id]
 
-    def _on_job_start(self, job_id: str, queued_job):
+    def _on_job_start(self, job_id: str, queued_job: QueuedJob) -> None:
         """Callback when queue manager starts a job"""
         job = self.jobs.get(job_id)
         if job and job.command:
             asyncio.create_task(self._execute_simple_job(job, job.command))
 
-    def _on_job_complete(self, job_id: str, success: bool):
+    def _on_job_complete(self, job_id: str, success: bool) -> None:
         """Callback when queue manager completes a job"""
         job = self.jobs.get(job_id)
         if job:
@@ -475,7 +528,7 @@ class JobManager:
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict],
+        task_definitions: List[Dict[str, Any]],
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
@@ -524,11 +577,11 @@ class JobManager:
             except Exception as e:
                 logger.error(f"Failed to pre-save tasks for job {job_id}: {e}")
 
-        self.output_manager.create_job_output(job_id)
+        self.safe_output_manager.create_job_output(job_id)
 
         asyncio.create_task(self._execute_composite_job(job))
 
-        self.event_broadcaster.broadcast_event(
+        self.safe_event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
             data={"job_type": job_type, "task_count": len(tasks)},
@@ -536,7 +589,7 @@ class JobManager:
 
         return job_id
 
-    async def _execute_composite_job(self, job: BorgJob):
+    async def _execute_composite_job(self, job: BorgJob) -> None:
         """Execute a composite job with multiple sequential tasks"""
         job.status = "running"
 
@@ -544,7 +597,7 @@ class JobManager:
         if self.database_manager:
             await self.database_manager.update_job_status(job.id, "running")
 
-        self.event_broadcaster.broadcast_event(
+        self.safe_event_broadcaster.broadcast_event(
             EventType.JOB_STATUS_CHANGED,
             job_id=job.id,
             data={"status": "running", "started_at": job.started_at.isoformat()},
@@ -557,7 +610,7 @@ class JobManager:
                 task.status = "running"
                 task.started_at = datetime.now(UTC)
 
-                self.event_broadcaster.broadcast_event(
+                self.safe_event_broadcaster.broadcast_event(
                     EventType.TASK_STARTED,
                     job_id=job.id,
                     data={
@@ -587,7 +640,7 @@ class JobManager:
                     if not task.completed_at:
                         task.completed_at = datetime.now(UTC)
 
-                    self.event_broadcaster.broadcast_event(
+                    self.safe_event_broadcaster.broadcast_event(
                         EventType.TASK_COMPLETED
                         if task.status == "completed"
                         else EventType.TASK_FAILED,
@@ -627,7 +680,7 @@ class JobManager:
                     task.completed_at = datetime.now(UTC)
                     logger.error(f"Task {task.task_type} in job {job.id} failed: {e}")
 
-                    self.event_broadcaster.broadcast_event(
+                    self.safe_event_broadcaster.broadcast_event(
                         EventType.TASK_FAILED,
                         job_id=job.id,
                         data={"task_index": task_index, "error": str(e)},
@@ -673,7 +726,7 @@ class JobManager:
                     job.id, job.status, job.completed_at
                 )
 
-            self.event_broadcaster.broadcast_event(
+            self.safe_event_broadcaster.broadcast_event(
                 EventType.JOB_COMPLETED
                 if job.status == "completed"
                 else EventType.JOB_FAILED,
@@ -692,37 +745,37 @@ class JobManager:
 
             if self.database_manager:
                 await self.database_manager.update_job_status(
-                    job.id, "failed", job.completed_at, str(e)
+                    job.id, "failed", job.completed_at, None, None, str(e)
                 )
 
-            self.event_broadcaster.broadcast_event(
+            self.safe_event_broadcaster.broadcast_event(
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
             )
 
     async def _execute_simple_job(
-        self, job: BorgJob, command: List[str], env: Optional[Dict] = None
-    ):
+        self, job: BorgJob, command: List[str], env: Optional[Dict[str, str]] = None
+    ) -> None:
         """Execute a simple single-command job (for test compatibility)"""
         job.status = "running"
 
         try:
-            process = await self.executor.start_process(command, env)
+            process = await self.safe_executor.start_process(command, env)
             self._processes[job.id] = process
 
-            def output_callback(line: str, progress: Dict):
+            def output_callback(line: str, progress: Dict[str, Any]) -> None:
                 asyncio.create_task(
-                    self.output_manager.add_output_line(
+                    self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
                     )
                 )
 
-                self.event_broadcaster.broadcast_event(
+                self.safe_event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={"line": line, "progress": progress},
                 )
 
-            result = await self.executor.monitor_process_output(
+            result = await self.safe_executor.monitor_process_output(
                 process, output_callback=output_callback
             )
 
@@ -733,7 +786,7 @@ class JobManager:
             if result.error:
                 job.error = result.error
 
-            self.event_broadcaster.broadcast_event(
+            self.safe_event_broadcaster.broadcast_event(
                 EventType.JOB_COMPLETED
                 if job.status == "completed"
                 else EventType.JOB_FAILED,
@@ -747,7 +800,7 @@ class JobManager:
             job.completed_at = datetime.now(UTC)
             logger.error(f"Job {job.id} execution failed: {e}")
 
-            self.event_broadcaster.broadcast_event(
+            self.safe_event_broadcaster.broadcast_event(
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
             )
 
@@ -764,6 +817,10 @@ class JobManager:
 
             params = task.parameters
 
+            if job.repository_id is None:
+                task.status = "failed"
+                task.error = "Repository ID is missing"
+                return False
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
                 task.status = "failed"
@@ -773,17 +830,19 @@ class JobManager:
                 return False
 
             repository_path = repo_data.get("path") or params.get("repository_path")
-            passphrase = repo_data.get("passphrase") or params.get("passphrase")
+            passphrase = str(
+                repo_data.get("passphrase") or params.get("passphrase") or ""
+            )
 
-            def task_output_callback(line: str, progress: Dict):
+            def task_output_callback(line: str, progress: Dict[str, Any]) -> None:
                 task.output_lines.append(line)
                 asyncio.create_task(
-                    self.output_manager.add_output_line(
+                    self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
                     )
                 )
 
-                self.event_broadcaster.broadcast_event(
+                self.safe_event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={
@@ -814,7 +873,8 @@ class JobManager:
 
             additional_args.append(f"{repository_path}::{archive_name}")
 
-            additional_args.append(source_path)
+            if source_path:
+                additional_args.append(str(source_path))
 
             logger.info(f"Final additional_args for Borg command: {additional_args}")
 
@@ -826,11 +886,11 @@ class JobManager:
             )
 
             # Start the backup process
-            process = await self.executor.start_process(command, env)
+            process = await self.safe_executor.start_process(command, env)
             self._processes[job.id] = process
 
             # Monitor the process
-            result = await self.executor.monitor_process_output(
+            result = await self.safe_executor.monitor_process_output(
                 process, output_callback=task_output_callback
             )
 
@@ -863,7 +923,7 @@ class JobManager:
                             task.output_lines.append(line)
                             # Also add to output manager for real-time display
                             asyncio.create_task(
-                                self.output_manager.add_output_line(
+                                self.safe_output_manager.add_output_line(
                                     job.id, line, "stdout", {}
                                 )
                             )
@@ -903,6 +963,10 @@ class JobManager:
         try:
             params = task.parameters
 
+            if job.repository_id is None:
+                task.status = "failed"
+                task.error = "Repository ID is missing"
+                return False
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
                 task.status = "failed"
@@ -912,18 +976,20 @@ class JobManager:
                 return False
 
             repository_path = repo_data.get("path") or params.get("repository_path")
-            passphrase = repo_data.get("passphrase") or params.get("passphrase")
+            passphrase = str(
+                repo_data.get("passphrase") or params.get("passphrase") or ""
+            )
 
-            def task_output_callback(line: str, progress: Dict):
+            def task_output_callback(line: str, progress: Dict[str, Any]) -> None:
                 task.output_lines.append(line)
                 asyncio.create_task(
-                    self.output_manager.add_output_line(
+                    self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
                     )
                 )
 
-            result = await self.executor.execute_prune_task(
-                repository_path=repository_path,
+            result = await self.safe_executor.execute_prune_task(
+                repository_path=str(repository_path or ""),
                 passphrase=passphrase,
                 keep_within=params.get("keep_within"),
                 keep_daily=params.get("keep_daily"),
@@ -963,6 +1029,10 @@ class JobManager:
 
             params = task.parameters
 
+            if job.repository_id is None:
+                task.status = "failed"
+                task.error = "Repository ID is missing"
+                return False
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
                 task.status = "failed"
@@ -972,12 +1042,14 @@ class JobManager:
                 return False
 
             repository_path = repo_data.get("path") or params.get("repository_path")
-            passphrase = repo_data.get("passphrase") or params.get("passphrase")
+            passphrase = str(
+                repo_data.get("passphrase") or params.get("passphrase") or ""
+            )
 
-            def task_output_callback(line: str, progress: Dict):
+            def task_output_callback(line: str, progress: Dict[str, Any]) -> None:
                 task.output_lines.append(line)
                 asyncio.create_task(
-                    self.output_manager.add_output_line(
+                    self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
                     )
                 )
@@ -993,7 +1065,8 @@ class JobManager:
             if params.get("repair", False):
                 additional_args.append("--repair")
 
-            additional_args.append(repository_path)
+            if repository_path:
+                additional_args.append(str(repository_path))
 
             command, env = build_secure_borg_command(
                 base_command="borg check",
@@ -1002,10 +1075,10 @@ class JobManager:
                 additional_args=additional_args,
             )
 
-            process = await self.executor.start_process(command, env)
+            process = await self.safe_executor.start_process(command, env)
             self._processes[job.id] = process
 
-            result = await self.executor.monitor_process_output(
+            result = await self.safe_executor.monitor_process_output(
                 process, output_callback=task_output_callback
             )
 
@@ -1023,7 +1096,7 @@ class JobManager:
                         if line.strip():
                             task.output_lines.append(line)
                             asyncio.create_task(
-                                self.output_manager.add_output_line(
+                                self.safe_output_manager.add_output_line(
                                     job.id, line, "stdout", {}
                                 )
                             )
@@ -1061,6 +1134,10 @@ class JobManager:
         """Execute a cloud sync task using JobExecutor"""
         params = task.parameters
 
+        if job.repository_id is None:
+            task.status = "failed"
+            task.error = "Repository ID is missing"
+            return False
         repo_data = await self._get_repository_data(job.repository_id)
         if not repo_data:
             task.status = "failed"
@@ -1070,7 +1147,7 @@ class JobManager:
             return False
 
         repository_path = repo_data.get("path") or params.get("repository_path")
-        passphrase = repo_data.get("passphrase") or params.get("passphrase")
+        passphrase = str(repo_data.get("passphrase") or params.get("passphrase") or "")
 
         # Validate required parameters
         if not repository_path:
@@ -1087,13 +1164,15 @@ class JobManager:
             task.completed_at = datetime.now(UTC)
             return False
 
-        def task_output_callback(line: str, progress: Dict):
+        def task_output_callback(line: str, progress: Dict[str, Any]) -> None:
             task.output_lines.append(line)
             asyncio.create_task(
-                self.output_manager.add_output_line(job.id, line, "stdout", progress)
+                self.safe_output_manager.add_output_line(
+                    job.id, line, "stdout", progress
+                )
             )
 
-            self.event_broadcaster.broadcast_event(
+            self.safe_event_broadcaster.broadcast_event(
                 EventType.JOB_OUTPUT,
                 job_id=job.id,
                 data={
@@ -1115,14 +1194,49 @@ class JobManager:
             # Add output line for UI feedback
             task.output_lines.append("Cloud sync skipped - no configuration")
             asyncio.create_task(
-                self.output_manager.add_output_line(
+                self.safe_output_manager.add_output_line(
                     job.id, "Cloud sync skipped - no configuration", "stdout", {}
                 )
             )
             return True
 
-        result = await self.executor.execute_cloud_sync_task(
-            repository_path=repository_path,
+        # Validate dependencies
+        if not all(
+            [
+                self.dependencies.db_session_factory,
+                self.dependencies.rclone_service,
+                self.dependencies.encryption_service,
+                self.dependencies.storage_factory,
+                self.dependencies.provider_registry,
+            ]
+        ):
+            task.status = "failed"
+            task.error = "Missing required cloud sync dependencies"
+            return False
+
+        # Ensure required dependencies are available
+        if not all(
+            [
+                self.dependencies.db_session_factory,
+                self.dependencies.rclone_service,
+                self.dependencies.encryption_service,
+                self.dependencies.storage_factory,
+                self.dependencies.provider_registry,
+            ]
+        ):
+            raise RuntimeError(
+                "Required dependencies for cloud sync task are not available"
+            )
+
+        # Type assertions after validation
+        assert self.dependencies.db_session_factory is not None
+        assert self.dependencies.rclone_service is not None
+        assert self.dependencies.encryption_service is not None
+        assert self.dependencies.storage_factory is not None
+        assert self.dependencies.provider_registry is not None
+
+        result = await self.safe_executor.execute_cloud_sync_task(
+            repository_path=str(repository_path or ""),
             cloud_sync_config_id=cloud_sync_config_id,
             db_session_factory=self.dependencies.db_session_factory,
             rclone_service=self.dependencies.rclone_service,
@@ -1187,13 +1301,13 @@ class JobManager:
                     priority = params.get("priority", 0)
 
                     task.output_lines.append(
-                        {"text": f"Sending Pushover notification to {config.name}"}
+                        f"Sending Pushover notification to {config.name}"
                     )
-                    task.output_lines.append({"text": f"Title: {title}"})
-                    task.output_lines.append({"text": f"Message: {message}"})
-                    task.output_lines.append({"text": f"Priority: {priority}"})
+                    task.output_lines.append(f"Title: {title}")
+                    task.output_lines.append(f"Message: {message}")
+                    task.output_lines.append(f"Priority: {priority}")
 
-                    self.event_broadcaster.broadcast_event(
+                    self.safe_event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
                         job_id=job.id,
                         data={
@@ -1219,18 +1333,16 @@ class JobManager:
 
                     if success:
                         result_message = "✓ Notification sent successfully"
-                        task.output_lines.append({"text": result_message})
+                        task.output_lines.append(result_message)
                         if response_message:
-                            task.output_lines.append(
-                                {"text": f"Response: {response_message}"}
-                            )
+                            task.output_lines.append(f"Response: {response_message}")
                     else:
                         result_message = (
                             f"✗ Failed to send notification: {response_message}"
                         )
-                        task.output_lines.append({"text": result_message})
+                        task.output_lines.append(result_message)
 
-                    self.event_broadcaster.broadcast_event(
+                    self.safe_event_broadcaster.broadcast_event(
                         EventType.JOB_OUTPUT,
                         job_id=job.id,
                         data={"line": result_message, "task_index": task_index},
@@ -1285,16 +1397,16 @@ class JobManager:
             task.error = str(e)
             return False
 
-    def subscribe_to_events(self) -> Optional[str]:
+    def subscribe_to_events(self) -> Optional[asyncio.Queue[JobEvent]]:
         """Subscribe to job events"""
         if self.dependencies.event_broadcaster:
             return self.dependencies.event_broadcaster.subscribe_client()
         return None
 
-    def unsubscribe_from_events(self, client_id: str) -> bool:
+    def unsubscribe_from_events(self, client_queue: asyncio.Queue[JobEvent]) -> bool:
         """Unsubscribe from job events"""
         if self.dependencies.event_broadcaster:
-            return self.dependencies.event_broadcaster.unsubscribe_client(client_id)
+            return self.dependencies.event_broadcaster.unsubscribe_client(client_queue)
         return False
 
     async def stream_job_output(
@@ -1302,11 +1414,10 @@ class JobManager:
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream job output"""
         if self.output_manager:
-            async for output in self.output_manager.stream_job_output(job_id):
+            async for output in self.safe_output_manager.stream_job_output(job_id):
                 yield output
         else:
             return
-            yield
 
     def get_job(self, job_id: str) -> Optional[BorgJob]:
         """Get job by ID"""
@@ -1316,9 +1427,13 @@ class JobManager:
         """List all jobs"""
         return self.jobs.copy()
 
-    def get_job_output(self, job_id: str) -> AsyncGenerator[str, None]:
+    async def get_job_output(self, job_id: str) -> AsyncGenerator[Dict[str, Any], None]:
         """Get real-time job output"""
-        return self.output_manager.get_job_output(job_id)
+        if self.output_manager:
+            async for output in self.safe_output_manager.stream_job_output(job_id):
+                yield output
+        else:
+            return
 
     async def cancel_job(self, job_id: str) -> bool:
         """Cancel a running job"""
@@ -1331,7 +1446,7 @@ class JobManager:
 
         if job_id in self._processes:
             process = self._processes[job_id]
-            success = await self.executor.terminate_process(process)
+            success = await self.safe_executor.terminate_process(process)
             if success:
                 del self._processes[job_id]
 
@@ -1343,7 +1458,7 @@ class JobManager:
                 job_id, "cancelled", job.completed_at
             )
 
-        self.event_broadcaster.broadcast_event(
+        self.safe_event_broadcaster.broadcast_event(
             EventType.JOB_CANCELLED,
             job_id=job_id,
             data={"cancelled_at": job.completed_at.isoformat()},
@@ -1359,7 +1474,7 @@ class JobManager:
 
             del self.jobs[job_id]
 
-            self.output_manager.clear_job_output(job_id)
+            self.safe_output_manager.clear_job_output(job_id)
 
             if job_id in self._processes:
                 del self._processes[job_id]
@@ -1367,7 +1482,7 @@ class JobManager:
             return True
         return False
 
-    def get_queue_status(self):
+    def get_queue_status(self) -> Dict[str, int]:
         """Get queue manager status"""
         if self.queue_manager:
             stats = self.queue_manager.get_queue_stats()
@@ -1381,7 +1496,7 @@ class JobManager:
                     "queue_size": stats.total_queued,
                 }
             return {}
-        return None
+        return {}
 
     def get_active_jobs_count(self) -> int:
         """Get count of active (running/queued) jobs"""
@@ -1408,20 +1523,25 @@ class JobManager:
             "tasks": len(job.tasks) if job.tasks else 0,
         }
 
-    async def get_job_output_stream(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_output_stream(
+        self, job_id: str, last_n_lines: Optional[int] = None
+    ) -> Dict[str, Any]:
         """Get job output stream data"""
         # Get output from output manager (don't require job to exist, just output)
-        job_output = self.output_manager.get_job_output(job_id)
+        job_output = self.safe_output_manager.get_job_output(job_id)
         if job_output:
             # job_output.lines contains dict objects, not OutputLine objects
+            lines = list(job_output.lines)
+            if last_n_lines is not None and last_n_lines > 0:
+                lines = lines[-last_n_lines:]
             return {
-                "lines": list(job_output.lines),  # Already formatted as dicts
+                "lines": lines,
                 "progress": job_output.current_progress,
             }
 
         return {"lines": [], "progress": {}}
 
-    def get_queue_stats(self):
+    def get_queue_stats(self) -> Dict[str, int]:
         """Get queue statistics (alias for get_queue_status)"""
         return self.get_queue_status()
 
@@ -1483,17 +1603,16 @@ class JobManager:
 
         return None
 
-    async def stream_all_job_updates(self):
+    async def stream_all_job_updates(self) -> AsyncGenerator[JobEvent, None]:
         """Stream all job updates via event broadcaster"""
         if self.event_broadcaster:
-            async for event in self.event_broadcaster.stream_all_events():
+            async for event in self.safe_event_broadcaster.stream_all_events():
                 yield event
         else:
             # Fallback: empty stream
             return
-            yield  # Make this a generator
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Shutdown the job manager"""
         self._shutdown_requested = True
         logger.info("Shutting down job manager...")
@@ -1508,7 +1627,7 @@ class JobManager:
             await self.queue_manager.shutdown()
 
         if self.event_broadcaster:
-            await self.event_broadcaster.shutdown()
+            await self.safe_event_broadcaster.shutdown()
 
         # Clear data
         self.jobs.clear()
@@ -1556,10 +1675,10 @@ class JobManager:
         self.jobs[job_id] = job
 
         # Initialize output tracking
-        self.output_manager.create_job_output(job_id)
+        self.safe_output_manager.create_job_output(job_id)
 
         # Broadcast job started event
-        self.event_broadcaster.broadcast_event(
+        self.safe_event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
             data={"job_type": job_type, "job_name": job_name, "external": True},
@@ -1620,9 +1739,9 @@ class JobManager:
             elif status == "failed":
                 event_type = EventType.JOB_FAILED
             else:
-                event_type = EventType.JOB_UPDATED
+                event_type = EventType.JOB_STATUS_CHANGED
 
-            self.event_broadcaster.broadcast_event(
+            self.safe_event_broadcaster.broadcast_event(
                 event_type,
                 job_id=job_id,
                 data={"old_status": old_status, "new_status": status, "external": True},
@@ -1651,14 +1770,16 @@ class JobManager:
         # Add output to the main task
         if job.tasks:
             main_task = job.tasks[0]
-            # Store output in dictionary format for consistency with task streaming
+            # Store output in dict format for backward compatibility
             main_task.output_lines.append({"text": output_line})
 
         # Also add output through output manager for streaming
-        asyncio.create_task(self.output_manager.add_output_line(job_id, output_line))
+        asyncio.create_task(
+            self.safe_output_manager.add_output_line(job_id, output_line)
+        )
 
         # Broadcast output event for real-time streaming
-        self.event_broadcaster.broadcast_event(
+        self.safe_event_broadcaster.broadcast_event(
             EventType.JOB_OUTPUT,
             job_id=job_id,
             data={
@@ -1688,7 +1809,10 @@ class JobManager:
 
 
 # Factory function for creating JobManager instances (no singleton)
-def create_job_manager(config=None, rclone_service: RcloneService = None) -> JobManager:
+def create_job_manager(
+    config: Optional[Union[JobManagerConfig, Mock]] = None,
+    rclone_service: Optional[RcloneService] = None,
+) -> JobManager:
     """Factory function for creating JobManager instances"""
     if config is None:
         # Use environment variables or defaults
@@ -1724,8 +1848,8 @@ def get_default_job_manager_dependencies() -> JobManagerDependencies:
 
 
 def get_test_job_manager_dependencies(
-    mock_subprocess: Optional[Callable] = None,
-    mock_db_session: Optional[Callable] = None,
+    mock_subprocess: Optional[Callable[..., Any]] = None,
+    mock_db_session: Optional[Callable[[], Any]] = None,
     mock_rclone_service: Optional[Any] = None,
 ) -> JobManagerDependencies:
     """Get job manager dependencies for testing"""

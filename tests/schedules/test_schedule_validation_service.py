@@ -28,7 +28,9 @@ class TestScheduleValidationService:
         """Create a ScheduleService instance with mocked dependencies."""
         return ScheduleService(mock_db, mock_scheduler_service)
 
-    def test_validate_schedule_creation_data_valid_input(self, schedule_service):
+    def test_validate_schedule_creation_data_valid_input(
+        self, schedule_service
+    ) -> None:
         """Test validation with valid input data."""
         valid_data = {
             "name": "Daily Backup",
@@ -58,7 +60,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_minimal_valid_input(
         self, schedule_service
-    ):
+    ) -> None:
         """Test validation with minimal valid input data."""
         minimal_data = {
             "name": "Test Schedule",
@@ -86,7 +88,9 @@ class TestScheduleValidationService:
             "notification_config_id": None,
         }
 
-    def test_validate_schedule_creation_data_missing_name(self, schedule_service):
+    def test_validate_schedule_creation_data_missing_name(
+        self, schedule_service
+    ) -> None:
         """Test validation with missing name."""
         invalid_data = {
             "name": "",
@@ -104,7 +108,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_missing_repository_id(
         self, schedule_service
-    ):
+    ) -> None:
         """Test validation with missing repository ID."""
         invalid_data = {
             "name": "Test Schedule",
@@ -122,7 +126,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_invalid_repository_id(
         self, schedule_service
-    ):
+    ) -> None:
         """Test validation with invalid repository ID."""
         invalid_data = {
             "name": "Test Schedule",
@@ -140,7 +144,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_missing_cron_expression(
         self, schedule_service
-    ):
+    ) -> None:
         """Test validation with missing cron expression."""
         invalid_data = {
             "name": "Test Schedule",
@@ -158,7 +162,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_invalid_cron_expression_too_few_parts(
         self, schedule_service
-    ):
+    ) -> None:
         """Test validation with cron expression having too few parts."""
         invalid_data = {
             "name": "Test Schedule",
@@ -179,7 +183,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_invalid_cron_expression_too_many_parts(
         self, schedule_service
-    ):
+    ) -> None:
         """Test validation with cron expression having too many parts."""
         invalid_data = {
             "name": "Test Schedule",
@@ -200,7 +204,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_whitespace_handling(
         self, schedule_service
-    ):
+    ) -> None:
         """Test validation properly handles whitespace in inputs."""
         data_with_whitespace = {
             "name": "  Test Schedule  ",
@@ -219,7 +223,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_complex_cron_expressions(
         self, schedule_service
-    ):
+    ) -> None:
         """Test validation with complex but valid cron expressions."""
         test_cases = [
             "*/5 * * * *",  # Every 5 minutes
@@ -246,7 +250,7 @@ class TestScheduleValidationService:
 
     def test_validate_schedule_creation_data_optional_field_type_conversion(
         self, schedule_service
-    ):
+    ) -> None:
         """Test that optional fields are properly converted to integers or None."""
         test_cases = [
             ("", None),
@@ -271,7 +275,9 @@ class TestScheduleValidationService:
             assert is_valid is True
             assert processed_data["cloud_sync_config_id"] == expected_output
 
-    def test_validate_schedule_creation_data_exception_handling(self, schedule_service):
+    def test_validate_schedule_creation_data_exception_handling(
+        self, schedule_service
+    ) -> None:
         """Test validation handles exceptions gracefully."""
         # Pass None instead of dict to trigger exception
         is_valid, processed_data, error_msg = (
@@ -282,7 +288,7 @@ class TestScheduleValidationService:
         assert processed_data == {}
         assert "Invalid form data:" in error_msg
 
-    def test_validate_cron_expression_valid(self, schedule_service):
+    def test_validate_cron_expression_valid(self, schedule_service) -> None:
         """Test cron expression validation with valid expressions."""
         valid_expressions = [
             "0 2 * * *",
@@ -296,7 +302,7 @@ class TestScheduleValidationService:
             assert is_valid is True, f"Expected '{expr}' to be valid"
             assert error_msg is None
 
-    def test_validate_cron_expression_invalid(self, schedule_service):
+    def test_validate_cron_expression_invalid(self, schedule_service) -> None:
         """Test cron expression validation with invalid expressions."""
         invalid_expressions = [
             "60 * * * *",  # Invalid minute

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class JobStreamService:
     """Service for handling Server-Sent Events streaming for jobs"""
 
-    def __init__(self, job_manager: JobManager):
+    def __init__(self, job_manager: JobManager) -> None:
         self.job_manager = job_manager
 
     async def stream_all_jobs(self) -> StreamingResponse:
@@ -86,7 +86,7 @@ class JobStreamService:
                             else None,
                             "return_code": job.return_code,
                             "error": job.error,
-                            "progress": job.current_progress,
+                            "progress": None,
                             "command": command_display,
                         }
                     )
@@ -132,6 +132,8 @@ class JobStreamService:
                     # Stream events
                     while True:
                         try:
+                            if event_queue is None:
+                                break
                             event = await asyncio.wait_for(
                                 event_queue.get(), timeout=30.0
                             )
@@ -197,19 +199,23 @@ class JobStreamService:
                             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
                             break
                 finally:
-                    self.job_manager.unsubscribe_from_events(event_queue)
+                    if event_queue:
+                        self.job_manager.unsubscribe_from_events(event_queue)
             else:
                 # Stream regular borg job output
                 logger.info(f"Starting regular job output stream for {job_id}")
                 output_buffer = []
 
                 try:
-                    async for event in self.job_manager.stream_job_output(job_id):
-                        logger.debug(f"Job {job_id} received event: {event}")
+                    async for output_event in self.job_manager.stream_job_output(
+                        job_id
+                    ):
+                        # output_event is Dict[str, Any] from stream_job_output method
+                        logger.debug(f"Job {job_id} received event: {output_event}")
 
-                        if event.get("type") == "output":
+                        if output_event.get("type") == "output":
                             # Accumulate output lines
-                            line_data = event.get("data", "")
+                            line_data = output_event.get("data", "")
                             if isinstance(line_data, dict):
                                 output_buffer.append(line_data.get("text", ""))
                             else:
@@ -220,9 +226,9 @@ class JobStreamService:
                             yield f"event: output\ndata: {full_output}\n\n"
 
                             # Also send status update if there's progress
-                            if event.get("progress"):
+                            if output_event.get("progress"):
                                 yield "event: output-status\ndata: Streaming\n\n"
-                        elif event.get("type") == "complete":
+                        elif output_event.get("type") == "complete":
                             # Send completion event to trigger switch to static view
                             logger.info(
                                 f"Job {job_id} completed, sending completion event"
@@ -311,6 +317,8 @@ class JobStreamService:
                 # Stream live updates
                 while task.status == "running":
                     try:
+                        if event_queue is None:
+                            break
                         event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
                         logger.debug(
                             f"Task streaming received event: {event.get('type')} for job {event.get('job_id', 'unknown')}"
@@ -359,7 +367,8 @@ class JobStreamService:
                     yield f"event: complete\ndata: {task.status}\n\n"
 
             finally:
-                self.job_manager.unsubscribe_from_events(event_queue)
+                if event_queue:
+                    self.job_manager.unsubscribe_from_events(event_queue)
 
         except Exception as e:
             logger.error(
@@ -394,13 +403,6 @@ class JobStreamService:
 
                 # Calculate progress info
                 progress_info = ""
-                if borg_job.current_progress:
-                    if "files" in borg_job.current_progress:
-                        progress_info = f"Files: {borg_job.current_progress['files']}"
-                    if "transferred" in borg_job.current_progress:
-                        progress_info += (
-                            f" | {borg_job.current_progress['transferred']}"
-                        )
 
                 current_jobs.append(
                     {
@@ -408,7 +410,7 @@ class JobStreamService:
                         "type": job_type,
                         "status": borg_job.status,
                         "started_at": borg_job.started_at.strftime("%H:%M:%S"),
-                        "progress": borg_job.current_progress,
+                        "progress": {},
                         "progress_info": progress_info,
                     }
                 )

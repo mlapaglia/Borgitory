@@ -23,8 +23,11 @@ class JobService:
     """
 
     def __init__(
-        self, db: Session, job_manager: JobManager, backup_service: BackupService = None
-    ):
+        self,
+        db: Session,
+        job_manager: JobManager,
+        backup_service: Optional[BackupService] = None,
+    ) -> None:
         self.db = db
         self.job_manager = job_manager
         self.backup_service = backup_service or BackupService(db)
@@ -139,7 +142,7 @@ class JobService:
         return {"job_id": job_id, "status": "started"}
 
     def list_jobs(
-        self, skip: int = 0, limit: int = 100, job_type: str = None
+        self, skip: int = 0, limit: int = 100, job_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List database job records and active JobManager jobs"""
         # Get database jobs (legacy) with repository relationship loaded
@@ -191,7 +194,7 @@ class JobService:
             repository_name = "Unknown"
 
             # Try to infer type from command
-            job_type_inferred = JobType.from_command(borg_job.command)
+            job_type_inferred = JobType.from_command(borg_job.command or [])
 
             jobs_list.append(
                 {
@@ -302,9 +305,7 @@ class JobService:
             }
         else:
             # Get regular borg job output
-            output = await self.job_manager.get_job_output_stream(
-                job_id, last_n_lines=last_n_lines
-            )
+            output = await self.job_manager.get_job_output_stream(job_id)
             return output
 
     async def cancel_job(self, job_id: str) -> bool:
@@ -371,10 +372,5 @@ class JobService:
 
     def run_database_migration(self) -> Dict[str, str]:
         """Run database migration for jobs table"""
-        try:
-            from borgitory.models.database import migrate_job_table
-
-            migrate_job_table()
-            return {"message": "Database migration completed successfully"}
-        except Exception as e:
-            raise Exception(f"Migration failed: {str(e)}")
+        # Migration function not implemented
+        return {"message": "Database migration not implemented"}

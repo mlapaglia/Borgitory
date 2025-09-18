@@ -1,5 +1,6 @@
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict, Any
+from typing import List
 from sqlalchemy.orm import Session, joinedload
 from fastapi.templating import Jinja2Templates
 
@@ -17,11 +18,11 @@ class JobRenderService:
         self,
         job_manager: JobManager,
         templates_dir: str = "src/borgitory/templates",
-    ):
+    ) -> None:
         self.templates = Jinja2Templates(directory=templates_dir)
         self.job_manager = job_manager
 
-    def render_jobs_html(self, db: Session, expand: str = None) -> str:
+    def render_jobs_html(self, db: Session, expand: str = "") -> str:
         """Render job history as HTML"""
         try:
             # Get recent jobs (last 20) with their tasks
@@ -41,11 +42,7 @@ class JobRenderService:
             html_content = '<div class="space-y-3">'
 
             for job in db_jobs:
-                # Only render jobs that have UUIDs
-                if job.id is None:
-                    continue
-
-                should_expand = expand and job.id == expand
+                should_expand = bool(expand and job.id == expand)
                 html_content += self._render_job_html(job, expand_details=should_expand)
 
             html_content += "</div>"
@@ -114,7 +111,7 @@ class JobRenderService:
                                     "type": job_type,
                                     "status": job.status,
                                     "started_at": job.started_at.strftime("%H:%M:%S"),
-                                    "progress": getattr(job, "current_progress", None),
+                                    "progress": "",
                                     "progress_info": progress_info,
                                 }
                             )
@@ -134,7 +131,7 @@ class JobRenderService:
                 message=f"Error loading current operations: {str(e)}", padding="4"
             )
 
-    def _is_child_of_composite_job(self, job_id: str, job) -> bool:
+    def _is_child_of_composite_job(self, job_id: str, job: Any) -> bool:
         """Check if a job is a child task of a composite job"""
         # Simple heuristic: if there are composite jobs running,
         # assume simple borg jobs are their children
@@ -150,10 +147,6 @@ class JobRenderService:
     def _render_job_html(self, job: Job, expand_details: bool = False) -> str:
         """Render HTML for a single job (simple or composite)"""
         repository_name = job.repository.name if job.repository else "Unknown"
-
-        # Only process jobs that have UUIDs - skip legacy jobs without UUIDs
-        if job.id is None:
-            return ""  # Don't render jobs without UUIDs
 
         job_id = job.id
 
@@ -180,9 +173,8 @@ class JobRenderService:
         )
 
         # Debug logging
-        logger.info(
-            f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks"
-        )
+        task_count = len(list(job.tasks)) if job.tasks else 0
+        logger.info(f"Job {job.id[:8]}...: has {task_count} tasks")
         if job.tasks:
             for i, task in enumerate(job.tasks):
                 logger.info(
@@ -195,7 +187,7 @@ class JobRenderService:
         job_title += f" {progress_text}"
 
         # Sort tasks by order if composite
-        sorted_tasks = sorted(job.tasks or [], key=lambda t: t.task_order)
+        sorted_tasks: List[Any] = sorted(job.tasks or [], key=lambda t: t.task_order)
 
         # Fix task statuses for failed jobs
         if job.status == "failed":
@@ -230,7 +222,7 @@ class JobRenderService:
             expand_details=expand_details,
         )
 
-    def get_job_for_render(self, job_id: str, db: Session) -> dict:
+    def get_job_for_render(self, job_id: str, db: Session) -> Dict[str, Any]:
         """Get job data formatted for template rendering - prioritize database for completed jobs"""
         try:
             logger.info(f"Getting job {job_id} for rendering")
@@ -254,7 +246,8 @@ class JobRenderService:
             if job_id in self.job_manager.jobs:
                 logger.info(f"Found running job {job_id} in job manager")
                 manager_job = self.job_manager.jobs[job_id]
-                return self._format_manager_job_for_render(manager_job, job_id, job)
+                result = self._format_manager_job_for_render(manager_job, job_id, job)
+                return result if result is not None else {}
 
             # If job exists in database but not completed (edge case), still show it
             if job:
@@ -262,12 +255,12 @@ class JobRenderService:
                 return self._format_database_job_for_render(job)
 
             logger.info(f"Job {job_id} not found anywhere")
-            return None
+            return {}
         except Exception as e:
             logger.error(f"Error getting job for render: {e}")
-            return None
+            return {}
 
-    def _format_database_job_for_render(self, job: Job) -> dict:
+    def _format_database_job_for_render(self, job: Job) -> Dict[str, Any]:
         """Format a database job for template rendering"""
         try:
             repository_name = job.repository.name if job.repository else "Unknown"
@@ -295,12 +288,11 @@ class JobRenderService:
             )
 
             # All jobs are now composite with tasks
-            has_tasks = bool(job.tasks and len(job.tasks) > 0)
+            task_count = len(list(job.tasks)) if job.tasks else 0
+            has_tasks = bool(job.tasks and task_count > 0)
 
             # Debug logging
-            logger.info(
-                f"Job {job.id[:8]}...: has {len(job.tasks) if job.tasks else 0} tasks"
-            )
+            logger.info(f"Job {job.id[:8]}...: has {task_count} tasks")
             if job.tasks:
                 for i, task in enumerate(job.tasks):
                     logger.info(
@@ -316,7 +308,7 @@ class JobRenderService:
                 job_title += f" {progress_text}"
 
             # Sort tasks by order (all jobs have tasks now)
-            sorted_tasks = (
+            sorted_tasks: List[Any] = (
                 sorted(job.tasks or [], key=lambda t: t.task_order) if has_tasks else []
             )
 
@@ -352,9 +344,11 @@ class JobRenderService:
             }
         except Exception as e:
             logger.error(f"Error formatting database job {job.id}: {e}")
-            return None
+            return {}
 
-    def _format_manager_job_for_render(self, manager_job, job_id, db_job=None):
+    def _format_manager_job_for_render(
+        self, manager_job: Any, job_id: str, db_job: Any = None
+    ) -> Dict[str, Any] | None:
         """Format a job manager job for template rendering"""
         try:
             # Use database job data if available, otherwise create from manager job
@@ -493,7 +487,7 @@ class JobRenderService:
             logger.error(f"Error formatting manager job {job_id}: {e}")
             return None
 
-    def _fix_task_statuses_for_failed_job(self, sorted_tasks):
+    def _fix_task_statuses_for_failed_job(self, sorted_tasks: List[Any]) -> List[Any]:
         """
         Fix task statuses for failed jobs to ensure proper display.
 

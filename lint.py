@@ -9,19 +9,20 @@ Usage:
   python lint.py all      - Run all checks and formatting
 """
 
+from typing import List, Optional, Dict
 import subprocess
 import sys
 import os
 
 
-def run_command(cmd, env=None):
+def run_command(cmd: List[str], env: Optional[Dict[str, str]] = None) -> int:
     """Run a command and return the exit code."""
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, env=env)
     return result.returncode
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(1)
@@ -35,8 +36,9 @@ def main():
     elif command == "format":
         exit_code = run_command(["ruff", "format"])
     elif command == "mypy":
+        python_exe = sys.executable
         exit_code = run_command(
-            [".env_borg\\Scripts\\python.exe", "-m", "mypy", "src/borgitory", "tests"]
+            [python_exe, "-m", "mypy", "src/borgitory"]
         )
     elif command == "all":
         # Run all checks and formatting
@@ -49,9 +51,10 @@ def main():
             print("Running mypy type checking...")
             env = os.environ.copy()
             env["PYTHONPATH"] = "src"
+            python_exe = sys.executable
             exit_code = run_command(
                 [
-                    ".env_borg\\Scripts\\python.exe",
+                    python_exe,
                     "-m",
                     "mypy",
                     "src/borgitory",

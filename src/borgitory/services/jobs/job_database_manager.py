@@ -34,11 +34,11 @@ class JobDatabaseManager:
 
     def __init__(
         self,
-        db_session_factory: Optional[Callable] = None,
-    ):
+        db_session_factory: Optional[Callable[[], Any]] = None,
+    ) -> None:
         self.db_session_factory = db_session_factory or self._default_db_session_factory
 
-    def _default_db_session_factory(self):
+    def _default_db_session_factory(self) -> Any:
         """Default database session factory"""
         from borgitory.utils.db_session import get_db_session
 
@@ -50,24 +50,23 @@ class JobDatabaseManager:
             from borgitory.models.database import Job
 
             with self.db_session_factory() as db:
-                db_job = Job(
-                    id=job_data.job_uuid,  # Use UUID as primary key
-                    repository_id=job_data.repository_id,
-                    type=str(job_data.job_type),  # Convert JobType enum to string
-                    status=job_data.status,
-                    started_at=job_data.started_at,
-                    finished_at=job_data.finished_at,
-                    log_output=job_data.output,
-                    error=job_data.error_message,
-                    container_id=None,  # Explicitly set to None
-                    cloud_sync_config_id=job_data.cloud_sync_config_id,
-                    cleanup_config_id=None,  # Explicitly set to None
-                    check_config_id=None,  # Explicitly set to None
-                    notification_config_id=None,  # Explicitly set to None
-                    job_type="composite",  # Set as composite since we have tasks
-                    total_tasks=1,  # Default total tasks
-                    completed_tasks=0,  # Default completed tasks
-                )
+                db_job = Job()
+                db_job.id = job_data.job_uuid  # Use UUID as primary key
+                db_job.repository_id = job_data.repository_id
+                db_job.type = str(job_data.job_type)  # Convert JobType enum to string
+                db_job.status = job_data.status
+                db_job.started_at = job_data.started_at
+                db_job.finished_at = job_data.finished_at
+                db_job.log_output = job_data.output
+                db_job.error = job_data.error_message
+                db_job.container_id = None  # Explicitly set to None
+                db_job.cloud_sync_config_id = job_data.cloud_sync_config_id
+                db_job.cleanup_config_id = None  # Explicitly set to None
+                db_job.check_config_id = None  # Explicitly set to None
+                db_job.notification_config_id = None  # Explicitly set to None
+                db_job.job_type = "composite"  # Set as composite since we have tasks
+                db_job.total_tasks = 1  # Default total tasks
+                db_job.completed_tasks = 0  # Default completed tasks
 
                 db.add(db_job)
                 db.commit()
@@ -297,18 +296,17 @@ class JobDatabaseManager:
                     elif hasattr(task, "output") and task.output:
                         task_output = task.output
 
-                    db_task = JobTask(
-                        job_id=db_job.id,
-                        task_type=task.task_type,
-                        task_name=task.task_name,
-                        status=task.status,
-                        started_at=getattr(task, "started_at", None),
-                        completed_at=getattr(task, "completed_at", None),
-                        output=task_output,
-                        error=getattr(task, "error", None),
-                        return_code=getattr(task, "return_code", None),
-                        task_order=i,
-                    )
+                    db_task = JobTask()
+                    db_task.job_id = db_job.id
+                    db_task.task_type = task.task_type
+                    db_task.task_name = task.task_name
+                    db_task.status = task.status
+                    db_task.started_at = getattr(task, "started_at", None)
+                    db_task.completed_at = getattr(task, "completed_at", None)
+                    db_task.output = task_output
+                    db_task.error = getattr(task, "error", None)
+                    db_task.return_code = getattr(task, "return_code", None)
+                    db_task.task_order = i
                     db.add(db_task)
 
                 # Update job task counts

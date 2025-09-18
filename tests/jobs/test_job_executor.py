@@ -12,13 +12,13 @@ from borgitory.services.jobs.job_executor import JobExecutor
 class TestJobExecutor:
     """Test JobExecutor functionality"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures"""
         self.mock_subprocess = AsyncMock()
         self.executor = JobExecutor(subprocess_executor=self.mock_subprocess)
 
     @pytest.mark.asyncio
-    async def test_start_process_success(self):
+    async def test_start_process_success(self) -> None:
         """Test successful process start"""
         mock_process = AsyncMock()
         mock_process.pid = 12345
@@ -33,7 +33,7 @@ class TestJobExecutor:
         self.mock_subprocess.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_start_process_failure(self):
+    async def test_start_process_failure(self) -> None:
         """Test process start failure"""
 
         # Use AsyncMock side_effect properly to avoid unawaited coroutine warnings
@@ -48,7 +48,7 @@ class TestJobExecutor:
             await self.executor.start_process(command)
 
     @pytest.mark.asyncio
-    async def test_monitor_process_output_success(self):
+    async def test_monitor_process_output_success(self) -> None:
         """Test successful process output monitoring"""
         mock_process = AsyncMock()
         mock_process.wait.return_value = 0
@@ -63,7 +63,7 @@ class TestJobExecutor:
         output_lines = []
         progress_updates = []
 
-        def output_callback(line, progress):
+        def output_callback(line, progress) -> None:
             output_lines.append(line)
             if progress:
                 progress_updates.append(progress)
@@ -77,7 +77,7 @@ class TestJobExecutor:
         assert result.error is None
 
     @pytest.mark.asyncio
-    async def test_monitor_process_output_with_error(self):
+    async def test_monitor_process_output_with_error(self) -> None:
         """Test process output monitoring with error"""
         mock_process = AsyncMock()
         mock_process.wait.return_value = 1
@@ -89,7 +89,7 @@ class TestJobExecutor:
         assert result.return_code == -1
         assert "Process monitoring error" in result.error
 
-    def test_parse_progress_line_borg_output(self):
+    def test_parse_progress_line_borg_output(self) -> None:
         """Test parsing Borg progress output"""
         line = "1000000 500000 300000 100 /path/to/file"
 
@@ -102,7 +102,7 @@ class TestJobExecutor:
         assert progress["path"] == "/path/to/file"
         assert "timestamp" in progress
 
-    def test_parse_progress_line_archive_name(self):
+    def test_parse_progress_line_archive_name(self) -> None:
         """Test parsing archive name line"""
         line = "Archive name: test-archive-2023"
 
@@ -110,7 +110,7 @@ class TestJobExecutor:
 
         assert progress["archive_name"] == "test-archive-2023"
 
-    def test_parse_progress_line_no_match(self):
+    def test_parse_progress_line_no_match(self) -> None:
         """Test parsing line with no progress info"""
         line = "Some random output line"
 
@@ -118,7 +118,7 @@ class TestJobExecutor:
 
         assert progress == {}
 
-    def test_parse_progress_line_invalid_format(self):
+    def test_parse_progress_line_invalid_format(self) -> None:
         """Test parsing malformed progress line"""
         line = "1000000 abc 300000 def /path"
 
@@ -128,7 +128,7 @@ class TestJobExecutor:
         assert progress == {}
 
     @pytest.mark.asyncio
-    async def test_terminate_process_graceful(self):
+    async def test_terminate_process_graceful(self) -> None:
         """Test graceful process termination"""
         mock_process = AsyncMock()
         mock_process.returncode = None
@@ -141,7 +141,7 @@ class TestJobExecutor:
         mock_process.wait.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_terminate_process_force_kill(self):
+    async def test_terminate_process_force_kill(self) -> None:
         """Test force killing process after timeout"""
         mock_process = AsyncMock()
         mock_process.returncode = None
@@ -155,7 +155,7 @@ class TestJobExecutor:
         mock_process.kill.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_terminate_process_already_terminated(self):
+    async def test_terminate_process_already_terminated(self) -> None:
         """Test terminating already finished process"""
         mock_process = AsyncMock()
         mock_process.returncode = 0  # Already finished
@@ -167,7 +167,7 @@ class TestJobExecutor:
         mock_process.kill.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_terminate_process_error(self):
+    async def test_terminate_process_error(self) -> None:
         """Test error during process termination"""
         mock_process = AsyncMock()
         mock_process.returncode = None
@@ -177,7 +177,7 @@ class TestJobExecutor:
 
         assert result is False
 
-    def test_format_command_for_logging_basic(self):
+    def test_format_command_for_logging_basic(self) -> None:
         """Test basic command formatting"""
         command = ["borg", "list", "repo"]
 
@@ -185,7 +185,7 @@ class TestJobExecutor:
 
         assert result == "borg list repo"
 
-    def test_format_command_for_logging_with_passphrase(self):
+    def test_format_command_for_logging_with_passphrase(self) -> None:
         """Test command formatting with passphrase redaction"""
         command = ["borg", "list", "--passphrase", "secret123", "repo"]
 
@@ -194,7 +194,7 @@ class TestJobExecutor:
         assert result == "borg list --passphrase [REDACTED] repo"
         assert "secret123" not in result
 
-    def test_format_command_for_logging_with_repository_path(self):
+    def test_format_command_for_logging_with_repository_path(self) -> None:
         """Test command formatting with repository path"""
         command = ["borg", "create", "repo::archive-name", "/path"]
 

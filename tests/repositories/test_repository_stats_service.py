@@ -17,20 +17,20 @@ from borgitory.models.database import Repository
 class MockCommandExecutor(CommandExecutorInterface):
     """Mock command executor for testing"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.archive_list = []
         self.archive_info_data = {}
         self.file_data = {}
 
-    def set_archive_list(self, archives: List[str]):
+    def set_archive_list(self, archives: List[str]) -> None:
         """Set the list of archives to return"""
         self.archive_list = archives
 
-    def set_archive_info(self, archive_name: str, info: Dict[str, Any]):
+    def set_archive_info(self, archive_name: str, info: Dict[str, Any]) -> None:
         """Set archive info data for a specific archive"""
         self.archive_info_data[archive_name] = info
 
-    def set_file_data(self, archive_name: str, files: List[Dict[str, Any]]):
+    def set_file_data(self, archive_name: str, files: List[Dict[str, Any]]) -> None:
         """Set file data for a specific archive"""
         self.file_data[archive_name] = files
 
@@ -52,7 +52,7 @@ class MockCommandExecutor(CommandExecutorInterface):
 class TestRepositoryStatsService:
     """Test RepositoryStatsService functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.mock_executor = MockCommandExecutor()
         self.service = RepositoryStatsService(command_executor=self.mock_executor)
@@ -74,7 +74,7 @@ class TestRepositoryStatsService:
         )
 
     @pytest.mark.asyncio
-    async def test_get_repository_statistics_success(self):
+    async def test_get_repository_statistics_success(self) -> None:
         """Test successful repository statistics gathering."""
         # Setup mock data
         self.mock_executor.set_archive_list(["archive1", "archive2"])
@@ -127,7 +127,7 @@ class TestRepositoryStatsService:
         assert self.progress_calls[-1] == ("Statistics analysis complete!", 100)
 
     @pytest.mark.asyncio
-    async def test_get_repository_statistics_no_archives(self):
+    async def test_get_repository_statistics_no_archives(self) -> None:
         """Test statistics gathering when no archives exist."""
         # Set empty archive list
         self.mock_executor.set_archive_list([])
@@ -140,7 +140,7 @@ class TestRepositoryStatsService:
         assert result["error"] == "No archives found in repository"
 
     @pytest.mark.asyncio
-    async def test_get_repository_statistics_exception(self):
+    async def test_get_repository_statistics_exception(self) -> None:
         """Test statistics gathering handles exceptions properly."""
 
         # Create an executor that throws exceptions
@@ -161,7 +161,7 @@ class TestRepositoryStatsService:
         assert "Test error" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_get_archive_list_success(self):
+    async def test_get_archive_list_success(self) -> None:
         """Test successful archive listing."""
         mock_stdout = "archive1\narchive2\narchive3\n"
 
@@ -185,7 +185,7 @@ class TestRepositoryStatsService:
             mock_subprocess.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_archive_list_failure(self):
+    async def test_get_archive_list_failure(self) -> None:
         """Test archive listing failure handling."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess, patch(
             "borgitory.services.repositories.repository_stats_service.build_secure_borg_command"
@@ -205,7 +205,7 @@ class TestRepositoryStatsService:
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_get_archive_list_exception(self):
+    async def test_get_archive_list_exception(self) -> None:
         """Test archive listing exception handling."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
             mock_subprocess.side_effect = Exception("Connection error")
@@ -215,7 +215,7 @@ class TestRepositoryStatsService:
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_get_archive_info_success(self):
+    async def test_get_archive_info_success(self) -> None:
         """Test successful archive info retrieval."""
         mock_json_response = {
             "archives": [
@@ -271,7 +271,7 @@ class TestRepositoryStatsService:
             assert result["unique_chunks"] == 50
 
     @pytest.mark.asyncio
-    async def test_get_archive_info_failure(self):
+    async def test_get_archive_info_failure(self) -> None:
         """Test archive info retrieval failure."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess, patch(
             "borgitory.services.repositories.repository_stats_service.build_secure_borg_command"
@@ -292,7 +292,7 @@ class TestRepositoryStatsService:
 
             assert result is None
 
-    def test_build_size_timeline(self):
+    def test_build_size_timeline(self) -> None:
         """Test size timeline chart data building."""
         archive_stats = [
             {
@@ -323,7 +323,7 @@ class TestRepositoryStatsService:
         assert result["datasets"][1]["data"][0] == 500000 / (1024 * 1024)  # ~0.48 MB
         assert result["datasets"][2]["data"][0] == 300000 / (1024 * 1024)  # ~0.29 MB
 
-    def test_build_dedup_compression_stats(self):
+    def test_build_dedup_compression_stats(self) -> None:
         """Test deduplication and compression statistics building."""
         archive_stats = [
             {
@@ -348,7 +348,7 @@ class TestRepositoryStatsService:
         assert result["datasets"][1]["data"][0] == 40.0
 
     @pytest.mark.asyncio
-    async def test_get_file_type_stats_success(self):
+    async def test_get_file_type_stats_success(self) -> None:
         """Test file type statistics gathering."""
         archives = ["archive1", "archive2"]
         mock_file_output = "1024 file1.txt\n2048 file2.jpg\n512 file3.txt\n"
@@ -375,7 +375,7 @@ class TestRepositoryStatsService:
             assert "labels" in result["count_chart"]
             assert "datasets" in result["count_chart"]
 
-    def test_build_file_type_chart_data(self):
+    def test_build_file_type_chart_data(self) -> None:
         """Test file type chart data building."""
         timeline_data = {
             "labels": ["2023-01-01", "2023-01-02"],
@@ -400,7 +400,7 @@ class TestRepositoryStatsService:
         assert "labels" in size_chart
         assert "datasets" in size_chart
 
-    def test_build_summary_stats(self):
+    def test_build_summary_stats(self) -> None:
         """Test summary statistics building."""
         archive_stats = [
             {
@@ -436,13 +436,13 @@ class TestRepositoryStatsService:
             result["space_saved_gb"] == 1.96
         )  # Original - deduplicated (calculated value)
 
-    def test_build_summary_stats_empty(self):
+    def test_build_summary_stats_empty(self) -> None:
         """Test summary statistics with empty archive stats."""
         result = self.service._build_summary_stats([])
 
         assert result == {}
 
-    def test_build_summary_stats_zero_division(self):
+    def test_build_summary_stats_zero_division(self) -> None:
         """Test summary statistics handles zero division properly."""
         archive_stats = [
             {

@@ -4,6 +4,7 @@ Tests for repository statistics progress streaming functionality
 
 import pytest
 import asyncio
+from typing import Any, Callable, Optional, List
 from unittest.mock import Mock
 from httpx import AsyncClient, ASGITransport
 
@@ -19,7 +20,7 @@ class TestProgressStreaming:
     """Test suite for SSE progress streaming during repository statistics generation"""
 
     @pytest.fixture
-    def mock_repository(self):
+    def mock_repository(self) -> Mock:
         """Create a mock repository for testing"""
         repo = Mock(spec=Repository)
         repo.id = 1
@@ -29,17 +30,19 @@ class TestProgressStreaming:
         return repo
 
     @pytest.fixture
-    def mock_db(self):
+    def mock_db(self) -> Mock:
         """Create a mock database session"""
         db = Mock()
         return db
 
     @pytest.mark.asyncio
-    async def test_progress_streaming_basic_flow(self, mock_repository, mock_db):
+    async def test_progress_streaming_basic_flow(
+        self, mock_repository: Mock, mock_db: Mock
+    ) -> None:
         """Test that progress streaming sends expected SSE events"""
 
         # Override database dependency
-        def override_get_db():
+        def override_get_db() -> Mock:
             mock_db.query.return_value.filter.return_value.first.return_value = (
                 mock_repository
             )
@@ -48,7 +51,9 @@ class TestProgressStreaming:
         app.dependency_overrides[get_db] = override_get_db
 
         # Mock the stats service to call progress callback with test data
-        async def mock_get_stats(repo, db, progress_callback=None):
+        async def mock_get_stats(
+            repo: Any, db: Any, progress_callback: Optional[Callable[..., None]] = None
+        ) -> dict[str, Any]:
             if progress_callback:
                 # Simulate the progress flow with small delays to allow queue processing
                 progress_callback("Initializing repository analysis...", 5)
@@ -147,11 +152,13 @@ class TestProgressStreaming:
                 del app.dependency_overrides[get_repository_stats_service]
 
     @pytest.mark.asyncio
-    async def test_progress_streaming_error_handling(self, mock_repository, mock_db):
+    async def test_progress_streaming_error_handling(
+        self, mock_repository: Mock, mock_db: Mock
+    ) -> None:
         """Test that errors are properly streamed via SSE"""
 
         # Override database dependency
-        def override_get_db():
+        def override_get_db() -> Mock:
             mock_db.query.return_value.filter.return_value.first.return_value = (
                 mock_repository
             )
@@ -160,7 +167,9 @@ class TestProgressStreaming:
         app.dependency_overrides[get_db] = override_get_db
 
         # Mock the stats service to return an error
-        async def mock_get_stats_error(repo, db, progress_callback=None):
+        async def mock_get_stats_error(
+            repo: Any, db: Any, progress_callback: Optional[Callable[..., None]] = None
+        ) -> dict[str, Any]:
             if progress_callback:
                 progress_callback("Initializing repository analysis...", 5)
                 await asyncio.sleep(0.01)
@@ -213,11 +222,11 @@ class TestProgressStreaming:
                 del app.dependency_overrides[get_repository_stats_service]
 
     @pytest.mark.asyncio
-    async def test_progress_streaming_repository_not_found(self, mock_db):
+    async def test_progress_streaming_repository_not_found(self, mock_db: Mock) -> None:
         """Test handling of non-existent repository"""
 
         # Override database dependency
-        def override_get_db():
+        def override_get_db() -> Mock:
             mock_db.query.return_value.filter.return_value.first.return_value = None
             return mock_db
 
@@ -235,7 +244,7 @@ class TestProgressStreaming:
             # Clean up dependency override
             app.dependency_overrides.clear()
 
-    def test_progress_streaming_html_template_elements(self):
+    def test_progress_streaming_html_template_elements(self) -> None:
         """Test that loading template has correct SSE swap elements"""
         from fastapi.templating import Jinja2Templates
         from fastapi import Request
@@ -251,7 +260,7 @@ class TestProgressStreaming:
             mock_request, "partials/statistics/loading_state.html", {"repository_id": 1}
         )
 
-        html_content = response.body.decode()
+        html_content = bytes(response.body).decode()
 
         # Verify SSE connection is set up
         assert 'hx-ext="sse"' in html_content, "Should have SSE extension"
@@ -277,7 +286,7 @@ class TestProgressStreaming:
             "Should have progress track"
         )
 
-    def _parse_sse_events(self, sse_text: str) -> list:
+    def _parse_sse_events(self, sse_text: str) -> List[dict[str, str]]:
         """Parse SSE response text into event objects"""
         events = []
         current_event = {}
@@ -298,7 +307,7 @@ class TestProgressStreaming:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_full_progress_streaming_integration(self):
+    async def test_full_progress_streaming_integration(self) -> None:
         """
         Integration test that verifies the complete progress streaming flow
         This test requires a test repository to be available

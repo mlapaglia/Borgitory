@@ -30,7 +30,7 @@ class TestDebugService:
     @pytest.mark.asyncio
     async def test_get_debug_info_all_sections_success(
         self, debug_service, mock_db_session
-    ):
+    ) -> None:
         """Test successful retrieval of all debug info sections"""
         with patch.object(
             debug_service, "_get_system_info", return_value={"system": "info"}
@@ -60,7 +60,7 @@ class TestDebugService:
     @pytest.mark.asyncio
     async def test_get_debug_info_handles_section_failures(
         self, debug_service, mock_db_session
-    ):
+    ) -> None:
         """Test that individual section failures don't break entire debug info"""
         with patch.object(
             debug_service, "_get_system_info", side_effect=Exception("System error")
@@ -85,7 +85,7 @@ class TestDebugService:
             assert result["volumes"] == {"volumes": "info"}
 
     @pytest.mark.asyncio
-    async def test_get_system_info(self, debug_service):
+    async def test_get_system_info(self, debug_service) -> None:
         """Test system info collection"""
         with patch("platform.platform", return_value="Test Platform"), patch(
             "platform.system", return_value="TestOS"
@@ -109,7 +109,7 @@ class TestDebugService:
             assert result["python_executable"] == "/usr/bin/python"
 
     @pytest.mark.asyncio
-    async def test_get_application_info(self, debug_service):
+    async def test_get_application_info(self, debug_service) -> None:
         """Test application info collection"""
         test_time = datetime(2023, 1, 1, 12, 0, 0)
 
@@ -129,7 +129,7 @@ class TestDebugService:
             assert "startup_time" in result
 
     @pytest.mark.asyncio
-    async def test_get_application_info_debug_mode_true(self, debug_service):
+    async def test_get_application_info_debug_mode_true(self, debug_service) -> None:
         """Test application info with debug mode enabled"""
         with patch("os.getenv", return_value="TRUE"), patch(
             "borgitory.services.debug_service.datetime"
@@ -140,7 +140,7 @@ class TestDebugService:
 
             assert result["debug_mode"] is True
 
-    def test_get_database_info_success(self, debug_service, mock_db_session):
+    def test_get_database_info_success(self, debug_service, mock_db_session) -> None:
         """Test successful database info collection"""
         # Mock query results with different chains for different calls
         repo_query_mock = MagicMock()
@@ -179,7 +179,9 @@ class TestDebugService:
             assert result["database_size_bytes"] == 1024 * 1024
             assert result["database_accessible"] is True
 
-    def test_get_database_info_size_formatting(self, debug_service, mock_db_session):
+    def test_get_database_info_size_formatting(
+        self, debug_service, mock_db_session
+    ) -> None:
         """Test database size formatting for different sizes"""
         mock_db_session.query.return_value.count.return_value = 1
 
@@ -204,7 +206,9 @@ class TestDebugService:
             result = debug_service._get_database_info(mock_db_session)
             assert result["database_size"] == "2.0 GB"
 
-    def test_get_database_info_exception_handling(self, debug_service, mock_db_session):
+    def test_get_database_info_exception_handling(
+        self, debug_service, mock_db_session
+    ) -> None:
         """Test database info exception handling"""
         mock_db_session.query.side_effect = Exception("Database error")
 
@@ -214,7 +218,7 @@ class TestDebugService:
         assert result["database_accessible"] is False
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_success(self, debug_service):
+    async def test_get_volume_info_success(self, debug_service) -> None:
         """Test volume info collection success"""
         mock_volume_service = MagicMock()
         mock_volume_service.get_volume_info = AsyncMock(
@@ -234,7 +238,7 @@ class TestDebugService:
             assert result["total_mounted_volumes"] == 2
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_with_volumes(self, debug_service):
+    async def test_get_volume_info_with_volumes(self, debug_service) -> None:
         """Test volume info when volumes are present"""
         mock_volume_service = MagicMock()
         mock_volume_service.get_volume_info = AsyncMock(
@@ -251,7 +255,7 @@ class TestDebugService:
             assert result["total_mounted_volumes"] == 1
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_service_failure(self, debug_service):
+    async def test_get_volume_info_service_failure(self, debug_service) -> None:
         """Test volume info when volume service fails"""
         with patch(
             "borgitory.dependencies.get_volume_service",
@@ -264,7 +268,7 @@ class TestDebugService:
             assert result["total_mounted_volumes"] == 0
 
     @pytest.mark.asyncio
-    async def test_get_tool_versions_success(self, debug_service):
+    async def test_get_tool_versions_success(self, debug_service) -> None:
         """Test successful tool version detection"""
         # Mock borg process
         mock_borg_process = MagicMock()
@@ -295,7 +299,7 @@ class TestDebugService:
             assert result["rclone"]["accessible"] is True
 
     @pytest.mark.asyncio
-    async def test_get_tool_versions_command_failures(self, debug_service):
+    async def test_get_tool_versions_command_failures(self, debug_service) -> None:
         """Test tool version detection when commands fail"""
         # Mock borg process failure
         mock_borg_process = MagicMock()
@@ -321,7 +325,7 @@ class TestDebugService:
             assert result["rclone"]["accessible"] is False
             assert "error" in result["rclone"]
 
-    def test_get_environment_info(self, debug_service):
+    def test_get_environment_info(self, debug_service) -> None:
         """Test environment info collection"""
         mock_env = {
             "PATH": "/usr/bin:/bin",
@@ -343,7 +347,9 @@ class TestDebugService:
             assert "SECRET_KEY" not in result  # Not in safe list
             assert "PASSWORD" not in result  # Not in safe list
 
-    def test_get_environment_info_hides_sensitive_database_url(self, debug_service):
+    def test_get_environment_info_hides_sensitive_database_url(
+        self, debug_service
+    ) -> None:
         """Test that non-sqlite database URLs are hidden"""
         mock_env = {"DATABASE_URL": "postgresql://user:pass@localhost/db"}
 
@@ -352,7 +358,7 @@ class TestDebugService:
 
             assert result["DATABASE_URL"] == "***HIDDEN***"
 
-    def test_get_job_manager_info_success(self, debug_service):
+    def test_get_job_manager_info_success(self, debug_service) -> None:
         """Test successful job manager info collection"""
         # Mock job manager with jobs
         mock_job_manager = MagicMock()
@@ -377,7 +383,7 @@ class TestDebugService:
         assert result["total_jobs"] == 3  # 3 total jobs
         assert result["job_manager_running"] is True
 
-    def test_get_job_manager_info_no_jobs_attribute(self, debug_service):
+    def test_get_job_manager_info_no_jobs_attribute(self, debug_service) -> None:
         """Test job manager info when job manager has no jobs attribute"""
         mock_job_manager = MagicMock()
         del mock_job_manager.jobs  # Remove jobs attribute
@@ -390,7 +396,7 @@ class TestDebugService:
         assert result["total_jobs"] == 0
         assert result["job_manager_running"] is True
 
-    def test_get_job_manager_info_exception_handling(self, debug_service):
+    def test_get_job_manager_info_exception_handling(self, debug_service) -> None:
         """Test job manager info exception handling"""
         # Simulate job manager error by making jobs attribute missing
         mock_job_manager = Mock()
@@ -404,7 +410,7 @@ class TestDebugService:
         assert "active_jobs" in result
         assert result["total_jobs"] == 0  # Due to missing jobs attribute
 
-    def test_get_job_manager_info_jobs_without_status(self, debug_service):
+    def test_get_job_manager_info_jobs_without_status(self, debug_service) -> None:
         """Test job manager info when jobs don't have status attribute"""
         mock_job_manager = MagicMock()
         mock_job1 = MagicMock()

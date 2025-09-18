@@ -4,12 +4,14 @@ API endpoints for managing prune configurations (archive pruning policies)
 
 import logging
 from typing import List
+from borgitory.models.database import CleanupConfig
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+from starlette.templating import _TemplateResponse
 
 from borgitory.models.schemas import (
-    CleanupConfig,
+    CleanupConfig as CleanupConfigSchema,
     CleanupConfigCreate,
     CleanupConfigUpdate,
 )
@@ -70,11 +72,11 @@ async def create_cleanup_config(
     cleanup_config: CleanupConfigCreate,
     templates: TemplatesDep,
     service: CleanupServiceDep,
-):
+) -> HTMLResponse:
     """Create a new cleanup configuration"""
     success, config, error_message = service.create_cleanup_config(cleanup_config)
 
-    if success:
+    if success and config:
         response = templates.TemplateResponse(
             request,
             "partials/prune/create_success.html",
@@ -91,7 +93,7 @@ async def create_cleanup_config(
         )
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/", response_model=List[CleanupConfigSchema])
 def list_cleanup_configs(
     service: CleanupServiceDep,
     skip: int = 0,
@@ -127,11 +129,11 @@ async def enable_cleanup_config(
     config_id: int,
     templates: TemplatesDep,
     service: CleanupServiceDep,
-):
+) -> _TemplateResponse:
     """Enable a cleanup configuration"""
     success, config, error_message = service.enable_cleanup_config(config_id)
 
-    if success:
+    if success and config:
         response = templates.TemplateResponse(
             request,
             "partials/prune/action_success.html",
@@ -154,11 +156,11 @@ async def disable_cleanup_config(
     config_id: int,
     templates: TemplatesDep,
     service: CleanupServiceDep,
-):
+) -> HTMLResponse:
     """Disable a cleanup configuration"""
     success, config, error_message = service.disable_cleanup_config(config_id)
 
-    if success:
+    if success and config:
         response = templates.TemplateResponse(
             request,
             "partials/prune/action_success.html",
@@ -205,13 +207,13 @@ async def update_cleanup_config(
     config_update: CleanupConfigUpdate,
     templates: TemplatesDep,
     service: CleanupServiceDep,
-):
+) -> HTMLResponse:
     """Update a cleanup configuration"""
     success, updated_config, error_message = service.update_cleanup_config(
         config_id, config_update
     )
 
-    if success:
+    if success and updated_config:
         response = templates.TemplateResponse(
             request,
             "partials/prune/update_success.html",
@@ -234,7 +236,7 @@ async def delete_cleanup_config(
     config_id: int,
     templates: TemplatesDep,
     service: CleanupServiceDep,
-):
+) -> HTMLResponse:
     """Delete a cleanup configuration"""
     success, config_name, error_message = service.delete_cleanup_config(config_id)
 

@@ -9,14 +9,15 @@ import pytest
 import uuid
 from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock
-from typing import List
+from typing import Any, AsyncGenerator, Dict, List
+from sqlalchemy.orm import Session
 
 from borgitory.services.jobs.job_manager import BorgJob, BorgJobTask, JobManagerConfig
 from borgitory.models.database import Repository, Job, JobTask
 
 
 @pytest.fixture
-def mock_job_manager():
+def mock_job_manager() -> Mock:
     """Standard mock JobManager for all job service tests."""
     manager = Mock()
     manager.jobs = {}
@@ -41,7 +42,7 @@ def mock_job_manager():
 
 
 @pytest.fixture
-def mock_job_executor():
+def mock_job_executor() -> Mock:
     """Standard mock JobExecutor for job execution tests."""
     executor = Mock()
     executor.start_process = AsyncMock()
@@ -53,7 +54,7 @@ def mock_job_executor():
 
 
 @pytest.fixture
-def sample_borg_job():
+def sample_borg_job() -> BorgJob:
     """Create a sample BorgJob for testing."""
     return BorgJob(
         id=str(uuid.uuid4()),
@@ -67,7 +68,7 @@ def sample_borg_job():
 
 
 @pytest.fixture
-def sample_composite_job():
+def sample_composite_job() -> BorgJob:
     """Create a composite BorgJob with tasks for testing."""
     job_id = str(uuid.uuid4())
     task1 = BorgJobTask(
@@ -95,13 +96,12 @@ def sample_composite_job():
 
 
 @pytest.fixture
-def sample_repository(test_db):
+def sample_repository(test_db: Session) -> Repository:
     """Create a sample repository in the test database."""
-    repository = Repository(
-        name="test-repo",
-        path="/tmp/test-repo",
-        encrypted_passphrase="test-encrypted-passphrase",
-    )
+    repository = Repository()
+    repository.name = "test-repo"
+    repository.path = "/tmp/test-repo"
+    repository.encrypted_passphrase = "test-encrypted-passphrase"
     test_db.add(repository)
     test_db.commit()
     test_db.refresh(repository)
@@ -109,16 +109,15 @@ def sample_repository(test_db):
 
 
 @pytest.fixture
-def sample_database_job(test_db, sample_repository):
+def sample_database_job(test_db: Session, sample_repository: Repository) -> Job:
     """Create a sample Job record in the test database."""
-    job = Job(
-        id=str(uuid.uuid4()),
-        repository_id=sample_repository.id,
-        type="backup",
-        status="completed",
-        started_at=datetime.now(UTC),
-        finished_at=datetime.now(UTC),
-    )
+    job = Job()
+    job.id = str(uuid.uuid4())
+    job.repository_id = sample_repository.id
+    job.type = "backup"
+    job.status = "completed"
+    job.started_at = datetime.now(UTC)
+    job.finished_at = datetime.now(UTC)
     test_db.add(job)
     test_db.commit()
     test_db.refresh(job)
@@ -126,37 +125,36 @@ def sample_database_job(test_db, sample_repository):
 
 
 @pytest.fixture
-def sample_database_job_with_tasks(test_db, sample_repository):
+def sample_database_job_with_tasks(
+    test_db: Session, sample_repository: Repository
+) -> Job:
     """Create a Job with JobTasks in the test database."""
-    job = Job(
-        id=str(uuid.uuid4()),
-        repository_id=sample_repository.id,
-        type="backup",
-        status="completed",
-        started_at=datetime.now(UTC),
-        finished_at=datetime.now(UTC),
-    )
+    job = Job()
+    job.id = str(uuid.uuid4())
+    job.repository_id = sample_repository.id
+    job.type = "backup"
+    job.status = "completed"
+    job.started_at = datetime.now(UTC)
+    job.finished_at = datetime.now(UTC)
     test_db.add(job)
     test_db.flush()  # Get the job ID
 
-    task1 = JobTask(
-        job_id=job.id,
-        task_type="backup",
-        task_name="Backup Task",
-        task_order=0,
-        status="completed",
-        return_code=0,
-        output="Backup completed successfully\nFiles processed: 100",
-    )
-    task2 = JobTask(
-        job_id=job.id,
-        task_type="prune",
-        task_name="Prune Task",
-        task_order=1,
-        status="completed",
-        return_code=0,
-        output="Prune completed\nRemoved 5 archives",
-    )
+    task1 = JobTask()
+    task1.job_id = job.id
+    task1.task_type = "backup"
+    task1.task_name = "Backup Task"
+    task1.task_order = 0
+    task1.status = "completed"
+    task1.return_code = 0
+    task1.output = "Backup completed successfully\nFiles processed: 100"
+    task2 = JobTask()
+    task2.job_id = job.id
+    task2.task_type = "prune"
+    task2.task_name = "Prune Task"
+    task2.task_order = 1
+    task2.status = "completed"
+    task2.return_code = 0
+    task2.output = "Prune completed\nRemoved 5 archives"
 
     test_db.add_all([task1, task2])
     test_db.commit()
@@ -165,7 +163,7 @@ def sample_database_job_with_tasks(test_db, sample_repository):
 
 
 @pytest.fixture
-def job_manager_config():
+def job_manager_config() -> JobManagerConfig:
     """Standard JobManagerConfig for testing."""
     return JobManagerConfig(
         max_concurrent_backups=2,
@@ -176,7 +174,7 @@ def job_manager_config():
 
 
 @pytest.fixture
-def mock_subprocess_process():
+def mock_subprocess_process() -> AsyncMock:
     """Mock subprocess process for job execution testing."""
     process = AsyncMock()
     process.pid = 12345
@@ -186,7 +184,7 @@ def mock_subprocess_process():
     process.kill = Mock()
 
     # Mock stdout as async iterator
-    async def mock_stdout():
+    async def mock_stdout() -> AsyncGenerator[bytes, None]:
         yield b"Starting backup...\n"
         yield b"Processing files...\n"
         yield b"Backup completed\n"
@@ -196,14 +194,12 @@ def mock_subprocess_process():
 
 
 def create_mock_job_context(
-    job_id: str = None,
+    job_id: str = "",
     status: str = "completed",
     job_type: str = "simple",
-    tasks: List = None,
-) -> dict:
+    tasks: List[Dict[str, Any]] = [],
+) -> Dict[str, Any]:
     """Factory function to create mock job context for rendering tests."""
-    if job_id is None:
-        job_id = str(uuid.uuid4())
 
     mock_job = Mock()
     mock_job.id = job_id
@@ -232,7 +228,7 @@ def create_mock_job_context(
     }
 
 
-def create_mock_event_queue():
+def create_mock_event_queue() -> AsyncMock:
     """Factory function to create mock event queue for streaming tests."""
     queue = AsyncMock()
     queue.get = AsyncMock()
@@ -241,7 +237,7 @@ def create_mock_event_queue():
 
 
 @pytest.fixture
-def mock_event_broadcaster():
+def mock_event_broadcaster() -> Mock:
     """Mock event broadcaster for job event testing."""
     broadcaster = Mock()
     broadcaster.broadcast_event = Mock()
@@ -252,7 +248,7 @@ def mock_event_broadcaster():
 
 
 @pytest.fixture
-def mock_job_dependencies():
+def mock_job_dependencies() -> Dict[str, Any]:
     """Mock all job-related dependencies in one fixture."""
     return {
         "job_manager": Mock(),

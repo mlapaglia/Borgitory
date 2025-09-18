@@ -7,10 +7,17 @@ preventing cross-test contamination and enabling reliable test execution.
 
 import pytest
 from typing import List
+from unittest.mock import Mock
+from borgitory.services.cloud_providers.registry_factory import (
+    ProviderRegistry,
+    RegistryFactory,
+)
+from borgitory.services.jobs.job_manager import JobManagerDependencies
+from borgitory.services.jobs.job_executor import JobExecutor
 
 
 @pytest.fixture
-def clean_registry():
+def clean_registry() -> ProviderRegistry:
     """
     Create a fresh, empty registry for testing.
 
@@ -20,13 +27,12 @@ def clean_registry():
     Returns:
         ProviderRegistry: Empty registry instance
     """
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_empty_registry()
 
 
 @pytest.fixture
-def production_registry():
+def production_registry() -> ProviderRegistry:
     """
     Create a registry with all production providers registered.
 
@@ -42,58 +48,54 @@ def production_registry():
 
 
 @pytest.fixture
-def s3_only_registry():
+def s3_only_registry() -> ProviderRegistry:
     """
     Create a registry with only S3 provider registered.
 
     Returns:
         ProviderRegistry: Registry with only S3 provider
     """
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(["s3"])
 
 
 @pytest.fixture
-def sftp_only_registry():
+def sftp_only_registry() -> ProviderRegistry:
     """
     Create a registry with only SFTP provider registered.
 
     Returns:
         ProviderRegistry: Registry with only SFTP provider
     """
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(["sftp"])
 
 
 @pytest.fixture
-def smb_only_registry():
+def smb_only_registry() -> ProviderRegistry:
     """
     Create a registry with only SMB provider registered.
 
     Returns:
         ProviderRegistry: Registry with only SMB provider
     """
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(["smb"])
 
 
 @pytest.fixture
-def multi_provider_registry():
+def multi_provider_registry() -> ProviderRegistry:
     """
     Create a registry with S3 and SFTP providers (common test scenario).
 
     Returns:
         ProviderRegistry: Registry with S3 and SFTP providers
     """
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(["s3", "sftp"])
 
 
-def create_test_registry_with_providers(providers: List[str]):
+def create_test_registry_with_providers(providers: List[str]) -> ProviderRegistry:
     """
     Helper function to create a test registry with specific providers.
 
@@ -103,13 +105,12 @@ def create_test_registry_with_providers(providers: List[str]):
     Returns:
         ProviderRegistry: Registry with specified providers
     """
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_test_registry(providers)
 
 
 @pytest.fixture
-def isolated_job_dependencies():
+def isolated_job_dependencies() -> JobManagerDependencies:
     """
     Create JobManagerDependencies with an isolated registry for testing.
 
@@ -119,9 +120,6 @@ def isolated_job_dependencies():
     Returns:
         JobManagerDependencies: Dependencies with isolated registry
     """
-    from borgitory.services.jobs.job_manager import JobManagerDependencies
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
-    from unittest.mock import Mock
 
     # Create isolated registry
     registry = RegistryFactory.create_test_registry(["s3", "sftp", "smb"])
@@ -139,15 +137,13 @@ def isolated_job_dependencies():
 
 
 @pytest.fixture
-def job_executor_with_registry():
+def job_executor_with_registry() -> tuple[JobExecutor, ProviderRegistry]:
     """
     Create a JobExecutor with an isolated registry for testing.
 
     Returns:
         tuple: (JobExecutor, ProviderRegistry) for testing
     """
-    from borgitory.services.jobs.job_executor import JobExecutor
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     registry = RegistryFactory.create_test_registry(["s3", "sftp", "smb"])
     executor = JobExecutor()

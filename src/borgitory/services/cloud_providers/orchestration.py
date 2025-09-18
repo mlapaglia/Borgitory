@@ -8,7 +8,7 @@ with clean separation of concerns and easy testability.
 import asyncio
 import time
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 from .types import SyncEvent, SyncEventType, SyncResult
 from .storage import CloudStorage
@@ -36,7 +36,9 @@ class SyncEventHandler(ABC):
 class LoggingSyncEventHandler(SyncEventHandler):
     """Event handler that logs sync events"""
 
-    def __init__(self, logger, output_callback: Optional[Callable[[str], None]] = None):
+    def __init__(
+        self, logger: Any, output_callback: Optional[Callable[[str], None]] = None
+    ) -> None:
         """
         Initialize logging event handler.
 
@@ -73,7 +75,7 @@ class CloudSyncer:
     dependencies and simple return types.
     """
 
-    def __init__(self, storage: CloudStorage, event_handler: SyncEventHandler):
+    def __init__(self, storage: CloudStorage, event_handler: SyncEventHandler) -> None:
         """
         Initialize cloud syncer.
 
@@ -126,7 +128,7 @@ class CloudSyncer:
             bytes_transferred = 0
             files_transferred = 0
 
-            def progress_callback(event: SyncEvent):
+            def progress_callback(event: SyncEvent) -> None:
                 nonlocal bytes_transferred, files_transferred
 
                 # Extract metrics from progress events if available

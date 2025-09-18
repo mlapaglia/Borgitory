@@ -5,6 +5,7 @@ This test file ensures complete coverage of the service layer with
 proper DI patterns and real database usage where appropriate.
 """
 
+from typing import Any
 import pytest
 import json
 from unittest.mock import Mock, AsyncMock, patch
@@ -22,10 +23,10 @@ class TestConfigValidator:
     """Test ConfigValidator with all supported providers and edge cases"""
 
     @pytest.fixture
-    def validator(self):
+    def validator(self) -> ConfigValidator:
         return ConfigValidator()
 
-    def test_validate_s3_config_success(self, validator):
+    def test_validate_s3_config_success(self, validator: ConfigValidator) -> None:
         """Test successful S3 configuration validation"""
         config = {
             "bucket_name": "test-bucket",
@@ -43,7 +44,7 @@ class TestConfigValidator:
         assert result.access_key == "AKIAIOSFODNN7EXAMPLE"
         assert result.region == "us-east-1"
 
-    def test_validate_s3_config_minimal(self, validator):
+    def test_validate_s3_config_minimal(self, validator: ConfigValidator) -> None:
         """Test S3 config with minimal required fields"""
         config = {
             "bucket_name": "test-bucket",
@@ -59,7 +60,9 @@ class TestConfigValidator:
         assert result.region is not None
         assert result.storage_class is not None
 
-    def test_validate_s3_config_missing_bucket(self, validator):
+    def test_validate_s3_config_missing_bucket(
+        self, validator: ConfigValidator
+    ) -> None:
         """Test S3 config validation with missing bucket name"""
         config = {
             "access_key": "AKIAIOSFODNN7EXAMPLE",
@@ -69,14 +72,18 @@ class TestConfigValidator:
         with pytest.raises(Exception):  # Pydantic validation error
             validator.validate_config("s3", config)
 
-    def test_validate_s3_config_missing_credentials(self, validator):
+    def test_validate_s3_config_missing_credentials(
+        self, validator: ConfigValidator
+    ) -> None:
         """Test S3 config validation with missing credentials"""
         config = {"bucket_name": "test-bucket"}
 
         with pytest.raises(Exception):  # Pydantic validation error
             validator.validate_config("s3", config)
 
-    def test_validate_sftp_config_with_password(self, validator):
+    def test_validate_sftp_config_with_password(
+        self, validator: ConfigValidator
+    ) -> None:
         """Test successful SFTP configuration validation with password"""
         config = {
             "host": "sftp.example.com",
@@ -95,7 +102,9 @@ class TestConfigValidator:
         assert result.password == "testpass"
         assert result.port == 22
 
-    def test_validate_sftp_config_with_private_key(self, validator):
+    def test_validate_sftp_config_with_private_key(
+        self, validator: ConfigValidator
+    ) -> None:
         """Test SFTP configuration with private key authentication"""
         config = {
             "host": "sftp.example.com",
@@ -114,7 +123,7 @@ class TestConfigValidator:
         assert result.port == 2222
         assert result.host_key_checking is False
 
-    def test_validate_sftp_config_minimal(self, validator):
+    def test_validate_sftp_config_minimal(self, validator: ConfigValidator) -> None:
         """Test SFTP config with minimal required fields"""
         config = {
             "host": "sftp.example.com",
@@ -129,7 +138,9 @@ class TestConfigValidator:
         assert result.port == 22  # Default port
         assert result.host_key_checking is True  # Default
 
-    def test_validate_sftp_config_missing_auth(self, validator):
+    def test_validate_sftp_config_missing_auth(
+        self, validator: ConfigValidator
+    ) -> None:
         """Test SFTP config without password or private key"""
         config = {
             "host": "sftp.example.com",
@@ -140,21 +151,23 @@ class TestConfigValidator:
         with pytest.raises(Exception):  # Should require authentication
             validator.validate_config("sftp", config)
 
-    def test_validate_sftp_config_missing_required_fields(self, validator):
+    def test_validate_sftp_config_missing_required_fields(
+        self, validator: ConfigValidator
+    ) -> None:
         """Test SFTP config with missing required fields"""
         config = {"host": "sftp.example.com", "password": "testpass"}
 
         with pytest.raises(Exception):  # Missing username and remote_path
             validator.validate_config("sftp", config)
 
-    def test_validate_unknown_provider(self, validator):
+    def test_validate_unknown_provider(self, validator: ConfigValidator) -> None:
         """Test validation with unknown provider"""
         config = {"bucket_name": "test"}
 
         with pytest.raises(ValueError, match="Unknown provider: azure"):
             validator.validate_config("azure", config)
 
-    def test_validate_empty_config(self, validator):
+    def test_validate_empty_config(self, validator: ConfigValidator) -> None:
         """Test validation with empty configuration"""
         with pytest.raises(Exception):
             validator.validate_config("s3", {})
@@ -164,14 +177,16 @@ class TestStorageFactory:
     """Test StorageFactory with proper DI and all providers"""
 
     @pytest.fixture
-    def mock_rclone_service(self):
+    def mock_rclone_service(self) -> Mock:
         return Mock()
 
     @pytest.fixture
-    def factory(self, mock_rclone_service):
+    def factory(self, mock_rclone_service: Mock) -> StorageFactory:
         return StorageFactory(mock_rclone_service)
 
-    def test_create_s3_storage_success(self, factory, mock_rclone_service):
+    def test_create_s3_storage_success(
+        self, factory: StorageFactory, mock_rclone_service: Mock
+    ) -> None:
         """Test successful S3 storage creation"""
         config = {
             "bucket_name": "test-bucket",
@@ -186,7 +201,9 @@ class TestStorageFactory:
         assert hasattr(storage, "test_connection")
         assert hasattr(storage, "upload_repository")
 
-    def test_create_sftp_storage_success(self, factory, mock_rclone_service):
+    def test_create_sftp_storage_success(
+        self, factory: StorageFactory, mock_rclone_service: Mock
+    ) -> None:
         """Test successful SFTP storage creation"""
         config = {
             "host": "sftp.example.com",
@@ -201,21 +218,23 @@ class TestStorageFactory:
         assert hasattr(storage, "test_connection")
         assert hasattr(storage, "upload_repository")
 
-    def test_create_storage_invalid_config(self, factory):
+    def test_create_storage_invalid_config(self, factory: StorageFactory) -> None:
         """Test storage creation with invalid configuration"""
         config = {"invalid": "config"}
 
         with pytest.raises(Exception):  # Validation should fail
             factory.create_storage("s3", config)
 
-    def test_create_storage_unknown_provider(self, factory):
+    def test_create_storage_unknown_provider(self, factory: StorageFactory) -> None:
         """Test storage creation with unknown provider"""
         config = {"bucket_name": "test"}
 
         with pytest.raises(ValueError, match="Unknown provider: unknown"):
             factory.create_storage("unknown", config)
 
-    def test_factory_uses_injected_rclone_service(self, mock_rclone_service):
+    def test_factory_uses_injected_rclone_service(
+        self, mock_rclone_service: Mock
+    ) -> None:
         """Test that factory uses the injected rclone service"""
         factory = StorageFactory(mock_rclone_service)
 
@@ -231,7 +250,7 @@ class TestStorageFactory:
         # This verifies proper dependency injection
         assert storage is not None
 
-    def test_factory_validator_integration(self, factory):
+    def test_factory_validator_integration(self, factory: StorageFactory) -> None:
         """Test that factory properly integrates with validator"""
         # The factory should validate config before creating storage
         invalid_config = {}
@@ -244,11 +263,11 @@ class TestEncryptionService:
     """Test EncryptionService with real encryption/decryption"""
 
     @pytest.fixture
-    def service(self):
+    def service(self) -> EncryptionService:
         return EncryptionService()
 
     @pytest.fixture
-    def sample_config(self):
+    def sample_config(self) -> dict[str, Any]:
         return {
             "host": "example.com",
             "username": "testuser",
@@ -257,7 +276,9 @@ class TestEncryptionService:
             "public_key": "not-sensitive",
         }
 
-    def test_encrypt_sensitive_fields(self, service, sample_config):
+    def test_encrypt_sensitive_fields(
+        self, service: EncryptionService, sample_config: dict[str, Any]
+    ) -> None:
         """Test encryption of sensitive fields"""
         sensitive_fields = ["password"]
 
@@ -277,7 +298,9 @@ class TestEncryptionService:
         # Encrypted value should be different from original
         assert encrypted_config["encrypted_password"] != "secret123"
 
-    def test_decrypt_sensitive_fields(self, service, sample_config):
+    def test_decrypt_sensitive_fields(
+        self, service: EncryptionService, sample_config: dict[str, Any]
+    ) -> None:
         """Test decryption of sensitive fields"""
         sensitive_fields = ["password"]
 
@@ -298,7 +321,7 @@ class TestEncryptionService:
         # Non-sensitive fields should be unchanged
         assert decrypted_config["host"] == "example.com"
 
-    def test_encrypt_multiple_fields(self, service):
+    def test_encrypt_multiple_fields(self, service: EncryptionService) -> None:
         """Test encryption of multiple sensitive fields"""
         config = {
             "access_key": "AKIA123",
@@ -320,7 +343,7 @@ class TestEncryptionService:
         # Non-sensitive field should remain
         assert encrypted_config["region"] == "us-east-1"
 
-    def test_decrypt_multiple_fields(self, service):
+    def test_decrypt_multiple_fields(self, service: EncryptionService) -> None:
         """Test decryption of multiple sensitive fields"""
         config = {
             "access_key": "AKIA123",
@@ -340,14 +363,18 @@ class TestEncryptionService:
         assert decrypted_config["secret_key"] == "secret456"
         assert decrypted_config["region"] == "us-east-1"
 
-    def test_encrypt_empty_sensitive_fields(self, service, sample_config):
+    def test_encrypt_empty_sensitive_fields(
+        self, service: EncryptionService, sample_config: dict[str, Any]
+    ) -> None:
         """Test encryption with empty sensitive fields list"""
         encrypted_config = service.encrypt_sensitive_fields(sample_config, [])
 
         # Config should be unchanged
         assert encrypted_config == sample_config
 
-    def test_encrypt_nonexistent_fields(self, service, sample_config):
+    def test_encrypt_nonexistent_fields(
+        self, service: EncryptionService, sample_config: dict[str, Any]
+    ) -> None:
         """Test encryption of fields that don't exist in config"""
         sensitive_fields = ["nonexistent_field", "another_missing"]
 
@@ -358,7 +385,7 @@ class TestEncryptionService:
         # Config should be unchanged since fields don't exist
         assert encrypted_config == sample_config
 
-    def test_encrypt_empty_field_values(self, service):
+    def test_encrypt_empty_field_values(self, service: EncryptionService) -> None:
         """Test encryption of empty field values"""
         config = {"password": "", "secret_key": None, "host": "example.com"}
         sensitive_fields = ["password", "secret_key"]
@@ -376,7 +403,7 @@ class TestEncryptionService:
         )
         assert encrypted_config["host"] == "example.com"
 
-    def test_decrypt_missing_encrypted_fields(self, service):
+    def test_decrypt_missing_encrypted_fields(self, service: EncryptionService) -> None:
         """Test decryption when encrypted fields are missing"""
         config = {"host": "example.com", "username": "testuser"}
         sensitive_fields = ["password"]
@@ -386,7 +413,7 @@ class TestEncryptionService:
         # Should return config unchanged
         assert decrypted_config == config
 
-    def test_roundtrip_encryption_decryption(self, service):
+    def test_roundtrip_encryption_decryption(self, service: EncryptionService) -> None:
         """Test that encrypt->decrypt produces original data"""
         original_config = {
             "host": "sftp.example.com",
@@ -416,27 +443,29 @@ class TestCloudSyncService:
     """Test CloudSyncService with comprehensive coverage"""
 
     @pytest.fixture
-    def mock_storage_factory(self):
+    def mock_storage_factory(self) -> Mock:
         return Mock()
 
     @pytest.fixture
-    def mock_encryption_service(self):
+    def mock_encryption_service(self) -> Mock:
         return Mock()
 
     @pytest.fixture
-    def service(self, mock_storage_factory, mock_encryption_service):
+    def service(
+        self, mock_storage_factory: Mock, mock_encryption_service: Mock
+    ) -> CloudSyncService:
         return CloudSyncService(
             storage_factory=mock_storage_factory,
             encryption_service=mock_encryption_service,
         )
 
     @pytest.fixture
-    def service_with_defaults(self, mock_storage_factory):
+    def service_with_defaults(self, mock_storage_factory: Mock) -> CloudSyncService:
         """Service without injected encryption service (uses default)"""
         return CloudSyncService(storage_factory=mock_storage_factory)
 
     @pytest.fixture
-    def sample_s3_config(self):
+    def sample_s3_config(self) -> CloudSyncConfig:
         return CloudSyncConfig(
             provider="s3",
             config={
@@ -449,7 +478,7 @@ class TestCloudSyncService:
         )
 
     @pytest.fixture
-    def sample_sftp_config(self):
+    def sample_sftp_config(self) -> CloudSyncConfig:
         return CloudSyncConfig(
             provider="sftp",
             config={
@@ -463,8 +492,11 @@ class TestCloudSyncService:
 
     @pytest.mark.asyncio
     async def test_execute_sync_success(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test successful sync execution"""
         # Setup mocks
         mock_storage = AsyncMock()
@@ -500,15 +532,18 @@ class TestCloudSyncService:
 
     @pytest.mark.asyncio
     async def test_execute_sync_with_output_callback(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test sync execution with output callback"""
         mock_storage = AsyncMock()
         mock_storage_factory.create_storage.return_value = mock_storage
 
         output_messages = []
 
-        def output_callback(message):
+        def output_callback(message: str) -> None:
             output_messages.append(message)
 
         with patch(
@@ -526,8 +561,11 @@ class TestCloudSyncService:
 
     @pytest.mark.asyncio
     async def test_execute_sync_storage_creation_failure(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test sync when storage creation fails"""
         mock_storage_factory.create_storage.side_effect = Exception(
             "Invalid configuration"
@@ -536,13 +574,17 @@ class TestCloudSyncService:
         result = await service.execute_sync(sample_s3_config, "/test/repo")
 
         assert result.success is False
+        assert result.error is not None
         assert "Failed to execute sync" in result.error
         assert "Invalid configuration" in result.error
 
     @pytest.mark.asyncio
     async def test_execute_sync_syncer_failure(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test sync when syncer raises exception"""
         mock_storage = AsyncMock()
         mock_storage_factory.create_storage.return_value = mock_storage
@@ -557,19 +599,23 @@ class TestCloudSyncService:
             result = await service.execute_sync(sample_s3_config, "/test/repo")
 
         assert result.success is False
+        assert result.error is not None
         assert "Failed to execute sync" in result.error
         assert "Sync failed" in result.error
 
     @pytest.mark.asyncio
     async def test_execute_sync_with_callback_on_error(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test that output callback receives error messages"""
         mock_storage_factory.create_storage.side_effect = Exception("Storage error")
 
         output_messages = []
 
-        def output_callback(message):
+        def output_callback(message: str) -> None:
             output_messages.append(message)
 
         result = await service.execute_sync(
@@ -581,8 +627,11 @@ class TestCloudSyncService:
 
     @pytest.mark.asyncio
     async def test_test_connection_success(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test successful connection test"""
         mock_storage = AsyncMock()
         mock_storage.test_connection.return_value = True
@@ -595,8 +644,11 @@ class TestCloudSyncService:
 
     @pytest.mark.asyncio
     async def test_test_connection_failure(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test failed connection test"""
         mock_storage = AsyncMock()
         mock_storage.test_connection.return_value = False
@@ -608,8 +660,11 @@ class TestCloudSyncService:
 
     @pytest.mark.asyncio
     async def test_test_connection_exception(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test connection test with exception"""
         mock_storage_factory.create_storage.side_effect = Exception("Connection error")
 
@@ -618,8 +673,11 @@ class TestCloudSyncService:
         assert result is False
 
     def test_get_connection_info_success(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test successful connection info retrieval"""
         mock_storage = Mock()
         mock_storage.get_connection_info.return_value = "s3(bucket=test-bucket)"
@@ -630,8 +688,11 @@ class TestCloudSyncService:
         assert result == "s3(bucket=test-bucket)"
 
     def test_get_connection_info_exception(
-        self, service, mock_storage_factory, sample_s3_config
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        sample_s3_config: CloudSyncConfig,
+    ) -> None:
         """Test connection info with exception"""
         mock_storage_factory.create_storage.side_effect = Exception("Storage error")
 
@@ -641,8 +702,11 @@ class TestCloudSyncService:
         assert "Storage error" in result
 
     def test_prepare_config_for_storage(
-        self, service, mock_storage_factory, mock_encryption_service
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        mock_encryption_service: Mock,
+    ) -> None:
         """Test preparing config for database storage"""
         provider = "s3"
         config = {
@@ -678,8 +742,11 @@ class TestCloudSyncService:
         assert parsed_result == encrypted_config
 
     def test_load_config_from_storage(
-        self, service, mock_storage_factory, mock_encryption_service
-    ):
+        self,
+        service: CloudSyncService,
+        mock_storage_factory: Mock,
+        mock_encryption_service: Mock,
+    ) -> None:
         """Test loading config from database storage"""
         provider = "sftp"
         stored_config = json.dumps(
@@ -719,7 +786,9 @@ class TestCloudSyncService:
 
         assert result == decrypted_config
 
-    def test_service_with_default_encryption_service(self, service_with_defaults):
+    def test_service_with_default_encryption_service(
+        self, service_with_defaults: CloudSyncService
+    ) -> None:
         """Test that service creates default encryption service when none provided"""
         # This tests the default parameter handling in __init__
         assert service_with_defaults._encryption_service is not None
@@ -727,8 +796,8 @@ class TestCloudSyncService:
 
     @pytest.mark.asyncio
     async def test_execute_sync_different_providers(
-        self, service, mock_storage_factory
-    ):
+        self, service: CloudSyncService, mock_storage_factory: Mock
+    ) -> None:
         """Test sync execution with different provider types"""
         configs = [
             CloudSyncConfig(

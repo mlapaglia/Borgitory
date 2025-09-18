@@ -67,7 +67,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_create_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_create
-    ):
+    ) -> None:
         """Test successful config creation returns correct HTMX response."""
         from borgitory.api.repository_check_configs import (
             create_repository_check_config,
@@ -110,7 +110,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_create_config_failure_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_create
-    ):
+    ) -> None:
         """Test failed config creation returns correct HTMX error response."""
         from borgitory.api.repository_check_configs import (
             create_repository_check_config,
@@ -138,7 +138,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_create_config_server_error_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_create
-    ):
+    ) -> None:
         """Test server error during creation returns correct status code."""
         from borgitory.api.repository_check_configs import (
             create_repository_check_config,
@@ -163,7 +163,9 @@ class TestRepositoryCheckConfigsAPI:
             status_code=500,
         )
 
-    def test_get_configs_html_success(self, mock_request, mock_templates, mock_service):
+    def test_get_configs_html_success(
+        self, mock_request, mock_templates, mock_service
+    ) -> None:
         """Test getting configs HTML returns correct template response."""
         from borgitory.api.repository_check_configs import (
             get_repository_check_configs_html,
@@ -186,7 +188,7 @@ class TestRepositoryCheckConfigsAPI:
 
     def test_get_configs_html_exception(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting configs HTML with exception returns error template."""
         from borgitory.api.repository_check_configs import (
             get_repository_check_configs_html,
@@ -206,7 +208,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_get_form_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting form returns correct HTMX template response."""
         from borgitory.api.repository_check_configs import get_repository_check_form
 
@@ -226,7 +228,9 @@ class TestRepositoryCheckConfigsAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_policy_form_htmx_response(self, mock_request, mock_templates):
+    async def test_get_policy_form_htmx_response(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test getting policy form returns correct HTMX template response."""
         from borgitory.api.repository_check_configs import get_policy_form
 
@@ -242,7 +246,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_get_config_edit_form_success(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting edit form returns correct HTMX template response."""
         from borgitory.api.repository_check_configs import (
             get_repository_check_config_edit_form,
@@ -268,7 +272,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_get_config_edit_form_not_found(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test getting edit form for non-existent config raises HTTPException."""
         from borgitory.api.repository_check_configs import (
             get_repository_check_config_edit_form,
@@ -288,7 +292,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_update_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_update
-    ):
+    ) -> None:
         """Test successful config update returns correct HTMX response."""
         from borgitory.api.repository_check_configs import (
             update_repository_check_config,
@@ -319,7 +323,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_update_config_failure_htmx_response(
         self, mock_request, mock_templates, mock_service, sample_config_update
-    ):
+    ) -> None:
         """Test failed config update returns correct HTMX error response."""
         from borgitory.api.repository_check_configs import (
             update_repository_check_config,
@@ -342,7 +346,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_enable_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test successful config enable returns correct HTMX response."""
         from borgitory.api.repository_check_configs import (
             enable_repository_check_config,
@@ -374,7 +378,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_disable_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test successful config disable returns correct HTMX response."""
         from borgitory.api.repository_check_configs import (
             disable_repository_check_config,
@@ -406,7 +410,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_delete_config_success_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test successful config deletion returns correct HTMX response."""
         from borgitory.api.repository_check_configs import (
             delete_repository_check_config,
@@ -434,7 +438,7 @@ class TestRepositoryCheckConfigsAPI:
     @pytest.mark.asyncio
     async def test_delete_config_failure_htmx_response(
         self, mock_request, mock_templates, mock_service
-    ):
+    ) -> None:
         """Test failed config deletion returns correct HTMX error response."""
         from borgitory.api.repository_check_configs import (
             delete_repository_check_config,
@@ -454,7 +458,7 @@ class TestRepositoryCheckConfigsAPI:
             status_code=404,
         )
 
-    def test_get_config_by_id_success(self, mock_service):
+    def test_get_config_by_id_success(self, mock_service) -> None:
         """Test getting config by ID returns service result."""
         from borgitory.api.repository_check_configs import get_repository_check_config
 
@@ -469,7 +473,7 @@ class TestRepositoryCheckConfigsAPI:
         # Verify result is returned
         assert result == mock_config
 
-    def test_get_config_by_id_not_found(self, mock_service):
+    def test_get_config_by_id_not_found(self, mock_service) -> None:
         """Test getting non-existent config by ID raises HTTPException."""
         from borgitory.api.repository_check_configs import get_repository_check_config
         from fastapi import HTTPException
@@ -482,7 +486,9 @@ class TestRepositoryCheckConfigsAPI:
         assert exc_info.value.status_code == 404
         assert "Check policy not found" in str(exc_info.value.detail)
 
-    def test_toggle_custom_options_show_custom(self, mock_request, mock_templates):
+    def test_toggle_custom_options_show_custom(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test toggling custom options shows custom options when no config selected."""
         from borgitory.api.repository_check_configs import toggle_custom_options
 
@@ -495,7 +501,9 @@ class TestRepositoryCheckConfigsAPI:
             {"show_custom": True},
         )
 
-    def test_toggle_custom_options_hide_custom(self, mock_request, mock_templates):
+    def test_toggle_custom_options_hide_custom(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test toggling custom options hides custom options when config selected."""
         from borgitory.api.repository_check_configs import toggle_custom_options
 
@@ -510,7 +518,7 @@ class TestRepositoryCheckConfigsAPI:
 
     def test_update_check_options_repository_only_type(
         self, mock_request, mock_templates
-    ):
+    ) -> None:
         """Test update check options for repository_only check type."""
         from borgitory.api.repository_check_configs import update_check_options
 
@@ -532,7 +540,9 @@ class TestRepositoryCheckConfigsAPI:
         assert context["time_limit_display"] == "block"
         assert context["archive_filters_display"] == "none"
 
-    def test_update_check_options_full_check_type(self, mock_request, mock_templates):
+    def test_update_check_options_full_check_type(
+        self, mock_request, mock_templates
+    ) -> None:
         """Test update check options for full check type."""
         from borgitory.api.repository_check_configs import update_check_options
 

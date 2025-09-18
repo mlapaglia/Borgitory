@@ -166,57 +166,24 @@ exclude_lines = [
 ]
 
 [tool.mypy]
+strict = true
 python_version = "3.11"
 show_error_codes = true
 show_column_numbers = true
-
-warn_return_any = false
-warn_unused_configs = false
-check_untyped_defs = false
-no_implicit_optional = false
-warn_redundant_casts = false
-warn_unused_ignores = false
-warn_no_return = false
-warn_unreachable = false
-strict_equality = false
-
-disallow_any_unimported = false
-disallow_any_expr = false
-disallow_any_decorated = false
-disallow_any_explicit = false
-disallow_any_generics = false
-disallow_subclassing_any = false
-
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-disallow_untyped_decorators = false
-
-disable_error_code = [
-    "assignment",
-    "return-value", 
-    "arg-type",
-    "no-any-return",
-    "var-annotated",
-    "misc",
-    "valid-type",
-    "call-arg",
-    "index",
-    "dict-item",
-    "operator",
-    "annotation-unchecked",
-    "union-attr",
-    "attr-defined",
-]
+pretty = true
+disallow_any_unimported = true
+warn_incomplete_stub = true
+namespace_packages = true
+implicit_reexport = false
+strict_concatenate = true
 
 plugins = ["sqlalchemy.ext.mypy.plugin"]
-
 exclude = [
     "^alembic/",
     "^htmlcov/",
     "^\\.",
 ]
-
-files = ["src/borgitory", "tests"]
+files = ["src/borgitory"]
 
 [[tool.mypy.overrides]]
 module = [

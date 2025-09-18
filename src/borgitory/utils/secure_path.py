@@ -269,7 +269,7 @@ def secure_path_join(base_dir: str, *path_parts: str) -> str:
     return str(final_validated)
 
 
-def secure_exists(path: str, allowed_base_dirs: List[str] = None) -> bool:
+def secure_exists(path: str, allowed_base_dirs: Optional[List[str]] = None) -> bool:
     """
     Securely check if a path exists, validating it's under allowed directories.
 
@@ -291,7 +291,7 @@ def secure_exists(path: str, allowed_base_dirs: List[str] = None) -> bool:
         return False
 
 
-def secure_isdir(path: str, allowed_base_dirs: List[str] = None) -> bool:
+def secure_isdir(path: str, allowed_base_dirs: Optional[List[str]] = None) -> bool:
     """
     Securely check if a path is a directory, validating it's under allowed directories.
 
@@ -313,7 +313,9 @@ def secure_isdir(path: str, allowed_base_dirs: List[str] = None) -> bool:
         return False
 
 
-def secure_remove_file(file_path: str, allowed_base_dirs: List[str] = None) -> bool:
+def secure_remove_file(
+    file_path: str, allowed_base_dirs: Optional[List[str]] = None
+) -> bool:
     """
     Securely remove a file, validating it's under allowed directories.
 
@@ -340,7 +342,9 @@ def secure_remove_file(file_path: str, allowed_base_dirs: List[str] = None) -> b
 
 
 def get_directory_listing(
-    path: str, allowed_base_dirs: List[str] = None, include_files: bool = False
+    path: str,
+    allowed_base_dirs: Optional[List[str]] = None,
+    include_files: bool = False,
 ) -> List[Dict[str, str]]:
     """
     Get a secure directory listing with additional metadata.

@@ -33,7 +33,7 @@ from borgitory.services.volumes.volume_service import VolumeService
 class TestDependencies:
     """Test class for dependency providers."""
 
-    def test_get_simple_command_runner(self):
+    def test_get_simple_command_runner(self) -> None:
         """Test SimpleCommandRunner dependency provider."""
         runner = get_simple_command_runner()
 
@@ -44,7 +44,7 @@ class TestDependencies:
         runner2 = get_simple_command_runner()
         assert runner is runner2
 
-    def test_get_borg_service(self):
+    def test_get_borg_service(self) -> None:
         """Test BorgService dependency provider."""
         service = get_borg_service()
 
@@ -55,7 +55,7 @@ class TestDependencies:
         service2 = get_borg_service()
         assert service is service2
 
-    def test_borg_service_has_injected_command_runner(self):
+    def test_borg_service_has_injected_command_runner(self) -> None:
         """Test that BorgService receives the proper command runner dependency."""
         service = get_borg_service()
         command_runner = get_simple_command_runner()
@@ -63,7 +63,7 @@ class TestDependencies:
         # The command runner should be the same instance (singleton pattern)
         assert service.command_runner is command_runner
 
-    def test_borg_service_has_injected_volume_service(self):
+    def test_borg_service_has_injected_volume_service(self) -> None:
         """Test that BorgService receives the proper volume service dependency."""
         service = get_borg_service()
         volume_service = get_volume_service()
@@ -71,7 +71,7 @@ class TestDependencies:
         # The volume service should be the same instance (singleton pattern)
         assert service.volume_service is volume_service
 
-    def test_dependency_isolation_in_tests(self):
+    def test_dependency_isolation_in_tests(self) -> None:
         """Test that dependencies can be properly mocked in tests."""
         from unittest.mock import Mock
 
@@ -82,7 +82,7 @@ class TestDependencies:
         assert service.command_runner is mock_runner
         assert isinstance(mock_runner, Mock)
 
-    def test_get_job_service(self):
+    def test_get_job_service(self) -> None:
         """Test JobService dependency provider."""
         service = get_job_service()
 
@@ -93,7 +93,7 @@ class TestDependencies:
         assert service is not service2  # Different instances
         assert isinstance(service2, JobService)
 
-    def test_get_recovery_service(self):
+    def test_get_recovery_service(self) -> None:
         """Test RecoveryService dependency provider."""
         service = get_recovery_service()
 
@@ -103,7 +103,7 @@ class TestDependencies:
         service2 = get_recovery_service()
         assert service is service2
 
-    def test_get_pushover_service(self):
+    def test_get_pushover_service(self) -> None:
         """Test PushoverService dependency provider."""
         service = get_pushover_service()
 
@@ -113,7 +113,7 @@ class TestDependencies:
         service2 = get_pushover_service()
         assert service is service2
 
-    def test_get_job_stream_service(self):
+    def test_get_job_stream_service(self) -> None:
         """Test JobStreamService dependency provider."""
         service = get_job_stream_service()
 
@@ -123,7 +123,7 @@ class TestDependencies:
         service2 = get_job_stream_service()
         assert service is service2
 
-    def test_get_job_render_service(self):
+    def test_get_job_render_service(self) -> None:
         """Test JobRenderService dependency provider."""
         service = get_job_render_service()
 
@@ -133,7 +133,7 @@ class TestDependencies:
         service2 = get_job_render_service()
         assert service is service2
 
-    def test_get_debug_service(self):
+    def test_get_debug_service(self) -> None:
         """Test DebugService dependency provider."""
         service = get_debug_service()
 
@@ -143,7 +143,7 @@ class TestDependencies:
         service2 = get_debug_service()
         assert service is service2
 
-    def test_debug_service_has_injected_volume_service(self):
+    def test_debug_service_has_injected_volume_service(self) -> None:
         """Test that DebugService receives the proper volume service dependency."""
         service = get_debug_service()
         volume_service = get_volume_service()
@@ -151,7 +151,7 @@ class TestDependencies:
         # The volume service should be the same instance (singleton pattern)
         assert service.volume_service is volume_service
 
-    def test_get_rclone_service(self):
+    def test_get_rclone_service(self) -> None:
         """Test RcloneService dependency provider."""
         service = get_rclone_service()
 
@@ -161,7 +161,7 @@ class TestDependencies:
         service2 = get_rclone_service()
         assert service is service2
 
-    def test_get_repository_stats_service(self):
+    def test_get_repository_stats_service(self) -> None:
         """Test RepositoryStatsService dependency provider."""
         service = get_repository_stats_service()
 
@@ -171,7 +171,7 @@ class TestDependencies:
         service2 = get_repository_stats_service()
         assert service is service2
 
-    def test_get_volume_service(self):
+    def test_get_volume_service(self) -> None:
         """Test VolumeService dependency provider."""
         service = get_volume_service()
 
@@ -181,7 +181,7 @@ class TestDependencies:
         service2 = get_volume_service()
         assert service is service2
 
-    def test_default_initialization_still_works(self):
+    def test_default_initialization_still_works(self) -> None:
         """Test that services can still be initialized without dependency injection."""
         from unittest.mock import Mock
 

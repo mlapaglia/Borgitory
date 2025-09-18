@@ -4,10 +4,11 @@ RepositoryParser - Handles Borg repository discovery and parsing
 
 import asyncio
 import configparser
+import json
 import logging
 import os
 from datetime import datetime, UTC
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from borgitory.models.database import Repository
 from borgitory.services.simple_command_runner import SimpleCommandRunner
@@ -32,11 +33,11 @@ class RepositoryParser:
         self,
         command_runner: Optional[SimpleCommandRunner] = None,
         job_manager: Optional[JobManager] = None,
-    ):
+    ) -> None:
         self.command_runner = command_runner or SimpleCommandRunner()
         self.job_manager = job_manager
 
-    def parse_borg_config(self, repo_path: str) -> Dict[str, any]:
+    def parse_borg_config(self, repo_path: str) -> Dict[str, Any]:
         """Parse a Borg repository config file to determine encryption mode"""
         config_path = os.path.join(repo_path, "config")
 
@@ -175,10 +176,8 @@ class RepositoryParser:
                 "preview": f"Parse error: {str(e)}",
             }
 
-    async def start_repository_scan(self, scan_path: str = None) -> str:
+    async def start_repository_scan(self, scan_path: str = "/mnt") -> str:
         """Start an asynchronous repository scan and return job_id for tracking"""
-        if scan_path is None:
-            scan_path = "/mnt"
 
         logger.info(f"Starting repository scan in {scan_path}")
 
@@ -233,7 +232,7 @@ class RepositoryParser:
             logger.error(f"Failed to start repository scan: {e}")
             raise
 
-    async def check_scan_status(self, job_id: str) -> Dict[str, any]:
+    async def check_scan_status(self, job_id: str) -> Dict[str, Any]:
         """Check the status of a running repository scan"""
         try:
             if not self.job_manager:
@@ -267,7 +266,7 @@ class RepositoryParser:
                 "error": str(e),
             }
 
-    async def get_scan_results(self, job_id: str) -> List[Dict]:
+    async def get_scan_results(self, job_id: str) -> List[Dict[str, Any]]:
         """Get the results of a completed repository scan"""
         try:
             if not self.job_manager:
@@ -290,9 +289,9 @@ class RepositoryParser:
             logger.error(f"Error getting scan results for job {job_id}: {e}")
             return []
 
-    async def _parse_scan_output(self, output: str) -> List[Dict]:
+    async def _parse_scan_output(self, output: str) -> List[Dict[str, Any]]:
         """Parse the output from find command to identify potential Borg repositories"""
-        repositories = []
+        repositories: List[Dict[str, Any]] = []
 
         if not output.strip():
             logger.warning("Scan output is empty")
@@ -345,7 +344,7 @@ class RepositoryParser:
         logger.info(f"Found {len(repositories)} repositories total")
         return repositories
 
-    async def _get_repository_metadata(self, repo_path: str) -> Dict[str, any]:
+    async def _get_repository_metadata(self, repo_path: str) -> Dict[str, Any]:
         """Try to get additional metadata about a repository (size, last backup, etc.)"""
         metadata = {}
 
@@ -357,7 +356,7 @@ class RepositoryParser:
                     ["du", "-sh", repo_path],
                     timeout=10,  # Quick timeout
                 )
-                if result.returncode == 0:
+                if result.return_code == 0:
                     size_line = result.stdout.strip().split("\t")[0]
                     metadata["size"] = size_line
         except Exception as e:
@@ -368,7 +367,7 @@ class RepositoryParser:
             data_dir = os.path.join(repo_path, "data")
             if os.path.exists(data_dir):
                 # Get the most recent modification time in the data directory
-                latest_mtime = 0
+                latest_mtime = 0.0
                 for root, dirs, files in os.walk(data_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
@@ -389,8 +388,8 @@ class RepositoryParser:
         return metadata
 
     async def verify_repository_access(
-        self, repository: Repository, test_passphrase: str = None
-    ) -> Dict[str, any]:
+        self, repository: Repository, test_passphrase: str = ""
+    ) -> Dict[str, Any]:
         """Verify that we can access a repository with given credentials"""
         try:
             # Use the provided passphrase or the one stored in the repository
@@ -424,7 +423,7 @@ class RepositoryParser:
 
             # Wait for completion with a reasonable timeout
             max_wait = 15  # 15 seconds should be enough for info command
-            wait_time = 0
+            wait_time = 0.0
 
             while wait_time < max_wait:
                 status = job_manager.get_job_status(job_id)
@@ -468,8 +467,6 @@ class RepositoryParser:
 
                         try:
                             if output.strip():
-                                import json
-
                                 repo_info = json.loads(output)
                         except json.JSONDecodeError:
                             # Output might not be JSON, that's okay
@@ -500,7 +497,9 @@ class RepositoryParser:
                 "requires_passphrase": True,
             }
 
-    async def scan_for_repositories(self, scan_path: str = None) -> List[Dict]:
+    async def scan_for_repositories(
+        self, scan_path: str = "/mnt"
+    ) -> List[Dict[str, Any]]:
         """Legacy method - use start_repository_scan + check_scan_status + get_scan_results instead"""
         job_id = await self.start_repository_scan(scan_path)
 
@@ -520,7 +519,7 @@ class RepositoryParser:
                         f"Current output: {status['output'][-200:]}"
                     )  # Last 200 chars
 
-            if status["completed"]:
+            if status.get("completed"):
                 logger.info(f"Scan completed after {wait_time}s")
                 return await self.get_scan_results(job_id)
 

@@ -11,11 +11,11 @@ class TestCronDescriptionAPI:
     """Test suite for the cron description HTMX endpoint."""
 
     @pytest.fixture
-    def client(self):
+    def client(self) -> TestClient:
         """Create test client."""
         return TestClient(app)
 
-    def test_describe_cron_expression_valid(self, client):
+    def test_describe_cron_expression_valid(self, client) -> None:
         """Test valid cron expression returns proper HTML response."""
         response = client.get(
             "/api/schedules/cron/describe?custom_cron_input=0%2012%20*%20*%20*"
@@ -29,7 +29,7 @@ class TestCronDescriptionAPI:
         assert "Schedule:" in html_content
         assert "bg-blue-50" in html_content  # Success styling
 
-    def test_describe_cron_expression_invalid(self, client):
+    def test_describe_cron_expression_invalid(self, client) -> None:
         """Test invalid cron expression returns error HTML."""
         response = client.get(
             "/api/schedules/cron/describe?custom_cron_input=invalid%20cron"
@@ -43,7 +43,7 @@ class TestCronDescriptionAPI:
         assert "bg-red-50" in html_content  # Error styling
         assert "Invalid" in html_content
 
-    def test_describe_cron_expression_empty(self, client):
+    def test_describe_cron_expression_empty(self, client) -> None:
         """Test empty cron expression returns empty response."""
         response = client.get("/api/schedules/cron/describe?custom_cron_input=")
 
@@ -52,7 +52,7 @@ class TestCronDescriptionAPI:
         # Should return empty div or minimal content
         assert len(html_content) < 50  # Very minimal response
 
-    def test_describe_cron_expression_whitespace(self, client):
+    def test_describe_cron_expression_whitespace(self, client) -> None:
         """Test cron expression with whitespace is handled properly."""
         response = client.get(
             "/api/schedules/cron/describe?custom_cron_input=%20%200%2012%20*%20*%20*%20%20"
@@ -63,7 +63,7 @@ class TestCronDescriptionAPI:
         assert "12:00 PM" in html_content or "12:00" in html_content
         assert "Schedule:" in html_content
 
-    def test_describe_cron_expression_missing_field(self, client):
+    def test_describe_cron_expression_missing_field(self, client) -> None:
         """Test request without custom_cron_input field."""
 
         response = client.get("/api/schedules/cron/describe")
@@ -73,7 +73,7 @@ class TestCronDescriptionAPI:
         # Should handle missing field gracefully
         assert len(html_content) < 50
 
-    def test_describe_cron_expression_complex_valid(self, client):
+    def test_describe_cron_expression_complex_valid(self, client) -> None:
         """Test complex valid cron expressions."""
         test_cases = [
             "*/5 * * * *",  # Every 5 minutes
@@ -94,7 +94,7 @@ class TestCronDescriptionAPI:
             )
             assert "bg-blue-50" in html_content, f"No success styling for: {cron_expr}"
 
-    def test_describe_cron_expression_complex_invalid(self, client):
+    def test_describe_cron_expression_complex_invalid(self, client) -> None:
         """Test complex invalid cron expressions."""
         invalid_cases = [
             "1 2 3",  # Too few parts
@@ -112,7 +112,7 @@ class TestCronDescriptionAPI:
             assert "Error:" in html_content, f"No error message for: {cron_expr}"
             assert "bg-red-50" in html_content, f"No error styling for: {cron_expr}"
 
-    def test_htmx_response_structure(self, client):
+    def test_htmx_response_structure(self, client) -> None:
         """Test that response is structured for HTMX replacement."""
         response = client.get(
             "/api/schedules/cron/describe?custom_cron_input=0%2012%20*%20*%20*"
@@ -127,13 +127,13 @@ class TestCronDescriptionAPI:
         assert "p-2" in html_content  # Has padding
         assert "rounded" in html_content  # Has border radius
 
-    def test_concurrent_requests(self, client):
+    def test_concurrent_requests(self, client) -> None:
         """Test that multiple concurrent requests work properly."""
         import threading
 
         results = []
 
-        def make_request(cron_expr):
+        def make_request(cron_expr) -> None:
             from urllib.parse import quote
 
             response = client.get(
@@ -168,7 +168,7 @@ class TestCronDescriptionAPI:
     @patch(
         "borgitory.services.cron_description_service.CronDescriptionService.get_human_description"
     )
-    def test_service_integration(self, mock_service, client):
+    def test_service_integration(self, mock_service, client) -> None:
         """Test that the endpoint properly integrates with the service."""
         # Mock the service response
         mock_service.return_value = {"description": "Mocked description", "error": None}
@@ -187,7 +187,7 @@ class TestCronDescriptionAPI:
     @patch(
         "borgitory.services.cron_description_service.CronDescriptionService.get_human_description"
     )
-    def test_service_error_handling(self, mock_service, client):
+    def test_service_error_handling(self, mock_service, client) -> None:
         """Test that service errors are properly handled."""
         # Mock the service to return an error
         mock_service.return_value = {
@@ -207,7 +207,7 @@ class TestCronDescriptionAPI:
         assert "Mocked error message" in html_content
         assert "bg-red-50" in html_content
 
-    def test_response_caching_headers(self, client):
+    def test_response_caching_headers(self, client) -> None:
         """Test that responses have appropriate caching headers for HTMX."""
         response = client.get(
             "/api/schedules/cron/describe?custom_cron_input=0%2012%20*%20*%20*"
@@ -219,7 +219,7 @@ class TestCronDescriptionAPI:
         assert "content-type" in response.headers
         assert response.headers["content-type"].startswith("text/html")
 
-    def test_form_data_parsing_edge_cases(self, client):
+    def test_form_data_parsing_edge_cases(self, client) -> None:
         """Test edge cases in form data parsing."""
         edge_cases = [
             {},  # Empty form data

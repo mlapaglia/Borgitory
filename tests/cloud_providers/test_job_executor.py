@@ -15,24 +15,27 @@ class TestJobExecutor:
     """Test JobExecutor with clean architecture"""
 
     @pytest.fixture
-    def job_executor(self):
+    def job_executor(self) -> JobExecutor:
         """Create JobExecutor instance"""
         return JobExecutor()
 
     @pytest.fixture
-    def mock_cloud_sync_service(self):
+    def mock_cloud_sync_service(self) -> AsyncMock:
         """Mock cloud sync service"""
         return AsyncMock()
 
     @pytest.fixture
-    def mock_config_load_service(self):
+    def mock_config_load_service(self) -> AsyncMock:
         """Mock config load service"""
         return AsyncMock()
 
     @pytest.mark.asyncio
     async def test_successful_cloud_sync(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test successful cloud sync - simple and focused!"""
         # Arrange
         config = CloudSyncConfig(
@@ -64,8 +67,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_successful_sync_with_metrics(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test successful sync with detailed metrics"""
         config = CloudSyncConfig(
             provider="sftp", config={"host": "backup.example.com"}, name="backup-server"
@@ -97,8 +103,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_config_not_found(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test when config is not found - equally simple!"""
         # Arrange
         mock_config_load_service.load_config.return_value = None
@@ -121,8 +130,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_config_disabled(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test when config is disabled"""
         # Config service returns None for disabled configs
         mock_config_load_service.load_config.return_value = None
@@ -140,8 +152,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_sync_failure(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test sync failure handling"""
         # Arrange
         config = CloudSyncConfig(provider="s3", config={"bucket_name": "test-bucket"})
@@ -165,8 +180,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_sync_failure_with_partial_success(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test sync failure that transferred some data"""
         config = CloudSyncConfig(provider="s3", config={"bucket_name": "test"})
         mock_config_load_service.load_config.return_value = config
@@ -191,8 +209,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_zero_config_id(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test when config ID is 0 (falsy but valid ID)"""
         config = CloudSyncConfig(provider="s3", config={"bucket_name": "test"})
         mock_config_load_service.load_config.return_value = config
@@ -213,8 +234,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_with_output_callback(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test that output callback is passed through correctly"""
         # Arrange
         config = CloudSyncConfig(provider="s3", config={"bucket_name": "test"})
@@ -223,7 +247,7 @@ class TestJobExecutor:
 
         output_messages = []
 
-        def output_callback(message):
+        def output_callback(message: str) -> None:
             output_messages.append(message)
 
         # Act
@@ -244,8 +268,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_output_callback_with_failure(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test output callback receives failure messages"""
         config = CloudSyncConfig(provider="s3", config={"bucket_name": "test"})
         mock_config_load_service.load_config.return_value = config
@@ -255,7 +282,7 @@ class TestJobExecutor:
 
         output_messages = []
 
-        def output_callback(message):
+        def output_callback(message: str) -> None:
             output_messages.append(message)
 
         await job_executor.execute_cloud_sync_task_v2(
@@ -272,8 +299,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_config_load_exception(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test exception during config loading"""
         # Arrange
         mock_config_load_service.load_config.side_effect = Exception(
@@ -290,7 +320,9 @@ class TestJobExecutor:
 
         # Assert
         assert result.return_code == -1
+        assert result.error is not None
         assert "Database connection failed" in result.error
+        assert result.error is not None
         assert b"Database connection failed" in result.stderr
 
         # Sync service should not be called
@@ -298,8 +330,11 @@ class TestJobExecutor:
 
     @pytest.mark.asyncio
     async def test_sync_service_exception(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test exception during sync execution"""
         config = CloudSyncConfig(provider="s3", config={"bucket_name": "test"})
         mock_config_load_service.load_config.return_value = config
@@ -315,18 +350,22 @@ class TestJobExecutor:
         )
 
         assert result.return_code == -1
+        assert result.error is not None
         assert "Sync service crashed" in result.error
 
     @pytest.mark.asyncio
     async def test_exception_with_output_callback(
-        self, job_executor, mock_cloud_sync_service, mock_config_load_service
-    ):
+        self,
+        job_executor: JobExecutor,
+        mock_cloud_sync_service: AsyncMock,
+        mock_config_load_service: AsyncMock,
+    ) -> None:
         """Test that exceptions are reported to output callback"""
         mock_config_load_service.load_config.side_effect = Exception("Config error")
 
         output_messages = []
 
-        def output_callback(message):
+        def output_callback(message: str) -> None:
             output_messages.append(message)
 
         result = await job_executor.execute_cloud_sync_task_v2(
@@ -339,6 +378,7 @@ class TestJobExecutor:
 
         assert result.return_code == -1
         # Should have received error message through callback
+        assert result.error is not None
         assert any("Config error" in msg for msg in output_messages)
 
 
@@ -346,7 +386,7 @@ class TestWithRealMockConfigService:
     """Test using the MockConfigLoadService for more realistic scenarios"""
 
     @pytest.mark.asyncio
-    async def test_with_predefined_configs(self):
+    async def test_with_predefined_configs(self) -> None:
         """Test using MockConfigLoadService with predefined configs"""
         # Arrange
         configs = {
@@ -417,7 +457,7 @@ class TestWithRealMockConfigService:
         assert b"configuration disabled" in result.stdout
 
     @pytest.mark.asyncio
-    async def test_multiple_provider_types(self):
+    async def test_multiple_provider_types(self) -> None:
         """Test with different provider types"""
         configs = {
             10: CloudSyncConfig(
