@@ -87,9 +87,7 @@ class ArchiveManager:
             f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
         )
 
-        from borgitory.services.archives.archive_mount_manager import (
-            get_archive_mount_manager,
-        )
+        from borgitory.dependencies import get_archive_mount_manager
 
         mount_manager = get_archive_mount_manager()
 
@@ -102,7 +100,7 @@ class ArchiveManager:
         logger.info(
             f"Listed {len(contents)} items from mounted archive {archive_name} path '{path}'"
         )
-        return contents
+        return contents  # type: ignore[no-any-return]
 
     def _filter_directory_contents(
         self, all_entries: List[Dict[str, Any]], target_path: str = ""

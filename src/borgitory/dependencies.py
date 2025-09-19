@@ -591,3 +591,17 @@ UpcomingBackupsServiceDep = Annotated[
 ]
 CloudSyncServiceDep = Annotated["CloudSyncService", Depends(get_cloud_sync_service)]
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
+
+
+@lru_cache()
+def get_archive_mount_manager() -> Any:
+    """Get the ArchiveMountManager instance."""
+    from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
+    from borgitory.services.jobs.job_executor import JobExecutor
+    
+    return ArchiveMountManager(
+        job_executor=JobExecutor()
+    )
+
+
+ArchiveMountManagerDep = Annotated[Any, Depends(get_archive_mount_manager)]

@@ -269,13 +269,12 @@ def secure_path_join(base_dir: str, *path_parts: str) -> str:
     return str(final_validated)
 
 
-def secure_exists(path: str, allowed_base_dirs: Optional[List[str]] = None) -> bool:
+def secure_exists(path: str) -> bool:
     """
     Securely check if a path exists, validating it's under allowed directories.
 
     Args:
         path: The path to check
-        allowed_base_dirs: Ignored - kept for backward compatibility
 
     Returns:
         True if path exists and is under /mnt or /app/data
@@ -291,13 +290,12 @@ def secure_exists(path: str, allowed_base_dirs: Optional[List[str]] = None) -> b
         return False
 
 
-def secure_isdir(path: str, allowed_base_dirs: Optional[List[str]] = None) -> bool:
+def secure_isdir(path: str) -> bool:
     """
     Securely check if a path is a directory, validating it's under allowed directories.
 
     Args:
         path: The path to check
-        allowed_base_dirs: Ignored - kept for backward compatibility
 
     Returns:
         True if path is a directory and is under /mnt or /app/data
@@ -313,15 +311,12 @@ def secure_isdir(path: str, allowed_base_dirs: Optional[List[str]] = None) -> bo
         return False
 
 
-def secure_remove_file(
-    file_path: str, allowed_base_dirs: Optional[List[str]] = None
-) -> bool:
+def secure_remove_file(file_path: str) -> bool:
     """
     Securely remove a file, validating it's under allowed directories.
 
     Args:
         file_path: Path to the file to remove
-        allowed_base_dirs: Ignored - kept for backward compatibility
 
     Returns:
         True if file was removed or didn't exist, False if operation failed
@@ -343,7 +338,6 @@ def secure_remove_file(
 
 def get_directory_listing(
     path: str,
-    allowed_base_dirs: Optional[List[str]] = None,
     include_files: bool = False,
 ) -> List[Dict[str, str]]:
     """
@@ -351,7 +345,6 @@ def get_directory_listing(
 
     Args:
         path: Directory path to list
-        allowed_base_dirs: Ignored - kept for backward compatibility
         include_files: Whether to include files (default: directories only)
 
     Returns:

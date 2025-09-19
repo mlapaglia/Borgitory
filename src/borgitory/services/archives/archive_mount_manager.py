@@ -372,27 +372,4 @@ class ArchiveMountManager:
         }
 
 
-# Global instance - will be deprecated in favor of proper DI
-_mount_manager: Optional[ArchiveMountManager] = None
-
-
-def get_archive_mount_manager(
-    base_mount_dir: Optional[str] = None,
-    job_executor: Optional[JobExecutor] = None,
-    cleanup_interval: int = 300,
-    mount_timeout: int = 1800,
-) -> ArchiveMountManager:
-    """Get the global archive mount manager instance
-
-    This function provides backward compatibility but dependency injection
-    should be preferred for new code.
-    """
-    global _mount_manager
-    if _mount_manager is None:
-        _mount_manager = ArchiveMountManager(
-            base_mount_dir=base_mount_dir,
-            job_executor=job_executor,
-            cleanup_interval=cleanup_interval,
-            mount_timeout=mount_timeout,
-        )
-    return _mount_manager
+# Global instance removed - use dependency injection via dependencies.py
