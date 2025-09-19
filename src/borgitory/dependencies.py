@@ -51,6 +51,7 @@ from borgitory.services.cloud_providers import EncryptionService, StorageFactory
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncService
+    from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
     from borgitory.protocols.command_protocols import (
         CommandRunnerProtocol,
         ProcessExecutorProtocol,
@@ -594,7 +595,7 @@ ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)
 
 
 @lru_cache()
-def get_archive_mount_manager() -> Any:
+def get_archive_mount_manager() -> "ArchiveMountManager":
     """Get the ArchiveMountManager instance."""
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
     from borgitory.services.jobs.job_executor import JobExecutor
@@ -602,4 +603,6 @@ def get_archive_mount_manager() -> Any:
     return ArchiveMountManager(job_executor=JobExecutor())
 
 
-ArchiveMountManagerDep = Annotated[Any, Depends(get_archive_mount_manager)]
+ArchiveMountManagerDep = Annotated[
+    "ArchiveMountManager", Depends(get_archive_mount_manager)
+]
