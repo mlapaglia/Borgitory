@@ -404,7 +404,7 @@ async def get_notification_form(
     except Exception as e:
         logger.error(f"Error getting notification form: {e}")
         return HTMLResponse(
-            f'<div class="text-red-500">Error loading form: {str(e)}</div>',
+            '<div class="text-red-500">Failed to load notification form.</div>',
             status_code=500,
         )
 
