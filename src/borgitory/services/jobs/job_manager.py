@@ -1821,11 +1821,8 @@ def create_job_manager(
             max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
             max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
         )
-    elif hasattr(config, "to_internal_config"):
-        # Backward compatible config wrapper
-        internal_config = config.to_internal_config()
     else:
-        # Assume it's already a JobManagerConfig
+        # Assume it's already a JobManagerConfig or compatible
         internal_config = config
 
     # Create dependencies with rclone service
@@ -1860,13 +1857,6 @@ def get_test_job_manager_dependencies(
         mock_rclone_service=mock_rclone_service,
     )
 
-
-# Backward compatibility aliases
-BorgJobManager = JobManager
-ModularBorgJobManager = JobManager  # For transitional compatibility
-BorgJobManagerConfig = JobManagerConfig
-
-
 # Export all public classes and functions
 __all__ = [
     "JobManager",
@@ -1878,8 +1868,4 @@ __all__ = [
     "create_job_manager",
     "get_default_job_manager_dependencies",
     "get_test_job_manager_dependencies",
-    # Backward compatibility
-    "BorgJobManager",
-    "ModularBorgJobManager",
-    "BorgJobManagerConfig",
 ]
