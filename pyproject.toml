@@ -181,18 +181,27 @@ exclude_lines = [
 ]
 
 [tool.mypy]
-strict = true
+# Basic settings
 python_version = "3.11"
-show_error_codes = true
-show_column_numbers = true
-pretty = true
-disallow_any_unimported = true
-warn_incomplete_stub = true
-namespace_packages = true
-implicit_reexport = false
-strict_concatenate = true
+strict = true
 
-plugins = ["sqlalchemy.ext.mypy.plugin"]
+# Display options
+pretty = true
+show_column_numbers = true
+show_error_codes = true
+
+# Any-related rules
+disallow_any_explicit = true
+disallow_any_unimported = true
+warn_return_any = true
+
+# Other strict rules
+implicit_reexport = false
+namespace_packages = true
+strict_concatenate = true
+warn_incomplete_stub = true
+
+# File configuration
 exclude = [
     "^alembic/",
     "^htmlcov/",
@@ -200,19 +209,31 @@ exclude = [
 ]
 files = ["src/borgitory"]
 
+# Plugins
+plugins = [
+    "pydantic.mypy",
+    "sqlalchemy.ext.mypy.plugin",
+]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
+
 [[tool.mypy.overrides]]
 module = [
-    "sqlalchemy.*",
-    "alembic.*",
-    "passlib.*",
-    "bcrypt.*",
-    "cryptography.*",
-    "docker.*",
     "aiofiles.*",
     "aiohttp.*",
+    "alembic.*",
     "apscheduler.*",
+    "bcrypt.*",
     "cron_descriptor.*",
+    "cryptography.*",
+    "docker.*",
+    "passlib.*",
     "pyfuse3.*",
+    "sqlalchemy.*",
     "sse_starlette.*",
 ]
 ignore_missing_imports = true

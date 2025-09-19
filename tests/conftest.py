@@ -43,6 +43,11 @@ from tests.fixtures.registry_fixtures import (  # noqa: F401
     s3_only_registry,
     sftp_only_registry,
     smb_only_registry,
+    # Notification registry fixtures
+    notification_registry,
+    clean_notification_registry,
+    pushover_only_notification_registry,
+    discord_only_notification_registry,
 )
 
 

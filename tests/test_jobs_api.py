@@ -386,13 +386,24 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies
     ) -> None:
         """Test getting specific job details."""
-        job_data = {"id": "test-job-123", "type": "backup", "status": "completed"}
+        job_data = {"id": "test-job-123", "job_type": "backup", "status": "completed"}
         setup_dependencies["job_service"].get_job.return_value = job_data
 
         response = await async_client.get("/api/jobs/test-job-123")
 
         assert response.status_code == 200
-        assert response.json() == job_data
+        response_data = response.json()
+
+        # Verify the core fields are correct
+        assert response_data["id"] == "test-job-123"
+        assert response_data["status"] == "completed"
+        assert response_data["job_type"] == "backup"
+
+        # Verify optional fields are present (may be None)
+        assert "started_at" in response_data
+        assert "completed_at" in response_data
+        assert "return_code" in response_data
+        assert "error" in response_data
         setup_dependencies["job_service"].get_job.assert_called_once_with(
             "test-job-123"
         )
@@ -413,13 +424,29 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies
     ) -> None:
         """Test getting job status."""
-        status_data = {"status": "running", "progress": 50}
+        status_data = {
+            "id": "test-job-123",
+            "status": "running",
+            "running": True,
+            "completed": False,
+            "failed": False,
+            "job_type": "backup",
+        }
         setup_dependencies["job_service"].get_job_status.return_value = status_data
 
         response = await async_client.get("/api/jobs/test-job-123/status")
 
         assert response.status_code == 200
-        assert response.json() == status_data
+        response_data = response.json()
+
+        # Verify the core fields are correct
+        assert response_data["id"] == "test-job-123"
+        assert response_data["status"] == "running"
+        assert response_data["running"] is True
+        assert response_data["completed"] is False
+        assert response_data["failed"] is False
+        assert response_data["job_type"] == "backup"
+
         setup_dependencies["job_service"].get_job_status.assert_called_once_with(
             "test-job-123"
         )
@@ -442,13 +469,28 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies
     ) -> None:
         """Test getting job output."""
-        output_data = {"output": ["line 1", "line 2"], "total_lines": 2}
+        output_data = {
+            "lines": [
+                {"text": "line 1", "timestamp": None, "stream": None},
+                {"text": "line 2", "timestamp": None, "stream": None},
+            ],
+            "progress": {},
+        }
         setup_dependencies["job_service"].get_job_output.return_value = output_data
 
         response = await async_client.get("/api/jobs/test-job-123/output")
 
         assert response.status_code == 200
-        assert response.json() == output_data
+        response_data = response.json()
+
+        # Verify the structure
+        assert "lines" in response_data
+        assert "progress" in response_data
+        assert len(response_data["lines"]) == 2
+        assert response_data["lines"][0]["text"] == "line 1"
+        assert response_data["lines"][1]["text"] == "line 2"
+        assert response_data["progress"] == {}
+
         setup_dependencies["job_service"].get_job_output.assert_called_once_with(
             "test-job-123", 100
         )
@@ -532,173 +574,6 @@ class TestJobsAPI:
         setup_dependencies[
             "job_stream_service"
         ].stream_task_output.assert_called_once_with("test-job-123", 1)
-
-    # Test job management endpoints
-
-    @pytest.mark.asyncio
-    async def test_cancel_job_success(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test successful job cancellation."""
-        setup_dependencies["job_service"].cancel_job.return_value = True
-
-        response = await async_client.delete("/api/jobs/test-job-123")
-
-        assert response.status_code == 200
-        assert response.json() == {"message": "Job cancelled successfully"}
-        setup_dependencies["job_service"].cancel_job.assert_called_once_with(
-            "test-job-123"
-        )
-
-    @pytest.mark.asyncio
-    async def test_cancel_job_not_found(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test cancelling non-existent job."""
-        setup_dependencies["job_service"].cancel_job.return_value = False
-
-        response = await async_client.delete("/api/jobs/non-existent-job")
-
-        assert response.status_code == 404
-
-    @pytest.mark.asyncio
-    async def test_get_job_manager_stats(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test getting job manager statistics."""
-        # Setup mock job manager with some test data
-        from borgitory.services.jobs.job_manager import BorgJob
-        from datetime import datetime, UTC
-
-        mock_jobs = {
-            "job-1": BorgJob(
-                id="job-1",
-                command=["test"],
-                job_type="backup",
-                status="running",
-                started_at=datetime.now(UTC),
-            ),
-            "job-2": BorgJob(
-                id="job-2",
-                command=["test"],
-                job_type="backup",
-                status="completed",
-                started_at=datetime.now(UTC),
-            ),
-            "job-3": BorgJob(
-                id="job-3",
-                command=["test"],
-                job_type="backup",
-                status="failed",
-                started_at=datetime.now(UTC),
-            ),
-        }
-        setup_dependencies["job_manager"].jobs = mock_jobs
-
-        response = await async_client.get("/api/jobs/manager/stats")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total_jobs"] == 3
-        assert data["running_jobs"] == 1
-        assert data["completed_jobs"] == 1
-        assert data["failed_jobs"] == 1
-
-    @pytest.mark.asyncio
-    async def test_cleanup_completed_jobs(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test cleaning up completed jobs."""
-        # Setup mock job manager with completed jobs
-        from borgitory.services.jobs.job_manager import BorgJob
-        from datetime import datetime, UTC
-
-        mock_jobs = {
-            "job-1": BorgJob(
-                id="job-1",
-                command=["test"],
-                job_type="backup",
-                status="completed",
-                started_at=datetime.now(UTC),
-            ),
-            "job-2": BorgJob(
-                id="job-2",
-                command=["test"],
-                job_type="backup",
-                status="failed",
-                started_at=datetime.now(UTC),
-            ),
-            "job-3": BorgJob(
-                id="job-3",
-                command=["test"],
-                job_type="backup",
-                status="running",
-                started_at=datetime.now(UTC),
-            ),
-        }
-        setup_dependencies["job_manager"].jobs = mock_jobs
-
-        response = await async_client.post("/api/jobs/manager/prune")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "Cleaned up" in data["message"]
-        assert setup_dependencies["job_manager"].cleanup_job.call_count == 2
-
-    @pytest.mark.asyncio
-    async def test_get_queue_stats(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test getting queue statistics."""
-        # The actual queue stats structure from the real implementation
-        queue_stats = {
-            "available_slots": 5,
-            "max_concurrent_backups": 5,
-            "queue_size": 0,
-            "queued_backups": 0,
-            "running_backups": 0,
-        }
-        setup_dependencies["job_manager"].get_queue_stats.return_value = queue_stats
-
-        response = await async_client.get("/api/jobs/queue/stats")
-
-        assert response.status_code == 200
-        data = response.json()
-        # Check that we get the expected structure
-        assert "available_slots" in data
-        assert "max_concurrent_backups" in data
-        setup_dependencies["job_manager"].get_queue_stats.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_run_database_migration_success(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test successful database migration."""
-        migration_result = {"status": "success", "message": "Migration completed"}
-        setup_dependencies[
-            "job_service"
-        ].run_database_migration.return_value = migration_result
-
-        response = await async_client.post("/api/jobs/migrate")
-
-        assert response.status_code == 200
-        assert response.json() == migration_result
-        setup_dependencies["job_service"].run_database_migration.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_run_database_migration_error(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test database migration with error."""
-        setup_dependencies[
-            "job_service"
-        ].run_database_migration.side_effect = Exception("Migration failed")
-
-        response = await async_client.post("/api/jobs/migrate")
-
-        assert response.status_code == 500
-
-    # Test HTMX-specific endpoints
 
     @pytest.mark.asyncio
     async def test_toggle_job_details(

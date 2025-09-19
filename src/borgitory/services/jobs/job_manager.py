@@ -1267,7 +1267,6 @@ class JobManager:
                     NotificationMessage,
                     NotificationType,
                     NotificationPriority,
-                    NotificationResult,
                     NotificationConfig as NotificationConfigType,
                 )
 
@@ -1358,14 +1357,6 @@ class JobManager:
                 # Send the notification
                 result = await notification_service.send_notification(
                     notification_config, notification_message
-                )
-
-                # Cast to proper type for type checking
-                result = NotificationResult(
-                    success=getattr(result, "success", False),
-                    provider=getattr(result, "provider", config.provider),
-                    message=getattr(result, "message", ""),
-                    error=getattr(result, "error", None),
                 )
 
                 if result.success:

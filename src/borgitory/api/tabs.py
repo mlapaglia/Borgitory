@@ -3,12 +3,17 @@ Tab Content API - Serves HTML fragments for lazy loading tabs via HTMX
 """
 
 import logging
-from typing import Any, Dict
+from typing import Dict
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse
 
 from borgitory.api.auth import get_current_user
-from borgitory.dependencies import ProviderRegistryDep, get_templates
+from borgitory.dependencies import (
+    ProviderRegistryDep,
+    NotificationProviderRegistryDep,
+    get_templates,
+)
+from borgitory.models.database import User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -16,7 +21,7 @@ templates = get_templates()
 
 
 def _render_tab_with_nav(
-    request: Request, template_name: str, active_tab: str, context: Dict[str, Any]
+    request: Request, template_name: str, active_tab: str, context: Dict[str, object]
 ) -> HTMLResponse:
     """Helper to render tab content with OOB navigation update."""
     # Main content
@@ -40,7 +45,7 @@ def _render_tab_with_nav(
 
 @router.get("/repositories", response_class=HTMLResponse)
 async def get_repositories_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request,
@@ -52,7 +57,7 @@ async def get_repositories_tab(
 
 @router.get("/backups", response_class=HTMLResponse)
 async def get_backups_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request, "partials/backups/tab.html", "backups", {"current_user": current_user}
@@ -61,7 +66,7 @@ async def get_backups_tab(
 
 @router.get("/schedules", response_class=HTMLResponse)
 async def get_schedules_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request,
@@ -75,7 +80,7 @@ async def get_schedules_tab(
 async def get_cloud_sync_tab(
     request: Request,
     registry: ProviderRegistryDep,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     # Generate supported providers list directly from registry
     provider_info = registry.get_all_provider_info()
@@ -103,7 +108,7 @@ async def get_cloud_sync_tab(
 
 @router.get("/archives", response_class=HTMLResponse)
 async def get_archives_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request,
@@ -115,7 +120,7 @@ async def get_archives_tab(
 
 @router.get("/statistics", response_class=HTMLResponse)
 async def get_statistics_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request,
@@ -127,7 +132,7 @@ async def get_statistics_tab(
 
 @router.get("/jobs", response_class=HTMLResponse)
 async def get_jobs_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request, "partials/jobs/tab.html", "jobs", {"current_user": current_user}
@@ -136,19 +141,39 @@ async def get_jobs_tab(
 
 @router.get("/notifications", response_class=HTMLResponse)
 async def get_notifications_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request,
+    notification_registry: NotificationProviderRegistryDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
+    # Generate supported providers list directly from registry
+    provider_info = notification_registry.get_all_provider_info()
+    logger.info(f"Provider info from registry: {provider_info}")
+    supported_providers = []
+    for provider_name, info in provider_info.items():
+        supported_providers.append(
+            {
+                "value": provider_name,
+                "label": info["label"],
+                "description": info["description"],
+            }
+        )
+    supported_providers = sorted(supported_providers, key=lambda x: x["value"])
+    logger.info(f"Supported providers for template: {supported_providers}")
+
     return _render_tab_with_nav(
         request,
         "partials/notifications/tab.html",
         "notifications",
-        {"current_user": current_user},
+        {
+            "current_user": current_user,
+            "supported_providers": supported_providers,
+        },
     )
 
 
 @router.get("/prune", response_class=HTMLResponse)
 async def get_cleanup_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request, "partials/prune/tab.html", "prune", {"current_user": current_user}
@@ -157,7 +182,7 @@ async def get_cleanup_tab(
 
 @router.get("/repository-check", response_class=HTMLResponse)
 async def get_repository_check_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request,
@@ -169,7 +194,7 @@ async def get_repository_check_tab(
 
 @router.get("/debug", response_class=HTMLResponse)
 async def get_debug_tab(
-    request: Request, current_user: Dict[str, Any] = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request, "partials/debug/tab.html", "debug", {"current_user": current_user}

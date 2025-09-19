@@ -32,4 +32,6 @@ __all__ = [
     "NotificationType",
     "NotificationPriority",
     "ConnectionInfo",
+    "pushover_provider",
+    "discord_provider",
 ]

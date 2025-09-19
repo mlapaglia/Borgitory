@@ -10,6 +10,7 @@ from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
 class StorageService(Protocol):
     """Protocol for cloud storage services"""
+
     async def execute_sync(
         self,
         config: CloudSyncConfig,

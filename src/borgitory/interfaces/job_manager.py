@@ -29,6 +29,7 @@ class JobExecutor(Protocol):
 
 class JobManager(Protocol):
     """Protocol for job management services"""
+
     async def start_borg_command(
         self,
         command: List[str],
@@ -45,6 +46,7 @@ class JobManager(Protocol):
             Job ID for tracking
         """
         ...
+
     async def create_composite_job(
         self,
         job_type: str,

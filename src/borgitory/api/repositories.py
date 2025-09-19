@@ -1,5 +1,5 @@
 import logging
-from typing import Union, Any, Dict, List
+from typing import Union, Dict, List
 from fastapi import (
     APIRouter,
     Depends,
@@ -11,6 +11,7 @@ from fastapi import (
 )
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from borgitory.models.database import Repository, User, get_db
 from borgitory.models.schemas import (
@@ -51,6 +52,19 @@ from starlette.templating import _TemplateResponse
 router = APIRouter()
 logger = logging.getLogger(__name__)
 templates = get_templates()
+
+
+class DirectoryInfo(BaseModel):
+    """Directory information model"""
+
+    name: str
+    path: str
+
+
+class DirectoryListResponse(BaseModel):
+    """Response model for directory listing"""
+
+    directories: List[DirectoryInfo]
 
 
 @router.post("/")
@@ -122,26 +136,25 @@ def get_repositories_html(
         )
 
 
-@router.get("/directories")
-async def list_directories(
-    volume_svc: VolumeServiceDep, path: str = "/mnt"
-) -> Dict[str, Any]:
+@router.get("/directories", response_model=DirectoryListResponse)
+async def list_directories(path: str = "/mnt") -> DirectoryListResponse:
     """List directories at the given path for autocomplete functionality. All paths must be under /mnt."""
 
     try:
         if not user_secure_exists(path):
-            return {"directories": []}
+            return DirectoryListResponse(directories=[])
 
         if not user_secure_isdir(path):
-            return {"directories": []}
+            return DirectoryListResponse(directories=[])
 
         directories = user_get_directory_listing(path, include_files=False)
+        directory_infos = [DirectoryInfo(**dir_info) for dir_info in directories]
 
-        return {"directories": directories}
+        return DirectoryListResponse(directories=directory_infos)
 
     except PathSecurityError as e:
         logger.warning(f"Path security violation: {e}")
-        return {"directories": []}
+        return DirectoryListResponse(directories=[])
 
     except Exception as e:
         logger.error(f"Error listing directories at {path}: {e}")

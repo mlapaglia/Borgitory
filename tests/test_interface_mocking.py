@@ -15,6 +15,7 @@ from borgitory.interfaces.job_manager import JobManager
 
 class MockCommandRunner:
     """Mock implementation of CommandRunner protocol"""
+
     async def run_command(
         self,
         command: List[str],
@@ -43,6 +44,7 @@ class MockVolumeService:
 
 class MockJobManager:
     """Mock implementation of JobManager protocol"""
+
     async def start_borg_command(
         self,
         command: List[str],
@@ -50,6 +52,7 @@ class MockJobManager:
         is_backup: bool = False,
     ) -> str:
         return "mock-job-id-123"
+
     async def create_composite_job(
         self,
         job_type: str,

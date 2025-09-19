@@ -22,6 +22,7 @@ class BorgService(Protocol):
             Result dictionary with success status and message
         """
         ...
+
     async def create_backup(
         self,
         repository: Any,
@@ -66,6 +67,7 @@ class BorgService(Protocol):
             Repository information dictionary
         """
         ...
+
     async def list_archive_contents(
         self, repository: Any, archive_name: str
     ) -> List[Dict[str, Any]]:
@@ -80,6 +82,7 @@ class BorgService(Protocol):
             List of archive contents
         """
         ...
+
     async def extract_file_stream(
         self, repository: Any, archive_name: str, file_path: str
     ) -> StreamingResponse:
@@ -93,6 +96,7 @@ class BorgService(Protocol):
             StreamingResponse with file content
         """
         ...
+
     async def verify_repository_access(
         self, repo_path: str, passphrase: str, keyfile_path: str = ""
     ) -> bool:

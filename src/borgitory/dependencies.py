@@ -4,6 +4,10 @@ FastAPI dependency providers for the application.
 
 from typing import Annotated, TYPE_CHECKING, Optional, Callable, Any
 
+from borgitory.services.notifications.registry_factory import (
+    NotificationRegistryFactory,
+)
+
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
     from borgitory.services.notifications.service import NotificationProviderFactory
@@ -165,15 +169,27 @@ def get_recovery_service() -> RecoveryService:
 
 
 @lru_cache()
-def get_notification_provider_registry() -> "NotificationProviderRegistry":
+def get_notification_registry_factory() -> "NotificationRegistryFactory":
     """
-    Provide a NotificationProviderRegistry singleton instance.
+    Provide a NotificationRegistryFactory singleton instance.
 
     Uses FastAPI's built-in caching for singleton behavior.
     """
-    from borgitory.services.notifications.registry import NotificationProviderRegistry
+    from borgitory.services.notifications.registry_factory import _production_factory
 
-    return NotificationProviderRegistry()
+    return _production_factory
+
+
+@lru_cache()
+def get_notification_provider_registry() -> "NotificationProviderRegistry":
+    """
+    Provide a NotificationProviderRegistry singleton instance with proper dependency injection.
+
+    Uses FastAPI's built-in caching for singleton behavior.
+    Ensures all notification providers are registered by importing the provider modules.
+    """
+    factory = get_notification_registry_factory()
+    return factory.create_production_registry()
 
 
 @lru_cache()
@@ -575,6 +591,9 @@ NotificationServiceDep = Annotated[
 ]
 NotificationConfigServiceDep = Annotated[
     NotificationConfigService, Depends(get_notification_config_service)
+]
+NotificationRegistryFactoryDep = Annotated[
+    "NotificationRegistryFactory", Depends(get_notification_registry_factory)
 ]
 NotificationProviderRegistryDep = Annotated[
     "NotificationProviderRegistry", Depends(get_notification_provider_registry)

@@ -5,7 +5,7 @@ API endpoints for managing notification configurations with provider support.
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Request
 from fastapi.responses import HTMLResponse
 from starlette.templating import _TemplateResponse
@@ -48,63 +48,6 @@ def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]
     return None
 
 
-def _get_supported_providers(
-    registry: NotificationProviderRegistryDep,
-) -> List[Dict[str, Any]]:
-    """Get supported providers from the registry."""
-    from borgitory.services.notifications.registry import get_all_provider_info
-
-    provider_info = get_all_provider_info()
-    supported_providers = []
-
-    for provider_name, info in provider_info.items():
-        supported_providers.append(
-            {
-                "value": provider_name,
-                "label": info["label"],
-                "description": info["description"],
-            }
-        )
-
-    # Sort by provider name for consistent ordering
-    return sorted(supported_providers, key=lambda x: x["value"])
-
-
-def _get_submit_button_text(
-    registry: NotificationProviderRegistryDep, provider: str, mode: str = "create"
-) -> str:
-    """Get submit button text based on provider and mode"""
-    if not provider:
-        if mode == "create":
-            return "Add Notification"
-        else:
-            return "Update Notification"
-
-    supported_providers = _get_supported_providers(registry)
-    provider_data = None
-    for p in supported_providers:
-        if p["value"] == provider:
-            provider_data = p
-            break
-
-    if provider_data:
-        provider_label = provider_data["label"]
-        action = "Add" if mode == "create" else "Update"
-        return f"{action} {provider_label} Notification"
-    else:
-        # Fallback for unknown providers
-        action = "Add" if mode == "create" else "Update"
-        return f"{action} Notification"
-
-
-@router.get("/providers")
-async def get_supported_providers(
-    registry: NotificationProviderRegistryDep,
-) -> List[Dict[str, Any]]:
-    """Get list of supported notification providers"""
-    return _get_supported_providers(registry)
-
-
 @router.get("/provider-fields")
 async def get_provider_fields(
     request: Request,
@@ -124,8 +67,9 @@ async def get_provider_fields(
         )
 
     try:
-        supported_providers = _get_supported_providers(registry)
-        submit_button_text = _get_submit_button_text(registry, provider, mode)
+        submit_button_text = (
+            "Add Notification" if mode == "create" else "Update Notification"
+        )
 
         context = {
             "provider": provider,
@@ -205,16 +149,6 @@ async def create_notification_config(
             {"error_message": f"Failed to create notification: {str(e)}"},
             status_code=500,
         )
-
-
-@router.get("/", response_class=HTMLResponse)
-def list_notification_configs(
-    config_service: NotificationConfigServiceDep,
-    skip: int = 0,
-    limit: int = 100,
-) -> List[Any]:
-    """List all notification configurations"""
-    return config_service.get_all_configs(skip=skip, limit=limit)
 
 
 @router.get("/html", response_class=HTMLResponse)

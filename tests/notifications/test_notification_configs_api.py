@@ -31,24 +31,18 @@ def create_pushover_notification_config(
 class TestNotificationConfigsAPIHTMX:
     """Test class for notification API HTMX responses."""
 
-    @pytest.mark.asyncio
-    async def test_get_supported_providers(self, async_client: AsyncClient) -> None:
-        """Test getting supported providers returns JSON."""
-        response = await async_client.get("/api/notifications/providers")
+    def test_get_supported_providers(self, notification_registry) -> None:
+        """Test getting supported providers from registry directly."""
+        provider_info = notification_registry.get_all_provider_info()
 
-        assert response.status_code == 200
-        assert "application/json" in response.headers["content-type"]
-
-        providers = response.json()
-        assert isinstance(providers, list)
-        assert len(providers) > 0
+        assert isinstance(provider_info, dict)
+        assert len(provider_info) > 0
 
         # Should include pushover provider
-        pushover_provider = next(
-            (p for p in providers if p["value"] == "pushover"), None
-        )
-        assert pushover_provider is not None
-        assert pushover_provider["label"] == "Pushover"
+        assert "pushover" in provider_info
+        pushover_info = provider_info["pushover"]
+        assert pushover_info["label"] == "Pushover"
+        assert "description" in pushover_info
 
     @pytest.mark.asyncio
     async def test_get_provider_fields_pushover(

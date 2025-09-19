@@ -8,6 +8,7 @@ including configuration validation, provider creation, and encryption handling.
 import json
 import logging
 from typing import Dict, Any, Optional, List
+from .providers.base import NotificationProvider, NotificationProviderConfig
 
 from .types import NotificationMessage, NotificationResult, NotificationConfig
 from .registry import get_config_class, get_provider_class, get_supported_providers
@@ -18,7 +19,9 @@ logger = logging.getLogger(__name__)
 class ConfigValidator:
     """Validates notification provider configurations"""
 
-    def validate_config(self, provider: str, config: Dict[str, Any]) -> Any:
+    def validate_config(
+        self, provider: str, config: Dict[str, Any]
+    ) -> NotificationProviderConfig:
         """
         Validate configuration for a specific provider.
 
@@ -40,7 +43,7 @@ class ConfigValidator:
                 f"Supported providers: {', '.join(sorted(supported))}"
             )
 
-        return config_class(**config)
+        return config_class(**config)  # type: ignore[no-any-return]
 
 
 class NotificationProviderFactory:
@@ -50,7 +53,9 @@ class NotificationProviderFactory:
         """Initialize notification provider factory."""
         self._validator = ConfigValidator()
 
-    def create_provider(self, provider: str, config: Dict[str, Any]) -> Any:
+    def create_provider(
+        self, provider: str, config: Dict[str, Any]
+    ) -> NotificationProvider:
         """
         Create a notification provider instance.
 
@@ -84,7 +89,7 @@ class NotificationProviderFactory:
             # This is a regular class, instantiate normally
             provider_instance = provider_class(validated_config)
 
-        return provider_instance
+        return provider_instance  # type: ignore[no-any-return]
 
     def get_supported_providers(self) -> List[str]:
         """Get list of supported provider names."""
@@ -187,7 +192,7 @@ class NotificationService:
         self,
         config: NotificationConfig,
         message: NotificationMessage,
-    ) -> Any:
+    ) -> NotificationResult:
         """
         Send a notification message.
 
@@ -218,7 +223,7 @@ class NotificationService:
                 error=error_msg,
             )
 
-    async def test_connection(self, config: NotificationConfig) -> Any:
+    async def test_connection(self, config: NotificationConfig) -> bool:
         """
         Test connection to notification service.
 
