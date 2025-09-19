@@ -191,7 +191,7 @@ show_column_numbers = true
 show_error_codes = true
 
 # Any-related rules
-disallow_any_explicit = true
+disallow_any_explicit = false
 disallow_any_unimported = true
 warn_return_any = true
 

@@ -11,7 +11,11 @@ import pkgutil
 from typing import List, Optional, Protocol
 
 import borgitory.services.notifications.providers as providers_package
-from .registry import NotificationProviderRegistry, get_registry
+from .registry import (
+    NotificationProviderRegistry,
+    get_registry,
+    NotificationProviderMetadata,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +117,17 @@ class NotificationRegistryFactory:
             config_class = global_registry.get_config_class(provider_name)
             provider_class = global_registry.get_provider_class(provider_name)
 
-            # Register in the test registry
-            test_registry._config_classes[provider_name] = config_class
-            test_registry._provider_classes[provider_name] = provider_class
-            test_registry._metadata[provider_name] = metadata
+            # Only register if all components are present
+            if (
+                metadata is not None
+                and config_class is not None
+                and provider_class is not None
+            ):
+                test_registry._config_classes[provider_name] = config_class
+                test_registry._provider_classes[provider_name] = provider_class
+                test_registry._metadata[provider_name] = NotificationProviderMetadata(
+                    **metadata
+                )
 
         return test_registry
 
