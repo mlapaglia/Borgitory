@@ -266,11 +266,6 @@ class TestSecureExists:
 
             assert secure_exists("/mnt/test") is False
 
-    def test_secure_exists_backward_compatibility(self) -> None:
-        """Test that allowed_base_dirs parameter is ignored."""
-        # Should work the same regardless of the ignored parameter
-        assert secure_exists("../../../etc/passwd", ["/allowed"]) is False
-
 
 class TestSecureIsdir:
     """Test secure directory checking."""

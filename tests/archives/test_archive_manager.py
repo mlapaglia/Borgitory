@@ -181,7 +181,7 @@ class TestArchiveManager:
     ) -> None:
         """Test listing directory contents using FUSE mount."""
         with patch(
-            "borgitory.services.archives.archive_mount_manager.get_archive_mount_manager"
+            "borgitory.dependencies.get_archive_mount_manager"
         ) as mock_get_manager:
             mock_mount_manager = Mock()
             mock_mount_manager.mount_archive = AsyncMock()

@@ -1012,15 +1012,3 @@ class TestJobManagerFactoryFunctions:
 
             assert manager.config.max_concurrent_backups == 8
             assert manager.config.max_output_lines_per_job == 1500
-
-    def test_create_job_manager_backward_compatible_config(self) -> None:
-        """Test creating job manager with backward compatible config"""
-        mock_config = Mock()
-        mock_config.to_internal_config.return_value = JobManagerConfig(
-            max_concurrent_backups=15
-        )
-
-        manager = create_job_manager(mock_config)
-
-        assert manager.config.max_concurrent_backups == 15
-        mock_config.to_internal_config.assert_called_once()

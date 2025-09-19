@@ -100,7 +100,7 @@ class ArchiveManager:
         logger.info(
             f"Listed {len(contents)} items from mounted archive {archive_name} path '{path}'"
         )
-        return contents  # type: ignore[no-any-return]
+        return contents
 
     def _filter_directory_contents(
         self, all_entries: List[Dict[str, Any]], target_path: str = ""
