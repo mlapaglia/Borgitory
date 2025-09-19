@@ -5,7 +5,18 @@ This factory enables runtime service creation based on protocols,
 supporting different implementations and configurations.
 """
 
-from typing import Type, Dict, Any, Optional, TypeVar, Generic
+from typing import (
+    Type,
+    Dict,
+    Any,
+    Optional,
+    TypeVar,
+    Generic,
+    Union,
+    Callable,
+    overload,
+    Literal,
+)
 from abc import ABC
 import logging
 
@@ -19,19 +30,22 @@ logger = logging.getLogger(__name__)
 # Generic protocol type
 P = TypeVar("P")
 
+# Union type for implementations - can be class or factory function
+ImplementationType = Union[Type[P], Callable[..., P]]
+
 
 class ServiceFactory(Generic[P], ABC):
     """Base factory for creating protocol-compliant services."""
 
     def __init__(self) -> None:
-        self._implementations: Dict[str, Type[P]] = {}
+        self._implementations: Dict[str, ImplementationType[P]] = {}
         self._configurations: Dict[str, Dict[str, Any]] = {}
         self._default_implementation: Optional[str] = None
 
     def register_implementation(
         self,
         name: str,
-        implementation: Type[P],
+        implementation: ImplementationType[P],
         config: Optional[Dict[str, Any]] = None,
         set_as_default: bool = False,
     ) -> None:
@@ -57,23 +71,26 @@ class ServiceFactory(Generic[P], ABC):
                 f"Implementation '{name}' not found. Available: {available}"
             )
 
-        implementation_class = self._implementations[name]
+        implementation = self._implementations[name]
         config = self._configurations.get(name, {})
 
         # Merge factory config with runtime kwargs
         final_config = {**config, **kwargs}
 
         logger.debug(
-            f"Creating {implementation_class.__name__} with config: {final_config}"
+            f"Creating {getattr(implementation, '__name__', str(implementation))} with config: {final_config}"
         )
 
         try:
-            return implementation_class(**final_config)
+            # Handle both class constructors and factory functions
+            return implementation(**final_config)
         except Exception as e:
-            logger.error(f"Failed to create {implementation_class.__name__}: {e}")
+            logger.error(
+                f"Failed to create {getattr(implementation, '__name__', str(implementation))}: {e}"
+            )
             raise
 
-    def list_implementations(self) -> Dict[str, Type[P]]:
+    def list_implementations(self) -> Dict[str, ImplementationType[P]]:
         """List all registered implementations."""
         return self._implementations.copy()
 
@@ -160,7 +177,7 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
                 job_manager=job_manager,
             )
 
-        self.register_implementation("borg", create_borg_service, set_as_default=True)  # type: ignore[arg-type]
+        self.register_implementation("borg", create_borg_service, set_as_default=True)
 
         # Future implementations:
         # self.register_implementation("restic", ResticService)
@@ -191,6 +208,20 @@ class ServiceRegistry:
         self._factories[name] = factory
         logger.info(f"Registered factory '{name}'")
 
+    @overload
+    def get_factory(
+        self, name: Literal["notifications"]
+    ) -> NotificationServiceFactory: ...
+
+    @overload
+    def get_factory(self, name: Literal["command_runners"]) -> CommandRunnerFactory: ...
+
+    @overload
+    def get_factory(self, name: Literal["backup_services"]) -> BackupServiceFactory: ...
+
+    @overload
+    def get_factory(self, name: str) -> "ServiceFactory[Any]": ...
+
     def get_factory(self, name: str) -> "ServiceFactory[Any]":
         """Get a service factory by name."""
         if name not in self._factories:
@@ -205,15 +236,15 @@ class ServiceRegistry:
     # Convenience methods for common factories
     def get_notification_factory(self) -> NotificationServiceFactory:
         """Get the notification service factory."""
-        return self.get_factory("notifications")  # type: ignore[return-value]
+        return self.get_factory("notifications")
 
     def get_command_runner_factory(self) -> CommandRunnerFactory:
         """Get the command runner factory."""
-        return self.get_factory("command_runners")  # type: ignore[return-value]
+        return self.get_factory("command_runners")
 
     def get_backup_service_factory(self) -> BackupServiceFactory:
         """Get the backup service factory."""
-        return self.get_factory("backup_services")  # type: ignore[return-value]
+        return self.get_factory("backup_services")
 
 
 # Global service registry instance

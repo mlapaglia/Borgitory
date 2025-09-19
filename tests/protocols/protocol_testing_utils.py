@@ -40,7 +40,11 @@ class ProtocolMockFactory:
         from borgitory.protocols import CommandRunnerProtocol, CommandResult
 
         mock = Mock(spec=CommandRunnerProtocol)
-        mock.run_command = AsyncMock(return_value=CommandResult(0, b"success", b""))
+        mock.run_command = AsyncMock(
+            return_value=CommandResult(
+                success=True, return_code=0, stdout="success", stderr="", duration=0.1
+            )
+        )
         return mock
 
     @staticmethod

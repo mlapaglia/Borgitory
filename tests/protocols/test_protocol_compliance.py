@@ -275,12 +275,8 @@ class TestProtocolInstantiation:
         mock_volume.get_mounted_volumes = AsyncMock(return_value=["/test"])
         mock_backup.create_backup = AsyncMock(return_value="job-123")
 
-        # For sync methods, regular Mock works
-        mock_volume.get_volume_info.return_value = {"info": "test"}
-
-        # Test sync method
-        info = mock_volume.get_volume_info()
-        assert info == {"info": "test"}
+        # For async methods, use AsyncMock
+        mock_volume.get_volume_info = AsyncMock(return_value={"info": "test"})
 
         # Note: For async methods in real usage, you'd await them:
         # volumes = await mock_volume.get_mounted_volumes()
