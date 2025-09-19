@@ -29,7 +29,6 @@ class JobExecutor(Protocol):
 
 class JobManager(Protocol):
     """Protocol for job management services"""
-
     async def start_borg_command(
         self,
         command: List[str],
@@ -38,17 +37,14 @@ class JobManager(Protocol):
     ) -> str:
         """
         Start a Borg command and return job ID.
-
         Args:
             command: Command to execute
             env: Environment variables
             is_backup: Whether this is a backup operation
-
         Returns:
             Job ID for tracking
         """
         ...
-
     async def create_composite_job(
         self,
         job_type: str,
@@ -59,14 +55,12 @@ class JobManager(Protocol):
     ) -> str:
         """
         Create a composite job with multiple tasks.
-
         Args:
             job_type: Type of job
             task_definitions: List of task definitions
             repository: Repository object
             schedule: Optional schedule
             cloud_sync_config_id: Optional cloud sync config ID
-
         Returns:
             Job ID for tracking
         """

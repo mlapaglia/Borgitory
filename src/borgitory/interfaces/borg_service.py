@@ -22,7 +22,6 @@ class BorgService(Protocol):
             Result dictionary with success status and message
         """
         ...
-
     async def create_backup(
         self,
         repository: Any,
@@ -33,14 +32,12 @@ class BorgService(Protocol):
     ) -> str:
         """
         Create a backup and return job_id for tracking.
-
         Args:
             repository: Repository object
             source_path: Path to backup
             compression: Compression algorithm
             dry_run: Whether to perform dry run
             cloud_sync_config_id: Optional cloud sync config
-
         Returns:
             Job ID for tracking backup progress
         """
@@ -69,7 +66,6 @@ class BorgService(Protocol):
             Repository information dictionary
         """
         ...
-
     async def list_archive_contents(
         self, repository: Any, archive_name: str
     ) -> List[Dict[str, Any]]:
@@ -84,34 +80,28 @@ class BorgService(Protocol):
             List of archive contents
         """
         ...
-
     async def extract_file_stream(
         self, repository: Any, archive_name: str, file_path: str
     ) -> StreamingResponse:
         """
         Extract a single file from an archive and stream it.
-
         Args:
             repository: Repository object
             archive_name: Name of the archive
             file_path: Path to the file within the archive
-
         Returns:
             StreamingResponse with file content
         """
         ...
-
     async def verify_repository_access(
         self, repo_path: str, passphrase: str, keyfile_path: str = ""
     ) -> bool:
         """
         Verify we can access a repository with given credentials.
-
         Args:
             repo_path: Path to repository
             passphrase: Repository passphrase
             keyfile_path: Path to keyfile if needed
-
         Returns:
             True if access successful, False otherwise
         """

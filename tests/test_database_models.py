@@ -10,7 +10,6 @@ from borgitory.models.database import (
     Repository,
     User,
     CloudSyncConfig,
-    NotificationConfig,
     get_cipher_suite,
 )
 import borgitory.models.database
@@ -290,70 +289,8 @@ class TestUserModel:
         assert user.verify_password(special_password) is True
 
 
-class TestNotificationConfigModel:
-    """Test NotificationConfig model credential encryption."""
-
-    def setup_method(self) -> None:
-        """Set up test fixtures."""
-        self.mock_cipher = Mock()
-        self.mock_cipher.encrypt.side_effect = (
-            lambda x: f"encrypted_{x.decode()}".encode()
-        )
-        self.mock_cipher.decrypt.side_effect = (
-            lambda x: x.decode().replace("encrypted_", "").encode()
-        )
-
-    def test_pushover_credentials_encryption(self) -> None:
-        """Test Pushover credentials are properly encrypted."""
-        config = NotificationConfig(name="test-pushover", provider="pushover")
-
-        user_key = "u4t8z5j2k9x7m1n3q6r8s4v2w9y5z7a2"
-        app_token = "a3g7h2j5k8l4m9n6p1q4r7s2t5v8w3x6"
-
-        with patch(
-            "borgitory.models.database.get_cipher_suite", return_value=self.mock_cipher
-        ):
-            config.set_pushover_credentials(user_key, app_token)
-
-            assert config.encrypted_user_key == f"encrypted_{user_key}"
-            assert config.encrypted_app_token == f"encrypted_{app_token}"
-
-    def test_pushover_credentials_decryption(self) -> None:
-        """Test Pushover credentials are properly decrypted."""
-        config = NotificationConfig(name="test-pushover", provider="pushover")
-        config.encrypted_user_key = "encrypted_u4t8z5j2k9x7m1n3q6r8s4v2w9y5z7a2"
-        config.encrypted_app_token = "encrypted_a3g7h2j5k8l4m9n6p1q4r7s2t5v8w3x6"
-
-        with patch(
-            "borgitory.models.database.get_cipher_suite", return_value=self.mock_cipher
-        ):
-            user_key, app_token = config.get_pushover_credentials()
-
-            assert user_key == "u4t8z5j2k9x7m1n3q6r8s4v2w9y5z7a2"
-            assert app_token == "a3g7h2j5k8l4m9n6p1q4r7s2t5v8w3x6"
-
-    def test_pushover_credentials_roundtrip(self) -> None:
-        """Test complete Pushover credential encryption/decryption cycle."""
-        original_user_key = "test_user_key_12345"
-        original_app_token = "test_app_token_67890"
-
-        with patch(
-            "borgitory.config.get_secret_key",
-            return_value="test_key_32_chars_long_for_test!",
-        ):
-            borgitory.models.database._cipher_suite = None
-
-            config = NotificationConfig(name="test", provider="pushover")
-            config.set_pushover_credentials(original_user_key, original_app_token)
-
-            # Verify credentials were encrypted
-            assert config.encrypted_user_key != original_user_key
-            assert config.encrypted_app_token != original_app_token
-
-            # Verify we can decrypt them back
-            decrypted_user_key, decrypted_app_token = config.get_pushover_credentials()
-            assert decrypted_user_key == original_user_key
-            assert decrypted_app_token == original_app_token
+# TestNotificationConfigModel removed - old Pushover-specific tests
+# New generic NotificationConfig model tests will be added later
 
 
 class TestEncryptionSecurity:
@@ -504,16 +441,5 @@ class TestModelRelationships:
         assert hasattr(config, "created_at")
         assert hasattr(config, "updated_at")
 
-    def test_notification_config_model_fields(self) -> None:
-        """Test NotificationConfig model has all required fields."""
-        config = NotificationConfig(name="test", provider="pushover")
-
-        # Test required fields exist
-        assert hasattr(config, "id")
-        assert hasattr(config, "name")
-        assert hasattr(config, "provider")
-        assert hasattr(config, "encrypted_user_key")
-        assert hasattr(config, "encrypted_app_token")
-        assert hasattr(config, "notify_on_success")
-        assert hasattr(config, "notify_on_failure")
-        assert hasattr(config, "enabled")
+    # test_notification_config_model_fields removed - old Pushover-specific test
+    # New generic NotificationConfig model tests will be added later

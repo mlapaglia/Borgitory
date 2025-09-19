@@ -1,0 +1,193 @@
+"""
+Discord webhook notification provider implementation.
+"""
+
+import logging
+from typing import Any, Dict, List
+import aiohttp
+from pydantic import Field, field_validator
+
+from .base import NotificationProvider, NotificationProviderConfig
+from ..types import (
+    NotificationMessage,
+    NotificationResult,
+    ConnectionInfo,
+    NotificationType,
+)
+from ..registry import register_provider
+
+logger = logging.getLogger(__name__)
+
+
+class DiscordConfig(NotificationProviderConfig):
+    """Configuration for Discord webhook notifications"""
+
+    webhook_url: str = Field(..., description="Discord webhook URL")
+    username: str = Field(default="Borgitory", description="Bot username")
+    avatar_url: str = Field(default="", description="Bot avatar URL (optional)")
+
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_webhook_url(cls, v: str) -> str:
+        """Validate Discord webhook URL format"""
+        if not v.startswith("https://discord.com/api/webhooks/") and not v.startswith(
+            "https://discordapp.com/api/webhooks/"
+        ):
+            raise ValueError("Invalid Discord webhook URL format")
+        return v
+
+
+class DiscordProvider(NotificationProvider):
+    """
+    Discord webhook notification provider implementation.
+    """
+
+    config_class = DiscordConfig
+
+    def __init__(self, config: DiscordConfig) -> None:
+        super().__init__(config)
+        self.config: DiscordConfig = config
+
+    async def send_notification(
+        self, message: NotificationMessage
+    ) -> NotificationResult:
+        """Send a notification via Discord webhook"""
+        try:
+            # Create Discord embed based on notification type
+            embed_color = self._get_color_for_type(message.notification_type)
+
+            embed = {
+                "title": message.title,
+                "description": message.message,
+                "color": embed_color,
+                "timestamp": None,  # Discord will use current time
+                "footer": {"text": "Borgitory Backup System"},
+            }
+
+            # Add fields based on metadata
+            if message.metadata:
+                fields = []
+                for key, value in message.metadata.items():
+                    if key not in ["response", "status_code"]:  # Skip internal fields
+                        fields.append(
+                            {
+                                "name": key.replace("_", " ").title(),
+                                "value": str(value),
+                                "inline": True,
+                            }
+                        )
+                if fields:
+                    embed["fields"] = fields
+
+            payload = {"username": self.config.username, "embeds": [embed]}
+
+            if self.config.avatar_url:
+                payload["avatar_url"] = self.config.avatar_url
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    self.config.webhook_url, json=payload
+                ) as response:
+                    response_text = await response.text()
+
+                    if response.status == 204:  # Discord webhooks return 204 on success
+                        logger.info(f"Discord notification sent: {message.title}")
+                        return NotificationResult(
+                            success=True,
+                            provider="discord",
+                            message="Notification sent successfully",
+                            metadata={"response": response_text},
+                        )
+                    else:
+                        logger.error(
+                            f"Discord webhook error {response.status}: {response_text}"
+                        )
+                        return NotificationResult(
+                            success=False,
+                            provider="discord",
+                            message=f"HTTP error {response.status}",
+                            error=response_text,
+                            metadata={"status_code": response.status},
+                        )
+
+        except Exception as e:
+            logger.error(f"Error sending Discord notification: {e}")
+            return NotificationResult(
+                success=False,
+                provider="discord",
+                message="Exception occurred",
+                error=str(e),
+            )
+
+    async def test_connection(self) -> bool:
+        """Test Discord webhook connection"""
+        try:
+            test_message = NotificationMessage(
+                title="Borgitory Test",
+                message="This is a test notification from Borgitory backup system.",
+                notification_type=NotificationType.INFO,
+            )
+
+            result = await self.send_notification(test_message)
+            return result.success
+
+        except Exception as e:
+            logger.error(f"Discord connection test failed: {e}")
+            return False
+
+    def get_connection_info(self) -> ConnectionInfo:
+        """Get connection info for display"""
+        webhook_id = (
+            self.config.webhook_url.split("/")[-2]
+            if "/" in self.config.webhook_url
+            else "unknown"
+        )
+        return ConnectionInfo(
+            provider="discord",
+            endpoint=f"Webhook: {webhook_id[:8]}...",
+            status="configured",
+        )
+
+    def get_sensitive_fields(self) -> List[str]:
+        """Get list of fields that should be encrypted"""
+        return ["webhook_url"]
+
+    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Get provider-specific display details for the UI"""
+        webhook_url = config_dict.get("webhook_url", "")
+        webhook_id = webhook_url.split("/")[-2] if "/" in webhook_url else "unknown"
+        masked_webhook = f"{webhook_id[:8]}..." if len(webhook_id) >= 8 else "***"
+
+        details = f"""
+        <div class="space-y-2">
+            <div><span class="font-medium">Webhook:</span> {masked_webhook}</div>
+            <div><span class="font-medium">Username:</span> {config_dict.get("username", "Borgitory")}</div>
+        </div>
+        """
+
+        return {"provider_name": "Discord", "provider_details": details.strip()}
+
+    def _get_color_for_type(self, notification_type: NotificationType) -> int:
+        """Get Discord embed color for notification type"""
+        color_map = {
+            NotificationType.SUCCESS: 0x00FF00,  # Green
+            NotificationType.FAILURE: 0xFF0000,  # Red
+            NotificationType.WARNING: 0xFFA500,  # Orange
+            NotificationType.INFO: 0x0099FF,  # Blue
+        }
+        return color_map.get(notification_type, 0x0099FF)
+
+
+# Register the provider directly
+@register_provider(
+    name="discord",
+    label="Discord Webhook",
+    description="Send notifications to Discord channel via webhook",
+    supports_priority=False,
+    supports_formatting=True,
+    requires_credentials=True,
+)
+class DiscordProviderRegistered(DiscordProvider):
+    """Registered Discord provider"""
+
+    config_class = DiscordConfig

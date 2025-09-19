@@ -108,19 +108,17 @@ class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
 
     def _register_default_implementations(self) -> None:
         """Register default notification service implementations."""
-        from borgitory.services.notifications.pushover_service import PushoverService
+        from borgitory.services.notifications.service import NotificationService
 
-        self.register_implementation("pushover", PushoverService, set_as_default=True)
-
-        # Future implementations can be registered here:
-        # self.register_implementation("email", EmailNotificationService)
-        # self.register_implementation("slack", SlackNotificationService)
+        self.register_implementation(
+            "provider_based", NotificationService, set_as_default=True
+        )
 
     def create_notification_service(
-        self, provider: str = "pushover", **config: Any
+        self, service_type: str = "provider_based", **config: Any
     ) -> NotificationServiceProtocol:
-        """Create a notification service for the specified provider."""
-        return self.create_service(provider, **config)
+        """Create a notification service for the specified type."""
+        return self.create_service(service_type, **config)
 
 
 class CommandRunnerFactory(ServiceFactory[CommandRunnerProtocol]):
@@ -135,10 +133,6 @@ class CommandRunnerFactory(ServiceFactory[CommandRunnerProtocol]):
         from borgitory.services.simple_command_runner import SimpleCommandRunner
 
         self.register_implementation("simple", SimpleCommandRunner, set_as_default=True)
-
-        # Future implementations:
-        # self.register_implementation("async", AsyncCommandRunner)
-        # self.register_implementation("distributed", DistributedCommandRunner)
 
     def create_command_runner(
         self, runner_type: str = "simple", **config: Any
@@ -178,10 +172,6 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
             )
 
         self.register_implementation("borg", create_borg_service, set_as_default=True)
-
-        # Future implementations:
-        # self.register_implementation("restic", ResticService)
-        # self.register_implementation("duplicity", DuplicityService)
 
     def create_backup_service(
         self, backup_type: str = "borg", **config: Any

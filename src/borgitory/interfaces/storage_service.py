@@ -10,7 +10,6 @@ from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
 
 class StorageService(Protocol):
     """Protocol for cloud storage services"""
-
     async def execute_sync(
         self,
         config: CloudSyncConfig,
@@ -19,12 +18,10 @@ class StorageService(Protocol):
     ) -> SyncResult:
         """
         Execute a cloud sync operation.
-
         Args:
             config: Cloud sync configuration
             repository_path: Path to the repository to sync
             output_callback: Optional callback for real-time output
-
         Returns:
             SyncResult indicating success/failure and details
         """

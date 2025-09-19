@@ -3,6 +3,10 @@ FastAPI dependency providers for the application.
 """
 
 from typing import Annotated, TYPE_CHECKING, Optional, Callable, Any
+
+if TYPE_CHECKING:
+    from borgitory.services.notifications.registry import NotificationProviderRegistry
+    from borgitory.services.notifications.service import NotificationProviderFactory
 from functools import lru_cache
 
 from fastapi import Depends
@@ -15,7 +19,8 @@ from borgitory.services.jobs.job_service import JobService
 from borgitory.services.backups.backup_service import BackupService
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.recovery_service import RecoveryService
-from borgitory.services.notifications.pushover_service import PushoverService
+from borgitory.services.notifications.service import NotificationService
+from borgitory.services.notifications.config_service import NotificationConfigService
 from borgitory.services.jobs.job_stream_service import JobStreamService
 from borgitory.services.jobs.job_render_service import JobRenderService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
@@ -40,9 +45,6 @@ from borgitory.services.configuration_service import ConfigurationService
 from borgitory.services.repositories.repository_check_config_service import (
     RepositoryCheckConfigService,
 )
-from borgitory.services.notifications.notification_config_service import (
-    NotificationConfigService,
-)
 from borgitory.services.cleanup_service import CleanupService
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
@@ -63,7 +65,6 @@ if TYPE_CHECKING:
     from borgitory.protocols.repository_protocols import (
         BackupServiceProtocol,
     )
-    from borgitory.protocols.notification_protocols import NotificationServiceProtocol
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
 from borgitory.services.jobs.job_queue_manager import JobQueueManager
@@ -164,14 +165,49 @@ def get_recovery_service() -> RecoveryService:
 
 
 @lru_cache()
-def get_pushover_service() -> "NotificationServiceProtocol":
+def get_notification_provider_registry() -> "NotificationProviderRegistry":
     """
-    Provide a NotificationServiceProtocol implementation (PushoverService).
+    Provide a NotificationProviderRegistry singleton instance.
 
     Uses FastAPI's built-in caching for singleton behavior.
-    Returns protocol interface for loose coupling.
     """
-    return PushoverService()
+    from borgitory.services.notifications.registry import NotificationProviderRegistry
+
+    return NotificationProviderRegistry()
+
+
+@lru_cache()
+def get_notification_provider_factory() -> "NotificationProviderFactory":
+    """
+    Provide a NotificationProviderFactory instance.
+
+    Following the exact pattern of cloud providers' StorageFactory.
+    """
+    from borgitory.services.notifications.service import NotificationProviderFactory
+
+    return NotificationProviderFactory()
+
+
+@lru_cache()
+def get_notification_service() -> NotificationService:
+    """
+    Provide a NotificationService implementation following cloud provider pattern.
+
+    Uses FastAPI's built-in caching for singleton behavior.
+    """
+    return NotificationService()
+
+
+def get_notification_config_service(
+    db: Session = Depends(get_db),
+    notification_service: NotificationService = Depends(get_notification_service),
+) -> NotificationConfigService:
+    """
+    Provide a NotificationConfigService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return NotificationConfigService(db=db, notification_service=notification_service)
 
 
 @lru_cache()
@@ -261,7 +297,7 @@ def get_archive_manager(
     """
     Provide an ArchiveManager instance with proper dependency injection.
 
-    Uses pure FastAPI DI with automatic dependency resolution.
+    Uses FastAPI DI with automatic dependency resolution.
     """
     return ArchiveManager(job_executor=job_executor, command_builder=command_builder)
 
@@ -329,7 +365,6 @@ def get_job_manager_dependency() -> "JobManagerProtocol":
             queue_manager=get_job_queue_manager(),
             database_manager=get_job_database_manager(),
             event_broadcaster=get_job_event_broadcaster_dep(),
-            pushover_service=get_pushover_service(),
             rclone_service=get_rclone_service(),
         )
 
@@ -358,7 +393,7 @@ def get_borg_service(
     """
     Provide a BorgService instance with proper dependency injection.
 
-    Uses pure FastAPI DI with automatic dependency resolution.
+    Uses FastAPI DI with automatic dependency resolution.
     """
     return BorgService(
         command_runner=command_runner,
@@ -373,7 +408,7 @@ def get_job_stream_service(
     """
     Provide a JobStreamService instance with proper dependency injection.
 
-    Uses pure FastAPI DI with automatic dependency resolution.
+    Uses FastAPI DI with automatic dependency resolution.
     """
     return JobStreamService(job_manager)
 
@@ -384,7 +419,7 @@ def get_job_render_service(
     """
     Provide a JobRenderService instance with proper dependency injection.
 
-    Uses pure FastAPI DI with automatic dependency resolution.
+    Uses FastAPI DI with automatic dependency resolution.
     """
     return JobRenderService(job_manager=job_manager)
 
@@ -395,7 +430,7 @@ def get_debug_service(
 ) -> DebugService:
     """
     Provide a DebugService instance with proper dependency injection.
-    Uses pure FastAPI DI with automatic dependency resolution.
+    Uses FastAPI DI with automatic dependency resolution.
     """
     return DebugService(volume_service=volume_service, job_manager=job_manager)
 
@@ -408,7 +443,7 @@ def get_repository_service(
     """
     Provide a RepositoryService instance with proper dependency injection.
 
-    Uses pure FastAPI DI with automatic dependency resolution.
+    Uses FastAPI DI with automatic dependency resolution.
     """
     return RepositoryService(
         borg_service=borg_service,
@@ -462,17 +497,6 @@ def get_repository_check_config_service(
     Note: This creates a new instance per request since it depends on the database session.
     """
     return RepositoryCheckConfigService(db=db)
-
-
-def get_notification_config_service(
-    db: Session = Depends(get_db),
-) -> NotificationConfigService:
-    """
-    Provide a NotificationConfigService instance with database session injection.
-
-    Note: This creates a new instance per request since it depends on the database session.
-    """
-    return NotificationConfigService(db=db)
 
 
 def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
@@ -546,7 +570,18 @@ BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager_dependency)]
 RecoveryServiceDep = Annotated[RecoveryService, Depends(get_recovery_service)]
-PushoverServiceDep = Annotated[PushoverService, Depends(get_pushover_service)]
+NotificationServiceDep = Annotated[
+    NotificationService, Depends(get_notification_service)
+]
+NotificationConfigServiceDep = Annotated[
+    NotificationConfigService, Depends(get_notification_config_service)
+]
+NotificationProviderRegistryDep = Annotated[
+    "NotificationProviderRegistry", Depends(get_notification_provider_registry)
+]
+NotificationProviderFactoryDep = Annotated[
+    "NotificationProviderFactory", Depends(get_notification_provider_factory)
+]
 JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service)]
 JobRenderServiceDep = Annotated[JobRenderService, Depends(get_job_render_service)]
 DebugServiceDep = Annotated[DebugService, Depends(get_debug_service)]
@@ -578,9 +613,6 @@ JobExecutorDep = Annotated[JobExecutor, Depends(get_job_executor)]
 JobOutputManagerDep = Annotated[JobOutputManager, Depends(get_job_output_manager)]
 JobQueueManagerDep = Annotated[JobQueueManager, Depends(get_job_queue_manager)]
 JobDatabaseManagerDep = Annotated[JobDatabaseManager, Depends(get_job_database_manager)]
-NotificationConfigServiceDep = Annotated[
-    NotificationConfigService, Depends(get_notification_config_service)
-]
 EncryptionServiceDep = Annotated[EncryptionService, Depends(get_encryption_service)]
 StorageFactoryDep = Annotated[StorageFactory, Depends(get_storage_factory)]
 CleanupServiceDep = Annotated[CleanupService, Depends(get_cleanup_service)]

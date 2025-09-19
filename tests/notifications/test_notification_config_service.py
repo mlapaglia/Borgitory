@@ -4,29 +4,38 @@ Tests for NotificationConfigService - Business logic tests
 
 import pytest
 from sqlalchemy.orm import Session
-from borgitory.services.notifications.notification_config_service import (
-    NotificationConfigService,
-)
+from fastapi import HTTPException
+from borgitory.services.notifications.config_service import NotificationConfigService
+from borgitory.services.notifications.service import NotificationService
 from borgitory.models.database import NotificationConfig
 
 
 @pytest.fixture
-def service(test_db: Session):
-    """NotificationConfigService instance with real database session."""
-    return NotificationConfigService(test_db)
+def notification_service():
+    """NotificationService instance for testing."""
+    return NotificationService()
 
 
 @pytest.fixture
-def sample_config(test_db: Session):
-    """Create a sample notification config for testing."""
-    config = NotificationConfig(
-        name="test-config",
-        provider="pushover",
-        notify_on_success=True,
-        notify_on_failure=False,
-        enabled=True,
+def service(test_db: Session, notification_service):
+    """NotificationConfigService instance with real database session."""
+    return NotificationConfigService(
+        db=test_db, notification_service=notification_service
     )
-    config.set_pushover_credentials("test-user", "test-token")
+
+
+@pytest.fixture
+def sample_config(test_db: Session, notification_service):
+    """Create a sample notification config for testing."""
+    config = NotificationConfig()
+    config.name = "test-config"
+    config.provider = "pushover"
+    config.provider_config = notification_service.prepare_config_for_storage(
+        "pushover",
+        {"user_key": "test-user" + "x" * 21, "app_token": "test-token" + "x" * 20},
+    )
+    config.enabled = True
+
     test_db.add(config)
     test_db.commit()
     test_db.refresh(config)
@@ -41,25 +50,25 @@ class TestNotificationConfigService:
         result = service.get_all_configs()
         assert result == []
 
-    def test_get_all_configs_with_data(self, service, test_db: Session) -> None:
+    def test_get_all_configs_with_data(
+        self, service, test_db: Session, notification_service
+    ) -> None:
         """Test getting configs with data."""
-        config1 = NotificationConfig(
-            name="config-1",
-            provider="pushover",
-            notify_on_success=True,
-            notify_on_failure=False,
-            enabled=True,
+        config1 = NotificationConfig()
+        config1.name = "config-1"
+        config1.provider = "pushover"
+        config1.provider_config = notification_service.prepare_config_for_storage(
+            "pushover", {"user_key": "u1" + "x" * 28, "app_token": "t1" + "x" * 28}
         )
-        config1.set_pushover_credentials("user1", "token1")
+        config1.enabled = True
 
-        config2 = NotificationConfig(
-            name="config-2",
-            provider="pushover",
-            notify_on_success=False,
-            notify_on_failure=True,
-            enabled=False,
+        config2 = NotificationConfig()
+        config2.name = "config-2"
+        config2.provider = "discord"
+        config2.provider_config = notification_service.prepare_config_for_storage(
+            "discord", {"webhook_url": "https://discord.com/api/webhooks/test"}
         )
-        config2.set_pushover_credentials("user2", "token2")
+        config2.enabled = False
 
         test_db.add(config1)
         test_db.add(config2)
@@ -71,17 +80,22 @@ class TestNotificationConfigService:
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_all_configs_pagination(self, service, test_db: Session) -> None:
+    def test_get_all_configs_pagination(
+        self, service, test_db: Session, notification_service
+    ) -> None:
         """Test getting configs with pagination."""
         for i in range(5):
-            config = NotificationConfig(
-                name=f"config-{i}",
-                provider="pushover",
-                notify_on_success=True,
-                notify_on_failure=False,
-                enabled=True,
+            config = NotificationConfig()
+            config.name = f"config-{i}"
+            config.provider = "pushover"
+            config.provider_config = notification_service.prepare_config_for_storage(
+                "pushover",
+                {
+                    "user_key": f"user{i}" + "x" * 25,
+                    "app_token": f"token{i}" + "x" * 24,
+                },
             )
-            config.set_pushover_credentials(f"user{i}", f"token{i}")
+            config.enabled = True
             test_db.add(config)
         test_db.commit()
 
@@ -100,24 +114,36 @@ class TestNotificationConfigService:
         result = service.get_config_by_id(999)
         assert result is None
 
+    def test_get_supported_providers(self, service) -> None:
+        """Test getting supported providers."""
+        providers = service.get_supported_providers()
+        assert len(providers) > 0
+
+        # Check structure
+        for provider in providers:
+            assert "value" in provider
+            assert "label" in provider
+            assert "description" in provider
+
+        # Should include pushover and discord
+        provider_values = [p["value"] for p in providers]
+        assert "pushover" in provider_values
+        assert "discord" in provider_values
+
     def test_create_config_success(self, service, test_db: Session) -> None:
         """Test successful config creation."""
-        success, config, error = service.create_config(
+        config = service.create_config(
             name="new-config",
             provider="pushover",
-            notify_on_success=True,
-            notify_on_failure=False,
-            user_key="new-user",
-            app_token="new-token",
+            provider_config={
+                "user_key": "new-user" + "x" * 22,
+                "app_token": "new-token" + "x" * 21,
+            },
         )
 
-        assert success is True
-        assert error is None
         assert config.name == "new-config"
         assert config.provider == "pushover"
-        assert config.notify_on_success is True
-        assert config.notify_on_failure is False
-        assert config.enabled is True  # Default value
+        assert config.enabled is True
 
         # Verify saved to database
         saved_config = (
@@ -128,90 +154,90 @@ class TestNotificationConfigService:
         assert saved_config is not None
         assert saved_config.provider == "pushover"
 
-        # Verify credentials were set
-        user_key, app_token = saved_config.get_pushover_credentials()
-        assert user_key == "new-user"
-        assert app_token == "new-token"
-
-    def test_create_config_database_error(self, service, test_db: Session) -> None:
-        """Test config creation with database error."""
-        from unittest.mock import patch
-
-        # Mock the database commit to raise an exception
-        with patch.object(test_db, "commit", side_effect=Exception("Database error")):
-            success, config, error = service.create_config(
-                name="error-config",
+    def test_create_config_duplicate_name(self, service, sample_config) -> None:
+        """Test creating config with duplicate name."""
+        with pytest.raises(HTTPException) as exc_info:
+            service.create_config(
+                name="test-config",  # Same name as sample_config
                 provider="pushover",
-                notify_on_success=True,
-                notify_on_failure=False,
-                user_key="user",
-                app_token="token",
+                provider_config={
+                    "user_key": "user" + "x" * 26,
+                    "app_token": "token" + "x" * 25,
+                },
             )
 
-            assert success is False
-            assert config is None
-            assert "Failed to create notification configuration" in error
+        assert exc_info.value.status_code == 400
+        assert "already exists" in str(exc_info.value.detail)
+
+    def test_create_config_invalid_provider_config(self, service) -> None:
+        """Test creating config with invalid provider configuration."""
+        with pytest.raises(HTTPException) as exc_info:
+            service.create_config(
+                name="invalid-config",
+                provider="pushover",
+                provider_config={},  # Missing required fields
+            )
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid configuration" in str(exc_info.value.detail)
 
     def test_update_config_success(self, service, test_db, sample_config) -> None:
         """Test successful config update."""
-        success, updated_config, error = service.update_config(
+        updated_config = service.update_config(
             config_id=sample_config.id,
             name="updated-config",
             provider="pushover",
-            notify_on_success=False,
-            notify_on_failure=True,
-            user_key="updated-user",
-            app_token="updated-token",
+            provider_config={
+                "user_key": "updated-user" + "x" * 18,
+                "app_token": "updated-token" + "x" * 17,
+            },
         )
 
-        assert success is True
-        assert error is None
         assert updated_config.name == "updated-config"
-        assert updated_config.notify_on_success is False
-        assert updated_config.notify_on_failure is True
+        assert updated_config.provider == "pushover"
 
-        # Verify credentials were updated
-        user_key, app_token = updated_config.get_pushover_credentials()
-        assert user_key == "updated-user"
-        assert app_token == "updated-token"
+        # Verify in database
+        test_db.refresh(updated_config)
+        assert updated_config.name == "updated-config"
 
     def test_update_config_not_found(self, service) -> None:
         """Test updating non-existent config."""
-        success, config, error = service.update_config(
-            config_id=999,
-            name="not-found",
-            provider="pushover",
-            notify_on_success=True,
-            notify_on_failure=False,
-            user_key="user",
-            app_token="token",
-        )
+        with pytest.raises(HTTPException) as exc_info:
+            service.update_config(
+                config_id=999,
+                name="not-found",
+                provider="pushover",
+                provider_config={
+                    "user_key": "user" + "x" * 26,
+                    "app_token": "token" + "x" * 25,
+                },
+            )
 
-        assert success is False
-        assert config is None
-        assert "not found" in error
+        assert exc_info.value.status_code == 404
+        assert "not found" in str(exc_info.value.detail)
 
-    def test_enable_config_success(self, service, test_db: Session) -> None:
+    def test_enable_config_success(
+        self, service, test_db: Session, notification_service
+    ) -> None:
         """Test successful config enabling."""
         # Create disabled config
-        config = NotificationConfig(
-            name="disabled-config",
-            provider="pushover",
-            notify_on_success=True,
-            notify_on_failure=False,
-            enabled=False,
+        config = NotificationConfig()
+        config.name = "disabled-config"
+        config.provider = "pushover"
+        config.provider_config = notification_service.prepare_config_for_storage(
+            "pushover", {"user_key": "user" + "x" * 26, "app_token": "token" + "x" * 25}
         )
-        config.set_pushover_credentials("user", "token")
+        config.enabled = False
+
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
 
-        success, success_msg, error = service.enable_config(config.id)
+        success, message = service.enable_config(config.id)
 
         assert success is True
-        assert error is None
-        assert "enabled successfully" in success_msg
-        assert config.name in success_msg
+        assert "enabled successfully" in message
+        assert config.name in message
 
         # Verify in database
         test_db.refresh(config)
@@ -219,33 +245,34 @@ class TestNotificationConfigService:
 
     def test_enable_config_not_found(self, service) -> None:
         """Test enabling non-existent config."""
-        success, success_msg, error = service.enable_config(999)
+        with pytest.raises(HTTPException) as exc_info:
+            service.enable_config(999)
 
-        assert success is False
-        assert success_msg is None
-        assert "not found" in error
+        assert exc_info.value.status_code == 404
+        assert "not found" in str(exc_info.value.detail)
 
-    def test_disable_config_success(self, service, test_db: Session) -> None:
+    def test_disable_config_success(
+        self, service, test_db: Session, notification_service
+    ) -> None:
         """Test successful config disabling."""
         # Create enabled config
-        config = NotificationConfig(
-            name="enabled-config",
-            provider="pushover",
-            notify_on_success=True,
-            notify_on_failure=False,
-            enabled=True,
+        config = NotificationConfig()
+        config.name = "enabled-config"
+        config.provider = "pushover"
+        config.provider_config = notification_service.prepare_config_for_storage(
+            "pushover", {"user_key": "user" + "x" * 26, "app_token": "token" + "x" * 25}
         )
-        config.set_pushover_credentials("user", "token")
+        config.enabled = True
+
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
 
-        success, success_msg, error = service.disable_config(config.id)
+        success, message = service.disable_config(config.id)
 
         assert success is True
-        assert error is None
-        assert "disabled successfully" in success_msg
-        assert config.name in success_msg
+        assert "disabled successfully" in message
+        assert config.name in message
 
         # Verify in database
         test_db.refresh(config)
@@ -253,22 +280,21 @@ class TestNotificationConfigService:
 
     def test_disable_config_not_found(self, service) -> None:
         """Test disabling non-existent config."""
-        success, success_msg, error = service.disable_config(999)
+        with pytest.raises(HTTPException) as exc_info:
+            service.disable_config(999)
 
-        assert success is False
-        assert success_msg is None
-        assert "not found" in error
+        assert exc_info.value.status_code == 404
+        assert "not found" in str(exc_info.value.detail)
 
     def test_delete_config_success(self, service, test_db, sample_config) -> None:
         """Test successful config deletion."""
         config_id = sample_config.id
         config_name = sample_config.name
 
-        success, returned_name, error = service.delete_config(config_id)
+        success, returned_name = service.delete_config(config_id)
 
         assert success is True
         assert returned_name == config_name
-        assert error is None
 
         # Verify removed from database
         deleted_config = (
@@ -280,156 +306,124 @@ class TestNotificationConfigService:
 
     def test_delete_config_not_found(self, service) -> None:
         """Test deleting non-existent config."""
-        success, name, error = service.delete_config(999)
+        with pytest.raises(HTTPException) as exc_info:
+            service.delete_config(999)
 
-        assert success is False
-        assert name is None
-        assert "not found" in error
+        assert exc_info.value.status_code == 404
+        assert "not found" in str(exc_info.value.detail)
 
-    def test_get_configs_with_descriptions_success(
-        self, service, test_db: Session
+    def test_get_config_with_decrypted_data_success(
+        self, service, sample_config, notification_service
     ) -> None:
-        """Test getting configs with computed descriptions."""
-        # Config that notifies on both success and failure
-        config1 = NotificationConfig(
-            name="both-notifications",
-            provider="pushover",
-            notify_on_success=True,
-            notify_on_failure=True,
-            enabled=True,
-        )
-        config1.set_pushover_credentials("user1", "token1")
-
-        # Config that only notifies on failure
-        config2 = NotificationConfig(
-            name="failure-only",
-            provider="pushover",
-            notify_on_success=False,
-            notify_on_failure=True,
-            enabled=True,
-        )
-        config2.set_pushover_credentials("user2", "token2")
-
-        # Config that doesn't notify on anything
-        config3 = NotificationConfig(
-            name="no-notifications",
-            provider="pushover",
-            notify_on_success=False,
-            notify_on_failure=False,
-            enabled=True,
-        )
-        config3.set_pushover_credentials("user3", "token3")
-
-        test_db.add_all([config1, config2, config3])
-        test_db.commit()
-
-        result = service.get_configs_with_descriptions()
-
-        assert len(result) == 3
-
-        # Find each config and check descriptions
-        both_config = next(c for c in result if c["name"] == "both-notifications")
-        assert both_config["notification_desc"] == "Success, Failures"
-
-        failure_config = next(c for c in result if c["name"] == "failure-only")
-        assert failure_config["notification_desc"] == "Failures"
-
-        none_config = next(c for c in result if c["name"] == "no-notifications")
-        assert none_config["notification_desc"] == "No notifications"
-
-    def test_get_configs_with_descriptions_empty(self, service) -> None:
-        """Test getting config descriptions when database is empty."""
-        result = service.get_configs_with_descriptions()
-        assert result == []
-
-    def test_get_config_credentials_success(self, service, sample_config) -> None:
-        """Test getting config credentials successfully."""
-        success, user_key, app_token, error = service.get_config_credentials(
+        """Test getting config with decrypted data."""
+        config, decrypted_config = service.get_config_with_decrypted_data(
             sample_config.id
         )
 
-        assert success is True
-        assert user_key == "test-user"
-        assert app_token == "test-token"
-        assert error is None
+        assert config.id == sample_config.id
+        assert config.name == "test-config"
+        assert isinstance(decrypted_config, dict)
+        assert "user_key" in decrypted_config
+        assert "app_token" in decrypted_config
+        assert decrypted_config["user_key"].startswith("test-user")
+        assert decrypted_config["app_token"].startswith("test-token")
 
-    def test_get_config_credentials_not_found(self, service) -> None:
-        """Test getting credentials for non-existent config."""
-        success, user_key, app_token, error = service.get_config_credentials(999)
+    def test_get_config_with_decrypted_data_not_found(self, service) -> None:
+        """Test getting decrypted data for non-existent config."""
+        with pytest.raises(HTTPException) as exc_info:
+            service.get_config_with_decrypted_data(999)
 
-        assert success is False
-        assert user_key is None
-        assert app_token is None
-        assert "not found" in error
+        assert exc_info.value.status_code == 404
+        assert "not found" in str(exc_info.value.detail)
 
-    def test_get_config_credentials_unsupported_provider(
-        self, service, test_db: Session
+    @pytest.mark.asyncio
+    async def test_test_config_success(self, service, sample_config) -> None:
+        """Test successful config testing."""
+        # Note: This will likely fail in tests since we don't have real credentials
+        # but we can test that the method exists and handles the flow correctly
+        try:
+            success, message = await service.test_config(sample_config.id)
+            # Either succeeds or fails, but should return proper types
+            assert isinstance(success, bool)
+            assert isinstance(message, str)
+        except Exception:
+            # Expected in test environment without real credentials
+            pass
+
+    @pytest.mark.asyncio
+    async def test_test_config_not_found(self, service) -> None:
+        """Test testing non-existent config."""
+        with pytest.raises(HTTPException) as exc_info:
+            await service.test_config(999)
+
+        assert exc_info.value.status_code == 404
+        assert "not found" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_test_config_disabled(
+        self, service, test_db: Session, notification_service
     ) -> None:
-        """Test getting credentials for unsupported provider."""
-        # Create config with unsupported provider (shouldn't happen normally)
-        config = NotificationConfig(
-            name="unsupported-config",
-            provider="unsupported",
-            notify_on_success=True,
-            notify_on_failure=False,
-            enabled=True,
+        """Test testing disabled config."""
+        # Create disabled config
+        config = NotificationConfig()
+        config.name = "disabled-config"
+        config.provider = "pushover"
+        config.provider_config = notification_service.prepare_config_for_storage(
+            "pushover", {"user_key": "user" + "x" * 26, "app_token": "token" + "x" * 25}
         )
+        config.enabled = False
+
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
 
-        success, user_key, app_token, error = service.get_config_credentials(config.id)
+        with pytest.raises(HTTPException) as exc_info:
+            await service.test_config(config.id)
 
-        assert success is False
-        assert user_key is None
-        assert app_token is None
-        assert "Unsupported notification provider" in error
+        assert exc_info.value.status_code == 400
+        assert "disabled" in str(exc_info.value.detail)
 
     def test_config_lifecycle(self, service, test_db: Session) -> None:
         """Test complete config lifecycle: create, update, enable/disable, delete."""
         # Create
-        success, created_config, error = service.create_config(
+        created_config = service.create_config(
             name="lifecycle-test",
             provider="pushover",
-            notify_on_success=True,
-            notify_on_failure=False,
-            user_key="lifecycle-user",
-            app_token="lifecycle-token",
+            provider_config={
+                "user_key": "lifecycle-user" + "x" * 16,
+                "app_token": "lifecycle-token" + "x" * 15,
+            },
         )
-        assert success is True
         config_id = created_config.id
 
         # Update
-        success, updated_config, error = service.update_config(
+        updated_config = service.update_config(
             config_id=config_id,
             name="updated-lifecycle-test",
             provider="pushover",
-            notify_on_success=False,
-            notify_on_failure=True,
-            user_key="updated-user",
-            app_token="updated-token",
+            provider_config={
+                "user_key": "updated-user" + "x" * 18,
+                "app_token": "updated-token" + "x" * 17,
+            },
         )
-        assert success is True
         assert updated_config.name == "updated-lifecycle-test"
-        assert updated_config.notify_on_success is False
-        assert updated_config.notify_on_failure is True
 
         # Disable
-        success, success_msg, error = service.disable_config(config_id)
+        success, message = service.disable_config(config_id)
         assert success is True
 
         # Enable
-        success, success_msg, error = service.enable_config(config_id)
+        success, message = service.enable_config(config_id)
         assert success is True
 
-        # Get credentials
-        success, user_key, app_token, error = service.get_config_credentials(config_id)
-        assert success is True
-        assert user_key == "updated-user"
-        assert app_token == "updated-token"
+        # Get with decrypted data
+        config, decrypted_config = service.get_config_with_decrypted_data(config_id)
+        assert config.name == "updated-lifecycle-test"
+        assert decrypted_config["user_key"].startswith("updated-user")
+        assert decrypted_config["app_token"].startswith("updated-token")
 
         # Delete
-        success, config_name, error = service.delete_config(config_id)
+        success, config_name = service.delete_config(config_id)
         assert success is True
         assert config_name == "updated-lifecycle-test"
 

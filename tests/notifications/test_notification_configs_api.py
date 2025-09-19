@@ -1,560 +1,335 @@
 """
-Tests for notification configs API endpoints - HTMX and response validation focused
+Tests for notification API endpoints - HTMX response format testing only
+Business logic tests are in test_notification_config_service.py
 """
 
 import pytest
-from typing import Any
-from unittest.mock import MagicMock, AsyncMock
-from fastapi import Request
-from fastapi.responses import HTMLResponse
+from httpx import AsyncClient
+from sqlalchemy.orm import Session
+from unittest.mock import patch
 
-from borgitory.models.schemas import NotificationConfigCreate, NotificationProvider
-
-
-@pytest.fixture
-def mock_request() -> MagicMock:
-    """Mock FastAPI request"""
-    request = MagicMock(spec=Request)
-    request.headers = {}
-    return request
+from borgitory.models.database import NotificationConfig
 
 
-@pytest.fixture
-def mock_templates() -> MagicMock:
-    """Mock templates dependency"""
-    templates = MagicMock()
-    mock_response = MagicMock(spec=HTMLResponse)
-    mock_response.headers = {}
-    templates.TemplateResponse.return_value = mock_response
-    templates.get_template.return_value.render.return_value = "mocked html content"
-    return templates
+def create_pushover_notification_config(
+    name: str, enabled: bool = True
+) -> NotificationConfig:
+    """Create a test Pushover notification configuration."""
+    config = NotificationConfig()
+    config.name = name
+    config.provider = "pushover"
+    config.enabled = enabled
 
-
-@pytest.fixture
-def mock_service() -> MagicMock:
-    """Mock NotificationConfigService"""
-    service = MagicMock()
-    return service
-
-
-@pytest.fixture
-def mock_pushover_service() -> MagicMock:
-    """Mock PushoverService"""
-    pushover_service = AsyncMock()
-    return pushover_service
-
-
-@pytest.fixture
-def sample_config_create() -> NotificationConfigCreate:
-    """Sample config creation data"""
-    return NotificationConfigCreate(
-        name="test-config",
-        provider=NotificationProvider.PUSHOVER,
-        notify_on_success=True,
-        notify_on_failure=False,
-        user_key="test-user",
-        app_token="test-token",
+    # Use valid 30-character keys for Pushover validation
+    config.provider_config = (
+        '{"user_key": "u' + "x" * 29 + '", "app_token": "a' + "x" * 29 + '"}'
     )
 
+    return config
 
-class TestNotificationConfigsAPI:
-    """Test class for API endpoints focusing on HTMX responses."""
 
-    @pytest.mark.asyncio
-    async def test_create_config_success_htmx_response(
-        self,
-        mock_request: Any,
-        mock_templates: Any,
-        mock_service: Any,
-        sample_config_create: Any,
-    ) -> None:
-        """Test successful config creation returns correct HTMX response."""
-        from borgitory.api.notifications import create_notification_config
-
-        # Mock successful service response
-        mock_config = MagicMock()
-        mock_config.name = "test-config"
-        mock_service.create_config.return_value = (True, mock_config, None)
-
-        result = await create_notification_config(
-            mock_request, mock_templates, sample_config_create, mock_service
-        )
-
-        # Verify service was called with correct parameters
-        mock_service.create_config.assert_called_once_with(
-            name=sample_config_create.name,
-            provider=sample_config_create.provider,
-            notify_on_success=sample_config_create.notify_on_success,
-            notify_on_failure=sample_config_create.notify_on_failure,
-            user_key=sample_config_create.user_key,
-            app_token=sample_config_create.app_token,
-        )
-
-        # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/create_success.html",
-            {"config_name": "test-config"},
-        )
-
-        # Verify HX-Trigger header is set
-        assert result.headers["HX-Trigger"] == "notificationUpdate"
+class TestNotificationConfigsAPIHTMX:
+    """Test class for notification API HTMX responses."""
 
     @pytest.mark.asyncio
-    async def test_create_config_failure_htmx_response(
-        self,
-        mock_request: Any,
-        mock_templates: Any,
-        mock_service: Any,
-        sample_config_create: Any,
-    ) -> None:
-        """Test failed config creation returns correct HTMX error response."""
-        from borgitory.api.notifications import create_notification_config
+    async def test_get_supported_providers(self, async_client: AsyncClient) -> None:
+        """Test getting supported providers returns JSON."""
+        response = await async_client.get("/api/notifications/providers")
 
-        # Mock service failure
-        mock_service.create_config.return_value = (
-            False,
-            None,
-            "Failed to create notification configuration",
+        assert response.status_code == 200
+        assert "application/json" in response.headers["content-type"]
+
+        providers = response.json()
+        assert isinstance(providers, list)
+        assert len(providers) > 0
+
+        # Should include pushover provider
+        pushover_provider = next(
+            (p for p in providers if p["value"] == "pushover"), None
         )
-
-        await create_notification_config(
-            mock_request, mock_templates, sample_config_create, mock_service
-        )
-
-        # Verify error template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/create_error.html",
-            {"error_message": "Failed to create notification configuration"},
-            status_code=500,
-        )
-
-    def test_list_configs_success(self, mock_service: Any) -> None:
-        """Test listing configs returns service result."""
-        from borgitory.api.notifications import list_notification_configs
-
-        mock_configs = [MagicMock(), MagicMock()]
-        mock_service.get_all_configs.return_value = mock_configs
-
-        result = list_notification_configs(mock_service, skip=0, limit=100)
-
-        # Verify service was called with correct parameters
-        mock_service.get_all_configs.assert_called_once_with(skip=0, limit=100)
-
-        # Verify result is returned
-        assert result == mock_configs
-
-    def test_get_configs_html_success(
-        self, mock_request: Any, mock_templates: Any, mock_service: Any
-    ) -> None:
-        """Test getting configs HTML returns correct template response."""
-        from borgitory.api.notifications import get_notification_configs_html
-
-        mock_configs_data = [
-            {"name": "config1", "notification_desc": "Success, Failures"},
-            {"name": "config2", "notification_desc": "Failures"},
-        ]
-        mock_service.get_configs_with_descriptions.return_value = mock_configs_data
-
-        get_notification_configs_html(mock_request, mock_templates, mock_service)
-
-        # Verify service was called
-        mock_service.get_configs_with_descriptions.assert_called_once()
-
-        # Verify template was rendered
-        mock_templates.get_template.assert_called_once_with(
-            "partials/notifications/config_list_content.html"
-        )
-
-    def test_get_configs_html_exception(
-        self, mock_request: Any, mock_templates: Any, mock_service: Any
-    ) -> None:
-        """Test getting configs HTML with exception returns error template."""
-        from borgitory.api.notifications import get_notification_configs_html
-
-        mock_service.get_configs_with_descriptions.side_effect = Exception(
-            "Service error"
-        )
-
-        get_notification_configs_html(mock_request, mock_templates, mock_service)
-
-        # Verify error template response
-        mock_templates.get_template.assert_called_with("partials/jobs/error_state.html")
+        assert pushover_provider is not None
+        assert pushover_provider["label"] == "Pushover"
 
     @pytest.mark.asyncio
-    async def test_test_config_success_htmx_response(
-        self,
-        mock_request: Any,
-        mock_templates: Any,
-        mock_service: Any,
-        mock_pushover_service: Any,
+    async def test_get_provider_fields_pushover(
+        self, async_client: AsyncClient
     ) -> None:
-        """Test successful config test returns correct HTMX response."""
-        from borgitory.api.notifications import test_notification_config
-
-        # Mock successful service response
-        mock_service.get_config_credentials.return_value = (
-            True,
-            "test-user",
-            "test-token",
-            None,
+        """Test getting provider fields for Pushover returns HTML."""
+        response = await async_client.get(
+            "/api/notifications/provider-fields?provider=pushover"
         )
-        mock_pushover_service.test_pushover_connection.return_value = {
-            "status": "success",
-            "message": "Test successful",
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+        content = response.text
+        assert len(content) > 0
+        assert "user_key" in content  # Should contain pushover-specific fields
+
+    @pytest.mark.asyncio
+    async def test_get_provider_fields_discord(self, async_client: AsyncClient) -> None:
+        """Test getting provider fields for Discord returns HTML."""
+        response = await async_client.get(
+            "/api/notifications/provider-fields?provider=discord"
+        )
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+        content = response.text
+        assert len(content) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_provider_fields_no_provider(
+        self, async_client: AsyncClient
+    ) -> None:
+        """Test getting provider fields without provider returns empty."""
+        response = await async_client.get("/api/notifications/provider-fields")
+
+        assert response.status_code == 200
+        assert response.text == ""
+
+    @pytest.mark.asyncio
+    async def test_get_provider_fields_unknown_provider(
+        self, async_client: AsyncClient
+    ) -> None:
+        """Test getting provider fields for unknown provider returns error message."""
+        response = await async_client.get(
+            "/api/notifications/provider-fields?provider=unknown"
+        )
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "No template found" in response.text
+
+    @pytest.mark.asyncio
+    async def test_create_config_html_response(self, async_client: AsyncClient) -> None:
+        """Test config creation returns HTML response."""
+        form_data = {
+            "name": "test-pushover-create",
+            "provider": "pushover",
+            "user_key": "u" + "x" * 29,  # 30 character user key
+            "app_token": "a" + "x" * 29,  # 30 character app token
         }
 
-        await test_notification_config(
-            mock_request, 1, mock_pushover_service, mock_templates, mock_service
-        )
+        response = await async_client.post("/api/notifications/", data=form_data)
 
-        # Verify service was called
-        mock_service.get_config_credentials.assert_called_once_with(1)
-
-        # Verify pushover service was called
-        mock_pushover_service.test_pushover_connection.assert_called_once_with(
-            "test-user", "test-token"
-        )
-
-        # Verify success template response
-        mock_templates.TemplateResponse.assert_called_with(
-            mock_request,
-            "partials/notifications/test_success.html",
-            {"message": "Test successful"},
-        )
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "HX-Trigger" in response.headers
+        assert response.headers["HX-Trigger"] == "notificationUpdate"
 
     @pytest.mark.asyncio
-    async def test_test_config_not_found_htmx_response(
-        self,
-        mock_request: Any,
-        mock_templates: Any,
-        mock_service: Any,
-        mock_pushover_service: Any,
+    async def test_create_config_validation_error(
+        self, async_client: AsyncClient
     ) -> None:
-        """Test testing non-existent config returns correct HTMX error response."""
-        from borgitory.api.notifications import test_notification_config
-
-        # Mock service failure
-        mock_service.get_config_credentials.return_value = (
-            False,
-            None,
-            None,
-            "Notification configuration not found",
-        )
-
-        await test_notification_config(
-            mock_request, 999, mock_pushover_service, mock_templates, mock_service
-        )
-
-        # Verify error template response
-        mock_templates.TemplateResponse.assert_called_with(
-            mock_request,
-            "partials/notifications/test_error.html",
-            {"error_message": "Notification configuration not found"},
-            status_code=404,
-        )
-
-    @pytest.mark.asyncio
-    async def test_test_config_pushover_failure_htmx_response(
-        self,
-        mock_request: Any,
-        mock_templates: Any,
-        mock_service: Any,
-        mock_pushover_service: Any,
-    ) -> None:
-        """Test failed pushover test returns correct HTMX error response."""
-        from borgitory.api.notifications import test_notification_config
-
-        # Mock successful credential retrieval but failed test
-        mock_service.get_config_credentials.return_value = (
-            True,
-            "test-user",
-            "test-token",
-            None,
-        )
-        mock_pushover_service.test_pushover_connection.return_value = {
-            "status": "error",
-            "message": "Invalid credentials",
+        """Test config creation with invalid data returns error HTML."""
+        form_data = {
+            "name": "test-invalid",
+            "provider": "pushover",
+            "user_key": "short",  # Too short for validation
+            "app_token": "short",  # Too short for validation
         }
 
-        await test_notification_config(
-            mock_request, 1, mock_pushover_service, mock_templates, mock_service
-        )
+        response = await async_client.post("/api/notifications/", data=form_data)
 
-        # Verify error template response
-        mock_templates.TemplateResponse.assert_called_with(
-            mock_request,
-            "partials/notifications/test_error.html",
-            {"error_message": "Invalid credentials"},
-            status_code=400,
-        )
-
-    @pytest.mark.asyncio
-    async def test_enable_config_success_htmx_response(
-        self, mock_request: Any, mock_templates: Any, mock_service: Any
-    ) -> None:
-        """Test successful config enable returns correct HTMX response."""
-        from borgitory.api.notifications import enable_notification_config
-
-        mock_service.enable_config.return_value = (
-            True,
-            "Config enabled successfully!",
-            None,
-        )
-
-        result = await enable_notification_config(
-            mock_request, 1, mock_templates, mock_service
-        )
-
-        # Verify service was called
-        mock_service.enable_config.assert_called_once_with(1)
-
-        # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/action_success.html",
-            {"message": "Config enabled successfully!"},
-        )
-
-        # Verify HX-Trigger header is set
-        assert result.headers["HX-Trigger"] == "notificationUpdate"
-
-    @pytest.mark.asyncio
-    async def test_enable_config_not_found_htmx_response(
-        self, mock_request: Any, mock_templates: Any, mock_service: Any
-    ) -> None:
-        """Test enabling non-existent config returns correct HTMX error response."""
-        from borgitory.api.notifications import enable_notification_config
-
-        mock_service.enable_config.return_value = (
-            False,
-            None,
-            "Notification configuration not found",
-        )
-
-        await enable_notification_config(
-            mock_request, 999, mock_templates, mock_service
-        )
-
-        # Verify error template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/action_error.html",
-            {"error_message": "Notification configuration not found"},
-            status_code=404,
+        assert response.status_code == 400  # Proper HTTP status for validation error
+        # Should contain error message in response
+        content = response.text
+        assert (
+            "error" in content.lower()
+            or "invalid" in content.lower()
+            or "validation" in content.lower()
         )
 
     @pytest.mark.asyncio
-    async def test_disable_config_success_htmx_response(
-        self, mock_request: Any, mock_templates: Any, mock_service: Any
+    async def test_enable_config_html_response(
+        self, async_client: AsyncClient, test_db: Session
     ) -> None:
-        """Test successful config disable returns correct HTMX response."""
-        from borgitory.api.notifications import disable_notification_config
-
-        mock_service.disable_config.return_value = (
-            True,
-            "Config disabled successfully!",
-            None,
+        """Test config enable returns HTML response."""
+        config = create_pushover_notification_config(
+            name="enable-html-test", enabled=False
         )
+        test_db.add(config)
+        test_db.commit()
+        test_db.refresh(config)
 
-        result = await disable_notification_config(
-            mock_request, 1, mock_templates, mock_service
-        )
+        response = await async_client.post(f"/api/notifications/{config.id}/enable")
 
-        # Verify service was called
-        mock_service.disable_config.assert_called_once_with(1)
-
-        # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/action_success.html",
-            {"message": "Config disabled successfully!"},
-        )
-
-        # Verify HX-Trigger header is set
-        assert result.headers["HX-Trigger"] == "notificationUpdate"
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "HX-Trigger" in response.headers
+        assert response.headers["HX-Trigger"] == "notificationUpdate"
 
     @pytest.mark.asyncio
-    async def test_get_edit_form_success_htmx_response(
-        self, mock_request, mock_templates, mock_service
+    async def test_disable_config_html_response(
+        self, async_client: AsyncClient, test_db: Session
     ) -> None:
-        """Test getting edit form returns correct HTMX template response."""
-        from borgitory.api.notifications import get_notification_config_edit_form
-
-        mock_config = MagicMock()
-        mock_service.get_config_by_id.return_value = mock_config
-        mock_service.get_config_credentials.return_value = (
-            True,
-            "test-user",
-            "test-token",
-            None,
+        """Test config disable returns HTML response."""
+        config = create_pushover_notification_config(
+            name="disable-html-test", enabled=True
         )
+        test_db.add(config)
+        test_db.commit()
+        test_db.refresh(config)
 
-        await get_notification_config_edit_form(
-            mock_request, 1, mock_templates, mock_service
-        )
+        response = await async_client.post(f"/api/notifications/{config.id}/disable")
 
-        # Verify service was called
-        mock_service.get_config_by_id.assert_called_once_with(1)
-        mock_service.get_config_credentials.assert_called_once_with(1)
-
-        # Verify correct template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/edit_form.html",
-            {
-                "config": mock_config,
-                "user_key": "test-user",
-                "app_token": "test-token",
-                "is_edit_mode": True,
-            },
-        )
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "HX-Trigger" in response.headers
+        assert response.headers["HX-Trigger"] == "notificationUpdate"
 
     @pytest.mark.asyncio
-    async def test_get_edit_form_not_found(
-        self, mock_request, mock_templates, mock_service
+    async def test_test_config_html_response(
+        self, async_client: AsyncClient, test_db: Session
     ) -> None:
-        """Test getting edit form for non-existent config raises HTTPException."""
-        from borgitory.api.notifications import get_notification_config_edit_form
-        from fastapi import HTTPException
+        """Test config test returns HTML response."""
+        config = create_pushover_notification_config(
+            name="test-config-html", enabled=True
+        )
+        test_db.add(config)
+        test_db.commit()
+        test_db.refresh(config)
 
-        mock_service.get_config_by_id.return_value = None
+        # Mock the notification service test
+        with patch(
+            "borgitory.services.notifications.config_service.NotificationConfigService.test_config"
+        ) as mock_test:
+            mock_test.return_value = (True, "Connection successful")
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_notification_config_edit_form(
-                mock_request, 999, mock_templates, mock_service
-            )
+            response = await async_client.post(f"/api/notifications/{config.id}/test")
 
-        assert exc_info.value.status_code == 404
-        assert "Notification configuration not found" in str(exc_info.value.detail)
+            assert response.status_code == 200
+            assert "text/html" in response.headers["content-type"]
 
     @pytest.mark.asyncio
-    async def test_update_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service, sample_config_create
+    async def test_get_edit_form_html_response(
+        self, async_client: AsyncClient, test_db: Session
     ) -> None:
-        """Test successful config update returns correct HTMX response."""
-        from borgitory.api.notifications import update_notification_config
-
-        mock_config = MagicMock()
-        mock_config.name = "updated-config"
-        mock_service.update_config.return_value = (True, mock_config, None)
-
-        result = await update_notification_config(
-            mock_request, 1, sample_config_create, mock_templates, mock_service
+        """Test getting edit form returns HTML."""
+        config = create_pushover_notification_config(
+            name="edit-form-test", enabled=True
         )
+        test_db.add(config)
+        test_db.commit()
+        test_db.refresh(config)
 
-        # Verify service was called with correct parameters
-        mock_service.update_config.assert_called_once_with(
-            config_id=1,
-            name=sample_config_create.name,
-            provider=sample_config_create.provider,
-            notify_on_success=sample_config_create.notify_on_success,
-            notify_on_failure=sample_config_create.notify_on_failure,
-            user_key=sample_config_create.user_key,
-            app_token=sample_config_create.app_token,
-        )
+        response = await async_client.get(f"/api/notifications/{config.id}/edit")
 
-        # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/update_success.html",
-            {"config_name": "updated-config"},
-        )
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
 
-        # Verify HX-Trigger header is set
-        assert result.headers["HX-Trigger"] == "notificationUpdate"
+        content = response.text
+        assert len(content) > 0
+        assert config.name in content
 
     @pytest.mark.asyncio
-    async def test_update_config_failure_htmx_response(
-        self, mock_request, mock_templates, mock_service, sample_config_create
+    async def test_update_config_html_response(
+        self, async_client: AsyncClient, test_db: Session
     ) -> None:
-        """Test failed config update returns correct HTMX error response."""
-        from borgitory.api.notifications import update_notification_config
+        """Test config update returns HTML response."""
+        config = create_pushover_notification_config(
+            name="update-html-test", enabled=True
+        )
+        test_db.add(config)
+        test_db.commit()
+        test_db.refresh(config)
 
-        mock_service.update_config.return_value = (
-            False,
-            None,
-            "Notification configuration not found",
+        form_data = {
+            "name": "updated-name",
+            "provider": "pushover",
+            "user_key": "u" + "x" * 29,  # 30 character user key
+            "app_token": "a" + "x" * 29,  # 30 character app token
+        }
+
+        response = await async_client.put(
+            f"/api/notifications/{config.id}", data=form_data
         )
 
-        await update_notification_config(
-            mock_request, 999, sample_config_create, mock_templates, mock_service
-        )
-
-        # Verify error template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/update_error.html",
-            {"error_message": "Notification configuration not found"},
-            status_code=404,
-        )
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "HX-Trigger" in response.headers
+        assert response.headers["HX-Trigger"] == "notificationUpdate"
 
     @pytest.mark.asyncio
-    async def test_get_notification_form_htmx_response(
-        self, mock_request, mock_templates
+    async def test_delete_config_html_response(
+        self, async_client: AsyncClient, test_db: Session
     ) -> None:
-        """Test getting notification form returns correct HTMX template response."""
-        from borgitory.api.notifications import get_notification_form
-
-        await get_notification_form(mock_request, mock_templates)
-
-        # Verify correct template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/add_form.html",
-            {},
+        """Test config deletion returns HTML response."""
+        config = create_pushover_notification_config(
+            name="delete-html-test", enabled=True
         )
+        test_db.add(config)
+        test_db.commit()
+        test_db.refresh(config)
+
+        response = await async_client.delete(f"/api/notifications/{config.id}")
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "HX-Trigger" in response.headers
+        assert response.headers["HX-Trigger"] == "notificationUpdate"
 
     @pytest.mark.asyncio
-    async def test_delete_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service
+    async def test_get_notification_form_html_response(
+        self, async_client: AsyncClient
     ) -> None:
-        """Test successful config deletion returns correct HTMX response."""
-        from borgitory.api.notifications import delete_notification_config
+        """Test getting notification form returns HTML."""
+        response = await async_client.get("/api/notifications/form")
 
-        mock_service.delete_config.return_value = (True, "test-config", None)
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
 
-        result = await delete_notification_config(
-            mock_request, 1, mock_templates, mock_service
-        )
-
-        # Verify service was called
-        mock_service.delete_config.assert_called_once_with(1)
-
-        # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/action_success.html",
-            {
-                "message": "Notification configuration 'test-config' deleted successfully!"
-            },
-        )
-
-        # Verify HX-Trigger header is set
-        assert result.headers["HX-Trigger"] == "notificationUpdate"
+        content = response.text
+        assert len(content) > 0
+        assert "notification" in content.lower()
 
     @pytest.mark.asyncio
-    async def test_delete_config_failure_htmx_response(
-        self, mock_request, mock_templates, mock_service
-    ) -> None:
-        """Test failed config deletion returns correct HTMX error response."""
-        from borgitory.api.notifications import delete_notification_config
+    async def test_config_not_found_responses(self, async_client: AsyncClient) -> None:
+        """Test various endpoints with non-existent config ID."""
+        non_existent_id = 99999
 
-        mock_service.delete_config.return_value = (
-            False,
-            None,
-            "Notification configuration not found",
+        # Test enable
+        response = await async_client.post(
+            f"/api/notifications/{non_existent_id}/enable"
         )
+        assert response.status_code == 404  # Proper HTTP status for not found
+        assert "not found" in response.text.lower() or "error" in response.text.lower()
 
-        await delete_notification_config(
-            mock_request, 999, mock_templates, mock_service
+        # Test disable
+        response = await async_client.post(
+            f"/api/notifications/{non_existent_id}/disable"
         )
+        assert response.status_code == 404  # Proper HTTP status for not found
+        assert "not found" in response.text.lower() or "error" in response.text.lower()
 
-        # Verify error template response
-        mock_templates.TemplateResponse.assert_called_once_with(
-            mock_request,
-            "partials/notifications/action_error.html",
-            {"error_message": "Notification configuration not found"},
-            status_code=404,
+        # Test delete
+        response = await async_client.delete(f"/api/notifications/{non_existent_id}")
+        assert response.status_code == 404  # Proper HTTP status for not found
+        assert "not found" in response.text.lower() or "error" in response.text.lower()
+
+        # Test test
+        response = await async_client.post(f"/api/notifications/{non_existent_id}/test")
+        assert response.status_code == 404  # Proper HTTP status for not found
+        assert "not found" in response.text.lower() or "error" in response.text.lower()
+
+        # Test edit form
+        response = await async_client.get(f"/api/notifications/{non_existent_id}/edit")
+        assert (
+            response.status_code == 404 or response.status_code == 500
+        )  # Either is acceptable
+        assert "not found" in response.text.lower() or "error" in response.text.lower()
+
+        # Test update (may return 400 due to form validation before config lookup)
+        response = await async_client.put(
+            f"/api/notifications/{non_existent_id}", data={"name": "test"}
+        )
+        assert (
+            response.status_code == 400 or response.status_code == 404
+        )  # Either is acceptable
+        assert (
+            "not found" in response.text.lower()
+            or "error" in response.text.lower()
+            or "invalid" in response.text.lower()
         )

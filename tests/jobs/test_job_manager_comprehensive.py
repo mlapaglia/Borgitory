@@ -40,7 +40,6 @@ class TestJobManagerFactory:
         assert deps.queue_manager is not None
         assert deps.event_broadcaster is not None
         assert deps.database_manager is not None
-        assert deps.pushover_service is not None
 
         # Test that it uses default session factory
         assert deps.db_session_factory is not None
@@ -551,16 +550,29 @@ class TestJobManagerTaskExecution:
         self, job_manager_with_db, test_db
     ) -> None:
         """Test successful notification task execution"""
-        # Create notification config in database
-        notification_config = NotificationConfig(
-            name="Test Pushover",
-            provider="pushover",
-            enabled=True,
-            encrypted_user_key="encrypted_user_key",
-            encrypted_app_token="encrypted_app_token",
+        # Create notification config in database using new model
+        notification_config = NotificationConfig()
+        notification_config.name = "Test Pushover"
+        notification_config.provider = "pushover"
+        notification_config.enabled = True
+
+        # Use the new NotificationService to prepare config for storage
+        from borgitory.services.notifications.service import NotificationService
+
+        notification_service = NotificationService()
+        notification_config.provider_config = (
+            notification_service.prepare_config_for_storage(
+                "pushover",
+                {
+                    "user_key": "u" + "x" * 29,  # 30 character user key
+                    "app_token": "a" + "x" * 29,  # 30 character app token
+                },
+            )
         )
+
         test_db.add(notification_config)
         test_db.commit()
+        test_db.refresh(notification_config)
 
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
@@ -585,24 +597,31 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock successful notification with proper database access
-        with patch.object(
-            notification_config,
-            "get_pushover_credentials",
-            return_value=("user_key", "app_token"),
-        ), patch("borgitory.services.jobs.job_manager.get_db_session") as mock_get_db:
+        with patch(
+            "borgitory.services.jobs.job_manager.get_db_session"
+        ) as mock_get_db, patch(
+            "borgitory.services.notifications.service.NotificationService.send_notification"
+        ) as mock_send:
             # Set up the database session context manager
             mock_get_db.return_value.__enter__.return_value = test_db
 
-            job_manager_with_db.pushover_service.send_notification_with_response = (
-                AsyncMock(return_value=(True, "Message sent"))
+            # Mock successful notification result
+            from borgitory.services.notifications.types import NotificationResult
+
+            mock_result = NotificationResult(
+                success=True, provider="pushover", message="Message sent successfully"
             )
+            mock_send.return_value = mock_result
 
             success = await job_manager_with_db._execute_notification_task(job, task)
 
         assert success is True
         assert task.status == "completed"
         assert task.return_code == 0
-        assert len(task.output_lines) > 0
+        assert task.error is None
+
+        # Verify notification service was called
+        mock_send.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_execute_notification_task_no_config(

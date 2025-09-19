@@ -205,9 +205,9 @@ class TestIntegrationWithExistingTests:
         assert isinstance(service, DebugService)
 
     def test_direct_calls_vs_dependency_overrides(self):
-        """Test pure FastAPI DI behavior - direct calls create new instances, overrides work in FastAPI context."""
+        """Test FastAPI DI behavior - direct calls create new instances, overrides work in FastAPI context."""
 
-        # With pure FastAPI DI, direct calls create new instances each time
+        # With FastAPI DI, direct calls create new instances each time
         service1 = get_debug_service()
         service2 = get_debug_service()
         assert service1 is not service2  # No longer singleton

@@ -129,20 +129,20 @@ class TestNotificationServiceFactory:
         factory = NotificationServiceFactory()
 
         implementations = factory.list_implementations()
-        assert "pushover" in implementations
-        assert factory.get_default_implementation() == "pushover"
+        assert "provider_based" in implementations
+        assert factory.get_default_implementation() == "provider_based"
 
-    def test_create_pushover_service(self):
-        """Test creating a Pushover notification service."""
+    def test_create_notification_service(self):
+        """Test creating a notification service."""
         factory = NotificationServiceFactory()
 
-        service = factory.create_notification_service("pushover")
+        service = factory.create_notification_service("provider_based")
 
         assert service is not None
-        # Should have the actual methods from PushoverService
+        # Should have the methods from NotificationService
         assert hasattr(service, "send_notification")
-        assert hasattr(service, "test_pushover_connection")
-        assert hasattr(service, "send_backup_success_notification")
+        assert hasattr(service, "test_connection")
+        assert hasattr(service, "prepare_config_for_storage")
 
     def test_create_default_service(self):
         """Test creating default notification service."""
@@ -152,8 +152,7 @@ class TestNotificationServiceFactory:
 
         assert service is not None
         assert hasattr(service, "send_notification")
-        # Check the class name instead of a method that doesn't exist
-        assert service.__class__.__name__ == "PushoverService"
+        assert service.__class__.__name__ == "NotificationService"
 
 
 class TestCommandRunnerFactory:
@@ -272,7 +271,7 @@ class TestConvenienceFunctions:
 
     def test_create_notification_service_function(self):
         """Test the create_notification_service convenience function."""
-        service = create_notification_service("pushover")
+        service = create_notification_service("provider_based")
 
         assert service is not None
         assert hasattr(service, "send_notification")
@@ -318,7 +317,7 @@ class TestFactoryIntegration:
             return service.__class__.__name__
 
         result = use_notification_service(notification_service)
-        assert result == "PushoverService"
+        assert result == "NotificationService"
 
         # Test command runner
         command_factory = registry.get_command_runner_factory()

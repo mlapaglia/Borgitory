@@ -1,0 +1,70 @@
+<!-- Pushover Provider Fields -->
+<div class="space-y-4">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Pushover User Key</label>
+        <input type="text" name="user_key" required placeholder="u1a2b3c4d5e6f7g8h9i0j1k2l3m4n5" class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Found in your Pushover dashboard</p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">App Token</label>
+        <input type="text" name="app_token" required placeholder="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8" class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Create an application in Pushover to get this token</p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Default Priority</label>
+        <select name="priority" class="select-modern w-full">
+            <option value="-2">Lowest Priority</option>
+            <option value="-1">Low Priority</option>
+            <option value="0" selected>Normal Priority</option>
+            <option value="1">High Priority</option>
+            <option value="2">Emergency Priority</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Default priority for notifications (can be overridden per notification)</p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Default Sound</label>
+        <select name="sound" class="select-modern w-full">
+            <option value="default" selected>Default</option>
+            <option value="bike">Bike</option>
+            <option value="bugle">Bugle</option>
+            <option value="cashregister">Cash Register</option>
+            <option value="classical">Classical</option>
+            <option value="cosmic">Cosmic</option>
+            <option value="falling">Falling</option>
+            <option value="gamelan">Gamelan</option>
+            <option value="incoming">Incoming</option>
+            <option value="intermission">Intermission</option>
+            <option value="magic">Magic</option>
+            <option value="mechanical">Mechanical</option>
+            <option value="pianobar">Piano Bar</option>
+            <option value="siren">Siren</option>
+            <option value="spacealarm">Space Alarm</option>
+            <option value="tugboat">Tugboat</option>
+            <option value="alien">Alien Alarm (long)</option>
+            <option value="climb">Climb (long)</option>
+            <option value="persistent">Persistent (long)</option>
+            <option value="echo">Pushover Echo (long)</option>
+            <option value="updown">Up Down (long)</option>
+            <option value="none">Silent</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Default sound for notifications</p>
+    </div>
+
+    <div class="flex space-x-2">
+        <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+            {{ submit_button_text or "Add Pushover Notification" }}
+        </button>
+        <button type="button" 
+                hx-post="/api/notifications/test-config"
+                hx-include="closest form"
+                hx-target="#notification-test-status"
+                class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+            Test Connection
+        </button>
+    </div>
+    
+    <div id="notification-test-status" class="mt-2"></div>
+</div>

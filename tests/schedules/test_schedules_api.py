@@ -97,8 +97,15 @@ class TestSchedulesAPI:
         notification_config = NotificationConfig()
         notification_config.name = "test-notif"
         notification_config.provider = "pushover"
-        notification_config.encrypted_user_key = "test-encrypted-user"
-        notification_config.encrypted_app_token = "test-encrypted-token"
+        notification_config.provider_config = (
+            '{"user_key": "'
+            + "u"
+            + "x" * 29
+            + '", "app_token": "'
+            + "a"
+            + "x" * 29
+            + '"}'
+        )
         notification_config.enabled = True
 
         test_db.add_all([cleanup_config, cloud_config, notification_config])

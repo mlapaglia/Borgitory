@@ -10,7 +10,7 @@ from borgitory.dependencies import (
     get_borg_service,
     get_job_service,
     get_recovery_service,
-    get_pushover_service,
+    get_notification_service,
     get_job_stream_service,
     get_job_render_service,
     get_debug_service,
@@ -24,7 +24,7 @@ from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.recovery_service import RecoveryService
-from borgitory.services.notifications.pushover_service import PushoverService
+from borgitory.services.notifications.service import NotificationService
 from borgitory.services.jobs.job_stream_service import JobStreamService
 from borgitory.services.jobs.job_render_service import JobRenderService
 from borgitory.services.debug_service import DebugService
@@ -50,7 +50,7 @@ class TestDependencies:
         assert runner is runner2
 
     def test_get_borg_service(self) -> None:
-        """Test BorgService dependency provider with pure FastAPI DI."""
+        """Test BorgService dependency provider with FastAPI DI."""
         # Test that BorgService works in FastAPI context
         mock_borg_service = Mock(spec=BorgService)
         mock_borg_service.scan_for_repositories.return_value = []
@@ -62,7 +62,7 @@ class TestDependencies:
             # Verify our mock was used
             assert mock_borg_service.scan_for_repositories.called
 
-        # Test that pure DI creates new instances (no longer singleton)
+        # Test that DI creates new instances (no longer singleton)
         # Note: Direct calls receive Depends objects, so we test the DI behavior
         sig = inspect.signature(get_borg_service)
         assert "command_runner" in sig.parameters
@@ -157,14 +157,14 @@ class TestDependencies:
         service2 = get_recovery_service()
         assert service is service2
 
-    def test_get_pushover_service(self) -> None:
-        """Test PushoverService dependency provider."""
-        service = get_pushover_service()
+    def test_get_notification_service(self) -> None:
+        """Test NotificationService dependency provider."""
+        service = get_notification_service()
 
-        assert isinstance(service, PushoverService)
+        assert isinstance(service, NotificationService)
 
         # Should return same instance due to singleton pattern
-        service2 = get_pushover_service()
+        service2 = get_notification_service()
         assert service is service2
 
     def test_get_job_stream_service(self) -> None:
@@ -173,7 +173,7 @@ class TestDependencies:
 
         assert isinstance(service, JobStreamService)
 
-        # No longer singleton - pure FastAPI DI creates new instances
+        # No longer singleton - FastAPI DI creates new instances
         service2 = get_job_stream_service()
         assert service is not service2, "JobStreamService should no longer be singleton"
 
@@ -183,12 +183,12 @@ class TestDependencies:
 
         assert isinstance(service, JobRenderService)
 
-        # No longer singleton - pure FastAPI DI creates new instances
+        # No longer singleton - FastAPI DI creates new instances
         service2 = get_job_render_service()
         assert service is not service2, "JobRenderService should no longer be singleton"
 
     def test_get_debug_service(self) -> None:
-        """Test DebugService dependency provider with pure FastAPI DI."""
+        """Test DebugService dependency provider with FastAPI DI."""
 
         # Test that DebugService works in FastAPI context
         mock_debug_service = Mock(spec=DebugService)
@@ -203,7 +203,7 @@ class TestDependencies:
             # Verify our mock was used
             assert mock_debug_service.get_debug_info.called
 
-        # Test that pure DI creates new instances (no longer singleton)
+        # Test that DI creates new instances (no longer singleton)
         # Note: Direct calls receive Depends objects, so we test the DI behavior
         import inspect
 
@@ -282,7 +282,7 @@ class TestDependencies:
         mock_job_manager = Mock()
         job_service = JobService(db=mock_db, job_manager=mock_job_manager)
         recovery_service = RecoveryService()
-        pushover_service = PushoverService()
+        notification_service = NotificationService()
         job_stream_service = JobStreamService(mock_job_manager)
         job_render_service = JobRenderService(job_manager=mock_job_manager)
         debug_service = DebugService()
@@ -293,7 +293,7 @@ class TestDependencies:
         assert isinstance(service, BorgService)
         assert isinstance(job_service, JobService)
         assert isinstance(recovery_service, RecoveryService)
-        assert isinstance(pushover_service, PushoverService)
+        assert isinstance(notification_service, NotificationService)
         assert isinstance(job_stream_service, JobStreamService)
         assert isinstance(job_render_service, JobRenderService)
         assert isinstance(debug_service, DebugService)
