@@ -13,7 +13,7 @@ from .borg_service import BorgService
 
 __all__ = [
     "CommandRunner",
-    "CommandResult", 
+    "CommandResult",
     "StorageService",
     "JobManager",
     "JobExecutor",

@@ -9,6 +9,7 @@ from typing import Protocol, List, Dict, Optional, NamedTuple
 
 class CommandResult(NamedTuple):
     """Result of a command execution"""
+
     success: bool
     return_code: int
     stdout: str
@@ -19,7 +20,7 @@ class CommandResult(NamedTuple):
 
 class CommandRunner(Protocol):
     """Protocol for command execution services"""
-    
+
     async def run_command(
         self,
         command: List[str],

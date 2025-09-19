@@ -2,7 +2,7 @@
 FastAPI dependency providers for the application.
 """
 
-from typing import Annotated
+from typing import Annotated, TYPE_CHECKING, Optional, Callable, Any
 from functools import lru_cache
 
 from fastapi import Depends
@@ -48,6 +48,9 @@ from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
 from borgitory.services.cloud_providers import EncryptionService, StorageFactory
+
+if TYPE_CHECKING:
+    from borgitory.services.cloud_sync_service import CloudSyncService
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
 from borgitory.services.jobs.job_queue_manager import JobQueueManager
@@ -75,6 +78,7 @@ def get_job_output_manager() -> JobOutputManager:
     Configuration loaded from environment per request.
     """
     import os
+
     max_lines = int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000"))
     return JobOutputManager(max_lines_per_job=max_lines)
 
@@ -87,15 +91,18 @@ def get_job_queue_manager() -> JobQueueManager:
     Configuration loaded from environment per request.
     """
     import os
+
     return JobQueueManager(
         max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
-        max_concurrent_operations=int(os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")),
+        max_concurrent_operations=int(
+            os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")
+        ),
         queue_poll_interval=float(os.getenv("BORG_QUEUE_POLL_INTERVAL", "0.1")),
     )
 
 
 def get_job_database_manager(
-    db_session_factory=None,
+    db_session_factory: Optional[Callable[[], Any]] = None,
 ) -> JobDatabaseManager:
     """
     Provide a JobDatabaseManager instance.
@@ -105,11 +112,10 @@ def get_job_database_manager(
     """
     if db_session_factory is None:
         from borgitory.utils.db_session import get_db_session
+
         db_session_factory = get_db_session
-    
+
     return JobDatabaseManager(db_session_factory=db_session_factory)
-
-
 
 
 @lru_cache()
@@ -120,10 +126,6 @@ def get_simple_command_runner() -> SimpleCommandRunner:
     Uses FastAPI's built-in caching for singleton behavior.
     """
     return SimpleCommandRunner()
-
-
-
-
 
 
 def get_backup_service(db: Session = Depends(get_db)) -> BackupService:
@@ -154,8 +156,6 @@ def get_pushover_service() -> PushoverService:
     Uses FastAPI's built-in caching for singleton behavior.
     """
     return PushoverService()
-
-
 
 
 @lru_cache()
@@ -246,12 +246,7 @@ def get_archive_manager(
 
     Uses pure FastAPI DI with automatic dependency resolution.
     """
-    return ArchiveManager(
-        job_executor=job_executor, 
-        command_builder=command_builder
-    )
-
-
+    return ArchiveManager(job_executor=job_executor, command_builder=command_builder)
 
 
 def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
@@ -297,11 +292,17 @@ def get_job_manager_dependency() -> JobManager:
         config = JobManagerConfig(
             max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
             max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
-            max_concurrent_operations=int(os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")),
+            max_concurrent_operations=int(
+                os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")
+            ),
             queue_poll_interval=float(os.getenv("BORG_QUEUE_POLL_INTERVAL", "0.1")),
-            sse_keepalive_timeout=float(os.getenv("BORG_SSE_KEEPALIVE_TIMEOUT", "30.0")),
+            sse_keepalive_timeout=float(
+                os.getenv("BORG_SSE_KEEPALIVE_TIMEOUT", "30.0")
+            ),
             sse_max_queue_size=int(os.getenv("BORG_SSE_MAX_QUEUE_SIZE", "100")),
-            max_concurrent_cloud_uploads=int(os.getenv("BORG_MAX_CONCURRENT_CLOUD_UPLOADS", "3")),
+            max_concurrent_cloud_uploads=int(
+                os.getenv("BORG_MAX_CONCURRENT_CLOUD_UPLOADS", "3")
+            ),
         )
 
         # Create dependencies using our new DI services (resolved directly)
@@ -316,7 +317,7 @@ def get_job_manager_dependency() -> JobManager:
         )
 
         _job_manager_instance = JobManager(config=config, dependencies=dependencies)
-    
+
     return _job_manager_instance
 
 
@@ -332,17 +333,20 @@ def get_job_service(
     return JobService(db, job_manager)
 
 
-@lru_cache()
-def get_borg_service() -> BorgService:
+def get_borg_service(
+    command_runner: SimpleCommandRunner = Depends(get_simple_command_runner),
+    volume_service: VolumeService = Depends(get_volume_service),
+    job_manager: JobManager = Depends(get_job_manager_dependency),
+) -> BorgService:
     """
-    Provide a BorgService singleton instance with dependency injection.
+    Provide a BorgService instance with proper dependency injection.
 
-    Uses FastAPI's DI system internally while maintaining singleton behavior.
+    Uses pure FastAPI DI with automatic dependency resolution.
     """
     return BorgService(
-        command_runner=get_simple_command_runner(),
-        volume_service=get_volume_service(),
-        job_manager=get_job_manager_dependency(),
+        command_runner=command_runner,
+        volume_service=volume_service,
+        job_manager=job_manager,
     )
 
 
@@ -368,32 +372,32 @@ def get_job_render_service(
     return JobRenderService(job_manager=job_manager)
 
 
-@lru_cache()
-def get_debug_service() -> DebugService:
+def get_debug_service(
+    volume_service: VolumeService = Depends(get_volume_service),
+    job_manager: JobManager = Depends(get_job_manager_dependency),
+) -> DebugService:
     """
-    Provide a DebugService singleton instance with dependency injection.
-    Uses FastAPI's DI system internally while maintaining singleton behavior.
+    Provide a DebugService instance with proper dependency injection.
+    Uses pure FastAPI DI with automatic dependency resolution.
     """
-    return DebugService(
-        volume_service=get_volume_service(), 
-        job_manager=get_job_manager_dependency()
-    )
+    return DebugService(volume_service=volume_service, job_manager=job_manager)
 
 
-@lru_cache()
-def get_repository_service() -> RepositoryService:
+def get_repository_service(
+    borg_service: BorgService = Depends(get_borg_service),
+    scheduler_service: ScheduleService = Depends(get_scheduler_service),
+    volume_service: VolumeService = Depends(get_volume_service),
+) -> RepositoryService:
     """
-    Provide a RepositoryService singleton instance with proper dependency injection.
+    Provide a RepositoryService instance with proper dependency injection.
 
-    Uses FastAPI's DI system internally while maintaining singleton behavior.
+    Uses pure FastAPI DI with automatic dependency resolution.
     """
     return RepositoryService(
-        borg_service=get_borg_service(),
-        scheduler_service=get_scheduler_service(),
-        volume_service=get_volume_service(),
+        borg_service=borg_service,
+        scheduler_service=scheduler_service,
+        volume_service=volume_service,
     )
-
-
 
 
 @lru_cache()
@@ -502,18 +506,18 @@ def get_cloud_sync_service(
 ) -> "CloudSyncService":
     """
     Provide a CloudSyncService instance with proper dependency injection.
-    
+
     Request-scoped since it depends on database session.
     """
     from borgitory.services.cloud_sync_service import CloudSyncService
-    from borgitory.services.cloud_providers.registry import get_provider_metadata
-    
+    from borgitory.services.cloud_providers.registry import get_metadata
+
     return CloudSyncService(
         db=db,
         rclone_service=rclone_service,
         storage_factory=storage_factory,
         encryption_service=encryption_service,
-        get_metadata_func=get_provider_metadata,
+        get_metadata_func=get_metadata,
     )
 
 

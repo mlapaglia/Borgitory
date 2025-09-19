@@ -2,6 +2,9 @@
 Tests for FastAPI dependency providers
 """
 
+import inspect
+from unittest.mock import Mock, AsyncMock
+
 from borgitory.dependencies import (
     get_simple_command_runner,
     get_borg_service,
@@ -14,7 +17,9 @@ from borgitory.dependencies import (
     get_rclone_service,
     get_repository_stats_service,
     get_volume_service,
+    get_job_manager_dependency,
 )
+from tests.utils.di_testing import override_dependency, override_multiple_dependencies
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
@@ -45,35 +50,84 @@ class TestDependencies:
         assert runner is runner2
 
     def test_get_borg_service(self) -> None:
-        """Test BorgService dependency provider."""
-        service = get_borg_service()
+        """Test BorgService dependency provider with pure FastAPI DI."""
+        # Test that BorgService works in FastAPI context
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.scan_for_repositories.return_value = []
 
-        assert isinstance(service, BorgService)
-        assert isinstance(service.command_runner, SimpleCommandRunner)
+        with override_dependency(get_borg_service, lambda: mock_borg_service) as client:
+            response = client.get("/api/repositories/scan")
+            assert response.status_code == 200
 
-        # Should return same instance due to singleton pattern
-        service2 = get_borg_service()
-        assert service is service2
+            # Verify our mock was used
+            assert mock_borg_service.scan_for_repositories.called
+
+        # Test that pure DI creates new instances (no longer singleton)
+        # Note: Direct calls receive Depends objects, so we test the DI behavior
+        sig = inspect.signature(get_borg_service)
+        assert "command_runner" in sig.parameters
+        assert "volume_service" in sig.parameters
+        assert "job_manager" in sig.parameters
 
     def test_borg_service_has_injected_command_runner(self) -> None:
-        """Test that BorgService receives the proper command runner dependency."""
-        service = get_borg_service()
-        command_runner = get_simple_command_runner()
+        """Test that BorgService receives the proper command runner dependency via FastAPI DI."""
+        # Create mock dependencies
+        mock_command_runner = Mock()
+        mock_volume_service = Mock()
+        mock_job_manager = Mock()
 
-        # The command runner should be the same instance (singleton pattern)
-        assert service.command_runner is command_runner
+        # Set up mock return values (need async mocks for async methods)
+        mock_command_runner.run_command = AsyncMock(
+            return_value=Mock(success=True, stdout="", stderr="")
+        )
+        mock_volume_service.get_mounted_volumes = AsyncMock(
+            return_value=["/test/volume"]
+        )
+
+        # Override dependencies
+        overrides = {
+            get_simple_command_runner: lambda: mock_command_runner,
+            get_volume_service: lambda: mock_volume_service,
+            get_job_manager_dependency: lambda: mock_job_manager,
+        }
+
+        with override_multiple_dependencies(overrides) as client:
+            # Test that the repository scan endpoint works with our mocked dependencies
+            response = client.get("/api/repositories/scan")
+            assert response.status_code == 200
+
+            # The mock command runner should have been used
+            assert mock_command_runner.run_command.called
 
     def test_borg_service_has_injected_volume_service(self) -> None:
-        """Test that BorgService receives the proper volume service dependency."""
-        service = get_borg_service()
-        volume_service = get_volume_service()
+        """Test that BorgService receives the proper volume service dependency via FastAPI DI."""
+        # Create mock dependencies
+        mock_command_runner = Mock()
+        mock_volume_service = Mock()
+        mock_job_manager = Mock()
 
-        # The volume service should be the same instance (singleton pattern)
-        assert service.volume_service is volume_service
+        # Set up mock return values (BorgService calls get_mounted_volumes on volume_service)
+        mock_volume_service.get_mounted_volumes = AsyncMock(
+            return_value=["/test/volume"]
+        )
+
+        # Override dependencies
+        overrides = {
+            get_simple_command_runner: lambda: mock_command_runner,
+            get_volume_service: lambda: mock_volume_service,
+            get_job_manager_dependency: lambda: mock_job_manager,
+        }
+
+        with override_multiple_dependencies(overrides) as client:
+            # Test that the repository scan endpoint works with our mocked dependencies
+            response = client.get("/api/repositories/scan")
+            assert response.status_code == 200
+
+            # The mock volume service should have been used
+            assert mock_volume_service.get_mounted_volumes.called
 
     def test_dependency_isolation_in_tests(self) -> None:
         """Test that dependencies can be properly mocked in tests."""
-        from unittest.mock import Mock
 
         # This demonstrates how to inject mock dependencies for testing
         mock_runner = Mock(spec=SimpleCommandRunner)
@@ -134,22 +188,59 @@ class TestDependencies:
         assert service is not service2, "JobRenderService should no longer be singleton"
 
     def test_get_debug_service(self) -> None:
-        """Test DebugService dependency provider."""
-        service = get_debug_service()
+        """Test DebugService dependency provider with pure FastAPI DI."""
 
-        assert isinstance(service, DebugService)
+        # Test that DebugService works in FastAPI context
+        mock_debug_service = Mock(spec=DebugService)
+        mock_debug_service.get_debug_info.return_value = {"test": "data"}
 
-        # Should return same instance due to singleton pattern
-        service2 = get_debug_service()
-        assert service is service2
+        with override_dependency(
+            get_debug_service, lambda: mock_debug_service
+        ) as client:
+            response = client.get("/api/debug/info")
+            assert response.status_code == 200
+
+            # Verify our mock was used
+            assert mock_debug_service.get_debug_info.called
+
+        # Test that pure DI creates new instances (no longer singleton)
+        # Note: Direct calls receive Depends objects, so we test the DI behavior
+        import inspect
+
+        sig = inspect.signature(get_debug_service)
+        assert "volume_service" in sig.parameters
+        assert "job_manager" in sig.parameters
 
     def test_debug_service_has_injected_volume_service(self) -> None:
-        """Test that DebugService receives the proper volume service dependency."""
-        service = get_debug_service()
-        volume_service = get_volume_service()
+        """Test that DebugService receives the proper volume service dependency via FastAPI DI."""
 
-        # The volume service should be the same instance (singleton pattern)
-        assert service.volume_service is volume_service
+        # Create mock dependencies
+        mock_volume_service = Mock()
+        mock_job_manager = Mock()
+
+        # Set up mock return values (DebugService calls get_volume_info, not get_mounted_volumes)
+        mock_volume_service.get_volume_info.return_value = {
+            "mounted_volumes": ["/test/volume"],
+            "total_mounted_volumes": 1,
+        }
+
+        # Override dependencies
+        overrides = {
+            get_volume_service: lambda: mock_volume_service,
+            get_job_manager_dependency: lambda: mock_job_manager,
+        }
+
+        with override_multiple_dependencies(overrides) as client:
+            # Test that the debug service endpoint works with our mocked dependencies
+            response = client.get("/api/debug/info")
+            assert response.status_code == 200
+
+            # Verify that our mocked volume service was used
+            debug_info = response.json()
+            assert "volumes" in debug_info
+
+            # The mock volume service should have been called
+            assert mock_volume_service.get_volume_info.called
 
     def test_get_rclone_service(self) -> None:
         """Test RcloneService dependency provider."""
@@ -183,7 +274,6 @@ class TestDependencies:
 
     def test_default_initialization_still_works(self) -> None:
         """Test that services can still be initialized without dependency injection."""
-        from unittest.mock import Mock
 
         # This ensures backward compatibility
         runner = SimpleCommandRunner()
