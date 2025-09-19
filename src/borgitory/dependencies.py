@@ -598,10 +598,8 @@ def get_archive_mount_manager() -> Any:
     """Get the ArchiveMountManager instance."""
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
     from borgitory.services.jobs.job_executor import JobExecutor
-    
-    return ArchiveMountManager(
-        job_executor=JobExecutor()
-    )
+
+    return ArchiveMountManager(job_executor=JobExecutor())
 
 
 ArchiveMountManagerDep = Annotated[Any, Depends(get_archive_mount_manager)]
