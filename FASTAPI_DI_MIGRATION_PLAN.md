@@ -594,3 +594,74 @@ The 2 failed tests are **infrastructure-related, not DI migration issues**:
 - **✅ Reliability**: 99.88% test success rate maintained
 - **✅ Architecture**: Clean DI patterns successfully implemented
 - **✅ Maintainability**: Improved dependency management achieved
+
+---
+
+## 🔄 **Important Observation: Pure DI Backward Compatibility**
+
+### **Discovery During ArchiveManager Conversion**
+When converting ArchiveManager from hybrid DI to pure FastAPI DI, we discovered that **direct calls to pure DI functions still work** due to backward compatibility:
+
+**Example:**
+```python
+# Pure FastAPI DI function
+def get_archive_manager(
+    job_executor: JobExecutor = Depends(get_job_executor),
+    command_builder: BorgCommandBuilder = Depends(get_borg_command_builder),
+) -> ArchiveManager:
+    return ArchiveManager(job_executor=job_executor, command_builder=command_builder)
+
+# This still works outside FastAPI context:
+service = get_archive_manager()  # ✅ Works - dependencies auto-resolved
+```
+
+### **Why This Works**
+- Dependencies (`get_job_executor`, `get_borg_command_builder`) can be called directly
+- They provide default values when called outside FastAPI request context
+- FastAPI's `Depends()` objects resolve to actual function calls when needed
+
+### **Key Behavior Changes**
+1. **✅ Backward Compatibility**: Direct calls continue to work
+2. **🔄 Singleton Behavior Removed**: Each call creates a new instance (no longer cached)
+3. **✅ API Context**: Works perfectly with FastAPI's DI system
+4. **✅ Testing**: Can be overridden via `app.dependency_overrides`
+
+### **Future Cleanup Plan (Post-Migration)**
+Once all services are converted to pure FastAPI DI, we should:
+
+1. **Phase C.4: Remove Backward Compatibility** (New Phase)
+   - **Step C.4.1**: Audit all direct service calls in `src/` directory
+   - **Step C.4.2**: Convert direct calls to use FastAPI DI or constructor injection
+   - **Step C.4.3**: Remove default parameter values from pure DI functions
+   - **Step C.4.4**: Add type hints to enforce DI-only usage
+   - **Step C.4.5**: Update tests to use dependency overrides exclusively
+
+**Example of future cleanup:**
+```python
+# Current (backward compatible)
+def get_archive_manager(
+    job_executor: JobExecutor = Depends(get_job_executor),
+    command_builder: BorgCommandBuilder = Depends(get_borg_command_builder),
+) -> ArchiveManager:
+    return ArchiveManager(job_executor=job_executor, command_builder=command_builder)
+
+# Future (DI-only, no backward compatibility)
+def get_archive_manager(
+    job_executor: JobExecutor = Depends(get_job_executor),
+    command_builder: BorgCommandBuilder = Depends(get_borg_command_builder),
+) -> ArchiveManager:
+    """
+    Pure FastAPI DI function - can only be called within FastAPI request context.
+    For testing, use app.dependency_overrides.
+    """
+    return ArchiveManager(job_executor=job_executor, command_builder=command_builder)
+```
+
+### **Benefits of Future Cleanup**
+- **🎯 Enforced DI**: Prevents accidental direct calls outside FastAPI context
+- **🧪 Better Testing**: Forces proper use of dependency overrides
+- **📚 Clearer Intent**: Makes DI requirements explicit
+- **⚡ Performance**: Removes unnecessary compatibility overhead
+- **🔒 Type Safety**: Better compile-time checking of DI usage
+
+**Note**: This cleanup should only be done **after** all services are converted to pure FastAPI DI to avoid breaking existing code during the migration process.

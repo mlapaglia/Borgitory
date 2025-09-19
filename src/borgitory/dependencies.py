@@ -237,16 +237,18 @@ def get_borg_command_builder() -> BorgCommandBuilder:
     return BorgCommandBuilder()
 
 
-@lru_cache()
-def get_archive_manager() -> ArchiveManager:
+def get_archive_manager(
+    job_executor: JobExecutor = Depends(get_job_executor),
+    command_builder: BorgCommandBuilder = Depends(get_borg_command_builder),
+) -> ArchiveManager:
     """
-    Provide an ArchiveManager singleton instance with proper dependency injection.
+    Provide an ArchiveManager instance with proper dependency injection.
 
-    Uses FastAPI's DI system internally while maintaining singleton behavior.
+    Uses pure FastAPI DI with automatic dependency resolution.
     """
     return ArchiveManager(
-        job_executor=get_job_executor(), 
-        command_builder=get_borg_command_builder()
+        job_executor=job_executor, 
+        command_builder=command_builder
     )
 
 
@@ -344,31 +346,32 @@ def get_borg_service() -> BorgService:
     )
 
 
-@lru_cache()
-def get_job_stream_service() -> JobStreamService:
+def get_job_stream_service(
+    job_manager: JobManager = Depends(get_job_manager_dependency),
+) -> JobStreamService:
     """
-    Provide a JobStreamService singleton instance.
+    Provide a JobStreamService instance with proper dependency injection.
 
-    Uses FastAPI's DI system internally while maintaining singleton behavior.
+    Uses pure FastAPI DI with automatic dependency resolution.
     """
-    return JobStreamService(get_job_manager_dependency())
+    return JobStreamService(job_manager)
 
 
-@lru_cache()
-def get_job_render_service() -> JobRenderService:
+def get_job_render_service(
+    job_manager: JobManager = Depends(get_job_manager_dependency),
+) -> JobRenderService:
     """
-    Provide a JobRenderService singleton instance.
+    Provide a JobRenderService instance with proper dependency injection.
 
-    Uses FastAPI's DI system internally while maintaining singleton behavior.
+    Uses pure FastAPI DI with automatic dependency resolution.
     """
-    return JobRenderService(job_manager=get_job_manager_dependency())
+    return JobRenderService(job_manager=job_manager)
 
 
 @lru_cache()
 def get_debug_service() -> DebugService:
     """
-    Provide a DebugService singleton instance with proper dependency injection.
-
+    Provide a DebugService singleton instance with dependency injection.
     Uses FastAPI's DI system internally while maintaining singleton behavior.
     """
     return DebugService(

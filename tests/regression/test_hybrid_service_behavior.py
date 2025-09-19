@@ -89,12 +89,17 @@ class TestHybridServiceBehavior:
         assert callable(getattr(service, 'get_debug_info', None))
         
     def test_job_stream_service_singleton_behavior(self):
-        """Test that JobStreamService maintains singleton behavior."""
+        """Test that JobStreamService no longer maintains singleton behavior (converted to pure DI)."""
+        # Direct calls still work (backward compatibility) but no longer return the same instance
         service1 = get_job_stream_service()
         service2 = get_job_stream_service()
         
-        assert service1 is service2
+        # Both should be JobStreamService instances
         assert isinstance(service1, JobStreamService)
+        assert isinstance(service2, JobStreamService)
+        
+        # But they should be DIFFERENT instances (no longer singleton)
+        assert service1 is not service2, "JobStreamService should no longer be singleton"
         
     def test_job_stream_service_dependencies_resolved(self):
         """Test that JobStreamService has proper dependencies."""
@@ -113,12 +118,17 @@ class TestHybridServiceBehavior:
         assert callable(getattr(service, 'get_current_jobs_data', None))
         
     def test_job_render_service_singleton_behavior(self):
-        """Test that JobRenderService maintains singleton behavior."""
+        """Test that JobRenderService no longer maintains singleton behavior (converted to pure DI)."""
+        # Direct calls still work (backward compatibility) but no longer return the same instance
         service1 = get_job_render_service()
         service2 = get_job_render_service()
         
-        assert service1 is service2
+        # Both should be JobRenderService instances
         assert isinstance(service1, JobRenderService)
+        assert isinstance(service2, JobRenderService)
+        
+        # But they should be DIFFERENT instances (no longer singleton)
+        assert service1 is not service2, "JobRenderService should no longer be singleton"
         
     def test_job_render_service_dependencies_resolved(self):
         """Test that JobRenderService has proper dependencies."""
@@ -138,15 +148,22 @@ class TestHybridServiceBehavior:
         assert callable(getattr(service, 'stream_current_jobs_html', None))
         
     def test_archive_manager_singleton_behavior(self):
-        """Test that ArchiveManager maintains singleton behavior."""
+        """Test that ArchiveManager no longer maintains singleton behavior (converted to pure DI)."""
+        # Note: ArchiveManager has been converted to pure FastAPI DI
+        # Direct calls still work (backward compatibility) but no longer return the same instance
         service1 = get_archive_manager()
         service2 = get_archive_manager()
         
-        assert service1 is service2
+        # Both should be ArchiveManager instances
         assert isinstance(service1, ArchiveManager)
+        assert isinstance(service2, ArchiveManager)
+        
+        # But they should be DIFFERENT instances (no longer singleton)
+        assert service1 is not service2, "ArchiveManager should no longer be singleton"
         
     def test_archive_manager_dependencies_resolved(self):
         """Test that ArchiveManager has proper dependencies."""
+        # Direct calls still work with pure DI (backward compatibility)
         service = get_archive_manager()
         
         assert hasattr(service, 'job_executor')
@@ -158,6 +175,7 @@ class TestHybridServiceBehavior:
         
     def test_archive_manager_core_functionality(self):
         """Test core ArchiveManager functionality works."""
+        # Direct calls work with pure DI (backward compatibility)
         service = get_archive_manager()
         
         # Test that key methods exist and are callable

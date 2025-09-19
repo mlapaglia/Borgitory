@@ -179,11 +179,16 @@ class MockServiceFactory:
     @staticmethod
     def create_mock_job_manager() -> Mock:
         """Create a mock JobManager with common method signatures."""
+        from borgitory.services.jobs.job_manager import JobManager
         mock = Mock(spec=JobManager)
         
         # Setup common return values
-        mock.get_all_jobs.return_value = []
-        mock.get_job_status.return_value = "completed"
+        mock.list_jobs.return_value = []
+        mock.get_job_status.return_value = {"status": "completed"}
+        mock.get_job.return_value = {"id": "test-job-123", "status": "completed"}
+        mock.start_borg_command.return_value = {"job_id": "test-job-123"}
+        mock.get_active_jobs_count.return_value = 0
+        mock.get_queue_stats.return_value = {"pending": 0, "running": 0}
         mock.cancel_job.return_value = True
         
         return mock
@@ -215,6 +220,33 @@ class MockServiceFactory:
         # Setup common return values
         mock.get_mounted_volumes.return_value = ["/mnt/test-volume"]
         mock.get_volume_info.return_value = {"path": "/mnt/test", "size": "100GB"}
+        
+        return mock
+    
+    @staticmethod
+    def create_mock_job_executor() -> Mock:
+        """Create a mock JobExecutor with common method signatures."""
+        from borgitory.services.jobs.job_executor import JobExecutor
+        mock = Mock(spec=JobExecutor)
+        
+        # Setup common return values
+        mock.start_process.return_value = {"success": True, "output": "Mock output"}
+        mock.execute_prune_task.return_value = {"success": True}
+        mock.execute_cloud_sync_task.return_value = {"success": True}
+        
+        return mock
+    
+    @staticmethod
+    def create_mock_borg_command_builder() -> Mock:
+        """Create a mock BorgCommandBuilder with common method signatures."""
+        from borgitory.services.borg_command_builder import BorgCommandBuilder
+        mock = Mock(spec=BorgCommandBuilder)
+        
+        # Setup common return values
+        mock.build_list_archives_command.return_value = ["borg", "list"]
+        mock.build_backup_command.return_value = ["borg", "create"]
+        mock.build_check_command.return_value = ["borg", "check"]
+        mock.generate_archive_name.return_value = "test-archive-2025-01-19"
         
         return mock
 

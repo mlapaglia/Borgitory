@@ -119,9 +119,9 @@ class TestDependencies:
 
         assert isinstance(service, JobStreamService)
 
-        # Should return same instance due to singleton pattern
+        # No longer singleton - pure FastAPI DI creates new instances
         service2 = get_job_stream_service()
-        assert service is service2
+        assert service is not service2, "JobStreamService should no longer be singleton"
 
     def test_get_job_render_service(self) -> None:
         """Test JobRenderService dependency provider."""
@@ -129,9 +129,9 @@ class TestDependencies:
 
         assert isinstance(service, JobRenderService)
 
-        # Should return same instance due to singleton pattern
+        # No longer singleton - pure FastAPI DI creates new instances
         service2 = get_job_render_service()
-        assert service is service2
+        assert service is not service2, "JobRenderService should no longer be singleton"
 
     def test_get_debug_service(self) -> None:
         """Test DebugService dependency provider."""
