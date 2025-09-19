@@ -24,6 +24,7 @@ import logging
 from borgitory.protocols.command_protocols import CommandRunnerProtocol
 from borgitory.protocols.repository_protocols import BackupServiceProtocol
 from borgitory.protocols.notification_protocols import NotificationServiceProtocol
+from borgitory.protocols.cloud_protocols import CloudSyncServiceProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -108,10 +109,23 @@ class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
 
     def _register_default_implementations(self) -> None:
         """Register default notification service implementations."""
-        from borgitory.services.notifications.service import NotificationService
+        from borgitory.services.notifications.service import (
+            NotificationService,
+            NotificationProviderFactory,
+        )
+        from borgitory.dependencies import get_http_client
+
+        def create_notification_service(**kwargs: Any) -> NotificationService:
+            """Factory function to create NotificationService with proper dependencies."""
+            # Create the required provider factory with HTTP client
+            http_client = get_http_client()
+            provider_factory = NotificationProviderFactory(http_client=http_client)
+
+            # Create the service with the factory
+            return NotificationService(provider_factory=provider_factory, **kwargs)
 
         self.register_implementation(
-            "provider_based", NotificationService, set_as_default=True
+            "provider_based", create_notification_service, set_as_default=True
         )
 
     def create_notification_service(
@@ -139,6 +153,64 @@ class CommandRunnerFactory(ServiceFactory[CommandRunnerProtocol]):
     ) -> CommandRunnerProtocol:
         """Create a command runner of the specified type."""
         return self.create_service(runner_type, **config)
+
+
+class CloudProviderServiceFactory(ServiceFactory[CloudSyncServiceProtocol]):
+    """Factory for creating cloud provider services with proper DI."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._register_default_implementations()
+
+    def _register_default_implementations(self) -> None:
+        """Register default cloud sync service implementations."""
+        from borgitory.services.cloud_sync_service import CloudSyncService
+        from borgitory.dependencies import (
+            get_rclone_service,
+            get_storage_factory,
+            get_encryption_service,
+        )
+
+        def create_cloud_sync_service(**kwargs: Any) -> CloudSyncServiceProtocol:
+            """Factory function to create CloudSyncService with proper dependencies."""
+            # **DI CHECK**: CloudSyncService requires db session, which must be passed in kwargs
+            # We only inject the non-request-scoped dependencies here
+            from borgitory.services.cloud_providers.registry import get_metadata
+
+            # Get singleton dependencies
+            rclone_service = get_rclone_service()
+            storage_factory = get_storage_factory(rclone_service)
+            encryption_service = get_encryption_service()
+
+            # db session must be provided in kwargs (request-scoped)
+            if "db" not in kwargs:
+                raise ValueError(
+                    "CloudSyncService requires 'db' parameter (request-scoped)"
+                )
+
+            # Create the service with injected dependencies
+            from typing import cast
+
+            return cast(
+                CloudSyncServiceProtocol,
+                CloudSyncService(
+                    db=kwargs["db"],
+                    rclone_service=rclone_service,
+                    storage_factory=storage_factory,
+                    encryption_service=encryption_service,
+                    get_metadata_func=get_metadata,
+                ),
+            )
+
+        self.register_implementation(
+            "default", create_cloud_sync_service, set_as_default=True
+        )
+
+    def create_cloud_sync_service(
+        self, service_type: str = "default", **config: Any
+    ) -> CloudSyncServiceProtocol:
+        """Create a cloud sync service for the specified type."""
+        return self.create_service(service_type, **config)
 
 
 class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
@@ -191,6 +263,7 @@ class ServiceRegistry:
         """Initialize default service factories."""
         self.register_factory("notifications", NotificationServiceFactory())
         self.register_factory("command_runners", CommandRunnerFactory())
+        self.register_factory("cloud_providers", CloudProviderServiceFactory())
         self.register_factory("backup_services", BackupServiceFactory())
 
     def register_factory(self, name: str, factory: "ServiceFactory[Any]") -> None:
@@ -205,6 +278,11 @@ class ServiceRegistry:
 
     @overload
     def get_factory(self, name: Literal["command_runners"]) -> CommandRunnerFactory: ...
+
+    @overload
+    def get_factory(
+        self, name: Literal["cloud_providers"]
+    ) -> CloudProviderServiceFactory: ...
 
     @overload
     def get_factory(self, name: Literal["backup_services"]) -> BackupServiceFactory: ...
@@ -231,6 +309,10 @@ class ServiceRegistry:
     def get_command_runner_factory(self) -> CommandRunnerFactory:
         """Get the command runner factory."""
         return self.get_factory("command_runners")
+
+    def get_cloud_provider_service_factory(self) -> CloudProviderServiceFactory:
+        """Get the cloud provider service factory."""
+        return self.get_factory("cloud_providers")
 
     def get_backup_service_factory(self) -> BackupServiceFactory:
         """Get the backup service factory."""
@@ -266,6 +348,15 @@ def create_command_runner(
     registry = get_service_registry()
     factory = registry.get_command_runner_factory()
     return factory.create_command_runner(runner_type, **config)
+
+
+def create_cloud_sync_service(
+    service_type: str = "default", **config: Any
+) -> CloudSyncServiceProtocol:
+    """Create a cloud sync service using the factory."""
+    registry = get_service_registry()
+    factory = registry.get_cloud_provider_service_factory()
+    return factory.create_cloud_sync_service(service_type, **config)
 
 
 def create_backup_service(

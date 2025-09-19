@@ -4,8 +4,10 @@ Pushover notification provider implementation.
 
 import logging
 from typing import Any, Dict, List, Optional
-import aiohttp
 from pydantic import Field, field_validator
+
+# Import HttpClient protocol from discord_provider for consistency
+from .discord_provider import HttpClient, AiohttpClient
 
 from .base import NotificationProvider, NotificationProviderConfig
 from ..types import (
@@ -61,9 +63,12 @@ class PushoverProvider(NotificationProvider):
     config_class = PushoverConfig
     PUSHOVER_API_URL = "https://api.pushover.net/1/messages.json"
 
-    def __init__(self, config: PushoverConfig) -> None:
+    def __init__(
+        self, config: PushoverConfig, http_client: Optional[HttpClient] = None
+    ) -> None:
         super().__init__(config)
         self.config: PushoverConfig = config
+        self.http_client = http_client or AiohttpClient()
 
     async def send_notification(
         self, message: NotificationMessage
@@ -85,57 +90,50 @@ class PushoverProvider(NotificationProvider):
                 "sound": sound,
             }
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.PUSHOVER_API_URL, data=payload
-                ) as response:
-                    response_text = await response.text()
+            response = await self.http_client.post(self.PUSHOVER_API_URL, data=payload)
+            response_text = await response.text()
 
-                    if response.status == 200:
-                        try:
-                            result = await response.json()
-                            if result.get("status") == 1:
-                                logger.info(
-                                    f"Pushover notification sent: {message.title}"
-                                )
-                                return NotificationResult(
-                                    success=True,
-                                    provider="pushover",
-                                    message="Notification sent successfully",
-                                    metadata={"response": response_text},
-                                )
-                            else:
-                                error_msg = result.get("errors", ["Unknown error"])
-                                logger.error(f"Pushover API error: {error_msg}")
-                                return NotificationResult(
-                                    success=False,
-                                    provider="pushover",
-                                    message="API returned error",
-                                    error=str(error_msg),
-                                    metadata={"response": response_text},
-                                )
-                        except Exception as e:
-                            # Even if JSON parsing fails, if status is 200, consider it success
-                            logger.info(
-                                f"Pushover notification sent (JSON parse error): {message.title} - {e}"
-                            )
-                            return NotificationResult(
-                                success=True,
-                                provider="pushover",
-                                message="Notification sent successfully",
-                                metadata={"response": response_text},
-                            )
-                    else:
-                        logger.error(
-                            f"Pushover HTTP error {response.status}: {response_text}"
+            if response.status == 200:
+                try:
+                    result = await response.json()
+                    if result.get("status") == 1:
+                        logger.info(f"Pushover notification sent: {message.title}")
+                        return NotificationResult(
+                            success=True,
+                            provider="pushover",
+                            message="Notification sent successfully",
+                            metadata={"response": response_text},
                         )
+                    else:
+                        error_msg = result.get("errors", ["Unknown error"])
+                        logger.error(f"Pushover API error: {error_msg}")
                         return NotificationResult(
                             success=False,
                             provider="pushover",
-                            message=f"HTTP error {response.status}",
-                            error=response_text,
-                            metadata={"status_code": response.status},
+                            message="API returned error",
+                            error=str(error_msg),
+                            metadata={"response": response_text},
                         )
+                except Exception as e:
+                    # Even if JSON parsing fails, if status is 200, consider it success
+                    logger.info(
+                        f"Pushover notification sent (JSON parse error): {message.title} - {e}"
+                    )
+                    return NotificationResult(
+                        success=True,
+                        provider="pushover",
+                        message="Notification sent successfully",
+                        metadata={"response": response_text},
+                    )
+            else:
+                logger.error(f"Pushover HTTP error {response.status}: {response_text}")
+                return NotificationResult(
+                    success=False,
+                    provider="pushover",
+                    message=f"HTTP error {response.status}",
+                    error=response_text,
+                    metadata={"status_code": response.status},
+                )
 
         except Exception as e:
             logger.error(f"Error sending Pushover notification: {e}")

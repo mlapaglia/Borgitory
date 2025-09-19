@@ -7,7 +7,7 @@ must implement, ensuring consistency across different providers.
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ..types import NotificationMessage, NotificationResult, ConnectionInfo
 
@@ -19,8 +19,7 @@ class NotificationProviderConfig(BaseModel):
     Each provider should extend this with provider-specific fields.
     """
 
-    class Config:
-        extra = "forbid"  # Prevent unknown fields
+    model_config = ConfigDict(extra="forbid")  # Prevent unknown fields
 
 
 class NotificationProvider(ABC):

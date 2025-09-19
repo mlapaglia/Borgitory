@@ -215,8 +215,16 @@ class TestProtocolCompliance:
             "NotificationService should have test_connection method"
         )
 
-        # Check instantiation
-        service = NotificationService()
+        # Check instantiation with proper dependencies
+        from borgitory.dependencies import (
+            get_http_client,
+            get_notification_provider_factory,
+        )
+
+        # Create the service with proper DI
+        http_client = get_http_client()
+        provider_factory = get_notification_provider_factory(http_client)
+        service = NotificationService(provider_factory=provider_factory)
         assert service is not None
 
     def test_job_manager_basic_compliance(self):

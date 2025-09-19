@@ -3,7 +3,7 @@ Discord webhook notification provider implementation.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Protocol, cast
 import aiohttp
 from pydantic import Field, field_validator
 
@@ -17,6 +17,97 @@ from ..types import (
 from ..registry import register_provider
 
 logger = logging.getLogger(__name__)
+
+
+class HttpClient(Protocol):
+    """Protocol for HTTP client dependency injection"""
+
+    async def post(
+        self,
+        url: str,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> "HttpResponse":
+        """Make a POST request with JSON or form data payload"""
+        ...
+
+    async def close(self) -> None:
+        """Close the HTTP client and cleanup resources"""
+        ...
+
+
+class HttpResponse(Protocol):
+    """Protocol for HTTP response"""
+
+    @property
+    def status(self) -> int:
+        """HTTP status code"""
+        ...
+
+    async def text(self) -> str:
+        """Get response text"""
+        ...
+
+    async def json(self) -> Dict[str, Any]:
+        """Get response as JSON"""
+        ...
+
+
+class AiohttpClient:
+    """Default HTTP client implementation using aiohttp"""
+
+    def __init__(self, session: Optional[aiohttp.ClientSession] = None):
+        """Initialize with optional existing session"""
+        self._session = session
+        self._owns_session = session is None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create aiohttp session"""
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def post(
+        self,
+        url: str,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> "AiohttpResponse":
+        """Make a POST request using aiohttp"""
+        session = await self._get_session()
+        if json is not None:
+            async with session.post(url, json=json) as response:
+                return AiohttpResponse(response)
+        elif data is not None:
+            async with session.post(url, data=data) as response:
+                return AiohttpResponse(response)
+        else:
+            async with session.post(url) as response:
+                return AiohttpResponse(response)
+
+    async def close(self) -> None:
+        """Close the HTTP client session if we own it"""
+        if self._session and self._owns_session:
+            await self._session.close()
+            self._session = None
+
+
+class AiohttpResponse:
+    """Wrapper for aiohttp response to match protocol"""
+
+    def __init__(self, response: aiohttp.ClientResponse):
+        self._response = response
+        self._status = response.status
+
+    @property
+    def status(self) -> int:
+        return self._status
+
+    async def text(self) -> str:
+        return await self._response.text()
+
+    async def json(self) -> Dict[str, Any]:
+        return cast(Dict[str, Any], await self._response.json())
 
 
 class DiscordConfig(NotificationProviderConfig):
@@ -44,9 +135,12 @@ class DiscordProvider(NotificationProvider):
 
     config_class = DiscordConfig
 
-    def __init__(self, config: DiscordConfig) -> None:
+    def __init__(
+        self, config: DiscordConfig, http_client: Optional[HttpClient] = None
+    ) -> None:
         super().__init__(config)
         self.config: DiscordConfig = config
+        self.http_client = http_client or AiohttpClient()
 
     async def send_notification(
         self, message: NotificationMessage
@@ -84,31 +178,30 @@ class DiscordProvider(NotificationProvider):
             if self.config.avatar_url:
                 payload["avatar_url"] = self.config.avatar_url
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.config.webhook_url, json=payload
-                ) as response:
-                    response_text = await response.text()
+            response = await self.http_client.post(
+                self.config.webhook_url, json=payload
+            )
+            response_text = await response.text()
 
-                    if response.status == 204:  # Discord webhooks return 204 on success
-                        logger.info(f"Discord notification sent: {message.title}")
-                        return NotificationResult(
-                            success=True,
-                            provider="discord",
-                            message="Notification sent successfully",
-                            metadata={"response": response_text},
-                        )
-                    else:
-                        logger.error(
-                            f"Discord webhook error {response.status}: {response_text}"
-                        )
-                        return NotificationResult(
-                            success=False,
-                            provider="discord",
-                            message=f"HTTP error {response.status}",
-                            error=response_text,
-                            metadata={"status_code": response.status},
-                        )
+            if response.status == 204:  # Discord webhooks return 204 on success
+                logger.info(f"Discord notification sent: {message.title}")
+                return NotificationResult(
+                    success=True,
+                    provider="discord",
+                    message="Notification sent successfully",
+                    metadata={"response": response_text},
+                )
+            else:
+                logger.error(
+                    f"Discord webhook error {response.status}: {response_text}"
+                )
+                return NotificationResult(
+                    success=False,
+                    provider="discord",
+                    message=f"HTTP error {response.status}",
+                    error=response_text,
+                    metadata={"status_code": response.status},
+                )
 
         except Exception as e:
             logger.error(f"Error sending Discord notification: {e}")

@@ -4,11 +4,13 @@ HTTP/API integration tests should be separate integration tests.
 """
 
 import pytest
+from unittest.mock import Mock, AsyncMock
 
 from borgitory.services.notifications.providers.pushover_provider import (
     PushoverProvider,
     PushoverConfig,
 )
+from borgitory.services.notifications.providers.discord_provider import HttpClient
 from borgitory.services.notifications.types import (
     NotificationMessage,
     NotificationResult,
@@ -36,6 +38,15 @@ def pushover_provider(pushover_config):
 
 
 @pytest.fixture
+def mock_http_client():
+    """Create a mock HTTP client for testing DI."""
+    mock = Mock(spec=HttpClient)
+    mock.post = AsyncMock()
+    mock.close = AsyncMock()
+    return mock
+
+
+@pytest.fixture
 def sample_message():
     """Create a sample notification message for testing."""
     return NotificationMessage(
@@ -48,6 +59,25 @@ def sample_message():
 
 class TestPushoverProvider:
     """Unit tests for PushoverProvider class - business logic focus"""
+
+    def test_provider_initialization_with_http_client_injection(
+        self, pushover_config, mock_http_client
+    ):
+        """Test that PushoverProvider accepts HTTP client injection."""
+        provider = PushoverProvider(pushover_config, http_client=mock_http_client)
+
+        assert provider.config == pushover_config
+        assert provider.http_client == mock_http_client
+
+    def test_provider_initialization_with_default_http_client(self, pushover_config):
+        """Test that PushoverProvider creates default HTTP client when none provided."""
+        provider = PushoverProvider(pushover_config)
+
+        assert provider.config == pushover_config
+        assert provider.http_client is not None
+        # Should be AiohttpClient instance
+        assert hasattr(provider.http_client, "post")
+        assert hasattr(provider.http_client, "close")
 
     # ===== CONFIGURATION TESTS =====
 

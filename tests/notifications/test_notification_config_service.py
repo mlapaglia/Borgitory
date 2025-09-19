@@ -12,8 +12,17 @@ from borgitory.models.database import NotificationConfig
 
 @pytest.fixture
 def notification_service():
-    """NotificationService instance for testing."""
-    return NotificationService()
+    """NotificationService instance for testing using proper DI chain."""
+    from borgitory.dependencies import (
+        get_http_client,
+        get_notification_provider_factory,
+    )
+
+    # Manually resolve the dependency chain for testing
+    http_client = get_http_client()
+    factory = get_notification_provider_factory(http_client)
+
+    return NotificationService(provider_factory=factory)
 
 
 @pytest.fixture

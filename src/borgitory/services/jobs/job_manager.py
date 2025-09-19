@@ -46,6 +46,7 @@ from unittest.mock import Mock
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+    from borgitory.services.notifications.service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,7 @@ class JobManagerDependencies:
     encryption_service: Optional[Any] = None
     storage_factory: Optional[Any] = None
     provider_registry: Optional[Any] = None
+    notification_service: Optional["NotificationService"] = None
 
     def __post_init__(self) -> None:
         """Initialize default dependencies if not provided"""
@@ -179,6 +181,7 @@ class JobManagerFactory:
             encryption_service=custom_dependencies.encryption_service,
             storage_factory=custom_dependencies.storage_factory,
             provider_registry=custom_dependencies.provider_registry,
+            notification_service=custom_dependencies.notification_service,
         )
 
         # Job Executor
@@ -308,6 +311,9 @@ class JobManager:
         self.queue_manager = dependencies.queue_manager
         self.event_broadcaster = dependencies.event_broadcaster
         self.database_manager = dependencies.database_manager
+        self.notification_service: Optional["NotificationService"] = (
+            dependencies.notification_service
+        )
 
         self.jobs: Dict[str, BorgJob] = {}
         self._processes: Dict[str, asyncio.subprocess.Process] = {}
@@ -1262,7 +1268,6 @@ class JobManager:
         try:
             with get_db_session() as db:
                 from borgitory.models.database import NotificationConfig
-                from borgitory.services.notifications.service import NotificationService
                 from borgitory.services.notifications.types import (
                     NotificationMessage,
                     NotificationType,
@@ -1288,8 +1293,17 @@ class JobManager:
                     task.return_code = 0
                     return True
 
-                # Create notification service
-                notification_service = NotificationService()
+                # Use injected notification service
+                if self.notification_service is None:
+                    logger.error(
+                        "NotificationService not available - ensure proper DI setup"
+                    )
+                    task.status = "failed"
+                    task.return_code = 1
+                    task.error = "NotificationService not available"
+                    return False
+
+                notification_service = self.notification_service
 
                 # Load and decrypt configuration
                 try:

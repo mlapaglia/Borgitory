@@ -36,7 +36,16 @@ class NotificationConfigService:
             notification_service: Notification service for provider operations
         """
         self.db = db
-        self._notification_service = notification_service or NotificationService()
+        if notification_service is None:
+            # Create a basic notification service with default factory
+            from .service import NotificationProviderFactory
+            from borgitory.dependencies import get_http_client
+
+            http_client = get_http_client()
+            factory = NotificationProviderFactory(http_client)
+            self._notification_service = NotificationService(factory)
+        else:
+            self._notification_service = notification_service
 
     def get_all_configs(
         self, skip: int = 0, limit: int = 100

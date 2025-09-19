@@ -11,6 +11,7 @@ from borgitory.services.notifications.registry_factory import (
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
     from borgitory.services.notifications.service import NotificationProviderFactory
+    from borgitory.services.notifications.providers.discord_provider import HttpClient
 from functools import lru_cache
 
 from fastapi import Depends
@@ -66,6 +67,8 @@ if TYPE_CHECKING:
     from borgitory.protocols.job_protocols import (
         JobManagerProtocol,
     )
+    from borgitory.protocols.cloud_protocols import CloudSyncServiceProtocol
+    from borgitory.factories.service_factory import CloudProviderServiceFactory
     from borgitory.protocols.repository_protocols import (
         BackupServiceProtocol,
     )
@@ -193,25 +196,41 @@ def get_notification_provider_registry() -> "NotificationProviderRegistry":
 
 
 @lru_cache()
-def get_notification_provider_factory() -> "NotificationProviderFactory":
+def get_http_client() -> "HttpClient":
+    """Provide HTTP client singleton for notification providers."""
+    from borgitory.services.notifications.providers.discord_provider import (
+        AiohttpClient,
+    )
+
+    return AiohttpClient()
+
+
+def get_notification_provider_factory(
+    http_client: "HttpClient" = Depends(get_http_client),
+) -> "NotificationProviderFactory":
     """
-    Provide a NotificationProviderFactory instance.
+    Provide NotificationProviderFactory with injected HTTP client.
 
     Following the exact pattern of cloud providers' StorageFactory.
     """
     from borgitory.services.notifications.service import NotificationProviderFactory
 
-    return NotificationProviderFactory()
+    return NotificationProviderFactory(http_client=http_client)
 
 
 @lru_cache()
-def get_notification_service() -> NotificationService:
+def get_notification_service(
+    provider_factory: "NotificationProviderFactory" = Depends(
+        get_notification_provider_factory
+    ),
+) -> NotificationService:
     """
-    Provide a NotificationService implementation following cloud provider pattern.
+    Provide NotificationService with injected factory.
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Following the exact pattern of cloud providers' CloudSyncService.
+    Uses FastAPI's dependency injection for proper DI.
     """
-    return NotificationService()
+    return NotificationService(provider_factory=provider_factory)
 
 
 def get_notification_config_service(
@@ -382,6 +401,7 @@ def get_job_manager_dependency() -> "JobManagerProtocol":
             database_manager=get_job_database_manager(),
             event_broadcaster=get_job_event_broadcaster_dep(),
             rclone_service=get_rclone_service(),
+            notification_service=get_notification_service(),
         )
 
         _job_manager_instance = JobManager(config=config, dependencies=dependencies)
@@ -555,27 +575,33 @@ def get_storage_factory(
     return StorageFactory(rclone)
 
 
+@lru_cache()
+def get_cloud_provider_service_factory() -> "CloudProviderServiceFactory":
+    """
+    Provide CloudProviderServiceFactory singleton instance.
+
+    Uses FastAPI's built-in caching for singleton behavior.
+    Following the exact pattern of NotificationProviderFactory.
+    """
+    from borgitory.factories.service_factory import CloudProviderServiceFactory
+
+    return CloudProviderServiceFactory()
+
+
 def get_cloud_sync_service(
     db: Session = Depends(get_db),
-    rclone_service: RcloneService = Depends(get_rclone_service),
-    storage_factory: StorageFactory = Depends(get_storage_factory),
-    encryption_service: EncryptionService = Depends(get_encryption_service),
-) -> "CloudSyncService":
+    factory: "CloudProviderServiceFactory" = Depends(
+        get_cloud_provider_service_factory
+    ),
+) -> "CloudSyncServiceProtocol":
     """
-    Provide a CloudSyncService instance with proper dependency injection.
+    Provide a CloudSyncService instance using factory pattern with proper DI.
 
     Request-scoped since it depends on database session.
+    Uses factory for consistent DI pattern across all services.
     """
-    from borgitory.services.cloud_sync_service import CloudSyncService
-    from borgitory.services.cloud_providers.registry import get_metadata
-
-    return CloudSyncService(
-        db=db,
-        rclone_service=rclone_service,
-        storage_factory=storage_factory,
-        encryption_service=encryption_service,
-        get_metadata_func=get_metadata,
-    )
+    # **DI CHECK**: Using factory pattern with request-scoped db injection
+    return factory.create_cloud_sync_service("default", db=db)
 
 
 # Type aliases for dependency injection
@@ -598,8 +624,12 @@ NotificationRegistryFactoryDep = Annotated[
 NotificationProviderRegistryDep = Annotated[
     "NotificationProviderRegistry", Depends(get_notification_provider_registry)
 ]
+HttpClientDep = Annotated["HttpClient", Depends(get_http_client)]
 NotificationProviderFactoryDep = Annotated[
     "NotificationProviderFactory", Depends(get_notification_provider_factory)
+]
+CloudProviderServiceFactoryDep = Annotated[
+    "CloudProviderServiceFactory", Depends(get_cloud_provider_service_factory)
 ]
 JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service)]
 JobRenderServiceDep = Annotated[JobRenderService, Depends(get_job_render_service)]

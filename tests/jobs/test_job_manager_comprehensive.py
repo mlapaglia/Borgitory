@@ -122,7 +122,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.fixture
     def job_manager_with_db(self, test_db: Session):
-        """Create job manager with real database session"""
+        """Create job manager with real database session and proper notification service injection"""
 
         @contextmanager
         def db_session_factory():
@@ -131,7 +131,21 @@ class TestJobManagerTaskExecution:
             finally:
                 pass
 
-        deps = JobManagerDependencies(db_session_factory=db_session_factory)
+        # Create notification service using proper DI
+        from borgitory.dependencies import (
+            get_http_client,
+            get_notification_provider_factory,
+        )
+        from borgitory.services.notifications.service import NotificationService
+
+        http_client = get_http_client()
+        factory = get_notification_provider_factory(http_client)
+        notification_service = NotificationService(provider_factory=factory)
+
+        deps = JobManagerDependencies(
+            db_session_factory=db_session_factory,
+            notification_service=notification_service,
+        )
         full_deps = JobManagerFactory.create_dependencies(custom_dependencies=deps)
         manager = JobManager(dependencies=full_deps)
         return manager
@@ -557,9 +571,16 @@ class TestJobManagerTaskExecution:
         notification_config.enabled = True
 
         # Use the new NotificationService to prepare config for storage
+        from borgitory.dependencies import (
+            get_http_client,
+            get_notification_provider_factory,
+        )
         from borgitory.services.notifications.service import NotificationService
 
-        notification_service = NotificationService()
+        # Manually resolve the dependency chain for testing
+        http_client = get_http_client()
+        factory = get_notification_provider_factory(http_client)
+        notification_service = NotificationService(provider_factory=factory)
         notification_config.provider_config = (
             notification_service.prepare_config_for_storage(
                 "pushover",

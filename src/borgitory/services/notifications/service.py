@@ -5,9 +5,20 @@ This module provides the high-level service interface for notification operation
 including configuration validation, provider creation, and encryption handling.
 """
 
+import inspect
 import json
 import logging
-from typing import Dict, Any, Optional, List
+from typing import (
+    Dict,
+    Any,
+    Optional,
+    List,
+    get_type_hints,
+    Union,
+    get_origin,
+    get_args,
+    Type,
+)
 from .providers.base import NotificationProvider, NotificationProviderConfig
 
 from .types import NotificationMessage, NotificationResult, NotificationConfig
@@ -47,11 +58,15 @@ class ConfigValidator:
 
 
 class NotificationProviderFactory:
-    """Factory for creating notification provider instances"""
+    """Factory for creating notification provider instances with automatic dependency injection"""
 
-    def __init__(self) -> None:
-        """Initialize notification provider factory."""
+    def __init__(self, http_client: Optional[Any] = None) -> None:
+        """Initialize notification provider factory with available dependencies."""
         self._validator = ConfigValidator()
+        self._dependencies = {
+            "http_client": http_client,
+            # Add more injectable dependencies here as needed
+        }
 
     def create_provider(
         self, provider: str, config: Dict[str, Any]
@@ -79,17 +94,103 @@ class NotificationProviderFactory:
                 f"Supported providers: {', '.join(sorted(supported))}"
             )
 
-        # Handle the registration wrapper pattern
-        if hasattr(provider_class, "__new__") and hasattr(
-            provider_class, "config_class"
-        ):
-            # This is a registration wrapper, call it directly
-            provider_instance = provider_class(validated_config)
-        else:
-            # This is a regular class, instantiate normally
-            provider_instance = provider_class(validated_config)
+        # Create provider instance with automatic dependency injection
+        return self._create_provider_with_dependencies(provider_class, validated_config)
 
-        return provider_instance  # type: ignore[no-any-return]
+    def _create_provider_with_dependencies(
+        self,
+        provider_class: Type[NotificationProvider],
+        validated_config: NotificationProviderConfig,
+    ) -> NotificationProvider:
+        """
+        Automatically inject dependencies based on constructor signature.
+
+        Uses inspection to determine what dependencies the provider needs
+        and injects available ones, with type checking support.
+        """
+        try:
+            # Get constructor signature
+            sig = inspect.signature(provider_class.__init__)
+
+            # Get type hints for additional validation
+            try:
+                type_hints = get_type_hints(provider_class.__init__)
+            except (NameError, AttributeError):
+                # Some providers might not have complete type hints
+                type_hints = {}
+
+            # Build kwargs with available dependencies
+            kwargs: Dict[str, Any] = {"config": validated_config}  # Always pass config
+
+            for param_name, param in sig.parameters.items():
+                if param_name in ["self", "config"]:
+                    continue
+
+                # Check if we have this dependency available
+                if (
+                    param_name in self._dependencies
+                    and self._dependencies[param_name] is not None
+                ):
+                    dependency_value = self._dependencies[param_name]
+
+                    # Optional: Type checking if type hints are available
+                    if param_name in type_hints:
+                        expected_type = type_hints[param_name]
+
+                        # Handle Optional types (Union[SomeType, None])
+                        origin = get_origin(expected_type)
+                        if origin is Union:
+                            args = get_args(expected_type)
+                            # Check if this is Optional[T] (Union[T, None])
+                            if len(args) == 2 and type(None) in args:
+                                # Extract the non-None type
+                                expected_type = (
+                                    args[0] if args[1] is type(None) else args[1]
+                                )
+
+                        # Basic type validation (can be enhanced)
+                        try:
+                            if not isinstance(dependency_value, expected_type):
+                                logger.warning(
+                                    f"Type mismatch for {param_name}: expected {expected_type}, "
+                                    f"got {type(dependency_value)}. Injecting anyway."
+                                )
+                        except TypeError:
+                            # Some types might not work with isinstance (e.g., generics)
+                            logger.debug(
+                                f"Cannot validate type for {param_name}, injecting anyway"
+                            )
+
+                    kwargs[param_name] = dependency_value
+                    logger.debug(
+                        f"Injecting {param_name} into {provider_class.__name__}"
+                    )
+
+                elif param.default is not param.empty:
+                    # Parameter has default value, skip injection
+                    logger.debug(f"Skipping {param_name} (has default value)")
+                    continue
+                else:
+                    # Required parameter we don't have
+                    logger.warning(
+                        f"Required parameter '{param_name}' for {provider_class.__name__} "
+                        f"not available in dependencies"
+                    )
+
+            return provider_class(**kwargs)
+
+        except Exception as e:
+            logger.error(
+                f"Failed to create provider {provider_class.__name__} with DI: {e}"
+            )
+            # Fallback to basic instantiation
+            try:
+                return provider_class(validated_config)
+            except Exception as fallback_error:
+                logger.error(f"Fallback creation also failed: {fallback_error}")
+                raise ValueError(
+                    f"Could not create provider {provider_class.__name__}: {e}"
+                ) from e
 
     def get_supported_providers(self) -> List[str]:
         """Get list of supported provider names."""
@@ -175,17 +276,17 @@ class NotificationService:
 
     def __init__(
         self,
-        provider_factory: Optional[NotificationProviderFactory] = None,
+        provider_factory: NotificationProviderFactory,
         encryption_service: Optional[EncryptionService] = None,
     ) -> None:
         """
-        Initialize notification service.
+        Initialize notification service with required dependencies.
 
         Args:
-            provider_factory: Factory for creating provider instances (optional)
+            provider_factory: Factory for creating provider instances (required)
             encryption_service: Service for handling encryption (optional)
         """
-        self._provider_factory = provider_factory or NotificationProviderFactory()
+        self._provider_factory = provider_factory
         self._encryption_service = encryption_service or EncryptionService()
 
     async def send_notification(
@@ -310,8 +411,8 @@ class NotificationService:
         # Get sensitive fields from a dummy instance
         dummy_config = {}
         for field_name, field_info in config_class.__annotations__.items():
-            if hasattr(config_class, "__fields__"):
-                field = config_class.__fields__.get(field_name)
+            if hasattr(config_class, "model_fields"):
+                field = config_class.model_fields.get(field_name)
                 if field and hasattr(field, "default"):
                     dummy_config[field_name] = field.default
                 else:
