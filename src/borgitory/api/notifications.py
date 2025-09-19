@@ -5,6 +5,7 @@ API endpoints for managing notification configurations with provider support.
 import logging
 import os
 import re
+import html
 from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Request
 from fastapi.responses import HTMLResponse
@@ -63,7 +64,7 @@ async def get_provider_fields(
     template_path = _get_provider_template(provider, mode)
     if not template_path:
         return HTMLResponse(
-            f'<div class="text-red-500">No template found for provider: {provider}</div>'
+            f'<div class="text-red-500">No template found for provider: {html.escape(provider)}</div>'
         )
 
     try:
