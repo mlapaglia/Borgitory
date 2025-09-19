@@ -8,13 +8,14 @@ from borgitory.models.enums import JobType
 from borgitory.dependencies import JobServiceDep
 from borgitory.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from borgitory.services.jobs.job_manager import JobManager
+from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.dependencies import TemplatesDep
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def get_job_manager_dependency() -> JobManager:
+def get_job_manager_dependency() -> JobManagerProtocol:
     """Dependency to get modular job manager instance."""
     from borgitory.dependencies import get_job_manager_dependency as get_jm_dep
 

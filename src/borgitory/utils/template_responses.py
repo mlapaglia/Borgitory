@@ -3,8 +3,10 @@ Template Response Utilities for HTMX/JSON handling.
 Provides consistent response formatting for API endpoints.
 """
 
+from typing import Optional
 from fastapi import Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from borgitory.models.repository_dtos import (
     RepositoryOperationResult,
@@ -13,11 +15,18 @@ from borgitory.models.repository_dtos import (
     DeleteRepositoryResult,
 )
 
-# Import templates from dependency injection
-from borgitory.dependencies import get_templates
+# Templates will be loaded lazily to avoid circular imports
+_templates_cache: Optional[Jinja2Templates] = None
 
-# Get templates instance using dependency injection
-templates = get_templates()
+
+def get_templates_instance() -> Jinja2Templates:
+    """Get templates instance with lazy loading to avoid circular imports."""
+    global _templates_cache
+    if _templates_cache is None:
+        from borgitory.dependencies import get_templates
+
+        _templates_cache = get_templates()
+    return _templates_cache
 
 
 class ResponseType:
@@ -46,7 +55,7 @@ class RepositoryResponseHandler:
     ) -> HTMLResponse:
         """Handle repository creation response."""
         if result.success:
-            response = templates.TemplateResponse(
+            response = get_templates_instance().TemplateResponse(
                 request,
                 "partials/repositories/form_create_success.html",
                 {"repository_name": result.repository_name},
@@ -58,7 +67,7 @@ class RepositoryResponseHandler:
             if result.is_validation_error and result.validation_errors:
                 error_message = result.validation_errors[0].message
 
-            return templates.TemplateResponse(
+            return get_templates_instance().TemplateResponse(
                 request,
                 "partials/repositories/form_create_error.html",
                 {"error_message": error_message},
@@ -71,7 +80,7 @@ class RepositoryResponseHandler:
     ) -> HTMLResponse:
         """Handle repository import response."""
         if result.success:
-            response = templates.TemplateResponse(
+            response = get_templates_instance().TemplateResponse(
                 request,
                 "partials/repositories/form_import_success.html",
                 {"repository_name": result.repository_name},
@@ -83,7 +92,7 @@ class RepositoryResponseHandler:
             if result.is_validation_error and result.validation_errors:
                 error_message = result.validation_errors[0].message
 
-            return templates.TemplateResponse(
+            return get_templates_instance().TemplateResponse(
                 request,
                 "partials/repositories/form_import_error.html",
                 {"error_message": error_message},
@@ -96,13 +105,13 @@ class RepositoryResponseHandler:
     ) -> HTMLResponse:
         """Handle repository scan response."""
         if result.success:
-            return templates.TemplateResponse(
+            return get_templates_instance().TemplateResponse(
                 request,
                 "partials/repositories/scan_results.html",
                 {"repositories": [repo.__dict__ for repo in result.repositories]},
             )
         else:
-            return templates.TemplateResponse(
+            return get_templates_instance().TemplateResponse(
                 request,
                 "partials/common/error_message.html",
                 {"error_message": f"Error: {result.error_message}"},
@@ -114,14 +123,14 @@ class RepositoryResponseHandler:
     ) -> HTMLResponse:
         """Handle repository deletion response."""
         if result.success:
-            return templates.TemplateResponse(
+            return get_templates_instance().TemplateResponse(
                 request,
                 "partials/repositories/delete_success.html",
                 {"repository_name": result.repository_name},
                 status_code=200,
             )
         else:
-            return templates.TemplateResponse(
+            return get_templates_instance().TemplateResponse(
                 request,
                 "partials/common/error_message.html",
                 {"error_message": result.error_message},
@@ -143,7 +152,7 @@ class ArchiveResponseHandler:
                 archive.__dict__ for archive in result.recent_archives
             ]
 
-            return templates.TemplateResponse(
+            return get_templates_instance().TemplateResponse(
                 request,
                 "partials/archives/list_content.html",
                 {
@@ -156,7 +165,7 @@ class ArchiveResponseHandler:
                 },
             )
         else:
-            return templates.TemplateResponse(
+            return get_templates_instance().TemplateResponse(
                 request,
                 "partials/archives/error_message.html",
                 {

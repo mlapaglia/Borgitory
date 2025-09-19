@@ -13,11 +13,9 @@ import os
 from borgitory.services.archives.archive_mount_manager import (
     ArchiveMountManager,
     MountInfo,
-    get_archive_mount_manager,
 )
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
-import borgitory.services.archives.archive_mount_manager
 
 
 class TestArchiveMountManager:
@@ -607,44 +605,6 @@ class TestArchiveMountManager:
         assert mount_stat["mount_point"] == str(mount_point)
         assert "mounted_at" in mount_stat
         assert "last_accessed" in mount_stat
-
-
-class TestGetArchiveMountManagerGlobal:
-    """Test the global get_archive_mount_manager function."""
-
-    def teardown_method(self) -> None:
-        """Reset global state."""
-        # Reset global instance
-        borgitory.services.archives.archive_mount_manager._mount_manager = None
-
-    def test_get_archive_mount_manager_default(self) -> None:
-        """Test getting default global instance."""
-        manager = get_archive_mount_manager()
-        assert isinstance(manager, ArchiveMountManager)
-
-        # Should return same instance on subsequent calls
-        manager2 = get_archive_mount_manager()
-        assert manager is manager2
-
-    def test_get_archive_mount_manager_with_params(self) -> None:
-        """Test getting global instance with custom parameters."""
-        custom_job_executor = Mock(spec=JobExecutor)
-
-        # Use a temporary directory to avoid permission issues
-        with tempfile.TemporaryDirectory() as temp_dir:
-            custom_dir = os.path.join(temp_dir, "custom_dir")
-            manager = get_archive_mount_manager(
-                base_mount_dir=custom_dir,
-                job_executor=custom_job_executor,
-                cleanup_interval=120,
-                mount_timeout=600,
-            )
-
-            assert isinstance(manager, ArchiveMountManager)
-            assert manager.base_mount_dir == Path(custom_dir)
-            assert manager.job_executor is custom_job_executor
-            assert manager.cleanup_interval == 120
-            assert manager.mount_timeout == 600
 
 
 class TestMountInfoDataclass:

@@ -45,7 +45,8 @@ from unittest.mock import Mock
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
-    from borgitory.services.notifications.pushover_service import PushoverService
+    from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+    from borgitory.protocols.notification_protocols import NotificationServiceProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +78,12 @@ class JobManagerDependencies:
     """Injectable dependencies for the job manager"""
 
     # Core services
-    job_executor: Optional[JobExecutor] = None
+    job_executor: Optional["ProcessExecutorProtocol"] = None
     output_manager: Optional[JobOutputManager] = None
     queue_manager: Optional[JobQueueManager] = None
     event_broadcaster: Optional[JobEventBroadcaster] = None
     database_manager: Optional[JobDatabaseManager] = None
-    pushover_service: Optional["PushoverService"] = None
+    pushover_service: Optional["NotificationServiceProtocol"] = None
 
     # External dependencies (for testing/customization)
     subprocess_executor: Optional[Callable[..., Any]] = field(
@@ -330,7 +331,7 @@ class JobManager:
         self._setup_callbacks()
 
     @property
-    def safe_executor(self) -> JobExecutor:
+    def safe_executor(self) -> "ProcessExecutorProtocol":
         if self.executor is None:
             raise RuntimeError(
                 "JobManager executor is None - ensure proper initialization"
@@ -1820,11 +1821,8 @@ def create_job_manager(
             max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
             max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
         )
-    elif hasattr(config, "to_internal_config"):
-        # Backward compatible config wrapper
-        internal_config = config.to_internal_config()
     else:
-        # Assume it's already a JobManagerConfig
+        # Assume it's already a JobManagerConfig or compatible
         internal_config = config
 
     # Create dependencies with rclone service
@@ -1860,12 +1858,6 @@ def get_test_job_manager_dependencies(
     )
 
 
-# Backward compatibility aliases
-BorgJobManager = JobManager
-ModularBorgJobManager = JobManager  # For transitional compatibility
-BorgJobManagerConfig = JobManagerConfig
-
-
 # Export all public classes and functions
 __all__ = [
     "JobManager",
@@ -1877,8 +1869,4 @@ __all__ = [
     "create_job_manager",
     "get_default_job_manager_dependencies",
     "get_test_job_manager_dependencies",
-    # Backward compatibility
-    "BorgJobManager",
-    "ModularBorgJobManager",
-    "BorgJobManagerConfig",
 ]

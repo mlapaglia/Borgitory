@@ -4,7 +4,7 @@ import logging
 from typing import AsyncGenerator, Dict, Any
 from fastapi.responses import StreamingResponse
 
-from borgitory.services.jobs.job_manager import JobManager
+from borgitory.protocols import JobManagerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class JobStreamService:
     """Service for handling Server-Sent Events streaming for jobs"""
 
-    def __init__(self, job_manager: JobManager) -> None:
+    def __init__(self, job_manager: JobManagerProtocol) -> None:
         self.job_manager = job_manager
 
     async def stream_all_jobs(self) -> StreamingResponse:

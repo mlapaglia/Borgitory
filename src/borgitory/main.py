@@ -61,9 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await scheduler_service.start()
         logger.info("Scheduler started")
 
-        from borgitory.services.archives.archive_mount_manager import (
-            get_archive_mount_manager,
-        )
+        from borgitory.dependencies import get_archive_mount_manager
 
         mount_manager = get_archive_mount_manager()
 

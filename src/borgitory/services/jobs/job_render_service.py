@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 
 from borgitory.models.database import Job
 from borgitory.models.enums import JobType
-from borgitory.services.jobs.job_manager import JobManager
+from borgitory.protocols import JobManagerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class JobRenderService:
 
     def __init__(
         self,
-        job_manager: JobManager,
+        job_manager: JobManagerProtocol,
         templates_dir: str = "src/borgitory/templates",
     ) -> None:
         # Use dependency injection if templates_dir is the default

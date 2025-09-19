@@ -265,9 +265,10 @@ class TestSimpleCommandRunner:
         assert result.duration == 1.5
         assert result.error is None
 
-        # Test immutability (NamedTuple should be immutable)
-        with pytest.raises(AttributeError):
-            result.success = False
+        # Test mutability (CommandResult is now a regular class)
+        # This should work without raising an exception
+        result.success = False
+        assert result.success is False
 
     def test_command_result_with_error(self) -> None:
         """Test CommandResult with error information."""

@@ -10,24 +10,12 @@ import re
 import inspect
 from typing import Dict, List, Optional, Callable, Any
 from datetime import datetime
-from dataclasses import dataclass
-
-
+from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.cloud_providers.service import EncryptionService, StorageFactory
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ProcessResult:
-    """Result of a process execution"""
-
-    return_code: int
-    stdout: bytes
-    stderr: bytes
-    error: Optional[str] = None
 
 
 class JobExecutor:

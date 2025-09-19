@@ -7,21 +7,11 @@ scanning, etc. that don't need complex job tracking, streaming, or queuing.
 
 import logging
 import asyncio
-from typing import List, Dict, Optional, NamedTuple
+from typing import List, Dict, Optional
 from datetime import datetime
+from borgitory.protocols.command_protocols import CommandResult
 
 logger = logging.getLogger(__name__)
-
-
-class CommandResult(NamedTuple):
-    """Result of a command execution"""
-
-    success: bool
-    return_code: int
-    stdout: str
-    stderr: str
-    duration: float
-    error: Optional[str] = None
 
 
 class SimpleCommandRunner:

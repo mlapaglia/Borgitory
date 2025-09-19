@@ -87,9 +87,7 @@ class ArchiveManager:
             f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
         )
 
-        from borgitory.services.archives.archive_mount_manager import (
-            get_archive_mount_manager,
-        )
+        from borgitory.dependencies import get_archive_mount_manager
 
         mount_manager = get_archive_mount_manager()
 

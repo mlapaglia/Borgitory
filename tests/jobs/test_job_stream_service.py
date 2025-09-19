@@ -519,15 +519,21 @@ class TestJobStreamService:
         assert len(current_jobs) == 0
 
     def test_dependency_injection_service_instance(self) -> None:
-        """Test that dependency injection provides proper service instance."""
+        """Test that dependency injection provides proper service instance with pure FastAPI DI."""
         from borgitory.dependencies import get_job_stream_service
+        from borgitory.main import app
+        from tests.utils.di_testing import override_dependency
+        from unittest.mock import Mock
+        import inspect
 
-        # Test the dependency provider
-        service = get_job_stream_service()
-        assert service is not None
-        assert isinstance(service, JobStreamService)
-        assert hasattr(service, "job_manager")
+        # Test that JobStreamService works in FastAPI context
+        mock_service = Mock(spec=JobStreamService)
+        mock_service.get_job_status.return_value = {"status": "running"}
 
-        # Test singleton behavior
-        service2 = get_job_stream_service()
-        assert service is service2
+        with override_dependency(get_job_stream_service, lambda: mock_service):
+            # Test that the override works
+            assert get_job_stream_service in app.dependency_overrides
+
+        # Test that pure DI creates new instances (no longer singleton)
+        sig = inspect.signature(get_job_stream_service)
+        assert "job_manager" in sig.parameters
