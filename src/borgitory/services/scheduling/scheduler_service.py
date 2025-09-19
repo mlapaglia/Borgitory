@@ -134,7 +134,11 @@ class SchedulerService:
         self.job_service_factory = job_service_factory or JobService
 
         # Cast to JobManager for the global function that expects concrete type
-        job_manager_concrete = self.job_manager if isinstance(self.job_manager, JobManager) else JobManager()
+        job_manager_concrete = (
+            self.job_manager
+            if isinstance(self.job_manager, JobManager)
+            else JobManager()
+        )
         set_scheduler_dependencies(job_manager_concrete, self.job_service_factory)
 
     async def start(self) -> None:

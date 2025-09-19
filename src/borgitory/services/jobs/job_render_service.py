@@ -6,7 +6,6 @@ from fastapi.templating import Jinja2Templates
 
 from borgitory.models.database import Job
 from borgitory.models.enums import JobType
-from borgitory.services.jobs.job_manager import JobManager
 from borgitory.protocols import JobManagerProtocol
 
 logger = logging.getLogger(__name__)

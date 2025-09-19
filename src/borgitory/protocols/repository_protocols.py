@@ -60,9 +60,8 @@ class BackupServiceProtocol(Protocol):
         ...
 
     async def verify_repository_access(
-        self,
-        repository: Any,  # Repository model
-    ) -> Dict[str, Any]:
+        self, repo_path: str, passphrase: str, keyfile_path: str = ""
+    ) -> bool:
         """Verify repository can be accessed."""
         ...
 

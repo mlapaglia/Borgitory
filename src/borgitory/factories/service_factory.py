@@ -84,11 +84,11 @@ class ServiceFactory(Generic[P], ABC):
 
 class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
     """Factory for creating notification services."""
-    
+
     def __init__(self) -> None:
         super().__init__()
         self._register_default_implementations()
-    
+
     def _register_default_implementations(self) -> None:
         """Register default notification service implementations."""
         from borgitory.services.notifications.pushover_service import PushoverService
@@ -154,7 +154,7 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
             volume_service = kwargs.get("volume_service", get_volume_service())
             job_manager = kwargs.get("job_manager", get_job_manager_dependency())
 
-            return BorgService(  # type: ignore[return-value]
+            return BorgService(
                 command_runner=command_runner,
                 volume_service=volume_service,
                 job_manager=job_manager,

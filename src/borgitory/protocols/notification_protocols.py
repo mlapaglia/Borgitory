@@ -20,6 +20,18 @@ class NotificationServiceProtocol(Protocol):
         """Send a notification."""
         ...
 
+    async def send_notification_with_response(
+        self,
+        user_key: str,
+        app_token: str,
+        title: str,
+        message: str,
+        priority: int = 0,
+        sound: str = "default",
+    ) -> tuple[bool, str]:
+        """Send a notification and return detailed response."""
+        ...
+
     async def test_pushover_connection(
         self,
         user_key: str,

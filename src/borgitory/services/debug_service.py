@@ -8,7 +8,6 @@ from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job
-from borgitory.services.jobs.job_manager import JobManager
 from borgitory.protocols import VolumeServiceProtocol, JobManagerProtocol
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,9 @@ class DebugService:
     """Service to gather system and application debug information"""
 
     def __init__(
-        self, volume_service: Optional[VolumeServiceProtocol] = None, job_manager: Optional[JobManagerProtocol] = None
+        self,
+        volume_service: Optional[VolumeServiceProtocol] = None,
+        job_manager: Optional[JobManagerProtocol] = None,
     ) -> None:
         self.volume_service = volume_service
         self.job_manager = job_manager

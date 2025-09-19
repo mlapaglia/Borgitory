@@ -58,14 +58,9 @@ if TYPE_CHECKING:
     from borgitory.protocols.storage_protocols import VolumeServiceProtocol
     from borgitory.protocols.job_protocols import (
         JobManagerProtocol,
-        JobStreamServiceProtocol,
-        JobRenderServiceProtocol,
-        DebugServiceProtocol,
     )
     from borgitory.protocols.repository_protocols import (
         BackupServiceProtocol,
-        ArchiveServiceProtocol,
-        RepositoryServiceProtocol,
     )
     from borgitory.protocols.notification_protocols import NotificationServiceProtocol
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -550,15 +545,9 @@ BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager_dependency)]
 RecoveryServiceDep = Annotated[RecoveryService, Depends(get_recovery_service)]
-PushoverServiceDep = Annotated[
-    PushoverService, Depends(get_pushover_service)
-]
-JobStreamServiceDep = Annotated[
-    JobStreamService, Depends(get_job_stream_service)
-]
-JobRenderServiceDep = Annotated[
-    JobRenderService, Depends(get_job_render_service)
-]
+PushoverServiceDep = Annotated[PushoverService, Depends(get_pushover_service)]
+JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service)]
+JobRenderServiceDep = Annotated[JobRenderService, Depends(get_job_render_service)]
 DebugServiceDep = Annotated[DebugService, Depends(get_debug_service)]
 RcloneServiceDep = Annotated[RcloneService, Depends(get_rclone_service)]
 RepositoryStatsServiceDep = Annotated[
@@ -572,9 +561,7 @@ TaskDefinitionBuilderDep = Annotated[
 RepositoryParserDep = Annotated[RepositoryParser, Depends(get_repository_parser)]
 BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
 ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
-RepositoryServiceDep = Annotated[
-    RepositoryService, Depends(get_repository_service)
-]
+RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
 JobEventBroadcasterDep = Annotated[
     JobEventBroadcaster, Depends(get_job_event_broadcaster_dep)
 ]

@@ -4,7 +4,6 @@ import logging
 from typing import AsyncGenerator, Dict, Any
 from fastapi.responses import StreamingResponse
 
-from borgitory.services.jobs.job_manager import JobManager
 from borgitory.protocols import JobManagerProtocol
 
 logger = logging.getLogger(__name__)
@@ -383,7 +382,7 @@ class JobStreamService:
     async def get_job_status(self, job_id: str) -> Dict[str, Any]:
         """Get current job status and progress for streaming"""
         output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
-        return output  # type: ignore[no-any-return]
+        return output
 
     def get_current_jobs_data(self) -> list[Dict[str, Any]]:
         """Get current running jobs data for rendering"""

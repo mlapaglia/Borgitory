@@ -22,13 +22,13 @@ class JobStatusProtocol(Protocol):
 
 class JobManagerProtocol(Protocol):
     """Protocol for job management services."""
-    
+
     # Properties
     @property
-    def jobs(self) -> Dict[str, Any]: 
+    def jobs(self) -> Dict[str, Any]:
         """Dictionary of active jobs."""
         ...
-    
+
     # Core job methods
     def list_jobs(self) -> Dict[str, Any]:
         """Get dictionary of all jobs."""
@@ -38,32 +38,33 @@ class JobManagerProtocol(Protocol):
         """Get status of a specific job."""
         ...
 
-
     async def cancel_job(self, job_id: str) -> bool:
         """Cancel a running job."""
         ...
-    
+
     # Event and streaming methods
     def subscribe_to_events(self) -> Optional[asyncio.Queue[Any]]:
         """Subscribe to job events."""
         ...
-    
+
     def unsubscribe_from_events(self, client_queue: asyncio.Queue[Any]) -> bool:
         """Unsubscribe from job events."""
         ...
-    
+
     def stream_job_output(self, job_id: str) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream output for a specific job."""
         ...
-    
+
     def stream_all_job_updates(self) -> AsyncGenerator[Any, None]:
         """Stream real-time job updates."""
         ...
-    
-    async def get_job_output_stream(self, job_id: str, last_n_lines: Optional[int] = None) -> Any:
+
+    async def get_job_output_stream(
+        self, job_id: str, last_n_lines: Optional[int] = None
+    ) -> Dict[str, Any]:
         """Get job output stream."""
         ...
-    
+
     async def start_borg_command(
         self,
         command: List[str],
@@ -72,7 +73,7 @@ class JobManagerProtocol(Protocol):
     ) -> str:
         """Start a borg command and return job ID."""
         ...
-    
+
     def cleanup_job(self, job_id: str) -> bool:
         """Clean up a completed job."""
         ...

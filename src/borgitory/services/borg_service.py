@@ -9,10 +9,8 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, cast
 from starlette.responses import StreamingResponse
 
 from borgitory.models.database import Repository, Job
-from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.simple_command_runner import SimpleCommandRunner
-from borgitory.services.jobs.job_manager import JobManager
 from borgitory.protocols import (
     CommandRunnerProtocol,
     VolumeServiceProtocol,
@@ -217,7 +215,7 @@ class BorgService:
                 )
                 return {
                     "success": False,
-                        "message": f"Initialization failed: {error_msg.decode('utf-8', errors='replace') if isinstance(error_msg, bytes) else error_msg}",
+                    "message": f"Initialization failed: {error_msg.decode('utf-8', errors='replace') if isinstance(error_msg, bytes) else error_msg}",
                 }
 
         except Exception as e:
@@ -728,7 +726,11 @@ class BorgService:
             # Process the output to find repositories
             repo_paths = []
             for line in result.stdout.splitlines():
-                line_text = line.decode('utf-8', errors='replace').strip() if isinstance(line, bytes) else line.strip()
+                line_text = (
+                    line.decode("utf-8", errors="replace").strip()
+                    if isinstance(line, bytes)
+                    else line.strip()
+                )
                 if self._is_valid_repository_path(line_text):
                     # Parse the Borg config file to get encryption info
                     encryption_info = self._parse_borg_config(line_text)
