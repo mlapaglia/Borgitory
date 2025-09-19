@@ -13,6 +13,11 @@ from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.jobs.job_manager import JobManager
+from borgitory.protocols import (
+    CommandRunnerProtocol,
+    VolumeServiceProtocol,
+    JobManagerProtocol,
+)
 from borgitory.utils.db_session import get_db_session
 from borgitory.utils.security import (
     build_secure_borg_command,
@@ -28,9 +33,9 @@ class BorgService:
     def __init__(
         self,
         job_executor: Optional[JobExecutor] = None,
-        command_runner: Optional[SimpleCommandRunner] = None,
-        job_manager: Optional[JobManager] = None,
-        volume_service: Optional[VolumeService] = None,
+        command_runner: Optional[CommandRunnerProtocol] = None,
+        job_manager: Optional[JobManagerProtocol] = None,
+        volume_service: Optional[VolumeServiceProtocol] = None,
     ) -> None:
         self.job_executor = job_executor or JobExecutor()
         self.command_runner = command_runner or SimpleCommandRunner()
@@ -41,7 +46,7 @@ class BorgService:
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
         )
 
-    def _get_job_manager(self) -> JobManager:
+    def _get_job_manager(self) -> JobManagerProtocol:
         """Get job manager instance - must be injected via DI"""
         if self.job_manager is None:
             raise RuntimeError(
@@ -212,7 +217,7 @@ class BorgService:
                 )
                 return {
                     "success": False,
-                    "message": f"Initialization failed: {error_msg}",
+                        "message": f"Initialization failed: {error_msg.decode('utf-8', errors='replace') if isinstance(error_msg, bytes) else error_msg}",
                 }
 
         except Exception as e:
@@ -723,7 +728,7 @@ class BorgService:
             # Process the output to find repositories
             repo_paths = []
             for line in result.stdout.splitlines():
-                line_text = line.strip()
+                line_text = line.decode('utf-8', errors='replace').strip() if isinstance(line, bytes) else line.strip()
                 if self._is_valid_repository_path(line_text):
                     # Parse the Borg config file to get encryption info
                     encryption_info = self._parse_borg_config(line_text)

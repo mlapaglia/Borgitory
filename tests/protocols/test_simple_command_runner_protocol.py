@@ -1,0 +1,150 @@
+"""
+Protocol-based tests for SimpleCommandRunner.
+
+These tests verify that SimpleCommandRunner works correctly when used
+through its protocol interface, ensuring the migration is successful.
+"""
+
+import pytest
+from borgitory.dependencies import get_simple_command_runner
+from borgitory.protocols.command_protocols import CommandRunnerProtocol
+from tests.protocols.protocol_testing_utils import ProtocolMockFactory
+
+
+class TestSimpleCommandRunnerProtocol:
+    """Test SimpleCommandRunner through its protocol interface."""
+
+    def test_dependency_returns_protocol(self):
+        """Test that dependency injection returns a protocol-compliant service."""
+        runner = get_simple_command_runner()
+
+        # Should be usable as protocol
+        def use_command_runner(cr: CommandRunnerProtocol) -> None:
+            assert cr is not None
+            assert hasattr(cr, "run_command")
+
+        use_command_runner(runner)  # Should work without type errors
+
+    def test_protocol_mock_compatibility(self):
+        """Test that protocol mocks work with command runner usage patterns."""
+        mock_runner = ProtocolMockFactory.create_command_runner_mock()
+
+        # Should be usable where protocol is expected
+        def use_command_runner(cr: CommandRunnerProtocol) -> None:
+            assert cr is not None
+            assert hasattr(cr, "run_command")
+
+        use_command_runner(mock_runner)
+
+    def test_fastapi_dependency_override_with_protocol(self):
+        """Test that FastAPI dependency overrides work with protocol mocks."""
+        from borgitory.main import app
+        from tests.utils.di_testing import override_dependency
+
+        # Create protocol mock
+        mock_runner = ProtocolMockFactory.create_command_runner_mock()
+
+        # Override dependency with protocol mock
+        with override_dependency(
+            get_simple_command_runner, lambda: mock_runner
+        ) as client:
+            # Verify override is active
+            assert get_simple_command_runner in app.dependency_overrides
+
+            # Note: Direct calls to get_simple_command_runner() will still return
+            # the cached instance due to @lru_cache(). This is expected behavior.
+            # The override only affects FastAPI's dependency injection system.
+
+            # Test that we can make API calls (the override works for FastAPI)
+            response = client.get("/")  # Basic endpoint test
+            assert response.status_code in [
+                200,
+                404,
+            ]  # Either works or endpoint doesn't exist
+
+    def test_protocol_interface_methods(self):
+        """Test that all protocol methods are available and callable."""
+        runner = get_simple_command_runner()
+
+        # Test that protocol methods exist
+        assert hasattr(runner, "run_command")
+        assert callable(getattr(runner, "run_command"))
+
+        # Test method signature compatibility (basic check)
+        import inspect
+
+        sig = inspect.signature(runner.run_command)
+        params = list(sig.parameters.keys())
+
+        # Should have at least command parameter
+        assert "command" in params
+
+    def test_backward_compatibility(self):
+        """Test that existing code still works after protocol migration."""
+        # This test ensures that any existing code that uses SimpleCommandRunner
+        # directly will continue to work
+
+        runner = get_simple_command_runner()
+
+        # Should still be a SimpleCommandRunner instance
+        from borgitory.services.simple_command_runner import SimpleCommandRunner
+
+        assert isinstance(runner, SimpleCommandRunner)
+
+        # Should have all the original methods
+        assert hasattr(runner, "run_command")
+        assert hasattr(runner, "timeout")  # Original attribute
+
+    def test_type_safety_with_protocols(self):
+        """Test that type annotations work correctly with protocols."""
+
+        def process_with_runner(runner: CommandRunnerProtocol) -> str:
+            """Function that expects a CommandRunnerProtocol."""
+            return f"Using runner: {type(runner).__name__}"
+
+        # Should work with real implementation
+        real_runner = get_simple_command_runner()
+        result = process_with_runner(real_runner)
+        assert "SimpleCommandRunner" in result
+
+        # Should work with mock implementation
+        mock_runner = ProtocolMockFactory.create_command_runner_mock()
+        result = process_with_runner(mock_runner)
+        assert "Mock" in result
+
+
+class TestCommandRunnerProtocolIntegration:
+    """Integration tests for CommandRunnerProtocol usage."""
+
+    def test_repository_parser_uses_protocol(self):
+        """Test that services depending on CommandRunner work with protocol."""
+        from borgitory.dependencies import get_repository_parser
+
+        # RepositoryParser depends on SimpleCommandRunner
+        # After protocol migration, it should still work
+        parser = get_repository_parser()
+        assert parser is not None
+        assert hasattr(parser, "command_runner")
+
+    def test_multiple_services_share_protocol_instance(self):
+        """Test that multiple services get the same protocol instance (singleton behavior)."""
+        runner1 = get_simple_command_runner()
+        runner2 = get_simple_command_runner()
+
+        # Should be the same instance due to @lru_cache
+        assert runner1 is runner2
+
+    def test_protocol_works_in_service_constructors(self):
+        """Test that services can be constructed with protocol instances."""
+        from borgitory.services.repositories.repository_parser import RepositoryParser
+
+        # Should be able to construct with protocol instance
+        runner = get_simple_command_runner()
+        parser = RepositoryParser(command_runner=runner)
+
+        assert parser is not None
+        assert parser.command_runner is runner
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

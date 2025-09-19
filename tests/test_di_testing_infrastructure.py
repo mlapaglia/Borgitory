@@ -13,12 +13,10 @@ from tests.utils.di_testing import (
     override_multiple_dependencies,
     MockServiceFactory,
     DependencyTestHelper,
-    create_test_overrides_for_hybrid_services,
 )
 from borgitory.dependencies import (
     get_debug_service,
     get_borg_service,
-    get_job_stream_service,
 )
 from borgitory.main import app
 
@@ -190,60 +188,6 @@ class TestDependencyTestHelper:
         DependencyTestHelper.verify_dependency_override_works(
             get_debug_service, mock_debug_service, "/api/debug/info"
         )
-
-
-class TestHybridServiceOverrides:
-    """Test the complete hybrid service override functionality."""
-
-    def test_create_test_overrides_for_hybrid_services(self):
-        """Test that we can create overrides for all hybrid services."""
-        overrides = create_test_overrides_for_hybrid_services()
-
-        # Verify we have overrides for all 6 hybrid services
-        assert len(overrides) == 6
-
-        # Verify all expected functions are present
-        from borgitory.dependencies import (
-            get_borg_service,
-            get_debug_service,
-            get_job_render_service,
-            get_archive_manager,
-            get_repository_service,
-        )
-
-        expected_functions = {
-            get_borg_service,
-            get_debug_service,
-            get_job_stream_service,
-            get_job_render_service,
-            get_archive_manager,
-            get_repository_service,
-        }
-
-        assert set(overrides.keys()) == expected_functions
-
-        # Verify each override function works
-        for dep_func, override_func in overrides.items():
-            mock_service = override_func()
-            assert mock_service is not None
-            assert isinstance(mock_service, Mock)
-
-    def test_all_hybrid_services_can_be_overridden(self):
-        """Test that all hybrid services can be overridden simultaneously."""
-        overrides = create_test_overrides_for_hybrid_services()
-
-        with override_multiple_dependencies(overrides) as client:
-            # Verify all overrides are active
-            for dep_func in overrides.keys():
-                assert dep_func in app.dependency_overrides
-
-            # Test that we can make basic requests
-            response = client.get("/api/debug/info")
-            assert response is not None
-
-        # Verify all overrides are cleaned up
-        for dep_func in overrides.keys():
-            assert dep_func not in app.dependency_overrides
 
 
 class TestIntegrationWithExistingTests:

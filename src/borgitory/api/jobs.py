@@ -18,7 +18,7 @@ def get_job_manager_dependency() -> JobManager:
     """Dependency to get modular job manager instance."""
     from borgitory.dependencies import get_job_manager_dependency as get_jm_dep
 
-    return get_jm_dep()
+    return get_jm_dep()  # type: ignore[return-value]
 
 
 @router.post("/backup", response_class=HTMLResponse)

@@ -77,12 +77,12 @@ class JobManagerDependencies:
     """Injectable dependencies for the job manager"""
 
     # Core services
-    job_executor: Optional[JobExecutor] = None
+    job_executor: Optional[Any] = None  # Can be JobExecutor or ProcessExecutorProtocol
     output_manager: Optional[JobOutputManager] = None
     queue_manager: Optional[JobQueueManager] = None
     event_broadcaster: Optional[JobEventBroadcaster] = None
     database_manager: Optional[JobDatabaseManager] = None
-    pushover_service: Optional["PushoverService"] = None
+    pushover_service: Optional[Any] = None  # Can be PushoverService or NotificationServiceProtocol
 
     # External dependencies (for testing/customization)
     subprocess_executor: Optional[Callable[..., Any]] = field(
@@ -335,7 +335,7 @@ class JobManager:
             raise RuntimeError(
                 "JobManager executor is None - ensure proper initialization"
             )
-        return self.executor
+        return self.executor  # type: ignore[no-any-return]
 
     @property
     def safe_output_manager(self) -> JobOutputManager:
@@ -1354,7 +1354,7 @@ class JobManager:
                         task.error = (
                             response_message or "Failed to send Pushover notification"
                         )
-                    return success
+                    return success  # type: ignore[no-any-return]
                 else:
                     logger.warning(
                         f"Unsupported notification provider: {config.provider}"

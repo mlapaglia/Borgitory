@@ -15,6 +15,7 @@ from borgitory.models.enums import JobType
 from borgitory.utils.db_session import get_db_session
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.jobs.job_manager import JobManager
+from borgitory.protocols import JobManagerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
 class SchedulerService:
     def __init__(
         self,
-        job_manager: Optional[JobManager] = None,
+        job_manager: Optional[JobManagerProtocol] = None,
         job_service_factory: Optional[JobService] = None,
     ) -> None:
         """
@@ -132,7 +133,9 @@ class SchedulerService:
         self.job_manager = job_manager or JobManager()
         self.job_service_factory = job_service_factory or JobService
 
-        set_scheduler_dependencies(self.job_manager, self.job_service_factory)
+        # Cast to JobManager for the global function that expects concrete type
+        job_manager_concrete = self.job_manager if isinstance(self.job_manager, JobManager) else JobManager()
+        set_scheduler_dependencies(job_manager_concrete, self.job_service_factory)
 
     async def start(self) -> None:
         """Start the scheduler"""

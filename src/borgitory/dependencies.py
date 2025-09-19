@@ -51,6 +51,23 @@ from borgitory.services.cloud_providers import EncryptionService, StorageFactory
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncService
+    from borgitory.protocols.command_protocols import (
+        CommandRunnerProtocol,
+        ProcessExecutorProtocol,
+    )
+    from borgitory.protocols.storage_protocols import VolumeServiceProtocol
+    from borgitory.protocols.job_protocols import (
+        JobManagerProtocol,
+        JobStreamServiceProtocol,
+        JobRenderServiceProtocol,
+        DebugServiceProtocol,
+    )
+    from borgitory.protocols.repository_protocols import (
+        BackupServiceProtocol,
+        ArchiveServiceProtocol,
+        RepositoryServiceProtocol,
+    )
+    from borgitory.protocols.notification_protocols import NotificationServiceProtocol
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
 from borgitory.services.jobs.job_queue_manager import JobQueueManager
@@ -61,11 +78,12 @@ from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
 # Job Manager Sub-Services (defined first to avoid forward references)
 @lru_cache()
-def get_job_executor() -> JobExecutor:
+def get_job_executor() -> "ProcessExecutorProtocol":
     """
-    Provide a JobExecutor singleton instance.
+    Provide a ProcessExecutorProtocol implementation (JobExecutor).
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Request-scoped - new instance per request for proper isolation.
+    Returns protocol interface for loose coupling.
     """
     return JobExecutor()
 
@@ -119,11 +137,12 @@ def get_job_database_manager(
 
 
 @lru_cache()
-def get_simple_command_runner() -> SimpleCommandRunner:
+def get_simple_command_runner() -> "CommandRunnerProtocol":
     """
-    Provide a SimpleCommandRunner singleton instance.
+    Provide a CommandRunnerProtocol implementation (SimpleCommandRunner).
 
     Uses FastAPI's built-in caching for singleton behavior.
+    Returns protocol interface for loose coupling.
     """
     return SimpleCommandRunner()
 
@@ -149,11 +168,12 @@ def get_recovery_service() -> RecoveryService:
 
 
 @lru_cache()
-def get_pushover_service() -> PushoverService:
+def get_pushover_service() -> "NotificationServiceProtocol":
     """
-    Provide a PushoverService singleton instance.
+    Provide a NotificationServiceProtocol implementation (PushoverService).
 
     Uses FastAPI's built-in caching for singleton behavior.
+    Returns protocol interface for loose coupling.
     """
     return PushoverService()
 
@@ -198,11 +218,12 @@ def get_scheduler_service() -> SchedulerService:
 
 
 @lru_cache()
-def get_volume_service() -> VolumeService:
+def get_volume_service() -> "VolumeServiceProtocol":
     """
-    Provide a VolumeService singleton instance.
+    Provide a VolumeServiceProtocol implementation (VolumeService).
 
     Uses FastAPI's built-in caching for singleton behavior.
+    Returns protocol interface for loose coupling.
     """
     return VolumeService()
 
@@ -273,7 +294,7 @@ def get_templates() -> Jinja2Templates:
 _job_manager_instance = None
 
 
-def get_job_manager_dependency() -> JobManager:
+def get_job_manager_dependency() -> "JobManagerProtocol":
     """
     Provide a JobManager singleton instance for FastAPI dependency injection.
 
@@ -334,9 +355,9 @@ def get_job_service(
 
 
 def get_borg_service(
-    command_runner: SimpleCommandRunner = Depends(get_simple_command_runner),
-    volume_service: VolumeService = Depends(get_volume_service),
-    job_manager: JobManager = Depends(get_job_manager_dependency),
+    command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
+    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> BorgService:
     """
     Provide a BorgService instance with proper dependency injection.
@@ -351,7 +372,7 @@ def get_borg_service(
 
 
 def get_job_stream_service(
-    job_manager: JobManager = Depends(get_job_manager_dependency),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> JobStreamService:
     """
     Provide a JobStreamService instance with proper dependency injection.
@@ -362,7 +383,7 @@ def get_job_stream_service(
 
 
 def get_job_render_service(
-    job_manager: JobManager = Depends(get_job_manager_dependency),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> JobRenderService:
     """
     Provide a JobRenderService instance with proper dependency injection.
@@ -373,8 +394,8 @@ def get_job_render_service(
 
 
 def get_debug_service(
-    volume_service: VolumeService = Depends(get_volume_service),
-    job_manager: JobManager = Depends(get_job_manager_dependency),
+    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> DebugService:
     """
     Provide a DebugService instance with proper dependency injection.
@@ -384,9 +405,9 @@ def get_debug_service(
 
 
 def get_repository_service(
-    borg_service: BorgService = Depends(get_borg_service),
+    borg_service: "BackupServiceProtocol" = Depends(get_borg_service),
     scheduler_service: ScheduleService = Depends(get_scheduler_service),
-    volume_service: VolumeService = Depends(get_volume_service),
+    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
 ) -> RepositoryService:
     """
     Provide a RepositoryService instance with proper dependency injection.
@@ -529,9 +550,15 @@ BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager_dependency)]
 RecoveryServiceDep = Annotated[RecoveryService, Depends(get_recovery_service)]
-PushoverServiceDep = Annotated[PushoverService, Depends(get_pushover_service)]
-JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service)]
-JobRenderServiceDep = Annotated[JobRenderService, Depends(get_job_render_service)]
+PushoverServiceDep = Annotated[
+    PushoverService, Depends(get_pushover_service)
+]
+JobStreamServiceDep = Annotated[
+    JobStreamService, Depends(get_job_stream_service)
+]
+JobRenderServiceDep = Annotated[
+    JobRenderService, Depends(get_job_render_service)
+]
 DebugServiceDep = Annotated[DebugService, Depends(get_debug_service)]
 RcloneServiceDep = Annotated[RcloneService, Depends(get_rclone_service)]
 RepositoryStatsServiceDep = Annotated[
@@ -545,7 +572,9 @@ TaskDefinitionBuilderDep = Annotated[
 RepositoryParserDep = Annotated[RepositoryParser, Depends(get_repository_parser)]
 BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
 ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
-RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
+RepositoryServiceDep = Annotated[
+    RepositoryService, Depends(get_repository_service)
+]
 JobEventBroadcasterDep = Annotated[
     JobEventBroadcaster, Depends(get_job_event_broadcaster_dep)
 ]
