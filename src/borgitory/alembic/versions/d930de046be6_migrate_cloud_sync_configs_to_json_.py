@@ -42,8 +42,18 @@ def upgrade() -> None:
 
     # Check if cloud_sync_configs table exists before trying to modify it
     if "cloud_sync_configs" in existing_tables:
+        # Get existing columns to check what needs to be dropped
+        existing_columns = [
+            col["name"] for col in inspector.get_columns("cloud_sync_configs")
+        ]
+
         with op.batch_alter_table("cloud_sync_configs", schema=None) as batch_op:
-            batch_op.add_column(sa.Column("provider_config", sa.Text(), nullable=False))
+            # Only add provider_config if it doesn't exist
+            if "provider_config" not in existing_columns:
+                batch_op.add_column(
+                    sa.Column("provider_config", sa.Text(), nullable=False)
+                )
+
             batch_op.alter_column(
                 "id", existing_type=sa.INTEGER(), nullable=False, autoincrement=True
             )
@@ -59,15 +69,23 @@ def upgrade() -> None:
                 server_default=None,
                 existing_nullable=True,
             )
-            batch_op.drop_column("encrypted_secret_key")
-            batch_op.drop_column("port")
-            batch_op.drop_column("username")
-            batch_op.drop_column("bucket_name")
-            batch_op.drop_column("remote_path")
-            batch_op.drop_column("encrypted_access_key")
-            batch_op.drop_column("encrypted_password")
-            batch_op.drop_column("encrypted_private_key")
-            batch_op.drop_column("host")
+
+            # Only drop columns that actually exist
+            columns_to_drop = [
+                "encrypted_secret_key",
+                "port",
+                "username",
+                "bucket_name",
+                "remote_path",
+                "encrypted_access_key",
+                "encrypted_password",
+                "encrypted_private_key",
+                "host",
+            ]
+
+            for column_name in columns_to_drop:
+                if column_name in existing_columns:
+                    batch_op.drop_column(column_name)
 
     # ### end Alembic commands ###
 
