@@ -43,7 +43,7 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
         )
 
     # Sort by provider name for consistent ordering
-    return sorted(supported_providers, key=lambda x: x["value"])
+    return sorted(supported_providers, key=lambda x: str(x["value"]))
 
 
 def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]:
@@ -141,7 +141,7 @@ def _parse_form_data_to_config(
         name=regular_fields["name"],
         provider=regular_fields["provider"],
         path_prefix=regular_fields.get("path_prefix", ""),
-        provider_config=provider_config,
+        provider_config=cast(Dict[str, Union[str, int, float, bool]], provider_config),
     )
 
 
@@ -164,7 +164,9 @@ def _parse_form_data_to_config_update(
         name=regular_fields.get("name"),
         provider=regular_fields.get("provider"),
         path_prefix=regular_fields.get("path_prefix"),
-        provider_config=provider_config if provider_config else None,
+        provider_config=cast(Dict[str, Union[str, int, float, bool]], provider_config)
+        if provider_config
+        else None,
     )
 
 

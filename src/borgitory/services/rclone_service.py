@@ -271,7 +271,7 @@ class RcloneService:
                     access_key_id, secret_access_key, bucket_name
                 )
 
-                if test_result["status"] == "success":
+                if test_result.get("status") == "success":
                     return {
                         "status": "success",
                         "message": "Connection successful - bucket accessible and writable",
@@ -281,7 +281,7 @@ class RcloneService:
                 else:
                     return {
                         "status": "warning",
-                        "message": f"Bucket is readable but may have write permission issues: {test_result['message']}",
+                        "message": f"Bucket is readable but may have write permission issues: {test_result.get('message', 'Unknown error')}",
                         "output": stdout_text,
                         "details": {"read_test": "passed", "write_test": "failed"},
                     }
@@ -606,7 +606,7 @@ class RcloneService:
                     host, username, remote_path, port, password, private_key
                 )
 
-                if test_result["status"] == "success":
+                if test_result.get("status") == "success":
                     return {
                         "status": "success",
                         "message": "SFTP connection successful - remote directory accessible and writable",
@@ -1145,7 +1145,7 @@ class RcloneService:
                     kerberos_ccache,
                 )
 
-                if test_result["status"] == "success":
+                if test_result.get("status") == "success":
                     return {
                         "status": "success",
                         "message": f"Successfully connected to SMB share {share_name} on {host}",

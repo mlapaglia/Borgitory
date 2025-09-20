@@ -302,7 +302,15 @@ class TaskDefinitionBuilder:
         # Add backup task
         if include_backup:
             backup_params = backup_params or {}
-            tasks.append(self.build_backup_task(repository_name, **backup_params))
+            # Extract and cast parameters with defaults
+            source_path = str(backup_params.get("source_path", "/data"))
+            compression = str(backup_params.get("compression", "zstd"))
+            dry_run = bool(backup_params.get("dry_run", False))
+            tasks.append(
+                self.build_backup_task(
+                    repository_name, source_path, compression, dry_run
+                )
+            )
 
         # Add prune task (request takes precedence over config)
         if prune_request:

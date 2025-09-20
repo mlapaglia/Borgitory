@@ -207,7 +207,7 @@ class DiscordProvider(NotificationProvider):
                 payload["avatar_url"] = self.config.avatar_url
 
             response = await self.http_client.post(
-                self.config.webhook_url, json=payload
+                self.config.webhook_url, json=cast(Dict[str, object], payload)
             )
             response_text = await response.text()
 

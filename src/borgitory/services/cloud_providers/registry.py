@@ -207,12 +207,14 @@ def register_provider(
 
         # Auto-discover rclone mapping if not provided
         final_rclone_mapping = rclone_mapping
-        if not final_rclone_mapping and hasattr(
-            provider_class.storage_class,
-            "get_rclone_mapping",  # type: ignore[attr-defined]
+        storage_class = getattr(provider_class, "storage_class", None)
+        if (
+            not final_rclone_mapping
+            and storage_class
+            and hasattr(storage_class, "get_rclone_mapping")
         ):
             try:
-                final_rclone_mapping = provider_class.storage_class.get_rclone_mapping()  # type: ignore[attr-defined]
+                final_rclone_mapping = storage_class.get_rclone_mapping()
                 logger.debug(f"Auto-discovered rclone mapping for provider '{name}'")
             except Exception as e:
                 logger.warning(

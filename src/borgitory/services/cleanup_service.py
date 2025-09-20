@@ -4,7 +4,7 @@ Handles all cleanup configuration-related business operations independent of HTT
 """
 
 import logging
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Tuple, Union
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import CleanupConfig, Repository
@@ -207,7 +207,9 @@ class CleanupService:
             self.db.rollback()
             return False, None, f"Failed to delete cleanup configuration: {str(e)}"
 
-    def get_configs_with_descriptions(self) -> List[Dict[str, Any]]:
+    def get_configs_with_descriptions(
+        self,
+    ) -> List[Dict[str, Union[str, int, bool, None]]]:
         """
         Get all cleanup configurations with computed description fields.
 
@@ -245,7 +247,7 @@ class CleanupService:
             logger.error(f"Error getting configs with descriptions: {str(e)}")
             return []
 
-    def get_form_data(self) -> Dict[str, Any]:
+    def get_form_data(self) -> Dict[str, List[Repository]]:
         """Get data needed for cleanup form."""
         try:
             repositories = self.db.query(Repository).all()

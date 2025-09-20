@@ -173,8 +173,8 @@ class SMBStorage(CloudStorage):
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
-                            message=progress.get("message", "Uploading..."),
-                            progress=progress.get("percentage", 0.0),
+                            message=str(progress.get("message", "Uploading...")),
+                            progress=float(progress.get("percentage", 0.0) or 0.0),
                         )
                     )
 

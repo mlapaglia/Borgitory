@@ -14,7 +14,7 @@ import logging
 import os
 import re
 import inspect
-from typing import Dict, List, Optional, Callable, Any
+from typing import Any, Dict, List, Optional, Callable, Union
 from datetime import datetime, UTC
 from dataclasses import dataclass
 from enum import Enum
@@ -93,7 +93,7 @@ class BackupExecutor:
     """
 
     def __init__(
-        self, subprocess_executor: Optional[Callable[..., Any]] = None
+        self, subprocess_executor: Optional[Callable[..., object]] = None
     ) -> None:
         self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
         self.progress_pattern = re.compile(
@@ -323,7 +323,9 @@ class BackupExecutor:
         process: asyncio.subprocess.Process,
         result: BackupResult,
         output_callback: Optional[Callable[[str], None]] = None,
-        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        progress_callback: Optional[
+            Callable[[Dict[str, Union[str, int, float]]], None]
+        ] = None,
     ) -> bytes:
         """Monitor process output and capture it in the result"""
         stdout_data = b""
@@ -362,7 +364,7 @@ class BackupExecutor:
             result.error_message = error_msg
             return stdout_data
 
-    def _parse_progress_line(self, line: str) -> Dict[str, Any]:
+    def _parse_progress_line(self, line: str) -> Dict[str, Union[str, int, float]]:
         """Parse Borg output line for progress information"""
         progress_info = {}
 

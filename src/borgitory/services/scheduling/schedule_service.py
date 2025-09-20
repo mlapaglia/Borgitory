@@ -4,10 +4,13 @@ Handles all schedule-related business operations independent of HTTP concerns.
 """
 
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Schedule, Repository
+
+if TYPE_CHECKING:
+    from borgitory.services.scheduling.scheduler_service import SchedulerService
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +18,7 @@ logger = logging.getLogger(__name__)
 class ScheduleService:
     """Service for schedule business logic operations."""
 
-    def __init__(self, db: Session, scheduler_service: Any) -> None:
+    def __init__(self, db: Session, scheduler_service: "SchedulerService") -> None:
         self.db = db
         self.scheduler_service = scheduler_service
 

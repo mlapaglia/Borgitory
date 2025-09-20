@@ -2,7 +2,7 @@ import inspect
 import json
 import logging
 from datetime import datetime, UTC
-from typing import List, Dict, Any, Callable, cast
+from typing import Any, List, Dict, Callable, cast
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -72,7 +72,7 @@ class CloudSyncService:
         rclone_service: RcloneService,
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
-        get_metadata_func: Callable[[str], Any],
+        get_metadata_func: Callable[[str], object],
     ):
         self.db = db
         self._rclone_service = rclone_service
@@ -106,7 +106,7 @@ class CloudSyncService:
 
         try:
             storage = self._storage_factory.create_storage(
-                config.provider, config.provider_config
+                config.provider, cast(Dict[str, object], config.provider_config)
             )
         except Exception as e:
             raise HTTPException(
@@ -115,7 +115,7 @@ class CloudSyncService:
 
         sensitive_fields = storage.get_sensitive_fields()
         encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-            config.provider_config, sensitive_fields
+            cast(Dict[str, object], config.provider_config), sensitive_fields
         )
 
         db_config = CloudSyncConfig()
