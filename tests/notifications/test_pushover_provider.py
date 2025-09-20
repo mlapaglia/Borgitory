@@ -5,6 +5,7 @@ HTTP/API integration tests should be separate integration tests.
 
 import pytest
 from unittest.mock import Mock, AsyncMock
+from urllib.parse import urlparse
 
 from borgitory.services.notifications.providers.pushover_provider import (
     PushoverProvider,
@@ -331,7 +332,10 @@ class TestPushoverProvider:
         """Test provider has correct constants"""
         # Test API URL is set
         assert hasattr(pushover_provider, "PUSHOVER_API_URL")
-        assert "pushover.net" in pushover_provider.PUSHOVER_API_URL
+        url = urlparse(pushover_provider.PUSHOVER_API_URL)
+        assert url.hostname is not None
+        # Allow root domain or any subdomain
+        assert url.hostname == "pushover.net" or url.hostname.endswith(".pushover.net")
 
     # ===== EDGE CASES =====
 
