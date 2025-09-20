@@ -46,7 +46,7 @@ from unittest.mock import Mock
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
-    from borgitory.services.notifications.service import NotificationService
+    from borgitory.dependencies import ApplicationScopedNotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,8 @@ class JobManagerDependencies:
     encryption_service: Optional[Any] = None
     storage_factory: Optional[Any] = None
     provider_registry: Optional[Any] = None
-    notification_service: Optional["NotificationService"] = None
+    # Use semantic type alias for application-scoped notification service
+    notification_service: Optional["ApplicationScopedNotificationService"] = None
 
     def __post_init__(self) -> None:
         """Initialize default dependencies if not provided"""
@@ -219,31 +220,8 @@ class JobManagerFactory:
                 keepalive_timeout=config.sse_keepalive_timeout,
             )
 
-        # Cloud Provider Services
-        if not deps.encryption_service:
-            from borgitory.services.cloud_providers.service import EncryptionService
-
-            deps.encryption_service = EncryptionService()
-
-        if not deps.storage_factory:
-            from borgitory.services.cloud_providers.service import StorageFactory
-
-            # Create storage factory with rclone service (create default if needed)
-            rclone_service = deps.rclone_service
-            if not rclone_service:
-                from borgitory.services.rclone_service import RcloneService
-
-                rclone_service = RcloneService()
-                deps.rclone_service = rclone_service
-            deps.storage_factory = StorageFactory(rclone_service)
-
-        # Provider Registry
-        if not deps.provider_registry:
-            from borgitory.services.cloud_providers.registry_factory import (
-                RegistryFactory,
-            )
-
-            deps.provider_registry = RegistryFactory.get_default_registry()
+        # Cloud Provider Services - no longer using fallback logic
+        # All dependencies should be provided explicitly via DI
 
         # Job Database Manager
         if custom_dependencies.database_manager:
@@ -254,6 +232,38 @@ class JobManagerFactory:
             )
 
         return deps
+
+    @classmethod
+    def create_complete_dependencies(
+        cls,
+        config: Optional[JobManagerConfig] = None,
+    ) -> JobManagerDependencies:
+        """Create a complete set of dependencies with all cloud sync services for production use"""
+
+        if config is None:
+            config = JobManagerConfig()
+
+        # Import dependencies from the DI system
+        from borgitory.dependencies import (
+            get_rclone_service,
+            get_encryption_service,
+            get_storage_factory,
+            get_provider_registry,
+        )
+
+        # Create complete dependencies with all cloud sync and notification services
+        # Import singleton dependency functions
+        from borgitory.dependencies import get_notification_service_singleton
+
+        complete_deps = JobManagerDependencies(
+            rclone_service=get_rclone_service(),
+            encryption_service=get_encryption_service(),
+            storage_factory=get_storage_factory(get_rclone_service()),
+            provider_registry=get_provider_registry(),
+            notification_service=get_notification_service_singleton(),
+        )
+
+        return cls.create_dependencies(config=config, custom_dependencies=complete_deps)
 
     @classmethod
     def create_for_testing(
@@ -286,7 +296,7 @@ class JobManagerFactory:
             sse_max_queue_size=10,
         )
 
-        return cls.create_dependencies(config=config)
+        return cls.create_complete_dependencies(config=config)
 
 
 class JobManager:
@@ -302,7 +312,7 @@ class JobManager:
         self.config = config or JobManagerConfig()
 
         if dependencies is None:
-            dependencies = JobManagerFactory.create_dependencies()
+            dependencies = JobManagerFactory.create_complete_dependencies()
 
         self.dependencies = dependencies
 
@@ -311,7 +321,10 @@ class JobManager:
         self.queue_manager = dependencies.queue_manager
         self.event_broadcaster = dependencies.event_broadcaster
         self.database_manager = dependencies.database_manager
-        self.notification_service: Optional["NotificationService"] = (
+        # Use semantic type alias for application-scoped notification service
+        from borgitory.dependencies import ApplicationScopedNotificationService
+
+        self.notification_service: Optional[ApplicationScopedNotificationService] = (
             dependencies.notification_service
         )
 
@@ -1873,7 +1886,7 @@ def create_job_manager(
 
 def get_default_job_manager_dependencies() -> JobManagerDependencies:
     """Get default job manager dependencies (production configuration)"""
-    return JobManagerFactory.create_dependencies()
+    return JobManagerFactory.create_complete_dependencies()
 
 
 def get_test_job_manager_dependencies(

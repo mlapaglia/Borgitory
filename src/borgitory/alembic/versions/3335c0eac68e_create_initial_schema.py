@@ -1,8 +1,8 @@
-"""real schema
+"""Create initial schema
 
-Revision ID: 1ed39e3f2c76
-Revises: fd2bb4e709c6
-Create Date: 2025-09-19 22:06:21.564106
+Revision ID: 3335c0eac68e
+Revises: 9f06f8c8088d
+Create Date: 2025-09-19 23:07:49.420156
 
 """
 
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "1ed39e3f2c76"
-down_revision: Union[str, Sequence[str], None] = "fd2bb4e709c6"
+revision: str = "3335c0eac68e"
+down_revision: Union[str, Sequence[str], None] = "9f06f8c8088d"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -71,10 +71,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("provider", sa.String(), nullable=False),
-        sa.Column("encrypted_user_key", sa.String(), nullable=True),
-        sa.Column("encrypted_app_token", sa.String(), nullable=True),
-        sa.Column("notify_on_success", sa.Boolean(), nullable=False),
-        sa.Column("notify_on_failure", sa.Boolean(), nullable=False),
+        sa.Column("provider_config", sa.Text(), nullable=False),
         sa.Column("enabled", sa.Boolean(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),

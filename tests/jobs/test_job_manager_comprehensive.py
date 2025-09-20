@@ -142,9 +142,22 @@ class TestJobManagerTaskExecution:
         factory = get_notification_provider_factory(http_client)
         notification_service = NotificationService(provider_factory=factory)
 
+        # Import cloud sync dependencies for complete testing
+        from borgitory.dependencies import (
+            get_rclone_service,
+            get_encryption_service,
+            get_storage_factory,
+            get_provider_registry,
+        )
+
         deps = JobManagerDependencies(
             db_session_factory=db_session_factory,
             notification_service=notification_service,
+            # Add cloud sync dependencies for comprehensive testing
+            rclone_service=get_rclone_service(),
+            encryption_service=get_encryption_service(),
+            storage_factory=get_storage_factory(get_rclone_service()),
+            provider_registry=get_provider_registry(),
         )
         full_deps = JobManagerFactory.create_dependencies(custom_dependencies=deps)
         manager = JobManager(dependencies=full_deps)

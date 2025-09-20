@@ -219,17 +219,64 @@ def get_notification_provider_factory(
 
 
 @lru_cache()
+def get_notification_service_singleton() -> NotificationService:
+    """
+    Create NotificationService singleton for application-scoped use.
+
+    📋 USAGE:
+    ✅ Use for: Singletons, direct instantiation, tests, JobManager
+    ❌ Don't use for: FastAPI endpoints (use get_notification_service instead)
+
+    📋 PATTERN: Dual Functions
+    This is the singleton version that resolves dependencies directly.
+    For FastAPI DI, use get_notification_service() with Depends().
+
+    Returns:
+        NotificationService: Cached singleton instance
+    """
+    from borgitory.services.notifications.service import NotificationService
+
+    http_client = get_http_client()
+    provider_factory = get_notification_provider_factory(http_client)
+    return NotificationService(provider_factory=provider_factory)
+
+
 def get_notification_service(
     provider_factory: "NotificationProviderFactory" = Depends(
         get_notification_provider_factory
     ),
 ) -> NotificationService:
     """
-    Provide NotificationService with injected factory.
+    Provide NotificationService with FastAPI dependency injection.
 
-    Following the exact pattern of cloud providers' CloudSyncService.
-    Uses FastAPI's dependency injection for proper DI.
+    📋 USAGE:
+    ✅ Use for: FastAPI endpoints with Depends(get_notification_service)
+    ❌ Don't use for: Direct calls, singletons, tests
+
+    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
+    ⚠️  For direct calls, use get_notification_service_singleton() instead.
+
+    📋 PATTERN: Dual Functions
+    This is the FastAPI DI version that expects resolved dependencies.
+    For direct calls, use get_notification_service_singleton().
+
+    Args:
+        provider_factory: Injected by FastAPI DI system
+
+    Returns:
+        NotificationService: New instance with injected dependencies
+
+    Raises:
+        RuntimeError: If called directly with Depends object
     """
+    # Add runtime check to catch misuse
+    if hasattr(provider_factory, "dependency"):
+        raise RuntimeError(
+            "get_notification_service() was called directly with a Depends object. "
+            "This indicates a bug in the dependency injection setup. "
+            "Use get_notification_service_singleton() for direct calls instead."
+        )
+
     return NotificationService(provider_factory=provider_factory)
 
 
@@ -374,6 +421,7 @@ def get_job_manager_dependency() -> "JobManagerProtocol":
             JobManager,
             JobManagerConfig,
             JobManagerDependencies,
+            JobManagerFactory,
         )
 
         # Create configuration from environment
@@ -394,14 +442,23 @@ def get_job_manager_dependency() -> "JobManagerProtocol":
         )
 
         # Create dependencies using our new DI services (resolved directly)
-        dependencies = JobManagerDependencies(
+        custom_dependencies = JobManagerDependencies(
             job_executor=get_job_executor(),
             output_manager=get_job_output_manager(),
             queue_manager=get_job_queue_manager(),
             database_manager=get_job_database_manager(),
             event_broadcaster=get_job_event_broadcaster_dep(),
             rclone_service=get_rclone_service(),
-            notification_service=get_notification_service(),
+            notification_service=get_notification_service_singleton(),
+            # Add cloud sync dependencies
+            encryption_service=get_encryption_service(),
+            storage_factory=get_storage_factory(get_rclone_service()),
+            provider_registry=get_provider_registry(),
+        )
+
+        # Use the factory to ensure all dependencies are properly initialized
+        dependencies = JobManagerFactory.create_dependencies(
+            config=config, custom_dependencies=custom_dependencies
         )
 
         _job_manager_instance = JobManager(config=config, dependencies=dependencies)
@@ -604,17 +661,35 @@ def get_cloud_sync_service(
     return factory.create_cloud_sync_service("default", db=db)
 
 
-# Type aliases for dependency injection
-SimpleCommandRunnerDep = Annotated[
+# 📋 SEMANTIC TYPE ALIASES FOR DEPENDENCY INJECTION
+#
+# These type aliases express the INTENDED USAGE PATTERN and LIFECYCLE:
+# - ApplicationScoped* = Singleton instances for app-wide services (JobManager, background tasks)
+# - RequestScoped* = Per-request instances via FastAPI DI (API endpoints)
+#
+# This makes the architectural intent crystal clear and prevents misuse.
+
+# Core Services - Request Scoped (FastAPI Endpoints)
+RequestScopedSimpleCommandRunner = Annotated[
     SimpleCommandRunner, Depends(get_simple_command_runner)
 ]
-BorgServiceDep = Annotated[BorgService, Depends(get_borg_service)]
-JobServiceDep = Annotated[JobService, Depends(get_job_service)]
-JobManagerDep = Annotated[JobManager, Depends(get_job_manager_dependency)]
-RecoveryServiceDep = Annotated[RecoveryService, Depends(get_recovery_service)]
-NotificationServiceDep = Annotated[
+RequestScopedBorgService = Annotated[BorgService, Depends(get_borg_service)]
+RequestScopedJobService = Annotated[JobService, Depends(get_job_service)]
+RequestScopedJobManager = Annotated[JobManager, Depends(get_job_manager_dependency)]
+RequestScopedRecoveryService = Annotated[RecoveryService, Depends(get_recovery_service)]
+
+# Notification Service - Dual Scoped (Most Complex Example)
+ApplicationScopedNotificationService = NotificationService  # Application-wide singleton
+RequestScopedNotificationService = Annotated[
     NotificationService, Depends(get_notification_service)
-]
+]  # Per-request instance via FastAPI DI
+
+# Legacy aliases for backward compatibility (deprecated)
+SimpleCommandRunnerDep = RequestScopedSimpleCommandRunner
+BorgServiceDep = RequestScopedBorgService
+JobServiceDep = RequestScopedJobService
+JobManagerDep = RequestScopedJobManager
+RecoveryServiceDep = RequestScopedRecoveryService
 NotificationConfigServiceDep = Annotated[
     NotificationConfigService, Depends(get_notification_config_service)
 ]

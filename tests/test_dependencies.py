@@ -10,7 +10,6 @@ from borgitory.dependencies import (
     get_borg_service,
     get_job_service,
     get_recovery_service,
-    get_notification_service,
     get_job_stream_service,
     get_job_render_service,
     get_debug_service,
@@ -159,12 +158,15 @@ class TestDependencies:
 
     def test_get_notification_service(self) -> None:
         """Test NotificationService dependency provider."""
-        service = get_notification_service()
+        # Import the singleton version for direct testing
+        from borgitory.dependencies import get_notification_service_singleton
+
+        service = get_notification_service_singleton()
 
         assert isinstance(service, NotificationService)
 
         # Should return same instance due to singleton pattern
-        service2 = get_notification_service()
+        service2 = get_notification_service_singleton()
         assert service is service2
 
     def test_get_job_stream_service(self) -> None:

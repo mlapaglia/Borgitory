@@ -1,8 +1,8 @@
-"""Initial schema
+"""Initial empty state
 
-Revision ID: fd2bb4e709c6
+Revision ID: 9f06f8c8088d
 Revises:
-Create Date: 2025-09-19 21:31:14.879972
+Create Date: 2025-09-19 22:46:16.757334
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "fd2bb4e709c6"
+revision: str = "9f06f8c8088d"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -31,4 +31,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade schema."""
     op.drop_table("apscheduler_jobs")
