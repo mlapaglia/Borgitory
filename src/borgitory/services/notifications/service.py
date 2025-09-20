@@ -18,7 +18,6 @@ from typing import (
     get_args,
     Type,
     cast,
-    TYPE_CHECKING,
 )
 from .providers.base import NotificationProvider, NotificationProviderConfig
 
@@ -123,7 +122,9 @@ class NotificationProviderFactory:
                 type_hints = {}
 
             # Build kwargs with available dependencies
-            kwargs: Dict[str, Union[str, int, float, bool, NotificationProviderConfig, object]] = {"config": validated_config}  # Always pass config
+            kwargs: Dict[
+                str, Union[str, int, float, bool, NotificationProviderConfig, object]
+            ] = {"config": validated_config}  # Always pass config
 
             for param_name, param in sig.parameters.items():
                 if param_name in ["self", "config"]:
@@ -204,7 +205,9 @@ class EncryptionService:
     """Handles encryption/decryption of sensitive configuration fields"""
 
     def encrypt_sensitive_fields(
-        self, config: Dict[str, Union[str, int, float, bool]], sensitive_fields: List[str]
+        self,
+        config: Dict[str, Union[str, int, float, bool]],
+        sensitive_fields: List[str],
     ) -> Dict[str, Union[str, int, float, bool]]:
         """
         Encrypt sensitive fields in configuration.
@@ -224,16 +227,16 @@ class EncryptionService:
         for field in sensitive_fields:
             if field in encrypted_config and encrypted_config[field]:
                 field_value = encrypted_config[field]
-                encrypted_value = cipher.encrypt(
-                    str(field_value).encode()
-                ).decode()
+                encrypted_value = cipher.encrypt(str(field_value).encode()).decode()
                 encrypted_config[f"encrypted_{field}"] = encrypted_value
                 del encrypted_config[field]
 
         return encrypted_config
 
     def decrypt_sensitive_fields(
-        self, config: Dict[str, Union[str, int, float, bool]], sensitive_fields: List[str]
+        self,
+        config: Dict[str, Union[str, int, float, bool]],
+        sensitive_fields: List[str],
     ) -> Dict[str, Union[str, int, float, bool]]:
         """
         Decrypt sensitive fields in configuration.
@@ -309,7 +312,8 @@ class NotificationService:
         """
         try:
             provider = self._provider_factory.create_provider(
-                    config.provider, cast(Dict[str, Union[str, int, float, bool]], config.config)
+                config.provider,
+                cast(Dict[str, Union[str, int, float, bool]], config.config),
             )
 
             return await provider.send_notification(message)
@@ -336,7 +340,8 @@ class NotificationService:
         """
         try:
             provider = self._provider_factory.create_provider(
-                    config.provider, cast(Dict[str, Union[str, int, float, bool]], config.config)
+                config.provider,
+                cast(Dict[str, Union[str, int, float, bool]], config.config),
             )
             return await provider.test_connection()
 
@@ -356,14 +361,17 @@ class NotificationService:
         """
         try:
             provider = self._provider_factory.create_provider(
-                    config.provider, cast(Dict[str, Union[str, int, float, bool]], config.config)
+                config.provider,
+                cast(Dict[str, Union[str, int, float, bool]], config.config),
             )
             return str(provider.get_connection_info().endpoint)
 
         except Exception as e:
             return f"Error getting connection info: {str(e)}"
 
-    def prepare_config_for_storage(self, provider: str, config: Dict[str, Union[str, int, float, bool]]) -> str:
+    def prepare_config_for_storage(
+        self, provider: str, config: Dict[str, Union[str, int, float, bool]]
+    ) -> str:
         """
         Prepare configuration for database storage by encrypting sensitive fields.
 

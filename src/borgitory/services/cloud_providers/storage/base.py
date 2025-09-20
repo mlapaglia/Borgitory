@@ -6,7 +6,7 @@ must implement, ensuring consistency across different providers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Dict, Optional
 from pydantic import BaseModel, ConfigDict
 
 from ..types import SyncEvent, ConnectionInfo

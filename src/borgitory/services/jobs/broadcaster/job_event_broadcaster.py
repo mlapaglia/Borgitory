@@ -28,7 +28,9 @@ class JobEventBroadcaster:
 
         # Client event queues for SSE streaming
         self._client_queues: List[asyncio.Queue[JobEvent]] = []
-        self._client_queue_metadata: Dict[asyncio.Queue[JobEvent], Dict[str, Union[str, int, datetime]]] = {}
+        self._client_queue_metadata: Dict[
+            asyncio.Queue[JobEvent], Dict[str, Union[str, int, datetime]]
+        ] = {}
 
         # Event history for new clients
         self._recent_events: List[JobEvent] = []
@@ -153,7 +155,9 @@ class JobEventBroadcaster:
                     # Update client metadata
                     if client_queue in self._client_queue_metadata:
                         metadata = self._client_queue_metadata[client_queue]
-                        if "events_sent" in metadata and isinstance(metadata["events_sent"], int):
+                        if "events_sent" in metadata and isinstance(
+                            metadata["events_sent"], int
+                        ):
                             metadata["events_sent"] += 1
 
                     yield event
@@ -209,9 +213,7 @@ class JobEventBroadcaster:
 
                         # Remove clients with no activity for a long time
                         events_sent = metadata.get("events_sent", 0)
-                        if (
-                            connected_duration > 3600 and events_sent == 0
-                        ):  # 1 hour
+                        if connected_duration > 3600 and events_sent == 0:  # 1 hour
                             queues_to_remove.append(queue)
 
                 # Remove identified queues
@@ -258,7 +260,9 @@ class JobEventBroadcaster:
             "client_details": [
                 {
                     "client_id": metadata["client_id"],
-                    "connected_at": metadata["connected_at"].isoformat() if isinstance(metadata["connected_at"], datetime) else str(metadata["connected_at"]),
+                    "connected_at": metadata["connected_at"].isoformat()
+                    if isinstance(metadata["connected_at"], datetime)
+                    else str(metadata["connected_at"]),
                     "events_sent": metadata["events_sent"],
                     "queue_size": queue.qsize(),
                 }

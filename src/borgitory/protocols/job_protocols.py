@@ -87,7 +87,9 @@ class JobStreamServiceProtocol(Protocol):
     """Protocol for job output streaming services."""
 
     async def stream_job_output(self, job_id: str) -> AsyncGenerator[str, None]: ...
-    async def stream_all_job_updates(self) -> AsyncGenerator[Dict[str, object], None]: ...
+    async def stream_all_job_updates(
+        self,
+    ) -> AsyncGenerator[Dict[str, object], None]: ...
 
 
 class JobRenderServiceProtocol(Protocol):

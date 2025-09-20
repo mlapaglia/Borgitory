@@ -493,7 +493,9 @@ class CloudSyncConfigCreate(CloudSyncConfigBase):
         if not self.provider_config:
             raise ValueError("provider_config is required")
 
-        validate_provider_config(self.provider, cast(Dict[str, object], self.provider_config))
+        validate_provider_config(
+            self.provider, cast(Dict[str, object], self.provider_config)
+        )
         return self
 
 
@@ -537,7 +539,9 @@ class CloudSyncConfigUpdate(BaseModel):
                 validate_provider_config,
             )
 
-            validate_provider_config(self.provider, cast(Dict[str, object], self.provider_config))
+            validate_provider_config(
+                self.provider, cast(Dict[str, object], self.provider_config)
+            )
 
         return self
 

@@ -2,10 +2,13 @@
 Protocol interfaces for notification services.
 """
 
-from typing import Protocol, Dict, List, Optional, TYPE_CHECKING, Any
+from typing import Protocol, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from borgitory.services.notifications.types import NotificationConfig, NotificationResult
+    from borgitory.services.notifications.types import (
+        NotificationConfig,
+        NotificationResult,
+    )
 
 
 class NotificationServiceProtocol(Protocol):

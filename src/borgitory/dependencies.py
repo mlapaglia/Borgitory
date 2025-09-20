@@ -69,9 +69,6 @@ if TYPE_CHECKING:
     )
     from borgitory.protocols.cloud_protocols import CloudSyncServiceProtocol
     from borgitory.factories.service_factory import CloudProviderServiceFactory
-    from borgitory.protocols.repository_protocols import (
-        BackupServiceProtocol,
-    )
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
 from borgitory.services.jobs.job_queue_manager import JobQueueManager

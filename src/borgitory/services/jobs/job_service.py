@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, UTC
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 
 from borgitory.models.database import Repository, Job

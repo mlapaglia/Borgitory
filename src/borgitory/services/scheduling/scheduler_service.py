@@ -173,9 +173,19 @@ class SchedulerService:
 
     def _handle_job_event(self, event: object) -> None:
         """Handle job execution events"""
-        if hasattr(event, "exception") and hasattr(event, "job_id") and getattr(event, "exception"):
-            logger.error(f"Job {getattr(event, 'job_id')} failed: {getattr(event, 'exception')}")
-        elif hasattr(event, "code") and hasattr(event, "job_id") and getattr(event, "code") == EVENT_JOB_ERROR:
+        if (
+            hasattr(event, "exception")
+            and hasattr(event, "job_id")
+            and getattr(event, "exception")
+        ):
+            logger.error(
+                f"Job {getattr(event, 'job_id')} failed: {getattr(event, 'exception')}"
+            )
+        elif (
+            hasattr(event, "code")
+            and hasattr(event, "job_id")
+            and getattr(event, "code") == EVENT_JOB_ERROR
+        ):
             logger.error(f"Job {getattr(event, 'job_id')} failed")
         elif hasattr(event, "job_id"):
             logger.info(f"Job {getattr(event, 'job_id')} executed successfully")

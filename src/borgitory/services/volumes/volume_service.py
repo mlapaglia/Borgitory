@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional
 
 from borgitory.services.volumes.file_system_interface import FileSystemInterface
 from borgitory.services.volumes.os_file_system import OsFileSystem

@@ -4,7 +4,7 @@ Job Queue Manager - Handles job queuing and concurrency control
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum

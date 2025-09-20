@@ -50,7 +50,10 @@ class RepositoryService:
     """Service for repository business logic operations."""
 
     def __init__(
-        self, borg_service: BorgService, scheduler_service: SchedulerService, volume_service: VolumeService
+        self,
+        borg_service: BorgService,
+        scheduler_service: SchedulerService,
+        volume_service: VolumeService,
     ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service

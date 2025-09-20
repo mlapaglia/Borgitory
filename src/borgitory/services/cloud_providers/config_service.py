@@ -7,7 +7,7 @@ keeping the JobExecutor clean and testable.
 
 import json
 import logging
-from typing import Optional, Callable, Dict, Protocol
+from typing import Optional, Callable, Dict
 from abc import ABC, abstractmethod
 
 from .types import CloudSyncConfig

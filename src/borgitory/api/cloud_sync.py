@@ -121,7 +121,9 @@ def _get_provider_display_details(
     return {"provider_name": provider_name, "provider_details": provider_details}
 
 
-def _parse_form_data_to_config(form_data: Mapping[str, Union[str, object]]) -> CloudSyncConfigCreate:
+def _parse_form_data_to_config(
+    form_data: Mapping[str, Union[str, object]],
+) -> CloudSyncConfigCreate:
     """Parse form data with bracket notation into CloudSyncConfigCreate object"""
     provider_config = {}
     regular_fields = {}

@@ -7,7 +7,7 @@ with proper separation of concerns.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from datetime import datetime, UTC
 
 

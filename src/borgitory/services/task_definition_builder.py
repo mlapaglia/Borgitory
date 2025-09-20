@@ -5,7 +5,7 @@ This class eliminates duplication between job_service.py and scheduler_service.p
 by providing a consistent interface for building all task types.
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 from sqlalchemy.orm import Session
 from borgitory.models.database import (
     CleanupConfig,
@@ -268,7 +268,7 @@ class TaskDefinitionBuilder:
         self,
         repository_name: str,
         include_backup: bool = True,
-            backup_params: Optional[Dict[str, object]] = None,
+        backup_params: Optional[Dict[str, object]] = None,
         cleanup_config_id: Optional[int] = None,
         prune_request: Optional[PruneRequest] = None,
         check_config_id: Optional[int] = None,
@@ -276,7 +276,7 @@ class TaskDefinitionBuilder:
         include_cloud_sync: bool = False,
         cloud_sync_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
-        ) -> list[Dict[str, object]]:
+    ) -> list[Dict[str, object]]:
         """
         Build a complete list of task definitions for a job.
 

@@ -68,7 +68,9 @@ class JobManager(Protocol):
         """
         ...
 
-    def get_job_status(self, job_id: str) -> Optional[Dict[str, Union[str, int, float, bool, None]]]:
+    def get_job_status(
+        self, job_id: str
+    ) -> Optional[Dict[str, Union[str, int, float, bool, None]]]:
         """Get status information for a job"""
         ...
 

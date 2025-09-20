@@ -3,7 +3,7 @@ Discord webhook notification provider implementation.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Protocol, cast
+from typing import Dict, List, Optional, Protocol, cast
 import aiohttp
 from pydantic import Field, field_validator
 

@@ -4,11 +4,106 @@ import subprocess
 import tempfile
 import os
 import time
-from typing import AsyncGenerator, Dict, Optional, Callable, List, Union, cast, Any
+from typing import (
+    AsyncGenerator,
+    Dict,
+    Optional,
+    Callable,
+    List,
+    Union,
+    cast,
+    TypedDict,
+    Literal,
+)
 
 from borgitory.models.database import Repository
 
 logger = logging.getLogger(__name__)
+
+
+# Type definitions for cloud provider configurations
+class S3Config(TypedDict):
+    """Type definition for S3 provider configuration"""
+
+    provider: Literal["s3"]
+    bucket_name: str
+    access_key_id: str
+    secret_access_key: str
+    region: str
+    endpoint_url: Optional[str]
+    storage_class: str
+    path_prefix: str
+
+
+class SFTPConfig(TypedDict):
+    """Type definition for SFTP provider configuration"""
+
+    provider: Literal["sftp"]
+    host: str
+    username: str
+    port: int
+    password: Optional[str]
+    private_key: Optional[str]
+    remote_path: str
+    path_prefix: str
+
+
+class SMBConfig(TypedDict):
+    """Type definition for SMB provider configuration"""
+
+    provider: Literal["smb"]
+    host: str
+    user: str
+    share_name: str
+    password: Optional[str]
+    port: int
+    domain: str
+    spn: Optional[str]
+    use_kerberos: bool
+    idle_timeout: str
+    hide_special_share: bool
+    case_insensitive: bool
+    kerberos_ccache: Optional[str]
+    path_prefix: str
+
+
+# Union type for all cloud provider configurations
+CloudProviderConfig = Union[S3Config, SFTPConfig, SMBConfig]
+
+
+class ConnectionTestResult(TypedDict, total=False):
+    """Type definition for connection test results"""
+
+    status: Literal["success", "failed", "warning", "error"]
+    message: str
+    output: Optional[str]
+    details: Optional[Dict[str, Union[str, int, bool, None]]]
+    can_write: Optional[bool]
+
+
+class SyncResult(TypedDict, total=False):
+    """Type definition for sync operation results"""
+
+    success: bool
+    error: Optional[str]
+    stats: Optional[Dict[str, Union[str, int, float]]]
+
+
+class ProgressData(TypedDict, total=False):
+    """Type definition for progress data from rclone operations"""
+
+    type: str
+    transferred: Optional[str]
+    total: Optional[str]
+    percentage: Optional[float]
+    speed: Optional[str]
+    eta: Optional[str]
+    command: Optional[str]
+    pid: Optional[int]
+    return_code: Optional[int]
+    status: Optional[str]
+    message: Optional[str]
+    stream: Optional[str]
 
 
 class RcloneService:
@@ -53,7 +148,7 @@ class RcloneService:
         region: str = "us-east-1",
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
-    ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+    ) -> AsyncGenerator[ProgressData, None]:
         """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
 
         # Build S3 path
@@ -84,11 +179,14 @@ class RcloneService:
                 *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
 
-            yield {"type": "started", "command": " ".join(command), "pid": process.pid}
+            yield cast(
+                ProgressData,
+                {"type": "started", "command": " ".join(command), "pid": process.pid},
+            )
 
             async def read_stream(
                 stream: Optional[asyncio.StreamReader], stream_type: str
-            ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+            ) -> AsyncGenerator[ProgressData, None]:
                 if stream is None:
                     return
                 while True:
@@ -100,13 +198,16 @@ class RcloneService:
                     progress_data = self.parse_rclone_progress(decoded_line)
 
                     if progress_data:
-                        yield {"type": "progress", **progress_data}
+                        yield cast(ProgressData, {"type": "progress", **progress_data})
                     else:
-                        yield {
-                            "type": "log",
-                            "stream": stream_type,
-                            "message": decoded_line,
-                        }
+                        yield cast(
+                            ProgressData,
+                            {
+                                "type": "log",
+                                "stream": stream_type,
+                                "message": decoded_line,
+                            },
+                        )
 
             async for item in self._merge_async_generators(
                 read_stream(process.stdout, "stdout"),
@@ -116,14 +217,17 @@ class RcloneService:
 
             return_code = await process.wait()
 
-            yield {
-                "type": "completed",
-                "return_code": return_code,
-                "status": "success" if return_code == 0 else "failed",
-            }
+            yield cast(
+                ProgressData,
+                {
+                    "type": "completed",
+                    "return_code": return_code,
+                    "status": "success" if return_code == 0 else "failed",
+                },
+            )
 
         except Exception as e:
-            yield {"type": "error", "message": str(e)}
+            yield cast(ProgressData, {"type": "error", "message": str(e)})
 
     async def test_s3_connection(
         self,
@@ -133,7 +237,7 @@ class RcloneService:
         region: str = "us-east-1",
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
-    ) -> Dict[str, Any]:
+    ) -> ConnectionTestResult:
         """Test S3 connection by checking bucket access"""
         try:
             s3_path = f":s3:{bucket_name}"
@@ -210,7 +314,7 @@ class RcloneService:
 
     async def _test_s3_write_permissions(
         self, access_key_id: str, secret_access_key: str, bucket_name: str
-    ) -> Dict[str, Any]:
+    ) -> ConnectionTestResult:
         """Test write permissions by creating and deleting a small test file"""
         try:
             from datetime import datetime
@@ -273,7 +377,9 @@ class RcloneService:
         except Exception as e:
             return {"status": "failed", "message": f"Write test failed: {str(e)}"}
 
-    def parse_rclone_progress(self, line: str) -> Optional[Dict[str, Union[str, int, float]]]:
+    def parse_rclone_progress(
+        self, line: str
+    ) -> Optional[Dict[str, Union[str, int, float]]]:
         """Parse Rclone progress output"""
         # Look for progress statistics
         if "Transferred:" in line:
@@ -364,7 +470,7 @@ class RcloneService:
         password: Optional[str] = None,
         private_key: Optional[str] = None,
         path_prefix: str = "",
-    ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+    ) -> AsyncGenerator[ProgressData, None]:
         """Sync a Borg repository to SFTP using Rclone with SFTP backend"""
 
         # Build SFTP path
@@ -399,17 +505,20 @@ class RcloneService:
                 *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
 
-            yield {
-                "type": "started",
-                "command": " ".join(
-                    [c for c in command if not c.startswith("--sftp-pass")]
-                ),  # Hide password
-                "pid": process.pid,
-            }
+            yield cast(
+                ProgressData,
+                {
+                    "type": "started",
+                    "command": " ".join(
+                        [c for c in command if not c.startswith("--sftp-pass")]
+                    ),  # Hide password
+                    "pid": process.pid,
+                },
+            )
 
             async def read_stream(
                 stream: Optional[asyncio.StreamReader], stream_type: str
-            ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+            ) -> AsyncGenerator[ProgressData, None]:
                 if stream is None:
                     return
                 while True:
@@ -421,13 +530,16 @@ class RcloneService:
                     progress_data = self.parse_rclone_progress(decoded_line)
 
                     if progress_data:
-                        yield {"type": "progress", **progress_data}
+                        yield cast(ProgressData, {"type": "progress", **progress_data})
                     else:
-                        yield {
-                            "type": "log",
-                            "stream": stream_type,
-                            "message": decoded_line,
-                        }
+                        yield cast(
+                            ProgressData,
+                            {
+                                "type": "log",
+                                "stream": stream_type,
+                                "message": decoded_line,
+                            },
+                        )
 
             async for item in self._merge_async_generators(
                 read_stream(process.stdout, "stdout"),
@@ -437,14 +549,17 @@ class RcloneService:
 
             return_code = await process.wait()
 
-            yield {
-                "type": "completed",
-                "return_code": return_code,
-                "status": "success" if return_code == 0 else "failed",
-            }
+            yield cast(
+                ProgressData,
+                {
+                    "type": "completed",
+                    "return_code": return_code,
+                    "status": "success" if return_code == 0 else "failed",
+                },
+            )
 
         except Exception as e:
-            yield {"type": "error", "message": str(e)}
+            yield cast(ProgressData, {"type": "error", "message": str(e)})
         finally:
             if key_file_path:
                 try:
@@ -460,7 +575,7 @@ class RcloneService:
         port: int = 22,
         password: Optional[str] = None,
         private_key: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConnectionTestResult:
         """Test SFTP connection by listing remote directory"""
         key_file_path = None
         try:
@@ -561,7 +676,7 @@ class RcloneService:
         port: int = 22,
         password: Optional[str] = None,
         private_key: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConnectionTestResult:
         """Test write permissions by creating and deleting a small test file"""
         key_file_path = None
         temp_file_path = None
@@ -642,15 +757,15 @@ class RcloneService:
                     pass
 
     async def _merge_async_generators(
-        self, *async_generators: AsyncGenerator[Dict[str, Union[str, int, float]], None]
-    ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+        self, *async_generators: AsyncGenerator[ProgressData, None]
+    ) -> AsyncGenerator[ProgressData, None]:
         """Merge multiple async generators into one"""
         tasks = []
         for gen in async_generators:
 
             async def wrapper(
-                g: AsyncGenerator[Dict[str, Union[str, int, float]], None],
-            ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+                g: AsyncGenerator[ProgressData, None],
+            ) -> AsyncGenerator[ProgressData, None]:
                 async for item in g:
                     yield item
 
@@ -664,9 +779,9 @@ class RcloneService:
         self,
         source_path: str,
         remote_path: str,
-        config: Dict[str, Any],
-        progress_callback: Optional[Callable[[Dict[str, Union[str, int, float]]], None]] = None,
-    ) -> Dict[str, Any]:
+        config: CloudProviderConfig,
+        progress_callback: Optional[Callable[[ProgressData], None]] = None,
+    ) -> SyncResult:
         """
         Generic sync repository method that delegates to provider-specific methods
         based on the cloud sync configuration.
@@ -709,7 +824,10 @@ class RcloneService:
                                 "error": f"Rclone process failed with return code {progress_data.get('return_code')}",
                             }
                     elif progress_data.get("type") == "progress":
-                        stats.update(progress_data)
+                        # Only update with numeric/string values that stats can handle
+                        for key, value in progress_data.items():
+                            if key != "type" and isinstance(value, (str, int, float)):
+                                stats[key] = value
                     elif progress_data.get("type") == "error":
                         return {
                             "success": False,
@@ -724,9 +842,16 @@ class RcloneService:
             elif provider == "sftp":
                 host = config.get("host")
                 username = config.get("username")
-                port = int(config.get("port", 22))
-                password = str(config.get("password")) if config.get("password") else None
-                private_key = str(config.get("private_key")) if config.get("private_key") else None
+                port_value = config.get("port", 22)
+                port = int(port_value) if isinstance(port_value, (int, str)) else 22
+                password = (
+                    str(config.get("password")) if config.get("password") else None
+                )
+                private_key = (
+                    str(config.get("private_key"))
+                    if config.get("private_key")
+                    else None
+                )
                 path_prefix = str(config.get("path_prefix", ""))
 
                 if not all([host, username]):
@@ -769,7 +894,10 @@ class RcloneService:
                                 "error": f"Rclone process failed with return code {progress_data.get('return_code')}",
                             }
                     elif progress_data.get("type") == "progress":
-                        sftp_stats.update(progress_data)
+                        # Only update with numeric/string values that stats can handle
+                        for key, value in progress_data.items():
+                            if key != "type" and isinstance(value, (str, int, float)):
+                                sftp_stats[key] = value
                     elif progress_data.get("type") == "error":
                         return {
                             "success": False,
@@ -856,8 +984,8 @@ class RcloneService:
         hide_special_share: bool = True,
         case_insensitive: bool = True,
         kerberos_ccache: Optional[str] = None,
-        progress_callback: Optional[Callable[[Dict[str, Union[str, int, float]]], None]] = None,
-    ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+        progress_callback: Optional[Callable[[ProgressData], None]] = None,
+    ) -> AsyncGenerator[ProgressData, None]:
         """Sync a Borg repository to SMB using Rclone with SMB backend"""
 
         smb_path = f":smb:{share_name}"
@@ -895,17 +1023,20 @@ class RcloneService:
                 *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
 
-            yield {
-                "type": "started",
-                "command": " ".join(
-                    [c for c in command if not c.startswith("--smb-pass")]
-                ),
-                "pid": process.pid,
-            }
+            yield cast(
+                ProgressData,
+                {
+                    "type": "started",
+                    "command": " ".join(
+                        [c for c in command if not c.startswith("--smb-pass")]
+                    ),
+                    "pid": process.pid,
+                },
+            )
 
             async def read_stream(
                 stream: Optional[asyncio.StreamReader], stream_type: str
-            ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+            ) -> AsyncGenerator[ProgressData, None]:
                 if stream is None:
                     return
                 while True:
@@ -917,13 +1048,16 @@ class RcloneService:
                     progress_data = self.parse_rclone_progress(decoded_line)
 
                     if progress_data:
-                        yield {"type": "progress", **progress_data}
+                        yield cast(ProgressData, {"type": "progress", **progress_data})
                     else:
-                        yield {
-                            "type": "log",
-                            "stream": stream_type,
-                            "message": decoded_line,
-                        }
+                        yield cast(
+                            ProgressData,
+                            {
+                                "type": "log",
+                                "stream": stream_type,
+                                "message": decoded_line,
+                            },
+                        )
 
             async for item in self._merge_async_generators(
                 read_stream(process.stdout, "stdout"),
@@ -933,14 +1067,17 @@ class RcloneService:
 
             return_code = await process.wait()
 
-            yield {
-                "type": "completed",
-                "return_code": return_code,
-                "status": "success" if return_code == 0 else "failed",
-            }
+            yield cast(
+                ProgressData,
+                {
+                    "type": "completed",
+                    "return_code": return_code,
+                    "status": "success" if return_code == 0 else "failed",
+                },
+            )
 
         except Exception as e:
-            yield {"type": "error", "message": str(e)}
+            yield cast(ProgressData, {"type": "error", "message": str(e)})
 
     async def test_smb_connection(
         self,
@@ -956,7 +1093,7 @@ class RcloneService:
         hide_special_share: bool = True,
         case_insensitive: bool = True,
         kerberos_ccache: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConnectionTestResult:
         """Test SMB connection by listing share contents"""
         try:
             smb_path = f":smb:{share_name}"
@@ -1014,7 +1151,7 @@ class RcloneService:
                         "message": f"Successfully connected to SMB share {share_name} on {host}",
                         "details": {
                             "can_list": True,
-                            "can_write": test_result.get("can_write", False),
+                            "can_write": bool(test_result.get("can_write", False)),
                             "stdout": stdout_text,
                         },
                     }
@@ -1062,7 +1199,7 @@ class RcloneService:
         hide_special_share: bool = True,
         case_insensitive: bool = True,
         kerberos_ccache: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> ConnectionTestResult:
         """Test write permissions on SMB share"""
 
         temp_file = None
@@ -1142,8 +1279,11 @@ class RcloneService:
 
     # Generic dispatcher methods using registry-based mapping
     async def sync_repository_to_provider(
-        self, provider: str, repository: Repository, **provider_config: Any
-    ) -> AsyncGenerator[Dict[str, Union[str, int, float]], None]:
+        self,
+        provider: str,
+        repository: Repository,
+        **provider_config: Union[str, int, bool, None],
+    ) -> AsyncGenerator[ProgressData, None]:
         """
         Truly generic provider sync dispatcher using registry.
 
@@ -1173,7 +1313,9 @@ class RcloneService:
             raise ValueError(f"Rclone method '{mapping.sync_method}' not found")
 
         # Map parameters from borgitory.config to rclone method parameters
-        rclone_params: Dict[str, Union[str, Repository]] = {"repository": repository}
+        rclone_params: Dict[str, Union[str, int, bool, Repository, None]] = {
+            "repository": repository
+        }
 
         # Apply parameter mapping
         for config_field, rclone_param in mapping.parameter_mapping.items():
@@ -1190,7 +1332,9 @@ class RcloneService:
         if mapping.optional_params:
             for param, default_value in mapping.optional_params.items():
                 if param not in rclone_params:
-                    rclone_params[param] = provider_config.get(param, default_value)
+                    value = provider_config.get(param, default_value)
+                    if isinstance(value, (str, int, bool, type(None))):
+                        rclone_params[param] = value
 
         # Remove the original repository key if it was mapped to a different name
         if (
@@ -1218,8 +1362,8 @@ class RcloneService:
             yield result
 
     async def test_provider_connection(
-        self, provider: str, **provider_config: Any
-    ) -> Dict[str, Any]:
+        self, provider: str, **provider_config: Union[str, int, bool, None]
+    ) -> ConnectionTestResult:
         """
         Generic provider connection test dispatcher using registry.
 
@@ -1248,7 +1392,7 @@ class RcloneService:
             raise ValueError(f"Rclone test method '{mapping.test_method}' not found")
 
         # Map parameters from borgitory.config to rclone method parameters
-        rclone_params = {}
+        rclone_params: Dict[str, Union[str, int, bool, None]] = {}
 
         # Apply parameter mapping
         for config_field, rclone_param in mapping.parameter_mapping.items():
@@ -1259,7 +1403,9 @@ class RcloneService:
         if mapping.optional_params:
             for param, default_value in mapping.optional_params.items():
                 if param not in ["path_prefix"] and param not in rclone_params:
-                    rclone_params[param] = provider_config.get(param, default_value)
+                    value = provider_config.get(param, default_value)
+                    if isinstance(value, (str, int, bool, type(None))):
+                        rclone_params[param] = value
 
         # Validate required parameters (excluding repository for connection tests)
         test_required_params = [p for p in mapping.required_params if p != "repository"]
@@ -1271,4 +1417,4 @@ class RcloneService:
 
         # Call the test method
         result = await test_method(**rclone_params)
-        return cast(Dict[str, Any], result)
+        return cast(ConnectionTestResult, result)

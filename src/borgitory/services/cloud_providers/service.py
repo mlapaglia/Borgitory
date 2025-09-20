@@ -10,7 +10,6 @@ import json
 import logging
 from typing import (
     Dict,
-    Any,
     Callable,
     Optional,
     cast,
@@ -124,7 +123,9 @@ class StorageFactory:
                 type_hints = {}
 
             # Build kwargs with available dependencies
-            kwargs: Dict[str, object] = {"config": validated_config}  # Always pass config
+            kwargs: Dict[str, object] = {
+                "config": validated_config
+            }  # Always pass config
 
             for param_name, param in sig.parameters.items():
                 if param_name in ["self", "config"]:
@@ -266,9 +267,7 @@ class EncryptionService:
                 and decrypted_config[encrypted_field]
             ):
                 field_value = decrypted_config[encrypted_field]
-                decrypted_value = cipher.decrypt(
-                    str(field_value).encode()
-                ).decode()
+                decrypted_value = cipher.decrypt(str(field_value).encode()).decode()
                 decrypted_config[field] = decrypted_value
                 del decrypted_config[encrypted_field]
 
@@ -375,7 +374,9 @@ class CloudSyncService:
         except Exception as e:
             return f"Error getting connection info: {str(e)}"
 
-    def prepare_config_for_storage(self, provider: str, config: Dict[str, object]) -> str:
+    def prepare_config_for_storage(
+        self, provider: str, config: Dict[str, object]
+    ) -> str:
         """
         Prepare configuration for database storage by encrypting sensitive fields.
 

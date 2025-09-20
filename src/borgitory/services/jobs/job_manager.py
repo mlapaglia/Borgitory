@@ -1004,11 +1004,21 @@ class JobManager:
             result = await self.safe_executor.execute_prune_task(
                 repository_path=str(repository_path or ""),
                 passphrase=passphrase,
-                keep_within=str(params.get("keep_within")) if params.get("keep_within") else None,
-                keep_daily=int(params.get("keep_daily")) if params.get("keep_daily") else None,
-                keep_weekly=int(params.get("keep_weekly")) if params.get("keep_weekly") else None,
-                keep_monthly=int(params.get("keep_monthly")) if params.get("keep_monthly") else None,
-                keep_yearly=int(params.get("keep_yearly")) if params.get("keep_yearly") else None,
+                keep_within=str(params.get("keep_within"))
+                if params.get("keep_within")
+                else None,
+                keep_daily=int(params.get("keep_daily"))
+                if params.get("keep_daily")
+                else None,
+                keep_weekly=int(params.get("keep_weekly"))
+                if params.get("keep_weekly")
+                else None,
+                keep_monthly=int(params.get("keep_monthly"))
+                if params.get("keep_monthly")
+                else None,
+                keep_yearly=int(params.get("keep_yearly"))
+                if params.get("keep_yearly")
+                else None,
                 show_stats=bool(params.get("show_stats", True)),
                 show_list=bool(params.get("show_list", False)),
                 save_space=bool(params.get("save_space", False)),
@@ -1197,7 +1207,11 @@ class JobManager:
 
         # Get cloud sync config ID, defaulting to None if not configured
         cloud_sync_config_id_raw = params.get("cloud_sync_config_id")
-        cloud_sync_config_id = int(cloud_sync_config_id_raw) if cloud_sync_config_id_raw is not None else None
+        cloud_sync_config_id = (
+            int(cloud_sync_config_id_raw)
+            if cloud_sync_config_id_raw is not None
+            else None
+        )
 
         # Handle skip case at caller level instead of inside executor
         if not cloud_sync_config_id:
@@ -1479,7 +1493,9 @@ class JobManager:
         """List all jobs"""
         return self.jobs.copy()
 
-    async def get_job_output(self, job_id: str) -> AsyncGenerator[Dict[str, object], None]:
+    async def get_job_output(
+        self, job_id: str
+    ) -> AsyncGenerator[Dict[str, object], None]:
         """Get real-time job output"""
         if self.output_manager:
             async for output in self.safe_output_manager.stream_job_output(job_id):

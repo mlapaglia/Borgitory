@@ -11,7 +11,9 @@ from starlette.responses import StreamingResponse
 class BorgService(Protocol):
     """Protocol for Borg backup services"""
 
-    async def initialize_repository(self, repository: object) -> Dict[str, Union[str, int, float, bool, None]]:
+    async def initialize_repository(
+        self, repository: object
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Initialize a new Borg repository.
 
@@ -44,7 +46,9 @@ class BorgService(Protocol):
         """
         ...
 
-    async def list_archives(self, repository: object) -> List[Dict[str, Union[str, int, float, bool, None]]]:
+    async def list_archives(
+        self, repository: object
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """
         List all archives in a repository.
 
@@ -56,7 +60,9 @@ class BorgService(Protocol):
         """
         ...
 
-    async def get_repo_info(self, repository: object) -> Dict[str, Union[str, int, float, bool, None]]:
+    async def get_repo_info(
+        self, repository: object
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Get repository information.
 
@@ -111,7 +117,9 @@ class BorgService(Protocol):
         """
         ...
 
-    async def scan_for_repositories(self) -> List[Dict[str, Union[str, int, float, bool, None]]]:
+    async def scan_for_repositories(
+        self,
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """
         Scan for Borg repositories.
 

@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict
 from fastapi.responses import StreamingResponse
 
 from borgitory.protocols import JobManagerProtocol

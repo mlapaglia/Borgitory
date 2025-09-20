@@ -3,7 +3,7 @@ Pushover notification provider implementation.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from pydantic import Field, field_validator
 
 # Import HttpClient protocol from discord_provider for consistency

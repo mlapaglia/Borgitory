@@ -261,7 +261,9 @@ class JobDatabaseManager:
             logger.error(f"Failed to get repository data for {repository_id}: {e}")
             return None
 
-    async def get_repository_data(self, repository_id: int) -> Optional[Dict[str, object]]:
+    async def get_repository_data(
+        self, repository_id: int
+    ) -> Optional[Dict[str, object]]:
         """Get repository data - public interface"""
         return await self._get_repository_data(repository_id)
 

@@ -6,7 +6,7 @@ from business logic and easy testability.
 """
 
 import re
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Dict, Optional
 from pydantic import Field, field_validator, model_validator
 
 from borgitory.services.rclone_service import RcloneService

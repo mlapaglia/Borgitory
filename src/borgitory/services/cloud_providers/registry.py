@@ -7,7 +7,7 @@ hardcoded if/elif chains.
 """
 
 import logging
-from typing import Dict, Type, List, Optional, Callable
+from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -208,7 +208,8 @@ def register_provider(
         # Auto-discover rclone mapping if not provided
         final_rclone_mapping = rclone_mapping
         if not final_rclone_mapping and hasattr(
-            provider_class.storage_class, "get_rclone_mapping"  # type: ignore[attr-defined]
+            provider_class.storage_class,
+            "get_rclone_mapping",  # type: ignore[attr-defined]
         ):
             try:
                 final_rclone_mapping = provider_class.storage_class.get_rclone_mapping()  # type: ignore[attr-defined]

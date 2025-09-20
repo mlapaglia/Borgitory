@@ -74,7 +74,9 @@ class UpcomingBackupsService:
             # Log the error in production, but don't break the entire list
             return None
 
-    def _parse_next_run_time(self, next_run_raw: Union[str, datetime, None]) -> datetime | None:
+    def _parse_next_run_time(
+        self, next_run_raw: Union[str, datetime, None]
+    ) -> datetime | None:
         """Parse next run time from various formats."""
         if not next_run_raw:
             return None
