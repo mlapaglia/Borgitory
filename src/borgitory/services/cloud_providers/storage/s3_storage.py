@@ -203,7 +203,7 @@ class S3Storage(CloudStorage):
         """S3 sensitive fields"""
         return ["access_key", "secret_key"]
 
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """Get S3-specific display details for the UI"""
         bucket_name = config_dict.get("bucket_name", "Unknown")
         region = config_dict.get("region", "us-east-1")

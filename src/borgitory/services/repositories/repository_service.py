@@ -30,6 +30,9 @@ from borgitory.models.repository_dtos import (
     DeleteRepositoryRequest,
     DeleteRepositoryResult,
 )
+from borgitory.services.borg_service import BorgService
+from borgitory.services.scheduling.scheduler_service import SchedulerService
+from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.utils.secure_path import (
     create_secure_filename,
     secure_path_join,
@@ -47,7 +50,7 @@ class RepositoryService:
     """Service for repository business logic operations."""
 
     def __init__(
-        self, borg_service: Any, scheduler_service: Any, volume_service: Any
+        self, borg_service: BorgService, scheduler_service: SchedulerService, volume_service: VolumeService
     ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service

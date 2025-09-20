@@ -2,8 +2,14 @@
 Protocol interfaces for command execution services.
 """
 
-from typing import Protocol, Dict, Optional, List, Callable, Any
+from typing import Protocol, Dict, Optional, List, Callable, TYPE_CHECKING
 import asyncio
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+    from borgitory.services.rclone_service import RcloneService
+    from borgitory.services.cloud_providers import EncryptionService, StorageFactory
+    from borgitory.services.cloud_providers.registry import ProviderRegistry
 
 
 class CommandResult:
@@ -70,8 +76,8 @@ class ProcessExecutorProtocol(Protocol):
     async def monitor_process_output(
         self,
         process: asyncio.subprocess.Process,
-        output_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        output_callback: Optional[Callable[[str, Dict[str, object]], None]] = None,
+        progress_callback: Optional[Callable[[Dict[str, object]], None]] = None,
     ) -> "ProcessResult":
         """Monitor a process and return the result when complete."""
         ...
@@ -90,7 +96,7 @@ class ProcessExecutorProtocol(Protocol):
         save_space: bool = False,
         force_prune: bool = False,
         dry_run: bool = False,
-        output_callback: Optional[Callable[..., Any]] = None,
+        output_callback: Optional[Callable[..., object]] = None,
     ) -> "ProcessResult":
         """Execute a borg prune task."""
         ...
@@ -99,12 +105,12 @@ class ProcessExecutorProtocol(Protocol):
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        db_session_factory: Callable[[], Any],
-        rclone_service: Any,  # RcloneService
-        encryption_service: Any,  # EncryptionService
-        storage_factory: Any,  # StorageFactory
-        provider_registry: Any,  # ProviderRegistry
-        output_callback: Optional[Callable[..., Any]] = None,
+        db_session_factory: Callable[[], "Session"],
+        rclone_service: "RcloneService",
+        encryption_service: "EncryptionService",
+        storage_factory: "StorageFactory",
+        provider_registry: "ProviderRegistry",
+        output_callback: Optional[Callable[..., object]] = None,
     ) -> "ProcessResult":
         """Execute a cloud sync task."""
         ...

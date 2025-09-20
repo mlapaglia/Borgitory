@@ -120,7 +120,7 @@ class JobDatabaseManager:
             logger.error(f"Failed to update job status: {e}")
             return False
 
-    async def get_job_by_uuid(self, job_uuid: str) -> Optional[Dict[str, Any]]:
+    async def get_job_by_uuid(self, job_uuid: str) -> Optional[Dict[str, object]]:
         """Get job data by UUID"""
         try:
             from borgitory.models.database import Job
@@ -154,7 +154,7 @@ class JobDatabaseManager:
 
     async def get_jobs_by_repository(
         self, repository_id: int, limit: int = 50, job_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, object]]:
         """Get jobs for a specific repository"""
         try:
             from borgitory.models.database import Job
@@ -237,7 +237,7 @@ class JobDatabaseManager:
 
     async def _get_repository_data(
         self, repository_id: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Dict[str, object]]:
         """Get repository data for cloud backup"""
         try:
             from borgitory.models.database import Repository
@@ -261,7 +261,7 @@ class JobDatabaseManager:
             logger.error(f"Failed to get repository data for {repository_id}: {e}")
             return None
 
-    async def get_repository_data(self, repository_id: int) -> Optional[Dict[str, Any]]:
+    async def get_repository_data(self, repository_id: int) -> Optional[Dict[str, object]]:
         """Get repository data - public interface"""
         return await self._get_repository_data(repository_id)
 
@@ -323,7 +323,7 @@ class JobDatabaseManager:
             logger.error(f"Failed to save job tasks for {job_uuid}: {e}")
             return False
 
-    async def get_job_statistics(self) -> Dict[str, Any]:
+    async def get_job_statistics(self) -> Dict[str, object]:
         """Get job statistics"""
         try:
             from borgitory.models.database import Job

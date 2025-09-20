@@ -2,7 +2,10 @@
 Protocol interfaces for cloud storage and synchronization services.
 """
 
-from typing import Protocol, Dict, List, Any, Optional, Callable
+from typing import Protocol, Dict, List, Optional, Callable, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from borgitory.models.database import CloudSyncConfig
 
 
 class CloudStorageProtocol(Protocol):
@@ -27,7 +30,7 @@ class CloudStorageProtocol(Protocol):
     async def list_files(
         self,
         remote_path: str = "",
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """List files in cloud storage."""
         ...
 
@@ -42,7 +45,7 @@ class CloudStorageProtocol(Protocol):
         """Test connection to cloud storage."""
         ...
 
-    def get_connection_info(self) -> Dict[str, Any]:
+    def get_connection_info(self) -> Dict[str, Union[str, int, float, bool, None]]:
         """Get connection information for display."""
         ...
 
@@ -56,23 +59,23 @@ class CloudSyncServiceProtocol(Protocol):
 
     async def execute_sync(
         self,
-        config: Any,  # CloudSyncConfig
+        config: "CloudSyncConfig",  # CloudSyncConfig
         repository_path: str,
         output_callback: Optional[Callable[[str], None]] = None,
-    ) -> Any:  # SyncResult
+    ) -> Dict[str, Union[str, int, float, bool, None]]:  # SyncResult
         """Execute a cloud sync operation."""
         ...
 
     async def test_connection(
         self,
-        config: Any,  # CloudSyncConfig
+        config: "CloudSyncConfig",  # CloudSyncConfig
     ) -> bool:
         """Test connection to cloud storage."""
         ...
 
     def get_connection_info(
         self,
-        config: Any,  # CloudSyncConfig
+        config: "CloudSyncConfig",  # CloudSyncConfig
     ) -> str:
         """Get connection information for display."""
         ...
@@ -80,7 +83,7 @@ class CloudSyncServiceProtocol(Protocol):
     def prepare_config_for_storage(
         self,
         provider: str,
-        config: Dict[str, Any],
+        config: Dict[str, Union[str, int, float, bool, None]],
     ) -> str:
         """Prepare configuration for database storage by encrypting sensitive fields."""
         ...
@@ -89,7 +92,7 @@ class CloudSyncServiceProtocol(Protocol):
         self,
         provider: str,
         stored_config: str,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """Load configuration from database storage by decrypting sensitive fields."""
         ...
 
@@ -99,17 +102,17 @@ class EncryptionServiceProtocol(Protocol):
 
     def encrypt_sensitive_fields(
         self,
-        config: Dict[str, Any],
+        config: Dict[str, Union[str, int, float, bool, None]],
         sensitive_fields: List[str],
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """Encrypt sensitive fields in configuration."""
         ...
 
     def decrypt_sensitive_fields(
         self,
-        config: Dict[str, Any],
+        config: Dict[str, Union[str, int, float, bool, None]],
         sensitive_fields: List[str],
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """Decrypt sensitive fields in configuration."""
         ...
 
@@ -120,7 +123,7 @@ class StorageFactoryProtocol(Protocol):
     def create_storage(
         self,
         provider: str,
-        config: Dict[str, Any],
+        config: Dict[str, Union[str, int, float, bool, None]],
     ) -> CloudStorageProtocol:
         """Create a cloud storage instance."""
         ...

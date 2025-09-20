@@ -25,8 +25,8 @@ class HttpClient(Protocol):
     async def post(
         self,
         url: str,
-        json: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, object]] = None,
+        data: Optional[Dict[str, object]] = None,
     ) -> "HttpResponse":
         """Make a POST request with JSON or form data payload"""
         ...
@@ -48,7 +48,7 @@ class HttpResponse(Protocol):
         """Get response text"""
         ...
 
-    async def json(self) -> Dict[str, Any]:
+    async def json(self) -> Dict[str, object]:
         """Get response as JSON"""
         ...
 
@@ -70,8 +70,8 @@ class AiohttpClient:
     async def post(
         self,
         url: str,
-        json: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, object]] = None,
+        data: Optional[Dict[str, object]] = None,
     ) -> "AiohttpResponse":
         """Make a POST request using aiohttp"""
         session = await self._get_session()
@@ -96,7 +96,7 @@ class AiohttpResponse:
     """Wrapper for aiohttp response to match protocol"""
 
     def __init__(
-        self, status: int, text_data: str, json_data: Optional[Dict[str, Any]] = None
+        self, status: int, text_data: str, json_data: Optional[Dict[str, object]] = None
     ):
         self._status = status
         self._text_data = text_data
@@ -125,7 +125,7 @@ class AiohttpResponse:
     async def text(self) -> str:
         return self._text_data
 
-    async def json(self) -> Dict[str, Any]:
+    async def json(self) -> Dict[str, object]:
         if self._json_data is not None:
             return self._json_data
 
@@ -133,7 +133,7 @@ class AiohttpResponse:
         import json
 
         try:
-            return cast(Dict[str, Any], json.loads(self._text_data))
+            return cast(Dict[str, object], json.loads(self._text_data))
         except json.JSONDecodeError:
             raise ValueError(f"Response is not valid JSON: {self._text_data}")
 
@@ -273,9 +273,9 @@ class DiscordProvider(NotificationProvider):
         """Get list of fields that should be encrypted"""
         return ["webhook_url"]
 
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """Get provider-specific display details for the UI"""
-        webhook_url = config_dict.get("webhook_url", "")
+        webhook_url = str(config_dict.get("webhook_url", ""))
         webhook_id = webhook_url.split("/")[-2] if "/" in webhook_url else "unknown"
         masked_webhook = f"{webhook_id[:8]}..." if len(webhook_id) >= 8 else "***"
 

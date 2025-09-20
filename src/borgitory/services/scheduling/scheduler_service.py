@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, UTC
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Union, Callable, cast
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -24,7 +24,7 @@ _job_service_factory = None
 
 
 def set_scheduler_dependencies(
-    job_manager: JobManager, job_service_factory: Any
+    job_manager: JobManager, job_service_factory: object
 ) -> None:
     """Set the dependencies for the scheduler context"""
     global _job_manager, _job_service_factory
@@ -88,8 +88,9 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
                 notification_config_id=schedule.notification_config_id,
             )
 
-            job_service = _job_service_factory(db, _job_manager)
-            result = await job_service.create_backup_job(
+            factory = cast(Callable[[object, object], object], _job_service_factory)
+            job_service = factory(db, _job_manager)
+            result = await job_service.create_backup_job(  # type: ignore[attr-defined]
                 backup_request, JobType.SCHEDULED_BACKUP
             )
             job_id = result["job_id"]
@@ -170,14 +171,14 @@ class SchedulerService:
         self._running = False
         logger.info("APScheduler v3 stopped successfully")
 
-    def _handle_job_event(self, event: Any) -> None:
+    def _handle_job_event(self, event: object) -> None:
         """Handle job execution events"""
-        if hasattr(event, "exception") and event.exception:
-            logger.error(f"Job {event.job_id} failed: {event.exception}")
-        elif event.code == EVENT_JOB_ERROR:
-            logger.error(f"Job {event.job_id} failed")
-        else:
-            logger.info(f"Job {event.job_id} executed successfully")
+        if hasattr(event, "exception") and hasattr(event, "job_id") and getattr(event, "exception"):
+            logger.error(f"Job {getattr(event, 'job_id')} failed: {getattr(event, 'exception')}")
+        elif hasattr(event, "code") and hasattr(event, "job_id") and getattr(event, "code") == EVENT_JOB_ERROR:
+            logger.error(f"Job {getattr(event, 'job_id')} failed")
+        elif hasattr(event, "job_id"):
+            logger.info(f"Job {getattr(event, 'job_id')} executed successfully")
 
     async def _reload_schedules(self) -> None:
         """Reload all schedules from database"""
@@ -300,7 +301,7 @@ class SchedulerService:
             logger.error(f"Failed to update schedule {schedule_id}: {str(e)}")
             raise
 
-    async def get_scheduled_jobs(self) -> List[Dict[str, Any]]:
+    async def get_scheduled_jobs(self) -> List[Dict[str, Union[str, datetime, None]]]:
         """Get all scheduled jobs with their next run times"""
         if not self._running:
             return []

@@ -2,7 +2,7 @@
 FastAPI dependency providers for the application.
 """
 
-from typing import Annotated, TYPE_CHECKING, Optional, Callable, Any
+from typing import Annotated, TYPE_CHECKING, Optional, Callable
 
 from borgitory.services.notifications.registry_factory import (
     NotificationRegistryFactory,
@@ -124,7 +124,7 @@ def get_job_queue_manager() -> JobQueueManager:
 
 
 def get_job_database_manager(
-    db_session_factory: Optional[Callable[[], Any]] = None,
+    db_session_factory: Optional[Callable[[], object]] = None,
 ) -> JobDatabaseManager:
     """
     Provide a JobDatabaseManager instance.
@@ -529,9 +529,9 @@ def get_debug_service(
 
 
 def get_repository_service(
-    borg_service: "BackupServiceProtocol" = Depends(get_borg_service),
-    scheduler_service: ScheduleService = Depends(get_scheduler_service),
-    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
+    borg_service: BorgService = Depends(get_borg_service),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+    volume_service: VolumeService = Depends(get_volume_service),
 ) -> RepositoryService:
     """
     Provide a RepositoryService instance with proper dependency injection.

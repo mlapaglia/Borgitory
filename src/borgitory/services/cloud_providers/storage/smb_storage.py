@@ -240,7 +240,7 @@ class SMBStorage(CloudStorage):
         """SMB sensitive fields that should be encrypted"""
         return ["pass"]
 
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """Get SMB-specific display details for the UI"""
         host = config_dict.get("host", "Unknown")
         port = config_dict.get("port", 445)

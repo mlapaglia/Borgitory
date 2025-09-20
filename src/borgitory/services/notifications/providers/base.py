@@ -82,7 +82,7 @@ class NotificationProvider(ABC):
         pass
 
     @abstractmethod
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """
         Get provider-specific display details for the UI.
 

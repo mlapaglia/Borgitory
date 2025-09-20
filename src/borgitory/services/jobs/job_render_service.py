@@ -228,7 +228,7 @@ class JobRenderService:
             expand_details=expand_details,
         )
 
-    def get_job_for_render(self, job_id: str, db: Session) -> Dict[str, Any]:
+    def get_job_for_render(self, job_id: str, db: Session) -> Dict[str, object]:
         """Get job data formatted for template rendering - prioritize database for completed jobs"""
         try:
             logger.info(f"Getting job {job_id} for rendering")
@@ -266,7 +266,7 @@ class JobRenderService:
             logger.error(f"Error getting job for render: {e}")
             return {}
 
-    def _format_database_job_for_render(self, job: Job) -> Dict[str, Any]:
+    def _format_database_job_for_render(self, job: Job) -> Dict[str, object]:
         """Format a database job for template rendering"""
         try:
             repository_name = job.repository.name if job.repository else "Unknown"
@@ -354,7 +354,7 @@ class JobRenderService:
 
     def _format_manager_job_for_render(
         self, manager_job: Any, job_id: str, db_job: Any = None
-    ) -> Dict[str, Any] | None:
+    ) -> Dict[str, object] | None:
         """Format a job manager job for template rendering"""
         try:
             # Use database job data if available, otherwise create from manager job

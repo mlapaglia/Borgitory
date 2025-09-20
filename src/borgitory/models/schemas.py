@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Union, cast
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
@@ -162,14 +162,14 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("source_path", mode="before")
     @classmethod
-    def validate_source_path(cls, v: Any) -> str:
+    def validate_source_path(cls, v: Union[str, int, float, bool, None]) -> str:
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
 
-        return normalize_path_with_mnt_prefix(v)
+        return normalize_path_with_mnt_prefix(str(v))
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
-    def validate_cloud_sync_config_id(cls, v: Any) -> Optional[int]:
+    def validate_cloud_sync_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -178,7 +178,7 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("cleanup_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Any) -> Optional[int]:
+    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -187,7 +187,7 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("check_config_id", mode="before")
     @classmethod
-    def validate_check_config_id(cls, v: Any) -> Optional[int]:
+    def validate_check_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -196,7 +196,7 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("notification_config_id", mode="before")
     @classmethod
-    def validate_notification_config_id(cls, v: Any) -> Optional[int]:
+    def validate_notification_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -241,7 +241,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
-    def validate_cloud_sync_config_id(cls, v: Any) -> Optional[int]:
+    def validate_cloud_sync_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -250,7 +250,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("cleanup_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Any) -> Optional[int]:
+    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -259,7 +259,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("check_config_id", mode="before")
     @classmethod
-    def validate_check_config_id(cls, v: Any) -> Optional[int]:
+    def validate_check_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -268,7 +268,7 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("notification_config_id", mode="before")
     @classmethod
-    def validate_notification_config_id(cls, v: Any) -> Optional[int]:
+    def validate_notification_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -353,7 +353,7 @@ class NotificationConfigBase(BaseModel):
     provider: str = Field(
         description="Notification provider (pushover, discord, slack, email, etc.)"
     )
-    provider_config: Dict[str, Any] = Field(
+    provider_config: Dict[str, Union[str, int, float, bool]] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
 
@@ -365,7 +365,7 @@ class NotificationConfigCreate(NotificationConfigBase):
 class NotificationConfigUpdate(BaseModel):
     name: Optional[str] = None
     provider: Optional[str] = None
-    provider_config: Optional[Dict[str, Any]] = None
+    provider_config: Optional[Dict[str, Union[str, int, float, bool]]] = None
     enabled: Optional[bool] = None
 
 
@@ -399,21 +399,21 @@ class BackupRequest(BaseModel):
 
     @field_validator("source_path", mode="before")
     @classmethod
-    def validate_source_path(cls, v: Any) -> str:
+    def validate_source_path(cls, v: Union[str, int, float, bool, None]) -> str:
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
 
-        return normalize_path_with_mnt_prefix(v)
+        return normalize_path_with_mnt_prefix(str(v))
 
     @field_validator("dry_run", mode="before")
     @classmethod
-    def validate_dry_run(cls, v: Any) -> bool:
+    def validate_dry_run(cls, v: Union[str, bool, int]) -> bool:
         if isinstance(v, str):
             return v.lower() in ("true", "1", "yes", "on")
         return bool(v)
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
-    def validate_cloud_sync_config_id(cls, v: Any) -> Optional[int]:
+    def validate_cloud_sync_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -422,7 +422,7 @@ class BackupRequest(BaseModel):
 
     @field_validator("cleanup_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Any) -> Optional[int]:
+    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -431,7 +431,7 @@ class BackupRequest(BaseModel):
 
     @field_validator("check_config_id", mode="before")
     @classmethod
-    def validate_check_config_id(cls, v: Any) -> Optional[int]:
+    def validate_check_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -440,7 +440,7 @@ class BackupRequest(BaseModel):
 
     @field_validator("notification_config_id", mode="before")
     @classmethod
-    def validate_notification_config_id(cls, v: Any) -> Optional[int]:
+    def validate_notification_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -459,7 +459,7 @@ class CloudSyncConfigBase(BaseModel):
     path_prefix: str = Field(
         default="", max_length=255, description="Optional path prefix for cloud storage"
     )
-    provider_config: Dict[str, Any] = Field(
+    provider_config: Dict[str, Union[str, int, float, bool]] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
 
@@ -493,7 +493,7 @@ class CloudSyncConfigCreate(CloudSyncConfigBase):
         if not self.provider_config:
             raise ValueError("provider_config is required")
 
-        validate_provider_config(self.provider, self.provider_config)
+        validate_provider_config(self.provider, cast(Dict[str, object], self.provider_config))
         return self
 
 
@@ -503,7 +503,7 @@ class CloudSyncConfigUpdate(BaseModel):
     )
     provider: Optional[str] = None
     path_prefix: Optional[str] = Field(None, max_length=255)
-    provider_config: Optional[Dict[str, Any]] = Field(
+    provider_config: Optional[Dict[str, Union[str, int, float, bool]]] = Field(
         None, description="Provider-specific configuration"
     )
     enabled: Optional[bool] = None
@@ -537,7 +537,7 @@ class CloudSyncConfigUpdate(BaseModel):
                 validate_provider_config,
             )
 
-            validate_provider_config(self.provider, self.provider_config)
+            validate_provider_config(self.provider, cast(Dict[str, object], self.provider_config))
 
         return self
 
@@ -575,21 +575,21 @@ class RepositoryCheckConfigBase(BaseModel):
 
     @field_validator("max_duration", mode="before")
     @classmethod
-    def validate_max_duration(cls, v: Any) -> Optional[int]:
+    def validate_max_duration(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v is None:
             return None
         return int(v)
 
     @field_validator("first_n_archives", mode="before")
     @classmethod
-    def validate_first_n_archives(cls, v: Any) -> Optional[int]:
+    def validate_first_n_archives(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v is None:
             return None
         return int(v)
 
     @field_validator("last_n_archives", mode="before")
     @classmethod
-    def validate_last_n_archives(cls, v: Any) -> Optional[int]:
+    def validate_last_n_archives(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v is None:
             return None
         return int(v)
@@ -687,7 +687,7 @@ class PruneRequest(BaseModel):
 
     @field_validator("dry_run", mode="before")
     @classmethod
-    def validate_dry_run(cls, v: Any) -> bool:
+    def validate_dry_run(cls, v: Union[str, bool, int]) -> bool:
         if isinstance(v, str):
             return v.lower() in ("true", "1", "yes", "on")
         return bool(v)
@@ -718,7 +718,7 @@ class CheckRequest(BaseModel):
 
     @field_validator("check_config_id", mode="before")
     @classmethod
-    def validate_check_config_id(cls, v: Any) -> Optional[int]:
+    def validate_check_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:

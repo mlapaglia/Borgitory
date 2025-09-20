@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional, Union
 
 from borgitory.services.volumes.file_system_interface import FileSystemInterface
 from borgitory.services.volumes.os_file_system import OsFileSystem
@@ -41,7 +41,7 @@ class VolumeService:
             logger.error(f"Error discovering mounted volumes under /mnt: {e}")
             return []
 
-    async def get_volume_info(self) -> Dict[str, Any]:
+    async def get_volume_info(self) -> Dict[str, object]:
         """Get detailed information about mounted volumes"""
         try:
             mounted_volumes = await self.get_mounted_volumes()

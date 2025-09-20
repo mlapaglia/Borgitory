@@ -194,7 +194,7 @@ class SFTPStorage(CloudStorage):
         """SFTP sensitive fields"""
         return ["password", "private_key"]
 
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """Get SFTP-specific display details for the UI"""
         host = config_dict.get("host", "Unknown")
         port = config_dict.get("port", 22)

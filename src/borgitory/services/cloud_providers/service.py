@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class ConfigValidator:
     """Validates cloud storage configurations"""
 
-    def validate_config(self, provider: str, config: Dict[str, Any]) -> Any:
+    def validate_config(self, provider: str, config: Dict[str, object]) -> object:
         """
         Validate configuration for a specific provider.
 
@@ -74,7 +74,7 @@ class StorageFactory:
             # Add more injectable dependencies here as needed
         }
 
-    def create_storage(self, provider: str, config: Dict[str, Any]) -> CloudStorage:
+    def create_storage(self, provider: str, config: Dict[str, object]) -> CloudStorage:
         """
         Create a cloud storage instance with automatic dependency injection.
 
@@ -102,7 +102,7 @@ class StorageFactory:
         return self._create_storage_with_dependencies(storage_class, validated_config)
 
     def _create_storage_with_dependencies(
-        self, storage_class: Any, validated_config: Any
+        self, storage_class: type, validated_config: object
     ) -> CloudStorage:
         """
         Automatically inject dependencies based on constructor signature.
@@ -114,17 +114,17 @@ class StorageFactory:
         """
         try:
             # Get constructor signature
-            sig = inspect.signature(storage_class.__init__)
+            sig = inspect.signature(storage_class.__init__)  # type: ignore[misc]
 
             # Get type hints for additional validation
             try:
-                type_hints = get_type_hints(storage_class.__init__)
+                type_hints = get_type_hints(storage_class.__init__)  # type: ignore[misc]
             except (NameError, AttributeError):
                 # Some storage providers might not have complete type hints
                 type_hints = {}
 
             # Build kwargs with available dependencies
-            kwargs: Dict[str, Any] = {"config": validated_config}  # Always pass config
+            kwargs: Dict[str, object] = {"config": validated_config}  # Always pass config
 
             for param_name, param in sig.parameters.items():
                 if param_name in ["self", "config"]:
@@ -214,8 +214,8 @@ class EncryptionService:
     """Handles encryption/decryption of sensitive configuration fields"""
 
     def encrypt_sensitive_fields(
-        self, config: Dict[str, Any], sensitive_fields: list[str]
-    ) -> Dict[str, Any]:
+        self, config: Dict[str, object], sensitive_fields: list[str]
+    ) -> Dict[str, object]:
         """
         Encrypt sensitive fields in configuration.
 
@@ -242,8 +242,8 @@ class EncryptionService:
         return encrypted_config
 
     def decrypt_sensitive_fields(
-        self, config: Dict[str, Any], sensitive_fields: list[str]
-    ) -> Dict[str, Any]:
+        self, config: Dict[str, object], sensitive_fields: list[str]
+    ) -> Dict[str, object]:
         """
         Decrypt sensitive fields in configuration.
 
@@ -265,8 +265,9 @@ class EncryptionService:
                 encrypted_field in decrypted_config
                 and decrypted_config[encrypted_field]
             ):
+                field_value = decrypted_config[encrypted_field]
                 decrypted_value = cipher.decrypt(
-                    decrypted_config[encrypted_field].encode()
+                    str(field_value).encode()
                 ).decode()
                 decrypted_config[field] = decrypted_value
                 del decrypted_config[encrypted_field]
@@ -374,7 +375,7 @@ class CloudSyncService:
         except Exception as e:
             return f"Error getting connection info: {str(e)}"
 
-    def prepare_config_for_storage(self, provider: str, config: Dict[str, Any]) -> str:
+    def prepare_config_for_storage(self, provider: str, config: Dict[str, object]) -> str:
         """
         Prepare configuration for database storage by encrypting sensitive fields.
 
@@ -397,7 +398,7 @@ class CloudSyncService:
 
     def load_config_from_storage(
         self, provider: str, stored_config: str
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """
         Load configuration from database storage by decrypting sensitive fields.
 

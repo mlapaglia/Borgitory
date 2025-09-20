@@ -2,7 +2,10 @@
 Protocol interfaces for notification services.
 """
 
-from typing import Protocol, Dict, List, Any, Optional
+from typing import Protocol, Dict, List, Optional, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from borgitory.services.notifications.types import NotificationConfig, NotificationResult
 
 
 class NotificationServiceProtocol(Protocol):
@@ -10,22 +13,22 @@ class NotificationServiceProtocol(Protocol):
 
     async def send_notification(
         self,
-        config: Any,  # NotificationConfig
-        message: Any,  # NotificationMessage
-    ) -> Any:  # NotificationResult
+        config: "NotificationConfig",
+        message: object,  # NotificationMessage
+    ) -> "NotificationResult":
         """Send a notification using the provider system."""
         ...
 
     async def test_connection(
         self,
-        config: Any,  # NotificationConfig
+        config: "NotificationConfig",
     ) -> bool:
         """Test connection to notification service."""
         ...
 
     def get_connection_info(
         self,
-        config: Any,  # NotificationConfig
+        config: "NotificationConfig",
     ) -> str:
         """Get connection information for display."""
         ...
@@ -33,7 +36,7 @@ class NotificationServiceProtocol(Protocol):
     def prepare_config_for_storage(
         self,
         provider: str,
-        config: Dict[str, Any],
+        config: Dict[str, object],
     ) -> str:
         """Prepare configuration for database storage."""
         ...
@@ -42,7 +45,7 @@ class NotificationServiceProtocol(Protocol):
         self,
         provider: str,
         stored_config: str,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Load configuration from database storage."""
         ...
 
@@ -53,27 +56,27 @@ class NotificationConfigServiceProtocol(Protocol):
     def create_config(
         self,
         provider: str,
-        config_data: Dict[str, Any],
-    ) -> Any:  # NotificationConfig model
+        config_data: Dict[str, object],
+    ) -> "NotificationConfig":
         """Create a new notification configuration."""
         ...
 
     def get_config(
         self,
         config_id: int,
-    ) -> Optional[Any]:  # NotificationConfig model
+    ) -> Optional["NotificationConfig"]:
         """Get a notification configuration by ID."""
         ...
 
-    def list_configs(self) -> List[Any]:  # List[NotificationConfig]
+    def list_configs(self) -> List["NotificationConfig"]:
         """List all notification configurations."""
         ...
 
     def update_config(
         self,
         config_id: int,
-        config_data: Dict[str, Any],
-    ) -> Optional[Any]:  # NotificationConfig model
+        config_data: Dict[str, object],
+    ) -> Optional["NotificationConfig"]:
         """Update a notification configuration."""
         ...
 

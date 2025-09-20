@@ -7,7 +7,7 @@ keeping the JobExecutor clean and testable.
 
 import json
 import logging
-from typing import Optional, Callable, Any, Dict
+from typing import Optional, Callable, Dict, Protocol
 from abc import ABC, abstractmethod
 
 from .types import CloudSyncConfig
@@ -35,7 +35,7 @@ class ConfigLoadService(ABC):
 class DatabaseConfigLoadService(ConfigLoadService):
     """Service that loads configurations from database"""
 
-    def __init__(self, db_session_factory: Callable[[], Any]) -> None:
+    def __init__(self, db_session_factory: Callable[[], object]) -> None:
         """
         Initialize with database session factory.
 
@@ -49,7 +49,7 @@ class DatabaseConfigLoadService(ConfigLoadService):
         try:
             from borgitory.models.database import CloudSyncConfig as DbCloudSyncConfig
 
-            with self._db_session_factory() as db:
+            with self._db_session_factory() as db:  # type: ignore[attr-defined]
                 db_config = (
                     db.query(DbCloudSyncConfig)
                     .filter(DbCloudSyncConfig.id == config_id)
@@ -80,24 +80,24 @@ class DatabaseConfigLoadService(ConfigLoadService):
             logger.error(f"Failed to load config {config_id}: {str(e)}")
             return None
 
-    def _convert_legacy_config(self, db_config: Any) -> Dict[str, Any]:
+    def _convert_legacy_config(self, db_config: object) -> Dict[str, object]:
         """Convert legacy database configuration to new format"""
-        if db_config.provider == "s3":
-            access_key, secret_key = db_config.get_credentials()
+        if db_config.provider == "s3":  # type: ignore[attr-defined]
+            access_key, secret_key = db_config.get_credentials()  # type: ignore[attr-defined]
             return {
-                "bucket_name": db_config.bucket_name,
+                "bucket_name": db_config.bucket_name,  # type: ignore[attr-defined]
                 "access_key": access_key,
                 "secret_key": secret_key,
                 "region": "us-east-1",
                 "storage_class": "STANDARD",
             }
-        elif db_config.provider == "sftp":
-            password, private_key = db_config.get_sftp_credentials()
+        elif db_config.provider == "sftp":  # type: ignore[attr-defined]
+            password, private_key = db_config.get_sftp_credentials()  # type: ignore[attr-defined]
             config = {
-                "host": db_config.host,
-                "username": db_config.username,
-                "remote_path": db_config.remote_path,
-                "port": db_config.port or 22,
+                "host": db_config.host,  # type: ignore[attr-defined]
+                "username": db_config.username,  # type: ignore[attr-defined]
+                "remote_path": db_config.remote_path,  # type: ignore[attr-defined]
+                "port": db_config.port or 22,  # type: ignore[attr-defined]
                 "host_key_checking": True,
             }
             if password:
@@ -106,7 +106,7 @@ class DatabaseConfigLoadService(ConfigLoadService):
                 config["private_key"] = private_key
             return config
         else:
-            raise ValueError(f"Unknown legacy provider: {db_config.provider}")
+            raise ValueError(f"Unknown legacy provider: {db_config.provider}")  # type: ignore[attr-defined]
 
 
 class MockConfigLoadService(ConfigLoadService):
