@@ -78,9 +78,12 @@ def mock_notification_config():
     """Mock notification configuration"""
     config = MagicMock(spec=NotificationConfig)
     config.id = 1
+    config.name = "test-pushover"
     config.provider = "pushover"
-    config.notify_on_success = True
-    config.notify_on_failure = True
+    config.provider_config = (
+        '{"user_key": "encrypted_user", "app_token": "encrypted_token"}'
+    )
+    config.enabled = True
     return config
 
 
@@ -343,8 +346,6 @@ class TestTaskDefinitionBuilder:
             "type": "notification",
             "name": "Send notification for test-repo",
             "provider": "pushover",
-            "notify_on_success": True,
-            "notify_on_failure": True,
             "config_id": 1,
         }
 

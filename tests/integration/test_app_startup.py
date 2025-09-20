@@ -11,8 +11,13 @@ from typing import Optional
 class AppRunner:
     """Helper class to manage app startup and shutdown for testing."""
 
-    def __init__(self, data_dir: str, port: int = 8001):
+    def __init__(self, data_dir: str, port: int = None):
         self.data_dir = data_dir
+        # Use a different port for each test to avoid conflicts
+        if port is None:
+            import random
+
+            port = random.randint(8001, 8999)
         self.port = port
         self.process: Optional[subprocess.Popen] = None
         self.base_url = f"http://localhost:{port}"
@@ -43,9 +48,26 @@ class AppRunner:
         while time.time() - start_time < timeout:
             if self.is_ready():
                 return True
+
+            # Check if process crashed
+            if self.process.poll() is not None:
+                # Process died, get logs and fail immediately
+                stdout, stderr = self.get_logs()
+                print("Process crashed during startup!")
+                print(f"Exit code: {self.process.poll()}")
+                print(f"STDOUT: {stdout}")
+                print(f"STDERR: {stderr}")
+                return False
+
             time.sleep(0.5)
 
-        # If we get here, startup failed
+        # If we get here, startup timed out
+        print(f"App startup timed out after {timeout} seconds")
+        if self.process and self.process.poll() is None:
+            print("Process is still running but not responding to health checks")
+        stdout, stderr = self.get_logs()
+        print(f"STDOUT: {stdout}")
+        print(f"STDERR: {stderr}")
         self.stop()
         return False
 
@@ -83,18 +105,20 @@ class AppRunner:
         """Get stdout and stderr logs from the process."""
         if self.process:
             try:
-                # Terminate the process to read logs
-                if self.process.poll() is None:
-                    self.process.terminate()
-
-                # Wait a bit for process to finish
-                try:
-                    stdout, stderr = self.process.communicate(timeout=5)
-                    return stdout.decode(), stderr.decode()
-                except subprocess.TimeoutExpired:
-                    self.process.kill()
+                # If process has finished, get all logs
+                if self.process.poll() is not None:
                     stdout, stderr = self.process.communicate()
                     return stdout.decode(), stderr.decode()
+                else:
+                    # Process is still running, terminate it to get logs
+                    self.process.terminate()
+                    try:
+                        stdout, stderr = self.process.communicate(timeout=5)
+                        return stdout.decode(), stderr.decode()
+                    except subprocess.TimeoutExpired:
+                        self.process.kill()
+                        stdout, stderr = self.process.communicate()
+                        return stdout.decode(), stderr.decode()
             except Exception as e:
                 return f"Error reading logs: {e}", ""
         return "", ""

@@ -1,5 +1,6 @@
 """Integration tests for basic endpoint functionality."""
 
+import threading
 import pytest
 import requests
 import json
@@ -249,8 +250,6 @@ def test_error_handling_graceful(app_runner_module):
 
 def test_concurrent_requests_handling(app_runner_module):
     """Test that the application can handle multiple concurrent requests."""
-    import threading
-
     # App is already started by the module fixture
 
     results = []

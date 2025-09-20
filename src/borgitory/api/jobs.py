@@ -1,18 +1,98 @@
 import logging
-from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import List, Dict, Optional
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from starlette.responses import StreamingResponse
+from pydantic import BaseModel
 from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from borgitory.models.enums import JobType
 from borgitory.dependencies import JobServiceDep
 from borgitory.dependencies import JobStreamServiceDep, JobRenderServiceDep
-from borgitory.services.jobs.job_manager import JobManager
 from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.dependencies import TemplatesDep
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# Response Models
+class JobResponse(BaseModel):
+    """Generic job response model"""
+
+    id: str
+    status: str
+    job_type: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    return_code: Optional[int] = None
+    error: Optional[str] = None
+
+
+class JobStatusResponse(BaseModel):
+    """Job status response model"""
+
+    id: str
+    status: str
+    running: bool
+    completed: bool
+    failed: bool
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    return_code: Optional[int] = None
+    error: Optional[str] = None
+    job_type: Optional[str] = None
+    current_task_index: Optional[int] = None
+    tasks: Optional[int] = None
+
+
+class JobOutputLine(BaseModel):
+    """Job output line model"""
+
+    text: str
+    timestamp: Optional[str] = None
+    stream: Optional[str] = None
+
+
+class JobOutputResponse(BaseModel):
+    """Job output response model"""
+
+    lines: List[JobOutputLine]
+    progress: Dict[str, str] = {}
+
+
+class MessageResponse(BaseModel):
+    """Generic message response model"""
+
+    message: str
+
+
+class JobManagerStatsResponse(BaseModel):
+    """Job manager statistics response model"""
+
+    total_jobs: int
+    running_jobs: int
+    completed_jobs: int
+    failed_jobs: int
+    active_processes: int
+    running_job_ids: List[str]
+
+
+class QueueStatsResponse(BaseModel):
+    """Queue statistics response model"""
+
+    max_concurrent_backups: int
+    running_backups: int
+    queued_backups: int
+    available_slots: int
+    queue_size: int
+
+
+class MigrationResponse(BaseModel):
+    """Database migration response model"""
+
+    message: str
+    success: Optional[bool] = None
+    affected_rows: Optional[int] = None
 
 
 def get_job_manager_dependency() -> JobManagerProtocol:
@@ -142,15 +222,16 @@ async def stream_all_jobs(
     return await stream_svc.stream_all_jobs()
 
 
-@router.get("/")
+@router.get("/", response_model=List[JobResponse])
 def list_jobs(
     job_svc: JobServiceDep,
     skip: int = 0,
     limit: int = 100,
     type: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> List[JobResponse]:
     """List database job records (legacy jobs) and active JobManager jobs"""
-    return job_svc.list_jobs(skip, limit, type)
+    jobs_data = job_svc.list_jobs(skip, limit, type)
+    return [JobResponse(**job) for job in jobs_data]
 
 
 @router.get("/html", response_class=HTMLResponse)
@@ -188,26 +269,26 @@ async def stream_current_jobs_html(
     )
 
 
-@router.get("/{job_id}")
+@router.get("/{job_id}", response_model=JobResponse)
 def get_job(
     job_id: str,
     job_svc: JobServiceDep,
-) -> Dict[str, Any]:
+) -> JobResponse:
     """Get job details - supports both database IDs and JobManager IDs"""
     job = job_svc.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job
+    return JobResponse(**job)
 
 
-@router.get("/{job_id}/status")
-async def get_job_status(job_id: str, job_svc: JobServiceDep) -> Dict[str, Any]:
+@router.get("/{job_id}/status", response_model=JobStatusResponse)
+async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusResponse:
     """Get current job status and progress"""
     try:
         output = await job_svc.get_job_status(job_id)
         if "error" in output:
             raise HTTPException(status_code=404, detail=output["error"])
-        return output
+        return JobStatusResponse(**output)
     except HTTPException:
         raise  # Re-raise HTTPExceptions without modification
     except Exception as e:
@@ -215,18 +296,27 @@ async def get_job_status(job_id: str, job_svc: JobServiceDep) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{job_id}/output")
+@router.get("/{job_id}/output", response_model=JobOutputResponse)
 async def get_job_output(
     job_id: str,
     job_svc: JobServiceDep,
     last_n_lines: int = 100,
-) -> Dict[str, Any]:
+) -> JobOutputResponse:
     """Get job output lines"""
     try:
         output = await job_svc.get_job_output(job_id, last_n_lines)
         if "error" in output:
             raise HTTPException(status_code=404, detail=output["error"])
-        return output
+
+        # Convert lines to proper format
+        lines = []
+        for line in output.get("lines", []):
+            if isinstance(line, dict):
+                lines.append(JobOutputLine(**line))
+            else:
+                lines.append(JobOutputLine(text=str(line)))
+
+        return JobOutputResponse(lines=lines, progress=output.get("progress", {}))
     except HTTPException:
         raise  # Re-raise HTTPExceptions without modification
     except Exception as e:
@@ -331,10 +421,10 @@ async def toggle_task_details(
     return templates.TemplateResponse(request, template_name, context)
 
 
-@router.post("/{job_id}/copy-output")
-async def copy_job_output() -> Dict[str, Any]:
+@router.post("/{job_id}/copy-output", response_model=MessageResponse)
+async def copy_job_output() -> MessageResponse:
     """Copy job output to clipboard (returns success message)"""
-    return {"message": "Output copied to clipboard"}
+    return MessageResponse(message="Output copied to clipboard")
 
 
 @router.get("/{job_id}/tasks/{task_order}/stream")
@@ -347,76 +437,7 @@ async def stream_task_output(
     return await stream_svc.stream_task_output(job_id, task_order)
 
 
-@router.post("/{job_id}/tasks/{task_order}/copy-output")
-async def copy_task_output() -> Dict[str, Any]:
+@router.post("/{job_id}/tasks/{task_order}/copy-output", response_model=MessageResponse)
+async def copy_task_output() -> MessageResponse:
     """Copy task output to clipboard (returns success message)"""
-    return {"message": "Task output copied to clipboard"}
-
-
-@router.delete("/{job_id}")
-async def cancel_job(
-    job_id: str,
-    job_svc: JobServiceDep,
-) -> Dict[str, Any]:
-    """Cancel a running job"""
-    success = await job_svc.cancel_job(job_id)
-    if success:
-        return {"message": "Job cancelled successfully"}
-    raise HTTPException(status_code=404, detail="Job not found")
-
-
-@router.get("/manager/stats")
-def get_job_manager_stats(
-    job_manager: JobManager = Depends(get_job_manager_dependency),
-) -> Dict[str, Any]:
-    """Get JobManager statistics"""
-    jobs = job_manager.jobs
-    running_jobs = [job for job in jobs.values() if job.status == "running"]
-    completed_jobs = [job for job in jobs.values() if job.status == "completed"]
-    failed_jobs = [job for job in jobs.values() if job.status == "failed"]
-
-    return {
-        "total_jobs": len(jobs),
-        "running_jobs": len(running_jobs),
-        "completed_jobs": len(completed_jobs),
-        "failed_jobs": len(failed_jobs),
-        "active_processes": len(job_manager._processes),
-        "running_job_ids": [job.id for job in running_jobs],
-    }
-
-
-@router.post("/manager/prune")
-def cleanup_completed_jobs(
-    job_manager: JobManager = Depends(get_job_manager_dependency),
-) -> Dict[str, Any]:
-    """Clean up completed jobs from JobManager memory"""
-    cleaned = 0
-    jobs_to_remove = []
-
-    for job_id, job in job_manager.jobs.items():
-        if job.status in ["completed", "failed"]:
-            jobs_to_remove.append(job_id)
-
-    for job_id in jobs_to_remove:
-        job_manager.cleanup_job(job_id)
-        cleaned += 1
-
-    return {"message": f"Cleaned up {cleaned} completed jobs"}
-
-
-@router.get("/queue/stats")
-def get_queue_stats(
-    job_manager: JobManager = Depends(get_job_manager_dependency),
-) -> Dict[str, Any]:
-    """Get backup queue statistics"""
-    return job_manager.get_queue_stats()
-
-
-@router.post("/migrate")
-def run_database_migration(job_svc: JobServiceDep) -> Dict[str, Any]:
-    """Manually trigger database migration for jobs table"""
-    try:
-        return job_svc.run_database_migration()
-    except Exception as e:
-        logger.error(f"Migration failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+    return MessageResponse(message="Task output copied to clipboard")

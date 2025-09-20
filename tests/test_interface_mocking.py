@@ -113,7 +113,6 @@ def test_mock_job_manager_implements_protocol():
 async def test_mock_command_runner_functionality():
     """Test that mock CommandRunner works functionally"""
     runner: CommandRunner = MockCommandRunner()
-
     result = await runner.run_command(["echo", "hello"])
     assert result.success is True
     assert result.return_code == 0

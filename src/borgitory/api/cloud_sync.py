@@ -550,9 +550,3 @@ def disable_cloud_sync_config(
             {"error_message": error_message},
             status_code=500,
         )
-
-
-@router.get("/providers")
-def get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, Any]]:
-    """Get list of supported cloud providers from the registry."""
-    return _get_supported_providers(registry)

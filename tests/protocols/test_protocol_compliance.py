@@ -27,7 +27,7 @@ from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.borg_service import BorgService
 from borgitory.services.archives.archive_manager import ArchiveManager
-from borgitory.services.notifications.pushover_service import PushoverService
+from borgitory.services.notifications.service import NotificationService
 
 
 class ProtocolComplianceChecker:
@@ -200,18 +200,31 @@ class TestProtocolCompliance:
         manager = ArchiveManager()
         assert manager is not None
 
-    def test_pushover_service_compliance(self):
-        """Test that PushoverService satisfies NotificationServiceProtocol."""
+    def test_notification_service_compliance(self):
+        """Test that NotificationService satisfies NotificationServiceProtocol."""
         checker = ProtocolComplianceChecker()
-        checker.check_protocol_compliance(PushoverService, NotificationServiceProtocol)
-
-        # Check for key methods
-        assert hasattr(PushoverService, "send_notification"), (
-            "PushoverService should have send_notification method"
+        checker.check_protocol_compliance(
+            NotificationService, NotificationServiceProtocol
         )
 
-        # Check instantiation
-        service = PushoverService()
+        # Check for key methods
+        assert hasattr(NotificationService, "send_notification"), (
+            "NotificationService should have send_notification method"
+        )
+        assert hasattr(NotificationService, "test_connection"), (
+            "NotificationService should have test_connection method"
+        )
+
+        # Check instantiation with proper dependencies
+        from borgitory.dependencies import (
+            get_http_client,
+            get_notification_provider_factory,
+        )
+
+        # Create the service with proper DI
+        http_client = get_http_client()
+        provider_factory = get_notification_provider_factory(http_client)
+        service = NotificationService(provider_factory=provider_factory)
         assert service is not None
 
     def test_job_manager_basic_compliance(self):

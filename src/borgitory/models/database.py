@@ -292,16 +292,16 @@ class NotificationConfig(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    provider: Mapped[str] = mapped_column(String, nullable=False)  # "pushover"
+    provider: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # "pushover", "discord", "slack", "email", etc.
 
-    # Pushover-specific fields
-    encrypted_user_key: Mapped[str | None] = mapped_column(String, nullable=True)
-    encrypted_app_token: Mapped[str | None] = mapped_column(String, nullable=True)
+    # JSON configuration field for provider-specific settings
+    provider_config: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )  # JSON field for provider configuration
 
-    # Notification settings
-    notify_on_success: Mapped[bool] = mapped_column(Boolean, default=True)
-    notify_on_failure: Mapped[bool] = mapped_column(Boolean, default=True)
-
+    # Common fields
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC)
@@ -309,23 +309,6 @@ class NotificationConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
-
-    def set_pushover_credentials(self, user_key: str, app_token: str) -> None:
-        """Encrypt and store Pushover credentials"""
-        self.encrypted_user_key = get_cipher_suite().encrypt(user_key.encode()).decode()
-        self.encrypted_app_token = (
-            get_cipher_suite().encrypt(app_token.encode()).decode()
-        )
-
-    def get_pushover_credentials(self) -> tuple[str, str]:
-        """Decrypt and return Pushover credentials"""
-        if not self.encrypted_user_key or not self.encrypted_app_token:
-            raise ValueError("Pushover credentials not set")
-        user_key = get_cipher_suite().decrypt(self.encrypted_user_key.encode()).decode()
-        app_token = (
-            get_cipher_suite().decrypt(self.encrypted_app_token.encode()).decode()
-        )
-        return user_key, app_token
 
 
 class CloudSyncConfig(Base):
@@ -404,23 +387,6 @@ async def init_db() -> None:
             result.fetchone()
             logger.info("Database connection test successful")
 
-            try:
-                result = connection.execute(
-                    text(
-                        "SELECT name FROM sqlite_master WHERE type='table' AND name='jobs';"
-                    )
-                )
-                if not result.fetchone():
-                    logger.info(
-                        "Tables not found, creating them from borgitory.models..."
-                    )
-                    Base.metadata.create_all(bind=engine)
-                    logger.info("Database tables created successfully")
-                else:
-                    logger.info("Database tables already exist")
-            except Exception as e:
-                logger.warning(f"Could not check/create tables: {e}")
-
         try:
             from borgitory.utils.migrations import get_current_revision
 
@@ -428,12 +394,13 @@ async def init_db() -> None:
             logger.info(f"Current database revision: {current_revision}")
         except Exception as e:
             logger.warning(f"Could not check migration status: {e}")
+            logger.error("Make sure migrations have been run with: borgitory migrate")
 
         logger.info("Database initialization completed successfully")
 
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
-        logger.error("Make sure migrations have been run with: alembic upgrade head")
+        logger.error("Make sure migrations have been run with: borgitory migrate")
         raise
 
 

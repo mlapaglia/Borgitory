@@ -6,50 +6,44 @@ from typing import Protocol, Dict, List, Any, Optional
 
 
 class NotificationServiceProtocol(Protocol):
-    """Protocol for notification services (PushoverService, etc.)."""
+    """Protocol for the new provider-based notification service."""
 
     async def send_notification(
         self,
-        user_key: str,
-        app_token: str,
-        title: str,
-        message: str,
-        priority: int = 0,
-        sound: str = "default",
+        config: Any,  # NotificationConfig
+        message: Any,  # NotificationMessage
+    ) -> Any:  # NotificationResult
+        """Send a notification using the provider system."""
+        ...
+
+    async def test_connection(
+        self,
+        config: Any,  # NotificationConfig
     ) -> bool:
-        """Send a notification."""
-        ...
-
-    async def send_notification_with_response(
-        self,
-        user_key: str,
-        app_token: str,
-        title: str,
-        message: str,
-        priority: int = 0,
-        sound: str = "default",
-    ) -> tuple[bool, str]:
-        """Send a notification and return detailed response."""
-        ...
-
-    async def test_pushover_connection(
-        self,
-        user_key: str,
-        app_token: str,
-    ) -> Dict[str, Any]:
         """Test connection to notification service."""
         ...
 
-    async def send_backup_success_notification(
+    def get_connection_info(
         self,
-        user_key: str,
-        app_token: str,
-        repository_name: str,
-        job_type: str,
-        duration: Optional[str] = None,
-        archive_count: Optional[int] = None,
-    ) -> bool:
-        """Send a backup success notification."""
+        config: Any,  # NotificationConfig
+    ) -> str:
+        """Get connection information for display."""
+        ...
+
+    def prepare_config_for_storage(
+        self,
+        provider: str,
+        config: Dict[str, Any],
+    ) -> str:
+        """Prepare configuration for database storage."""
+        ...
+
+    def load_config_from_storage(
+        self,
+        provider: str,
+        stored_config: str,
+    ) -> Dict[str, Any]:
+        """Load configuration from database storage."""
         ...
 
 

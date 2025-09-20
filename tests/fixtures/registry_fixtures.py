@@ -12,6 +12,10 @@ from borgitory.services.cloud_providers.registry_factory import (
     ProviderRegistry,
     RegistryFactory,
 )
+from borgitory.services.notifications.registry_factory import (
+    NotificationRegistryFactory,
+    NotificationProviderRegistry,
+)
 from borgitory.services.jobs.job_manager import JobManagerDependencies
 from borgitory.services.jobs.job_executor import JobExecutor
 
@@ -149,3 +153,60 @@ def job_executor_with_registry() -> tuple[JobExecutor, ProviderRegistry]:
     executor = JobExecutor()
 
     return executor, registry
+
+
+# Notification Registry Fixtures
+
+
+@pytest.fixture
+def clean_notification_registry() -> NotificationProviderRegistry:
+    """
+    Create a fresh, empty notification registry for testing.
+
+    This fixture provides a completely clean registry with no providers registered.
+    Use this when you need to test registry behavior from scratch.
+
+    Returns:
+        NotificationProviderRegistry: Empty registry instance
+    """
+    factory = NotificationRegistryFactory()
+    return factory.create_test_registry([])
+
+
+@pytest.fixture
+def notification_registry() -> NotificationProviderRegistry:
+    """
+    Create a notification registry with all production providers for testing.
+
+    This fixture provides a registry with all available notification providers registered.
+    Use this when you need to test functionality that depends on provider availability.
+
+    Returns:
+        NotificationProviderRegistry: Registry with all providers
+    """
+    factory = NotificationRegistryFactory()
+    return factory.create_production_registry()
+
+
+@pytest.fixture
+def pushover_only_notification_registry() -> NotificationProviderRegistry:
+    """
+    Create a notification registry with only Pushover provider for focused testing.
+
+    Returns:
+        NotificationProviderRegistry: Registry with only Pushover provider
+    """
+    factory = NotificationRegistryFactory()
+    return factory.create_test_registry(["pushover"])
+
+
+@pytest.fixture
+def discord_only_notification_registry() -> NotificationProviderRegistry:
+    """
+    Create a notification registry with only Discord provider for focused testing.
+
+    Returns:
+        NotificationProviderRegistry: Registry with only Discord provider
+    """
+    factory = NotificationRegistryFactory()
+    return factory.create_test_registry(["discord"])

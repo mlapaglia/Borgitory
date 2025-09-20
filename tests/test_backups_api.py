@@ -98,10 +98,18 @@ class TestBackupsAPI:
         test_db.add(cloud_sync_config)
 
         # Create enabled notification config
-        notification_config = NotificationConfig(
-            name="test-notification",
-            enabled=True,
-            provider="pushover",
+        notification_config = NotificationConfig()
+        notification_config.name = "test-notification"
+        notification_config.enabled = True
+        notification_config.provider = "pushover"
+        notification_config.provider_config = (
+            '{"user_key": "'
+            + "u"
+            + "x" * 29
+            + '", "app_token": "'
+            + "a"
+            + "x" * 29
+            + '"}'
         )
         test_db.add(notification_config)
 
@@ -219,20 +227,54 @@ class TestBackupsAPI:
                 ),
                 enabled=False,
             ),
-            # Notification configs
-            NotificationConfig(name="notif-1", enabled=True, provider="pushover"),
-            NotificationConfig(name="notif-2", enabled=False, provider="pushover"),
-            # Repository check configs
-            RepositoryCheckConfig(
-                name="check-1", enabled=True, check_type="full", verify_data=True
-            ),
-            RepositoryCheckConfig(
-                name="check-2",
-                enabled=False,
-                check_type="repository_only",
-                verify_data=False,
-            ),
+            # Notification configs - need to create with proper provider_config
         ]
+
+        # Create notification configs with proper provider_config
+        notif_1 = NotificationConfig()
+        notif_1.name = "notif-1"
+        notif_1.enabled = True
+        notif_1.provider = "pushover"
+        notif_1.provider_config = (
+            '{"user_key": "'
+            + "u"
+            + "x" * 29
+            + '", "app_token": "'
+            + "a"
+            + "x" * 29
+            + '"}'
+        )
+
+        notif_2 = NotificationConfig()
+        notif_2.name = "notif-2"
+        notif_2.enabled = False
+        notif_2.provider = "pushover"
+        notif_2.provider_config = (
+            '{"user_key": "'
+            + "u2"
+            + "x" * 28
+            + '", "app_token": "'
+            + "a2"
+            + "x" * 28
+            + '"}'
+        )
+
+        configs.extend(
+            [
+                notif_1,
+                notif_2,
+                # Repository check configs
+                RepositoryCheckConfig(
+                    name="check-1", enabled=True, check_type="full", verify_data=True
+                ),
+                RepositoryCheckConfig(
+                    name="check-2",
+                    enabled=False,
+                    check_type="repository_only",
+                    verify_data=False,
+                ),
+            ]
+        )
 
         for config in configs:
             test_db.add(config)
@@ -307,8 +349,18 @@ class TestBackupsAPI:
         )
         test_db.add(cloud_sync_config)
 
-        notification_config = NotificationConfig(
-            name="context-notif", enabled=True, provider="pushover"
+        notification_config = NotificationConfig()
+        notification_config.name = "context-notif"
+        notification_config.enabled = True
+        notification_config.provider = "pushover"
+        notification_config.provider_config = (
+            '{"user_key": "'
+            + "u"
+            + "x" * 29
+            + '", "app_token": "'
+            + "a"
+            + "x" * 29
+            + '"}'
         )
         test_db.add(notification_config)
 

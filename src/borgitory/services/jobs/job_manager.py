@@ -46,7 +46,7 @@ from unittest.mock import Mock
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
-    from borgitory.protocols.notification_protocols import NotificationServiceProtocol
+    from borgitory.dependencies import ApplicationScopedNotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,6 @@ class JobManagerDependencies:
     queue_manager: Optional[JobQueueManager] = None
     event_broadcaster: Optional[JobEventBroadcaster] = None
     database_manager: Optional[JobDatabaseManager] = None
-    pushover_service: Optional["NotificationServiceProtocol"] = None
 
     # External dependencies (for testing/customization)
     subprocess_executor: Optional[Callable[..., Any]] = field(
@@ -95,6 +94,8 @@ class JobManagerDependencies:
     encryption_service: Optional[Any] = None
     storage_factory: Optional[Any] = None
     provider_registry: Optional[Any] = None
+    # Use semantic type alias for application-scoped notification service
+    notification_service: Optional["ApplicationScopedNotificationService"] = None
 
     def __post_init__(self) -> None:
         """Initialize default dependencies if not provided"""
@@ -181,6 +182,7 @@ class JobManagerFactory:
             encryption_service=custom_dependencies.encryption_service,
             storage_factory=custom_dependencies.storage_factory,
             provider_registry=custom_dependencies.provider_registry,
+            notification_service=custom_dependencies.notification_service,
         )
 
         # Job Executor
@@ -218,41 +220,8 @@ class JobManagerFactory:
                 keepalive_timeout=config.sse_keepalive_timeout,
             )
 
-        # PushoverService
-        if custom_dependencies.pushover_service:
-            deps.pushover_service = custom_dependencies.pushover_service
-        else:
-            from borgitory.services.notifications.pushover_service import (
-                PushoverService,
-            )
-
-            deps.pushover_service = PushoverService()
-
-        # Cloud Provider Services
-        if not deps.encryption_service:
-            from borgitory.services.cloud_providers.service import EncryptionService
-
-            deps.encryption_service = EncryptionService()
-
-        if not deps.storage_factory:
-            from borgitory.services.cloud_providers.service import StorageFactory
-
-            # Create storage factory with rclone service (create default if needed)
-            rclone_service = deps.rclone_service
-            if not rclone_service:
-                from borgitory.services.rclone_service import RcloneService
-
-                rclone_service = RcloneService()
-                deps.rclone_service = rclone_service
-            deps.storage_factory = StorageFactory(rclone_service)
-
-        # Provider Registry
-        if not deps.provider_registry:
-            from borgitory.services.cloud_providers.registry_factory import (
-                RegistryFactory,
-            )
-
-            deps.provider_registry = RegistryFactory.get_default_registry()
+        # Cloud Provider Services - no longer using fallback logic
+        # All dependencies should be provided explicitly via DI
 
         # Job Database Manager
         if custom_dependencies.database_manager:
@@ -263,6 +232,38 @@ class JobManagerFactory:
             )
 
         return deps
+
+    @classmethod
+    def create_complete_dependencies(
+        cls,
+        config: Optional[JobManagerConfig] = None,
+    ) -> JobManagerDependencies:
+        """Create a complete set of dependencies with all cloud sync services for production use"""
+
+        if config is None:
+            config = JobManagerConfig()
+
+        # Import dependencies from the DI system
+        from borgitory.dependencies import (
+            get_rclone_service,
+            get_encryption_service,
+            get_storage_factory,
+            get_provider_registry,
+        )
+
+        # Create complete dependencies with all cloud sync and notification services
+        # Import singleton dependency functions
+        from borgitory.dependencies import get_notification_service_singleton
+
+        complete_deps = JobManagerDependencies(
+            rclone_service=get_rclone_service(),
+            encryption_service=get_encryption_service(),
+            storage_factory=get_storage_factory(get_rclone_service()),
+            provider_registry=get_provider_registry(),
+            notification_service=get_notification_service_singleton(),
+        )
+
+        return cls.create_dependencies(config=config, custom_dependencies=complete_deps)
 
     @classmethod
     def create_for_testing(
@@ -295,7 +296,7 @@ class JobManagerFactory:
             sse_max_queue_size=10,
         )
 
-        return cls.create_dependencies(config=config)
+        return cls.create_complete_dependencies(config=config)
 
 
 class JobManager:
@@ -311,7 +312,7 @@ class JobManager:
         self.config = config or JobManagerConfig()
 
         if dependencies is None:
-            dependencies = JobManagerFactory.create_dependencies()
+            dependencies = JobManagerFactory.create_complete_dependencies()
 
         self.dependencies = dependencies
 
@@ -320,7 +321,12 @@ class JobManager:
         self.queue_manager = dependencies.queue_manager
         self.event_broadcaster = dependencies.event_broadcaster
         self.database_manager = dependencies.database_manager
-        self.pushover_service = dependencies.pushover_service
+        # Use semantic type alias for application-scoped notification service
+        from borgitory.dependencies import ApplicationScopedNotificationService
+
+        self.notification_service: Optional[ApplicationScopedNotificationService] = (
+            dependencies.notification_service
+        )
 
         self.jobs: Dict[str, BorgJob] = {}
         self._processes: Dict[str, asyncio.subprocess.Process] = {}
@@ -1257,7 +1263,7 @@ class JobManager:
     async def _execute_notification_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
     ) -> bool:
-        """Execute a notification task"""
+        """Execute a notification task using the new provider-based system"""
         params = task.parameters
 
         notification_config_id = params.get("notification_config_id") or params.get(
@@ -1275,6 +1281,12 @@ class JobManager:
         try:
             with get_db_session() as db:
                 from borgitory.models.database import NotificationConfig
+                from borgitory.services.notifications.types import (
+                    NotificationMessage,
+                    NotificationType,
+                    NotificationPriority,
+                    NotificationConfig as NotificationConfigType,
+                )
 
                 config = (
                     db.query(NotificationConfig)
@@ -1294,75 +1306,107 @@ class JobManager:
                     task.return_code = 0
                     return True
 
-                if config.provider == "pushover":
-                    user_key, app_token = config.get_pushover_credentials()
-
-                    title = params.get("title", "Borgitory Notification")
-                    message = params.get("message", "Job completed")
-                    priority = params.get("priority", 0)
-
-                    task.output_lines.append(
-                        f"Sending Pushover notification to {config.name}"
-                    )
-                    task.output_lines.append(f"Title: {title}")
-                    task.output_lines.append(f"Message: {message}")
-                    task.output_lines.append(f"Priority: {priority}")
-
-                    self.safe_event_broadcaster.broadcast_event(
-                        EventType.JOB_OUTPUT,
-                        job_id=job.id,
-                        data={
-                            "line": f"Sending Pushover notification to {config.name}",
-                            "task_index": task_index,
-                        },
-                    )
-
-                    if self.pushover_service:
-                        (
-                            success,
-                            response_message,
-                        ) = await self.pushover_service.send_notification_with_response(
-                            user_key=user_key,
-                            app_token=app_token,
-                            title=title,
-                            message=message,
-                            priority=priority,
-                        )
-                    else:
-                        success = False
-                        response_message = "PushoverService not available"
-
-                    if success:
-                        result_message = "✓ Notification sent successfully"
-                        task.output_lines.append(result_message)
-                        if response_message:
-                            task.output_lines.append(f"Response: {response_message}")
-                    else:
-                        result_message = (
-                            f"✗ Failed to send notification: {response_message}"
-                        )
-                        task.output_lines.append(result_message)
-
-                    self.safe_event_broadcaster.broadcast_event(
-                        EventType.JOB_OUTPUT,
-                        job_id=job.id,
-                        data={"line": result_message, "task_index": task_index},
-                    )
-
-                    task.status = "completed" if success else "failed"
-                    task.return_code = 0 if success else 1
-                    if not success:
-                        task.error = (
-                            response_message or "Failed to send Pushover notification"
-                        )
-                    return success
-                else:
-                    logger.warning(
-                        f"Unsupported notification provider: {config.provider}"
+                # Use injected notification service
+                if self.notification_service is None:
+                    logger.error(
+                        "NotificationService not available - ensure proper DI setup"
                     )
                     task.status = "failed"
-                    task.error = f"Unsupported provider: {config.provider}"
+                    task.return_code = 1
+                    task.error = "NotificationService not available"
                     return False
+
+                notification_service = self.notification_service
+
+                # Load and decrypt configuration
+                try:
+                    decrypted_config = notification_service.load_config_from_storage(
+                        config.provider, config.provider_config
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to load notification config: {e}")
+                    task.status = "failed"
+                    task.return_code = 1
+                    task.error = f"Failed to load configuration: {str(e)}"
+                    return False
+
+                # Create notification config object
+                notification_config = NotificationConfigType(
+                    provider=config.provider,
+                    config=decrypted_config,
+                    name=config.name,
+                    enabled=config.enabled,
+                )
+
+                # Extract message details from task parameters
+                title = params.get("title", "Borgitory Notification")
+                message = params.get("message", "Job completed")
+                notification_type_str = params.get("type", "info")
+                priority_value = params.get("priority", 0)
+
+                # Convert to proper types
+                try:
+                    notification_type = NotificationType(notification_type_str.lower())
+                except ValueError:
+                    notification_type = NotificationType.INFO
+
+                try:
+                    priority = NotificationPriority(priority_value)
+                except ValueError:
+                    priority = NotificationPriority.NORMAL
+
+                # Create notification message
+                notification_message = NotificationMessage(
+                    title=title,
+                    message=message,
+                    notification_type=notification_type,
+                    priority=priority,
+                )
+
+                # Log what we're doing
+                task.output_lines.append(
+                    f"Sending {config.provider} notification to {config.name}"
+                )
+                task.output_lines.append(f"Title: {title}")
+                task.output_lines.append(f"Message: {message}")
+                task.output_lines.append(f"Type: {notification_type.value}")
+                task.output_lines.append(f"Priority: {priority.value}")
+
+                self.safe_event_broadcaster.broadcast_event(
+                    EventType.JOB_OUTPUT,
+                    job_id=job.id,
+                    data={
+                        "line": f"Sending {config.provider} notification to {config.name}",
+                        "task_index": task_index,
+                    },
+                )
+
+                # Send the notification
+                result = await notification_service.send_notification(
+                    notification_config, notification_message
+                )
+
+                if result.success:
+                    result_message = "✓ Notification sent successfully"
+                    task.output_lines.append(result_message)
+                    if result.message:
+                        task.output_lines.append(f"Response: {result.message}")
+                else:
+                    result_message = f"✗ Failed to send notification: {result.error or result.message}"
+                    task.output_lines.append(result_message)
+
+                self.safe_event_broadcaster.broadcast_event(
+                    EventType.JOB_OUTPUT,
+                    job_id=job.id,
+                    data={"line": result_message, "task_index": task_index},
+                )
+
+                task.status = "completed" if result.success else "failed"
+                task.return_code = 0 if result.success else 1
+                if not result.success:
+                    task.error = result.error or "Failed to send notification"
+
+                return result.success
 
         except Exception as e:
             logger.error(f"Error executing notification task: {e}")
@@ -1842,7 +1886,7 @@ def create_job_manager(
 
 def get_default_job_manager_dependencies() -> JobManagerDependencies:
     """Get default job manager dependencies (production configuration)"""
-    return JobManagerFactory.create_dependencies()
+    return JobManagerFactory.create_complete_dependencies()
 
 
 def get_test_job_manager_dependencies(

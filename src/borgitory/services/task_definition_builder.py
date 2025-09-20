@@ -261,8 +261,6 @@ class TaskDefinitionBuilder:
             "type": "notification",
             "name": f"Send notification for {repository_name}",
             "provider": notification_config.provider,
-            "notify_on_success": notification_config.notify_on_success,
-            "notify_on_failure": notification_config.notify_on_failure,
             "config_id": notification_config_id,
         }
 

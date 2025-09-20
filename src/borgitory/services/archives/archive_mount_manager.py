@@ -370,6 +370,3 @@ class ArchiveMountManager:
                 for info in self.active_mounts.values()
             ],
         }
-
-
-# Global instance removed - use dependency injection via dependencies.py

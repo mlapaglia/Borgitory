@@ -134,7 +134,7 @@ class TestJobRenderService:
         service._format_database_job_for_render(job_without_tasks)
 
     def test_dependency_injection_service(self) -> None:
-        """Test that dependency injection service works with pure FastAPI DI"""
+        """Test that dependency injection service works with FastAPI DI"""
         from borgitory.dependencies import get_job_render_service
         from borgitory.main import app
         from tests.utils.di_testing import override_dependency
@@ -150,7 +150,7 @@ class TestJobRenderService:
             # For now, just verify the override works
             assert get_job_render_service in app.dependency_overrides
 
-        # Test that pure DI creates new instances (no longer singleton)
+        # Test that DI creates new instances (no longer singleton)
         sig = inspect.signature(get_job_render_service)
         assert "job_manager" in sig.parameters
 

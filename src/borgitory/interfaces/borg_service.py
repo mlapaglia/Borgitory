@@ -33,14 +33,12 @@ class BorgService(Protocol):
     ) -> str:
         """
         Create a backup and return job_id for tracking.
-
         Args:
             repository: Repository object
             source_path: Path to backup
             compression: Compression algorithm
             dry_run: Whether to perform dry run
             cloud_sync_config_id: Optional cloud sync config
-
         Returns:
             Job ID for tracking backup progress
         """
@@ -90,12 +88,10 @@ class BorgService(Protocol):
     ) -> StreamingResponse:
         """
         Extract a single file from an archive and stream it.
-
         Args:
             repository: Repository object
             archive_name: Name of the archive
             file_path: Path to the file within the archive
-
         Returns:
             StreamingResponse with file content
         """
@@ -106,12 +102,10 @@ class BorgService(Protocol):
     ) -> bool:
         """
         Verify we can access a repository with given credentials.
-
         Args:
             repo_path: Path to repository
             passphrase: Repository passphrase
             keyfile_path: Path to keyfile if needed
-
         Returns:
             True if access successful, False otherwise
         """

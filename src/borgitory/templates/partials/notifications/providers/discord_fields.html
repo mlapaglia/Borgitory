@@ -1,0 +1,37 @@
+<!-- Discord Provider Fields -->
+<div class="space-y-4">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Discord Webhook URL</label>
+        <input type="text" name="webhook_url" required placeholder="https://discord.com/api/webhooks/..." class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Create a webhook in your Discord server: Server Settings → Integrations → Webhooks → New Webhook
+        </p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bot Username</label>
+        <input type="text" name="username" placeholder="Borgitory" class="input-modern mt-1" value="Borgitory">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Name that will appear as the sender of messages</p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bot Avatar URL (Optional)</label>
+        <input type="url" name="avatar_url" placeholder="https://example.com/avatar.png" class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">URL to an image to use as the bot's avatar</p>
+    </div>
+
+    <div class="flex space-x-2">
+        <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+            {{ submit_button_text or "Add Discord Notification" }}
+        </button>
+        <button type="button" 
+                hx-post="/api/notifications/test-config"
+                hx-include="closest form"
+                hx-target="#notification-test-status"
+                class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+            Test Webhook
+        </button>
+    </div>
+    
+    <div id="notification-test-status" class="mt-2"></div>
+</div>

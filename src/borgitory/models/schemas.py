@@ -42,10 +42,7 @@ class CompressionType(str, Enum):
     ZSTD = "zstd"
 
 
-class NotificationProvider(str, Enum):
-    PUSHOVER = "pushover"
-    EMAIL = "email"
-    SLACK = "slack"
+# NotificationProvider enum removed - using flexible string field instead
 
 
 class RepositoryBase(BaseModel):
@@ -353,22 +350,22 @@ class NotificationConfigBase(BaseModel):
     name: str = Field(
         min_length=1, max_length=128, description="Notification configuration name"
     )
-    provider: NotificationProvider = NotificationProvider.PUSHOVER
-    notify_on_success: bool = True
-    notify_on_failure: bool = True
+    provider: str = Field(
+        description="Notification provider (pushover, discord, slack, email, etc.)"
+    )
+    provider_config: Dict[str, Any] = Field(
+        default_factory=dict, description="Provider-specific configuration"
+    )
 
 
 class NotificationConfigCreate(NotificationConfigBase):
-    user_key: str
-    app_token: str
+    pass
 
 
 class NotificationConfigUpdate(BaseModel):
     name: Optional[str] = None
-    user_key: Optional[str] = None
-    app_token: Optional[str] = None
-    notify_on_success: Optional[bool] = None
-    notify_on_failure: Optional[bool] = None
+    provider: Optional[str] = None
+    provider_config: Optional[Dict[str, Any]] = None
     enabled: Optional[bool] = None
 
 

@@ -5,9 +5,20 @@ This module provides the high-level service interface for cloud sync operations,
 including configuration validation, storage creation, and encryption handling.
 """
 
+import inspect
 import json
 import logging
-from typing import Dict, Any, Callable, Optional, cast
+from typing import (
+    Dict,
+    Any,
+    Callable,
+    Optional,
+    cast,
+    get_type_hints,
+    Union,
+    get_origin,
+    get_args,
+)
 
 from borgitory.services.rclone_service import RcloneService
 
@@ -48,21 +59,24 @@ class ConfigValidator:
 
 
 class StorageFactory:
-    """Factory for creating cloud storage instances"""
+    """Factory for creating cloud storage instances with automatic dependency injection"""
 
-    def __init__(self, rclone_service: RcloneService) -> None:
+    def __init__(self, rclone_service: Optional[RcloneService] = None) -> None:
         """
-        Initialize storage factory.
+        Initialize storage factory with available dependencies.
 
         Args:
-            rclone_service: Rclone service for I/O operations
+            rclone_service: Rclone service for I/O operations (optional for DI)
         """
-        self._rclone_service = rclone_service
         self._validator = ConfigValidator()
+        self._dependencies = {
+            "rclone_service": rclone_service,
+            # Add more injectable dependencies here as needed
+        }
 
     def create_storage(self, provider: str, config: Dict[str, Any]) -> CloudStorage:
         """
-        Create a cloud storage instance.
+        Create a cloud storage instance with automatic dependency injection.
 
         Args:
             provider: Provider name (e.g., s3, sftp, smb)
@@ -84,8 +98,112 @@ class StorageFactory:
                 f"Supported providers: {', '.join(sorted(supported))}"
             )
 
-        storage_instance = storage_class(validated_config, self._rclone_service)
-        return cast(CloudStorage, storage_instance)
+        # Create storage instance with automatic dependency injection
+        return self._create_storage_with_dependencies(storage_class, validated_config)
+
+    def _create_storage_with_dependencies(
+        self, storage_class: Any, validated_config: Any
+    ) -> CloudStorage:
+        """
+        Automatically inject dependencies based on constructor signature.
+
+        Uses inspection to determine what dependencies the storage provider needs
+        and injects available ones, with type checking support.
+
+        **DI CHECK**: Following the exact same pattern as NotificationProviderFactory
+        """
+        try:
+            # Get constructor signature
+            sig = inspect.signature(storage_class.__init__)
+
+            # Get type hints for additional validation
+            try:
+                type_hints = get_type_hints(storage_class.__init__)
+            except (NameError, AttributeError):
+                # Some storage providers might not have complete type hints
+                type_hints = {}
+
+            # Build kwargs with available dependencies
+            kwargs: Dict[str, Any] = {"config": validated_config}  # Always pass config
+
+            for param_name, param in sig.parameters.items():
+                if param_name in ["self", "config"]:
+                    continue
+
+                # Check if we have this dependency available
+                if (
+                    param_name in self._dependencies
+                    and self._dependencies[param_name] is not None
+                ):
+                    dependency_value = self._dependencies[param_name]
+
+                    # Optional: Type checking if type hints are available
+                    if param_name in type_hints:
+                        expected_type = type_hints[param_name]
+
+                        # Handle Optional types (Union[SomeType, None])
+                        origin = get_origin(expected_type)
+                        if origin is Union:
+                            args = get_args(expected_type)
+                            # Check if this is Optional[T] (Union[T, None])
+                            if len(args) == 2 and type(None) in args:
+                                # Extract the non-None type
+                                expected_type = (
+                                    args[0] if args[1] is type(None) else args[1]
+                                )
+
+                        # Basic type validation (can be enhanced)
+                        try:
+                            if not isinstance(dependency_value, expected_type):
+                                logger.warning(
+                                    f"Type mismatch for {param_name}: expected {expected_type}, "
+                                    f"got {type(dependency_value)}. Injecting anyway."
+                                )
+                        except TypeError:
+                            # Some types might not work with isinstance (e.g., generics)
+                            logger.debug(
+                                f"Cannot validate type for {param_name}, injecting anyway"
+                            )
+
+                    kwargs[param_name] = dependency_value
+                    logger.debug(
+                        f"Injecting {param_name} into {storage_class.__name__}"
+                    )
+
+                elif param.default is not param.empty:
+                    # Parameter has default value, skip injection
+                    logger.debug(f"Skipping {param_name} (has default value)")
+                    continue
+                else:
+                    # Required parameter we don't have
+                    logger.warning(
+                        f"Required parameter '{param_name}' for {storage_class.__name__} "
+                        f"not available in dependencies"
+                    )
+
+            return cast(CloudStorage, storage_class(**kwargs))
+
+        except Exception as e:
+            logger.error(
+                f"Failed to create storage {storage_class.__name__} with DI: {e}"
+            )
+            # Fallback to basic instantiation (backward compatibility)
+            try:
+                # Try the old way as fallback
+                rclone_service = self._dependencies.get("rclone_service")
+                if rclone_service is not None:
+                    return cast(
+                        CloudStorage, storage_class(validated_config, rclone_service)
+                    )
+                else:
+                    raise ValueError(
+                        "RcloneService dependency not available for fallback"
+                    )
+            except Exception as fallback_error:
+                logger.error(f"Fallback creation also failed: {fallback_error}")
+                raise ValueError(
+                    f"Could not create storage {storage_class.__name__}: {e}"
+                ) from e
 
     def get_supported_providers(self) -> list[str]:
         """Get list of supported provider names."""

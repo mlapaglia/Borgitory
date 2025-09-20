@@ -19,12 +19,10 @@ class StorageService(Protocol):
     ) -> SyncResult:
         """
         Execute a cloud sync operation.
-
         Args:
             config: Cloud sync configuration
             repository_path: Path to the repository to sync
             output_callback: Optional callback for real-time output
-
         Returns:
             SyncResult indicating success/failure and details
         """
