@@ -67,6 +67,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     borgbackup=${BORGBACKUP_VERSION} \
     fuse3=${FUSE3_VERSION} \
     python3-pyfuse3=3.4.0-3+b3 \
+    curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir -p /app/data
@@ -82,6 +83,8 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src
+
+HEALTHCHECK --interval=1m --timeout=10s --start-period=1m --retries=3 CMD curl -f http://localhost:8000 || exit 1
 
 EXPOSE 8000
 
