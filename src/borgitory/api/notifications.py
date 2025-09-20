@@ -84,7 +84,7 @@ async def get_provider_fields(
     except Exception as e:
         logger.error(f"Error rendering provider template {template_path}: {e}")
         return HTMLResponse(
-            f'<div class="text-red-500">Error loading provider fields: {str(e)}</div>'
+            '<div class="text-red-500">An error occurred while loading provider fields.</div>'
         )
 
 
