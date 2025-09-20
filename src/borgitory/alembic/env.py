@@ -39,9 +39,18 @@ target_metadata = Base.metadata
 def get_database_url() -> str:
     """Get database URL, preferring environment variable over config."""
     # For local development, use local-data path if the file exists
-    local_db_path = "local-data/borgitory.db"
-    if os.path.exists(local_db_path):
-        return f"sqlite:///{local_db_path}"
+    # Check multiple possible locations for the database
+    possible_paths = [
+        "local-data/borgitory.db",  # From project root
+        "../../local-data/borgitory.db",  # From src/borgitory/
+        os.path.join(os.getcwd(), "local-data", "borgitory.db"),  # Absolute from cwd
+    ]
+    
+    for local_db_path in possible_paths:
+        if os.path.exists(local_db_path):
+            # Convert to absolute path for consistency
+            abs_path = os.path.abspath(local_db_path)
+            return f"sqlite:///{abs_path}"
 
     # Otherwise use environment variable or default config
     return os.getenv("DATABASE_URL", DATABASE_URL)

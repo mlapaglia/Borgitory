@@ -387,23 +387,6 @@ async def init_db() -> None:
             result.fetchone()
             logger.info("Database connection test successful")
 
-            try:
-                result = connection.execute(
-                    text(
-                        "SELECT name FROM sqlite_master WHERE type='table' AND name='jobs';"
-                    )
-                )
-                if not result.fetchone():
-                    logger.info(
-                        "Tables not found, creating them from borgitory.models..."
-                    )
-                    Base.metadata.create_all(bind=engine)
-                    logger.info("Database tables created successfully")
-                else:
-                    logger.info("Database tables already exist")
-            except Exception as e:
-                logger.warning(f"Could not check/create tables: {e}")
-
         try:
             from borgitory.utils.migrations import get_current_revision
 
@@ -411,12 +394,13 @@ async def init_db() -> None:
             logger.info(f"Current database revision: {current_revision}")
         except Exception as e:
             logger.warning(f"Could not check migration status: {e}")
+            logger.error("Make sure migrations have been run with: borgitory migrate")
 
         logger.info("Database initialization completed successfully")
 
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
-        logger.error("Make sure migrations have been run with: alembic upgrade head")
+        logger.error("Make sure migrations have been run with: borgitory migrate")
         raise
 
 
