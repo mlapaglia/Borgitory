@@ -35,15 +35,15 @@ def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]
     template_path = f"partials/notifications/providers/{provider}_fields{suffix}.html"
     full_path = f"src/borgitory/templates/{template_path}"
 
-    # Ensure normalized full_path remains inside templates using commonpath
-    base_templates_dir = os.path.abspath(
+    # Ensure fully resolved full_path remains inside the intended provider templates dir
+    base_templates_dir = os.path.realpath(
         os.path.normpath("src/borgitory/templates/partials/notifications/providers/")
     )
-    normalized_path = os.path.abspath(os.path.normpath(full_path))
-    if os.path.commonpath([base_templates_dir, normalized_path]) != base_templates_dir:
+    real_full_path = os.path.realpath(os.path.normpath(full_path))
+    if not real_full_path.startswith(base_templates_dir + os.sep):
         return None
 
-    if os.path.exists(full_path):
+    if os.path.exists(real_full_path):
         return template_path
 
     return None
