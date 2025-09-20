@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict
 from fastapi.responses import StreamingResponse
 
 from borgitory.protocols import JobManagerProtocol
@@ -210,7 +210,7 @@ class JobStreamService:
                     async for output_event in self.job_manager.stream_job_output(
                         job_id
                     ):
-                        # output_event is Dict[str, Any] from stream_job_output method
+                        # output_event is Dict[str, object] from stream_job_output method
                         logger.debug(f"Job {job_id} received event: {output_event}")
 
                         if output_event.get("type") == "output":
@@ -379,12 +379,12 @@ class JobStreamService:
             error_msg = f"Streaming error for job {job_id}, task {task_order}: {str(e)}"
             yield f"event: error\ndata: {error_msg}\n\n"
 
-    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_status(self, job_id: str) -> Dict[str, object]:
         """Get current job status and progress for streaming"""
         output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
         return output
 
-    def get_current_jobs_data(self) -> list[Dict[str, Any]]:
+    def get_current_jobs_data(self) -> list[Dict[str, object]]:
         """Get current running jobs data for rendering"""
         current_jobs = []
 

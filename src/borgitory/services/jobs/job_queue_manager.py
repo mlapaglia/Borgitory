@@ -4,7 +4,7 @@ Job Queue Manager - Handles job queuing and concurrency control
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
@@ -29,7 +29,7 @@ class QueuedJob:
     job_type: str
     priority: JobPriority = JobPriority.NORMAL
     queued_at: Optional[datetime] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, object]] = None
 
     def __post_init__(self) -> None:
         if self.queued_at is None:
@@ -145,7 +145,7 @@ class JobQueueManager:
         job_id: str,
         job_type: str,
         priority: JobPriority = JobPriority.NORMAL,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, object]] = None,
     ) -> bool:
         """Add a job to the appropriate queue"""
         await self.initialize()
@@ -353,7 +353,7 @@ class JobQueueManager:
             },
         )
 
-    def get_running_jobs(self) -> List[Dict[str, Any]]:
+    def get_running_jobs(self) -> List[Dict[str, object]]:
         """Get list of currently running jobs"""
         return [
             {

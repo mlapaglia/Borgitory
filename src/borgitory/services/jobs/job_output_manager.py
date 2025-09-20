@@ -5,7 +5,7 @@ Job Output Manager - Handles job output collection, storage, and streaming
 import asyncio
 import logging
 from collections import deque
-from typing import Dict, List, Optional, AsyncGenerator, Any
+from typing import Dict, List, Optional, AsyncGenerator
 from datetime import datetime
 from dataclasses import dataclass, field
 
@@ -19,9 +19,9 @@ class OutputLine:
     text: str
     timestamp: str
     type: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, object] = field(default_factory=dict)
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: object = None) -> object:
         """Dict-like access for backward compatibility"""
         if key == "text":
             return self.text
@@ -35,7 +35,7 @@ class OutputLine:
             return self.metadata[key]
         return default
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, key: str) -> object:
         """Dict-like access for backward compatibility"""
         result = self.get(key)
         if result is None and key not in ["text", "timestamp", "type", "metadata"]:
@@ -52,7 +52,7 @@ class JobOutput:
 
     job_id: str
     lines: deque[OutputLine] = field(default_factory=deque)
-    current_progress: Dict[str, Any] = field(default_factory=dict)
+    current_progress: Dict[str, object] = field(default_factory=dict)
     total_lines: int = 0
     max_lines: int = 1000
 
@@ -86,7 +86,7 @@ class JobOutputManager:
         job_id: str,
         text: str,
         line_type: str = "stdout",
-        progress_info: Optional[Dict[str, Any]] = None,
+        progress_info: Optional[Dict[str, object]] = None,
     ) -> None:
         """Add a line of output to a job"""
         if job_id not in self._job_outputs:
@@ -114,7 +114,7 @@ class JobOutputManager:
         """Get output container for a job"""
         return self._job_outputs.get(job_id)
 
-    async def get_job_output_stream(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_output_stream(self, job_id: str) -> Dict[str, object]:
         """Get formatted output data for API responses"""
         job_output = self.get_job_output(job_id)
         if not job_output:
@@ -129,7 +129,7 @@ class JobOutputManager:
 
     async def stream_job_output(
         self, job_id: str, follow: bool = True
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[Dict[str, object], None]:
         """Stream job output in real-time"""
         job_output = self.get_job_output(job_id)
         if not job_output:
@@ -155,7 +155,7 @@ class JobOutputManager:
             # Small delay to prevent busy waiting
             await asyncio.sleep(0.1)
 
-    def get_output_summary(self, job_id: str) -> Dict[str, Any]:
+    def get_output_summary(self, job_id: str) -> Dict[str, object]:
         """Get summary of job output"""
         job_output = self.get_job_output(job_id)
         if not job_output:
@@ -180,7 +180,7 @@ class JobOutputManager:
         logger.debug(f"Cleared output for job {job_id}")
         return True
 
-    def get_all_job_outputs(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_job_outputs(self) -> Dict[str, Dict[str, object]]:
         """Get summary of all job outputs"""
         return {job_id: self.get_output_summary(job_id) for job_id in self._job_outputs}
 
@@ -206,7 +206,7 @@ class JobOutputManager:
         if max_lines:
             lines = lines[-max_lines:]
 
-        return [line["text"] for line in lines]
+        return [str(line["text"]) for line in lines]
 
     def cleanup_old_outputs(self, max_age_seconds: int = 3600) -> int:
         """Clean up old job outputs"""
@@ -222,7 +222,8 @@ class JobOutputManager:
             # Check age of most recent line
             try:
                 last_line = list(job_output.lines)[-1]
-                last_timestamp = datetime.fromisoformat(last_line["timestamp"])
+                timestamp_str = str(last_line["timestamp"])
+                last_timestamp = datetime.fromisoformat(timestamp_str)
                 age_seconds = (current_time - last_timestamp).total_seconds()
 
                 if age_seconds > max_age_seconds:

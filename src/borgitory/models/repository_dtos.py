@@ -3,7 +3,7 @@ Data Transfer Objects for Repository operations.
 Clean data structures for business logic layer.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Union
 from dataclasses import dataclass
 from fastapi import UploadFile
 
@@ -68,7 +68,7 @@ class ArchiveInfo:
     time: str
     formatted_time: Optional[str] = None
     size_info: Optional[str] = None
-    stats: Optional[Dict[str, Any]] = None
+    stats: Optional[Dict[str, Union[str, int, float, bool, None]]] = None
 
 
 @dataclass
@@ -186,7 +186,7 @@ class RepositoryInfoResult:
 
     success: bool
     repository_id: int
-    info: Optional[Dict[str, Any]] = None
+    info: Optional[Dict[str, Union[str, int, float, bool, None]]] = None
     error_message: Optional[str] = None
 
 

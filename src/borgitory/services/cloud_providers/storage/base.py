@@ -6,7 +6,7 @@ must implement, ensuring consistency across different providers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Dict, Optional
 from pydantic import BaseModel, ConfigDict
 
 from ..types import SyncEvent, ConnectionInfo
@@ -84,7 +84,7 @@ class CloudStorage(ABC):
         pass
 
     @abstractmethod
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """
         Get provider-specific display details for the UI.
 

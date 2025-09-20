@@ -6,7 +6,7 @@ from business logic and easy testability.
 """
 
 import re
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Dict, Optional
 from pydantic import Field, field_validator
 
 from borgitory.services.rclone_service import RcloneService
@@ -149,8 +149,8 @@ class S3Storage(CloudStorage):
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
-                            message=progress.get("message", "Uploading..."),
-                            progress=progress.get("percentage", 0.0),
+                            message=str(progress.get("message", "Uploading...")),
+                            progress=float(progress.get("percentage", 0.0) or 0.0),
                         )
                     )
 
@@ -203,7 +203,7 @@ class S3Storage(CloudStorage):
         """S3 sensitive fields"""
         return ["access_key", "secret_key"]
 
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """Get S3-specific display details for the UI"""
         bucket_name = config_dict.get("bucket_name", "Unknown")
         region = config_dict.get("region", "us-east-1")

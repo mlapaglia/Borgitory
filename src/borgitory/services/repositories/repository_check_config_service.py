@@ -4,7 +4,7 @@ Handles all repository check configuration-related business operations independe
 """
 
 import logging
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Union, Tuple
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import RepositoryCheckConfig, Repository
@@ -103,7 +103,7 @@ class RepositoryCheckConfigService:
             return False, None, f"Failed to create check policy: {str(e)}"
 
     def update_config(
-        self, config_id: int, update_data: Dict[str, Any]
+        self, config_id: int, update_data: Dict[str, Union[str, int, bool, None]]
     ) -> Tuple[bool, Optional[RepositoryCheckConfig], Optional[str]]:
         """
         Update an existing repository check configuration.
@@ -213,7 +213,9 @@ class RepositoryCheckConfigService:
             self.db.rollback()
             return False, None, f"Failed to delete check policy: {str(e)}"
 
-    def get_form_data(self) -> Dict[str, Any]:
+    def get_form_data(
+        self,
+    ) -> Dict[str, List[Union[Repository, RepositoryCheckConfig]]]:
         """Get data needed for repository check form."""
         try:
             repositories = self.db.query(Repository).all()

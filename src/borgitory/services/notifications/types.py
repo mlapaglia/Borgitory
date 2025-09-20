@@ -3,7 +3,7 @@ Type definitions for notification system.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 from enum import Enum
 
 
@@ -35,7 +35,7 @@ class NotificationMessage:
     message: str
     notification_type: NotificationType = NotificationType.INFO
     priority: NotificationPriority = NotificationPriority.NORMAL
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, object]] = None
 
     def __post_init__(self) -> None:
         if self.metadata is None:
@@ -50,7 +50,7 @@ class NotificationResult:
     provider: str
     message: str
     error: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, object]] = None
 
     def __post_init__(self) -> None:
         if self.metadata is None:
@@ -64,7 +64,7 @@ class ConnectionInfo:
     provider: str
     endpoint: str
     status: str = "unknown"
-    additional_info: Optional[Dict[str, Any]] = None
+    additional_info: Optional[Dict[str, object]] = None
 
     def __post_init__(self) -> None:
         if self.additional_info is None:
@@ -80,7 +80,7 @@ class NotificationConfig:
     """Configuration for a notification provider"""
 
     provider: str
-    config: Dict[str, Any]
+    config: Dict[str, object]
     name: str = ""
     enabled: bool = True
 

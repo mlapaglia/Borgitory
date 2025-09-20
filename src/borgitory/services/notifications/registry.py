@@ -7,7 +7,7 @@ hardcoded if/elif chains.
 """
 
 import logging
-from typing import Dict, Type, Any, List, Optional, Callable
+from typing import Dict, Type, List, Optional, Callable
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class NotificationProviderMetadata:
     supports_attachments: bool = False
     supports_formatting: bool = False
     requires_credentials: bool = True
-    additional_info: Optional[Dict[str, Any]] = None
+    additional_info: Optional[Dict[str, object]] = None
 
     def __post_init__(self) -> None:
         if self.additional_info is None:
@@ -40,15 +40,15 @@ class NotificationProviderRegistry:
     """
 
     def __init__(self) -> None:
-        self._config_classes: Dict[str, Type[Any]] = {}
-        self._provider_classes: Dict[str, Type[Any]] = {}
+        self._config_classes: Dict[str, Type[object]] = {}
+        self._provider_classes: Dict[str, Type[object]] = {}
         self._metadata: Dict[str, NotificationProviderMetadata] = {}
 
     def register_provider(
         self,
         name: str,
-        config_class: Type[Any],
-        provider_class: Type[Any],
+        config_class: Type[object],
+        provider_class: Type[object],
         metadata: NotificationProviderMetadata,
     ) -> None:
         """
@@ -69,11 +69,11 @@ class NotificationProviderRegistry:
 
         logger.debug(f"Registered notification provider: {name}")
 
-    def get_config_class(self, provider: str) -> Optional[Type[Any]]:
+    def get_config_class(self, provider: str) -> Optional[Type[object]]:
         """Get the configuration class for a provider."""
         return self._config_classes.get(provider)
 
-    def get_provider_class(self, provider: str) -> Optional[Type[Any]]:
+    def get_provider_class(self, provider: str) -> Optional[Type[object]]:
         """Get the provider class for a provider."""
         return self._provider_classes.get(provider)
 
@@ -85,7 +85,7 @@ class NotificationProviderRegistry:
         """Get list of all registered provider names."""
         return list(self._config_classes.keys())
 
-    def get_provider_info(self, provider: str) -> Optional[Dict[str, Any]]:
+    def get_provider_info(self, provider: str) -> Optional[Dict[str, object]]:
         """
         Get complete provider information including metadata.
 
@@ -113,7 +113,7 @@ class NotificationProviderRegistry:
             "additional_info": metadata.additional_info if metadata else {},
         }
 
-    def get_all_provider_info(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_provider_info(self) -> Dict[str, Dict[str, object]]:
         """Get information for all registered providers."""
         return {
             provider: info
@@ -156,8 +156,8 @@ def register_provider(
     supports_attachments: bool = False,
     supports_formatting: bool = False,
     requires_credentials: bool = True,
-    **metadata_kwargs: Any,
-) -> Callable[[Type[Any]], Type[Any]]:
+    **metadata_kwargs: object,
+) -> Callable[[Type[object]], Type[object]]:
     """
     Decorator to register a notification provider.
 
@@ -183,7 +183,7 @@ def register_provider(
         **metadata_kwargs: Additional metadata
     """
 
-    def decorator(provider_class: Type[Any]) -> Type[Any]:
+    def decorator(provider_class: Type[object]) -> Type[object]:
         # Extract config class from the provider class
         if not hasattr(provider_class, "config_class"):
             raise ValueError(
@@ -216,12 +216,12 @@ def register_provider(
 
 
 # Convenience functions that use the global registry
-def get_config_class(provider: str) -> Optional[Type[Any]]:
+def get_config_class(provider: str) -> Optional[Type[object]]:
     """Get the configuration class for a provider."""
     return _registry.get_config_class(provider)
 
 
-def get_provider_class(provider: str) -> Optional[Type[Any]]:
+def get_provider_class(provider: str) -> Optional[Type[object]]:
     """Get the provider class for a provider."""
     return _registry.get_provider_class(provider)
 
@@ -236,12 +236,12 @@ def get_supported_providers() -> List[str]:
     return _registry.get_supported_providers()
 
 
-def get_provider_info(provider: str) -> Optional[Dict[str, Any]]:
+def get_provider_info(provider: str) -> Optional[Dict[str, object]]:
     """Get complete provider information including metadata."""
     return _registry.get_provider_info(provider)
 
 
-def get_all_provider_info() -> Dict[str, Dict[str, Any]]:
+def get_all_provider_info() -> Dict[str, Dict[str, object]]:
     """Get information for all registered providers."""
     return _registry.get_all_provider_info()
 
@@ -259,7 +259,7 @@ def is_provider_registered(provider: str) -> bool:
     return _registry.is_provider_registered(provider)
 
 
-def validate_provider_config(provider: str, config_dict: Dict[str, Any]) -> None:
+def validate_provider_config(provider: str, config_dict: Dict[str, object]) -> None:
     """
     Validate provider configuration using the registered config class.
 

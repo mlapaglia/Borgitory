@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Callable, Optional
+from typing import Dict, List, Callable, Optional, Any
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository
@@ -22,14 +22,14 @@ class CommandExecutorInterface(ABC):
     @abstractmethod
     async def execute_borg_info(
         self, repository: Repository, archive_name: str
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Execute borg info command to get archive details"""
         pass
 
     @abstractmethod
     async def execute_borg_list_files(
         self, repository: Repository, archive_name: str
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, object]]:
         """Execute borg list command to get file details from an archive"""
         pass
 
@@ -69,7 +69,7 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
 
     async def execute_borg_info(
         self, repository: Repository, archive_name: str
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Execute borg info command to get archive details"""
         try:
             command, env = build_secure_borg_command(
@@ -113,7 +113,7 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
 
     async def execute_borg_list_files(
         self, repository: Repository, archive_name: str
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, object]]:
         """Execute borg list command to get file details from an archive"""
         try:
             command, env = build_secure_borg_command(
@@ -160,7 +160,7 @@ class RepositoryStatsService:
         repository: Repository,
         db: Session,
         progress_callback: Optional[Callable[[str, int], None]] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Gather comprehensive repository statistics"""
         try:
             if progress_callback:
@@ -198,7 +198,7 @@ class RepositoryStatsService:
                 return {"error": "Could not retrieve archive information"}
 
             # Sort archives by date
-            archive_stats.sort(key=lambda x: x.get("start", ""))
+            archive_stats.sort(key=lambda x: str(x.get("start", "")))
 
             if progress_callback:
                 progress_callback("Building size and compression statistics...", 65)
@@ -271,7 +271,7 @@ class RepositoryStatsService:
 
     async def _get_archive_info(
         self, repository: Repository, archive_name: str
-    ) -> Dict[str, Any] | None:
+    ) -> Dict[str, object] | None:
         """Get detailed information for a specific archive"""
         try:
             command, env = build_secure_borg_command(
@@ -327,7 +327,7 @@ class RepositoryStatsService:
             logger.error(f"Error getting archive info for {archive_name}: {str(e)}")
             return None
 
-    def _build_size_timeline(
+    def _build_size_timeline(  # type: ignore[explicit-any]
         self, archive_stats: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Build size over time data for charting"""
@@ -360,25 +360,25 @@ class RepositoryStatsService:
 
         for archive in archive_stats:
             # Use archive name or start time as label
-            label = archive.get("start", archive.get("name", ""))[
+            label = str(archive.get("start", archive.get("name", "")))[
                 :10
             ]  # First 10 chars for date
             timeline_data["labels"].append(label)
 
             # Convert bytes to MB for better readability
             timeline_data["datasets"][0]["data"].append(
-                archive.get("original_size", 0) / (1024 * 1024)
+                float(archive.get("original_size", 0) or 0) / (1024 * 1024)
             )
             timeline_data["datasets"][1]["data"].append(
-                archive.get("compressed_size", 0) / (1024 * 1024)
+                float(archive.get("compressed_size", 0) or 0) / (1024 * 1024)
             )
             timeline_data["datasets"][2]["data"].append(
-                archive.get("deduplicated_size", 0) / (1024 * 1024)
+                float(archive.get("deduplicated_size", 0) or 0) / (1024 * 1024)
             )
 
         return timeline_data
 
-    def _build_dedup_compression_stats(
+    def _build_dedup_compression_stats(  # type: ignore[explicit-any]
         self, archive_stats: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Build deduplication and compression statistics"""
@@ -433,7 +433,7 @@ class RepositoryStatsService:
         progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> Dict[str, Any]:
         """Get file type statistics over time"""
-        file_type_timeline: Dict[str, Any] = {
+        file_type_timeline: Dict[str, object] = {
             "labels": [],
             "count_data": {},
             "size_data": {},
@@ -531,7 +531,7 @@ class RepositoryStatsService:
         return self._build_file_type_chart_data(file_type_timeline)
 
     def _build_file_type_chart_data(
-        self, timeline_data: Dict[str, Any]
+        self, timeline_data: Dict[str, object]
     ) -> Dict[str, Any]:
         """Build chart data for file types"""
         # Color palette for different file types
@@ -600,7 +600,7 @@ class RepositoryStatsService:
         }
 
     def _build_summary_stats(
-        self, archive_stats: List[Dict[str, Any]]
+        self, archive_stats: List[Dict[str, object]]
     ) -> Dict[str, Any]:
         """Build overall summary statistics"""
         if not archive_stats:

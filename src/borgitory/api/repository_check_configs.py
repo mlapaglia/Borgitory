@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import List
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from borgitory.models.schemas import (
@@ -51,8 +51,10 @@ async def create_repository_check_config(
     return response
 
 
-@router.get("/", response_class=HTMLResponse)
-def get_repository_check_configs(service: RepositoryCheckConfigServiceDep) -> List[Any]:
+@router.get("/", response_class=HTMLResponse, response_model=None)
+def get_repository_check_configs(
+    service: RepositoryCheckConfigServiceDep,
+) -> List[RepositoryCheckConfig]:
     """Get all repository check configurations"""
     return service.get_all_configs()
 

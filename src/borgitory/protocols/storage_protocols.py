@@ -2,7 +2,7 @@
 Protocol interfaces for storage and volume services.
 """
 
-from typing import Protocol, List, Dict, Any
+from typing import Protocol, List, Dict
 
 
 class VolumeInfo:
@@ -21,7 +21,7 @@ class VolumeServiceProtocol(Protocol):
         """Get list of mounted volume paths."""
         ...
 
-    async def get_volume_info(self) -> Dict[str, Any]:
+    async def get_volume_info(self) -> Dict[str, object]:
         """Get detailed volume information."""
         ...
 
@@ -41,6 +41,6 @@ class CloudStorageProtocol(Protocol):
         """Test connection to cloud storage."""
         ...
 
-    def get_connection_info(self) -> Dict[str, Any]:
+    def get_connection_info(self) -> Dict[str, object]:
         """Get connection information for display."""
         ...

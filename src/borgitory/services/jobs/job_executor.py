@@ -62,8 +62,8 @@ class JobExecutor:
     async def monitor_process_output(
         self,
         process: asyncio.subprocess.Process,
-        output_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        output_callback: Optional[Callable[[str, Dict[str, object]], None]] = None,
+        progress_callback: Optional[Callable[[Dict[str, object]], None]] = None,
     ) -> ProcessResult:
         """Monitor process output and return final result"""
         stdout_data = b""
@@ -102,7 +102,7 @@ class JobExecutor:
                 return_code=-1, stdout=stdout_data, stderr=stderr_data, error=error_msg
             )
 
-    def parse_progress_line(self, line: str) -> Dict[str, Any]:
+    def parse_progress_line(self, line: str) -> Dict[str, object]:
         """Parse Borg output line for progress information"""
         progress_info = {}
 

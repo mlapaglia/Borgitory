@@ -7,7 +7,7 @@ with proper separation of concerns.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from datetime import datetime, UTC
 
 
@@ -84,11 +84,11 @@ class CloudSyncConfig:
     """
 
     provider: str
-    config: Dict[str, Any]
+    config: Dict[str, object]
     path_prefix: str = ""
     name: str = ""
 
-    def get_config_value(self, key: str, default: Any = None) -> Any:
+    def get_config_value(self, key: str, default: object = None) -> object:
         """Get a configuration value with optional default"""
         return self.config.get(key, default)
 
@@ -102,7 +102,7 @@ class ConnectionInfo:
     """
 
     provider: str
-    details: Dict[str, Any]
+    details: Dict[str, object]
 
     def __str__(self) -> str:
         detail_parts = [f"{k}={v}" for k, v in self.details.items()]

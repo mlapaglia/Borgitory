@@ -3,7 +3,7 @@ Pushover notification provider implementation.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from pydantic import Field, field_validator
 
 # Import HttpClient protocol from discord_provider for consistency
@@ -172,9 +172,9 @@ class PushoverProvider(NotificationProvider):
         """Get list of fields that should be encrypted"""
         return ["user_key", "app_token"]
 
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """Get provider-specific display details for the UI"""
-        user_key = config_dict.get("user_key", "")
+        user_key = str(config_dict.get("user_key", ""))
         masked_key = f"{user_key[:6]}..." if len(user_key) >= 6 else "***"
 
         details = f"""

@@ -4,7 +4,7 @@ Handles all configuration-related business operations for dropdowns and form dat
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, TypedDict, cast
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import (
@@ -18,13 +18,32 @@ from borgitory.models.database import (
 logger = logging.getLogger(__name__)
 
 
+class ScheduleFormData(TypedDict):
+    """Type definition for schedule form data"""
+
+    repositories: List[Repository]
+    cleanup_configs: List[CleanupConfig]
+    cloud_sync_configs: List[CloudSyncConfig]
+    notification_configs: List[NotificationConfig]
+    check_configs: List[RepositoryCheckConfig]
+
+
+class CronFormContext(TypedDict):
+    """Type definition for cron form context data"""
+
+    preset: str
+    is_custom: bool
+    cron_expression: str
+    description: str
+
+
 class ConfigurationService:
     """Service for configuration and form data operations."""
 
     def __init__(self) -> None:
         pass
 
-    def get_schedule_form_data(self, db: Session) -> Dict[str, List[Any]]:
+    def get_schedule_form_data(self, db: Session) -> ScheduleFormData:
         """
         Get all configuration data needed for schedule forms.
 
@@ -62,7 +81,7 @@ class ConfigurationService:
             "0 2 */2 * *": "Every 2 days at 2:00 AM",
         }
 
-    def get_cron_form_context(self, preset: str = "") -> Dict[str, Any]:
+    def get_cron_form_context(self, preset: str = "") -> CronFormContext:
         """
         Get context data for cron expression form based on preset.
 
@@ -84,4 +103,4 @@ class ConfigurationService:
             preset_descriptions = self.get_cron_preset_descriptions()
             context["description"] = preset_descriptions.get(preset, "")
 
-        return context
+        return cast(CronFormContext, context)
