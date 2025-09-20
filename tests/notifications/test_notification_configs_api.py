@@ -188,7 +188,7 @@ class TestNotificationConfigsAPIHTMX:
 
         # Mock the notification service test
         with patch(
-            "borgitory.services.notifications.config_service.NotificationConfigService.test_config"
+            "borgitory.services.notifications.config_service.NotificationConfigService.test_config_with_service"
         ) as mock_test:
             mock_test.return_value = (True, "Connection successful")
 

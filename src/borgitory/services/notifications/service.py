@@ -252,16 +252,11 @@ class EncryptionService:
                 encrypted_field in decrypted_config
                 and decrypted_config[encrypted_field]
             ):
-                try:
-                    decrypted_value = cipher.decrypt(
-                        decrypted_config[encrypted_field].encode()
-                    ).decode()
-                    decrypted_config[field] = decrypted_value
-                    del decrypted_config[encrypted_field]
-                except Exception as e:
-                    logger.warning(f"Failed to decrypt field '{field}': {e}")
-                    # Keep the encrypted field, remove the encrypted_ prefix version
-                    del decrypted_config[encrypted_field]
+                decrypted_value = cipher.decrypt(
+                    decrypted_config[encrypted_field].encode()
+                ).decode()
+                decrypted_config[field] = decrypted_value
+                del decrypted_config[encrypted_field]
 
         return decrypted_config
 
@@ -413,14 +408,21 @@ class NotificationService:
         for field_name, field_info in config_class.__annotations__.items():
             if hasattr(config_class, "model_fields"):
                 field = config_class.model_fields.get(field_name)
-                if field and hasattr(field, "default"):
-                    dummy_config[field_name] = field.default
-                else:
-                    # Use a dummy value based on type
-                    if field_name in ["user_key", "app_token", "token", "key"]:
-                        dummy_config[field_name] = "dummy_value_30_chars_long_xxx"
+                if field and hasattr(field, "default") and field.default is not None:
+                    # Only use default if it's not None/PydanticUndefined
+                    from pydantic_core import PydanticUndefined
+
+                    if field.default is not PydanticUndefined:
+                        dummy_config[field_name] = field.default
                     else:
-                        dummy_config[field_name] = "dummy"
+                        dummy_config[field_name] = self._generate_dummy_field_value(
+                            provider, field_name
+                        )
+                else:
+                    # Use a dummy value based on field name and provider
+                    dummy_config[field_name] = self._generate_dummy_field_value(
+                        provider, field_name
+                    )
 
         try:
             temp_provider = self._provider_factory.create_provider(
@@ -443,3 +445,50 @@ class NotificationService:
         )
 
         return decrypted_config
+
+    def _generate_dummy_field_value(self, provider: str, field_name: str) -> str:
+        """
+        Generate appropriate dummy values for provider fields based on validation requirements.
+
+        Args:
+            provider: Provider name (e.g., 'discord', 'pushover')
+            field_name: Field name (e.g., 'webhook_url', 'user_key')
+
+        Returns:
+            Dummy value that will pass basic validation
+        """
+        # Provider-specific dummy values
+        if provider == "discord":
+            if field_name == "webhook_url":
+                return "https://discord.com/api/webhooks/123456789012345678/dummy_webhook_token_for_validation_purposes_only"
+            elif field_name == "username":
+                return "Borgitory"
+            elif field_name == "avatar_url":
+                return ""
+
+        elif provider == "pushover":
+            if field_name in ["user_key", "app_token"]:
+                return "dummy_value_30_chars_long_xxx"
+            elif field_name == "priority":
+                return "0"
+            elif field_name == "sound":
+                return "default"
+            elif field_name == "device":
+                return ""
+
+        # Generic fallbacks
+        if field_name in [
+            "user_key",
+            "app_token",
+            "token",
+            "key",
+            "password",
+            "secret",
+        ]:
+            return "dummy_value_30_chars_long_xxx"
+        elif field_name in ["priority"]:
+            return "0"
+        elif field_name in ["url", "webhook_url", "endpoint"]:
+            return "https://example.com/dummy"
+        else:
+            return "dummy"

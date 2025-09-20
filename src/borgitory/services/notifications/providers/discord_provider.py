@@ -77,13 +77,13 @@ class AiohttpClient:
         session = await self._get_session()
         if json is not None:
             async with session.post(url, json=json) as response:
-                return AiohttpResponse(response)
+                return await AiohttpResponse.create(response)
         elif data is not None:
             async with session.post(url, data=data) as response:
-                return AiohttpResponse(response)
+                return await AiohttpResponse.create(response)
         else:
             async with session.post(url) as response:
-                return AiohttpResponse(response)
+                return await AiohttpResponse.create(response)
 
     async def close(self) -> None:
         """Close the HTTP client session if we own it"""
@@ -95,19 +95,47 @@ class AiohttpClient:
 class AiohttpResponse:
     """Wrapper for aiohttp response to match protocol"""
 
-    def __init__(self, response: aiohttp.ClientResponse):
-        self._response = response
-        self._status = response.status
+    def __init__(
+        self, status: int, text_data: str, json_data: Optional[Dict[str, Any]] = None
+    ):
+        self._status = status
+        self._text_data = text_data
+        self._json_data = json_data
+
+    @classmethod
+    async def create(cls, response: aiohttp.ClientResponse) -> "AiohttpResponse":
+        """Create AiohttpResponse by reading data within the context manager"""
+        text_data = await response.text()
+        json_data = None
+
+        # Try to parse JSON if the response looks like JSON
+        if text_data.strip().startswith("{") or text_data.strip().startswith("["):
+            try:
+                json_data = await response.json()
+            except Exception:
+                # If JSON parsing fails, that's okay - we'll just have text
+                pass
+
+        return cls(response.status, text_data, json_data)
 
     @property
     def status(self) -> int:
         return self._status
 
     async def text(self) -> str:
-        return await self._response.text()
+        return self._text_data
 
     async def json(self) -> Dict[str, Any]:
-        return cast(Dict[str, Any], await self._response.json())
+        if self._json_data is not None:
+            return self._json_data
+
+        # Fallback: try to parse the text as JSON
+        import json
+
+        try:
+            return cast(Dict[str, Any], json.loads(self._text_data))
+        except json.JSONDecodeError:
+            raise ValueError(f"Response is not valid JSON: {self._text_data}")
 
 
 class DiscordConfig(NotificationProviderConfig):

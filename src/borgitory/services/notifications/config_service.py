@@ -328,6 +328,61 @@ class NotificationConfigService:
             logger.error(f"Error testing notification config {config_id}: {e}")
             return False, f"Test failed: {str(e)}"
 
+    async def test_config_with_service(
+        self, config_id: int, notification_service: NotificationService
+    ) -> Tuple[bool, str]:
+        """
+        Test notification configuration with provided notification service.
+
+        This method follows the same pattern as cloud sync service where
+        the encryption service is passed from the API layer.
+
+        Args:
+            config_id: Configuration ID to test
+            notification_service: NotificationService with proper encryption setup
+
+        Returns:
+            Tuple of (success, message)
+        """
+        config = self.get_config_by_id(config_id)
+        if not config:
+            raise HTTPException(
+                status_code=404, detail="Notification configuration not found"
+            )
+
+        if not config.enabled:
+            raise HTTPException(
+                status_code=400, detail="Notification configuration is disabled"
+            )
+
+        try:
+            # Load and decrypt configuration using the provided service
+            decrypted_config = notification_service.load_config_from_storage(
+                config.provider, config.provider_config
+            )
+
+            # Create notification config object
+            notification_config = NotificationConfigType(
+                provider=config.provider,
+                config=decrypted_config,
+                name=config.name,
+                enabled=config.enabled,
+            )
+
+            # Test the connection
+            test_success = await notification_service.test_connection(
+                notification_config
+            )
+
+            if test_success:
+                return True, f"Test notification sent successfully to {config.name}"
+            else:
+                return False, "Failed to send test notification"
+
+        except Exception as e:
+            logger.error(f"Error testing notification config {config_id}: {e}")
+            return False, f"Test failed: {str(e)}"
+
     def get_config_with_decrypted_data(
         self, config_id: int
     ) -> Tuple[NotificationConfig, Dict[str, Any]]:

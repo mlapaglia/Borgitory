@@ -186,7 +186,13 @@ async def test_notification_config(
 ) -> _TemplateResponse:
     """Test a notification configuration using the provider system"""
     try:
-        success, message = await config_service.test_config(config_id)
+        # Pass encryption service like cloud sync does
+        from borgitory.dependencies import get_notification_service_singleton
+
+        notification_service = get_notification_service_singleton()
+        success, message = await config_service.test_config_with_service(
+            config_id, notification_service
+        )
 
         if success:
             return templates.TemplateResponse(
