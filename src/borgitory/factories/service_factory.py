@@ -26,7 +26,8 @@ from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
-    from borgitory.services.cloud_providers import EncryptionService, StorageFactory
+    from borgitory.services.encryption_service import EncryptionService
+    from borgitory.services.cloud_providers import StorageFactory
     from borgitory.services.jobs.job_executor import JobExecutor
     from borgitory.protocols import VolumeServiceProtocol, JobManagerProtocol
     from borgitory.services.rclone_service import RcloneService

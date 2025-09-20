@@ -8,7 +8,8 @@ import asyncio
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
     from borgitory.services.rclone_service import RcloneService
-    from borgitory.services.cloud_providers import EncryptionService, StorageFactory
+    from borgitory.services.cloud_providers import StorageFactory
+    from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers.registry import ProviderRegistry
 
 

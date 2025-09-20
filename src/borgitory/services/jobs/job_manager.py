@@ -49,7 +49,8 @@ if TYPE_CHECKING:
     from borgitory.dependencies import ApplicationScopedNotificationService
     from sqlalchemy.orm import Session
     from borgitory.services.notifications.providers.discord_provider import HttpClient
-    from borgitory.services.cloud_providers import EncryptionService, StorageFactory
+    from borgitory.services.cloud_providers import StorageFactory
+    from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)

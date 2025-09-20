@@ -25,6 +25,7 @@ from .types import CloudSyncConfig, SyncResult
 from .storage import CloudStorage
 from .registry import get_config_class, get_storage_class, get_supported_providers
 from .orchestration import CloudSyncer, LoggingSyncEventHandler
+from borgitory.services.encryption_service import EncryptionService
 
 logger = logging.getLogger(__name__)
 
@@ -209,69 +210,6 @@ class StorageFactory:
     def get_supported_providers(self) -> list[str]:
         """Get list of supported provider names."""
         return get_supported_providers()
-
-
-class EncryptionService:
-    """Handles encryption/decryption of sensitive configuration fields"""
-
-    def encrypt_sensitive_fields(
-        self, config: Dict[str, object], sensitive_fields: list[str]
-    ) -> Dict[str, object]:
-        """
-        Encrypt sensitive fields in configuration.
-
-        Args:
-            config: Configuration dictionary
-            sensitive_fields: List of field names to encrypt
-
-        Returns:
-            Configuration with sensitive fields encrypted
-        """
-        from borgitory.models.database import get_cipher_suite
-
-        encrypted_config = config.copy()
-        cipher = get_cipher_suite()
-
-        for field in sensitive_fields:
-            if field in encrypted_config and encrypted_config[field]:
-                encrypted_value = cipher.encrypt(
-                    str(encrypted_config[field]).encode()
-                ).decode()
-                encrypted_config[f"encrypted_{field}"] = encrypted_value
-                del encrypted_config[field]
-
-        return encrypted_config
-
-    def decrypt_sensitive_fields(
-        self, config: Dict[str, object], sensitive_fields: list[str]
-    ) -> Dict[str, object]:
-        """
-        Decrypt sensitive fields in configuration.
-
-        Args:
-            config: Configuration dictionary with encrypted fields
-            sensitive_fields: List of field names to decrypt
-
-        Returns:
-            Configuration with sensitive fields decrypted
-        """
-        from borgitory.models.database import get_cipher_suite
-
-        decrypted_config = config.copy()
-        cipher = get_cipher_suite()
-
-        for field in sensitive_fields:
-            encrypted_field = f"encrypted_{field}"
-            if (
-                encrypted_field in decrypted_config
-                and decrypted_config[encrypted_field]
-            ):
-                field_value = decrypted_config[encrypted_field]
-                decrypted_value = cipher.decrypt(str(field_value).encode()).decode()
-                decrypted_config[field] = decrypted_value
-                del decrypted_config[encrypted_field]
-
-        return decrypted_config
 
 
 class CloudSyncService:

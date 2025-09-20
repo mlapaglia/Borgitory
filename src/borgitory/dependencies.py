@@ -54,7 +54,8 @@ from borgitory.services.cleanup_service import CleanupService
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
-from borgitory.services.cloud_providers import EncryptionService, StorageFactory
+from borgitory.services.cloud_providers import StorageFactory
+from borgitory.services.encryption_service import EncryptionService
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncConfigService

@@ -7,7 +7,8 @@ from typing import Protocol, Dict, List, Optional, Callable, Union, TYPE_CHECKIN
 if TYPE_CHECKING:
     from borgitory.models.database import CloudSyncConfig
     from borgitory.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
-    from borgitory.services.cloud_providers import StorageFactory, EncryptionService
+    from borgitory.services.cloud_providers import StorageFactory
+    from borgitory.services.encryption_service import EncryptionService
 
 
 class CloudStorageProtocol(Protocol):

@@ -15,7 +15,8 @@ from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import (
     get_storage_class,
 )
-from borgitory.services.cloud_providers import StorageFactory, EncryptionService
+from borgitory.services.cloud_providers import StorageFactory
+from borgitory.services.encryption_service import EncryptionService
 
 logger = logging.getLogger(__name__)
 

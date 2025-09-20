@@ -13,7 +13,8 @@ from datetime import datetime
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.service import EncryptionService, StorageFactory
+from borgitory.services.cloud_providers.service import StorageFactory
+from borgitory.services.encryption_service import EncryptionService
 
 logger = logging.getLogger(__name__)
 
