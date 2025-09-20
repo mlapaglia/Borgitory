@@ -73,6 +73,8 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
    - Open <http://localhost:8000> in your browser
    - Create your first admin account on initial setup
 
+<img width="1237" height="729" alt="image" src="https://github.com/user-attachments/assets/078ce596-3ba2-4b6f-ba3f-c2d8b95e02db" />
+
 #### Option 2: PyPI Installation
 
 Install Borgitory directly from PyPI:
