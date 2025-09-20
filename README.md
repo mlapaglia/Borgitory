@@ -53,13 +53,13 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
        ports:
          - "8000:8000"
        volumes:
-         - ./data:/app/data
+         - ./data:/app/data # database and encryption key location
          - /path/to/backup/sources:/mnt/sources:ro
          - /path/to/any/backup/repos:/mnt/repos:ro
        cap_add:
-         - SYS_ADMIN
+         - SYS_ADMIN # optional, needed to mount borg archives and browse them
        devices:
-         - /dev/fuse
+         - /dev/fuse # borg uses FUSE to mount archives
        restart: unless-stopped
    ```
 
@@ -72,8 +72,6 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
 2. **Access the web interface**
    - Open <http://localhost:8000> in your browser
    - Create your first admin account on initial setup
-
-**Docker Hub**: Available at [mlapaglia/borgitory](https://hub.docker.com/r/mlapaglia/borgitory)
 
 #### Option 2: PyPI Installation
 
@@ -95,3 +93,5 @@ borgitory serve --host 0.0.0.0 --port 8000
 - Python 3.11 or higher
 - BorgBackup installed and available in PATH
 - Rclone (optional, for cloud sync features)
+- FUSE (optional, for browsing archives)
+- Functionality on Windows is currently limited

@@ -1,5 +1,6 @@
 """Integration tests for basic endpoint functionality."""
 
+import threading
 import pytest
 import requests
 import json
@@ -245,3 +246,38 @@ def test_error_handling_graceful(app_runner_module):
 
         except requests.exceptions.RequestException as e:
             pytest.fail(f"Request {method} {path} caused connection error: {e}")
+
+
+def test_concurrent_requests_handling(app_runner_module):
+    """Test that the application can handle multiple concurrent requests."""
+    # App is already started by the module fixture
+
+    results = []
+
+    def make_request():
+        try:
+            response = requests.get(
+                f"{app_runner_module.base_url}/auth/check-users", timeout=10
+            )
+            results.append(response.status_code)
+        except Exception as e:
+            results.append(f"Error: {e}")
+
+    # Start multiple concurrent requests
+    threads = []
+    for _ in range(5):
+        thread = threading.Thread(target=make_request)
+        threads.append(thread)
+        thread.start()
+
+    # Wait for all requests to complete
+    for thread in threads:
+        thread.join(timeout=15)
+
+    # All requests should have completed successfully
+    assert len(results) == 5, f"Expected 5 results, got {len(results)}"
+
+    # All should return valid HTTP status codes
+    for result in results:
+        assert isinstance(result, int), f"Got error instead of status code: {result}"
+        assert 200 <= result < 600, f"Invalid status code: {result}"
