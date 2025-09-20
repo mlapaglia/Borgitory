@@ -15,7 +15,7 @@ from borgitory.models.schemas import (
     CloudSyncConfigUpdate,
     CloudSyncConfig as CloudSyncConfigSchema,
 )
-from borgitory.services.cloud_sync_service import CloudSyncService
+from borgitory.services.cloud_sync_service import CloudSyncConfigService
 from borgitory.dependencies import (
     RcloneServiceDep,
     EncryptionServiceDep,
@@ -176,9 +176,9 @@ def get_cloud_sync_service(
     storage_factory: StorageFactoryDep,
     encryption_service: EncryptionServiceDep,
     db: Session = Depends(get_db),
-) -> CloudSyncService:
+) -> CloudSyncConfigService:
     """Dependency to get cloud sync service instance."""
-    return CloudSyncService(
+    return CloudSyncConfigService(
         db=db,
         rclone_service=rclone_service,
         storage_factory=storage_factory,
@@ -225,7 +225,7 @@ async def get_provider_fields(
 @router.post("/", response_class=HTMLResponse)
 async def create_cloud_sync_config(
     request: Request,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Create a new cloud sync configuration"""
@@ -272,7 +272,7 @@ async def create_cloud_sync_config(
 @router.get("/html", response_class=HTMLResponse)
 def get_cloud_sync_configs_html(
     registry: ProviderRegistryDep,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> str:
     """Get cloud sync configurations as HTML"""
@@ -309,7 +309,7 @@ def get_cloud_sync_configs_html(
 
 @router.get("/", response_model=List[CloudSyncConfigSchema])
 def list_cloud_sync_configs(
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
 ) -> List[CloudSyncConfig]:
     """List all cloud sync configurations"""
     return cloud_sync_service.get_cloud_sync_configs()
@@ -318,7 +318,7 @@ def list_cloud_sync_configs(
 @router.get("/{config_id}", response_model=CloudSyncConfigSchema)
 def get_cloud_sync_config(
     config_id: int,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
 ) -> CloudSyncConfig:
     """Get a specific cloud sync configuration"""
     return cloud_sync_service.get_cloud_sync_config_by_id(config_id)
@@ -331,7 +331,7 @@ async def get_cloud_sync_edit_form(
     registry: ProviderRegistryDep,
     encryption_service: EncryptionServiceDep,
     storage_factory: StorageFactoryDep,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Get edit form for a specific cloud sync configuration"""
@@ -368,7 +368,7 @@ async def get_cloud_sync_edit_form(
 async def update_cloud_sync_config(
     request: Request,
     config_id: int,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Update a cloud sync configuration"""
@@ -409,7 +409,7 @@ async def update_cloud_sync_config(
 def delete_cloud_sync_config(
     request: Request,
     config_id: int,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Delete a cloud sync configuration"""
@@ -445,7 +445,7 @@ async def test_cloud_sync_config(
     rclone: RcloneServiceDep,
     encryption_service: EncryptionServiceDep,
     storage_factory: StorageFactoryDep,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Test a cloud sync configuration"""
@@ -498,7 +498,7 @@ async def test_cloud_sync_config(
 def enable_cloud_sync_config(
     request: Request,
     config_id: int,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Enable a cloud sync configuration"""
@@ -529,7 +529,7 @@ def enable_cloud_sync_config(
 def disable_cloud_sync_config(
     request: Request,
     config_id: int,
-    cloud_sync_service: CloudSyncService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
     """Disable a cloud sync configuration"""

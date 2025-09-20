@@ -2,7 +2,9 @@
 Protocol interfaces for notification services.
 """
 
-from typing import Protocol, Dict, List, Optional, TYPE_CHECKING
+from typing import Protocol, Dict, List, Optional, TYPE_CHECKING, Union
+
+from borgitory.services.notifications.types import NotificationMessage
 
 if TYPE_CHECKING:
     from borgitory.services.notifications.types import (
@@ -17,7 +19,7 @@ class NotificationServiceProtocol(Protocol):
     async def send_notification(
         self,
         config: "NotificationConfig",
-        message: object,  # NotificationMessage
+        message: NotificationMessage,
     ) -> "NotificationResult":
         """Send a notification using the provider system."""
         ...
@@ -39,7 +41,7 @@ class NotificationServiceProtocol(Protocol):
     def prepare_config_for_storage(
         self,
         provider: str,
-        config: Dict[str, object],
+        config: Dict[str, Union[str, int, float, bool]],
     ) -> str:
         """Prepare configuration for database storage."""
         ...
@@ -48,7 +50,7 @@ class NotificationServiceProtocol(Protocol):
         self,
         provider: str,
         stored_config: str,
-    ) -> Dict[str, object]:
+    ) -> Dict[str, Union[str, int, float, bool]]:
         """Load configuration from database storage."""
         ...
 
@@ -59,7 +61,7 @@ class NotificationConfigServiceProtocol(Protocol):
     def create_config(
         self,
         provider: str,
-        config_data: Dict[str, object],
+        config_data: Dict[str, Union[str, int, float, bool]],
     ) -> "NotificationConfig":
         """Create a new notification configuration."""
         ...
@@ -78,7 +80,7 @@ class NotificationConfigServiceProtocol(Protocol):
     def update_config(
         self,
         config_id: int,
-        config_data: Dict[str, object],
+        config_data: Dict[str, Union[str, int, float, bool]],
     ) -> Optional["NotificationConfig"]:
         """Update a notification configuration."""
         ...

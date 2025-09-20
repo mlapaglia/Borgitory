@@ -43,6 +43,7 @@ from .notification_protocols import (
 from .cloud_protocols import (
     CloudStorageProtocol,
     CloudSyncServiceProtocol,
+    CloudSyncConfigServiceProtocol,
     EncryptionServiceProtocol,
     StorageFactoryProtocol,
 )
@@ -70,6 +71,7 @@ __all__ = [
     # Cloud protocols
     "CloudStorageProtocol",
     "CloudSyncServiceProtocol",
+    "CloudSyncConfigServiceProtocol",
     "EncryptionServiceProtocol",
     "StorageFactoryProtocol",
 ]

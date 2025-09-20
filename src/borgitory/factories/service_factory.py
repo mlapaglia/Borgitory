@@ -8,31 +8,36 @@ supporting different implementations and configurations.
 from typing import (
     Type,
     Dict,
-    Any,
     Optional,
     TypeVar,
     Generic,
     Union,
     Callable,
-    overload,
-    Literal,
+    Any,
+    TYPE_CHECKING,
 )
 from abc import ABC
 import logging
 
-# Import our protocols
 from borgitory.protocols.command_protocols import CommandRunnerProtocol
 from borgitory.protocols.repository_protocols import BackupServiceProtocol
 from borgitory.protocols.notification_protocols import NotificationServiceProtocol
-from borgitory.protocols.cloud_protocols import CloudSyncServiceProtocol
+from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+    from borgitory.services.cloud_providers import EncryptionService, StorageFactory
+    from borgitory.services.jobs.job_executor import JobExecutor
+    from borgitory.protocols import VolumeServiceProtocol, JobManagerProtocol
+    from borgitory.services.rclone_service import RcloneService
 
 logger = logging.getLogger(__name__)
 
-# Generic protocol type
+# Define TypeVar here - this was missing!
 P = TypeVar("P")
 
-# Union type for implementations - can be class or factory function
-ImplementationType = Union[Type[P], Callable[..., P]]
+# Union type for implementations
+ImplementationType = Union[Type[P], Callable[..., P]]  # type: ignore[explicit-any]
 
 
 class ServiceFactory(Generic[P], ABC):
@@ -40,10 +45,10 @@ class ServiceFactory(Generic[P], ABC):
 
     def __init__(self) -> None:
         self._implementations: Dict[str, ImplementationType[P]] = {}
-        self._configurations: Dict[str, Dict[str, Any]] = {}
+        self._configurations: Dict[str, Dict[str, Any]] = {}  # type: ignore[explicit-any]
         self._default_implementation: Optional[str] = None
 
-    def register_implementation(
+    def register_implementation(  # type: ignore[explicit-any]
         self,
         name: str,
         implementation: ImplementationType[P],
@@ -58,9 +63,11 @@ class ServiceFactory(Generic[P], ABC):
         if set_as_default or not self._default_implementation:
             self._default_implementation = name
 
-        logger.info(f"Registered {implementation.__name__} as '{name}' implementation")
+        # Handle both classes and functions for logging
+        impl_name = getattr(implementation, "__name__", str(implementation))
+        logger.info(f"Registered {impl_name} as '{name}' implementation")
 
-    def create_service(
+    def create_service(  # type: ignore[explicit-any]
         self, implementation_name: Optional[str] = None, **kwargs: Any
     ) -> P:
         """Create a service instance."""
@@ -78,17 +85,13 @@ class ServiceFactory(Generic[P], ABC):
         # Merge factory config with runtime kwargs
         final_config = {**config, **kwargs}
 
-        logger.debug(
-            f"Creating {getattr(implementation, '__name__', str(implementation))} with config: {final_config}"
-        )
+        impl_name = getattr(implementation, "__name__", str(implementation))
+        logger.debug(f"Creating {impl_name} with config: {final_config}")
 
         try:
-            # Handle both class constructors and factory functions
             return implementation(**final_config)
         except Exception as e:
-            logger.error(
-                f"Failed to create {getattr(implementation, '__name__', str(implementation))}: {e}"
-            )
+            logger.error(f"Failed to create {impl_name}: {e}")
             raise
 
     def list_implementations(self) -> Dict[str, ImplementationType[P]]:
@@ -101,10 +104,12 @@ class ServiceFactory(Generic[P], ABC):
 
 
 class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
-    """Factory for creating notification services."""
+    """Factory for creating notification services with proper dependency injection."""
 
-    def __init__(self) -> None:
+    def __init__(self, http_client: Any) -> None:  # type: ignore[explicit-any]
         super().__init__()
+        # Inject dependencies instead of using service locator
+        self._http_client = http_client
         self._register_default_implementations()
 
     def _register_default_implementations(self) -> None:
@@ -113,93 +118,65 @@ class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
             NotificationService,
             NotificationProviderFactory,
         )
-        from borgitory.dependencies import get_http_client
 
-        def create_notification_service(**kwargs: Any) -> NotificationService:
-            """Factory function to create NotificationService with proper dependencies."""
-            # Create the required provider factory with HTTP client
-            http_client = get_http_client()
-            provider_factory = NotificationProviderFactory(http_client=http_client)
-
-            # Create the service with the factory
-            return NotificationService(provider_factory=provider_factory, **kwargs)
+        def create_notification_service(  # type: ignore[explicit-any]
+            encryption_service: Optional[Any] = None,
+        ) -> NotificationServiceProtocol:
+            """Factory function to create NotificationService."""
+            # Use injected dependencies - no more service locator!
+            provider_factory = NotificationProviderFactory(
+                http_client=self._http_client
+            )
+            return NotificationService(
+                provider_factory=provider_factory, encryption_service=encryption_service
+            )
 
         self.register_implementation(
             "provider_based", create_notification_service, set_as_default=True
         )
 
     def create_notification_service(
-        self, service_type: str = "provider_based", **config: Any
+        self,
+        service_type: str = "provider_based",
+        encryption_service: Optional["EncryptionService"] = None,
     ) -> NotificationServiceProtocol:
-        """Create a notification service for the specified type."""
-        return self.create_service(service_type, **config)
+        """Create a notification service."""
+        return self.create_service(service_type, encryption_service=encryption_service)
 
 
-class CommandRunnerFactory(ServiceFactory[CommandRunnerProtocol]):
-    """Factory for creating command runner services."""
+class CloudProviderServiceFactory(ServiceFactory[CloudSyncConfigServiceProtocol]):
+    """Factory for creating cloud provider services with proper dependency injection."""
 
-    def __init__(self) -> None:
+    def __init__(  # type: ignore[explicit-any]
+        self,
+        rclone_service: "RcloneService",
+        storage_factory: "StorageFactory",
+        encryption_service: "EncryptionService",
+        metadata_func: Callable[..., Any],
+    ) -> None:
         super().__init__()
-        self._register_default_implementations()
-
-    def _register_default_implementations(self) -> None:
-        """Register default command runner implementations."""
-        from borgitory.services.simple_command_runner import SimpleCommandRunner
-
-        self.register_implementation("simple", SimpleCommandRunner, set_as_default=True)
-
-    def create_command_runner(
-        self, runner_type: str = "simple", **config: Any
-    ) -> CommandRunnerProtocol:
-        """Create a command runner of the specified type."""
-        return self.create_service(runner_type, **config)
-
-
-class CloudProviderServiceFactory(ServiceFactory[CloudSyncServiceProtocol]):
-    """Factory for creating cloud provider services with proper DI."""
-
-    def __init__(self) -> None:
-        super().__init__()
+        # Inject dependencies instead of using service locator
+        self._rclone_service = rclone_service
+        self._storage_factory = storage_factory
+        self._encryption_service = encryption_service
+        self._metadata_func = metadata_func
         self._register_default_implementations()
 
     def _register_default_implementations(self) -> None:
         """Register default cloud sync service implementations."""
-        from borgitory.services.cloud_sync_service import CloudSyncService
-        from borgitory.dependencies import (
-            get_rclone_service,
-            get_storage_factory,
-            get_encryption_service,
-        )
 
-        def create_cloud_sync_service(**kwargs: Any) -> CloudSyncServiceProtocol:
-            """Factory function to create CloudSyncService with proper dependencies."""
-            # **DI CHECK**: CloudSyncService requires db session, which must be passed in kwargs
-            # We only inject the non-request-scoped dependencies here
-            from borgitory.services.cloud_providers.registry import get_metadata
+        def create_cloud_sync_service(db: "Session") -> CloudSyncConfigServiceProtocol:
+            """Factory function to create CloudSyncConfigService."""
+            # Import here to avoid circular dependencies
+            from borgitory.services.cloud_sync_service import CloudSyncConfigService
 
-            # Get singleton dependencies
-            rclone_service = get_rclone_service()
-            storage_factory = get_storage_factory(rclone_service)
-            encryption_service = get_encryption_service()
-
-            # db session must be provided in kwargs (request-scoped)
-            if "db" not in kwargs:
-                raise ValueError(
-                    "CloudSyncService requires 'db' parameter (request-scoped)"
-                )
-
-            # Create the service with injected dependencies
-            from typing import cast
-
-            return cast(
-                CloudSyncServiceProtocol,
-                CloudSyncService(
-                    db=kwargs["db"],
-                    rclone_service=rclone_service,
-                    storage_factory=storage_factory,
-                    encryption_service=encryption_service,
-                    get_metadata_func=get_metadata,
-                ),
+            # Use injected dependencies - no more service locator!
+            return CloudSyncConfigService(
+                db=db,
+                rclone_service=self._rclone_service,
+                storage_factory=self._storage_factory,
+                encryption_service=self._encryption_service,
+                get_metadata_func=self._metadata_func,
             )
 
         self.register_implementation(
@@ -207,162 +184,71 @@ class CloudProviderServiceFactory(ServiceFactory[CloudSyncServiceProtocol]):
         )
 
     def create_cloud_sync_service(
-        self, service_type: str = "default", **config: Any
-    ) -> CloudSyncServiceProtocol:
-        """Create a cloud sync service for the specified type."""
-        return self.create_service(service_type, **config)
+        self, db: "Session", service_type: str = "default"
+    ) -> CloudSyncConfigServiceProtocol:
+        """Create a cloud sync service."""
+        return self.create_service(service_type, db=db)
 
 
 class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
-    """Factory for creating backup services."""
+    """Factory for creating backup services with proper dependency injection."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        command_runner: CommandRunnerProtocol,
+        volume_service: "VolumeServiceProtocol",
+        job_manager: "JobManagerProtocol",
+    ) -> None:
         super().__init__()
+        # Inject dependencies instead of using service locator
+        self._command_runner = command_runner
+        self._volume_service = volume_service
+        self._job_manager = job_manager
         self._register_default_implementations()
 
     def _register_default_implementations(self) -> None:
         """Register default backup service implementations."""
 
-        # Note: BorgService requires dependencies, so we'll use a factory function
-        def create_borg_service(**kwargs: Any) -> BackupServiceProtocol:
+        def create_borg_service(
+            job_executor: Optional["JobExecutor"] = None,
+            command_runner: Optional[CommandRunnerProtocol] = None,
+            job_manager: Optional["JobManagerProtocol"] = None,
+            volume_service: Optional["VolumeServiceProtocol"] = None,
+        ) -> BackupServiceProtocol:
+            """Factory function to create BorgService."""
             from borgitory.services.borg_service import BorgService
-            from borgitory.dependencies import (
-                get_simple_command_runner,
-                get_volume_service,
-                get_job_manager_dependency,
-            )
 
-            # Use provided dependencies or defaults
-            command_runner = kwargs.get("command_runner", get_simple_command_runner())
-            volume_service = kwargs.get("volume_service", get_volume_service())
-            job_manager = kwargs.get("job_manager", get_job_manager_dependency())
+            # Use provided dependencies or injected defaults - no more service locator!
+            final_command_runner = command_runner or self._command_runner
+            final_volume_service = volume_service or self._volume_service
+            final_job_manager = job_manager or self._job_manager
 
             return BorgService(
-                command_runner=command_runner,
-                volume_service=volume_service,
-                job_manager=job_manager,
+                job_executor=job_executor,
+                command_runner=final_command_runner,
+                volume_service=final_volume_service,
+                job_manager=final_job_manager,
             )
 
         self.register_implementation("borg", create_borg_service, set_as_default=True)
 
     def create_backup_service(
-        self, backup_type: str = "borg", **config: Any
+        self,
+        backup_type: str = "borg",
+        job_executor: Optional["JobExecutor"] = None,
+        command_runner: Optional[CommandRunnerProtocol] = None,
+        job_manager: Optional["JobManagerProtocol"] = None,
+        volume_service: Optional["VolumeServiceProtocol"] = None,
     ) -> BackupServiceProtocol:
-        """Create a backup service of the specified type."""
-        return self.create_service(backup_type, **config)
+        """Create a backup service."""
+        return self.create_service(
+            backup_type,
+            job_executor=job_executor,
+            command_runner=command_runner,
+            job_manager=job_manager,
+            volume_service=volume_service,
+        )
 
 
-class ServiceRegistry:
-    """Central registry for all service factories."""
-
-    def __init__(self) -> None:
-        self._factories: Dict[str, "ServiceFactory[Any]"] = {}
-        self._initialize_default_factories()
-
-    def _initialize_default_factories(self) -> None:
-        """Initialize default service factories."""
-        self.register_factory("notifications", NotificationServiceFactory())
-        self.register_factory("command_runners", CommandRunnerFactory())
-        self.register_factory("cloud_providers", CloudProviderServiceFactory())
-        self.register_factory("backup_services", BackupServiceFactory())
-
-    def register_factory(self, name: str, factory: "ServiceFactory[Any]") -> None:
-        """Register a service factory."""
-        self._factories[name] = factory
-        logger.info(f"Registered factory '{name}'")
-
-    @overload
-    def get_factory(
-        self, name: Literal["notifications"]
-    ) -> NotificationServiceFactory: ...
-
-    @overload
-    def get_factory(self, name: Literal["command_runners"]) -> CommandRunnerFactory: ...
-
-    @overload
-    def get_factory(
-        self, name: Literal["cloud_providers"]
-    ) -> CloudProviderServiceFactory: ...
-
-    @overload
-    def get_factory(self, name: Literal["backup_services"]) -> BackupServiceFactory: ...
-
-    @overload
-    def get_factory(self, name: str) -> "ServiceFactory[Any]": ...
-
-    def get_factory(self, name: str) -> "ServiceFactory[Any]":
-        """Get a service factory by name."""
-        if name not in self._factories:
-            available = list(self._factories.keys())
-            raise ValueError(f"Factory '{name}' not found. Available: {available}")
-        return self._factories[name]
-
-    def list_factories(self) -> Dict[str, "ServiceFactory[Any]"]:
-        """List all registered factories."""
-        return self._factories.copy()
-
-    # Convenience methods for common factories
-    def get_notification_factory(self) -> NotificationServiceFactory:
-        """Get the notification service factory."""
-        return self.get_factory("notifications")
-
-    def get_command_runner_factory(self) -> CommandRunnerFactory:
-        """Get the command runner factory."""
-        return self.get_factory("command_runners")
-
-    def get_cloud_provider_service_factory(self) -> CloudProviderServiceFactory:
-        """Get the cloud provider service factory."""
-        return self.get_factory("cloud_providers")
-
-    def get_backup_service_factory(self) -> BackupServiceFactory:
-        """Get the backup service factory."""
-        return self.get_factory("backup_services")
-
-
-# Global service registry instance
-_service_registry: Optional[ServiceRegistry] = None
-
-
-def get_service_registry() -> ServiceRegistry:
-    """Get the global service registry instance."""
-    global _service_registry
-    if _service_registry is None:
-        _service_registry = ServiceRegistry()
-    return _service_registry
-
-
-# Convenience functions for common operations
-def create_notification_service(
-    provider: str = "pushover", **config: Any
-) -> NotificationServiceProtocol:
-    """Create a notification service using the factory."""
-    registry = get_service_registry()
-    factory = registry.get_notification_factory()
-    return factory.create_notification_service(provider, **config)
-
-
-def create_command_runner(
-    runner_type: str = "simple", **config: Any
-) -> CommandRunnerProtocol:
-    """Create a command runner using the factory."""
-    registry = get_service_registry()
-    factory = registry.get_command_runner_factory()
-    return factory.create_command_runner(runner_type, **config)
-
-
-def create_cloud_sync_service(
-    service_type: str = "default", **config: Any
-) -> CloudSyncServiceProtocol:
-    """Create a cloud sync service using the factory."""
-    registry = get_service_registry()
-    factory = registry.get_cloud_provider_service_factory()
-    return factory.create_cloud_sync_service(service_type, **config)
-
-
-def create_backup_service(
-    backup_type: str = "borg", **config: Any
-) -> BackupServiceProtocol:
-    """Create a backup service using the factory."""
-    registry = get_service_registry()
-    factory = registry.get_backup_service_factory()
-    return factory.create_backup_service(backup_type, **config)
+# Note: Global convenience functions removed to avoid circular imports
+# Use the factory directly via dependencies.py

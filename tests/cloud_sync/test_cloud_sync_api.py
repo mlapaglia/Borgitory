@@ -8,7 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy.orm import Session
 from unittest.mock import patch, Mock
 
-from borgitory.services.cloud_sync_service import CloudSyncService
+from borgitory.services.cloud_sync_service import CloudSyncConfigService
 from tests.conftest import create_s3_cloud_sync_config
 
 
@@ -70,7 +70,7 @@ class TestCloudSyncAPIHTMX:
 
         # Mock the service to avoid actual database operations
         with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
-            CloudSyncService, "create_cloud_sync_config"
+            CloudSyncConfigService, "create_cloud_sync_config"
         ) as mock_create:
             mock_db = Mock()
             mock_get_db.return_value = mock_db
@@ -125,7 +125,7 @@ class TestCloudSyncAPIHTMX:
         from fastapi import HTTPException
 
         with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
-            CloudSyncService, "create_cloud_sync_config"
+            CloudSyncConfigService, "create_cloud_sync_config"
         ) as mock_create:
             mock_db = Mock()
             mock_get_db.return_value = mock_db
@@ -142,7 +142,7 @@ class TestCloudSyncAPIHTMX:
     async def test_get_configs_html_empty(self, async_client: AsyncClient) -> None:
         """Test getting configs as HTML when empty."""
         with patch.object(
-            CloudSyncService, "get_cloud_sync_configs"
+            CloudSyncConfigService, "get_cloud_sync_configs"
         ) as mock_get_configs:
             mock_get_configs.return_value = []
 
@@ -262,7 +262,7 @@ class TestCloudSyncAPIHTMX:
 
         # Mock the rclone service and cloud sync service
         with patch(
-            "borgitory.services.cloud_sync_service.CloudSyncService.test_cloud_sync_config"
+            "borgitory.services.cloud_sync_service.CloudSyncConfigService.test_cloud_sync_config"
         ) as mock_test:
             mock_test.return_value = {
                 "status": "success",
@@ -324,7 +324,7 @@ class TestCloudSyncAPIHTMX:
 
         # Mock the service to avoid actual database operations
         with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
-            CloudSyncService, "create_cloud_sync_config"
+            CloudSyncConfigService, "create_cloud_sync_config"
         ) as mock_create:
             mock_db = Mock()
             mock_get_db.return_value = mock_db

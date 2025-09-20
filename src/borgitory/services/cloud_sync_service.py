@@ -63,8 +63,8 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
         return []
 
 
-class CloudSyncService:
-    """Service class for cloud sync configuration operations."""
+class CloudSyncConfigService:
+    """Service class for cloud sync configuration management (CRUD operations)."""
 
     def __init__(
         self,

@@ -6,6 +6,8 @@ from typing import Protocol, Dict, List, Optional, Callable, Union, TYPE_CHECKIN
 
 if TYPE_CHECKING:
     from borgitory.models.database import CloudSyncConfig
+    from borgitory.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
+    from borgitory.services.cloud_providers import StorageFactory, EncryptionService
 
 
 class CloudStorageProtocol(Protocol):
@@ -94,6 +96,51 @@ class CloudSyncServiceProtocol(Protocol):
         stored_config: str,
     ) -> Dict[str, Union[str, int, float, bool, None]]:
         """Load configuration from database storage by decrypting sensitive fields."""
+        ...
+
+
+class CloudSyncConfigServiceProtocol(Protocol):
+    """Protocol for cloud sync configuration management (CRUD operations)."""
+
+    def create_cloud_sync_config(
+        self, config: "CloudSyncConfigCreate"
+    ) -> "CloudSyncConfig":
+        """Create a new cloud sync configuration."""
+        ...
+
+    def get_cloud_sync_configs(self) -> List["CloudSyncConfig"]:
+        """Get all cloud sync configurations."""
+        ...
+
+    def get_cloud_sync_config_by_id(self, config_id: int) -> "CloudSyncConfig":
+        """Get a cloud sync configuration by ID."""
+        ...
+
+    def update_cloud_sync_config(
+        self, config_id: int, config_update: "CloudSyncConfigUpdate"
+    ) -> "CloudSyncConfig":
+        """Update a cloud sync configuration."""
+        ...
+
+    def delete_cloud_sync_config(self, config_id: int) -> None:
+        """Delete a cloud sync configuration."""
+        ...
+
+    def enable_cloud_sync_config(self, config_id: int) -> "CloudSyncConfig":
+        """Enable a cloud sync configuration."""
+        ...
+
+    def disable_cloud_sync_config(self, config_id: int) -> "CloudSyncConfig":
+        """Disable a cloud sync configuration."""
+        ...
+
+    def get_decrypted_config_for_editing(
+        self,
+        config_id: int,
+        encryption_service: "EncryptionService",
+        storage_factory: "StorageFactory",
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
+        """Get decrypted configuration for editing."""
         ...
 
 

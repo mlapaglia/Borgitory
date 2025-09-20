@@ -57,7 +57,7 @@ from fastapi.templating import Jinja2Templates
 from borgitory.services.cloud_providers import EncryptionService, StorageFactory
 
 if TYPE_CHECKING:
-    from borgitory.services.cloud_sync_service import CloudSyncService
+    from borgitory.services.cloud_sync_service import CloudSyncConfigService
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
     from borgitory.protocols.command_protocols import (
         CommandRunnerProtocol,
@@ -67,7 +67,7 @@ if TYPE_CHECKING:
     from borgitory.protocols.job_protocols import (
         JobManagerProtocol,
     )
-    from borgitory.protocols.cloud_protocols import CloudSyncServiceProtocol
+    from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
     from borgitory.factories.service_factory import CloudProviderServiceFactory
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
@@ -632,14 +632,21 @@ def get_storage_factory(
 @lru_cache()
 def get_cloud_provider_service_factory() -> "CloudProviderServiceFactory":
     """
-    Provide CloudProviderServiceFactory singleton instance.
+    Provide CloudProviderServiceFactory singleton instance with proper DI.
 
     Uses FastAPI's built-in caching for singleton behavior.
-    Following the exact pattern of NotificationProviderFactory.
+    Now properly injects dependencies instead of using service locator pattern.
     """
+    # **DI CHECK**: Factory gets dependencies injected, no more service locator!
     from borgitory.factories.service_factory import CloudProviderServiceFactory
+    from borgitory.services.cloud_providers.registry import get_metadata
 
-    return CloudProviderServiceFactory()
+    return CloudProviderServiceFactory(
+        rclone_service=get_rclone_service(),
+        storage_factory=get_storage_factory(get_rclone_service()),
+        encryption_service=get_encryption_service(),
+        metadata_func=get_metadata,
+    )
 
 
 def get_cloud_sync_service(
@@ -647,15 +654,15 @@ def get_cloud_sync_service(
     factory: "CloudProviderServiceFactory" = Depends(
         get_cloud_provider_service_factory
     ),
-) -> "CloudSyncServiceProtocol":
+) -> "CloudSyncConfigServiceProtocol":
     """
-    Provide a CloudSyncService instance using factory pattern with proper DI.
+    Provide a CloudSyncConfigService instance using factory pattern with proper DI.
 
     Request-scoped since it depends on database session.
     Uses factory for consistent DI pattern across all services.
     """
     # **DI CHECK**: Using factory pattern with request-scoped db injection
-    return factory.create_cloud_sync_service("default", db=db)
+    return factory.create_cloud_sync_service(db, "default")
 
 
 # 📋 SEMANTIC TYPE ALIASES FOR DEPENDENCY INJECTION
@@ -743,7 +750,9 @@ CronDescriptionServiceDep = Annotated[
 UpcomingBackupsServiceDep = Annotated[
     UpcomingBackupsService, Depends(get_upcoming_backups_service)
 ]
-CloudSyncServiceDep = Annotated["CloudSyncService", Depends(get_cloud_sync_service)]
+CloudSyncServiceDep = Annotated[
+    "CloudSyncConfigService", Depends(get_cloud_sync_service)
+]
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
 
 
