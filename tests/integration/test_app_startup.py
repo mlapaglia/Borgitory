@@ -16,6 +16,7 @@ class AppRunner:
         # Use a different port for each test to avoid conflicts
         if port is None:
             import random
+
             port = random.randint(8001, 8999)
         self.port = port
         self.process: Optional[subprocess.Popen] = None
@@ -47,17 +48,17 @@ class AppRunner:
         while time.time() - start_time < timeout:
             if self.is_ready():
                 return True
-            
+
             # Check if process crashed
             if self.process.poll() is not None:
                 # Process died, get logs and fail immediately
                 stdout, stderr = self.get_logs()
-                print(f"Process crashed during startup!")
+                print("Process crashed during startup!")
                 print(f"Exit code: {self.process.poll()}")
                 print(f"STDOUT: {stdout}")
                 print(f"STDERR: {stderr}")
                 return False
-                
+
             time.sleep(0.5)
 
         # If we get here, startup timed out

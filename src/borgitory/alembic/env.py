@@ -45,7 +45,7 @@ def get_database_url() -> str:
         "../../local-data/borgitory.db",  # From src/borgitory/
         os.path.join(os.getcwd(), "local-data", "borgitory.db"),  # Absolute from cwd
     ]
-    
+
     for local_db_path in possible_paths:
         if os.path.exists(local_db_path):
             # Convert to absolute path for consistency
