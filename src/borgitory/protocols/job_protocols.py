@@ -2,16 +2,17 @@
 Protocol interfaces for job management services.
 """
 
-from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING, Any
+from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
 import asyncio
-
-from borgitory.services.volumes.volume_service import VolumeInfo
 
 if TYPE_CHECKING:
     from borgitory.services.jobs.job_manager import BorgJob
     from borgitory.services.jobs.broadcaster.job_event import JobEvent
     from borgitory.models.database import Repository, Schedule
+    from borgitory.services.debug_service import DebugInfo, SystemInfo, JobManagerInfo
+    from borgitory.services.volumes.volume_service import VolumeInfo
+    from sqlalchemy.orm import Session
 
 
 class JobStatusProtocol(Protocol):
@@ -127,6 +128,7 @@ class JobRenderServiceProtocol(Protocol):
 class DebugServiceProtocol(Protocol):
     """Protocol for debug/diagnostics services."""
 
-    def get_system_info(self) -> Dict[str, Any]: ...
-    async def get_volume_info(self) -> Dict[str, VolumeInfo]: ...
-    def get_job_manager_info(self) -> Dict[str, Any]: ...
+    async def get_debug_info(self, db: "Session") -> "DebugInfo": ...
+    async def _get_system_info(self) -> "SystemInfo": ...
+    async def _get_volume_info(self) -> "VolumeInfo": ...
+    def _get_job_manager_info(self) -> "JobManagerInfo": ...
