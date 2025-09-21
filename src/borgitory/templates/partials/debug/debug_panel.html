@@ -183,39 +183,35 @@
             Tool Versions
         </h3>
         <div class="space-y-3 text-sm">
-            {% if debug_info.tools.error is defined %}
-                <div class="text-red-600">
-                    <span class="font-semibold">✗ Tools Error:</span> {{ debug_info.tools.error }}
+            <!-- Python Version (always first) -->
+            {% if debug_info.system.error is not defined %}
+            <div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 dark:text-gray-400">Python:</span>
+                    <span class="text-green-600 font-semibold">✓ Available</span>
                 </div>
-            {% else %}
-                <!-- Python Version (always first) -->
-                <div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400">Python:</span>
-                        <span class="text-green-600 font-semibold">✓ Available</span>
-                    </div>
-                    <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ debug_info.system.python_version.split()[0] }}</div>
-                </div>
-                
-                <!-- Other tools -->
-                {% for tool_name, tool_info in debug_info.tools.items() %}
-                <div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400">{{ tool_name|title }}:</span>
-                        {% if tool_info.accessible %}
-                            <span class="text-green-600 font-semibold">✓ Available</span>
-                        {% else %}
-                            <span class="text-red-600 font-semibold">✗ Not Available</span>
-                        {% endif %}
-                    </div>
+                <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ debug_info.system.python_version.split()[0] }}</div>
+            </div>
+            {% endif %}
+            
+            <!-- Other tools -->
+            {% for tool_name, tool_info in debug_info.tools.items() %}
+            <div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 dark:text-gray-400">{{ tool_name|title }}:</span>
                     {% if tool_info.accessible %}
-                        <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ tool_info.version }}</div>
+                        <span class="text-green-600 font-semibold">✓ Available</span>
                     {% else %}
-                        <div class="text-red-600 text-xs mt-1">{{ tool_info.error }}</div>
+                        <span class="text-red-600 font-semibold">✗ Not Available</span>
                     {% endif %}
                 </div>
-                {% endfor %}
-            {% endif %}
+                {% if tool_info.accessible %}
+                    <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ tool_info.version }}</div>
+                {% else %}
+                    <div class="text-red-600 text-xs mt-1">{{ tool_info.error }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
         </div>
     </div>
 

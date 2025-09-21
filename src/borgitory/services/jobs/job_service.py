@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from borgitory.models.database import Repository, Job
 from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from borgitory.models.enums import JobType
-from borgitory.services.jobs.job_manager import JobManager
+from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.services.backups.backup_service import BackupService
 
@@ -25,7 +25,7 @@ class JobService:
     def __init__(
         self,
         db: Session,
-        job_manager: JobManager,
+        job_manager: JobManagerProtocol,
         backup_service: Optional[BackupService] = None,
     ) -> None:
         self.db = db
@@ -366,7 +366,7 @@ class JobService:
 
         return cleaned
 
-    def get_queue_stats(self) -> Dict[str, object]:
+    def get_queue_stats(self) -> Dict[str, int]:
         """Get backup queue statistics"""
         return self.job_manager.get_queue_stats()
 

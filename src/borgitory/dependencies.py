@@ -74,8 +74,6 @@ from borgitory.services.jobs.job_output_manager import JobOutputManager
 from borgitory.services.jobs.job_queue_manager import JobQueueManager
 from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
-# Global singleton instances
-
 
 # Job Manager Sub-Services (defined first to avoid forward references)
 @lru_cache()
@@ -309,25 +307,6 @@ def get_repository_stats_service() -> RepositoryStatsService:
     return RepositoryStatsService()
 
 
-_scheduler_service_instance = None
-
-
-def get_scheduler_service() -> SchedulerService:
-    """
-    Provide a SchedulerService singleton instance with proper dependency injection.
-
-    Now uses the new DI system while maintaining backward compatibility.
-    """
-    global _scheduler_service_instance
-    if _scheduler_service_instance is None:
-        job_manager = get_job_manager_dependency()
-
-        _scheduler_service_instance = SchedulerService(
-            job_manager=job_manager, job_service_factory=None
-        )
-    return _scheduler_service_instance
-
-
 @lru_cache()
 def get_volume_service() -> "VolumeServiceProtocol":
     """
@@ -391,70 +370,170 @@ def get_templates() -> Jinja2Templates:
     return Jinja2Templates(directory=template_path)
 
 
-_job_manager_instance = None
-
-
-def get_job_manager_dependency() -> "JobManagerProtocol":
+@lru_cache()
+def get_provider_registry() -> ProviderRegistry:
     """
-    Provide a JobManager singleton instance for FastAPI dependency injection.
+    Provide a ProviderRegistry singleton instance with proper dependency injection.
 
-    Now uses the new sub-service DI system while maintaining backward compatibility.
+    Uses FastAPI's built-in caching for singleton behavior.
+    Ensures all cloud storage providers are registered by importing the storage modules.
     """
-    global _job_manager_instance
-    if _job_manager_instance is None:
-        import os
-        from borgitory.services.jobs.job_manager import (
-            JobManager,
-            JobManagerConfig,
-            JobManagerDependencies,
-            JobManagerFactory,
-        )
+    # Use the factory to ensure all providers are properly registered
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
-        # Create configuration from environment
-        config = JobManagerConfig(
-            max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
-            max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
-            max_concurrent_operations=int(
-                os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")
-            ),
-            queue_poll_interval=float(os.getenv("BORG_QUEUE_POLL_INTERVAL", "0.1")),
-            sse_keepalive_timeout=float(
-                os.getenv("BORG_SSE_KEEPALIVE_TIMEOUT", "30.0")
-            ),
-            sse_max_queue_size=int(os.getenv("BORG_SSE_MAX_QUEUE_SIZE", "100")),
-            max_concurrent_cloud_uploads=int(
-                os.getenv("BORG_MAX_CONCURRENT_CLOUD_UPLOADS", "3")
-            ),
-        )
+    return RegistryFactory.create_production_registry()
 
-        # Create dependencies using our new DI services (resolved directly)
-        custom_dependencies = JobManagerDependencies(
-            job_executor=get_job_executor(),
-            output_manager=get_job_output_manager(),
-            queue_manager=get_job_queue_manager(),
-            database_manager=get_job_database_manager(),
-            event_broadcaster=get_job_event_broadcaster_dep(),
-            rclone_service=get_rclone_service(),
-            notification_service=get_notification_service_singleton(),
-            # Add cloud sync dependencies
-            encryption_service=get_encryption_service(),
-            storage_factory=get_storage_factory(get_rclone_service()),
-            provider_registry=get_provider_registry(),
-        )
 
-        # Use the factory to ensure all dependencies are properly initialized
-        dependencies = JobManagerFactory.create_dependencies(
-            config=config, custom_dependencies=custom_dependencies
-        )
+@lru_cache()
+def get_configuration_service() -> ConfigurationService:
+    """
+    Provide a ConfigurationService singleton instance.
 
-        _job_manager_instance = JobManager(config=config, dependencies=dependencies)
+    Uses FastAPI's built-in caching for singleton behavior.
+    """
+    return ConfigurationService()
 
-    return _job_manager_instance
+
+def get_repository_check_config_service(
+    db: Session = Depends(get_db),
+) -> RepositoryCheckConfigService:
+    """
+    Provide a RepositoryCheckConfigService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return RepositoryCheckConfigService(db=db)
+
+
+def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
+    """
+    Provide a CleanupService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return CleanupService(db=db)
+
+
+@lru_cache()
+def get_cron_description_service() -> CronDescriptionService:
+    """
+    Provide a CronDescriptionService singleton instance.
+
+    Uses FastAPI's built-in caching for singleton behavior.
+    """
+    return CronDescriptionService()
+
+
+def get_upcoming_backups_service(
+    cron_description_service: CronDescriptionService = Depends(
+        get_cron_description_service
+    ),
+) -> UpcomingBackupsService:
+    """Provide UpcomingBackupsService instance."""
+    return UpcomingBackupsService(cron_description_service)
+
+
+def get_encryption_service() -> EncryptionService:
+    """Provide an EncryptionService instance."""
+    return EncryptionService()
+
+
+def get_storage_factory(
+    rclone: RcloneService = Depends(get_rclone_service),
+) -> StorageFactory:
+    """Provide a StorageFactory instance with injected RcloneService."""
+    return StorageFactory(rclone)
+
+
+def get_job_manager_dependency(
+    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
+    output_manager: JobOutputManager = Depends(get_job_output_manager),
+    queue_manager: JobQueueManager = Depends(get_job_queue_manager),
+    database_manager: JobDatabaseManager = Depends(get_job_database_manager),
+    event_broadcaster: JobEventBroadcaster = Depends(get_job_event_broadcaster_dep),
+    rclone_service: RcloneService = Depends(get_rclone_service),
+    notification_service: NotificationService = Depends(get_notification_service),
+    encryption_service: EncryptionService = Depends(get_encryption_service),
+    storage_factory: StorageFactory = Depends(get_storage_factory),
+    provider_registry: ProviderRegistry = Depends(get_provider_registry),
+) -> "JobManagerProtocol":
+    """
+    Provide a JobManager instance with proper FastAPI dependency injection.
+
+    Uses pure DI pattern - no global singletons, all dependencies injected by FastAPI.
+    """
+    import os
+    from borgitory.services.jobs.job_manager import (
+        JobManager,
+        JobManagerConfig,
+        JobManagerDependencies,
+        JobManagerFactory,
+    )
+
+    # Create configuration from environment
+    config = JobManagerConfig(
+        max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
+        max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
+        max_concurrent_operations=int(
+            os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")
+        ),
+        queue_poll_interval=float(os.getenv("BORG_QUEUE_POLL_INTERVAL", "0.1")),
+        sse_keepalive_timeout=float(os.getenv("BORG_SSE_KEEPALIVE_TIMEOUT", "30.0")),
+        sse_max_queue_size=int(os.getenv("BORG_SSE_MAX_QUEUE_SIZE", "100")),
+        max_concurrent_cloud_uploads=int(
+            os.getenv("BORG_MAX_CONCURRENT_CLOUD_UPLOADS", "3")
+        ),
+    )
+
+    # Create dependencies using injected services
+    custom_dependencies = JobManagerDependencies(
+        job_executor=job_executor,
+        output_manager=output_manager,
+        queue_manager=queue_manager,
+        database_manager=database_manager,
+        event_broadcaster=event_broadcaster,
+        rclone_service=rclone_service,
+        notification_service=notification_service,
+        encryption_service=encryption_service,
+        storage_factory=storage_factory,
+        provider_registry=provider_registry,
+    )
+
+    # Use the factory to ensure all dependencies are properly initialized
+    dependencies = JobManagerFactory.create_dependencies(
+        config=config, custom_dependencies=custom_dependencies
+    )
+
+    job_manager = JobManager(config=config, dependencies=dependencies)
+    return job_manager
+
+
+def get_scheduler_service(
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+) -> SchedulerService:
+    """
+    Provide a SchedulerService instance with proper FastAPI dependency injection.
+
+    Uses pure DI pattern - no global singletons, all dependencies injected by FastAPI.
+    """
+    return SchedulerService(job_manager=job_manager, job_service_factory=None)
+
+
+def get_schedule_service(
+    db: Session = Depends(get_db),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+) -> ScheduleService:
+    """
+    Provide a ScheduleService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return ScheduleService(db=db, scheduler_service=scheduler_service)
 
 
 def get_job_service(
     db: Session = Depends(get_db),
-    job_manager: JobManager = Depends(get_job_manager_dependency),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> JobService:
     """
     Provide a JobService instance with database session injection.
@@ -529,93 +608,6 @@ def get_repository_service(
         scheduler_service=scheduler_service,
         volume_service=volume_service,
     )
-
-
-@lru_cache()
-def get_provider_registry() -> ProviderRegistry:
-    """
-    Provide a ProviderRegistry singleton instance with proper dependency injection.
-
-    Uses FastAPI's built-in caching for singleton behavior.
-    Ensures all cloud storage providers are registered by importing the storage modules.
-    """
-    # Use the factory to ensure all providers are properly registered
-    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
-
-    return RegistryFactory.create_production_registry()
-
-
-def get_schedule_service(
-    db: Session = Depends(get_db),
-    scheduler_service: SchedulerService = Depends(get_scheduler_service),
-) -> ScheduleService:
-    """
-    Provide a ScheduleService instance with database session injection.
-
-    Note: This creates a new instance per request since it depends on the database session.
-    """
-    return ScheduleService(db=db, scheduler_service=scheduler_service)
-
-
-@lru_cache()
-def get_configuration_service() -> ConfigurationService:
-    """
-    Provide a ConfigurationService singleton instance.
-
-    Uses FastAPI's built-in caching for singleton behavior.
-    """
-    return ConfigurationService()
-
-
-def get_repository_check_config_service(
-    db: Session = Depends(get_db),
-) -> RepositoryCheckConfigService:
-    """
-    Provide a RepositoryCheckConfigService instance with database session injection.
-
-    Note: This creates a new instance per request since it depends on the database session.
-    """
-    return RepositoryCheckConfigService(db=db)
-
-
-def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
-    """
-    Provide a CleanupService instance with database session injection.
-
-    Note: This creates a new instance per request since it depends on the database session.
-    """
-    return CleanupService(db=db)
-
-
-@lru_cache()
-def get_cron_description_service() -> CronDescriptionService:
-    """
-    Provide a CronDescriptionService singleton instance.
-
-    Uses FastAPI's built-in caching for singleton behavior.
-    """
-    return CronDescriptionService()
-
-
-def get_upcoming_backups_service(
-    cron_description_service: CronDescriptionService = Depends(
-        get_cron_description_service
-    ),
-) -> UpcomingBackupsService:
-    """Provide UpcomingBackupsService instance."""
-    return UpcomingBackupsService(cron_description_service)
-
-
-def get_encryption_service() -> EncryptionService:
-    """Provide an EncryptionService instance."""
-    return EncryptionService()
-
-
-def get_storage_factory(
-    rclone: RcloneService = Depends(get_rclone_service),
-) -> StorageFactory:
-    """Provide a StorageFactory instance with injected RcloneService."""
-    return StorageFactory(rclone)
 
 
 @lru_cache()

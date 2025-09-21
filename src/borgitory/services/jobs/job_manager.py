@@ -8,7 +8,6 @@ clean architecture following the same pattern as other services in the applicati
 import asyncio
 import logging
 import uuid
-import os
 from datetime import datetime, UTC
 from typing import (
     Union,
@@ -41,7 +40,6 @@ from borgitory.services.jobs.job_database_manager import (
 from borgitory.services.rclone_service import RcloneService
 from borgitory.utils.db_session import get_db_session
 from contextlib import _GeneratorContextManager
-from unittest.mock import Mock
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
@@ -1877,37 +1875,6 @@ class JobManager:
             logger.warning(f"Cannot unregister external job {job_id} - not found")
 
 
-# Factory function for creating JobManager instances (no singleton)
-def create_job_manager(
-    config: Optional[Union[JobManagerConfig, Mock]] = None,
-    rclone_service: Optional[RcloneService] = None,
-) -> JobManager:
-    """Factory function for creating JobManager instances"""
-    if config is None:
-        # Use environment variables or defaults
-        internal_config = JobManagerConfig(
-            max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
-            max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
-        )
-    else:
-        # Assume it's already a JobManagerConfig or compatible
-        internal_config = config
-
-    # Create dependencies with rclone service
-    custom_deps = JobManagerDependencies(rclone_service=rclone_service)
-
-    dependencies = JobManagerFactory.create_dependencies(
-        config=internal_config, custom_dependencies=custom_deps
-    )
-
-    job_manager = JobManager(config=internal_config, dependencies=dependencies)
-    logger.info(
-        f"Created new job manager with config: max_concurrent={internal_config.max_concurrent_backups}"
-    )
-
-    return job_manager
-
-
 def get_default_job_manager_dependencies() -> JobManagerDependencies:
     """Get default job manager dependencies (production configuration)"""
     return JobManagerFactory.create_complete_dependencies()
@@ -1934,7 +1901,6 @@ __all__ = [
     "JobManagerFactory",
     "BorgJob",
     "BorgJobTask",
-    "create_job_manager",
     "get_default_job_manager_dependencies",
     "get_test_job_manager_dependencies",
 ]

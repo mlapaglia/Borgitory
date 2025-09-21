@@ -32,57 +32,134 @@ class TestDebugService:
         self, debug_service, mock_db_session
     ) -> None:
         """Test successful retrieval of all debug info sections"""
+        # Mock data that matches our TypedDict structures
+        system_info = {
+            "platform": "Test Platform",
+            "system": "TestOS",
+            "release": "1.0",
+            "version": "1.0.0",
+            "architecture": "x64",
+            "processor": "Test Processor",
+            "hostname": "test-host",
+            "python_version": "Python 3.9.0",
+            "python_executable": "/usr/bin/python",
+        }
+
+        app_info = {
+            "borgitory_version": "1.0.0",
+            "debug_mode": False,
+            "startup_time": "2023-01-01T12:00:00",
+            "working_directory": "/test/dir",
+        }
+
+        db_info = {
+            "repository_count": 5,
+            "total_jobs": 100,
+            "jobs_today": 10,
+            "database_type": "SQLite",
+            "database_url": "sqlite:///test.db",
+            "database_size": "1.0 MB",
+            "database_size_bytes": 1048576,
+            "database_accessible": True,
+        }
+
+        volume_info = {
+            "mounted_volumes": ["/data", "/backup"],
+            "total_mounted_volumes": 2,
+        }
+
+        tools_info = {
+            "borg": {"version": "borg 1.2.0", "accessible": True},
+            "rclone": {"version": "rclone v1.58.0", "accessible": True},
+        }
+
+        env_info = {"PATH": "/usr/bin:/bin", "HOME": "/home/user", "DEBUG": "false"}
+
+        job_manager_info = {
+            "active_jobs": 2,
+            "total_jobs": 5,
+            "job_manager_running": True,
+        }
+
         with patch.object(
-            debug_service, "_get_system_info", return_value={"system": "info"}
+            debug_service, "_get_system_info", return_value=system_info
         ), patch.object(
-            debug_service, "_get_application_info", return_value={"app": "info"}
+            debug_service, "_get_application_info", return_value=app_info
         ), patch.object(
-            debug_service, "_get_database_info", return_value={"db": "info"}
+            debug_service, "_get_database_info", return_value=db_info
         ), patch.object(
-            debug_service, "_get_volume_info", return_value={"volumes": "info"}
+            debug_service, "_get_volume_info", return_value=volume_info
         ), patch.object(
-            debug_service, "_get_tool_versions", return_value={"tools": "info"}
+            debug_service, "_get_tool_versions", return_value=tools_info
         ), patch.object(
-            debug_service, "_get_environment_info", return_value={"env": "info"}
+            debug_service, "_get_environment_info", return_value=env_info
         ), patch.object(
-            debug_service, "_get_job_manager_info", return_value={"jobs": "info"}
+            debug_service, "_get_job_manager_info", return_value=job_manager_info
         ):
             result = await debug_service.get_debug_info(mock_db_session)
 
-            assert result["system"] == {"system": "info"}
-            assert result["application"] == {"app": "info"}
-            assert result["database"] == {"db": "info"}
-            assert result["volumes"] == {"volumes": "info"}
-            assert result["tools"] == {"tools": "info"}
-            assert result["environment"] == {"env": "info"}
-            assert result["job_manager"] == {"jobs": "info"}
+            assert result["system"] == system_info
+            assert result["application"] == app_info
+            assert result["database"] == db_info
+            assert result["volumes"] == volume_info
+            assert result["tools"] == tools_info
+            assert result["environment"] == env_info
+            assert result["job_manager"] == job_manager_info
 
     @pytest.mark.asyncio
     async def test_get_debug_info_handles_section_failures(
         self, debug_service, mock_db_session
     ) -> None:
-        """Test that individual section failures don't break entire debug info"""
+        """Test that individual section failures are handled internally by each method"""
+        # In the new architecture, methods handle their own exceptions and return error dicts
+        app_info = {
+            "borgitory_version": "1.0.0",
+            "debug_mode": False,
+            "startup_time": "2023-01-01T12:00:00",
+            "working_directory": "/test/dir",
+        }
+
+        volume_info = {"mounted_volumes": ["/data"], "total_mounted_volumes": 1}
+
+        tools_info = {"borg": {"version": "borg 1.2.0", "accessible": True}}
+
+        env_info = {"PATH": "/usr/bin:/bin", "DEBUG": "false"}
+
+        job_manager_info = {
+            "active_jobs": 1,
+            "total_jobs": 3,
+            "job_manager_running": True,
+        }
+
         with patch.object(
-            debug_service, "_get_system_info", side_effect=Exception("System error")
+            debug_service, "_get_system_info", return_value={"error": "System error"}
         ), patch.object(
-            debug_service, "_get_application_info", return_value={"app": "info"}
+            debug_service, "_get_application_info", return_value=app_info
         ), patch.object(
-            debug_service, "_get_database_info", side_effect=Exception("DB error")
+            debug_service,
+            "_get_database_info",
+            return_value={"error": "DB error", "database_accessible": False},
         ), patch.object(
-            debug_service, "_get_volume_info", return_value={"volumes": "info"}
+            debug_service, "_get_volume_info", return_value=volume_info
         ), patch.object(
-            debug_service, "_get_tool_versions", return_value={"tools": "info"}
+            debug_service, "_get_tool_versions", return_value=tools_info
         ), patch.object(
-            debug_service, "_get_environment_info", return_value={"env": "info"}
+            debug_service, "_get_environment_info", return_value=env_info
         ), patch.object(
-            debug_service, "_get_job_manager_info", return_value={"jobs": "info"}
+            debug_service, "_get_job_manager_info", return_value=job_manager_info
         ):
             result = await debug_service.get_debug_info(mock_db_session)
 
             assert result["system"] == {"error": "System error"}
-            assert result["application"] == {"app": "info"}
-            assert result["database"] == {"error": "DB error"}
-            assert result["volumes"] == {"volumes": "info"}
+            assert result["application"] == app_info
+            assert result["database"] == {
+                "error": "DB error",
+                "database_accessible": False,
+            }
+            assert result["volumes"] == volume_info
+            assert result["tools"] == tools_info
+            assert result["environment"] == env_info
+            assert result["job_manager"] == job_manager_info
 
     @pytest.mark.asyncio
     async def test_get_system_info(self, debug_service) -> None:

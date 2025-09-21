@@ -1,10 +1,21 @@
 import logging
-from typing import List, Dict, Optional
+from typing import List, Optional, TypedDict
 
 from borgitory.services.volumes.file_system_interface import FileSystemInterface
 from borgitory.services.volumes.os_file_system import OsFileSystem
 
 logger = logging.getLogger(__name__)
+
+
+class VolumeInfo(TypedDict, total=False):
+    """Volume information structure"""
+
+    # Success fields
+    mounted_volumes: List[str]
+    total_mounted_volumes: int
+    accessible: bool
+    # Error field
+    error: str
 
 
 class VolumeService:
@@ -41,12 +52,12 @@ class VolumeService:
             logger.error(f"Error discovering mounted volumes under /mnt: {e}")
             return []
 
-    async def get_volume_info(self) -> Dict[str, object]:
+    async def get_volume_info(self) -> VolumeInfo:
         """Get detailed information about mounted volumes"""
         try:
             mounted_volumes = await self.get_mounted_volumes()
 
-            volume_info = {
+            volume_info: VolumeInfo = {
                 "mounted_volumes": mounted_volumes,
                 "total_mounted_volumes": len(mounted_volumes),
                 "accessible": True,

@@ -4,13 +4,107 @@ import sys
 import os
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Optional, TypedDict, List
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job
 from borgitory.protocols import VolumeServiceProtocol, JobManagerProtocol
 
 logger = logging.getLogger(__name__)
+
+
+class SystemInfo(TypedDict, total=False):
+    """System information structure"""
+
+    # Success fields
+    platform: str
+    system: str
+    release: str
+    version: str
+    architecture: str
+    processor: str
+    hostname: str
+    python_version: str
+    python_executable: str
+    # Error field
+    error: str
+
+
+class ApplicationInfo(TypedDict, total=False):
+    """Application information structure"""
+
+    # Success fields
+    borgitory_version: Optional[str]
+    debug_mode: bool
+    startup_time: str
+    working_directory: str
+    # Error field
+    error: str
+
+
+class DatabaseInfo(TypedDict, total=False):
+    """Database information structure"""
+
+    # Success fields
+    repository_count: int
+    total_jobs: int
+    jobs_today: int
+    database_type: str
+    database_url: str
+    database_size: str
+    database_size_bytes: int
+    # Common fields
+    database_accessible: bool
+    # Error field
+    error: str
+
+
+class ToolInfo(TypedDict, total=False):
+    """Tool version information structure"""
+
+    # Success fields
+    version: str
+    accessible: bool
+    # Error field
+    error: str
+
+
+class VolumeDebugInfo(TypedDict, total=False):
+    """Volume debug information structure"""
+
+    # Success fields
+    mounted_volumes: List[str]
+    total_mounted_volumes: int
+    # Error field
+    error: str
+
+
+class JobManagerInfo(TypedDict, total=False):
+    """Job manager information structure"""
+
+    # Success fields
+    active_jobs: int
+    total_jobs: int
+    job_manager_running: bool
+    # Error/unavailable fields
+    error: str
+    status: str
+
+
+class DebugInfo(TypedDict):
+    """Comprehensive debug information structure
+
+    Each field contains the specific TypedDict for that section.
+    All TypedDicts use total=False to handle error cases with {"error": str}.
+    """
+
+    system: SystemInfo
+    application: ApplicationInfo
+    database: DatabaseInfo
+    volumes: VolumeDebugInfo
+    tools: Dict[str, ToolInfo]
+    environment: Dict[str, str]
+    job_manager: JobManagerInfo
 
 
 class DebugService:
@@ -24,80 +118,55 @@ class DebugService:
         self.volume_service = volume_service
         self.job_manager = job_manager
 
-    async def get_debug_info(self, db: Session) -> Dict[str, Any]:
+    async def get_debug_info(self, db: Session) -> DebugInfo:
         """Gather comprehensive debug information"""
-        debug_info = {}
-
-        # Get each section separately to avoid one failure breaking everything
-        try:
-            debug_info["system"] = await self._get_system_info()
-        except Exception as e:
-            logger.error(f"Error getting system info: {str(e)}")
-            debug_info["system"] = {"error": str(e)}
-
-        try:
-            debug_info["application"] = await self._get_application_info()
-        except Exception as e:
-            logger.error(f"Error getting application info: {str(e)}")
-            debug_info["application"] = {"error": str(e)}
-
-        try:
-            debug_info["database"] = self._get_database_info(db)
-        except Exception as e:
-            logger.error(f"Error getting database info: {str(e)}")
-            debug_info["database"] = {"error": str(e)}
-
-        try:
-            debug_info["volumes"] = await self._get_volume_info()
-        except Exception as e:
-            logger.error(f"Error getting volume info: {str(e)}")
-            debug_info["volumes"] = {"error": str(e)}
-
-        try:
-            debug_info["tools"] = await self._get_tool_versions()
-        except Exception as e:
-            logger.error(f"Error getting tool versions: {str(e)}")
-            debug_info["tools"] = {"error": str(e)}
-
-        try:
-            debug_info["environment"] = self._get_environment_info()
-        except Exception as e:
-            logger.error(f"Error getting environment info: {str(e)}")
-            debug_info["environment"] = {"error": str(e)}
-
-        try:
-            debug_info["job_manager"] = self._get_job_manager_info()
-        except Exception as e:
-            logger.error(f"Error getting job manager info: {str(e)}")
-            debug_info["job_manager"] = {"error": str(e)}
+        # Each method now handles its own exceptions and returns the appropriate TypedDict
+        debug_info: DebugInfo = {
+            "system": await self._get_system_info(),
+            "application": await self._get_application_info(),
+            "database": self._get_database_info(db),
+            "volumes": await self._get_volume_info(),
+            "tools": await self._get_tool_versions(),
+            "environment": self._get_environment_info(),
+            "job_manager": self._get_job_manager_info(),
+        }
 
         return debug_info
 
-    async def _get_system_info(self) -> Dict[str, Any]:
+    async def _get_system_info(self) -> SystemInfo:
         """Get system information"""
-        return {
-            "platform": platform.platform(),
-            "system": platform.system(),
-            "release": platform.release(),
-            "version": platform.version(),
-            "architecture": platform.architecture()[0],
-            "processor": platform.processor(),
-            "hostname": platform.node(),
-            "python_version": sys.version,
-            "python_executable": sys.executable,
-        }
+        try:
+            system_info: SystemInfo = {
+                "platform": platform.platform(),
+                "system": platform.system(),
+                "release": platform.release(),
+                "version": platform.version(),
+                "architecture": platform.architecture()[0],
+                "processor": platform.processor(),
+                "hostname": platform.node(),
+                "python_version": sys.version,
+                "python_executable": sys.executable,
+            }
+            return system_info
+        except Exception as e:
+            logger.error(f"Error getting system info: {str(e)}")
+            return {"error": str(e)}
 
-    async def _get_application_info(self) -> Dict[str, Any]:
+    async def _get_application_info(self) -> ApplicationInfo:
         """Get application information"""
+        try:
+            app_info: ApplicationInfo = {
+                "borgitory_version": os.getenv("BORGITORY_VERSION"),
+                "debug_mode": os.getenv("DEBUG", "false").lower() == "true",
+                "startup_time": datetime.now().isoformat(),
+                "working_directory": os.getcwd(),
+            }
+            return app_info
+        except Exception as e:
+            logger.error(f"Error getting application info: {str(e)}")
+            return {"error": str(e)}
 
-        return {
-            "borgitory_version": os.getenv("BORGITORY_VERSION"),
-            "debug_mode": os.getenv("DEBUG", "false").lower() == "true",
-            "startup_time": datetime.now().isoformat(),
-            "working_directory": os.getcwd(),
-        }
-
-    def _get_database_info(self, db: Session) -> Dict[str, Any]:
+    def _get_database_info(self, db: Session) -> DatabaseInfo:
         """Get database information"""
         try:
             from borgitory.config import DATABASE_URL
@@ -170,13 +239,15 @@ class DebugService:
         except Exception as e:
             return {"error": str(e), "database_accessible": False}
 
-    async def _get_volume_info(self) -> Dict[str, Any]:
+    async def _get_volume_info(self) -> VolumeDebugInfo:
         """Get volume mount information"""
         try:
             # Use the shared volume service for volume discovery
             if self.volume_service:
                 volume_info = await self.volume_service.get_volume_info()
                 mounted_volumes = volume_info.get("mounted_volumes", [])
+                if not isinstance(mounted_volumes, list):
+                    mounted_volumes = []
             else:
                 # Fallback: use direct import (for backward compatibility)
                 from borgitory.dependencies import get_volume_service
@@ -184,22 +255,26 @@ class DebugService:
                 volume_service = get_volume_service()
                 volume_info = await volume_service.get_volume_info()
                 mounted_volumes = volume_info.get("mounted_volumes", [])
+                if not isinstance(mounted_volumes, list):
+                    mounted_volumes = []
 
-            return {
+            volume_debug_info: VolumeDebugInfo = {
                 "mounted_volumes": mounted_volumes,
                 "total_mounted_volumes": len(mounted_volumes),
             }
+            return volume_debug_info
 
         except Exception as e:
-            return {
+            error_info: VolumeDebugInfo = {
                 "error": str(e),
                 "mounted_volumes": [],
                 "total_mounted_volumes": 0,
             }
+            return error_info
 
-    async def _get_tool_versions(self) -> Dict[str, Any]:
+    async def _get_tool_versions(self) -> Dict[str, ToolInfo]:
         """Get versions of external tools"""
-        tools = {}
+        tools: Dict[str, ToolInfo] = {}
 
         try:
             process = await asyncio.create_subprocess_exec(
@@ -328,44 +403,48 @@ class DebugService:
 
         return tools
 
-    def _get_environment_info(self) -> Dict[str, Any]:
+    def _get_environment_info(self) -> Dict[str, str]:
         """Get environment variables (sanitized)"""
-        env_info = {}
+        try:
+            env_info: Dict[str, str] = {}
 
-        # List of environment variables that are safe to display
-        safe_env_vars = [
-            "PATH",
-            "HOME",
-            "USER",
-            "SHELL",
-            "LANG",
-            "LC_ALL",
-            "PYTHONPATH",
-            "VIRTUAL_ENV",
-            "CONDA_DEFAULT_ENV",
-            "DATABASE_URL",
-            "DEBUG",
-        ]
+            # List of environment variables that are safe to display
+            safe_env_vars = [
+                "PATH",
+                "HOME",
+                "USER",
+                "SHELL",
+                "LANG",
+                "LC_ALL",
+                "PYTHONPATH",
+                "VIRTUAL_ENV",
+                "CONDA_DEFAULT_ENV",
+                "DATABASE_URL",
+                "DEBUG",
+            ]
 
-        for var in safe_env_vars:
-            value = os.environ.get(var)
-            if value:
-                # Sanitize sensitive information
-                if (
-                    "PASSWORD" in var.upper()
-                    or "SECRET" in var.upper()
-                    or "KEY" in var.upper()
-                ):
-                    env_info[var] = "***HIDDEN***"
-                elif var == "DATABASE_URL" and "sqlite" not in value.lower():
-                    # Hide connection details for non-sqlite databases
-                    env_info[var] = "***HIDDEN***"
-                else:
-                    env_info[var] = value
+            for var in safe_env_vars:
+                value = os.environ.get(var)
+                if value:
+                    # Sanitize sensitive information
+                    if (
+                        "PASSWORD" in var.upper()
+                        or "SECRET" in var.upper()
+                        or "KEY" in var.upper()
+                    ):
+                        env_info[var] = "***HIDDEN***"
+                    elif var == "DATABASE_URL" and "sqlite" not in value.lower():
+                        # Hide connection details for non-sqlite databases
+                        env_info[var] = "***HIDDEN***"
+                    else:
+                        env_info[var] = value
 
-        return env_info
+            return env_info
+        except Exception as e:
+            logger.error(f"Error getting environment info: {str(e)}")
+            return {"error": str(e)}
 
-    def _get_job_manager_info(self) -> Dict[str, Any]:
+    def _get_job_manager_info(self) -> JobManagerInfo:
         """Get job manager information"""
         try:
             if not self.job_manager:

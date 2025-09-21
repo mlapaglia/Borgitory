@@ -6,9 +6,12 @@ from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
 import asyncio
 
+from borgitory.services.volumes.volume_service import VolumeInfo
+
 if TYPE_CHECKING:
     from borgitory.services.jobs.job_manager import BorgJob
     from borgitory.services.jobs.broadcaster.job_event import JobEvent
+    from borgitory.models.database import Repository, Schedule
 
 
 class JobStatusProtocol(Protocol):
@@ -34,7 +37,7 @@ class JobManagerProtocol(Protocol):
         ...
 
     # Core job methods
-    def list_jobs(self) -> Dict[str, object]:
+    def list_jobs(self) -> Dict[str, "BorgJob"]:
         """Get dictionary of all jobs."""
         ...
 
@@ -82,6 +85,27 @@ class JobManagerProtocol(Protocol):
         """Clean up a completed job."""
         ...
 
+    async def create_composite_job(
+        self,
+        job_type: str,
+        task_definitions: List[Dict[str, object]],
+        repository: "Repository",
+        schedule: Optional["Schedule"] = None,
+        cloud_sync_config_id: Optional[int] = None,
+    ) -> str:
+        """Create a composite job with multiple tasks."""
+        ...
+
+    def get_queue_stats(self) -> Dict[str, int]:
+        """Get queue statistics."""
+        ...
+
+    # Internal attributes that JobService accesses
+    @property
+    def _processes(self) -> Dict[str, "asyncio.subprocess.Process"]:
+        """Internal processes dictionary."""
+        ...
+
 
 class JobStreamServiceProtocol(Protocol):
     """Protocol for job output streaming services."""
@@ -104,5 +128,5 @@ class DebugServiceProtocol(Protocol):
     """Protocol for debug/diagnostics services."""
 
     def get_system_info(self) -> Dict[str, Any]: ...
-    async def get_volume_info(self) -> Dict[str, Any]: ...
+    async def get_volume_info(self) -> Dict[str, VolumeInfo]: ...
     def get_job_manager_info(self) -> Dict[str, Any]: ...

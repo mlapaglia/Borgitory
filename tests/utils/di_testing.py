@@ -105,11 +105,53 @@ class MockServiceFactory:
         """Create a mock DebugService with common method signatures."""
         mock = Mock(spec=DebugService)
 
-        # Setup common return values
+        # Setup common return values that match our DebugInfo TypedDict structure
         mock.get_debug_info.return_value = {
-            "system": {"platform": "test"},
-            "volumes": [],
-            "jobs": {"active": 0, "total": 0},
+            "system": {
+                "platform": "Test Platform",
+                "system": "TestOS",
+                "release": "1.0",
+                "version": "1.0.0",
+                "architecture": "x64",
+                "processor": "Test Processor",
+                "hostname": "test-host",
+                "python_version": "Python 3.9.0",
+                "python_executable": "/usr/bin/python",
+            },
+            "application": {
+                "borgitory_version": "1.0.0",
+                "debug_mode": False,
+                "startup_time": "2023-01-01T12:00:00",
+                "working_directory": "/test/dir",
+            },
+            "database": {
+                "repository_count": 5,
+                "total_jobs": 100,
+                "jobs_today": 10,
+                "database_type": "SQLite",
+                "database_url": "sqlite:///test.db",
+                "database_size": "1.0 MB",
+                "database_size_bytes": 1048576,
+                "database_accessible": True,
+            },
+            "volumes": {
+                "mounted_volumes": ["/data", "/backup"],
+                "total_mounted_volumes": 2,
+            },
+            "tools": {
+                "borg": {"version": "borg 1.2.0", "accessible": True},
+                "rclone": {"version": "rclone v1.58.0", "accessible": True},
+            },
+            "environment": {
+                "PATH": "/usr/bin:/bin",
+                "HOME": "/home/user",
+                "DEBUG": "false",
+            },
+            "job_manager": {
+                "active_jobs": 2,
+                "total_jobs": 5,
+                "job_manager_running": True,
+            },
         }
 
         return mock
@@ -215,9 +257,17 @@ class MockServiceFactory:
         """Create a mock VolumeService with common method signatures."""
         mock = Mock(spec=VolumeService)
 
-        # Setup common return values
-        mock.get_mounted_volumes.return_value = ["/mnt/test-volume"]
-        mock.get_volume_info.return_value = {"path": "/mnt/test", "size": "100GB"}
+        # Setup common return values that match our VolumeInfo TypedDict structure
+        from unittest.mock import AsyncMock
+
+        mock.get_mounted_volumes = AsyncMock(return_value=["/mnt/test-volume"])
+        mock.get_volume_info = AsyncMock(
+            return_value={
+                "mounted_volumes": ["/mnt/test-volume"],
+                "total_mounted_volumes": 1,
+                "accessible": True,
+            }
+        )
 
         return mock
 
