@@ -179,10 +179,43 @@ class MockServiceFactory:
         """Create a mock JobRenderService with common method signatures."""
         mock = Mock(spec=JobRenderService)
 
-        # Setup common return values
+        # Setup common return values for new architecture
         mock.render_jobs_html.return_value = "<div>Mock jobs HTML</div>"
         mock.render_current_jobs_html.return_value = "<div>Mock current jobs HTML</div>"
-        mock.get_job_for_render.return_value = {"id": "test-job", "status": "completed"}
+        mock.get_job_display_data.return_value = None  # Returns JobDisplayData or None
+
+        # Create a mock TemplateJobData structure
+        from unittest.mock import MagicMock
+
+        mock_template_job = MagicMock()
+
+        # Create mock tasks
+        mock_task_0 = MagicMock()
+        mock_task_0.task_order = 0
+        mock_task_0.task_name = "backup"
+        mock_task_0.status = "completed"
+
+        mock_task_1 = MagicMock()
+        mock_task_1.task_order = 1
+        mock_task_1.task_name = "prune"
+        mock_task_1.status = "completed"
+
+        mock_template_job.sorted_tasks = [
+            mock_task_0,
+            mock_task_1,
+        ]  # List with two tasks
+        mock_template_job.job.status = "completed"
+        mock_template_job.job.id = "test-job-123"
+
+        # Set up side_effect to return mock_template_job for known jobs, None for unknown
+        def get_job_for_template_side_effect(job_id, *args, **kwargs):
+            if job_id == "test-job-123":
+                return mock_template_job
+            return None
+
+        mock.get_job_for_template.side_effect = get_job_for_template_side_effect
+
+        mock._render_job_html.return_value = "<div>Mock job HTML</div>"
 
         # Setup async streaming methods
         async def mock_stream_current_jobs_html():
@@ -191,6 +224,30 @@ class MockServiceFactory:
         mock.stream_current_jobs_html.return_value = mock_stream_current_jobs_html()
 
         return mock
+
+    @staticmethod
+    def create_job_render_service_with_mocks(
+        job_manager=None, templates=None, converter=None
+    ):
+        """Create a real JobRenderService with mocked dependencies for testing."""
+        from fastapi.templating import Jinja2Templates
+        from borgitory.services.jobs.job_render_service import (
+            JobRenderService,
+            JobDataConverter,
+        )
+
+        if job_manager is None:
+            job_manager = Mock()
+        if templates is None:
+            templates = Mock(spec=Jinja2Templates)
+            # Mock common template methods
+            templates.get_template.return_value.render.return_value = "<div>test</div>"
+        if converter is None:
+            converter = Mock(spec=JobDataConverter)
+
+        return JobRenderService(
+            job_manager=job_manager, templates=templates, converter=converter
+        )
 
     @staticmethod
     def create_mock_archive_manager() -> Mock:

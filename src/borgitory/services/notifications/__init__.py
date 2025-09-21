@@ -10,7 +10,9 @@ from .registry import (
     get_supported_providers,
     get_all_provider_info,
     is_provider_registered,
+    NotificationProviderRegistry,
 )
+from .registry_factory import NotificationRegistryFactory
 from .types import (
     NotificationMessage,
     NotificationResult,
@@ -27,6 +29,8 @@ __all__ = [
     "get_supported_providers",
     "get_all_provider_info",
     "is_provider_registered",
+    "NotificationProviderRegistry",
+    "NotificationRegistryFactory",
     "NotificationMessage",
     "NotificationResult",
     "NotificationType",

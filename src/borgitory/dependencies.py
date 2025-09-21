@@ -2,7 +2,7 @@
 FastAPI dependency providers for the application.
 """
 
-from typing import Annotated, TYPE_CHECKING, Optional, Callable
+from typing import Annotated, TYPE_CHECKING, Optional, Callable, ContextManager
 
 from borgitory.services.notifications.registry_factory import (
     NotificationRegistryFactory,
@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
     from borgitory.services.notifications.service import NotificationProviderFactory
     from borgitory.services.notifications.providers.discord_provider import HttpClient
+    from sqlalchemy.orm import Session
 from functools import lru_cache
-
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from borgitory.models.database import get_db
@@ -23,6 +23,8 @@ from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.backups.backup_service import BackupService
 from borgitory.services.jobs.job_manager import JobManager
+
+# Note: JobManager singleton is handled by FastAPI's dependency caching system
 from borgitory.services.recovery_service import RecoveryService
 from borgitory.services.notifications.service import NotificationService
 from borgitory.services.notifications.config_service import NotificationConfigService
@@ -69,6 +71,7 @@ if TYPE_CHECKING:
     )
     from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
     from borgitory.factories.service_factory import CloudProviderServiceFactory
+    from borgitory.services.jobs.job_manager import JobManagerConfig
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
 from borgitory.services.jobs.job_queue_manager import JobQueueManager
@@ -119,7 +122,7 @@ def get_job_queue_manager() -> JobQueueManager:
 
 
 def get_job_database_manager(
-    db_session_factory: Optional[Callable[[], object]] = None,
+    db_session_factory: Optional[Callable[[], ContextManager["Session"]]] = None,
 ) -> JobDatabaseManager:
     """
     Provide a JobDatabaseManager instance.
@@ -445,33 +448,13 @@ def get_storage_factory(
     return StorageFactory(rclone)
 
 
-def get_job_manager_dependency(
-    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
-    output_manager: JobOutputManager = Depends(get_job_output_manager),
-    queue_manager: JobQueueManager = Depends(get_job_queue_manager),
-    database_manager: JobDatabaseManager = Depends(get_job_database_manager),
-    event_broadcaster: JobEventBroadcaster = Depends(get_job_event_broadcaster_dep),
-    rclone_service: RcloneService = Depends(get_rclone_service),
-    notification_service: NotificationService = Depends(get_notification_service),
-    encryption_service: EncryptionService = Depends(get_encryption_service),
-    storage_factory: StorageFactory = Depends(get_storage_factory),
-    provider_registry: ProviderRegistry = Depends(get_provider_registry),
-) -> "JobManagerProtocol":
-    """
-    Provide a JobManager instance with proper FastAPI dependency injection.
-
-    Uses pure DI pattern - no global singletons, all dependencies injected by FastAPI.
-    """
+@lru_cache()
+def _create_job_manager_config() -> "JobManagerConfig":
+    """Create JobManager configuration from environment variables."""
     import os
-    from borgitory.services.jobs.job_manager import (
-        JobManager,
-        JobManagerConfig,
-        JobManagerDependencies,
-        JobManagerFactory,
-    )
+    from borgitory.services.jobs.job_manager import JobManagerConfig
 
-    # Create configuration from environment
-    config = JobManagerConfig(
+    return JobManagerConfig(
         max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
         max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
         max_concurrent_operations=int(
@@ -485,7 +468,42 @@ def get_job_manager_dependency(
         ),
     )
 
-    # Create dependencies using injected services
+
+@lru_cache()
+def get_job_manager_singleton() -> "JobManagerProtocol":
+    """
+    Create JobManager singleton for application-scoped use.
+
+    📋 USAGE:
+    ✅ Use for: Singletons, direct instantiation, tests, background tasks
+    ❌ Don't use for: FastAPI endpoints (use get_job_manager_dependency instead)
+
+    📋 PATTERN: Dual Functions
+    This is the singleton version that resolves dependencies directly.
+    For FastAPI DI, use get_job_manager_dependency() with Depends().
+
+    Returns:
+        JobManagerProtocol: Cached singleton instance
+    """
+    from borgitory.services.jobs.job_manager import (
+        JobManagerDependencies,
+        JobManagerFactory,
+    )
+
+    # Resolve all dependencies directly (not via FastAPI DI)
+    config = _create_job_manager_config()
+    job_executor = get_job_executor()
+    output_manager = get_job_output_manager()
+    queue_manager = get_job_queue_manager()
+    database_manager = get_job_database_manager()
+    event_broadcaster = get_job_event_broadcaster_dep()
+    rclone_service = get_rclone_service()
+    notification_service = get_notification_service_singleton()  # Use singleton version
+    encryption_service = get_encryption_service()
+    storage_factory = get_storage_factory(rclone_service)
+    provider_registry = get_provider_registry()
+
+    # Create dependencies using resolved services
     custom_dependencies = JobManagerDependencies(
         job_executor=job_executor,
         output_manager=output_manager,
@@ -504,8 +522,30 @@ def get_job_manager_dependency(
         config=config, custom_dependencies=custom_dependencies
     )
 
-    job_manager = JobManager(config=config, dependencies=dependencies)
-    return job_manager
+    return JobManager(config=config, dependencies=dependencies)
+
+
+def get_job_manager_dependency() -> "JobManagerProtocol":
+    """
+    Provide JobManager with FastAPI dependency injection.
+
+    📋 USAGE:
+    ✅ Use for: FastAPI endpoints with Depends(get_job_manager_dependency)
+    ❌ Don't use for: Direct calls, singletons, tests
+
+    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
+    ⚠️  For direct calls, use get_job_manager_singleton() instead.
+
+    📋 PATTERN: Dual Functions
+    This is the FastAPI DI version that returns the same singleton instance.
+    For direct calls, use get_job_manager_singleton().
+
+    Returns:
+        JobManagerProtocol: The same singleton instance as get_job_manager_singleton()
+    """
+    # Both functions return the same singleton instance
+    # This ensures job state consistency across all usage patterns
+    return get_job_manager_singleton()
 
 
 def get_scheduler_service(
@@ -573,13 +613,14 @@ def get_job_stream_service(
 
 def get_job_render_service(
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+    templates: Jinja2Templates = Depends(get_templates),
 ) -> JobRenderService:
     """
     Provide a JobRenderService instance with proper dependency injection.
 
     Uses FastAPI DI with automatic dependency resolution.
     """
-    return JobRenderService(job_manager=job_manager)
+    return JobRenderService(job_manager=job_manager, templates=templates)
 
 
 def get_debug_service(
@@ -650,7 +691,7 @@ def get_cloud_sync_service(
 #
 # These type aliases express the INTENDED USAGE PATTERN and LIFECYCLE:
 # - ApplicationScoped* = Singleton instances for app-wide services (JobManager, background tasks)
-# - RequestScoped* = Per-request instances via FastAPI DI (API endpoints)
+# - RequestScoped* = Per-request instance via FastAPI DI (API endpoints)
 #
 # This makes the architectural intent crystal clear and prevents misuse.
 
@@ -660,7 +701,6 @@ RequestScopedSimpleCommandRunner = Annotated[
 ]
 RequestScopedBorgService = Annotated[BorgService, Depends(get_borg_service)]
 RequestScopedJobService = Annotated[JobService, Depends(get_job_service)]
-RequestScopedJobManager = Annotated[JobManager, Depends(get_job_manager_dependency)]
 RequestScopedRecoveryService = Annotated[RecoveryService, Depends(get_recovery_service)]
 
 # Notification Service - Dual Scoped (Most Complex Example)
@@ -669,7 +709,13 @@ RequestScopedNotificationService = Annotated[
     NotificationService, Depends(get_notification_service)
 ]  # Per-request instance via FastAPI DI
 
-# Legacy aliases for backward compatibility (deprecated)
+# JobManager Service - Dual Scoped (Critical for State Consistency)
+ApplicationScopedJobManager = "JobManagerProtocol"  # Application-wide singleton
+RequestScopedJobManager = Annotated[
+    "JobManagerProtocol", Depends(get_job_manager_dependency)
+]
+
+# Modern type aliases (use these)
 SimpleCommandRunnerDep = RequestScopedSimpleCommandRunner
 BorgServiceDep = RequestScopedBorgService
 JobServiceDep = RequestScopedJobService

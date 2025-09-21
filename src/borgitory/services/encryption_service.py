@@ -7,7 +7,7 @@ providing a single source of truth for encryption operations.
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +23,10 @@ class EncryptionService:
     """
 
     def encrypt_sensitive_fields(
-        self, config: Dict[str, object], sensitive_fields: List[str]
-    ) -> Dict[str, object]:
+        self,
+        config: Dict[str, Union[str, int, float, bool, None]],
+        sensitive_fields: List[str],
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Encrypt sensitive fields in configuration.
 
@@ -57,8 +59,10 @@ class EncryptionService:
         return encrypted_config
 
     def decrypt_sensitive_fields(
-        self, config: Dict[str, object], sensitive_fields: List[str]
-    ) -> Dict[str, object]:
+        self,
+        config: Dict[str, Union[str, int, float, bool, None]],
+        sensitive_fields: List[str],
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Decrypt sensitive fields in configuration.
 

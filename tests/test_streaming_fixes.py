@@ -15,7 +15,7 @@ class TestJobStreamingFixes:
     """Test the fixed streaming functionality"""
 
     @pytest.fixture
-    def mock_job_manager(self):
+    def mock_job_manager(self) -> Mock:
         """Create a mock job manager"""
         manager = Mock()
         manager.jobs = {}
@@ -24,12 +24,12 @@ class TestJobStreamingFixes:
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager):
+    def job_stream_service(self, mock_job_manager) -> JobStreamService:
         """Create JobStreamService with mocked dependencies"""
         return JobStreamService(job_manager=mock_job_manager)
 
     @pytest.fixture
-    def mock_composite_job(self):
+    def mock_composite_job(self) -> Mock:
         """Create a mock composite job with tasks"""
         job = Mock()
         job.id = str(uuid.uuid4())
@@ -60,7 +60,10 @@ class TestJobStreamingFixes:
 
     @pytest.mark.asyncio
     async def test_task_streaming_sends_individual_lines(
-        self, job_stream_service, mock_job_manager, mock_composite_job
+        self,
+        job_stream_service: JobStreamService,
+        mock_job_manager: Mock,
+        mock_composite_job: Mock,
     ) -> None:
         """Test that task streaming sends individual lines wrapped in divs"""
         job_id = mock_composite_job.id
@@ -97,7 +100,10 @@ class TestJobStreamingFixes:
 
     @pytest.mark.asyncio
     async def test_task_streaming_handles_new_output_events(
-        self, job_stream_service, mock_job_manager, mock_composite_job
+        self,
+        job_stream_service: JobStreamService,
+        mock_job_manager: Mock,
+        mock_composite_job: Mock,
     ) -> None:
         """Test that new output events are properly formatted"""
         job_id = mock_composite_job.id
@@ -135,7 +141,7 @@ class TestJobStreamingFixes:
 
     @pytest.mark.asyncio
     async def test_completed_task_streaming_from_database(
-        self, job_stream_service, mock_job_manager
+        self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming completed task output from database"""
         job_id = str(uuid.uuid4())
@@ -220,7 +226,7 @@ class TestJobRenderServiceUUIDIntegration:
     """Test job render service with UUID system"""
 
     @pytest.fixture
-    def mock_job_with_uuid(self):
+    def mock_job_with_uuid(self) -> Mock:
         """Create a mock job with UUID"""
         job = Mock()
         job.id = str(uuid.uuid4())
@@ -238,13 +244,13 @@ class TestJobRenderServiceUUIDIntegration:
 
         return job
 
-    def test_render_job_html_uses_uuid_as_primary_id(self, mock_job_with_uuid) -> None:
+    def test_render_job_html_uses_uuid_as_primary_id(
+        self, mock_job_with_uuid: Mock
+    ) -> None:
         """Test that job rendering uses UUID as primary identifier"""
-        from borgitory.services.jobs.job_render_service import JobRenderService
-        from unittest.mock import Mock
+        from tests.utils.di_testing import MockServiceFactory
 
-        mock_job_manager = Mock()
-        service = JobRenderService(job_manager=mock_job_manager)
+        service = MockServiceFactory.create_job_render_service_with_mocks()
         html = service._render_job_html(mock_job_with_uuid)
 
         # Should contain the UUID in the HTML
@@ -252,19 +258,59 @@ class TestJobRenderServiceUUIDIntegration:
         assert html != ""  # Should not return empty string
 
     def test_format_database_job_creates_context_with_uuid(
-        self, mock_job_with_uuid
+        self, mock_job_with_uuid: Mock
     ) -> None:
-        """Test that database job formatting creates context with UUID"""
-        from borgitory.services.jobs.job_render_service import JobRenderService
+        """Test that JobRenderService properly handles UUID-based job identification"""
+        from tests.utils.di_testing import MockServiceFactory
         from unittest.mock import Mock
+        from borgitory.services.jobs.job_render_service import JobDisplayData, JobStatus
 
-        mock_job_manager = Mock()
-        service = JobRenderService(job_manager=mock_job_manager)
-        result = service._format_database_job_for_render(mock_job_with_uuid)
+        # Create service with mocked dependencies
+        mock_db = Mock()
+        service = MockServiceFactory.create_job_render_service_with_mocks()
 
+        # Set up the mock job with completed status to trigger database path
+        mock_job_with_uuid.status = "completed"
+
+        # Mock database query to return our job
+        mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_job_with_uuid
+
+        # Mock the converter methods to return realistic data
+        from borgitory.services.jobs.job_render_service import JobProgress
+
+        expected_job_data = JobDisplayData(
+            id=mock_job_with_uuid.id,
+            title=f"{mock_job_with_uuid.type} - Test Job",
+            status=JobStatus.from_status_string("completed"),
+            repository_name=mock_job_with_uuid.repository.name
+            if mock_job_with_uuid.repository
+            else "Unknown",
+            started_at=mock_job_with_uuid.started_at,
+            finished_at=mock_job_with_uuid.finished_at,
+            tasks=[],
+            progress=JobProgress(completed_tasks=1, total_tasks=1),
+            error=mock_job_with_uuid.error,
+        )
+
+        service.converter.convert_database_job.return_value = expected_job_data
+        service.converter.fix_failed_job_tasks.return_value = expected_job_data
+
+        # Test the new architecture method
+        result = service.get_job_display_data(mock_job_with_uuid.id, mock_db)
+
+        # Verify the result contains the UUID and proper structure
         assert result is not None
-        assert result["job"].id == mock_job_with_uuid.id
-        assert result["job"].job_uuid == mock_job_with_uuid.id  # Legacy compatibility
+        assert result.id == mock_job_with_uuid.id
+        assert result.title == f"{mock_job_with_uuid.type} - Test Job"
+        assert result.status.type.value == "completed"
+
+        # Verify the converter was called with the database job
+        service.converter.convert_database_job.assert_called_once_with(
+            mock_job_with_uuid
+        )
+        service.converter.fix_failed_job_tasks.assert_called_once_with(
+            expected_job_data
+        )
 
 
 class TestStreamingEfficiency:

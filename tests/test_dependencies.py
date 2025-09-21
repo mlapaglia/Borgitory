@@ -18,7 +18,11 @@ from borgitory.dependencies import (
     get_volume_service,
     get_job_manager_dependency,
 )
-from tests.utils.di_testing import override_dependency, override_multiple_dependencies
+from tests.utils.di_testing import (
+    override_dependency,
+    override_multiple_dependencies,
+    MockServiceFactory,
+)
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
@@ -338,7 +342,9 @@ class TestDependencies:
         # NotificationService now requires provider_factory - skip this test
         # notification_service = NotificationService()
         job_stream_service = JobStreamService(mock_job_manager)
-        job_render_service = JobRenderService(job_manager=mock_job_manager)
+        job_render_service = MockServiceFactory.create_job_render_service_with_mocks(
+            job_manager=mock_job_manager
+        )
         debug_service = DebugService()
         rclone_service = RcloneService()
         repository_stats_service = RepositoryStatsService()

@@ -133,7 +133,9 @@ class TestMockServiceFactory:
         assert isinstance(mock, Mock)
         assert hasattr(mock, "render_jobs_html")
         assert hasattr(mock, "render_current_jobs_html")
-        assert hasattr(mock, "get_job_for_render")
+        assert hasattr(mock, "get_job_display_data")
+        assert hasattr(mock, "get_job_for_template")
+        assert hasattr(mock, "_render_job_html")
 
         # Verify HTML return values
         assert "Mock jobs HTML" in mock.render_jobs_html.return_value
