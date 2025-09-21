@@ -37,7 +37,6 @@ from borgitory.services.repositories.repository_stats_service import (
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.services.volumes.volume_service import VolumeService
-from borgitory.services.repositories.repository_parser import RepositoryParser
 from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.repositories.repository_service import RepositoryService
@@ -347,17 +346,6 @@ def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinition
     Note: This is not cached because it needs a database session per request.
     """
     return TaskDefinitionBuilder(db)
-
-
-def get_repository_parser(
-    command_runner: SimpleCommandRunner = Depends(get_simple_command_runner),
-) -> RepositoryParser:
-    """
-    Provide a RepositoryParser singleton instance with proper dependency injection.
-
-    Uses FastAPI's dependency injection for clean separation of concerns.
-    """
-    return RepositoryParser(command_runner=command_runner)
 
 
 @lru_cache()
@@ -723,7 +711,6 @@ VolumeServiceDep = Annotated[VolumeService, Depends(get_volume_service)]
 TaskDefinitionBuilderDep = Annotated[
     TaskDefinitionBuilder, Depends(get_task_definition_builder)
 ]
-RepositoryParserDep = Annotated[RepositoryParser, Depends(get_repository_parser)]
 BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
 ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
 RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
