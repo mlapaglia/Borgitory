@@ -353,8 +353,8 @@ class JobDatabaseManager:
 
                 return {
                     "total_jobs": db.query(Job).count(),
-                    "by_status": dict(status_counts),
-                    "by_type": dict(type_counts),
+                    "by_status": {status: count for status, count in status_counts},
+                    "by_type": {job_type: count for job_type, count in type_counts},
                     "recent_jobs_24h": recent_jobs,
                 }
 

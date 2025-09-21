@@ -113,15 +113,18 @@ class TestJobStreamingFixes:
 
         # Mock event queue to return a new output event
         mock_queue = AsyncMock()
-        new_output_event = {
-            "job_id": job_id,
-            "type": "job_output",
-            "data": {
+        from borgitory.services.jobs.broadcaster.job_event import JobEvent
+        from borgitory.services.jobs.broadcaster.event_type import EventType
+
+        new_output_event = JobEvent(
+            event_type=EventType.JOB_OUTPUT,
+            job_id=job_id,
+            data={
                 "task_type": "task_output",
                 "task_index": task_order,
                 "line": "New output line",
             },
-        }
+        )
         mock_queue.get.side_effect = [new_output_event, Exception("Test timeout")]
         mock_job_manager.subscribe_to_events.return_value = mock_queue
 

@@ -2,7 +2,10 @@ import inspect
 import json
 import logging
 from datetime import datetime, UTC
-from typing import Any, List, Dict, Callable, cast
+from typing import Any, List, Dict, Callable, cast, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from borgitory.services.cloud_providers.registry import ProviderMetadata
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -73,7 +76,7 @@ class CloudSyncConfigService:
         rclone_service: RcloneService,
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
-        get_metadata_func: Callable[[str], object],
+        get_metadata_func: Callable[[str], Optional["ProviderMetadata"]],
     ):
         self.db = db
         self._rclone_service = rclone_service

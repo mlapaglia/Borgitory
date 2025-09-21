@@ -97,7 +97,7 @@ class ProcessExecutorProtocol(Protocol):
         save_space: bool = False,
         force_prune: bool = False,
         dry_run: bool = False,
-        output_callback: Optional[Callable[..., object]] = None,
+        output_callback: Optional[Callable[[str], None]] = None,
     ) -> "ProcessResult":
         """Execute a borg prune task."""
         ...
@@ -111,7 +111,7 @@ class ProcessExecutorProtocol(Protocol):
         encryption_service: "EncryptionService",
         storage_factory: "StorageFactory",
         provider_registry: "ProviderRegistry",
-        output_callback: Optional[Callable[..., object]] = None,
+        output_callback: Optional[Callable[[str], None]] = None,
     ) -> "ProcessResult":
         """Execute a cloud sync task."""
         ...

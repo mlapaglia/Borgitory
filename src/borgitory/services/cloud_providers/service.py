@@ -313,7 +313,7 @@ class CloudSyncService:
             return f"Error getting connection info: {str(e)}"
 
     def prepare_config_for_storage(
-        self, provider: str, config: Dict[str, object]
+        self, provider: str, config: Dict[str, Union[str, int, float, bool, None]]
     ) -> str:
         """
         Prepare configuration for database storage by encrypting sensitive fields.
@@ -337,7 +337,7 @@ class CloudSyncService:
 
     def load_config_from_storage(
         self, provider: str, stored_config: str
-    ) -> Dict[str, object]:
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Load configuration from database storage by decrypting sensitive fields.
 

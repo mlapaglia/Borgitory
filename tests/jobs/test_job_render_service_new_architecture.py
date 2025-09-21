@@ -257,7 +257,7 @@ class TestJobRenderServiceNewArchitecture:
             job_manager=Mock(), templates=mock_templates, converter=Mock()
         )
 
-        result = service._render_job_html(job_display_data, expand_details=True)
+        service._render_job_html(job_display_data, expand_details=True)
 
         # Verify template was called with correct data
         mock_templates.get_template.assert_called_once_with(

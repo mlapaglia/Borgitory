@@ -215,7 +215,7 @@ class RepositoryCheckConfigService:
 
     def get_form_data(
         self,
-    ) -> Dict[str, List[Union[Repository, RepositoryCheckConfig]]]:
+    ) -> Dict[str, Union[List[Repository], List[RepositoryCheckConfig]]]:
         """Get data needed for repository check form."""
         try:
             repositories = self.db.query(Repository).all()

@@ -8,7 +8,14 @@ import logging
 import os
 import re
 import inspect
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Coroutine, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+    from borgitory.services.cloud_sync_service import CloudSyncConfigService
+    from borgitory.services.cloud_providers.config_service import (
+        CloudProviderConfigService,
+    )
 from datetime import datetime
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.services.rclone_service import RcloneService
@@ -23,7 +30,10 @@ class JobExecutor:
     """Handles subprocess execution and output monitoring"""
 
     def __init__(
-        self, subprocess_executor: Optional[Callable[..., Any]] = None
+        self,
+        subprocess_executor: Optional[
+            Callable[..., Coroutine[None, None, asyncio.subprocess.Process]]
+        ] = None,
     ) -> None:
         self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
         self.progress_pattern = re.compile(
@@ -205,7 +215,7 @@ class JobExecutor:
         save_space: bool = False,
         force_prune: bool = False,
         dry_run: bool = False,
-        output_callback: Optional[Callable[..., Any]] = None,
+        output_callback: Optional[Callable[[str], None]] = None,
     ) -> ProcessResult:
         """
         Execute a borg prune task with the job executor's proper streaming
@@ -288,12 +298,12 @@ class JobExecutor:
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        db_session_factory: Callable[[], Any],
+        db_session_factory: Callable[[], "Session"],
         rclone_service: RcloneService,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
         provider_registry: ProviderRegistry,
-        output_callback: Optional[Callable[..., Any]] = None,
+        output_callback: Optional[Callable[[str], None]] = None,
     ) -> ProcessResult:
         """
         Execute a cloud sync task with the job executor's proper streaming
@@ -505,8 +515,8 @@ class JobExecutor:
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        cloud_sync_service: Any,
-        config_load_service: Any,
+        cloud_sync_service: "CloudSyncConfigService",
+        config_load_service: "CloudProviderConfigService",
         output_callback: Optional[Callable[[str], None]] = None,
     ) -> ProcessResult:
         """
