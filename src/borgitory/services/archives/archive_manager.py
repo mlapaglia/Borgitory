@@ -5,7 +5,7 @@ ArchiveManager - Handles Borg archive operations and content management
 import asyncio
 import json
 import logging
-from typing import Dict, List, Optional, AsyncGenerator, Any, cast
+from typing import Dict, List, Optional, AsyncGenerator, TypedDict
 
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -13,6 +13,62 @@ from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.utils.security import validate_archive_name, sanitize_path
 
 logger = logging.getLogger(__name__)
+
+
+# TypedDict definitions for archive operations
+class ArchiveEntryRequired(TypedDict):
+    """Required fields for archive entry"""
+
+    path: str
+    name: str
+    type: str  # 'f' for file, 'd' for directory, etc.
+    size: int
+    isdir: bool
+
+
+class ArchiveEntry(ArchiveEntryRequired, total=False):
+    """Individual archive entry (file/directory) structure"""
+
+    # Optional fields from Borg JSON output
+    mtime: str
+    mode: str
+    uid: int
+    gid: int
+    healthy: bool
+    # Additional computed fields
+    children_count: Optional[int]
+
+
+class ArchiveMetadata(TypedDict, total=False):
+    """Archive metadata structure from Borg repository info"""
+
+    # Standard Borg archive fields
+    name: str
+    id: str
+    start: str
+    end: str
+    duration: float
+    stats: Dict[str, object]
+    # Size field that may be present in some Borg versions
+    size: int
+    # Additional fields that may be present
+    command_line: List[str]
+    hostname: str
+    username: str
+    comment: str
+
+
+class FileTypeSummary(TypedDict):
+    """File type summary structure"""
+
+    # Key is file type (extension or 'directory'), value is count
+    # This is a regular dict with string keys and int values
+
+
+class ArchiveValidationResult(TypedDict):
+    """Archive path validation result structure"""
+
+    # Key is field name, value is error message (empty dict if no errors)
 
 
 class ArchiveManager:
@@ -37,7 +93,7 @@ class ArchiveManager:
 
     async def list_archive_contents(
         self, repository: Repository, archive_name: str
-    ) -> List[Dict[str, Any]]:
+    ) -> List[ArchiveEntry]:
         """List contents of a specific archive"""
         try:
             command, env = self.command_builder.build_list_archive_contents_command(
@@ -81,7 +137,7 @@ class ArchiveManager:
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List[Dict[str, Any]]:
+    ) -> List[ArchiveEntry]:
         """List contents of a specific directory within an archive using FUSE mount"""
         logger.info(
             f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
@@ -103,8 +159,8 @@ class ArchiveManager:
         return contents
 
     def _filter_directory_contents(
-        self, all_entries: List[Dict[str, Any]], target_path: str = ""
-    ) -> List[Dict[str, Any]]:
+        self, all_entries: List[ArchiveEntry], target_path: str = ""
+    ) -> List[ArchiveEntry]:
         """Filter entries to show only immediate children of target_path"""
         target_path = target_path.strip().strip("/")
 
@@ -113,7 +169,7 @@ class ArchiveManager:
         )
 
         # Group entries by their immediate parent under target_path
-        children = {}
+        children: Dict[str, ArchiveEntry] = {}
 
         for entry in all_entries:
             entry_path = entry.get("path", "").lstrip("/")
@@ -154,31 +210,48 @@ class ArchiveManager:
                 # Use the actual Borg entry type - 'd' means directory
                 is_directory = len(path_parts) > 1 or entry.get("type") == "d"
 
-                children[immediate_child] = {
+                archive_entry: ArchiveEntry = {
                     "path": full_path,
                     "name": immediate_child,
                     "type": "d" if is_directory else entry.get("type", "f"),
                     "size": 0 if is_directory else entry.get("size", 0),
-                    "mtime": entry.get("mtime"),
-                    "mode": entry.get("mode"),
-                    "uid": entry.get("uid"),
-                    "gid": entry.get("gid"),
-                    "healthy": entry.get("healthy", True),
                     "isdir": is_directory,
-                    "children_count": 0 if not is_directory else None,
                 }
+
+                # Add optional fields if they exist
+                mtime = entry.get("mtime")
+                if mtime:
+                    archive_entry["mtime"] = mtime
+                mode = entry.get("mode")
+                if mode:
+                    archive_entry["mode"] = mode
+                uid = entry.get("uid")
+                if uid is not None:
+                    archive_entry["uid"] = uid
+                gid = entry.get("gid")
+                if gid is not None:
+                    archive_entry["gid"] = gid
+                healthy = entry.get("healthy")
+                if healthy is not None:
+                    archive_entry["healthy"] = healthy
+                if not is_directory:
+                    archive_entry["children_count"] = None
+                else:
+                    archive_entry["children_count"] = 0
+                children[immediate_child] = archive_entry
             else:
                 # This is another item in the same directory, possibly update info
                 existing = children[immediate_child]
-                if existing["type"] == "d":
+                if existing.get("type") == "d":
                     # It's a directory, we might want to count children
-                    if existing["children_count"] is not None:
-                        existing["children_count"] += 1
+                    current_count = existing.get("children_count")
+                    if isinstance(current_count, int):
+                        existing["children_count"] = current_count + 1
 
         result = list(children.values())
 
         # Sort results: directories first, then files, both alphabetically
-        result.sort(key=lambda x: (x["type"] != "d", x["name"].lower()))
+        result.sort(key=lambda x: (x.get("type") != "d", x.get("name", "").lower()))
 
         logger.info(f"Filtered to {len(result)} immediate children")
         return result
@@ -239,7 +312,7 @@ class ArchiveManager:
 
     async def get_archive_metadata(
         self, repository: Repository, archive_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[ArchiveMetadata]:
         """Get metadata for a specific archive"""
         try:
             # Get repository info which includes archive information
@@ -258,7 +331,31 @@ class ArchiveManager:
                     # Find the specific archive
                     for archive in archives:
                         if archive.get("name") == archive_name:
-                            return cast(Dict[str, Any], archive)
+                            # Convert to ArchiveMetadata TypedDict
+                            metadata: ArchiveMetadata = {}
+                            if archive.get("name"):
+                                metadata["name"] = archive["name"]
+                            if archive.get("id"):
+                                metadata["id"] = archive["id"]
+                            if archive.get("start"):
+                                metadata["start"] = archive["start"]
+                            if archive.get("end"):
+                                metadata["end"] = archive["end"]
+                            if archive.get("duration"):
+                                metadata["duration"] = archive["duration"]
+                            if archive.get("stats"):
+                                metadata["stats"] = archive["stats"]
+                            if archive.get("size"):
+                                metadata["size"] = archive["size"]
+                            if archive.get("command_line"):
+                                metadata["command_line"] = archive["command_line"]
+                            if archive.get("hostname"):
+                                metadata["hostname"] = archive["hostname"]
+                            if archive.get("username"):
+                                metadata["username"] = archive["username"]
+                            if archive.get("comment"):
+                                metadata["comment"] = archive["comment"]
+                            return metadata
 
                     return None  # Archive not found
                 except json.JSONDecodeError:
@@ -278,7 +375,7 @@ class ArchiveManager:
             return None
 
     def calculate_directory_size(
-        self, entries: List[Dict[str, Any]], directory_path: str = ""
+        self, entries: List[ArchiveEntry], directory_path: str = ""
     ) -> int:
         """Calculate the total size of all files in a directory path"""
         total_size = 0
@@ -302,8 +399,8 @@ class ArchiveManager:
         return total_size
 
     def find_entries_by_pattern(
-        self, entries: List[Dict[str, Any]], pattern: str, case_sensitive: bool = False
-    ) -> List[Dict[str, Any]]:
+        self, entries: List[ArchiveEntry], pattern: str, case_sensitive: bool = False
+    ) -> List[ArchiveEntry]:
         """Find archive entries matching a pattern"""
         import re
 
@@ -325,7 +422,7 @@ class ArchiveManager:
 
         return matching_entries
 
-    def get_file_type_summary(self, entries: List[Dict[str, Any]]) -> Dict[str, int]:
+    def get_file_type_summary(self, entries: List[ArchiveEntry]) -> Dict[str, int]:
         """Get a summary of file types in the archive"""
         type_counts: Dict[str, int] = {}
 

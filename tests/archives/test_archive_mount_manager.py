@@ -414,12 +414,12 @@ class TestArchiveMountManager:
 
         # Check directory entry
         subdir_entry = next(item for item in contents if item["name"] == "subdir")
-        assert subdir_entry["is_directory"] is True
+        assert subdir_entry["isdir"] is True
         assert subdir_entry["type"] == "d"
 
         # Check file entry
         file_entry = next(item for item in contents if item["name"] == "file1.txt")
-        assert file_entry["is_directory"] is False
+        assert file_entry["isdir"] is False
         assert file_entry["type"] == "f"
         assert file_entry["size"] == 0  # Empty file
 
