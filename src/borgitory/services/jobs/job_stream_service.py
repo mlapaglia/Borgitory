@@ -1,10 +1,13 @@
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict, TYPE_CHECKING, cast
 from fastapi.responses import StreamingResponse
 
 from borgitory.protocols import JobManagerProtocol
+
+if TYPE_CHECKING:
+    from borgitory.services.jobs.broadcaster.job_event import JobEvent
 
 logger = logging.getLogger(__name__)
 
@@ -99,8 +102,10 @@ class JobStreamService:
             # Stream job updates from borg job manager only
             # Individual task output should come from /api/jobs/{job_id}/stream
             async for event in self.job_manager.stream_all_job_updates():
-                event_type = event.get("type", "unknown")
-                yield f"event: {event_type}\\ndata: {json.dumps(event)}\\n\\n"
+                # Cast to JobEvent since it's imported under TYPE_CHECKING
+                job_event = cast("JobEvent", event)
+                event_type = job_event.event_type.value
+                yield f"event: {event_type}\\ndata: {json.dumps(job_event.to_dict())}\\n\\n"
 
         except Exception as e:
             logger.error(f"SSE streaming error: {e}")
@@ -137,13 +142,25 @@ class JobStreamService:
                             event = await asyncio.wait_for(
                                 event_queue.get(), timeout=30.0
                             )
+                            # event is already JobEvent type
                             # Only send events for this job
-                            if event.get("job_id") == job_id:
+                            if event.job_id == job_id:
                                 # Handle different event types for HTMX SSE
-                                if event.get("type") == "task_output":
+                                if event.event_type.value == "task_output":
                                     # Send task-specific output for HTMX sse-swap
-                                    task_index = event.get("task_index", 0)
-                                    output_line = event.get("line", "")
+                                    task_index_raw = (
+                                        event.data.get("task_index", 0)
+                                        if event.data
+                                        else 0
+                                    )
+                                    task_index = (
+                                        int(task_index_raw)
+                                        if isinstance(task_index_raw, (int, str))
+                                        else 0
+                                    )
+                                    output_line = (
+                                        event.data.get("line", "") if event.data else ""
+                                    )
 
                                     # Get current task and build accumulated output
                                     if hasattr(job, "tasks") and task_index < len(
@@ -172,27 +189,54 @@ class JobStreamService:
                                         # Fall back to single line
                                         yield f"event: task-{task_index}-output\ndata: {output_line}\n\n"
 
-                                elif event.get("type") == "task_started":
-                                    task_index = event.get("task_index", 0)
+                                elif event.event_type.value == "task_started":
+                                    task_index_raw = (
+                                        event.data.get("task_index", 0)
+                                        if event.data
+                                        else 0
+                                    )
+                                    task_index = (
+                                        int(task_index_raw)
+                                        if isinstance(task_index_raw, (int, str))
+                                        else 0
+                                    )
                                     status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">⟳ Running</span>'
                                     yield f"event: task-{task_index}-status\ndata: {status_badge}\n\n"
 
-                                elif event.get("type") == "task_completed":
-                                    task_index = event.get("task_index", 0)
+                                elif event.event_type.value == "task_completed":
+                                    task_index_raw = (
+                                        event.data.get("task_index", 0)
+                                        if event.data
+                                        else 0
+                                    )
+                                    task_index = (
+                                        int(task_index_raw)
+                                        if isinstance(task_index_raw, (int, str))
+                                        else 0
+                                    )
                                     status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✓ Completed</span>'
                                     yield f"event: task-{task_index}-status\ndata: {status_badge}\n\n"
 
-                                elif event.get("type") == "task_failed":
-                                    task_index = event.get("task_index", 0)
+                                elif event.event_type.value == "task_failed":
+                                    task_index_raw = (
+                                        event.data.get("task_index", 0)
+                                        if event.data
+                                        else 0
+                                    )
+                                    task_index = (
+                                        int(task_index_raw)
+                                        if isinstance(task_index_raw, (int, str))
+                                        else 0
+                                    )
                                     status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">✗ Failed</span>'
                                     yield f"event: task-{task_index}-status\ndata: {status_badge}\n\n"
 
-                                elif event.get("type") == "job_completed":
+                                elif event.event_type.value == "job_completed":
                                     # Send complete event to trigger switch to static view
                                     yield "event: complete\ndata: completed\n\n"
 
                                 else:
-                                    yield f"data: {json.dumps(event)}\n\n"
+                                    yield f"data: {json.dumps(event.to_dict())}\n\n"
                         except asyncio.TimeoutError:
                             yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
                         except Exception as e:
@@ -210,7 +254,7 @@ class JobStreamService:
                     async for output_event in self.job_manager.stream_job_output(
                         job_id
                     ):
-                        # output_event is Dict[str, Any] from stream_job_output method
+                        # output_event is Dict[str, object] from stream_job_output method
                         logger.debug(f"Job {job_id} received event: {output_event}")
 
                         if output_event.get("type") == "output":
@@ -237,7 +281,7 @@ class JobStreamService:
                             break
                         else:
                             # Send other events as JSON data
-                            yield f"data: {json.dumps(event)}\n\n"
+                            yield f"data: {json.dumps(output_event)}\n\n"
                 except Exception as stream_error:
                     logger.error(
                         f"Error in job output stream for {job_id}: {stream_error}"
@@ -320,16 +364,17 @@ class JobStreamService:
                         if event_queue is None:
                             break
                         event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
+                        # event is already JobEvent type
                         logger.debug(
-                            f"Task streaming received event: {event.get('type')} for job {event.get('job_id', 'unknown')}"
+                            f"Task streaming received event: {event.event_type.value} for job {event.job_id or 'unknown'}"
                         )
 
                         # Only process events for this specific job and task
                         if (
-                            event.get("job_id") == job_id
-                            and event.get("type") == "job_output"
+                            event.job_id == job_id
+                            and event.event_type.value == "job_output"
                         ):
-                            event_data = event.get("data", {})
+                            event_data = event.data or {}
                             # Check if this is a task-specific event for our task
                             event_task_index = event_data.get("task_index")
                             logger.debug(
@@ -337,7 +382,10 @@ class JobStreamService:
                             )
 
                             if event_task_index == task_order:
-                                output_line = event_data.get("line", "")
+                                output_line_raw = event_data.get("line", "")
+                                output_line = (
+                                    str(output_line_raw) if output_line_raw else ""
+                                )
                                 if output_line:
                                     # Send individual line as div for hx-swap="beforeend"
                                     logger.debug(
@@ -346,15 +394,17 @@ class JobStreamService:
                                     yield f"event: output\ndata: <div>{output_line}</div>\n\n"
 
                         elif (
-                            event.get("job_id") == job_id
-                            and event.get("type") in ["task_completed", "task_failed"]
-                            and event.get("task_index") == task_order
+                            event.job_id == job_id
+                            and event.event_type.value
+                            in ["task_completed", "task_failed"]
+                            and event.data
+                            and event.data.get("task_index") == task_order
                         ):
                             # Task completed or failed
                             logger.info(
-                                f"Task {task_order} in job {job_id} {event.get('type')}"
+                                f"Task {task_order} in job {job_id} {event.event_type.value}"
                             )
-                            yield f"event: complete\ndata: {event.get('type')}\n\n"
+                            yield f"event: complete\ndata: {event.event_type.value}\n\n"
                             break
 
                     except asyncio.TimeoutError:
@@ -379,14 +429,14 @@ class JobStreamService:
             error_msg = f"Streaming error for job {job_id}, task {task_order}: {str(e)}"
             yield f"event: error\ndata: {error_msg}\n\n"
 
-    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_status(self, job_id: str) -> Dict[str, object]:
         """Get current job status and progress for streaming"""
         output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
         return output
 
-    def get_current_jobs_data(self) -> list[Dict[str, Any]]:
+    def get_current_jobs_data(self) -> list[Dict[str, object]]:
         """Get current running jobs data for rendering"""
-        current_jobs = []
+        current_jobs: list[Dict[str, object]] = []
 
         # Get current jobs from JobManager (simple borg jobs)
         for job_id, borg_job in self.job_manager.jobs.items():

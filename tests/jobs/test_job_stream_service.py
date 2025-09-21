@@ -70,11 +70,14 @@ class TestJobStreamService:
 
         # Mock streaming generator that yields one update
         async def mock_stream_generator():
-            yield {
-                "type": "composite_job_status",
-                "job_id": "job-123",
-                "status": "completed",
-            }
+            from borgitory.services.jobs.broadcaster.job_event import JobEvent
+            from borgitory.services.jobs.broadcaster.event_type import EventType
+
+            yield JobEvent(
+                event_type=EventType.JOB_STATUS_CHANGED,
+                job_id="job-123",
+                data={"status": "completed"},
+            )
 
         self.mock_job_manager.stream_all_job_updates = Mock(
             return_value=mock_stream_generator()
@@ -99,7 +102,7 @@ class TestJobStreamService:
         assert jobs_data["jobs"][0]["status"] == "running"
 
         # Check job status update
-        assert "event: composite_job_status" in events[1]
+        assert "event: job_status_changed" in events[1]
 
     @pytest.mark.asyncio
     async def test_stream_all_jobs_error_handling(self) -> None:

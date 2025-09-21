@@ -22,7 +22,6 @@ from borgitory.dependencies import (
 )
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.jobs.job_stream_service import JobStreamService
-from borgitory.services.jobs.job_render_service import JobRenderService
 from borgitory.services.jobs.job_manager import JobManager
 
 
@@ -90,12 +89,9 @@ class TestJobsAPI:
     @pytest.fixture
     def mock_job_render_service(self) -> Mock:
         """Mock JobRenderService for testing."""
-        mock = Mock(spec=JobRenderService)
-        mock.render_jobs_html = Mock()
-        mock.render_current_jobs_html = Mock()
-        mock.stream_current_jobs_html = Mock()
-        mock.get_job_for_render = Mock()
-        return mock
+        from tests.utils.di_testing import MockServiceFactory
+
+        return MockServiceFactory.create_mock_job_render_service()
 
     @pytest.fixture
     def mock_job_manager(self) -> Mock:
@@ -132,8 +128,6 @@ class TestJobsAPI:
         mock_templates: Mock,
     ) -> Generator[None, None, None]:
         """Setup dependency overrides for testing."""
-        from borgitory.api.jobs import get_job_manager_dependency as local_get_jm_dep
-
         app.dependency_overrides[get_job_service] = lambda: mock_job_service
         app.dependency_overrides[get_job_stream_service] = (
             lambda: mock_job_stream_service
@@ -142,7 +136,6 @@ class TestJobsAPI:
             lambda: mock_job_render_service
         )
         app.dependency_overrides[get_job_manager_dependency] = lambda: mock_job_manager
-        app.dependency_overrides[local_get_jm_dep] = lambda: mock_job_manager
         app.dependency_overrides[get_templates] = lambda: mock_templates
 
         yield {
@@ -313,42 +306,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    # Test job retrieval endpoints
-
-    @pytest.mark.asyncio
-    async def test_list_jobs(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test listing jobs."""
-        setup_dependencies["job_service"].list_jobs.return_value = [
-            {"id": "job-1", "type": "backup", "status": "completed"},
-            {"id": "job-2", "type": "prune", "status": "running"},
-        ]
-
-        response = await async_client.get("/api/jobs/")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 2
-        assert data[0]["id"] == "job-1"
-        setup_dependencies["job_service"].list_jobs.assert_called_once_with(
-            0, 100, None
-        )
-
-    @pytest.mark.asyncio
-    async def test_list_jobs_with_params(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test listing jobs with query parameters."""
-        setup_dependencies["job_service"].list_jobs.return_value = []
-
-        response = await async_client.get("/api/jobs/?skip=10&limit=50&type=backup")
-
-        assert response.status_code == 200
-        setup_dependencies["job_service"].list_jobs.assert_called_once_with(
-            10, 50, "backup"
-        )
-
     @pytest.mark.asyncio
     async def test_get_jobs_html(
         self, async_client: AsyncClient, setup_dependencies
@@ -380,33 +337,6 @@ class TestJobsAPI:
         setup_dependencies[
             "job_render_service"
         ].render_current_jobs_html.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_job_success(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test getting specific job details."""
-        job_data = {"id": "test-job-123", "job_type": "backup", "status": "completed"}
-        setup_dependencies["job_service"].get_job.return_value = job_data
-
-        response = await async_client.get("/api/jobs/test-job-123")
-
-        assert response.status_code == 200
-        response_data = response.json()
-
-        # Verify the core fields are correct
-        assert response_data["id"] == "test-job-123"
-        assert response_data["status"] == "completed"
-        assert response_data["job_type"] == "backup"
-
-        # Verify optional fields are present (may be None)
-        assert "started_at" in response_data
-        assert "completed_at" in response_data
-        assert "return_code" in response_data
-        assert "error" in response_data
-        setup_dependencies["job_service"].get_job.assert_called_once_with(
-            "test-job-123"
-        )
 
     @pytest.mark.asyncio
     async def test_get_job_not_found(
@@ -463,54 +393,6 @@ class TestJobsAPI:
         response = await async_client.get("/api/jobs/non-existent-job/status")
 
         assert response.status_code == 404
-
-    @pytest.mark.asyncio
-    async def test_get_job_output_success(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test getting job output."""
-        output_data = {
-            "lines": [
-                {"text": "line 1", "timestamp": None, "stream": None},
-                {"text": "line 2", "timestamp": None, "stream": None},
-            ],
-            "progress": {},
-        }
-        setup_dependencies["job_service"].get_job_output.return_value = output_data
-
-        response = await async_client.get("/api/jobs/test-job-123/output")
-
-        assert response.status_code == 200
-        response_data = response.json()
-
-        # Verify the structure
-        assert "lines" in response_data
-        assert "progress" in response_data
-        assert len(response_data["lines"]) == 2
-        assert response_data["lines"][0]["text"] == "line 1"
-        assert response_data["lines"][1]["text"] == "line 2"
-        assert response_data["progress"] == {}
-
-        setup_dependencies["job_service"].get_job_output.assert_called_once_with(
-            "test-job-123", 100
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_job_output_with_limit(
-        self, async_client: AsyncClient, setup_dependencies
-    ) -> None:
-        """Test getting job output with custom limit."""
-        output_data = {"output": ["line 1"], "total_lines": 1}
-        setup_dependencies["job_service"].get_job_output.return_value = output_data
-
-        response = await async_client.get(
-            "/api/jobs/test-job-123/output?last_n_lines=50"
-        )
-
-        assert response.status_code == 200
-        setup_dependencies["job_service"].get_job_output.assert_called_once_with(
-            "test-job-123", 50
-        )
 
     # Test streaming endpoints
 
@@ -580,13 +462,7 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies
     ) -> None:
         """Test toggling job details visibility."""
-        job_data = {
-            "job": {"id": "test-job-123", "status": "completed"},
-            "expand_details": False,
-        }
-        setup_dependencies[
-            "job_render_service"
-        ].get_job_for_render.return_value = job_data
+        # The mock already handles this case properly
 
         response = await async_client.get(
             "/api/jobs/test-job-123/toggle-details?expanded=false"
@@ -594,14 +470,16 @@ class TestJobsAPI:
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-        setup_dependencies["job_render_service"].get_job_for_render.assert_called_once()
+        setup_dependencies[
+            "job_render_service"
+        ].get_job_for_template.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_toggle_job_details_not_found(
         self, async_client: AsyncClient, setup_dependencies
     ) -> None:
         """Test toggling details for non-existent job."""
-        setup_dependencies["job_render_service"].get_job_for_render.return_value = None
+        # The mock already handles non-existent jobs by returning None
 
         response = await async_client.get("/api/jobs/non-existent-job/toggle-details")
 
@@ -612,10 +490,7 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies
     ) -> None:
         """Test getting static job details."""
-        job_data = {"job": {"id": "test-job-123", "status": "completed"}}
-        setup_dependencies[
-            "job_render_service"
-        ].get_job_for_render.return_value = job_data
+        # The mock already handles this case properly
 
         response = await async_client.get("/api/jobs/test-job-123/details-static")
 
@@ -637,10 +512,8 @@ class TestJobsAPI:
         job_obj.id = "test-job-123"
         job_obj.status = "completed"
 
-        job_data = {"job": job_obj, "sorted_tasks": [task]}
-        setup_dependencies[
-            "job_render_service"
-        ].get_job_for_render.return_value = job_data
+        # The mock already handles this case with proper task structure
+        # Task order 1 should find the task we created in the mock
 
         response = await async_client.get(
             "/api/jobs/test-job-123/tasks/1/toggle-details"
@@ -654,13 +527,8 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies
     ) -> None:
         """Test toggling details for non-existent task."""
-        job_data = {
-            "job": {"id": "test-job-123", "status": "completed"},
-            "sorted_tasks": [],
-        }
-        setup_dependencies[
-            "job_render_service"
-        ].get_job_for_render.return_value = job_data
+        # The mock will return a job with tasks 0 and 1, but task 999 doesn't exist
+        # This should result in a 404
 
         response = await async_client.get(
             "/api/jobs/test-job-123/tasks/999/toggle-details"
@@ -741,21 +609,3 @@ class TestJobsAPI:
 
         response = await async_client.post("/api/jobs/check", json=invalid_request)
         assert response.status_code == 422
-
-
-class TestJobsAPIIntegration:
-    """Integration tests for jobs API with real database."""
-
-    @pytest.mark.asyncio
-    async def test_job_endpoint_registration(self, async_client: AsyncClient) -> None:
-        """Test that job endpoints are properly registered."""
-        # Test that endpoints exist by checking for proper error responses
-        # rather than trying to execute the full job creation flow
-
-        # Test backup endpoint with invalid data
-        response = await async_client.post("/api/jobs/backup", json={})
-        assert response.status_code == 422  # Validation error
-
-        # Test job listing endpoint
-        response = await async_client.get("/api/jobs/")
-        assert response.status_code == 200

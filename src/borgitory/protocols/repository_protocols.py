@@ -2,8 +2,11 @@
 Protocol interfaces for repository and backup services.
 """
 
-from typing import Protocol, Dict, List, Any, Optional, AsyncGenerator
+from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from borgitory.models.database import Repository
 
 
 class RepositoryInfo:
@@ -29,14 +32,14 @@ class BackupServiceProtocol(Protocol):
 
     async def initialize_repository(
         self,
-        repository: Any,  # Repository model
-    ) -> Dict[str, Any]:
+        repository: "Repository",  # Repository model
+    ) -> Dict[str, object]:
         """Initialize a new repository."""
         ...
 
     async def create_backup(
         self,
-        repository: Any,  # Repository model
+        repository: "Repository",  # Repository model
         source_path: str,
         compression: str = "zstd",
         dry_run: bool = False,
@@ -47,15 +50,15 @@ class BackupServiceProtocol(Protocol):
 
     async def list_archives(
         self,
-        repository: Any,  # Repository model
-    ) -> List[Dict[str, Any]]:
+        repository: "Repository",  # Repository model
+    ) -> List[Dict[str, object]]:
         """List all archives in a repository."""
         ...
 
     async def get_repo_info(
         self,
-        repository: Any,  # Repository model
-    ) -> Dict[str, Any]:
+        repository: "Repository",  # Repository model
+    ) -> Dict[str, object]:
         """Get repository information."""
         ...
 
@@ -65,7 +68,7 @@ class BackupServiceProtocol(Protocol):
         """Verify repository can be accessed."""
         ...
 
-    async def scan_for_repositories(self) -> List[Dict[str, Any]]:
+    async def scan_for_repositories(self) -> List[Dict[str, object]]:
         """Scan mounted volumes for Borg repositories."""
         ...
 
@@ -75,24 +78,24 @@ class ArchiveServiceProtocol(Protocol):
 
     async def list_archive_contents(
         self,
-        repository: Any,  # Repository model
+        repository: "Repository",  # Repository model
         archive_name: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, object]]:
         """List contents of an archive."""
         ...
 
     async def list_archive_directory_contents(
         self,
-        repository: Any,  # Repository model
+        repository: "Repository",  # Repository model
         archive_name: str,
         directory_path: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, object]]:
         """List contents of a directory within an archive."""
         ...
 
     async def extract_file_stream(
         self,
-        repository: Any,  # Repository model
+        repository: "Repository",  # Repository model
         archive_name: str,
         file_path: str,
     ) -> AsyncGenerator[bytes, None]:
@@ -108,40 +111,40 @@ class RepositoryServiceProtocol(Protocol):
         name: str,
         path: str,
         passphrase: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Create a new repository."""
         ...
 
     async def delete_repository(
         self,
         repository_id: int,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Delete a repository."""
         ...
 
-    async def scan_repositories(self) -> List[Dict[str, Any]]:
+    async def scan_repositories(self) -> List[Dict[str, object]]:
         """Scan for repositories on mounted volumes."""
         ...
 
     def get_repository_stats(
         self,
         repository_id: int,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Get repository statistics."""
         ...
 
-    def get_all_repositories(self) -> List[Any]:
+    def get_all_repositories(self) -> List[object]:
         """Get all repositories from database."""
         ...
 
-    def get_repository_by_id(self, repository_id: int) -> Optional[Any]:
+    def get_repository_by_id(self, repository_id: int) -> Optional[object]:
         """Get repository by ID."""
         ...
 
     async def update_repository(
         self,
         repository_id: int,
-        updates: Dict[str, Any],
-    ) -> Optional[Any]:
+        updates: Dict[str, object],
+    ) -> Optional[object]:
         """Update repository."""
         ...

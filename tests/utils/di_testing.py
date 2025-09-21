@@ -105,11 +105,53 @@ class MockServiceFactory:
         """Create a mock DebugService with common method signatures."""
         mock = Mock(spec=DebugService)
 
-        # Setup common return values
+        # Setup common return values that match our DebugInfo TypedDict structure
         mock.get_debug_info.return_value = {
-            "system": {"platform": "test"},
-            "volumes": [],
-            "jobs": {"active": 0, "total": 0},
+            "system": {
+                "platform": "Test Platform",
+                "system": "TestOS",
+                "release": "1.0",
+                "version": "1.0.0",
+                "architecture": "x64",
+                "processor": "Test Processor",
+                "hostname": "test-host",
+                "python_version": "Python 3.9.0",
+                "python_executable": "/usr/bin/python",
+            },
+            "application": {
+                "borgitory_version": "1.0.0",
+                "debug_mode": False,
+                "startup_time": "2023-01-01T12:00:00",
+                "working_directory": "/test/dir",
+            },
+            "database": {
+                "repository_count": 5,
+                "total_jobs": 100,
+                "jobs_today": 10,
+                "database_type": "SQLite",
+                "database_url": "sqlite:///test.db",
+                "database_size": "1.0 MB",
+                "database_size_bytes": 1048576,
+                "database_accessible": True,
+            },
+            "volumes": {
+                "mounted_volumes": ["/data", "/backup"],
+                "total_mounted_volumes": 2,
+            },
+            "tools": {
+                "borg": {"version": "borg 1.2.0", "accessible": True},
+                "rclone": {"version": "rclone v1.58.0", "accessible": True},
+            },
+            "environment": {
+                "PATH": "/usr/bin:/bin",
+                "HOME": "/home/user",
+                "DEBUG": "false",
+            },
+            "job_manager": {
+                "active_jobs": 2,
+                "total_jobs": 5,
+                "job_manager_running": True,
+            },
         }
 
         return mock
@@ -137,10 +179,43 @@ class MockServiceFactory:
         """Create a mock JobRenderService with common method signatures."""
         mock = Mock(spec=JobRenderService)
 
-        # Setup common return values
+        # Setup common return values for new architecture
         mock.render_jobs_html.return_value = "<div>Mock jobs HTML</div>"
         mock.render_current_jobs_html.return_value = "<div>Mock current jobs HTML</div>"
-        mock.get_job_for_render.return_value = {"id": "test-job", "status": "completed"}
+        mock.get_job_display_data.return_value = None  # Returns JobDisplayData or None
+
+        # Create a mock TemplateJobData structure
+        from unittest.mock import MagicMock
+
+        mock_template_job = MagicMock()
+
+        # Create mock tasks
+        mock_task_0 = MagicMock()
+        mock_task_0.task_order = 0
+        mock_task_0.task_name = "backup"
+        mock_task_0.status = "completed"
+
+        mock_task_1 = MagicMock()
+        mock_task_1.task_order = 1
+        mock_task_1.task_name = "prune"
+        mock_task_1.status = "completed"
+
+        mock_template_job.sorted_tasks = [
+            mock_task_0,
+            mock_task_1,
+        ]  # List with two tasks
+        mock_template_job.job.status = "completed"
+        mock_template_job.job.id = "test-job-123"
+
+        # Set up side_effect to return mock_template_job for known jobs, None for unknown
+        def get_job_for_template_side_effect(job_id, *args, **kwargs):
+            if job_id == "test-job-123":
+                return mock_template_job
+            return None
+
+        mock.get_job_for_template.side_effect = get_job_for_template_side_effect
+
+        mock._render_job_html.return_value = "<div>Mock job HTML</div>"
 
         # Setup async streaming methods
         async def mock_stream_current_jobs_html():
@@ -149,6 +224,30 @@ class MockServiceFactory:
         mock.stream_current_jobs_html.return_value = mock_stream_current_jobs_html()
 
         return mock
+
+    @staticmethod
+    def create_job_render_service_with_mocks(
+        job_manager=None, templates=None, converter=None
+    ):
+        """Create a real JobRenderService with mocked dependencies for testing."""
+        from fastapi.templating import Jinja2Templates
+        from borgitory.services.jobs.job_render_service import (
+            JobRenderService,
+            JobDataConverter,
+        )
+
+        if job_manager is None:
+            job_manager = Mock()
+        if templates is None:
+            templates = Mock(spec=Jinja2Templates)
+            # Mock common template methods
+            templates.get_template.return_value.render.return_value = "<div>test</div>"
+        if converter is None:
+            converter = Mock(spec=JobDataConverter)
+
+        return JobRenderService(
+            job_manager=job_manager, templates=templates, converter=converter
+        )
 
     @staticmethod
     def create_mock_archive_manager() -> Mock:
@@ -215,9 +314,17 @@ class MockServiceFactory:
         """Create a mock VolumeService with common method signatures."""
         mock = Mock(spec=VolumeService)
 
-        # Setup common return values
-        mock.get_mounted_volumes.return_value = ["/mnt/test-volume"]
-        mock.get_volume_info.return_value = {"path": "/mnt/test", "size": "100GB"}
+        # Setup common return values that match our VolumeInfo TypedDict structure
+        from unittest.mock import AsyncMock
+
+        mock.get_mounted_volumes = AsyncMock(return_value=["/mnt/test-volume"])
+        mock.get_volume_info = AsyncMock(
+            return_value={
+                "mounted_volumes": ["/mnt/test-volume"],
+                "total_mounted_volumes": 1,
+                "accessible": True,
+            }
+        )
 
         return mock
 

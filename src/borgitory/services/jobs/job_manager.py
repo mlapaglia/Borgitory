@@ -8,7 +8,6 @@ clean architecture following the same pattern as other services in the applicati
 import asyncio
 import logging
 import uuid
-import os
 from datetime import datetime, UTC
 from typing import (
     Union,
@@ -16,9 +15,10 @@ from typing import (
     Optional,
     List,
     AsyncGenerator,
-    Any,
     Callable,
+    Coroutine,
     TYPE_CHECKING,
+    Any,
 )
 from dataclasses import dataclass, field
 
@@ -41,12 +41,17 @@ from borgitory.services.jobs.job_database_manager import (
 from borgitory.services.rclone_service import RcloneService
 from borgitory.utils.db_session import get_db_session
 from contextlib import _GeneratorContextManager
-from unittest.mock import Mock
 
 if TYPE_CHECKING:
+    from asyncio.subprocess import Process
     from borgitory.models.database import Repository, Schedule
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
     from borgitory.dependencies import ApplicationScopedNotificationService
+    from sqlalchemy.orm import Session
+    from borgitory.services.notifications.providers.discord_provider import HttpClient
+    from borgitory.services.cloud_providers import StorageFactory
+    from borgitory.services.encryption_service import EncryptionService
+    from borgitory.services.cloud_providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -85,15 +90,17 @@ class JobManagerDependencies:
     database_manager: Optional[JobDatabaseManager] = None
 
     # External dependencies (for testing/customization)
-    subprocess_executor: Optional[Callable[..., Any]] = field(
-        default_factory=lambda: asyncio.create_subprocess_exec
+    subprocess_executor: Optional[Callable[..., Coroutine[None, None, "Process"]]] = (
+        field(default_factory=lambda: asyncio.create_subprocess_exec)
     )
-    db_session_factory: Optional[Callable[[], Any]] = None
-    rclone_service: Optional[Any] = None
-    http_client_factory: Optional[Callable[[], Any]] = None
-    encryption_service: Optional[Any] = None
-    storage_factory: Optional[Any] = None
-    provider_registry: Optional[Any] = None
+    db_session_factory: Optional[Callable[[], _GeneratorContextManager["Session"]]] = (
+        None
+    )
+    rclone_service: Optional[RcloneService] = None
+    http_client_factory: Optional[Callable[[], "HttpClient"]] = None
+    encryption_service: Optional["EncryptionService"] = None
+    storage_factory: Optional["StorageFactory"] = None
+    provider_registry: Optional["ProviderRegistry"] = None
     # Use semantic type alias for application-scoped notification service
     notification_service: Optional["ApplicationScopedNotificationService"] = None
 
@@ -102,7 +109,7 @@ class JobManagerDependencies:
         if self.db_session_factory is None:
             self.db_session_factory = self._default_db_session_factory
 
-    def _default_db_session_factory(self) -> _GeneratorContextManager[Any]:
+    def _default_db_session_factory(self) -> _GeneratorContextManager["Session"]:
         """Default database session factory"""
         return get_db_session()
 
@@ -118,7 +125,7 @@ class BorgJobTask:
     completed_at: Optional[datetime] = None
     return_code: Optional[int] = None
     error: Optional[str] = None
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: Dict[str, object] = field(default_factory=dict)
     output_lines: List[Union[str, Dict[str, str]]] = field(
         default_factory=list
     )  # Store task output
@@ -453,7 +460,9 @@ class JobManager:
             process = await self.safe_executor.start_process(command, env)
             self._processes[job.id] = process
 
-            def output_callback(line: str, progress: Dict[str, Any]) -> None:
+            def output_callback(line: str) -> None:
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 # Add output to both the task and the output manager
                 task.output_lines.append(line)
                 asyncio.create_task(
@@ -465,7 +474,7 @@ class JobManager:
                 self.safe_event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
-                    data={"line": line, "progress": progress},
+                    data={"line": line, "progress": None},  # No progress data
                 )
 
             result = await self.safe_executor.monitor_process_output(
@@ -535,7 +544,7 @@ class JobManager:
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict[str, Any]],
+        task_definitions: List[Dict[str, object]],
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
@@ -548,8 +557,8 @@ class JobManager:
         tasks = []
         for task_def in task_definitions:
             task = BorgJobTask(
-                task_type=task_def["type"],
-                task_name=task_def["name"],
+                task_type=str(task_def["type"]),
+                task_name=str(task_def["name"]),
                 parameters=task_def,
             )
             tasks.append(task)
@@ -769,7 +778,9 @@ class JobManager:
             process = await self.safe_executor.start_process(command, env)
             self._processes[job.id] = process
 
-            def output_callback(line: str, progress: Dict[str, Any]) -> None:
+            def output_callback(line: str) -> None:
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 asyncio.create_task(
                     self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -779,7 +790,7 @@ class JobManager:
                 self.safe_event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
-                    data={"line": line, "progress": progress},
+                    data={"line": line, "progress": None},  # No progress data
                 )
 
             result = await self.safe_executor.monitor_process_output(
@@ -841,8 +852,10 @@ class JobManager:
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
 
-            def task_output_callback(line: str, progress: Dict[str, Any]) -> None:
+            def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 asyncio.create_task(
                     self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -854,7 +867,7 @@ class JobManager:
                     job_id=job.id,
                     data={
                         "line": line,
-                        "progress": progress,
+                        "progress": None,  # No progress data
                         "task_index": job.current_task_index,
                     },
                 )
@@ -862,6 +875,8 @@ class JobManager:
             # Build backup command
             source_path = params.get("source_path")
             excludes = params.get("excludes", [])
+            if not isinstance(excludes, list):
+                excludes = []
             archive_name = params.get(
                 "archive_name", f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
             )
@@ -987,8 +1002,10 @@ class JobManager:
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
 
-            def task_output_callback(line: str, progress: Dict[str, Any]) -> None:
+            def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 asyncio.create_task(
                     self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -998,16 +1015,26 @@ class JobManager:
             result = await self.safe_executor.execute_prune_task(
                 repository_path=str(repository_path or ""),
                 passphrase=passphrase,
-                keep_within=params.get("keep_within"),
-                keep_daily=params.get("keep_daily"),
-                keep_weekly=params.get("keep_weekly"),
-                keep_monthly=params.get("keep_monthly"),
-                keep_yearly=params.get("keep_yearly"),
-                show_stats=params.get("show_stats", True),
-                show_list=params.get("show_list", False),
-                save_space=params.get("save_space", False),
-                force_prune=params.get("force_prune", False),
-                dry_run=params.get("dry_run", False),
+                keep_within=str(params.get("keep_within"))
+                if params.get("keep_within")
+                else None,
+                keep_daily=int(str(params.get("keep_daily") or 0))
+                if params.get("keep_daily")
+                else None,
+                keep_weekly=int(str(params.get("keep_weekly") or 0))
+                if params.get("keep_weekly")
+                else None,
+                keep_monthly=int(str(params.get("keep_monthly") or 0))
+                if params.get("keep_monthly")
+                else None,
+                keep_yearly=int(str(params.get("keep_yearly") or 0))
+                if params.get("keep_yearly")
+                else None,
+                show_stats=bool(params.get("show_stats", True)),
+                show_list=bool(params.get("show_list", False)),
+                save_space=bool(params.get("save_space", False)),
+                force_prune=bool(params.get("force_prune", False)),
+                dry_run=bool(params.get("dry_run", False)),
                 output_callback=task_output_callback,
             )
 
@@ -1053,8 +1080,10 @@ class JobManager:
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
 
-            def task_output_callback(line: str, progress: Dict[str, Any]) -> None:
+            def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 asyncio.create_task(
                     self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -1171,8 +1200,10 @@ class JobManager:
             task.completed_at = datetime.now(UTC)
             return False
 
-        def task_output_callback(line: str, progress: Dict[str, Any]) -> None:
+        def task_output_callback(line: str) -> None:
             task.output_lines.append(line)
+            # Provide default progress since callback now only receives line
+            progress: Dict[str, object] = {}
             asyncio.create_task(
                 self.safe_output_manager.add_output_line(
                     job.id, line, "stdout", progress
@@ -1184,13 +1215,18 @@ class JobManager:
                 job_id=job.id,
                 data={
                     "line": line,
-                    "progress": progress,
+                    "progress": None,  # No progress data
                     "task_index": task_index,
                 },
             )
 
         # Get cloud sync config ID, defaulting to None if not configured
-        cloud_sync_config_id = params.get("cloud_sync_config_id")
+        cloud_sync_config_id_raw = params.get("cloud_sync_config_id")
+        cloud_sync_config_id = (
+            int(str(cloud_sync_config_id_raw or 0))
+            if cloud_sync_config_id_raw is not None
+            else None
+        )
 
         # Handle skip case at caller level instead of inside executor
         if not cloud_sync_config_id:
@@ -1242,10 +1278,16 @@ class JobManager:
         assert self.dependencies.storage_factory is not None
         assert self.dependencies.provider_registry is not None
 
+        # Create a wrapper to convert context manager to direct session
+        db_factory = self.dependencies.db_session_factory
+
+        def session_factory() -> "Session":
+            return db_factory().__enter__()
+
         result = await self.safe_executor.execute_cloud_sync_task(
             repository_path=str(repository_path or ""),
             cloud_sync_config_id=cloud_sync_config_id,
-            db_session_factory=self.dependencies.db_session_factory,
+            db_session_factory=session_factory,
             rclone_service=self.dependencies.rclone_service,
             encryption_service=self.dependencies.encryption_service,
             storage_factory=self.dependencies.storage_factory,
@@ -1333,7 +1375,7 @@ class JobManager:
                 # Create notification config object
                 notification_config = NotificationConfigType(
                     provider=config.provider,
-                    config=decrypted_config,
+                    config=dict(decrypted_config),  # Cast to dict[str, object]
                     name=config.name,
                     enabled=config.enabled,
                 )
@@ -1346,19 +1388,23 @@ class JobManager:
 
                 # Convert to proper types
                 try:
-                    notification_type = NotificationType(notification_type_str.lower())
+                    notification_type = NotificationType(
+                        str(notification_type_str).lower()
+                    )
                 except ValueError:
                     notification_type = NotificationType.INFO
 
                 try:
-                    priority = NotificationPriority(priority_value)
+                    priority = NotificationPriority(
+                        int(str(priority_value)) if priority_value else 0
+                    )
                 except ValueError:
                     priority = NotificationPriority.NORMAL
 
                 # Create notification message
                 notification_message = NotificationMessage(
-                    title=title,
-                    message=message,
+                    title=str(title),
+                    message=str(message),
                     notification_type=notification_type,
                     priority=priority,
                 )
@@ -1456,7 +1502,7 @@ class JobManager:
 
     async def stream_job_output(
         self, job_id: str
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[Dict[str, object], None]:
         """Stream job output"""
         if self.output_manager:
             async for output in self.safe_output_manager.stream_job_output(job_id):
@@ -1472,7 +1518,9 @@ class JobManager:
         """List all jobs"""
         return self.jobs.copy()
 
-    async def get_job_output(self, job_id: str) -> AsyncGenerator[Dict[str, Any], None]:
+    async def get_job_output(
+        self, job_id: str
+    ) -> AsyncGenerator[Dict[str, object], None]:
         """Get real-time job output"""
         if self.output_manager:
             async for output in self.safe_output_manager.stream_job_output(job_id):
@@ -1547,7 +1595,7 @@ class JobManager:
         """Get count of active (running/queued) jobs"""
         return len([j for j in self.jobs.values() if j.status in ["running", "queued"]])
 
-    def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
+    def get_job_status(self, job_id: str) -> Optional[Dict[str, object]]:
         """Get job status information"""
         job = self.jobs.get(job_id)
         if not job:
@@ -1570,7 +1618,7 @@ class JobManager:
 
     async def get_job_output_stream(
         self, job_id: str, last_n_lines: Optional[int] = None
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Get job output stream data"""
         # Get output from output manager (don't require job to exist, just output)
         job_output = self.safe_output_manager.get_job_output(job_id)
@@ -1592,7 +1640,7 @@ class JobManager:
 
     async def _get_repository_data(
         self, repository_id: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Dict[str, object]]:
         """Get repository data by ID"""
         # First try using database manager if available
         if hasattr(self, "database_manager") and self.database_manager:
@@ -1853,37 +1901,6 @@ class JobManager:
             logger.warning(f"Cannot unregister external job {job_id} - not found")
 
 
-# Factory function for creating JobManager instances (no singleton)
-def create_job_manager(
-    config: Optional[Union[JobManagerConfig, Mock]] = None,
-    rclone_service: Optional[RcloneService] = None,
-) -> JobManager:
-    """Factory function for creating JobManager instances"""
-    if config is None:
-        # Use environment variables or defaults
-        internal_config = JobManagerConfig(
-            max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
-            max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
-        )
-    else:
-        # Assume it's already a JobManagerConfig or compatible
-        internal_config = config
-
-    # Create dependencies with rclone service
-    custom_deps = JobManagerDependencies(rclone_service=rclone_service)
-
-    dependencies = JobManagerFactory.create_dependencies(
-        config=internal_config, custom_dependencies=custom_deps
-    )
-
-    job_manager = JobManager(config=internal_config, dependencies=dependencies)
-    logger.info(
-        f"Created new job manager with config: max_concurrent={internal_config.max_concurrent_backups}"
-    )
-
-    return job_manager
-
-
 def get_default_job_manager_dependencies() -> JobManagerDependencies:
     """Get default job manager dependencies (production configuration)"""
     return JobManagerFactory.create_complete_dependencies()
@@ -1910,7 +1927,6 @@ __all__ = [
     "JobManagerFactory",
     "BorgJob",
     "BorgJobTask",
-    "create_job_manager",
     "get_default_job_manager_dependencies",
     "get_test_job_manager_dependencies",
 ]

@@ -2,7 +2,7 @@
 FastAPI dependency providers for the application.
 """
 
-from typing import Annotated, TYPE_CHECKING, Optional, Callable, Any
+from typing import Annotated, TYPE_CHECKING, Optional, Callable, ContextManager
 
 from borgitory.services.notifications.registry_factory import (
     NotificationRegistryFactory,
@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
     from borgitory.services.notifications.service import NotificationProviderFactory
     from borgitory.services.notifications.providers.discord_provider import HttpClient
+    from sqlalchemy.orm import Session
 from functools import lru_cache
-
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from borgitory.models.database import get_db
@@ -23,6 +23,8 @@ from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.backups.backup_service import BackupService
 from borgitory.services.jobs.job_manager import JobManager
+
+# Note: JobManager singleton is handled by FastAPI's dependency caching system
 from borgitory.services.recovery_service import RecoveryService
 from borgitory.services.notifications.service import NotificationService
 from borgitory.services.notifications.config_service import NotificationConfigService
@@ -37,7 +39,6 @@ from borgitory.services.repositories.repository_stats_service import (
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.services.volumes.volume_service import VolumeService
-from borgitory.services.repositories.repository_parser import RepositoryParser
 from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.repositories.repository_service import RepositoryService
@@ -54,10 +55,11 @@ from borgitory.services.cleanup_service import CleanupService
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
-from borgitory.services.cloud_providers import EncryptionService, StorageFactory
+from borgitory.services.cloud_providers import StorageFactory
+from borgitory.services.encryption_service import EncryptionService
 
 if TYPE_CHECKING:
-    from borgitory.services.cloud_sync_service import CloudSyncService
+    from borgitory.services.cloud_sync_service import CloudSyncConfigService
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
     from borgitory.protocols.command_protocols import (
         CommandRunnerProtocol,
@@ -67,17 +69,13 @@ if TYPE_CHECKING:
     from borgitory.protocols.job_protocols import (
         JobManagerProtocol,
     )
-    from borgitory.protocols.cloud_protocols import CloudSyncServiceProtocol
+    from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
     from borgitory.factories.service_factory import CloudProviderServiceFactory
-    from borgitory.protocols.repository_protocols import (
-        BackupServiceProtocol,
-    )
+    from borgitory.services.jobs.job_manager import JobManagerConfig
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
 from borgitory.services.jobs.job_queue_manager import JobQueueManager
 from borgitory.services.jobs.job_database_manager import JobDatabaseManager
-
-# Global singleton instances
 
 
 # Job Manager Sub-Services (defined first to avoid forward references)
@@ -124,7 +122,7 @@ def get_job_queue_manager() -> JobQueueManager:
 
 
 def get_job_database_manager(
-    db_session_factory: Optional[Callable[[], Any]] = None,
+    db_session_factory: Optional[Callable[[], ContextManager["Session"]]] = None,
 ) -> JobDatabaseManager:
     """
     Provide a JobDatabaseManager instance.
@@ -312,25 +310,6 @@ def get_repository_stats_service() -> RepositoryStatsService:
     return RepositoryStatsService()
 
 
-_scheduler_service_instance = None
-
-
-def get_scheduler_service() -> SchedulerService:
-    """
-    Provide a SchedulerService singleton instance with proper dependency injection.
-
-    Now uses the new DI system while maintaining backward compatibility.
-    """
-    global _scheduler_service_instance
-    if _scheduler_service_instance is None:
-        job_manager = get_job_manager_dependency()
-
-        _scheduler_service_instance = SchedulerService(
-            job_manager=job_manager, job_service_factory=None
-        )
-    return _scheduler_service_instance
-
-
 @lru_cache()
 def get_volume_service() -> "VolumeServiceProtocol":
     """
@@ -349,17 +328,6 @@ def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinition
     Note: This is not cached because it needs a database session per request.
     """
     return TaskDefinitionBuilder(db)
-
-
-def get_repository_parser(
-    command_runner: SimpleCommandRunner = Depends(get_simple_command_runner),
-) -> RepositoryParser:
-    """
-    Provide a RepositoryParser singleton instance with proper dependency injection.
-
-    Uses FastAPI's dependency injection for clean separation of concerns.
-    """
-    return RepositoryParser(command_runner=command_runner)
 
 
 @lru_cache()
@@ -405,146 +373,6 @@ def get_templates() -> Jinja2Templates:
     return Jinja2Templates(directory=template_path)
 
 
-_job_manager_instance = None
-
-
-def get_job_manager_dependency() -> "JobManagerProtocol":
-    """
-    Provide a JobManager singleton instance for FastAPI dependency injection.
-
-    Now uses the new sub-service DI system while maintaining backward compatibility.
-    """
-    global _job_manager_instance
-    if _job_manager_instance is None:
-        import os
-        from borgitory.services.jobs.job_manager import (
-            JobManager,
-            JobManagerConfig,
-            JobManagerDependencies,
-            JobManagerFactory,
-        )
-
-        # Create configuration from environment
-        config = JobManagerConfig(
-            max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
-            max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
-            max_concurrent_operations=int(
-                os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")
-            ),
-            queue_poll_interval=float(os.getenv("BORG_QUEUE_POLL_INTERVAL", "0.1")),
-            sse_keepalive_timeout=float(
-                os.getenv("BORG_SSE_KEEPALIVE_TIMEOUT", "30.0")
-            ),
-            sse_max_queue_size=int(os.getenv("BORG_SSE_MAX_QUEUE_SIZE", "100")),
-            max_concurrent_cloud_uploads=int(
-                os.getenv("BORG_MAX_CONCURRENT_CLOUD_UPLOADS", "3")
-            ),
-        )
-
-        # Create dependencies using our new DI services (resolved directly)
-        custom_dependencies = JobManagerDependencies(
-            job_executor=get_job_executor(),
-            output_manager=get_job_output_manager(),
-            queue_manager=get_job_queue_manager(),
-            database_manager=get_job_database_manager(),
-            event_broadcaster=get_job_event_broadcaster_dep(),
-            rclone_service=get_rclone_service(),
-            notification_service=get_notification_service_singleton(),
-            # Add cloud sync dependencies
-            encryption_service=get_encryption_service(),
-            storage_factory=get_storage_factory(get_rclone_service()),
-            provider_registry=get_provider_registry(),
-        )
-
-        # Use the factory to ensure all dependencies are properly initialized
-        dependencies = JobManagerFactory.create_dependencies(
-            config=config, custom_dependencies=custom_dependencies
-        )
-
-        _job_manager_instance = JobManager(config=config, dependencies=dependencies)
-
-    return _job_manager_instance
-
-
-def get_job_service(
-    db: Session = Depends(get_db),
-    job_manager: JobManager = Depends(get_job_manager_dependency),
-) -> JobService:
-    """
-    Provide a JobService instance with database session injection.
-
-    Note: This creates a new instance per request since it depends on the database session.
-    """
-    return JobService(db, job_manager)
-
-
-def get_borg_service(
-    command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
-    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
-    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-) -> BorgService:
-    """
-    Provide a BorgService instance with proper dependency injection.
-
-    Uses FastAPI DI with automatic dependency resolution.
-    """
-    return BorgService(
-        command_runner=command_runner,
-        volume_service=volume_service,
-        job_manager=job_manager,
-    )
-
-
-def get_job_stream_service(
-    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-) -> JobStreamService:
-    """
-    Provide a JobStreamService instance with proper dependency injection.
-
-    Uses FastAPI DI with automatic dependency resolution.
-    """
-    return JobStreamService(job_manager)
-
-
-def get_job_render_service(
-    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-) -> JobRenderService:
-    """
-    Provide a JobRenderService instance with proper dependency injection.
-
-    Uses FastAPI DI with automatic dependency resolution.
-    """
-    return JobRenderService(job_manager=job_manager)
-
-
-def get_debug_service(
-    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
-    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-) -> DebugService:
-    """
-    Provide a DebugService instance with proper dependency injection.
-    Uses FastAPI DI with automatic dependency resolution.
-    """
-    return DebugService(volume_service=volume_service, job_manager=job_manager)
-
-
-def get_repository_service(
-    borg_service: "BackupServiceProtocol" = Depends(get_borg_service),
-    scheduler_service: ScheduleService = Depends(get_scheduler_service),
-    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
-) -> RepositoryService:
-    """
-    Provide a RepositoryService instance with proper dependency injection.
-
-    Uses FastAPI DI with automatic dependency resolution.
-    """
-    return RepositoryService(
-        borg_service=borg_service,
-        scheduler_service=scheduler_service,
-        volume_service=volume_service,
-    )
-
-
 @lru_cache()
 def get_provider_registry() -> ProviderRegistry:
     """
@@ -557,18 +385,6 @@ def get_provider_registry() -> ProviderRegistry:
     from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
     return RegistryFactory.create_production_registry()
-
-
-def get_schedule_service(
-    db: Session = Depends(get_db),
-    scheduler_service: SchedulerService = Depends(get_scheduler_service),
-) -> ScheduleService:
-    """
-    Provide a ScheduleService instance with database session injection.
-
-    Note: This creates a new instance per request since it depends on the database session.
-    """
-    return ScheduleService(db=db, scheduler_service=scheduler_service)
 
 
 @lru_cache()
@@ -633,16 +449,226 @@ def get_storage_factory(
 
 
 @lru_cache()
+def _create_job_manager_config() -> "JobManagerConfig":
+    """Create JobManager configuration from environment variables."""
+    import os
+    from borgitory.services.jobs.job_manager import JobManagerConfig
+
+    return JobManagerConfig(
+        max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
+        max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
+        max_concurrent_operations=int(
+            os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")
+        ),
+        queue_poll_interval=float(os.getenv("BORG_QUEUE_POLL_INTERVAL", "0.1")),
+        sse_keepalive_timeout=float(os.getenv("BORG_SSE_KEEPALIVE_TIMEOUT", "30.0")),
+        sse_max_queue_size=int(os.getenv("BORG_SSE_MAX_QUEUE_SIZE", "100")),
+        max_concurrent_cloud_uploads=int(
+            os.getenv("BORG_MAX_CONCURRENT_CLOUD_UPLOADS", "3")
+        ),
+    )
+
+
+@lru_cache()
+def get_job_manager_singleton() -> "JobManagerProtocol":
+    """
+    Create JobManager singleton for application-scoped use.
+
+    📋 USAGE:
+    ✅ Use for: Singletons, direct instantiation, tests, background tasks
+    ❌ Don't use for: FastAPI endpoints (use get_job_manager_dependency instead)
+
+    📋 PATTERN: Dual Functions
+    This is the singleton version that resolves dependencies directly.
+    For FastAPI DI, use get_job_manager_dependency() with Depends().
+
+    Returns:
+        JobManagerProtocol: Cached singleton instance
+    """
+    from borgitory.services.jobs.job_manager import (
+        JobManagerDependencies,
+        JobManagerFactory,
+    )
+
+    # Resolve all dependencies directly (not via FastAPI DI)
+    config = _create_job_manager_config()
+    job_executor = get_job_executor()
+    output_manager = get_job_output_manager()
+    queue_manager = get_job_queue_manager()
+    database_manager = get_job_database_manager()
+    event_broadcaster = get_job_event_broadcaster_dep()
+    rclone_service = get_rclone_service()
+    notification_service = get_notification_service_singleton()  # Use singleton version
+    encryption_service = get_encryption_service()
+    storage_factory = get_storage_factory(rclone_service)
+    provider_registry = get_provider_registry()
+
+    # Create dependencies using resolved services
+    custom_dependencies = JobManagerDependencies(
+        job_executor=job_executor,
+        output_manager=output_manager,
+        queue_manager=queue_manager,
+        database_manager=database_manager,
+        event_broadcaster=event_broadcaster,
+        rclone_service=rclone_service,
+        notification_service=notification_service,
+        encryption_service=encryption_service,
+        storage_factory=storage_factory,
+        provider_registry=provider_registry,
+    )
+
+    # Use the factory to ensure all dependencies are properly initialized
+    dependencies = JobManagerFactory.create_dependencies(
+        config=config, custom_dependencies=custom_dependencies
+    )
+
+    return JobManager(config=config, dependencies=dependencies)
+
+
+def get_job_manager_dependency() -> "JobManagerProtocol":
+    """
+    Provide JobManager with FastAPI dependency injection.
+
+    📋 USAGE:
+    ✅ Use for: FastAPI endpoints with Depends(get_job_manager_dependency)
+    ❌ Don't use for: Direct calls, singletons, tests
+
+    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
+    ⚠️  For direct calls, use get_job_manager_singleton() instead.
+
+    📋 PATTERN: Dual Functions
+    This is the FastAPI DI version that returns the same singleton instance.
+    For direct calls, use get_job_manager_singleton().
+
+    Returns:
+        JobManagerProtocol: The same singleton instance as get_job_manager_singleton()
+    """
+    # Both functions return the same singleton instance
+    # This ensures job state consistency across all usage patterns
+    return get_job_manager_singleton()
+
+
+def get_scheduler_service(
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+) -> SchedulerService:
+    """
+    Provide a SchedulerService instance with proper FastAPI dependency injection.
+
+    Uses pure DI pattern - no global singletons, all dependencies injected by FastAPI.
+    """
+    return SchedulerService(job_manager=job_manager, job_service_factory=None)
+
+
+def get_schedule_service(
+    db: Session = Depends(get_db),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+) -> ScheduleService:
+    """
+    Provide a ScheduleService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return ScheduleService(db=db, scheduler_service=scheduler_service)
+
+
+def get_job_service(
+    db: Session = Depends(get_db),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+) -> JobService:
+    """
+    Provide a JobService instance with database session injection.
+
+    Note: This creates a new instance per request since it depends on the database session.
+    """
+    return JobService(db, job_manager)
+
+
+def get_borg_service(
+    command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
+    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+) -> BorgService:
+    """
+    Provide a BorgService instance with proper dependency injection.
+
+    Uses FastAPI DI with automatic dependency resolution.
+    """
+    return BorgService(
+        command_runner=command_runner,
+        volume_service=volume_service,
+        job_manager=job_manager,
+    )
+
+
+def get_job_stream_service(
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+) -> JobStreamService:
+    """
+    Provide a JobStreamService instance with proper dependency injection.
+
+    Uses FastAPI DI with automatic dependency resolution.
+    """
+    return JobStreamService(job_manager)
+
+
+def get_job_render_service(
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+    templates: Jinja2Templates = Depends(get_templates),
+) -> JobRenderService:
+    """
+    Provide a JobRenderService instance with proper dependency injection.
+
+    Uses FastAPI DI with automatic dependency resolution.
+    """
+    return JobRenderService(job_manager=job_manager, templates=templates)
+
+
+def get_debug_service(
+    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+) -> DebugService:
+    """
+    Provide a DebugService instance with proper dependency injection.
+    Uses FastAPI DI with automatic dependency resolution.
+    """
+    return DebugService(volume_service=volume_service, job_manager=job_manager)
+
+
+def get_repository_service(
+    borg_service: BorgService = Depends(get_borg_service),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+    volume_service: VolumeService = Depends(get_volume_service),
+) -> RepositoryService:
+    """
+    Provide a RepositoryService instance with proper dependency injection.
+
+    Uses FastAPI DI with automatic dependency resolution.
+    """
+    return RepositoryService(
+        borg_service=borg_service,
+        scheduler_service=scheduler_service,
+        volume_service=volume_service,
+    )
+
+
+@lru_cache()
 def get_cloud_provider_service_factory() -> "CloudProviderServiceFactory":
     """
-    Provide CloudProviderServiceFactory singleton instance.
+    Provide CloudProviderServiceFactory singleton instance with proper DI.
 
     Uses FastAPI's built-in caching for singleton behavior.
-    Following the exact pattern of NotificationProviderFactory.
+    Now properly injects dependencies instead of using service locator pattern.
     """
+    # **DI CHECK**: Factory gets dependencies injected, no more service locator!
     from borgitory.factories.service_factory import CloudProviderServiceFactory
+    from borgitory.services.cloud_providers.registry import get_metadata
 
-    return CloudProviderServiceFactory()
+    return CloudProviderServiceFactory(
+        rclone_service=get_rclone_service(),
+        storage_factory=get_storage_factory(get_rclone_service()),
+        encryption_service=get_encryption_service(),
+        metadata_func=get_metadata,
+    )
 
 
 def get_cloud_sync_service(
@@ -650,22 +676,22 @@ def get_cloud_sync_service(
     factory: "CloudProviderServiceFactory" = Depends(
         get_cloud_provider_service_factory
     ),
-) -> "CloudSyncServiceProtocol":
+) -> "CloudSyncConfigServiceProtocol":
     """
-    Provide a CloudSyncService instance using factory pattern with proper DI.
+    Provide a CloudSyncConfigService instance using factory pattern with proper DI.
 
     Request-scoped since it depends on database session.
     Uses factory for consistent DI pattern across all services.
     """
     # **DI CHECK**: Using factory pattern with request-scoped db injection
-    return factory.create_cloud_sync_service("default", db=db)
+    return factory.create_cloud_sync_service(db, "default")
 
 
 # 📋 SEMANTIC TYPE ALIASES FOR DEPENDENCY INJECTION
 #
 # These type aliases express the INTENDED USAGE PATTERN and LIFECYCLE:
 # - ApplicationScoped* = Singleton instances for app-wide services (JobManager, background tasks)
-# - RequestScoped* = Per-request instances via FastAPI DI (API endpoints)
+# - RequestScoped* = Per-request instance via FastAPI DI (API endpoints)
 #
 # This makes the architectural intent crystal clear and prevents misuse.
 
@@ -675,7 +701,6 @@ RequestScopedSimpleCommandRunner = Annotated[
 ]
 RequestScopedBorgService = Annotated[BorgService, Depends(get_borg_service)]
 RequestScopedJobService = Annotated[JobService, Depends(get_job_service)]
-RequestScopedJobManager = Annotated[JobManager, Depends(get_job_manager_dependency)]
 RequestScopedRecoveryService = Annotated[RecoveryService, Depends(get_recovery_service)]
 
 # Notification Service - Dual Scoped (Most Complex Example)
@@ -684,7 +709,13 @@ RequestScopedNotificationService = Annotated[
     NotificationService, Depends(get_notification_service)
 ]  # Per-request instance via FastAPI DI
 
-# Legacy aliases for backward compatibility (deprecated)
+# JobManager Service - Dual Scoped (Critical for State Consistency)
+ApplicationScopedJobManager = "JobManagerProtocol"  # Application-wide singleton
+RequestScopedJobManager = Annotated[
+    "JobManagerProtocol", Depends(get_job_manager_dependency)
+]
+
+# Modern type aliases (use these)
 SimpleCommandRunnerDep = RequestScopedSimpleCommandRunner
 BorgServiceDep = RequestScopedBorgService
 JobServiceDep = RequestScopedJobService
@@ -718,7 +749,6 @@ VolumeServiceDep = Annotated[VolumeService, Depends(get_volume_service)]
 TaskDefinitionBuilderDep = Annotated[
     TaskDefinitionBuilder, Depends(get_task_definition_builder)
 ]
-RepositoryParserDep = Annotated[RepositoryParser, Depends(get_repository_parser)]
 BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
 ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
 RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
@@ -746,7 +776,9 @@ CronDescriptionServiceDep = Annotated[
 UpcomingBackupsServiceDep = Annotated[
     UpcomingBackupsService, Depends(get_upcoming_backups_service)
 ]
-CloudSyncServiceDep = Annotated["CloudSyncService", Depends(get_cloud_sync_service)]
+CloudSyncServiceDep = Annotated[
+    "CloudSyncConfigService", Depends(get_cloud_sync_service)
+]
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
 
 

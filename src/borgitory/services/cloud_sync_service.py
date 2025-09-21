@@ -2,11 +2,15 @@ import inspect
 import json
 import logging
 from datetime import datetime, UTC
-from typing import List, Dict, Any, Callable, cast
+from typing import Any, List, Dict, Callable, cast, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from borgitory.services.cloud_providers.registry import ProviderMetadata
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import CloudSyncConfig
+from borgitory.types import ConfigDict
 from borgitory.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
@@ -15,7 +19,8 @@ from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import (
     get_storage_class,
 )
-from borgitory.services.cloud_providers import StorageFactory, EncryptionService
+from borgitory.services.cloud_providers import StorageFactory
+from borgitory.services.encryption_service import EncryptionService
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +68,8 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
         return []
 
 
-class CloudSyncService:
-    """Service class for cloud sync configuration operations."""
+class CloudSyncConfigService:
+    """Service class for cloud sync configuration management (CRUD operations)."""
 
     def __init__(
         self,
@@ -72,7 +77,7 @@ class CloudSyncService:
         rclone_service: RcloneService,
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
-        get_metadata_func: Callable[[str], Any],
+        get_metadata_func: Callable[[str], Optional["ProviderMetadata"]],
     ):
         self.db = db
         self._rclone_service = rclone_service
@@ -106,7 +111,7 @@ class CloudSyncService:
 
         try:
             storage = self._storage_factory.create_storage(
-                config.provider, config.provider_config
+                config.provider, cast(ConfigDict, config.provider_config)
             )
         except Exception as e:
             raise HTTPException(
@@ -115,7 +120,7 @@ class CloudSyncService:
 
         sensitive_fields = storage.get_sensitive_fields()
         encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-            config.provider_config, sensitive_fields
+            cast(ConfigDict, config.provider_config), sensitive_fields
         )
 
         db_config = CloudSyncConfig()
@@ -187,7 +192,7 @@ class CloudSyncService:
             )
             try:
                 storage = self._storage_factory.create_storage(
-                    provider, config_update.provider_config
+                    provider, cast(ConfigDict, config_update.provider_config)
                 )
             except Exception as e:
                 raise HTTPException(
@@ -196,7 +201,7 @@ class CloudSyncService:
 
             sensitive_fields = storage.get_sensitive_fields()
             encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-                config_update.provider_config, sensitive_fields
+                cast(ConfigDict, config_update.provider_config), sensitive_fields
             )
 
             config.provider_config = json.dumps(encrypted_config)
@@ -292,9 +297,10 @@ class CloudSyncService:
                 )
 
         # Add optional parameters with defaults if not already set
-        for param, default_value in mapping.optional_params.items():
-            if param not in test_params:
-                test_params[param] = default_value
+        if mapping.optional_params:
+            for param, default_value in mapping.optional_params.items():
+                if param not in test_params:
+                    test_params[param] = cast(ConfigDict, {param: default_value})[param]
 
         logger.info(
             f"Built test params: {list(test_params.keys())}"

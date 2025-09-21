@@ -14,7 +14,7 @@ from tests.protocols.protocol_testing_utils import ProtocolMockFactory
 class TestSimpleCommandRunnerProtocol:
     """Test SimpleCommandRunner through its protocol interface."""
 
-    def test_dependency_returns_protocol(self):
+    def test_dependency_returns_protocol(self) -> None:
         """Test that dependency injection returns a protocol-compliant service."""
         runner = get_simple_command_runner()
 
@@ -25,7 +25,7 @@ class TestSimpleCommandRunnerProtocol:
 
         use_command_runner(runner)  # Should work without type errors
 
-    def test_protocol_mock_compatibility(self):
+    def test_protocol_mock_compatibility(self) -> None:
         """Test that protocol mocks work with command runner usage patterns."""
         mock_runner = ProtocolMockFactory.create_command_runner_mock()
 
@@ -36,7 +36,7 @@ class TestSimpleCommandRunnerProtocol:
 
         use_command_runner(mock_runner)
 
-    def test_fastapi_dependency_override_with_protocol(self):
+    def test_fastapi_dependency_override_with_protocol(self) -> None:
         """Test that FastAPI dependency overrides work with protocol mocks."""
         from borgitory.main import app
         from tests.utils.di_testing import override_dependency
@@ -62,7 +62,7 @@ class TestSimpleCommandRunnerProtocol:
                 404,
             ]  # Either works or endpoint doesn't exist
 
-    def test_protocol_interface_methods(self):
+    def test_protocol_interface_methods(self) -> None:
         """Test that all protocol methods are available and callable."""
         runner = get_simple_command_runner()
 
@@ -79,7 +79,7 @@ class TestSimpleCommandRunnerProtocol:
         # Should have at least command parameter
         assert "command" in params
 
-    def test_backward_compatibility(self):
+    def test_backward_compatibility(self) -> None:
         """Test that existing code still works after protocol migration."""
         # This test ensures that any existing code that uses SimpleCommandRunner
         # directly will continue to work
@@ -95,7 +95,7 @@ class TestSimpleCommandRunnerProtocol:
         assert hasattr(runner, "run_command")
         assert hasattr(runner, "timeout")  # Original attribute
 
-    def test_type_safety_with_protocols(self):
+    def test_type_safety_with_protocols(self) -> None:
         """Test that type annotations work correctly with protocols."""
 
         def process_with_runner(runner: CommandRunnerProtocol) -> str:
@@ -116,34 +116,13 @@ class TestSimpleCommandRunnerProtocol:
 class TestCommandRunnerProtocolIntegration:
     """Integration tests for CommandRunnerProtocol usage."""
 
-    def test_repository_parser_uses_protocol(self):
-        """Test that services depending on CommandRunner work with protocol."""
-        from borgitory.dependencies import get_repository_parser
-
-        # RepositoryParser depends on SimpleCommandRunner
-        # After protocol migration, it should still work
-        parser = get_repository_parser()
-        assert parser is not None
-        assert hasattr(parser, "command_runner")
-
-    def test_multiple_services_share_protocol_instance(self):
+    def test_multiple_services_share_protocol_instance(self) -> None:
         """Test that multiple services get the same protocol instance (singleton behavior)."""
         runner1 = get_simple_command_runner()
         runner2 = get_simple_command_runner()
 
         # Should be the same instance due to @lru_cache
         assert runner1 is runner2
-
-    def test_protocol_works_in_service_constructors(self):
-        """Test that services can be constructed with protocol instances."""
-        from borgitory.services.repositories.repository_parser import RepositoryParser
-
-        # Should be able to construct with protocol instance
-        runner = get_simple_command_runner()
-        parser = RepositoryParser(command_runner=runner)
-
-        assert parser is not None
-        assert parser.command_runner is runner
 
 
 if __name__ == "__main__":

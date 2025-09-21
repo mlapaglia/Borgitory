@@ -10,7 +10,6 @@ from borgitory.services.jobs.job_manager import (
     JobManagerConfig,
     BorgJob,
     BorgJobTask,
-    create_job_manager,
 )
 from borgitory.models.database import Repository
 
@@ -427,30 +426,3 @@ class TestJobManager:
         """Test cancelling non-existent job"""
         result = await job_manager.cancel_job("nonexistent")
         assert result is False
-
-
-class TestJobManagerFactory:
-    """Test job manager factory functions"""
-
-    def test_create_job_manager_default(self) -> None:
-        """Test that create_job_manager creates instances with default config"""
-        manager = create_job_manager()
-
-        assert isinstance(manager, JobManager)
-        assert manager.config.max_concurrent_backups == 5  # default value
-
-    def test_create_job_manager_with_config(self) -> None:
-        """Test create_job_manager with custom config"""
-        config = JobManagerConfig(max_concurrent_backups=10)
-        manager = create_job_manager(config)
-
-        assert manager.config.max_concurrent_backups == 10
-
-    def test_create_job_manager_separate_instances(self) -> None:
-        """Test that create_job_manager creates separate instances (no singleton)"""
-        manager1 = create_job_manager()
-        manager2 = create_job_manager()
-
-        assert manager1 is not manager2
-        assert isinstance(manager1, JobManager)
-        assert isinstance(manager2, JobManager)

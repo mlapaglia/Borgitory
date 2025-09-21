@@ -4,7 +4,7 @@ Volume service protocol interface.
 Defines the contract for volume and filesystem services.
 """
 
-from typing import Protocol, List, Dict, Any
+from typing import Protocol, List, Dict, Union
 
 
 class VolumeService(Protocol):
@@ -19,7 +19,7 @@ class VolumeService(Protocol):
         """
         ...
 
-    async def get_volume_info(self) -> Dict[str, Any]:
+    async def get_volume_info(self) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Get information about available volumes.
 

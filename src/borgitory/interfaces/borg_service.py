@@ -4,14 +4,16 @@ Borg service protocol interface.
 Defines the contract for Borg backup operations.
 """
 
-from typing import Protocol, Dict, Any, List, Optional
+from typing import Protocol, Dict, List, Optional, Union
 from starlette.responses import StreamingResponse
 
 
 class BorgService(Protocol):
     """Protocol for Borg backup services"""
 
-    async def initialize_repository(self, repository: Any) -> Dict[str, Any]:
+    async def initialize_repository(
+        self, repository: object
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Initialize a new Borg repository.
 
@@ -25,7 +27,7 @@ class BorgService(Protocol):
 
     async def create_backup(
         self,
-        repository: Any,
+        repository: object,
         source_path: str,
         compression: str = "zstd",
         dry_run: bool = False,
@@ -44,7 +46,9 @@ class BorgService(Protocol):
         """
         ...
 
-    async def list_archives(self, repository: Any) -> List[Dict[str, Any]]:
+    async def list_archives(
+        self, repository: object
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """
         List all archives in a repository.
 
@@ -56,7 +60,9 @@ class BorgService(Protocol):
         """
         ...
 
-    async def get_repo_info(self, repository: Any) -> Dict[str, Any]:
+    async def get_repo_info(
+        self, repository: object
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Get repository information.
 
@@ -69,8 +75,8 @@ class BorgService(Protocol):
         ...
 
     async def list_archive_contents(
-        self, repository: Any, archive_name: str
-    ) -> List[Dict[str, Any]]:
+        self, repository: object, archive_name: str
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """
         List contents of a specific archive.
 
@@ -84,7 +90,7 @@ class BorgService(Protocol):
         ...
 
     async def extract_file_stream(
-        self, repository: Any, archive_name: str, file_path: str
+        self, repository: object, archive_name: str, file_path: str
     ) -> StreamingResponse:
         """
         Extract a single file from an archive and stream it.
@@ -111,7 +117,9 @@ class BorgService(Protocol):
         """
         ...
 
-    async def scan_for_repositories(self) -> List[Dict[str, Any]]:
+    async def scan_for_repositories(
+        self,
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """
         Scan for Borg repositories.
 

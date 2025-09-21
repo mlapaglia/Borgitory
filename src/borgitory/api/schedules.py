@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+from typing import cast, List, Dict, Any
 
 from borgitory.models.database import get_db
 from borgitory.models.schemas import (
@@ -32,7 +33,7 @@ async def get_schedules_form(
     return templates.TemplateResponse(
         request,
         "partials/schedules/create_form.html",
-        form_data,
+        cast(Dict[str, Any], form_data),
     )
 
 
@@ -123,7 +124,9 @@ async def get_upcoming_backups_html(
     """Get upcoming scheduled backups as formatted HTML"""
     try:
         jobs_raw = await scheduler_service.get_scheduled_jobs()
-        processed_jobs = upcoming_backups_service.process_jobs(jobs_raw)
+        processed_jobs = upcoming_backups_service.process_jobs(
+            cast(List[Dict[str, object]], jobs_raw)
+        )
 
         return HTMLResponse(
             templates.get_template(
@@ -150,7 +153,9 @@ async def get_cron_expression_form(
     context = config_service.get_cron_form_context(preset)
 
     return templates.TemplateResponse(
-        request, "partials/schedules/cron_expression_form.html", context
+        request,
+        "partials/schedules/cron_expression_form.html",
+        cast(Dict[str, Any], context),
     )
 
 

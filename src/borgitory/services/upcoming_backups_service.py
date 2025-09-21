@@ -1,7 +1,7 @@
 """Service for processing and formatting upcoming backup jobs."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Dict, List, Union
 
 from .cron_description_service import CronDescriptionService
 
@@ -33,7 +33,7 @@ class UpcomingBackupsService:
     def __init__(self, cron_description_service: CronDescriptionService) -> None:
         self.cron_description_service = cron_description_service
 
-    def process_jobs(self, jobs_raw: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    def process_jobs(self, jobs_raw: List[Dict[str, object]]) -> List[Dict[str, str]]:
         """Process raw job data into formatted upcoming backup information."""
         processed_jobs = []
 
@@ -44,21 +44,27 @@ class UpcomingBackupsService:
 
         return processed_jobs
 
-    def _process_single_job(self, job: Dict[str, Any]) -> Dict[str, str] | None:
+    def _process_single_job(self, job: Dict[str, object]) -> Dict[str, str] | None:
         """Process a single job into formatted data."""
         try:
-            next_run = self._parse_next_run_time(job.get("next_run"))
+            next_run_val = job.get("next_run")
+            if isinstance(next_run_val, (str, datetime)) or next_run_val is None:
+                next_run = self._parse_next_run_time(next_run_val)
+            else:
+                next_run = None
             if not next_run:
                 return None
 
             time_until = self._calculate_time_until(next_run)
+            trigger_val = job.get("trigger", "")
             cron_description = self.cron_description_service.format_cron_trigger(
-                job.get("trigger", "")
+                str(trigger_val)
             )
             next_run_display = next_run.strftime("%m/%d/%Y, %I:%M:%S %p")
 
+            name_val = job.get("name", "Unknown")
             return {
-                "name": job.get("name", "Unknown"),
+                "name": str(name_val),
                 "next_run_display": next_run_display,
                 "time_until": time_until,
                 "cron_description": cron_description,
@@ -68,7 +74,9 @@ class UpcomingBackupsService:
             # Log the error in production, but don't break the entire list
             return None
 
-    def _parse_next_run_time(self, next_run_raw: Any) -> datetime | None:
+    def _parse_next_run_time(
+        self, next_run_raw: Union[str, datetime, None]
+    ) -> datetime | None:
         """Parse next run time from various formats."""
         if not next_run_raw:
             return None

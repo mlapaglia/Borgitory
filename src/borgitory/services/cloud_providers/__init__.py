@@ -25,8 +25,8 @@ from .service import (
     CloudSyncService,
     StorageFactory,
     ConfigValidator,
-    EncryptionService,
 )
+from borgitory.services.encryption_service import EncryptionService
 from .config_service import (
     ConfigLoadService,
     DatabaseConfigLoadService,

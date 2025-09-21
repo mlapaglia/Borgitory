@@ -18,7 +18,11 @@ from borgitory.dependencies import (
     get_volume_service,
     get_job_manager_dependency,
 )
-from tests.utils.di_testing import override_dependency, override_multiple_dependencies
+from tests.utils.di_testing import (
+    override_dependency,
+    override_multiple_dependencies,
+    MockServiceFactory,
+)
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
@@ -194,7 +198,55 @@ class TestDependencies:
 
         # Test that DebugService works in FastAPI context
         mock_debug_service = Mock(spec=DebugService)
-        mock_debug_service.get_debug_info.return_value = {"test": "data"}
+        # Mock data that matches our DebugInfo TypedDict structure
+        mock_debug_info = {
+            "system": {
+                "platform": "Test Platform",
+                "system": "TestOS",
+                "release": "1.0",
+                "version": "1.0.0",
+                "architecture": "x64",
+                "processor": "Test Processor",
+                "hostname": "test-host",
+                "python_version": "Python 3.9.0",
+                "python_executable": "/usr/bin/python",
+            },
+            "application": {
+                "borgitory_version": "1.0.0",
+                "debug_mode": False,
+                "startup_time": "2023-01-01T12:00:00",
+                "working_directory": "/test/dir",
+            },
+            "database": {
+                "repository_count": 5,
+                "total_jobs": 100,
+                "jobs_today": 10,
+                "database_type": "SQLite",
+                "database_url": "sqlite:///test.db",
+                "database_size": "1.0 MB",
+                "database_size_bytes": 1048576,
+                "database_accessible": True,
+            },
+            "volumes": {
+                "mounted_volumes": ["/data", "/backup"],
+                "total_mounted_volumes": 2,
+            },
+            "tools": {
+                "borg": {"version": "borg 1.2.0", "accessible": True},
+                "rclone": {"version": "rclone v1.58.0", "accessible": True},
+            },
+            "environment": {
+                "PATH": "/usr/bin:/bin",
+                "HOME": "/home/user",
+                "DEBUG": "false",
+            },
+            "job_manager": {
+                "active_jobs": 2,
+                "total_jobs": 5,
+                "job_manager_running": True,
+            },
+        }
+        mock_debug_service.get_debug_info.return_value = mock_debug_info
 
         with override_dependency(
             get_debug_service, lambda: mock_debug_service
@@ -221,10 +273,13 @@ class TestDependencies:
         mock_job_manager = Mock()
 
         # Set up mock return values (DebugService calls get_volume_info, not get_mounted_volumes)
-        mock_volume_service.get_volume_info.return_value = {
-            "mounted_volumes": ["/test/volume"],
-            "total_mounted_volumes": 1,
-        }
+        mock_volume_service.get_volume_info = AsyncMock(
+            return_value={
+                "mounted_volumes": ["/test/volume"],
+                "total_mounted_volumes": 1,
+                "accessible": True,
+            }
+        )
 
         # Override dependencies
         overrides = {
@@ -287,7 +342,9 @@ class TestDependencies:
         # NotificationService now requires provider_factory - skip this test
         # notification_service = NotificationService()
         job_stream_service = JobStreamService(mock_job_manager)
-        job_render_service = JobRenderService(job_manager=mock_job_manager)
+        job_render_service = MockServiceFactory.create_job_render_service_with_mocks(
+            job_manager=mock_job_manager
+        )
         debug_service = DebugService()
         rclone_service = RcloneService()
         repository_stats_service = RepositoryStatsService()

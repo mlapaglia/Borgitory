@@ -257,13 +257,13 @@ class TestServiceLayerIntegration:
         assert "smb" in providers
 
 
-class TestCloudSyncServiceIntegration:
-    """Test CloudSyncService integration with registry"""
+class TestCloudSyncConfigServiceIntegration:
+    """Test CloudSyncConfigService integration with registry"""
 
     def test_cloud_sync_service_validates_providers_using_registry(self) -> None:
-        """Test that CloudSyncService validates providers using registry"""
+        """Test that CloudSyncConfigService validates providers using registry"""
         # Import storage modules to trigger registration (if not already done)
-        from borgitory.services.cloud_sync_service import CloudSyncService
+        from borgitory.services.cloud_sync_service import CloudSyncConfigService
         from fastapi import HTTPException
 
         mock_db = Mock()
@@ -278,7 +278,7 @@ class TestCloudSyncServiceIntegration:
         mock_storage_factory = Mock(spec=StorageFactory)
         mock_encryption = Mock(spec=EncryptionService)
 
-        service = CloudSyncService(
+        service = CloudSyncConfigService(
             db=mock_db,
             rclone_service=mock_rclone,
             storage_factory=mock_storage_factory,

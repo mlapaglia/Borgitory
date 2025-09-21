@@ -14,7 +14,7 @@ import logging
 import os
 import re
 import inspect
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Union, Protocol
 from datetime import datetime, UTC
 from dataclasses import dataclass
 from enum import Enum
@@ -23,6 +23,19 @@ from borgitory.models.database import Repository
 from borgitory.utils.security import build_secure_borg_command
 
 logger = logging.getLogger(__name__)
+
+
+class SubprocessExecutorProtocol(Protocol):
+    """Protocol for subprocess executors"""
+
+    async def __call__(
+        self,
+        *args: str,
+        stdout: Optional[int] = None,
+        stderr: Optional[int] = None,
+        env: Optional[Dict[str, str]] = None,
+        cwd: Optional[str] = None,
+    ) -> asyncio.subprocess.Process: ...
 
 
 class BackupStatus(Enum):
@@ -93,7 +106,7 @@ class BackupExecutor:
     """
 
     def __init__(
-        self, subprocess_executor: Optional[Callable[..., Any]] = None
+        self, subprocess_executor: Optional[SubprocessExecutorProtocol] = None
     ) -> None:
         self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
         self.progress_pattern = re.compile(
@@ -109,7 +122,9 @@ class BackupExecutor:
         config: BackupConfig,
         operation_id: Optional[str] = None,
         output_callback: Optional[Callable[[str], None]] = None,
-        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        progress_callback: Optional[
+            Callable[[Dict[str, Union[str, int, float]]], None]
+        ] = None,
     ) -> BackupResult:
         """
         Execute a backup operation with integrated output handling.
@@ -323,7 +338,9 @@ class BackupExecutor:
         process: asyncio.subprocess.Process,
         result: BackupResult,
         output_callback: Optional[Callable[[str], None]] = None,
-        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        progress_callback: Optional[
+            Callable[[Dict[str, Union[str, int, float]]], None]
+        ] = None,
     ) -> bytes:
         """Monitor process output and capture it in the result"""
         stdout_data = b""
@@ -362,7 +379,7 @@ class BackupExecutor:
             result.error_message = error_msg
             return stdout_data
 
-    def _parse_progress_line(self, line: str) -> Dict[str, Any]:
+    def _parse_progress_line(self, line: str) -> Dict[str, Union[str, int, float]]:
         """Parse Borg output line for progress information"""
         progress_info = {}
 

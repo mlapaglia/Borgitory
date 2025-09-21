@@ -4,7 +4,7 @@ Job manager protocol interfaces.
 Defines the contracts for job management and execution services.
 """
 
-from typing import Protocol, Dict, Any, List, Optional
+from typing import Protocol, Dict, List, Optional, Union
 
 
 class JobExecutor(Protocol):
@@ -12,17 +12,17 @@ class JobExecutor(Protocol):
 
     async def start_process(
         self, command: List[str], env: Optional[Dict[str, str]] = None
-    ) -> Any:
+    ) -> object:
         """Start a process for the given command"""
         ...
 
     async def monitor_process_output(
-        self, process: Any, output_callback: Optional[Any] = None
-    ) -> Any:
+        self, process: object, output_callback: Optional[object] = None
+    ) -> object:
         """Monitor process output and return result"""
         ...
 
-    async def terminate_process(self, process: Any) -> bool:
+    async def terminate_process(self, process: object) -> bool:
         """Terminate a running process"""
         ...
 
@@ -50,9 +50,9 @@ class JobManager(Protocol):
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict[str, Any]],
-        repository: Any,
-        schedule: Optional[Any] = None,
+        task_definitions: List[Dict[str, Union[str, int, float, bool, None]]],
+        repository: object,
+        schedule: Optional[object] = None,
         cloud_sync_config_id: Optional[int] = None,
     ) -> str:
         """
@@ -68,13 +68,15 @@ class JobManager(Protocol):
         """
         ...
 
-    def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
+    def get_job_status(
+        self, job_id: str
+    ) -> Optional[Dict[str, Union[str, int, float, bool, None]]]:
         """Get status information for a job"""
         ...
 
     async def get_job_output_stream(
         self, job_id: str, last_n_lines: Optional[int] = None
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """Get job output stream data"""
         ...
 
@@ -86,6 +88,6 @@ class JobManager(Protocol):
         """Clean up job resources"""
         ...
 
-    def get_queue_stats(self) -> Dict[str, Any]:
+    def get_queue_stats(self) -> Dict[str, Union[str, int, float, bool, None]]:
         """Get queue statistics"""
         ...

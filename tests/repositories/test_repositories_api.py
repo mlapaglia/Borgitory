@@ -1371,13 +1371,55 @@ class TestRepositoriesAPI:
             "total_archives": 3,
             "archive_stats": [],
             "size_over_time": {
-                "count_chart": {"labels": ["2024-01-01"], "datasets": []},
-                "size_chart": {"labels": ["2024-01-01"], "datasets": []},
+                "labels": ["2024-01-01"],
+                "datasets": [
+                    {
+                        "label": "Original Size",
+                        "data": [100.0],
+                        "borderColor": "rgb(59, 130, 246)",
+                        "backgroundColor": "rgba(59, 130, 246, 0.1)",
+                        "fill": False,
+                    }
+                ],
             },
-            "dedup_compression_stats": {},
+            "dedup_compression_stats": {
+                "labels": ["2024-01-01"],
+                "datasets": [
+                    {
+                        "label": "Compression Ratio %",
+                        "data": [20.0],
+                        "borderColor": "rgb(139, 92, 246)",
+                        "backgroundColor": "rgba(139, 92, 246, 0.1)",
+                        "fill": False,
+                        "yAxisID": "y",
+                    }
+                ],
+            },
             "file_type_stats": {
-                "count_chart": {"labels": ["text"], "datasets": [{"data": [100]}]},
-                "size_chart": {"labels": ["text"], "datasets": [{"data": [1000]}]},
+                "count_chart": {
+                    "labels": ["text"],
+                    "datasets": [
+                        {
+                            "label": ".txt files",
+                            "data": [100.0],
+                            "borderColor": "rgb(59, 130, 246)",
+                            "backgroundColor": "rgba(59, 130, 246, 0.1)",
+                            "fill": False,
+                        }
+                    ],
+                },
+                "size_chart": {
+                    "labels": ["text"],
+                    "datasets": [
+                        {
+                            "label": ".txt size (MB)",
+                            "data": [1000.0],
+                            "borderColor": "rgb(59, 130, 246)",
+                            "backgroundColor": "rgba(59, 130, 246, 0.1)",
+                            "fill": False,
+                        }
+                    ],
+                },
             },
             "summary": {
                 "total_archives": 3,
@@ -1387,6 +1429,8 @@ class TestRepositoriesAPI:
                 "total_deduplicated_size_gb": 3.0,
                 "overall_compression_ratio": 20.0,
                 "overall_deduplication_ratio": 25.0,
+                "space_saved_gb": 2.0,
+                "average_archive_size_gb": 1.67,
             },
         }
 

@@ -6,13 +6,16 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, TYPE_CHECKING
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from borgitory.models.database import Repository
 from borgitory.utils.security import build_secure_borg_command
 from borgitory.services.jobs.job_executor import JobExecutor
+
+if TYPE_CHECKING:
+    from borgitory.services.archives.archive_manager import ArchiveEntry
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +256,7 @@ class ArchiveMountManager:
 
     def list_directory(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List[Dict[str, Any]]:
+    ) -> List["ArchiveEntry"]:
         """List directory contents from mounted filesystem"""
         mount_key = self._get_mount_key(repository, archive_name)
 
@@ -280,19 +283,18 @@ class ArchiveMountManager:
                 try:
                     stat_info = item.stat()
 
-                    entry = {
+                    # Create ArchiveEntry compatible structure
+                    is_directory = item.is_dir()
+                    entry: "ArchiveEntry" = {
                         "path": str(item.relative_to(mount_info.mount_point)),
                         "name": item.name,
-                        "type": "d" if item.is_dir() else "f",
+                        "type": "d" if is_directory else "f",
                         "size": stat_info.st_size if item.is_file() else 0,
+                        "isdir": is_directory,
                         "mode": oct(stat_info.st_mode)[
                             -4:
                         ],  # Last 4 digits of octal mode
                         "mtime": datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
-                        "modified": datetime.fromtimestamp(
-                            stat_info.st_mtime
-                        ).isoformat(),
-                        "is_directory": item.is_dir(),
                         "healthy": True,
                     }
                     entries.append(entry)
@@ -302,7 +304,12 @@ class ArchiveMountManager:
                     continue
 
             # Sort: directories first, then files, both alphabetically
-            entries.sort(key=lambda x: (not x["is_directory"], str(x["name"]).lower()))
+            entries.sort(
+                key=lambda x: (
+                    not x.get("isdir", False),
+                    str(x.get("name", "")).lower(),
+                )
+            )
 
             logger.info(f"Listed {len(entries)} items from {target_path}")
             return entries
@@ -356,7 +363,7 @@ class ArchiveMountManager:
 
         self.active_mounts.clear()
 
-    def get_mount_stats(self) -> Dict[str, Any]:
+    def get_mount_stats(self) -> Dict[str, object]:
         """Get statistics about active mounts"""
         return {
             "active_mounts": len(self.active_mounts),

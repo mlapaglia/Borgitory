@@ -4,7 +4,7 @@ Job Event Broadcaster - Handles SSE streaming and event distribution
 
 import asyncio
 import logging
-from typing import Dict, List, AsyncGenerator, Any, Optional
+from typing import Dict, List, AsyncGenerator, Optional, Union
 from datetime import datetime
 
 from borgitory.services.jobs.broadcaster.event_type import EventType
@@ -28,7 +28,9 @@ class JobEventBroadcaster:
 
         # Client event queues for SSE streaming
         self._client_queues: List[asyncio.Queue[JobEvent]] = []
-        self._client_queue_metadata: Dict[asyncio.Queue[JobEvent], Dict[str, Any]] = {}
+        self._client_queue_metadata: Dict[
+            asyncio.Queue[JobEvent], Dict[str, Union[str, int, datetime]]
+        ] = {}
 
         # Event history for new clients
         self._recent_events: List[JobEvent] = []
@@ -53,7 +55,7 @@ class JobEventBroadcaster:
         self,
         event_type: EventType,
         job_id: Optional[str] = None,
-        data: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Union[str, int, float, bool, None]]] = None,
     ) -> None:
         """Broadcast an event to all connected clients"""
         event = JobEvent(event_type=event_type, job_id=job_id, data=data or {})
@@ -152,7 +154,11 @@ class JobEventBroadcaster:
 
                     # Update client metadata
                     if client_queue in self._client_queue_metadata:
-                        self._client_queue_metadata[client_queue]["events_sent"] += 1
+                        metadata = self._client_queue_metadata[client_queue]
+                        if "events_sent" in metadata and isinstance(
+                            metadata["events_sent"], int
+                        ):
+                            metadata["events_sent"] += 1
 
                     yield event
 
@@ -197,14 +203,17 @@ class JobEventBroadcaster:
                     # Check connection age and activity
                     if queue in self._client_queue_metadata:
                         metadata = self._client_queue_metadata[queue]
-                        connected_duration = (
-                            datetime.now() - metadata["connected_at"]
-                        ).total_seconds()
+                        connected_at = metadata.get("connected_at")
+                        if isinstance(connected_at, datetime):
+                            connected_duration = (
+                                datetime.now() - connected_at
+                            ).total_seconds()
+                        else:
+                            connected_duration = 0
 
                         # Remove clients with no activity for a long time
-                        if (
-                            connected_duration > 3600 and metadata["events_sent"] == 0
-                        ):  # 1 hour
+                        events_sent = metadata.get("events_sent", 0)
+                        if connected_duration > 3600 and events_sent == 0:  # 1 hour
                             queues_to_remove.append(queue)
 
                 # Remove identified queues
@@ -244,14 +253,16 @@ class JobEventBroadcaster:
         """Unsubscribe from job events (compatibility method)"""
         self.unsubscribe_client(queue)
 
-    def get_client_stats(self) -> Dict[str, Any]:
+    def get_client_stats(self) -> Dict[str, object]:
         """Get statistics about connected clients"""
         return {
             "total_clients": len(self._client_queues),
             "client_details": [
                 {
                     "client_id": metadata["client_id"],
-                    "connected_at": metadata["connected_at"].isoformat(),
+                    "connected_at": metadata["connected_at"].isoformat()
+                    if isinstance(metadata["connected_at"], datetime)
+                    else str(metadata["connected_at"]),
                     "events_sent": metadata["events_sent"],
                     "queue_size": queue.qsize(),
                 }
@@ -260,7 +271,7 @@ class JobEventBroadcaster:
             "recent_events_count": len(self._recent_events),
         }
 
-    def get_event_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_event_history(self, limit: int = 20) -> List[Dict[str, object]]:
         """Get recent event history"""
         return [event.to_dict() for event in self._recent_events[-limit:]]
 

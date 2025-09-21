@@ -14,7 +14,6 @@ from .command_protocols import (
 
 # Storage and volume protocols
 from .storage_protocols import (
-    VolumeInfo,
     VolumeServiceProtocol,
 )
 
@@ -43,6 +42,7 @@ from .notification_protocols import (
 from .cloud_protocols import (
     CloudStorageProtocol,
     CloudSyncServiceProtocol,
+    CloudSyncConfigServiceProtocol,
     EncryptionServiceProtocol,
     StorageFactoryProtocol,
 )
@@ -53,7 +53,6 @@ __all__ = [
     "CommandRunnerProtocol",
     "ProcessExecutorProtocol",
     # Storage protocols
-    "VolumeInfo",
     "VolumeServiceProtocol",
     # Job protocols
     "JobStatusProtocol",
@@ -70,6 +69,7 @@ __all__ = [
     # Cloud protocols
     "CloudStorageProtocol",
     "CloudSyncServiceProtocol",
+    "CloudSyncConfigServiceProtocol",
     "EncryptionServiceProtocol",
     "StorageFactoryProtocol",
 ]

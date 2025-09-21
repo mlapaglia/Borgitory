@@ -11,7 +11,7 @@ the complex job orchestration system. It handles:
 
 import logging
 from datetime import datetime, UTC
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Union, Callable
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job, JobTask
@@ -194,7 +194,11 @@ class BackupService:
             logger.error(f"Prune job {job.id} failed: {e}")
             raise
 
-    def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
+    def get_job_status(
+        self, job_id: str
+    ) -> Optional[
+        Dict[str, Union[str, int, bool, None, List[Dict[str, Union[str, int, None]]]]]
+    ]:
         """
         Get the status of a job.
 
@@ -243,7 +247,11 @@ class BackupService:
             ],
         }
 
-    def list_recent_jobs(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def list_recent_jobs(
+        self, limit: int = 50
+    ) -> List[
+        Dict[str, Union[str, int, bool, None, List[Dict[str, Union[str, int, None]]]]]
+    ]:
         """
         List recent jobs with their status.
 
@@ -298,7 +306,10 @@ class BackupService:
         return self.db.query(Repository).filter(Repository.id == repository_id).first()
 
     def _create_job_record(
-        self, repository: Repository, job_type: JobType, request: Any
+        self,
+        repository: Repository,
+        job_type: JobType,
+        request: Union[BackupRequest, PruneRequest],
     ) -> Job:
         """Create a new job record in the database"""
         import uuid

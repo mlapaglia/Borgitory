@@ -1,12 +1,12 @@
 """
-Tests for CloudSyncService - Business logic tests migrated from API tests
+Tests for CloudSyncConfigService - Business logic tests migrated from API tests
 """
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from borgitory.services.cloud_sync_service import CloudSyncService
+from borgitory.services.cloud_sync_service import CloudSyncConfigService
 from borgitory.models.database import CloudSyncConfig
 from borgitory.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
 from tests.conftest import create_s3_cloud_sync_config, create_sftp_cloud_sync_config
@@ -14,7 +14,7 @@ from tests.conftest import create_s3_cloud_sync_config, create_sftp_cloud_sync_c
 
 @pytest.fixture
 def service(test_db: Session):
-    """CloudSyncService instance with real database session."""
+    """CloudSyncConfigService instance with real database session."""
     from borgitory.services.cloud_providers.registry import get_metadata
     from borgitory.services.rclone_service import RcloneService
     from borgitory.services.cloud_providers import StorageFactory, EncryptionService
@@ -23,7 +23,7 @@ def service(test_db: Session):
     storage_factory = StorageFactory(rclone_service)
     encryption_service = EncryptionService()
 
-    return CloudSyncService(
+    return CloudSyncConfigService(
         db=test_db,
         rclone_service=rclone_service,
         storage_factory=storage_factory,
@@ -32,8 +32,8 @@ def service(test_db: Session):
     )
 
 
-class TestCloudSyncService:
-    """Test class for CloudSyncService business logic."""
+class TestCloudSyncConfigService:
+    """Test class for CloudSyncConfigService business logic."""
 
     def test_create_s3_config_success(self, service, test_db: Session) -> None:
         """Test successful S3 config creation."""

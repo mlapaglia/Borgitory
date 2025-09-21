@@ -6,7 +6,7 @@ must implement, ensuring consistency across different providers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Dict, List
 from pydantic import BaseModel, ConfigDict
 
 from ..types import NotificationMessage, NotificationResult, ConnectionInfo
@@ -82,7 +82,7 @@ class NotificationProvider(ABC):
         pass
 
     @abstractmethod
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """
         Get provider-specific display details for the UI.
 

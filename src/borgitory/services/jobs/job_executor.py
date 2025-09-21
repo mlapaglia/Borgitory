@@ -8,12 +8,17 @@ import logging
 import os
 import re
 import inspect
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Coroutine, TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 from datetime import datetime
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.service import EncryptionService, StorageFactory
+from borgitory.services.cloud_providers.service import StorageFactory
+from borgitory.services.encryption_service import EncryptionService
+from borgitory.types import ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +27,10 @@ class JobExecutor:
     """Handles subprocess execution and output monitoring"""
 
     def __init__(
-        self, subprocess_executor: Optional[Callable[..., Any]] = None
+        self,
+        subprocess_executor: Optional[
+            Callable[..., Coroutine[None, None, asyncio.subprocess.Process]]
+        ] = None,
     ) -> None:
         self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
         self.progress_pattern = re.compile(
@@ -62,8 +70,8 @@ class JobExecutor:
     async def monitor_process_output(
         self,
         process: asyncio.subprocess.Process,
-        output_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        output_callback: Optional[Callable[[str], None]] = None,
+        progress_callback: Optional[Callable[[Dict[str, object]], None]] = None,
     ) -> ProcessResult:
         """Monitor process output and return final result"""
         stdout_data = b""
@@ -79,9 +87,9 @@ class JobExecutor:
 
                     if output_callback:
                         if inspect.iscoroutinefunction(output_callback):
-                            await output_callback(line_text, progress_info)
+                            await output_callback(line_text)
                         else:
-                            output_callback(line_text, progress_info)
+                            output_callback(line_text)
 
                     if progress_callback and progress_info:
                         if inspect.iscoroutinefunction(progress_callback):
@@ -102,7 +110,7 @@ class JobExecutor:
                 return_code=-1, stdout=stdout_data, stderr=stderr_data, error=error_msg
             )
 
-    def parse_progress_line(self, line: str) -> Dict[str, Any]:
+    def parse_progress_line(self, line: str) -> Dict[str, object]:
         """Parse Borg output line for progress information"""
         progress_info = {}
 
@@ -204,7 +212,7 @@ class JobExecutor:
         save_space: bool = False,
         force_prune: bool = False,
         dry_run: bool = False,
-        output_callback: Optional[Callable[..., Any]] = None,
+        output_callback: Optional[Callable[[str], None]] = None,
     ) -> ProcessResult:
         """
         Execute a borg prune task with the job executor's proper streaming
@@ -287,12 +295,12 @@ class JobExecutor:
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        db_session_factory: Callable[[], Any],
+        db_session_factory: Callable[[], "Session"],
         rclone_service: RcloneService,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
         provider_registry: ProviderRegistry,
-        output_callback: Optional[Callable[..., Any]] = None,
+        output_callback: Optional[Callable[[str], None]] = None,
     ) -> ProcessResult:
         """
         Execute a cloud sync task with the job executor's proper streaming
@@ -318,7 +326,7 @@ class JobExecutor:
             logger.info(f"Starting cloud sync for repository {repository_path}")
 
             if output_callback:
-                output_callback("Starting cloud sync...", {})
+                output_callback("Starting cloud sync...")
 
             with session_factory() as db:
                 config = (
@@ -333,8 +341,7 @@ class JobExecutor:
                     )
                     if output_callback:
                         output_callback(
-                            "Cloud backup configuration not found or disabled - skipping",
-                            {},
+                            "Cloud backup configuration not found or disabled - skipping"
                         )
                     return ProcessResult(
                         return_code=0,
@@ -401,7 +408,7 @@ class JobExecutor:
 
                     # Create temporary storage to get sensitive fields
                     temp_storage = storage_factory.create_storage(
-                        config.provider, dummy_config
+                        config.provider, cast(ConfigDict, dummy_config)
                     )
                     sensitive_fields = temp_storage.get_sensitive_fields()
 
@@ -421,19 +428,21 @@ class JobExecutor:
                     logger.info(f"Syncing to {config.name} ({config.provider.upper()})")
                     if output_callback:
                         output_callback(
-                            f"Syncing to {config.name} ({config.provider.upper()})", {}
+                            f"Syncing to {config.name} ({config.provider.upper()})"
                         )
 
                     # Use the generic rclone dispatcher
                     progress_generator = rclone_service.sync_repository_to_provider(
-                        provider=config.provider, repository=repo_obj, **provider_config
+                        provider=config.provider,
+                        repository=repo_obj,
+                        **provider_config,  # type: ignore[arg-type]
                     )
 
                 except Exception as e:
                     error_msg = f"Failed to initialize cloud provider {config.provider}: {str(e)}"
                     logger.error(error_msg)
                     if output_callback:
-                        output_callback(error_msg, {})
+                        output_callback(error_msg)
                     return ProcessResult(
                         return_code=1,
                         stdout=b"",
@@ -445,13 +454,13 @@ class JobExecutor:
                     if progress.get("type") == "log":
                         log_line = f"[{progress['stream']}] {progress['message']}"
                         if output_callback:
-                            output_callback(log_line, {})
+                            output_callback(log_line)
 
                     elif progress.get("type") == "error":
-                        error_msg = progress["message"]
+                        error_msg = str(progress.get("message", "Unknown error"))
                         logger.error(f"Cloud sync error: {error_msg}")
                         if output_callback:
-                            output_callback(f"Cloud sync error: {error_msg}", {})
+                            output_callback(f"Cloud sync error: {error_msg}")
                         return ProcessResult(
                             return_code=1,
                             stdout=b"",
@@ -463,7 +472,7 @@ class JobExecutor:
                         if progress["status"] == "success":
                             logger.info("Cloud sync completed successfully")
                             if output_callback:
-                                output_callback("Cloud sync completed successfully", {})
+                                output_callback("Cloud sync completed successfully")
                             return ProcessResult(
                                 return_code=0,
                                 stdout=b"Cloud sync completed successfully",
@@ -474,7 +483,7 @@ class JobExecutor:
                             error_msg = "Cloud sync failed"
                             logger.error(f"{error_msg}")
                             if output_callback:
-                                output_callback(f"{error_msg}", {})
+                                output_callback(f"{error_msg}")
                             return ProcessResult(
                                 return_code=1,
                                 stdout=b"",
@@ -484,7 +493,7 @@ class JobExecutor:
 
                 logger.info("Cloud sync completed")
                 if output_callback:
-                    output_callback("Cloud sync completed", {})
+                    output_callback("Cloud sync completed")
                 return ProcessResult(
                     return_code=0,
                     stdout=b"Cloud sync completed",
@@ -494,80 +503,6 @@ class JobExecutor:
 
         except Exception as e:
             logger.error(f"Exception in cloud sync task: {str(e)}")
-            if output_callback:
-                output_callback(f"Exception in cloud sync task: {str(e)}", {})
-            return ProcessResult(
-                return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
-            )
-
-    async def execute_cloud_sync_task_v2(
-        self,
-        repository_path: str,
-        cloud_sync_config_id: int,
-        cloud_sync_service: Any,
-        config_load_service: Any,
-        output_callback: Optional[Callable[[str], None]] = None,
-    ) -> ProcessResult:
-        """
-        Execute cloud sync using the new clean architecture with proper DI.
-
-        This method demonstrates proper dependency injection - all dependencies
-        are injected via parameters, making it easy to test with mocks.
-
-        Args:
-            repository_path: Path to the repository to sync
-            cloud_sync_config_id: ID of the cloud sync configuration
-            cloud_sync_service: Injected cloud sync service
-            config_load_service: Injected config loading service
-            output_callback: Optional callback for real-time output
-
-        Returns:
-            ProcessResult with execution details
-        """
-        try:
-            logger.info(f"Starting cloud sync v2 for repository {repository_path}")
-
-            if output_callback:
-                output_callback("Starting cloud sync...")
-
-            sync_config = await config_load_service.load_config(cloud_sync_config_id)
-
-            if not sync_config:
-                logger.info("Cloud backup configuration not found or disabled")
-                if output_callback:
-                    output_callback("Cloud backup configuration not found or disabled")
-                return ProcessResult(
-                    return_code=0,
-                    stdout=b"Cloud sync skipped - configuration disabled",
-                    stderr=b"",
-                    error=None,
-                )
-
-            result = await cloud_sync_service.execute_sync(
-                sync_config, repository_path, output_callback
-            )
-
-            if result.success:
-                logger.info(
-                    f"Cloud sync completed successfully in {result.duration_seconds:.1f}s"
-                )
-                return ProcessResult(
-                    return_code=0,
-                    stdout="Cloud sync completed successfully".encode(),
-                    stderr=b"",
-                    error=None,
-                )
-            else:
-                logger.error(f"Cloud sync failed: {result.error}")
-                return ProcessResult(
-                    return_code=1,
-                    stdout=b"",
-                    stderr=result.error.encode() if result.error else b"Unknown error",
-                    error=result.error,
-                )
-
-        except Exception as e:
-            logger.error(f"Exception in cloud sync task v2: {str(e)}")
             if output_callback:
                 output_callback(f"Exception in cloud sync task: {str(e)}")
             return ProcessResult(

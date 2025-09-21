@@ -38,7 +38,7 @@ class MockCommandExecutor(CommandExecutorInterface):
         """Return mock archive list"""
         return self.archive_list
 
-    async def execute_borg_info(self, repository, archive_name: str) -> Dict[str, Any]:
+    async def execute_borg_info(self, repository, archive_name: str):
         """Return mock archive info"""
         return self.archive_info_data.get(archive_name, {})
 
@@ -440,7 +440,19 @@ class TestRepositoryStatsService:
         """Test summary statistics with empty archive stats."""
         result = self.service._build_summary_stats([])
 
-        assert result == {}
+        # Should return a complete SummaryStats TypedDict with default values
+        expected = {
+            "total_archives": 0,
+            "latest_archive_date": "",
+            "total_original_size_gb": 0.0,
+            "total_compressed_size_gb": 0.0,
+            "total_deduplicated_size_gb": 0.0,
+            "overall_compression_ratio": 0.0,
+            "overall_deduplication_ratio": 0.0,
+            "space_saved_gb": 0.0,
+            "average_archive_size_gb": 0.0,
+        }
+        assert result == expected
 
     def test_build_summary_stats_zero_division(self) -> None:
         """Test summary statistics handles zero division properly."""

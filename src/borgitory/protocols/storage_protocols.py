@@ -2,16 +2,10 @@
 Protocol interfaces for storage and volume services.
 """
 
-from typing import Protocol, List, Dict, Any
+from typing import Protocol, List, Dict, TYPE_CHECKING
 
-
-class VolumeInfo:
-    """Information about a mounted volume."""
-
-    def __init__(self, path: str, mount_point: str, filesystem: str):
-        self.path = path
-        self.mount_point = mount_point
-        self.filesystem = filesystem
+if TYPE_CHECKING:
+    from borgitory.services.volumes.volume_service import VolumeInfo
 
 
 class VolumeServiceProtocol(Protocol):
@@ -21,7 +15,7 @@ class VolumeServiceProtocol(Protocol):
         """Get list of mounted volume paths."""
         ...
 
-    async def get_volume_info(self) -> Dict[str, Any]:
+    async def get_volume_info(self) -> "VolumeInfo":
         """Get detailed volume information."""
         ...
 
@@ -41,6 +35,6 @@ class CloudStorageProtocol(Protocol):
         """Test connection to cloud storage."""
         ...
 
-    def get_connection_info(self) -> Dict[str, Any]:
+    def get_connection_info(self) -> Dict[str, object]:
         """Get connection information for display."""
         ...

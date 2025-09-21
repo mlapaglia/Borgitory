@@ -5,7 +5,7 @@ This class eliminates duplication between job_service.py and scheduler_service.p
 by providing a consistent interface for building all task types.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 from sqlalchemy.orm import Session
 from borgitory.models.database import (
     CleanupConfig,
@@ -38,7 +38,7 @@ class TaskDefinitionBuilder:
         source_path: str = "/data",
         compression: str = "zstd",
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """
         Build a backup task definition.
 
@@ -61,7 +61,7 @@ class TaskDefinitionBuilder:
 
     def build_prune_task_from_config(
         self, cleanup_config_id: int, repository_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Dict[str, object]]:
         """
         Build a prune task definition from a stored cleanup configuration.
 
@@ -107,7 +107,7 @@ class TaskDefinitionBuilder:
 
     def build_prune_task_from_request(
         self, prune_request: PruneRequest, repository_name: str
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """
         Build a prune task definition from a manual prune request.
 
@@ -145,7 +145,7 @@ class TaskDefinitionBuilder:
 
     def build_check_task_from_config(
         self, check_config_id: int, repository_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Dict[str, object]]:
         """
         Build a check task definition from a stored check configuration.
 
@@ -183,7 +183,7 @@ class TaskDefinitionBuilder:
 
     def build_check_task_from_request(
         self, check_request: CheckRequest, repository_name: str
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """
         Build a check task definition from a manual check request.
 
@@ -214,7 +214,7 @@ class TaskDefinitionBuilder:
         self,
         repository_name: Optional[str] = None,
         cloud_sync_config_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """
         Build a cloud sync task definition.
 
@@ -237,7 +237,7 @@ class TaskDefinitionBuilder:
 
     def build_notification_task(
         self, notification_config_id: int, repository_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Dict[str, object]]:
         """
         Build a notification task definition from a stored notification configuration.
 
@@ -268,7 +268,7 @@ class TaskDefinitionBuilder:
         self,
         repository_name: str,
         include_backup: bool = True,
-        backup_params: Optional[Dict[str, Any]] = None,
+        backup_params: Optional[Dict[str, object]] = None,
         cleanup_config_id: Optional[int] = None,
         prune_request: Optional[PruneRequest] = None,
         check_config_id: Optional[int] = None,
@@ -276,7 +276,7 @@ class TaskDefinitionBuilder:
         include_cloud_sync: bool = False,
         cloud_sync_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
-    ) -> list[Dict[str, Any]]:
+    ) -> list[Dict[str, object]]:
         """
         Build a complete list of task definitions for a job.
 
@@ -302,7 +302,15 @@ class TaskDefinitionBuilder:
         # Add backup task
         if include_backup:
             backup_params = backup_params or {}
-            tasks.append(self.build_backup_task(repository_name, **backup_params))
+            # Extract and cast parameters with defaults
+            source_path = str(backup_params.get("source_path", "/data"))
+            compression = str(backup_params.get("compression", "zstd"))
+            dry_run = bool(backup_params.get("dry_run", False))
+            tasks.append(
+                self.build_backup_task(
+                    repository_name, source_path, compression, dry_run
+                )
+            )
 
         # Add prune task (request takes precedence over config)
         if prune_request:

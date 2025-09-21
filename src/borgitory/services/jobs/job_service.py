@@ -1,12 +1,12 @@
 import logging
 from datetime import datetime, UTC
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 
 from borgitory.models.database import Repository, Job
 from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from borgitory.models.enums import JobType
-from borgitory.services.jobs.job_manager import JobManager
+from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.services.backups.backup_service import BackupService
 
@@ -25,7 +25,7 @@ class JobService:
     def __init__(
         self,
         db: Session,
-        job_manager: JobManager,
+        job_manager: JobManagerProtocol,
         backup_service: Optional[BackupService] = None,
     ) -> None:
         self.db = db
@@ -34,7 +34,7 @@ class JobService:
 
     async def create_backup_job(
         self, backup_request: BackupRequest, job_type: JobType
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Create a backup job with optional cleanup and check tasks"""
         repository = (
             self.db.query(Repository)
@@ -76,7 +76,7 @@ class JobService:
 
         return {"job_id": job_id, "status": "started"}
 
-    async def create_prune_job(self, prune_request: PruneRequest) -> Dict[str, Any]:
+    async def create_prune_job(self, prune_request: PruneRequest) -> Dict[str, object]:
         """Create a standalone prune job"""
         repository = (
             self.db.query(Repository)
@@ -102,7 +102,7 @@ class JobService:
 
         return {"job_id": job_id, "status": "started"}
 
-    async def create_check_job(self, check_request: CheckRequest) -> Dict[str, Any]:
+    async def create_check_job(self, check_request: CheckRequest) -> Dict[str, object]:
         """Create a repository check job"""
         repository = (
             self.db.query(Repository)
@@ -143,7 +143,7 @@ class JobService:
 
     def list_jobs(
         self, skip: int = 0, limit: int = 100, job_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, object]]:
         """List database job records and active JobManager jobs"""
         # Get database jobs (legacy) with repository relationship loaded
         query = self.db.query(Job).options(joinedload(Job.repository))
@@ -216,7 +216,7 @@ class JobService:
 
         return jobs_list
 
-    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+    def get_job(self, job_id: str) -> Optional[Dict[str, object]]:
         """Get job details - supports both database IDs and JobManager IDs"""
         # Try to get from JobManager first (if it's a UUID format)
         if len(job_id) > 10:  # Probably a UUID
@@ -269,14 +269,16 @@ class JobService:
 
         return None
 
-    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_status(self, job_id: str) -> Dict[str, object]:
         """Get current job status and progress"""
-        output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
-        return output
+        status = self.job_manager.get_job_status(job_id)
+        if status is None:
+            return {"error": "Job not found"}
+        return status
 
     async def get_job_output(
         self, job_id: str, last_n_lines: int = 100
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, object]:
         """Get job output lines"""
         # Check if this is a composite job first - look in unified manager
         job = self.job_manager.jobs.get(job_id)
@@ -335,7 +337,7 @@ class JobService:
 
         return False
 
-    def get_manager_stats(self) -> Dict[str, Any]:
+    def get_manager_stats(self) -> Dict[str, object]:
         """Get JobManager statistics"""
         jobs = self.job_manager.jobs
         running_jobs = [job for job in jobs.values() if job.status == "running"]
@@ -366,7 +368,7 @@ class JobService:
 
         return cleaned
 
-    def get_queue_stats(self) -> Dict[str, Any]:
+    def get_queue_stats(self) -> Dict[str, int]:
         """Get backup queue statistics"""
         return self.job_manager.get_queue_stats()
 

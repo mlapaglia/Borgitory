@@ -93,7 +93,7 @@ async def get_cloud_sync_tab(
                 "description": info["description"],
             }
         )
-    supported_providers = sorted(supported_providers, key=lambda x: x["value"])
+        supported_providers = sorted(supported_providers, key=lambda x: str(x["value"]))
 
     return _render_tab_with_nav(
         request,
@@ -157,7 +157,7 @@ async def get_notifications_tab(
                 "description": info["description"],
             }
         )
-    supported_providers = sorted(supported_providers, key=lambda x: x["value"])
+        supported_providers = sorted(supported_providers, key=lambda x: str(x["value"]))
     logger.info(f"Supported providers for template: {supported_providers}")
 
     return _render_tab_with_nav(

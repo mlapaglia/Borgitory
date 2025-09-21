@@ -381,7 +381,7 @@ class BorgService:
 
             # Parse JSON output - look for complete JSON structure
             json_lines = []
-            for line in output.get("lines", []):
+            for line in cast(List[Dict[str, str]], output.get("lines", [])):
                 line_text = line["text"].strip()
                 if line_text:
                     json_lines.append(line_text)
@@ -508,9 +508,14 @@ class BorgService:
 
             self._archive_manager = ArchiveManager()
 
-        return await self._archive_manager.list_archive_directory_contents(
+        entries = await self._archive_manager.list_archive_directory_contents(
             repository, archive_name, path
         )
+        # Convert ArchiveEntry objects to dictionaries
+        return [
+            entry.__dict__ if hasattr(entry, "__dict__") else dict(entry)
+            for entry in entries
+        ]
 
     async def extract_file_stream(
         self, repository: Repository, archive_name: str, file_path: str
@@ -625,7 +630,7 @@ class BorgService:
                     success = status["return_code"] == 0
                     # Clean up job
                     self._get_job_manager().cleanup_job(job_id)
-                    return cast(bool, success)
+                    return bool(success)
 
                 await asyncio.sleep(0.5)
                 wait_time += 0.5

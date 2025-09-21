@@ -6,7 +6,7 @@ from business logic and easy testability.
 """
 
 import re
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Dict, Optional
 from pydantic import Field, field_validator, model_validator
 
 from borgitory.services.rclone_service import RcloneService
@@ -173,8 +173,8 @@ class SMBStorage(CloudStorage):
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
-                            message=progress.get("message", "Uploading..."),
-                            progress=progress.get("percentage", 0.0),
+                            message=str(progress.get("message", "Uploading...")),
+                            progress=float(progress.get("percentage", 0.0) or 0.0),
                         )
                     )
 
@@ -240,7 +240,7 @@ class SMBStorage(CloudStorage):
         """SMB sensitive fields that should be encrypted"""
         return ["pass"]
 
-    def get_display_details(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """Get SMB-specific display details for the UI"""
         host = config_dict.get("host", "Unknown")
         port = config_dict.get("port", 445)

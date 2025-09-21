@@ -104,11 +104,15 @@ class TestMockServiceFactory:
         assert isinstance(mock, Mock)
         assert hasattr(mock, "get_debug_info")
 
-        # Verify default return value structure
+        # Verify default return value structure matches our DebugInfo TypedDict
         debug_info = mock.get_debug_info.return_value
         assert "system" in debug_info
+        assert "application" in debug_info
+        assert "database" in debug_info
         assert "volumes" in debug_info
-        assert "jobs" in debug_info
+        assert "tools" in debug_info
+        assert "environment" in debug_info
+        assert "job_manager" in debug_info
 
     def test_create_mock_job_stream_service(self):
         """Test JobStreamService mock creation."""
@@ -129,7 +133,9 @@ class TestMockServiceFactory:
         assert isinstance(mock, Mock)
         assert hasattr(mock, "render_jobs_html")
         assert hasattr(mock, "render_current_jobs_html")
-        assert hasattr(mock, "get_job_for_render")
+        assert hasattr(mock, "get_job_display_data")
+        assert hasattr(mock, "get_job_for_template")
+        assert hasattr(mock, "_render_job_html")
 
         # Verify HTML return values
         assert "Mock jobs HTML" in mock.render_jobs_html.return_value

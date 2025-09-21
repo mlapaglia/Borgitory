@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
 import asyncio
-from typing import Dict, Any, AsyncGenerator
+from typing import Dict, AsyncGenerator
 
 from borgitory.models.database import get_db, Repository
 from borgitory.dependencies import RepositoryStatsServiceDep, get_templates
+from borgitory.services.repositories.repository_stats_service import RepositoryStats
 
 router = APIRouter()
 templates = get_templates()
@@ -63,7 +64,7 @@ async def get_repository_statistics(
     repository_id: int,
     stats_svc: RepositoryStatsServiceDep,
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> RepositoryStats:
     """Get comprehensive repository statistics"""
 
     repository = db.query(Repository).filter(Repository.id == repository_id).first()
@@ -91,7 +92,7 @@ async def get_repository_statistics_progress(
         raise HTTPException(status_code=404, detail="Repository not found")
 
     async def generate_progress() -> AsyncGenerator[str, None]:
-        progress_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
+        progress_queue: asyncio.Queue[Dict[str, object]] = asyncio.Queue()
 
         def progress_callback(message: str, percent: int = 0) -> None:
             # Put progress data in queue (non-blocking)

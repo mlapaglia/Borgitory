@@ -30,6 +30,9 @@ from borgitory.models.repository_dtos import (
     DeleteRepositoryRequest,
     DeleteRepositoryResult,
 )
+from borgitory.services.borg_service import BorgService
+from borgitory.services.scheduling.scheduler_service import SchedulerService
+from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.utils.secure_path import (
     create_secure_filename,
     secure_path_join,
@@ -47,7 +50,10 @@ class RepositoryService:
     """Service for repository business logic operations."""
 
     def __init__(
-        self, borg_service: Any, scheduler_service: Any, volume_service: Any
+        self,
+        borg_service: BorgService,
+        scheduler_service: SchedulerService,
+        volume_service: VolumeService,
     ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service
@@ -141,7 +147,7 @@ class RepositoryService:
             verification_successful = await self.borg_service.verify_repository_access(
                 repo_path=request.path,
                 passphrase=request.passphrase,
-                keyfile_path=keyfile_path,
+                keyfile_path=str(keyfile_path) if keyfile_path else "",
             )
 
             if not verification_successful:
@@ -248,12 +254,14 @@ class RepositoryService:
                         archive_info.formatted_time = archive_info.time
 
                 if archive_info.stats and "original_size" in archive_info.stats:
-                    size_bytes = archive_info.stats["original_size"]
-                    for unit in ["B", "KB", "MB", "GB", "TB"]:
-                        if size_bytes < 1024.0:
-                            archive_info.size_info = f"{size_bytes:.1f} {unit}"
-                            break
-                        size_bytes /= 1024.0
+                    size_value = archive_info.stats["original_size"]
+                    if isinstance(size_value, (int, float)) and size_value is not None:
+                        size_bytes = float(size_value)
+                        for unit in ["B", "KB", "MB", "GB", "TB"]:
+                            if size_bytes < 1024.0:
+                                archive_info.size_info = f"{size_bytes:.1f} {unit}"
+                                break
+                            size_bytes /= 1024.0
 
                 archive_infos.append(archive_info)
 

@@ -5,7 +5,6 @@ Comprehensive tests for JobManager - covering missing lines and functionality
 import pytest
 import uuid
 import asyncio
-import os
 from datetime import datetime, UTC
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
@@ -19,7 +18,6 @@ from borgitory.services.jobs.job_manager import (
     JobManagerFactory,
     BorgJob,
     BorgJobTask,
-    create_job_manager,
     get_default_job_manager_dependencies,
     get_test_job_manager_dependencies,
 )
@@ -1051,17 +1049,3 @@ class TestJobManagerFactoryFunctions:
         assert deps.subprocess_executor is mock_subprocess
         assert deps.db_session_factory is mock_db_session
         assert deps.rclone_service is mock_rclone
-
-    def test_create_job_manager_with_environment_config(self) -> None:
-        """Test creating job manager with environment variables"""
-        with patch.dict(
-            os.environ,
-            {
-                "BORG_MAX_CONCURRENT_BACKUPS": "8",
-                "BORG_MAX_OUTPUT_LINES": "1500",
-            },
-        ):
-            manager = create_job_manager()
-
-            assert manager.config.max_concurrent_backups == 8
-            assert manager.config.max_output_lines_per_job == 1500

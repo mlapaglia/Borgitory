@@ -6,6 +6,7 @@ import pytest
 import uuid
 from unittest.mock import Mock, patch, AsyncMock
 import asyncio
+from typing import Any
 
 from borgitory.services.jobs.job_stream_service import JobStreamService
 
@@ -14,7 +15,7 @@ class TestStreamingErrorHandling:
     """Test error handling in streaming functionality"""
 
     @pytest.fixture
-    def mock_job_manager(self):
+    def mock_job_manager(self) -> Mock:
         manager = Mock()
         manager.jobs = {}
         manager.subscribe_to_events = Mock()
@@ -22,12 +23,12 @@ class TestStreamingErrorHandling:
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager):
+    def job_stream_service(self, mock_job_manager) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
     @pytest.mark.asyncio
     async def test_task_streaming_nonexistent_job(
-        self, job_stream_service, mock_job_manager
+        self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming for a job that doesn't exist"""
         job_id = str(uuid.uuid4())
@@ -58,7 +59,7 @@ class TestStreamingErrorHandling:
 
     @pytest.mark.asyncio
     async def test_task_streaming_job_with_mock_tasks(
-        self, job_stream_service, mock_job_manager
+        self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming for a job with Mock tasks attribute (error handling)"""
         job_id = str(uuid.uuid4())
@@ -83,7 +84,7 @@ class TestStreamingErrorHandling:
 
     @pytest.mark.asyncio
     async def test_task_streaming_invalid_task_order(
-        self, job_stream_service, mock_job_manager
+        self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming for invalid task order"""
         job_id = str(uuid.uuid4())
@@ -108,7 +109,7 @@ class TestStreamingErrorHandling:
 
     @pytest.mark.asyncio
     async def test_task_streaming_handles_timeout(
-        self, job_stream_service, mock_job_manager
+        self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test that streaming handles timeouts gracefully"""
         job_id = str(uuid.uuid4())
@@ -142,7 +143,7 @@ class TestStreamingErrorHandling:
 
     @pytest.mark.asyncio
     async def test_database_streaming_connection_error(
-        self, job_stream_service, mock_job_manager
+        self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test database streaming when connection fails"""
         job_id = str(uuid.uuid4())
@@ -171,13 +172,13 @@ class TestStreamingPerformance:
     """Test performance aspects of streaming"""
 
     @pytest.fixture
-    def mock_job_manager(self):
+    def mock_job_manager(self) -> Mock:
         manager = Mock()
         manager.jobs = {}
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager):
+    def job_stream_service(self, mock_job_manager) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
     def test_streaming_output_size_efficiency(self) -> None:
@@ -227,18 +228,18 @@ class TestEventFiltering:
     """Test event filtering logic"""
 
     @pytest.fixture
-    def mock_job_manager(self):
+    def mock_job_manager(self) -> Mock:
         manager = Mock()
         manager.jobs = {}
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager):
+    def job_stream_service(self, mock_job_manager) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
     @pytest.mark.asyncio
     async def test_event_filtering_correct_job_and_task(
-        self, job_stream_service, mock_job_manager
+        self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test that events are filtered correctly by job ID and task index"""
         job_id = str(uuid.uuid4())
@@ -256,37 +257,40 @@ class TestEventFiltering:
 
         # Mock event queue with mixed events
         mock_queue = AsyncMock()
+        from borgitory.services.jobs.broadcaster.job_event import JobEvent
+        from borgitory.services.jobs.broadcaster.event_type import EventType
+
         events_to_send = [
             # Event for different job - should be ignored
-            {
-                "job_id": other_job_id,
-                "type": "job_output",
-                "data": {
+            JobEvent(
+                event_type=EventType.JOB_OUTPUT,
+                job_id=other_job_id,
+                data={
                     "task_type": "task_output",
                     "task_index": task_order,
                     "line": "Wrong job",
                 },
-            },
+            ),
             # Event for correct job but wrong task - should be ignored
-            {
-                "job_id": job_id,
-                "type": "job_output",
-                "data": {
+            JobEvent(
+                event_type=EventType.JOB_OUTPUT,
+                job_id=job_id,
+                data={
                     "task_type": "task_output",
                     "task_index": 0,
                     "line": "Wrong task",
                 },
-            },
+            ),
             # Event for correct job and task - should be processed
-            {
-                "job_id": job_id,
-                "type": "job_output",
-                "data": {
+            JobEvent(
+                event_type=EventType.JOB_OUTPUT,
+                job_id=job_id,
+                data={
                     "task_type": "task_output",
                     "task_index": task_order,
                     "line": "Correct event",
                 },
-            },
+            ),
             Exception("End test"),
         ]
         mock_queue.get.side_effect = events_to_send
@@ -317,7 +321,7 @@ class TestBackwardCompatibilityEdgeCases:
     def test_empty_output_lines_handling(self) -> None:
         """Test handling of empty or None output_lines"""
         # Test various empty states
-        empty_states = [
+        empty_states: list[Any] = [
             None,
             [],
             [{"text": ""}],

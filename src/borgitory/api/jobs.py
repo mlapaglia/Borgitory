@@ -8,7 +8,6 @@ from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from borgitory.models.enums import JobType
 from borgitory.dependencies import JobServiceDep
 from borgitory.dependencies import JobStreamServiceDep, JobRenderServiceDep
-from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.dependencies import TemplatesDep
 
 logger = logging.getLogger(__name__)
@@ -93,13 +92,6 @@ class MigrationResponse(BaseModel):
     message: str
     success: Optional[bool] = None
     affected_rows: Optional[int] = None
-
-
-def get_job_manager_dependency() -> JobManagerProtocol:
-    """Dependency to get modular job manager instance."""
-    from borgitory.dependencies import get_job_manager_dependency as get_jm_dep
-
-    return get_jm_dep()
 
 
 @router.post("/backup", response_class=HTMLResponse)
@@ -222,18 +214,6 @@ async def stream_all_jobs(
     return await stream_svc.stream_all_jobs()
 
 
-@router.get("/", response_model=List[JobResponse])
-def list_jobs(
-    job_svc: JobServiceDep,
-    skip: int = 0,
-    limit: int = 100,
-    type: Optional[str] = None,
-) -> List[JobResponse]:
-    """List database job records (legacy jobs) and active JobManager jobs"""
-    jobs_data = job_svc.list_jobs(skip, limit, type)
-    return [JobResponse(**job) for job in jobs_data]
-
-
 @router.get("/html", response_class=HTMLResponse)
 def get_jobs_html(
     render_svc: JobRenderServiceDep,
@@ -269,58 +249,46 @@ async def stream_current_jobs_html(
     )
 
 
-@router.get("/{job_id}", response_model=JobResponse)
-def get_job(
-    job_id: str,
-    job_svc: JobServiceDep,
-) -> JobResponse:
-    """Get job details - supports both database IDs and JobManager IDs"""
-    job = job_svc.get_job(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return JobResponse(**job)
-
-
 @router.get("/{job_id}/status", response_model=JobStatusResponse)
 async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusResponse:
     """Get current job status and progress"""
     try:
         output = await job_svc.get_job_status(job_id)
         if "error" in output:
-            raise HTTPException(status_code=404, detail=output["error"])
-        return JobStatusResponse(**output)
+            raise HTTPException(status_code=404, detail=str(output["error"]))
+
+        # Create JobStatusResponse with proper type casting
+        def safe_int(value: object) -> Optional[int]:
+            """Safely convert value to int or None"""
+            if value is None:
+                return None
+            if isinstance(value, (int, float, str)):
+                try:
+                    return int(value)
+                except (ValueError, TypeError):
+                    return None
+            return None
+
+        return JobStatusResponse(
+            id=str(output["id"]),
+            status=str(output["status"]),
+            running=bool(output["running"]),
+            completed=bool(output["completed"]),
+            failed=bool(output["failed"]),
+            started_at=str(output["started_at"]) if output.get("started_at") else None,
+            completed_at=str(output["completed_at"])
+            if output.get("completed_at")
+            else None,
+            return_code=safe_int(output.get("return_code")),
+            error=str(output["error"]) if output.get("error") else None,
+            job_type=str(output["job_type"]) if output.get("job_type") else None,
+            current_task_index=safe_int(output.get("current_task_index")),
+            tasks=safe_int(output.get("tasks")),
+        )
     except HTTPException:
         raise  # Re-raise HTTPExceptions without modification
     except Exception as e:
         logger.error(f"Error getting job status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/{job_id}/output", response_model=JobOutputResponse)
-async def get_job_output(
-    job_id: str,
-    job_svc: JobServiceDep,
-    last_n_lines: int = 100,
-) -> JobOutputResponse:
-    """Get job output lines"""
-    try:
-        output = await job_svc.get_job_output(job_id, last_n_lines)
-        if "error" in output:
-            raise HTTPException(status_code=404, detail=output["error"])
-
-        # Convert lines to proper format
-        lines = []
-        for line in output.get("lines", []):
-            if isinstance(line, dict):
-                lines.append(JobOutputLine(**line))
-            else:
-                lines.append(JobOutputLine(text=str(line)))
-
-        return JobOutputResponse(lines=lines, progress=output.get("progress", {}))
-    except HTTPException:
-        raise  # Re-raise HTTPExceptions without modification
-    except Exception as e:
-        logger.error(f"Error getting job output: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -343,17 +311,19 @@ async def toggle_job_details(
     expanded: str = "false",
 ) -> HTMLResponse:
     """Toggle job details visibility and return refreshed job item"""
-    job = render_svc.get_job_for_render(job_id, job_svc.db)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+    # Toggle the expand_details state - if currently false, expand it
+    expand_details = expanded == "false"
 
-    # Toggle the expand_details state
-    job["expand_details"] = expanded == "false"  # If currently false, expand it
+    template_job = render_svc.get_job_for_template(job_id, job_svc.db, expand_details)
+    if not template_job:
+        raise HTTPException(status_code=404, detail="Job not found")
 
     logger.debug(f"Job toggle - rendering job {job_id}")
 
     # Return the complete job item with new state
-    return templates.TemplateResponse(request, "partials/jobs/job_item.html", job)
+    return templates.TemplateResponse(
+        request, "partials/jobs/job_item.html", template_job.__dict__
+    )
 
 
 @router.get("/{job_id}/details-static", response_class=HTMLResponse)
@@ -365,12 +335,12 @@ async def get_job_details_static(
     job_svc: JobServiceDep,
 ) -> HTMLResponse:
     """Get static job details (used when job completes)"""
-    job = render_svc.get_job_for_render(job_id, job_svc.db)
-    if not job:
+    template_job = render_svc.get_job_for_template(job_id, job_svc.db)
+    if not template_job:
         raise HTTPException(status_code=404, detail="Job not found")
 
     return templates.TemplateResponse(
-        request, "partials/jobs/job_details_static.html", job
+        request, "partials/jobs/job_details_static.html", template_job.__dict__
     )
 
 
@@ -385,35 +355,32 @@ async def toggle_task_details(
     expanded: str = "false",
 ) -> HTMLResponse:
     """Toggle task details visibility and return updated task item"""
-    job = render_svc.get_job_for_render(job_id, job_svc.db)
-    if not job:
+    template_job = render_svc.get_job_for_template(job_id, job_svc.db)
+    if not template_job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Find the specific task
+    # Find the specific task by order
     task = None
-    if job.get("sorted_tasks"):
-        for t in job["sorted_tasks"]:
-            if t.task_order == task_order:
-                task = t
-                break
+    for t in template_job.sorted_tasks:
+        if t.task_order == task_order:
+            task = t
+            break
 
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # Toggle the task expanded state
+    # Toggle task expansion state
     task_expanded = expanded == "false"  # If currently false, expand it
 
-    # Create context for the task template - use the UUID-based job context from render service
+    # Create context for the task template
     context = {
-        "job": job[
-            "job"
-        ],  # This is already the UUID-based job context from _format_manager_job_for_render
+        "job": template_job.job,  # Pass the job context object, not the full template data
         "task": task,
         "task_expanded": task_expanded,
     }
 
     # Choose appropriate template based on job status
-    if job["job"].status == "running":
+    if str(template_job.job.status) == "running":
         template_name = "partials/jobs/task_item_streaming.html"
     else:
         template_name = "partials/jobs/task_item_static.html"
