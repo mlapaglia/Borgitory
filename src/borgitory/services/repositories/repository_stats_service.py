@@ -2,13 +2,106 @@ import asyncio
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Callable, Optional, Any
+from typing import Dict, List, Callable, Optional, TypedDict
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository
 from borgitory.utils.security import build_secure_borg_command
 
 logger = logging.getLogger(__name__)
+
+
+# TypedDict definitions for repository statistics
+class FileTypeTimelineData(TypedDict):
+    """Internal structure for file type timeline data"""
+
+    labels: List[str]
+    count_data: Dict[str, List[int]]
+    size_data: Dict[str, List[float]]
+
+
+class ArchiveInfo(TypedDict, total=False):
+    """Individual archive information structure"""
+
+    # Success fields
+    name: str
+    start: str
+    end: str
+    duration: float
+    original_size: int
+    compressed_size: int
+    deduplicated_size: int
+    nfiles: int
+    unique_chunks: int
+    total_chunks: int
+    unique_size: int
+    total_size: int
+
+
+class ChartDatasetRequired(TypedDict):
+    """Required fields for Chart dataset"""
+
+    label: str
+    data: List[float]
+    borderColor: str
+    backgroundColor: str
+    fill: bool
+
+
+class ChartDataset(ChartDatasetRequired, total=False):
+    """Chart dataset structure for Chart.js with optional fields"""
+
+    yAxisID: str
+
+
+class TimelineChartData(TypedDict):
+    """Timeline chart data structure"""
+
+    labels: List[str]
+    datasets: List[ChartDataset]
+
+
+class DedupCompressionChartData(TypedDict):
+    """Deduplication and compression chart data structure"""
+
+    labels: List[str]
+    datasets: List[ChartDataset]
+
+
+class FileTypeChartData(TypedDict):
+    """File type chart data structure"""
+
+    count_chart: TimelineChartData
+    size_chart: TimelineChartData
+
+
+class SummaryStats(TypedDict):
+    """Summary statistics structure"""
+
+    total_archives: int
+    latest_archive_date: str
+    total_original_size_gb: float
+    total_compressed_size_gb: float
+    total_deduplicated_size_gb: float
+    overall_compression_ratio: float
+    overall_deduplication_ratio: float
+    space_saved_gb: float
+    average_archive_size_gb: float
+
+
+class RepositoryStats(TypedDict, total=False):
+    """Complete repository statistics structure"""
+
+    # Success fields
+    repository_path: str
+    total_archives: int
+    archive_stats: List[ArchiveInfo]
+    size_over_time: TimelineChartData
+    dedup_compression_stats: DedupCompressionChartData
+    file_type_stats: FileTypeChartData
+    summary: SummaryStats
+    # Error field
+    error: str
 
 
 class CommandExecutorInterface(ABC):
@@ -22,7 +115,7 @@ class CommandExecutorInterface(ABC):
     @abstractmethod
     async def execute_borg_info(
         self, repository: Repository, archive_name: str
-    ) -> Dict[str, object]:
+    ) -> ArchiveInfo:
         """Execute borg info command to get archive details"""
         pass
 
@@ -69,7 +162,7 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
 
     async def execute_borg_info(
         self, repository: Repository, archive_name: str
-    ) -> Dict[str, object]:
+    ) -> ArchiveInfo:
         """Execute borg info command to get archive details"""
         try:
             command, env = build_secure_borg_command(
@@ -88,7 +181,7 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
             if process.returncode == 0:
                 info_data = json.loads(stdout.decode())
                 archive_info = info_data.get("archives", [{}])[0]
-                return {
+                result: ArchiveInfo = {
                     "name": archive_info.get("name", archive_name),
                     "start": archive_info.get("start", ""),
                     "end": archive_info.get("end", ""),
@@ -104,6 +197,7 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
                     ),
                     "nfiles": archive_info.get("stats", {}).get("nfiles", 0),
                 }
+                return result
             else:
                 logger.error(f"Failed to get archive info: {stderr.decode()}")
                 return {}
@@ -160,7 +254,7 @@ class RepositoryStatsService:
         repository: Repository,
         db: Session,
         progress_callback: Optional[Callable[[str, int], None]] = None,
-    ) -> Dict[str, object]:
+    ) -> RepositoryStats:
         """Gather comprehensive repository statistics"""
         try:
             if progress_callback:
@@ -214,7 +308,7 @@ class RepositoryStatsService:
                 progress_callback("Finalizing statistics and building charts...", 90)
 
             # Build statistics
-            stats = {
+            stats: RepositoryStats = {
                 "repository_path": repository.path,
                 "total_archives": len(archive_stats),
                 "archive_stats": archive_stats,
@@ -327,11 +421,11 @@ class RepositoryStatsService:
             logger.error(f"Error getting archive info for {archive_name}: {str(e)}")
             return None
 
-    def _build_size_timeline(  # type: ignore[explicit-any]
-        self, archive_stats: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _build_size_timeline(
+        self, archive_stats: List[ArchiveInfo]
+    ) -> TimelineChartData:
         """Build size over time data for charting"""
-        timeline_data: Dict[str, Any] = {
+        timeline_data: TimelineChartData = {
             "labels": [],
             "datasets": [
                 {
@@ -378,11 +472,11 @@ class RepositoryStatsService:
 
         return timeline_data
 
-    def _build_dedup_compression_stats(  # type: ignore[explicit-any]
-        self, archive_stats: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _build_dedup_compression_stats(
+        self, archive_stats: List[ArchiveInfo]
+    ) -> DedupCompressionChartData:
         """Build deduplication and compression statistics"""
-        dedup_data: Dict[str, Any] = {
+        dedup_data: DedupCompressionChartData = {
             "labels": [],
             "datasets": [
                 {
@@ -390,6 +484,7 @@ class RepositoryStatsService:
                     "data": [],
                     "borderColor": "rgb(139, 92, 246)",
                     "backgroundColor": "rgba(139, 92, 246, 0.1)",
+                    "fill": False,
                     "yAxisID": "y",
                 },
                 {
@@ -397,6 +492,7 @@ class RepositoryStatsService:
                     "data": [],
                     "borderColor": "rgb(245, 158, 11)",
                     "backgroundColor": "rgba(245, 158, 11, 0.1)",
+                    "fill": False,
                     "yAxisID": "y1",
                 },
             ],
@@ -431,9 +527,9 @@ class RepositoryStatsService:
         repository: Repository,
         archives: List[str],
         progress_callback: Optional[Callable[[str, int], None]] = None,
-    ) -> Dict[str, Any]:
+    ) -> FileTypeChartData:
         """Get file type statistics over time"""
-        file_type_timeline: Dict[str, object] = {
+        file_type_timeline: FileTypeTimelineData = {
             "labels": [],
             "count_data": {},
             "size_data": {},
@@ -531,8 +627,8 @@ class RepositoryStatsService:
         return self._build_file_type_chart_data(file_type_timeline)
 
     def _build_file_type_chart_data(
-        self, timeline_data: Dict[str, object]
-    ) -> Dict[str, Any]:
+        self, timeline_data: FileTypeTimelineData
+    ) -> FileTypeChartData:
         """Build chart data for file types"""
         # Color palette for different file types
         colors = [
@@ -558,8 +654,8 @@ class RepositoryStatsService:
             :10
         ]
 
-        count_datasets = []
-        size_datasets = []
+        count_datasets: List[ChartDataset] = []
+        size_datasets: List[ChartDataset] = []
 
         for i, (ext, _) in enumerate(top_extensions):
             color = colors[i % len(colors)]
@@ -567,7 +663,7 @@ class RepositoryStatsService:
             count_datasets.append(
                 {
                     "label": f".{ext} files",
-                    "data": timeline_data["count_data"][ext],
+                    "data": [float(x) for x in timeline_data["count_data"][ext]],
                     "borderColor": color,
                     "backgroundColor": color.replace("rgb", "rgba").replace(
                         ")", ", 0.1)"
@@ -588,7 +684,7 @@ class RepositoryStatsService:
                 }
             )
 
-        return {
+        result: FileTypeChartData = {
             "count_chart": {
                 "labels": timeline_data["labels"],
                 "datasets": count_datasets,
@@ -598,13 +694,22 @@ class RepositoryStatsService:
                 "datasets": size_datasets,
             },
         }
+        return result
 
-    def _build_summary_stats(
-        self, archive_stats: List[Dict[str, object]]
-    ) -> Dict[str, Any]:
+    def _build_summary_stats(self, archive_stats: List[ArchiveInfo]) -> SummaryStats:
         """Build overall summary statistics"""
         if not archive_stats:
-            return {}
+            return {
+                "total_archives": 0,
+                "latest_archive_date": "",
+                "total_original_size_gb": 0.0,
+                "total_compressed_size_gb": 0.0,
+                "total_deduplicated_size_gb": 0.0,
+                "overall_compression_ratio": 0.0,
+                "overall_deduplication_ratio": 0.0,
+                "space_saved_gb": 0.0,
+                "average_archive_size_gb": 0.0,
+            }
 
         latest_archive = archive_stats[-1]
         total_original = sum(
@@ -617,7 +722,7 @@ class RepositoryStatsService:
             archive.get("deduplicated_size", 0) for archive in archive_stats
         )
 
-        return {
+        summary: SummaryStats = {
             "total_archives": len(archive_stats),
             "latest_archive_date": latest_archive.get("start", ""),
             "total_original_size_gb": round(total_original / (1024**3), 2),
@@ -642,3 +747,4 @@ class RepositoryStatsService:
             if archive_stats
             else 0,
         }
+        return summary
