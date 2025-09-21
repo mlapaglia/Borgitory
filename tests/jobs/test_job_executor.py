@@ -4,6 +4,7 @@ Tests for JobExecutor - subprocess execution and process management
 
 import pytest
 import asyncio
+from typing import Dict
 from unittest.mock import AsyncMock, patch
 
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -63,13 +64,16 @@ class TestJobExecutor:
         output_lines = []
         progress_updates = []
 
-        def output_callback(line, progress) -> None:
+        def output_callback(line: str) -> None:
             output_lines.append(line)
-            if progress:
-                progress_updates.append(progress)
+
+        def progress_callback(progress: Dict[str, object]) -> None:
+            progress_updates.append(progress)
 
         result = await self.executor.monitor_process_output(
-            mock_process, output_callback=output_callback
+            mock_process,
+            output_callback=output_callback,
+            progress_callback=progress_callback,
         )
 
         assert result.return_code == 0
@@ -87,6 +91,7 @@ class TestJobExecutor:
         result = await self.executor.monitor_process_output(mock_process)
 
         assert result.return_code == -1
+        assert result.error is not None
         assert "Process monitoring error" in result.error
 
     def test_parse_progress_line_borg_output(self) -> None:

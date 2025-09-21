@@ -26,6 +26,7 @@ from .storage import CloudStorage
 from .registry import get_config_class, get_storage_class, get_supported_providers
 from .orchestration import CloudSyncer, LoggingSyncEventHandler
 from borgitory.services.encryption_service import EncryptionService
+from borgitory.types import ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 class ConfigValidator:
     """Validates cloud storage configurations"""
 
-    def validate_config(self, provider: str, config: Dict[str, object]) -> object:
+    def validate_config(self, provider: str, config: ConfigDict) -> object:
         """
         Validate configuration for a specific provider.
 
@@ -55,7 +56,9 @@ class ConfigValidator:
                 f"Supported providers: {', '.join(sorted(supported))}"
             )
 
-        return config_class(**config)
+        # Filter out None values for the config class constructor
+        filtered_config = {k: v for k, v in config.items() if v is not None}
+        return config_class(**filtered_config)
 
 
 class StorageFactory:
@@ -74,7 +77,7 @@ class StorageFactory:
             # Add more injectable dependencies here as needed
         }
 
-    def create_storage(self, provider: str, config: Dict[str, object]) -> CloudStorage:
+    def create_storage(self, provider: str, config: ConfigDict) -> CloudStorage:
         """
         Create a cloud storage instance with automatic dependency injection.
 
@@ -312,9 +315,7 @@ class CloudSyncService:
         except Exception as e:
             return f"Error getting connection info: {str(e)}"
 
-    def prepare_config_for_storage(
-        self, provider: str, config: Dict[str, Union[str, int, float, bool, None]]
-    ) -> str:
+    def prepare_config_for_storage(self, provider: str, config: ConfigDict) -> str:
         """
         Prepare configuration for database storage by encrypting sensitive fields.
 
@@ -335,9 +336,7 @@ class CloudSyncService:
 
         return json.dumps(encrypted_config)
 
-    def load_config_from_storage(
-        self, provider: str, stored_config: str
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    def load_config_from_storage(self, provider: str, stored_config: str) -> ConfigDict:
         """
         Load configuration from database storage by decrypting sensitive fields.
 

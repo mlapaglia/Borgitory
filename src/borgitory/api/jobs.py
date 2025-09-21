@@ -255,8 +255,36 @@ async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusRespon
     try:
         output = await job_svc.get_job_status(job_id)
         if "error" in output:
-            raise HTTPException(status_code=404, detail=output["error"])
-        return JobStatusResponse(**output)
+            raise HTTPException(status_code=404, detail=str(output["error"]))
+
+        # Create JobStatusResponse with proper type casting
+        def safe_int(value: object) -> Optional[int]:
+            """Safely convert value to int or None"""
+            if value is None:
+                return None
+            if isinstance(value, (int, float, str)):
+                try:
+                    return int(value)
+                except (ValueError, TypeError):
+                    return None
+            return None
+
+        return JobStatusResponse(
+            id=str(output["id"]),
+            status=str(output["status"]),
+            running=bool(output["running"]),
+            completed=bool(output["completed"]),
+            failed=bool(output["failed"]),
+            started_at=str(output["started_at"]) if output.get("started_at") else None,
+            completed_at=str(output["completed_at"])
+            if output.get("completed_at")
+            else None,
+            return_code=safe_int(output.get("return_code")),
+            error=str(output["error"]) if output.get("error") else None,
+            job_type=str(output["job_type"]) if output.get("job_type") else None,
+            current_task_index=safe_int(output.get("current_task_index")),
+            tasks=safe_int(output.get("tasks")),
+        )
     except HTTPException:
         raise  # Re-raise HTTPExceptions without modification
     except Exception as e:

@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import CloudSyncConfig
+from borgitory.types import ConfigDict
 from borgitory.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
@@ -110,7 +111,7 @@ class CloudSyncConfigService:
 
         try:
             storage = self._storage_factory.create_storage(
-                config.provider, cast(Dict[str, object], config.provider_config)
+                config.provider, cast(ConfigDict, config.provider_config)
             )
         except Exception as e:
             raise HTTPException(
@@ -119,7 +120,7 @@ class CloudSyncConfigService:
 
         sensitive_fields = storage.get_sensitive_fields()
         encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-            cast(Dict[str, object], config.provider_config), sensitive_fields
+            cast(ConfigDict, config.provider_config), sensitive_fields
         )
 
         db_config = CloudSyncConfig()
@@ -191,7 +192,7 @@ class CloudSyncConfigService:
             )
             try:
                 storage = self._storage_factory.create_storage(
-                    provider, config_update.provider_config
+                    provider, cast(ConfigDict, config_update.provider_config)
                 )
             except Exception as e:
                 raise HTTPException(
@@ -200,7 +201,7 @@ class CloudSyncConfigService:
 
             sensitive_fields = storage.get_sensitive_fields()
             encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-                config_update.provider_config, sensitive_fields
+                cast(ConfigDict, config_update.provider_config), sensitive_fields
             )
 
             config.provider_config = json.dumps(encrypted_config)
@@ -296,9 +297,10 @@ class CloudSyncConfigService:
                 )
 
         # Add optional parameters with defaults if not already set
-        for param, default_value in mapping.optional_params.items():
-            if param not in test_params:
-                test_params[param] = default_value
+        if mapping.optional_params:
+            for param, default_value in mapping.optional_params.items():
+                if param not in test_params:
+                    test_params[param] = cast(ConfigDict, {param: default_value})[param]
 
         logger.info(
             f"Built test params: {list(test_params.keys())}"

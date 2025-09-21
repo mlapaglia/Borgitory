@@ -7,10 +7,11 @@ keeping the JobExecutor clean and testable.
 
 import json
 import logging
-from typing import Optional, Callable, Dict
+from typing import Optional, Callable, Dict, cast
 from abc import ABC, abstractmethod
 
 from .types import CloudSyncConfig
+from borgitory.types import ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class DatabaseConfigLoadService(ConfigLoadService):
 
                 return CloudSyncConfig(
                     provider=db_config.provider,
-                    config=provider_config,
+                    config=cast(ConfigDict, provider_config),
                     path_prefix=db_config.path_prefix or "",
                     name=db_config.name,
                 )

@@ -5,6 +5,7 @@ Type definitions for notification system.
 from dataclasses import dataclass
 from typing import Dict, Optional
 from enum import Enum
+from borgitory.types import ConfigDict
 
 
 class NotificationType(str, Enum):
@@ -80,7 +81,7 @@ class NotificationConfig:
     """Configuration for a notification provider"""
 
     provider: str
-    config: Dict[str, object]
+    config: ConfigDict
     name: str = ""
     enabled: bool = True
 

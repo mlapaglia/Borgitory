@@ -102,9 +102,10 @@ class JobStreamService:
             # Stream job updates from borg job manager only
             # Individual task output should come from /api/jobs/{job_id}/stream
             async for event in self.job_manager.stream_all_job_updates():
-                event = cast("JobEvent", event)
-                event_type = event.event_type.value
-                yield f"event: {event_type}\\ndata: {json.dumps(event.to_dict())}\\n\\n"
+                # Cast to JobEvent since it's imported under TYPE_CHECKING
+                job_event = cast("JobEvent", event)
+                event_type = job_event.event_type.value
+                yield f"event: {event_type}\\ndata: {json.dumps(job_event.to_dict())}\\n\\n"
 
         except Exception as e:
             logger.error(f"SSE streaming error: {e}")
@@ -141,7 +142,7 @@ class JobStreamService:
                             event = await asyncio.wait_for(
                                 event_queue.get(), timeout=30.0
                             )
-                            event = cast("JobEvent", event)
+                            # event is already JobEvent type
                             # Only send events for this job
                             if event.job_id == job_id:
                                 # Handle different event types for HTMX SSE
@@ -363,7 +364,7 @@ class JobStreamService:
                         if event_queue is None:
                             break
                         event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
-                        event = cast("JobEvent", event)
+                        # event is already JobEvent type
                         logger.debug(
                             f"Task streaming received event: {event.event_type.value} for job {event.job_id or 'unknown'}"
                         )

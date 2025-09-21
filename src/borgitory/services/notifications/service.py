@@ -24,6 +24,7 @@ from .providers.base import NotificationProvider, NotificationProviderConfig
 from .types import NotificationMessage, NotificationResult, NotificationConfig
 from .registry import get_config_class, get_provider_class, get_supported_providers
 from borgitory.services.encryption_service import EncryptionService
+from borgitory.types import ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class ConfigValidator:
     """Validates notification provider configurations"""
 
     def validate_config(
-        self, provider: str, config: Dict[str, Union[str, int, float, bool]]
+        self, provider: str, config: ConfigDict
     ) -> NotificationProviderConfig:
         """
         Validate configuration for a specific provider.
@@ -55,7 +56,9 @@ class ConfigValidator:
                 f"Supported providers: {', '.join(sorted(supported))}"
             )
 
-        return config_class(**config)  # type: ignore[return-value]
+        # Filter out None values for the config class constructor
+        filtered_config = {k: v for k, v in config.items() if v is not None}
+        return config_class(**filtered_config)  # type: ignore[return-value]
 
 
 class NotificationProviderFactory:
@@ -70,7 +73,7 @@ class NotificationProviderFactory:
         }
 
     def create_provider(
-        self, provider: str, config: Dict[str, Union[str, int, float, bool]]
+        self, provider: str, config: ConfigDict
     ) -> NotificationProvider:
         """
         Create a notification provider instance.
@@ -244,9 +247,13 @@ class NotificationService:
             NotificationResult indicating success/failure and details
         """
         try:
+            # Filter out None values for provider creation
+            filtered_config: ConfigDict = {
+                k: v for k, v in config.config.items() if v is not None
+            }
             provider = self._provider_factory.create_provider(
                 config.provider,
-                cast(Dict[str, Union[str, int, float, bool]], config.config),
+                filtered_config,
             )
 
             return await provider.send_notification(message)
@@ -272,9 +279,13 @@ class NotificationService:
             True if connection successful, False otherwise
         """
         try:
+            # Filter out None values for provider creation
+            filtered_config: ConfigDict = {
+                k: v for k, v in config.config.items() if v is not None
+            }
             provider = self._provider_factory.create_provider(
                 config.provider,
-                cast(Dict[str, Union[str, int, float, bool]], config.config),
+                filtered_config,
             )
             return await provider.test_connection()
 
@@ -293,18 +304,20 @@ class NotificationService:
             String representation of connection info
         """
         try:
+            # Filter out None values for provider creation
+            filtered_config: ConfigDict = {
+                k: v for k, v in config.config.items() if v is not None
+            }
             provider = self._provider_factory.create_provider(
                 config.provider,
-                cast(Dict[str, Union[str, int, float, bool]], config.config),
+                filtered_config,
             )
             return str(provider.get_connection_info().endpoint)
 
         except Exception as e:
             return f"Error getting connection info: {str(e)}"
 
-    def prepare_config_for_storage(
-        self, provider: str, config: Dict[str, Union[str, int, float, bool, None]]
-    ) -> str:
+    def prepare_config_for_storage(self, provider: str, config: ConfigDict) -> str:
         """
         Prepare configuration for database storage by encrypting sensitive fields.
 
@@ -325,9 +338,7 @@ class NotificationService:
 
         return json.dumps(encrypted_config)
 
-    def load_config_from_storage(
-        self, provider: str, stored_config: str
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    def load_config_from_storage(self, provider: str, stored_config: str) -> ConfigDict:
         """
         Load configuration from database storage by decrypting sensitive fields.
 

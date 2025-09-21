@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Dict
 from datetime import datetime, UTC
+from borgitory.types import ConfigDict
 
 
 class SyncEventType(Enum):
@@ -84,7 +85,7 @@ class CloudSyncConfig:
     """
 
     provider: str
-    config: Dict[str, object]
+    config: ConfigDict
     path_prefix: str = ""
     name: str = ""
 

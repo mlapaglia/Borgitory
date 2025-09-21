@@ -212,7 +212,7 @@ class TestCloudSyncDependencyInjection:
 
         output_messages = []
 
-        def output_callback(message, metadata) -> None:
+        def output_callback(message: str) -> None:
             output_messages.append(message)
 
         # Execute cloud sync with injected dependencies
@@ -539,8 +539,8 @@ class TestCloudSyncProgressHandling:
 
         progress_events = []
 
-        def progress_callback(message, metadata) -> None:
-            progress_events.append((message, metadata))
+        def progress_callback(message: str) -> None:
+            progress_events.append((message, {}))
 
         result = await self._execute_cloud_sync_with_di(
             job_executor,

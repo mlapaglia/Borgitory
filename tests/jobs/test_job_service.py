@@ -440,16 +440,12 @@ class TestJobService:
     async def test_get_job_status(self) -> None:
         """Test getting job status."""
         expected_output = {"status": "running", "progress": 50}
-        self.mock_job_manager.get_job_output_stream = AsyncMock(
-            return_value=expected_output
-        )
+        self.mock_job_manager.get_job_status.return_value = expected_output
 
         result = await self.job_service.get_job_status("job-123")
 
         assert result == expected_output
-        self.mock_job_manager.get_job_output_stream.assert_called_once_with(
-            "job-123", last_n_lines=50
-        )
+        self.mock_job_manager.get_job_status.assert_called_once_with("job-123")
 
     @pytest.mark.asyncio
     async def test_cancel_job_jobmanager(self, test_db: Session) -> None:

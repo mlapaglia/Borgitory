@@ -138,7 +138,10 @@ class ScheduleService:
             if schedule.enabled:
                 try:
                     await self.scheduler_service.update_schedule(
-                        schedule_id, schedule.cron_expression, schedule.repository_id
+                        schedule_id,
+                        schedule.name,
+                        schedule.cron_expression,
+                        schedule.enabled,
                     )
                 except Exception:
                     # If scheduler update fails, we still want to return the updated schedule

@@ -147,7 +147,7 @@ class RepositoryService:
             verification_successful = await self.borg_service.verify_repository_access(
                 repo_path=request.path,
                 passphrase=request.passphrase,
-                keyfile_path=keyfile_path,
+                keyfile_path=str(keyfile_path) if keyfile_path else "",
             )
 
             if not verification_successful:
@@ -254,12 +254,14 @@ class RepositoryService:
                         archive_info.formatted_time = archive_info.time
 
                 if archive_info.stats and "original_size" in archive_info.stats:
-                    size_bytes = archive_info.stats["original_size"]
-                    for unit in ["B", "KB", "MB", "GB", "TB"]:
-                        if size_bytes < 1024.0:
-                            archive_info.size_info = f"{size_bytes:.1f} {unit}"
-                            break
-                        size_bytes /= 1024.0
+                    size_value = archive_info.stats["original_size"]
+                    if isinstance(size_value, (int, float)) and size_value is not None:
+                        size_bytes = float(size_value)
+                        for unit in ["B", "KB", "MB", "GB", "TB"]:
+                            if size_bytes < 1024.0:
+                                archive_info.size_info = f"{size_bytes:.1f} {unit}"
+                                break
+                            size_bytes /= 1024.0
 
                 archive_infos.append(archive_info)
 

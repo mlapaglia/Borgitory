@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 P = TypeVar("P")
 
 # Union type for implementations
-ImplementationType = Union[Type[P], Callable[..., P]]  # type: ignore[explicit-any]
+ImplementationType = Union[Type[P], Callable[..., P]]
 
 
 class ServiceFactory(Generic[P], ABC):
@@ -46,10 +46,10 @@ class ServiceFactory(Generic[P], ABC):
 
     def __init__(self) -> None:
         self._implementations: Dict[str, ImplementationType[P]] = {}
-        self._configurations: Dict[str, Dict[str, Any]] = {}  # type: ignore[explicit-any]
+        self._configurations: Dict[str, Dict[str, Any]] = {}
         self._default_implementation: Optional[str] = None
 
-    def register_implementation(  # type: ignore[explicit-any]
+    def register_implementation(
         self,
         name: str,
         implementation: ImplementationType[P],
@@ -68,7 +68,7 @@ class ServiceFactory(Generic[P], ABC):
         impl_name = getattr(implementation, "__name__", str(implementation))
         logger.info(f"Registered {impl_name} as '{name}' implementation")
 
-    def create_service(  # type: ignore[explicit-any]
+    def create_service(
         self, implementation_name: Optional[str] = None, **kwargs: Any
     ) -> P:
         """Create a service instance."""
@@ -107,7 +107,7 @@ class ServiceFactory(Generic[P], ABC):
 class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
     """Factory for creating notification services with proper dependency injection."""
 
-    def __init__(self, http_client: Any) -> None:  # type: ignore[explicit-any]
+    def __init__(self, http_client: Any) -> None:
         super().__init__()
         # Inject dependencies instead of using service locator
         self._http_client = http_client
@@ -120,7 +120,7 @@ class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
             NotificationProviderFactory,
         )
 
-        def create_notification_service(  # type: ignore[explicit-any]
+        def create_notification_service(
             encryption_service: Optional[Any] = None,
         ) -> NotificationServiceProtocol:
             """Factory function to create NotificationService."""
@@ -128,7 +128,7 @@ class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
             provider_factory = NotificationProviderFactory(
                 http_client=self._http_client
             )
-            return NotificationService(
+            return NotificationService(  # type: ignore[return-value]
                 provider_factory=provider_factory, encryption_service=encryption_service
             )
 
@@ -148,7 +148,7 @@ class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
 class CloudProviderServiceFactory(ServiceFactory[CloudSyncConfigServiceProtocol]):
     """Factory for creating cloud provider services with proper dependency injection."""
 
-    def __init__(  # type: ignore[explicit-any]
+    def __init__(
         self,
         rclone_service: "RcloneService",
         storage_factory: "StorageFactory",

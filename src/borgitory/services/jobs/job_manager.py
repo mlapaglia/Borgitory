@@ -16,6 +16,7 @@ from typing import (
     List,
     AsyncGenerator,
     Callable,
+    Coroutine,
     TYPE_CHECKING,
     Any,
 )
@@ -42,6 +43,7 @@ from borgitory.utils.db_session import get_db_session
 from contextlib import _GeneratorContextManager
 
 if TYPE_CHECKING:
+    from asyncio.subprocess import Process
     from borgitory.models.database import Repository, Schedule
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
     from borgitory.dependencies import ApplicationScopedNotificationService
@@ -88,10 +90,12 @@ class JobManagerDependencies:
     database_manager: Optional[JobDatabaseManager] = None
 
     # External dependencies (for testing/customization)
-    subprocess_executor: Optional[Callable[..., object]] = field(
-        default_factory=lambda: asyncio.create_subprocess_exec
+    subprocess_executor: Optional[Callable[..., Coroutine[None, None, "Process"]]] = (
+        field(default_factory=lambda: asyncio.create_subprocess_exec)
     )
-    db_session_factory: Optional[Callable[[], "Session"]] = None
+    db_session_factory: Optional[Callable[[], _GeneratorContextManager["Session"]]] = (
+        None
+    )
     rclone_service: Optional[RcloneService] = None
     http_client_factory: Optional[Callable[[], "HttpClient"]] = None
     encryption_service: Optional["EncryptionService"] = None
@@ -456,7 +460,9 @@ class JobManager:
             process = await self.safe_executor.start_process(command, env)
             self._processes[job.id] = process
 
-            def output_callback(line: str, progress: Dict[str, object]) -> None:
+            def output_callback(line: str) -> None:
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 # Add output to both the task and the output manager
                 task.output_lines.append(line)
                 asyncio.create_task(
@@ -468,7 +474,7 @@ class JobManager:
                 self.safe_event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
-                    data={"line": line, "progress": progress},
+                    data={"line": line, "progress": None},  # No progress data
                 )
 
             result = await self.safe_executor.monitor_process_output(
@@ -772,7 +778,9 @@ class JobManager:
             process = await self.safe_executor.start_process(command, env)
             self._processes[job.id] = process
 
-            def output_callback(line: str, progress: Dict[str, object]) -> None:
+            def output_callback(line: str) -> None:
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 asyncio.create_task(
                     self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -782,7 +790,7 @@ class JobManager:
                 self.safe_event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
-                    data={"line": line, "progress": progress},
+                    data={"line": line, "progress": None},  # No progress data
                 )
 
             result = await self.safe_executor.monitor_process_output(
@@ -844,8 +852,10 @@ class JobManager:
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
 
-            def task_output_callback(line: str, progress: Dict[str, object]) -> None:
+            def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 asyncio.create_task(
                     self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -857,7 +867,7 @@ class JobManager:
                     job_id=job.id,
                     data={
                         "line": line,
-                        "progress": progress,
+                        "progress": None,  # No progress data
                         "task_index": job.current_task_index,
                     },
                 )
@@ -992,8 +1002,10 @@ class JobManager:
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
 
-            def task_output_callback(line: str, progress: Dict[str, object]) -> None:
+            def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 asyncio.create_task(
                     self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -1006,16 +1018,16 @@ class JobManager:
                 keep_within=str(params.get("keep_within"))
                 if params.get("keep_within")
                 else None,
-                keep_daily=int(params.get("keep_daily"))
+                keep_daily=int(str(params.get("keep_daily") or 0))
                 if params.get("keep_daily")
                 else None,
-                keep_weekly=int(params.get("keep_weekly"))
+                keep_weekly=int(str(params.get("keep_weekly") or 0))
                 if params.get("keep_weekly")
                 else None,
-                keep_monthly=int(params.get("keep_monthly"))
+                keep_monthly=int(str(params.get("keep_monthly") or 0))
                 if params.get("keep_monthly")
                 else None,
-                keep_yearly=int(params.get("keep_yearly"))
+                keep_yearly=int(str(params.get("keep_yearly") or 0))
                 if params.get("keep_yearly")
                 else None,
                 show_stats=bool(params.get("show_stats", True)),
@@ -1068,8 +1080,10 @@ class JobManager:
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
 
-            def task_output_callback(line: str, progress: Dict[str, object]) -> None:
+            def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
+                # Provide default progress since callback now only receives line
+                progress: Dict[str, object] = {}
                 asyncio.create_task(
                     self.safe_output_manager.add_output_line(
                         job.id, line, "stdout", progress
@@ -1186,8 +1200,10 @@ class JobManager:
             task.completed_at = datetime.now(UTC)
             return False
 
-        def task_output_callback(line: str, progress: Dict[str, object]) -> None:
+        def task_output_callback(line: str) -> None:
             task.output_lines.append(line)
+            # Provide default progress since callback now only receives line
+            progress: Dict[str, object] = {}
             asyncio.create_task(
                 self.safe_output_manager.add_output_line(
                     job.id, line, "stdout", progress
@@ -1199,7 +1215,7 @@ class JobManager:
                 job_id=job.id,
                 data={
                     "line": line,
-                    "progress": progress,
+                    "progress": None,  # No progress data
                     "task_index": task_index,
                 },
             )
@@ -1207,7 +1223,7 @@ class JobManager:
         # Get cloud sync config ID, defaulting to None if not configured
         cloud_sync_config_id_raw = params.get("cloud_sync_config_id")
         cloud_sync_config_id = (
-            int(cloud_sync_config_id_raw)
+            int(str(cloud_sync_config_id_raw or 0))
             if cloud_sync_config_id_raw is not None
             else None
         )
@@ -1262,10 +1278,16 @@ class JobManager:
         assert self.dependencies.storage_factory is not None
         assert self.dependencies.provider_registry is not None
 
+        # Create a wrapper to convert context manager to direct session
+        db_factory = self.dependencies.db_session_factory
+
+        def session_factory() -> "Session":
+            return db_factory().__enter__()
+
         result = await self.safe_executor.execute_cloud_sync_task(
             repository_path=str(repository_path or ""),
             cloud_sync_config_id=cloud_sync_config_id,
-            db_session_factory=self.dependencies.db_session_factory,
+            db_session_factory=session_factory,
             rclone_service=self.dependencies.rclone_service,
             encryption_service=self.dependencies.encryption_service,
             storage_factory=self.dependencies.storage_factory,
@@ -1353,7 +1375,7 @@ class JobManager:
                 # Create notification config object
                 notification_config = NotificationConfigType(
                     provider=config.provider,
-                    config=decrypted_config,
+                    config=dict(decrypted_config),  # Cast to dict[str, object]
                     name=config.name,
                     enabled=config.enabled,
                 )
@@ -1366,19 +1388,23 @@ class JobManager:
 
                 # Convert to proper types
                 try:
-                    notification_type = NotificationType(notification_type_str.lower())
+                    notification_type = NotificationType(
+                        str(notification_type_str).lower()
+                    )
                 except ValueError:
                     notification_type = NotificationType.INFO
 
                 try:
-                    priority = NotificationPriority(priority_value)
+                    priority = NotificationPriority(
+                        int(str(priority_value)) if priority_value else 0
+                    )
                 except ValueError:
                     priority = NotificationPriority.NORMAL
 
                 # Create notification message
                 notification_message = NotificationMessage(
-                    title=title,
-                    message=message,
+                    title=str(title),
+                    message=str(message),
                     notification_type=notification_type,
                     priority=priority,
                 )

@@ -77,7 +77,7 @@ class ProcessExecutorProtocol(Protocol):
     async def monitor_process_output(
         self,
         process: asyncio.subprocess.Process,
-        output_callback: Optional[Callable[[str, Dict[str, object]], None]] = None,
+        output_callback: Optional[Callable[[str], None]] = None,
         progress_callback: Optional[Callable[[Dict[str, object]], None]] = None,
     ) -> "ProcessResult":
         """Monitor a process and return the result when complete."""

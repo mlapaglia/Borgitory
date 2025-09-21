@@ -271,8 +271,10 @@ class JobService:
 
     async def get_job_status(self, job_id: str) -> Dict[str, object]:
         """Get current job status and progress"""
-        output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
-        return output
+        status = self.job_manager.get_job_status(job_id)
+        if status is None:
+            return {"error": "Job not found"}
+        return status
 
     async def get_job_output(
         self, job_id: str, last_n_lines: int = 100
