@@ -3,7 +3,7 @@ import platform
 import sys
 import os
 import logging
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, Optional, TypedDict, List
 from sqlalchemy.orm import Session
 
@@ -158,7 +158,7 @@ class DebugService:
             app_info: ApplicationInfo = {
                 "borgitory_version": os.getenv("BORGITORY_VERSION"),
                 "debug_mode": os.getenv("DEBUG", "false").lower() == "true",
-                "startup_time": datetime.now(UTC).isoformat(),
+                "startup_time": now_utc().isoformat(),
                 "working_directory": os.getcwd(),
             }
             return app_info
@@ -174,9 +174,7 @@ class DebugService:
             repository_count = db.query(Repository).count()
             total_jobs = db.query(Job).count()
             # Use started_at instead of created_at for Job model
-            today_start = datetime.now(UTC).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
+            today_start = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
             recent_jobs = db.query(Job).filter(Job.started_at >= today_start).count()
 
             # Get database file size (for SQLite)

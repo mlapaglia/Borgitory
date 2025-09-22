@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 
@@ -329,7 +329,7 @@ class JobService:
             if job:
                 # Update database status
                 job.status = "cancelled"
-                job.finished_at = datetime.now(UTC)
+                job.finished_at = now_utc()
                 self.db.commit()
                 return True
         except ValueError:

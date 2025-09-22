@@ -32,6 +32,10 @@ from borgitory.models.repository_dtos import (
 from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.services.volumes.volume_service import VolumeService
+from borgitory.utils.datetime_utils import (
+    format_datetime_for_display,
+    parse_datetime_string,
+)
 from borgitory.utils.secure_path import (
     create_secure_filename,
     secure_path_join,
@@ -244,11 +248,6 @@ class RepositoryService:
                 )
 
                 if archive_info.time:
-                    from borgitory.utils.datetime_utils import (
-                        parse_datetime_string,
-                        format_datetime_for_display,
-                    )
-
                     dt = parse_datetime_string(archive_info.time)
                     if dt:
                         archive_info.formatted_time = format_datetime_for_display(dt)

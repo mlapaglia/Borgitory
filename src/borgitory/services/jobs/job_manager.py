@@ -8,7 +8,8 @@ clean architecture following the same pattern as other services in the applicati
 import asyncio
 import logging
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from typing import (
     Union,
     Dict,
@@ -414,7 +415,7 @@ class JobManager:
             task_type="command",
             task_name=f"Execute: {command_str}",
             status="queued" if is_backup else "running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
 
         # Create composite job (all jobs are now composite)
@@ -423,7 +424,7 @@ class JobManager:
             command=command,
             job_type="composite",  # All jobs are now composite
             status="queued" if is_backup else "running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[main_task],  # Always has at least one task
         )
         self.jobs[job_id] = job
@@ -482,7 +483,7 @@ class JobManager:
             )
 
             # Update task and job based on process result
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             task.return_code = result.return_code
 
             if result.return_code == 0:
@@ -498,7 +499,7 @@ class JobManager:
                 job.error = task.error
 
             job.return_code = result.return_code
-            job.completed_at = datetime.now(UTC)
+            job.completed_at = now_utc()
 
             if result.error:
                 task.error = result.error
@@ -515,10 +516,10 @@ class JobManager:
         except Exception as e:
             task.status = "failed"
             task.error = str(e)
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             job.status = "failed"
             job.error = str(e)
-            job.completed_at = datetime.now(UTC)
+            job.completed_at = now_utc()
             logger.error(f"Composite job task {job.id} execution failed: {e}")
 
             self.safe_event_broadcaster.broadcast_event(
@@ -567,7 +568,7 @@ class JobManager:
             id=job_id,
             job_type="composite",
             status="pending",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=tasks,
             repository_id=repository.id,
             schedule=schedule,
@@ -624,7 +625,7 @@ class JobManager:
                 job.current_task_index = task_index
 
                 task.status = "running"
-                task.started_at = datetime.now(UTC)
+                task.started_at = now_utc()
 
                 self.safe_event_broadcaster.broadcast_event(
                     EventType.TASK_STARTED,
@@ -654,7 +655,7 @@ class JobManager:
                     # Task status, return_code, and completed_at are already set by the individual task methods
                     # Just ensure completed_at is set if not already
                     if not task.completed_at:
-                        task.completed_at = datetime.now(UTC)
+                        task.completed_at = now_utc()
 
                     self.safe_event_broadcaster.broadcast_event(
                         EventType.TASK_COMPLETED
@@ -693,7 +694,7 @@ class JobManager:
                 except Exception as e:
                     task.status = "failed"
                     task.error = str(e)
-                    task.completed_at = datetime.now(UTC)
+                    task.completed_at = now_utc()
                     logger.error(f"Task {task.task_type} in job {job.id} failed: {e}")
 
                     self.safe_event_broadcaster.broadcast_event(
@@ -734,7 +735,7 @@ class JobManager:
             else:
                 job.status = "failed"
 
-            job.completed_at = datetime.now(UTC)
+            job.completed_at = now_utc()
 
             # Update final job status
             if self.database_manager:
@@ -756,7 +757,7 @@ class JobManager:
         except Exception as e:
             job.status = "failed"
             job.error = str(e)
-            job.completed_at = datetime.now(UTC)
+            job.completed_at = now_utc()
             logger.error(f"Composite job {job.id} execution failed: {e}")
 
             if self.database_manager:
@@ -799,7 +800,7 @@ class JobManager:
 
             job.status = "completed" if result.return_code == 0 else "failed"
             job.return_code = result.return_code
-            job.completed_at = datetime.now(UTC)
+            job.completed_at = now_utc()
 
             if result.error:
                 job.error = result.error
@@ -815,7 +816,7 @@ class JobManager:
         except Exception as e:
             job.status = "failed"
             job.error = str(e)
-            job.completed_at = datetime.now(UTC)
+            job.completed_at = now_utc()
             logger.error(f"Job {job.id} execution failed: {e}")
 
             self.safe_event_broadcaster.broadcast_event(
@@ -844,7 +845,7 @@ class JobManager:
                 task.status = "failed"
                 task.return_code = 1
                 task.error = "Repository not found"
-                task.completed_at = datetime.now(UTC)
+                task.completed_at = now_utc()
                 return False
 
             repository_path = repo_data.get("path") or params.get("repository_path")
@@ -878,7 +879,7 @@ class JobManager:
             if not isinstance(excludes, list):
                 excludes = []
             archive_name = params.get(
-                "archive_name", f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+                "archive_name", f"backup-{now_utc().strftime('%Y%m%d-%H%M%S')}"
             )
 
             logger.info(
@@ -979,7 +980,7 @@ class JobManager:
             task.status = "failed"
             task.return_code = 1
             task.error = f"Backup task failed: {str(e)}"
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return False
 
     async def _execute_prune_task(
@@ -998,7 +999,7 @@ class JobManager:
                 task.status = "failed"
                 task.return_code = 1
                 task.error = "Repository not found"
-                task.completed_at = datetime.now(UTC)
+                task.completed_at = now_utc()
                 return False
 
             repository_path = repo_data.get("path") or params.get("repository_path")
@@ -1064,7 +1065,7 @@ class JobManager:
             task.status = "failed"
             task.return_code = -1
             task.error = f"Prune task failed: {str(e)}"
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return False
 
     async def _execute_check_task(
@@ -1085,7 +1086,7 @@ class JobManager:
                 task.status = "failed"
                 task.return_code = 1
                 task.error = "Repository not found"
-                task.completed_at = datetime.now(UTC)
+                task.completed_at = now_utc()
                 return False
 
             repository_path = repo_data.get("path") or params.get("repository_path")
@@ -1136,7 +1137,7 @@ class JobManager:
 
             task.return_code = result.return_code
             task.status = "completed" if result.return_code == 0 else "failed"
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
 
             if result.stdout:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()
@@ -1174,7 +1175,7 @@ class JobManager:
             task.status = "failed"
             task.return_code = 1
             task.error = str(e)
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return False
 
     async def _execute_cloud_sync_task(
@@ -1192,7 +1193,7 @@ class JobManager:
             task.status = "failed"
             task.return_code = 1
             task.error = "Repository not found"
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return False
 
         repository_path = repo_data.get("path") or params.get("repository_path")
@@ -1203,14 +1204,14 @@ class JobManager:
             task.status = "failed"
             task.return_code = 1
             task.error = "Repository path is required for cloud sync"
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return False
 
         if not passphrase:
             task.status = "failed"
             task.return_code = 1
             task.error = "Repository passphrase is required for cloud sync"
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return False
 
         def task_output_callback(line: str) -> None:
@@ -1246,7 +1247,7 @@ class JobManager:
             logger.info("No cloud backup configuration - skipping cloud sync")
             task.status = "completed"
             task.return_code = 0
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             # Add output line for UI feedback
             task.output_lines.append("Cloud sync skipped - no configuration")
             asyncio.create_task(
@@ -1557,7 +1558,7 @@ class JobManager:
                 del self._processes[job_id]
 
         job.status = "cancelled"
-        job.completed_at = datetime.now(UTC)
+        job.completed_at = now_utc()
 
         if self.database_manager:
             await self.database_manager.update_job_status(
@@ -1763,7 +1764,7 @@ class JobManager:
             task_type=job_type,
             task_name=job_name,
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
 
         # Create a composite BorgJob (all jobs are now composite)
@@ -1772,7 +1773,7 @@ class JobManager:
             command=[],  # External jobs don't have direct commands
             job_type="composite",  # All jobs are now composite
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             repository_id=None,  # Can be set later if needed
             schedule=None,
             tasks=[main_task],  # Always has at least one task
@@ -1825,7 +1826,7 @@ class JobManager:
             job.return_code = return_code
 
         if status in ["completed", "failed"]:
-            job.completed_at = datetime.now(UTC)
+            job.completed_at = now_utc()
 
         # Update the main task status as well
         if job.tasks:
@@ -1836,7 +1837,7 @@ class JobManager:
             if return_code is not None:
                 main_task.return_code = return_code
             if status in ["completed", "failed"]:
-                main_task.completed_at = datetime.now(UTC)
+                main_task.completed_at = now_utc()
 
         # Broadcast status change event
         if old_status != status:

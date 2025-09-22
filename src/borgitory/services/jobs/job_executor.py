@@ -15,7 +15,7 @@ from borgitory.utils.security import build_secure_borg_command
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
@@ -126,7 +126,7 @@ class JobExecutor:
                     "deduplicated_size": int(match.group("deduplicated_size")),
                     "nfiles": int(match.group("nfiles")),
                     "path": match.group("path").strip(),
-                    "timestamp": datetime.now(UTC).isoformat(),
+                    "timestamp": now_utc().isoformat(),
                 }
 
             elif "Archive name:" in line:

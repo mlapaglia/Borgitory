@@ -15,7 +15,8 @@ import os
 import re
 import inspect
 from typing import Dict, List, Optional, Callable, Union, Protocol
-from datetime import datetime, UTC
+from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from dataclasses import dataclass
 from enum import Enum
 
@@ -64,7 +65,7 @@ class BackupConfig:
         if self.excludes is None:
             self.excludes = []
         if self.archive_name is None:
-            self.archive_name = f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+            self.archive_name = f"backup-{now_utc().strftime('%Y%m%d-%H%M%S')}"
 
 
 @dataclass
@@ -147,11 +148,11 @@ class BackupExecutor:
             status=BackupStatus.RUNNING,
             return_code=-1,
             output_lines=[],
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
 
         if not operation_id:
-            operation_id = f"backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+            operation_id = f"backup-{now_utc().strftime('%Y%m%d-%H%M%S')}"
 
         logger.info(
             f"Starting backup operation {operation_id} for repository {repository.name}"
@@ -177,7 +178,7 @@ class BackupExecutor:
 
             return_code = await process.wait()
             result.return_code = return_code
-            result.completed_at = datetime.now(UTC)
+            result.completed_at = now_utc()
 
             if return_code == 0:
                 result.status = BackupStatus.COMPLETED
@@ -202,7 +203,7 @@ class BackupExecutor:
         except Exception as e:
             result.status = BackupStatus.FAILED
             result.return_code = -1
-            result.completed_at = datetime.now(UTC)
+            result.completed_at = now_utc()
             result.error_message = f"Backup operation failed: {str(e)}"
             logger.error(f"Backup operation {operation_id} failed with exception: {e}")
             return result
@@ -234,11 +235,11 @@ class BackupExecutor:
             status=BackupStatus.RUNNING,
             return_code=-1,
             output_lines=[],
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
 
         if not operation_id:
-            operation_id = f"prune-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+            operation_id = f"prune-{now_utc().strftime('%Y%m%d-%H%M%S')}"
 
         logger.info(
             f"Starting prune operation {operation_id} for repository {repository.name}"
@@ -258,7 +259,7 @@ class BackupExecutor:
 
             return_code = await process.wait()
             result.return_code = return_code
-            result.completed_at = datetime.now(UTC)
+            result.completed_at = now_utc()
 
             if return_code == 0:
                 result.status = BackupStatus.COMPLETED
@@ -283,7 +284,7 @@ class BackupExecutor:
         except Exception as e:
             result.status = BackupStatus.FAILED
             result.return_code = -1
-            result.completed_at = datetime.now(UTC)
+            result.completed_at = now_utc()
             result.error_message = f"Prune operation failed: {str(e)}"
             logger.error(f"Prune operation {operation_id} failed with exception: {e}")
             return result
@@ -377,7 +378,7 @@ class BackupExecutor:
                     "deduplicated_size": int(match.group("deduplicated_size")),
                     "nfiles": int(match.group("nfiles")),
                     "path": match.group("path").strip(),
-                    "timestamp": datetime.now(UTC).isoformat(),
+                    "timestamp": now_utc().isoformat(),
                 }
 
             elif "Archive name:" in line:

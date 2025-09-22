@@ -1,7 +1,7 @@
 import inspect
 import json
 import logging
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from typing import Any, List, Dict, Callable, cast, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -206,7 +206,7 @@ class CloudSyncConfigService:
 
             config.provider_config = json.dumps(encrypted_config)
 
-        config.updated_at = datetime.now(UTC)
+        config.updated_at = now_utc()
         self.db.commit()
         self.db.refresh(config)
 
@@ -222,7 +222,7 @@ class CloudSyncConfigService:
         """Enable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
         config.enabled = True
-        config.updated_at = datetime.now(UTC)
+        config.updated_at = now_utc()
         self.db.commit()
         return config
 
@@ -230,7 +230,7 @@ class CloudSyncConfigService:
         """Disable a cloud sync configuration."""
         config = self.get_cloud_sync_config_by_id(config_id)
         config.enabled = False
-        config.updated_at = datetime.now(UTC)
+        config.updated_at = now_utc()
         self.db.commit()
         return config
 

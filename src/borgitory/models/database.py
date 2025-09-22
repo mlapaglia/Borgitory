@@ -3,7 +3,8 @@ import hashlib
 import logging
 import uuid
 import os
-from datetime import datetime, UTC
+from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from typing import List
 
 from cryptography.fernet import Fernet
@@ -58,9 +59,7 @@ class Repository(Base):
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
     encrypted_passphrase: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
 
     jobs: Mapped[List["Job"]] = relationship(
         "Job", back_populates="repository", cascade="all, delete-orphan"
@@ -166,9 +165,7 @@ class Schedule(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
     cloud_sync_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("cloud_sync_configs.id"), nullable=True
     )
@@ -203,9 +200,7 @@ class User(Base):
         String, unique=True, index=True, nullable=False
     )
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     sessions: Mapped[List["UserSession"]] = relationship(
@@ -233,12 +228,8 @@ class UserSession(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     remember_me: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
-    last_activity: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
+    last_activity: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
     user_agent: Mapped[str | None] = mapped_column(String, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String, nullable=True)
 
@@ -251,7 +242,7 @@ class Setting(Base):
     key: Mapped[str] = mapped_column(String, primary_key=True, index=True)
     value: Mapped[str] = mapped_column(String, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime, default=lambda: now_utc(), onupdate=lambda: now_utc()
     )
 
 
@@ -282,11 +273,9 @@ class CleanupConfig(Base):
     save_space: Mapped[bool] = mapped_column(Boolean, default=False)
 
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime, default=lambda: now_utc(), onupdate=lambda: now_utc()
     )
 
 
@@ -306,11 +295,9 @@ class NotificationConfig(Base):
 
     # Common fields
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime, default=lambda: now_utc(), onupdate=lambda: now_utc()
     )
 
 
@@ -331,11 +318,9 @@ class CloudSyncConfig(Base):
     # Common fields
     path_prefix: Mapped[str] = mapped_column(String, default="", nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime, default=lambda: now_utc(), onupdate=lambda: now_utc()
     )
 
 
@@ -365,11 +350,9 @@ class RepositoryCheckConfig(Base):
 
     # Metadata
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime, default=lambda: now_utc(), onupdate=lambda: now_utc()
     )
 
 

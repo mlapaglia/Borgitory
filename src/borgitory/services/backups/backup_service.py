@@ -10,7 +10,7 @@ the complex job orchestration system. It handles:
 """
 
 import logging
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, List, Optional, Union, Callable
 from sqlalchemy.orm import Session
 
@@ -121,7 +121,7 @@ class BackupService:
             # Update job as failed
             job.status = "failed"
             job.error = str(e)
-            job.finished_at = datetime.now(UTC)
+            job.finished_at = now_utc()
             self.db.commit()
 
             # Note: JobManager status updates are now handled by JobService
@@ -189,7 +189,7 @@ class BackupService:
             # Update job as failed
             job.status = "failed"
             job.error = str(e)
-            job.finished_at = datetime.now(UTC)
+            job.finished_at = now_utc()
             self.db.commit()
 
             # Note: JobManager status updates are now handled by JobService
@@ -297,7 +297,7 @@ class BackupService:
             job = self.db.query(Job).filter(Job.id == job_id).first()
             if job and job.status == "running":
                 job.status = "cancelled"
-                job.finished_at = datetime.now(UTC)
+                job.finished_at = now_utc()
                 job.error = "Job was cancelled by user"
                 self.db.commit()
                 logger.info(f"Job {job_id} was cancelled")
@@ -322,7 +322,7 @@ class BackupService:
         job.repository_id = repository.id
         job.type = job_type.value
         job.status = "running"
-        job.started_at = datetime.now(UTC)
+        job.started_at = now_utc()
         job.job_type = job_type.value  # For compatibility
         job.total_tasks = 1  # Will be updated if more tasks are added
         job.completed_tasks = 0
@@ -351,7 +351,7 @@ class BackupService:
         task.task_type = "backup"
         task.task_name = f"Backup {job.repository.name}"
         task.status = "running"
-        task.started_at = datetime.now(UTC)
+        task.started_at = now_utc()
         task.task_order = 0
 
         self.db.add(task)
@@ -367,7 +367,7 @@ class BackupService:
         task.task_type = "prune"
         task.task_name = f"Prune {job.repository.name}"
         task.status = "running"
-        task.started_at = datetime.now(UTC)
+        task.started_at = now_utc()
         task.task_order = 0
 
         self.db.add(task)
@@ -394,7 +394,7 @@ class BackupService:
         """Update task record with backup result"""
         task.status = "completed" if result.success else "failed"
         task.return_code = result.return_code
-        task.completed_at = result.completed_at or datetime.now(UTC)
+        task.completed_at = result.completed_at or now_utc()
 
         if result.error_message:
             task.error = result.error_message
@@ -441,7 +441,7 @@ class BackupService:
         failed_tasks = [t for t in tasks if t.status == "failed"]
 
         job.completed_tasks = len(completed_tasks)
-        job.finished_at = datetime.now(UTC)
+        job.finished_at = now_utc()
 
         if failed_tasks:
             job.status = "failed"

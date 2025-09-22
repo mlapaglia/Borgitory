@@ -6,7 +6,7 @@ import asyncio
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from pathlib import Path
-from datetime import datetime, timedelta, UTC
+from datetime import timedelta
 import tempfile
 import os
 
@@ -16,6 +16,7 @@ from borgitory.services.archives.archive_mount_manager import (
 )
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
+from borgitory.utils.datetime_utils import now_utc
 
 
 class TestArchiveMountManager:
@@ -184,8 +185,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=mount_point,
-            mounted_at=datetime.now(UTC) - timedelta(minutes=10),
-            last_accessed=datetime.now(UTC) - timedelta(minutes=5),
+            mounted_at=now_utc() - timedelta(minutes=10),
+            last_accessed=now_utc() - timedelta(minutes=5),
         )
         self.manager.active_mounts[mount_key] = existing_mount_info
 
@@ -322,8 +323,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=mount_point,
-            mounted_at=datetime.now(UTC),
-            last_accessed=datetime.now(UTC),
+            mounted_at=now_utc(),
+            last_accessed=now_utc(),
             job_executor_process=mock_process,
         )
         self.manager.active_mounts[mount_key] = mount_info
@@ -398,8 +399,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=test_mount_point,
-            mounted_at=datetime.now(UTC),
-            last_accessed=datetime.now(UTC) - timedelta(minutes=5),
+            mounted_at=now_utc(),
+            last_accessed=now_utc() - timedelta(minutes=5),
         )
         self.manager.active_mounts[mount_key] = mount_info
 
@@ -438,8 +439,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=test_mount_point,
-            mounted_at=datetime.now(UTC),
-            last_accessed=datetime.now(UTC),
+            mounted_at=now_utc(),
+            last_accessed=now_utc(),
         )
         self.manager.active_mounts[mount_key] = mount_info
 
@@ -463,8 +464,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=test_mount_point,
-            mounted_at=datetime.now(UTC),
-            last_accessed=datetime.now(UTC),
+            mounted_at=now_utc(),
+            last_accessed=now_utc(),
         )
         self.manager.active_mounts[mount_key] = mount_info
 
@@ -486,8 +487,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=test_mount_point,
-            mounted_at=datetime.now(UTC),
-            last_accessed=datetime.now(UTC),
+            mounted_at=now_utc(),
+            last_accessed=now_utc(),
         )
         self.manager.active_mounts[mount_key] = mount_info
 
@@ -515,9 +516,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=mount_point,
-            mounted_at=datetime.now(UTC) - timedelta(hours=2),
-            last_accessed=datetime.now(UTC)
-            - timedelta(hours=1),  # Older than mount_timeout
+            mounted_at=now_utc() - timedelta(hours=2),
+            last_accessed=now_utc() - timedelta(hours=1),  # Older than mount_timeout
             job_executor_process=mock_process,
         )
         self.manager.active_mounts[mount_key] = old_mount_info
@@ -541,8 +541,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=mount_point,
-            mounted_at=datetime.now(UTC) - timedelta(minutes=10),
-            last_accessed=datetime.now(UTC) - timedelta(minutes=1),  # Recent access
+            mounted_at=now_utc() - timedelta(minutes=10),
+            last_accessed=now_utc() - timedelta(minutes=1),  # Recent access
         )
         self.manager.active_mounts[mount_key] = recent_mount_info
 
@@ -567,8 +567,8 @@ class TestArchiveMountManager:
                 repository_path=f"/repo{i}",
                 archive_name=f"archive{i}",
                 mount_point=mount_point,
-                mounted_at=datetime.now(UTC),
-                last_accessed=datetime.now(UTC),
+                mounted_at=now_utc(),
+                last_accessed=now_utc(),
                 job_executor_process=mock_process,
             )
             self.manager.active_mounts[mount_key] = mount_info
@@ -590,8 +590,8 @@ class TestArchiveMountManager:
             repository_path="/path/to/repo",
             archive_name="test-archive",
             mount_point=mount_point,
-            mounted_at=datetime.now(UTC),
-            last_accessed=datetime.now(UTC),
+            mounted_at=now_utc(),
+            last_accessed=now_utc(),
         )
         self.manager.active_mounts[mount_key] = mount_info
 
@@ -612,7 +612,7 @@ class TestMountInfoDataclass:
 
     def test_mount_info_creation(self) -> None:
         """Test MountInfo dataclass creation."""
-        now = datetime.now(UTC)
+        now = now_utc()
         mount_point = Path("/test/mount")
 
         mount_info = MountInfo(
@@ -633,7 +633,7 @@ class TestMountInfoDataclass:
     def test_mount_info_with_process(self) -> None:
         """Test MountInfo with process."""
         mock_process = Mock()
-        now = datetime.now(UTC)
+        now = now_utc()
 
         mount_info = MountInfo(
             repository_path="/repo",

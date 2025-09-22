@@ -4,7 +4,8 @@ Job Database Manager - Handles database operations with dependency injection
 
 import logging
 from typing import Dict, List, Optional, Callable, TYPE_CHECKING, ContextManager
-from datetime import datetime, UTC
+from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
@@ -197,7 +198,7 @@ class JobDatabaseManager:
             from borgitory.models.database import Job
             from datetime import timedelta
 
-            cutoff_date = datetime.now(UTC) - timedelta(days=older_than_days)
+            cutoff_date = now_utc() - timedelta(days=older_than_days)
             cleaned_count = 0
 
             with self.db_session_factory() as db:
@@ -346,7 +347,7 @@ class JobDatabaseManager:
                 # Recent jobs (last 24 hours)
                 from datetime import timedelta
 
-                recent_cutoff = datetime.now(UTC) - timedelta(hours=24)
+                recent_cutoff = now_utc() - timedelta(hours=24)
                 recent_jobs = (
                     db.query(Job).filter(Job.started_at >= recent_cutoff).count()
                 )

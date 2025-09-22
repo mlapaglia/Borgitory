@@ -1,5 +1,6 @@
 import logging
-from datetime import datetime, UTC
+from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 import traceback
 from typing import Dict, List, Optional, Union, Callable, cast
 
@@ -68,7 +69,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
 
         # Update schedule last run
         logger.info("SCHEDULER: Updating schedule last run time")
-        schedule.last_run = datetime.now(UTC)
+        schedule.last_run = now_utc()
         db.commit()
 
         try:
