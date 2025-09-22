@@ -5,7 +5,7 @@ Job Event Broadcaster - Handles SSE streaming and event distribution
 import asyncio
 import logging
 from typing import Dict, List, AsyncGenerator, Optional, Union
-from datetime import datetime
+from datetime import datetime, UTC
 
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.services.jobs.broadcaster.job_event import JobEvent
@@ -99,7 +99,7 @@ class JobEventBroadcaster:
         # Store client metadata
         self._client_queue_metadata[queue] = {
             "client_id": client_id or f"client_{len(self._client_queues)}",
-            "connected_at": datetime.now(),
+            "connected_at": datetime.now(UTC),
             "events_sent": 0,
         }
 
@@ -206,7 +206,7 @@ class JobEventBroadcaster:
                         connected_at = metadata.get("connected_at")
                         if isinstance(connected_at, datetime):
                             connected_duration = (
-                                datetime.now() - connected_at
+                                datetime.now(UTC) - connected_at
                             ).total_seconds()
                         else:
                             connected_duration = 0

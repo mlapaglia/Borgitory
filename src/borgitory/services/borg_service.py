@@ -237,7 +237,7 @@ class BorgService:
 
         try:
             validate_compression(compression)
-            archive_name = f"backup-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+            archive_name = f"backup-{datetime.now(UTC).strftime('%Y-%m-%d_%H-%M-%S')}"
             validate_archive_name(archive_name)
         except Exception as e:
             raise Exception(f"Validation failed: {str(e)}")

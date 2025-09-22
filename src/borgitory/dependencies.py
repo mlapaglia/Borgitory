@@ -56,6 +56,10 @@ from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
 from borgitory.services.cloud_providers import StorageFactory
+from borgitory.utils.datetime_utils import (
+    format_datetime_for_display,
+    get_server_timezone,
+)
 from borgitory.services.encryption_service import EncryptionService
 
 if TYPE_CHECKING:
@@ -365,12 +369,21 @@ def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
 @lru_cache()
 def get_templates() -> Jinja2Templates:
     """
-    Provide a Jinja2Templates singleton instance.
+    Provide a Jinja2Templates singleton instance with custom filters.
 
     Uses FastAPI's built-in caching for singleton behavior.
     """
     template_path = get_template_directory()
-    return Jinja2Templates(directory=template_path)
+    templates = Jinja2Templates(directory=template_path)
+
+    # Add custom datetime filters
+    def datetime_filter(dt, format_str="%Y-%m-%d %H:%M:%S"):
+        """Jinja2 filter for datetime formatting with timezone conversion"""
+        return format_datetime_for_display(dt, format_str, get_server_timezone())
+
+    templates.env.filters["format_datetime"] = datetime_filter
+
+    return templates
 
 
 @lru_cache()

@@ -16,8 +16,8 @@
     {% set task_status_icon = "◦" %}
 {% endif %}
 
-{% set task_started = task.started_at.strftime("%H:%M:%S") if task.started_at else "N/A" %}
-{% set task_finished = task.completed_at.strftime("%H:%M:%S") if task.completed_at else "N/A" %}
+{% set task_started = task.started_at | format_datetime("%H:%M:%S") if task.started_at else "N/A" %}
+{% set task_finished = task.completed_at | format_datetime("%H:%M:%S") if task.completed_at else "N/A" %}
 
 {% set task_duration = "" %}
 {% if task.started_at and task.completed_at %}

@@ -317,11 +317,11 @@ class RcloneService:
     ) -> ConnectionTestResult:
         """Test write permissions by creating and deleting a small test file"""
         try:
-            from datetime import datetime
+            from datetime import datetime, UTC
 
-            test_content = f"borgitory-test-{datetime.now().isoformat()}"
+            test_content = f"borgitory-test-{datetime.now(UTC).isoformat()}"
             test_filename = (
-                f"borgitory-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
+                f"borgitory-test-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}.txt"
             )
 
             with tempfile.NamedTemporaryFile(
@@ -682,11 +682,11 @@ class RcloneService:
         temp_file_path = None
 
         try:
-            from datetime import datetime
+            from datetime import datetime, UTC
 
-            test_content = f"borgitory-test-{datetime.now().isoformat()}"
+            test_content = f"borgitory-test-{datetime.now(UTC).isoformat()}"
             test_filename = (
-                f"borgitory-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
+                f"borgitory-test-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}.txt"
             )
 
             with tempfile.NamedTemporaryFile(

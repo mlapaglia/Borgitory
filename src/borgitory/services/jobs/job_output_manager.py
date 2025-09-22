@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections import deque
 from typing import Dict, List, Optional, AsyncGenerator
-from datetime import datetime
+from datetime import datetime, UTC
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class JobOutputManager:
         async with self._output_locks[job_id]:
             output_line = OutputLine(
                 text=text,
-                timestamp=datetime.now().isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 type=line_type,
                 metadata=progress_info or {},
             )

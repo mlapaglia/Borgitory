@@ -487,12 +487,16 @@ async def list_archives_html(
                     formatted_time = archive_time
                     if archive_time:
                         try:
-                            from datetime import datetime
-
-                            dt = datetime.fromisoformat(
-                                archive_time.replace("Z", "+00:00")
+                            from borgitory.utils.datetime_utils import (
+                                parse_datetime_string,
+                                format_datetime_for_display,
                             )
-                            formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+
+                            dt = parse_datetime_string(archive_time)
+                            if dt:
+                                formatted_time = format_datetime_for_display(dt)
+                            else:
+                                formatted_time = archive_time
                         except (ValueError, TypeError):
                             pass
 

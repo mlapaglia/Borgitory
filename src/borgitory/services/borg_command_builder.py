@@ -3,7 +3,7 @@ BorgCommandBuilder - Handles Borg command construction and validation
 """
 
 import logging
-from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, List, Optional, Tuple
 
 from borgitory.models.database import Repository
@@ -45,7 +45,7 @@ class BorgCommandBuilder:
             validate_compression(compression)
 
             if archive_name is None:
-                archive_name = f"backup-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+                archive_name = f"backup-{now_utc().strftime('%Y-%m-%d_%H-%M-%S')}"
 
             validate_archive_name(archive_name)
         except Exception as e:
@@ -318,7 +318,7 @@ class BorgCommandBuilder:
 
     def generate_archive_name(self, prefix: str = "backup") -> str:
         """Generate a timestamped archive name"""
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = now_utc().strftime("%Y-%m-%d_%H-%M-%S")
         archive_name = f"{prefix}-{timestamp}"
 
         try:
@@ -327,7 +327,7 @@ class BorgCommandBuilder:
         except Exception as e:
             # Fallback to basic name if validation fails
             logger.warning(f"Generated archive name validation failed: {e}")
-            return f"backup-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            return f"backup-{now_utc().strftime('%Y%m%d_%H%M%S')}"
 
     def validate_command_parameters(
         self,

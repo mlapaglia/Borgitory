@@ -1,9 +1,10 @@
 """Service for processing and formatting upcoming backup jobs."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Union
 
 from .cron_description_service import CronDescriptionService
+from borgitory.utils.datetime_utils import parse_datetime_string, now_utc
 
 
 def format_time_until(time_diff_ms: int) -> str:
@@ -85,13 +86,7 @@ class UpcomingBackupsService:
             return next_run_raw
 
         if isinstance(next_run_raw, str):
-            try:
-                return datetime.fromisoformat(next_run_raw.replace("Z", "+00:00"))
-            except (ValueError, TypeError):
-                try:
-                    return datetime.fromisoformat(next_run_raw)
-                except (ValueError, TypeError):
-                    return None
+            return parse_datetime_string(next_run_raw)
 
         return None
 
@@ -99,7 +94,7 @@ class UpcomingBackupsService:
         """Calculate time until next run."""
         now = datetime.now()
         if next_run.tzinfo:
-            now = datetime.now(timezone.utc)
+            now = now_utc()
 
         time_diff_seconds = (next_run - now).total_seconds()
         time_diff_ms = int(time_diff_seconds * 1000)
