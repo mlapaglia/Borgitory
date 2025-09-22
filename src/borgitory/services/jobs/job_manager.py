@@ -890,6 +890,10 @@ class JobManager:
             additional_args.extend(["--stats", "--list"])
             additional_args.extend(["--filter", "AME"])
 
+            dry_run = params.get("dry_run", False)
+            if dry_run:
+                additional_args.append("--dry-run")
+
             for exclude in excludes:
                 additional_args.extend(["--exclude", exclude])
 
