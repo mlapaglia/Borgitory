@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, UTC
+import traceback
 from typing import Dict, List, Optional, Union, Callable, cast
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -103,7 +104,6 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             logger.error(
                 f"SCHEDULER: Error creating job for schedule {schedule_id}: {str(e)}"
             )
-            import traceback
 
             logger.error(f"SCHEDULER: Traceback: {traceback.format_exc()}")
             raise

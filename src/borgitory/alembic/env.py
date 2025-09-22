@@ -61,13 +61,17 @@ def include_object(
     # Ignore anything related to apscheduler - it's managed by APScheduler
     if name and "apscheduler" in name.lower():
         return False
-    
+
     # Specifically ignore apscheduler_jobs table and related objects
     if type_ == "table" and name == "apscheduler_jobs":
         return False
-    
+
     # Ignore indexes on apscheduler tables
-    if type_ == "index" and name and ("apscheduler" in name.lower() or "ix_apscheduler" in name.lower()):
+    if (
+        type_ == "index"
+        and name
+        and ("apscheduler" in name.lower() or "ix_apscheduler" in name.lower())
+    ):
         return False
 
     # Include all other objects

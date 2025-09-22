@@ -5,6 +5,7 @@ Handles all schedule-related business operations independent of HTTP concerns.
 
 import logging
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
+from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Schedule, Repository
@@ -32,8 +33,6 @@ class ScheduleService:
             tuple: (is_valid, error_message)
         """
         try:
-            from apscheduler.triggers.cron import CronTrigger
-
             CronTrigger.from_crontab(cron_expression)
             return True, None
         except ValueError as e:
