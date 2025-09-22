@@ -138,7 +138,7 @@ class RetentionFieldHandler:
                 keep_within = config_or_params.get("keep_within")
 
             if keep_within:
-                args.extend(["--keep-within", keep_within])
+                args.extend(["--keep-within", str(keep_within)])
 
         for field in RETENTION_FIELDS:
             value = None
@@ -341,7 +341,7 @@ def validate_retention_values(
     Raises:
         ValueError: If any retention value is invalid
     """
-    result = {}
+    result: Dict[str, Optional[int]] = {}
     for field in RETENTION_FIELDS:
         key = f"keep_{field}"
         value = retention_values.get(key)

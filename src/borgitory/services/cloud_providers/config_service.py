@@ -11,7 +11,7 @@ from typing import Optional, Callable, Dict, cast
 from abc import ABC, abstractmethod
 
 from .types import CloudSyncConfig
-from borgitory.types import ConfigDict
+from borgitory.custom_types import ConfigDict
 
 logger = logging.getLogger(__name__)
 

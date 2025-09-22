@@ -219,7 +219,6 @@ class BorgCommandBuilder:
         """Build command to prune old archives from a repository"""
         additional_args = []
 
-        # Add retention parameters using consolidated handler
         retention_args = RetentionFieldHandler.build_borg_args_explicit(
             keep_within=keep_within,
             keep_secondly=keep_secondly,

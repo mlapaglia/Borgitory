@@ -95,7 +95,6 @@ class TaskDefinitionBuilder:
         if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
             task["keep_within"] = f"{cleanup_config.keep_within_days}d"
         elif cleanup_config.strategy == "advanced":
-            # Add retention fields using consolidated handler
             retention_dict = RetentionFieldHandler.to_dict(cleanup_config)
             task.update(retention_dict)
 
@@ -128,7 +127,6 @@ class TaskDefinitionBuilder:
         if prune_request.strategy == "simple" and prune_request.keep_within_days:
             task["keep_within"] = f"{prune_request.keep_within_days}d"
         elif prune_request.strategy == "advanced":
-            # Add retention fields using consolidated handler
             retention_dict = RetentionFieldHandler.to_dict(prune_request)
             task.update(retention_dict)
 

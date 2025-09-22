@@ -10,6 +10,9 @@ import re
 import inspect
 from typing import Dict, List, Optional, Callable, Coroutine, TYPE_CHECKING, cast
 
+from borgitory.constants.retention import RetentionFieldHandler
+from borgitory.utils.security import build_secure_borg_command
+
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 from datetime import datetime
@@ -18,7 +21,7 @@ from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.cloud_providers.service import StorageFactory
 from borgitory.services.encryption_service import EncryptionService
-from borgitory.types import ConfigDict
+from borgitory.custom_types import ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -242,12 +245,8 @@ class JobExecutor:
             ProcessResult with execution details
         """
         try:
-            from borgitory.utils.security import build_secure_borg_command
-            from borgitory.constants.retention import RetentionFieldHandler
-
             additional_args = []
 
-            # Add retention parameters using consolidated handler
             retention_args = RetentionFieldHandler.build_borg_args_explicit(
                 keep_within=keep_within,
                 keep_secondly=keep_secondly,
@@ -363,7 +362,6 @@ class JobExecutor:
                 try:
                     from borgitory.models.database import Repository
 
-                    # Build provider configuration from JSON
                     if not config.provider_config:
                         raise ValueError(
                             f"Cloud sync configuration '{config.name}' has no provider_config. "

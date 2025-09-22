@@ -26,7 +26,7 @@ from .storage import CloudStorage
 from .registry import get_config_class, get_storage_class, get_supported_providers
 from .orchestration import CloudSyncer, LoggingSyncEventHandler
 from borgitory.services.encryption_service import EncryptionService
-from borgitory.types import ConfigDict
+from borgitory.custom_types import ConfigDict
 
 logger = logging.getLogger(__name__)
 

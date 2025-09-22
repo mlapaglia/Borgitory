@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Dict
 from datetime import datetime, UTC
-from borgitory.types import ConfigDict
+from borgitory.custom_types import ConfigDict
 
 
 class SyncEventType(Enum):

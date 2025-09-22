@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import CloudSyncConfig
-from borgitory.types import ConfigDict
+from borgitory.custom_types import ConfigDict
 from borgitory.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
