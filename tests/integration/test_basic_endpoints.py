@@ -7,7 +7,7 @@ import json
 from .test_app_startup import AppRunner
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def app_runner_module(temp_data_dir):
     """Create a single AppRunner instance for all tests in this module."""
     runner = AppRunner(temp_data_dir)
