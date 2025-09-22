@@ -52,6 +52,8 @@ class TestJobManagerFactory:
 
         deps = JobManagerFactory.create_dependencies(config=config)
 
+        assert deps.queue_manager is not None
+        assert deps.output_manager is not None
         assert deps.queue_manager.max_concurrent_backups == 10
         assert deps.output_manager.max_lines_per_job == 2000
 
@@ -95,6 +97,8 @@ class TestJobManagerFactory:
         deps = JobManagerFactory.create_minimal()
 
         assert deps is not None
+        assert deps.queue_manager is not None
+        assert deps.output_manager is not None
         # Should have reduced limits
         assert deps.queue_manager.max_concurrent_backups == 1
         assert deps.output_manager.max_lines_per_job == 100
@@ -414,7 +418,82 @@ class TestJobManagerTaskExecution:
         assert success is False
         assert task.status == "failed"
         assert task.return_code == 2
+        assert task.error is not None
         assert "Backup failed" in task.error
+
+    @pytest.mark.asyncio
+    async def test_execute_backup_task_with_dry_run(
+        self, job_manager_with_db, sample_repository
+    ) -> None:
+        """Test backup task execution with dry_run flag"""
+        job_id = str(uuid.uuid4())
+        task = BorgJobTask(
+            task_type="backup",
+            task_name="Test Backup Dry Run",
+            parameters={
+                "source_path": "/tmp",
+                "excludes": ["*.log"],
+                "archive_name": "test-archive-dry",
+                "dry_run": True,  # This is the key parameter we're testing
+            },
+        )
+
+        job = BorgJob(
+            id=job_id,
+            job_type="composite",
+            status="running",
+            started_at=datetime.now(UTC),
+            tasks=[task],
+            repository_id=sample_repository.id,
+        )
+        job_manager_with_db.jobs[job_id] = job
+        job_manager_with_db.output_manager.create_job_output(job_id)
+
+        # Mock process execution and repository data
+        mock_process = AsyncMock()
+        result = ProcessResult(
+            return_code=0,
+            stdout=b"Archive would be created (dry run)",
+            stderr=b"",
+            error=None,
+        )
+
+        # Capture the actual command built to verify --dry-run flag is included
+        captured_command = None
+
+        def capture_command(base_command, repository_path, passphrase, additional_args):
+            nonlocal captured_command
+            captured_command = [base_command] + additional_args
+            return (captured_command, {"BORG_PASSPHRASE": passphrase})
+
+        with patch(
+            "borgitory.utils.security.build_secure_borg_command",
+            side_effect=capture_command,
+        ), patch.object(
+            job_manager_with_db.executor, "start_process", return_value=mock_process
+        ), patch.object(
+            job_manager_with_db.executor, "monitor_process_output", return_value=result
+        ), patch.object(
+            job_manager_with_db,
+            "_get_repository_data",
+            return_value={
+                "id": sample_repository.id,
+                "path": "/tmp/test-repo",
+                "passphrase": "test-passphrase",
+            },
+        ):
+            success = await job_manager_with_db._execute_backup_task(job, task)
+
+        # Verify the task completed successfully
+        assert success is True
+        assert task.status == "completed"
+        assert task.return_code == 0
+
+        # Verify that the --dry-run flag was included in the command
+        assert captured_command is not None
+        assert "--dry-run" in captured_command, (
+            f"Expected --dry-run in command: {captured_command}"
+        )
 
     @pytest.mark.asyncio
     async def test_execute_prune_task_success(self, job_manager_with_db) -> None:
@@ -680,6 +759,7 @@ class TestJobManagerTaskExecution:
         assert success is False
         assert task.status == "failed"
         assert task.return_code == 1
+        assert task.error is not None
         assert "No notification configuration" in task.error
 
     @pytest.mark.asyncio
@@ -703,6 +783,7 @@ class TestJobManagerTaskExecution:
         assert success is False
         assert task.status == "failed"
         assert task.return_code == 1
+        assert task.error is not None
         assert "Unknown task type: unknown_task" in task.error
 
 
