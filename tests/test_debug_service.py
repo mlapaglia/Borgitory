@@ -191,10 +191,10 @@ class TestDebugService:
         test_time = datetime(2023, 1, 1, 12, 0, 0)
 
         with patch("os.getenv") as mock_getenv, patch(
-            "borgitory.services.debug_service.datetime"
-        ) as mock_datetime, patch("os.getcwd", return_value="/test/dir"):
+            "borgitory.services.debug_service.now_utc"
+        ) as mock_now_utc, patch("os.getcwd", return_value="/test/dir"):
             mock_getenv.return_value = "false"
-            mock_datetime.now.return_value = test_time
+            mock_now_utc.return_value = test_time
 
             result = await debug_service._get_application_info()
 
@@ -209,9 +209,9 @@ class TestDebugService:
     async def test_get_application_info_debug_mode_true(self, debug_service) -> None:
         """Test application info with debug mode enabled"""
         with patch("os.getenv", return_value="TRUE"), patch(
-            "borgitory.services.debug_service.datetime"
-        ) as mock_datetime, patch("os.getcwd", return_value="/test/dir"):
-            mock_datetime.now.return_value = datetime(2023, 1, 1, 12, 0, 0)
+            "borgitory.services.debug_service.now_utc"
+        ) as mock_now_utc, patch("os.getcwd", return_value="/test/dir"):
+            mock_now_utc.return_value = datetime(2023, 1, 1, 12, 0, 0)
 
             result = await debug_service._get_application_info()
 

@@ -61,6 +61,7 @@ from borgitory.utils.datetime_utils import (
     get_server_timezone,
 )
 from borgitory.services.encryption_service import EncryptionService
+from datetime import datetime
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncConfigService
@@ -377,7 +378,7 @@ def get_templates() -> Jinja2Templates:
     templates = Jinja2Templates(directory=template_path)
 
     # Add custom datetime filters
-    def datetime_filter(dt, format_str="%Y-%m-%d %H:%M:%S"):
+    def datetime_filter(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
         """Jinja2 filter for datetime formatting with timezone conversion"""
         return format_datetime_for_display(dt, format_str, get_server_timezone())
 
