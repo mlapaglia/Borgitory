@@ -467,8 +467,9 @@ class TestJobManagerTaskExecution:
             return (captured_command, {"BORG_PASSPHRASE": passphrase})
 
         with patch(
-            "borgitory.utils.security.build_secure_borg_command", side_effect=capture_command
-        ) as mock_build, patch.object(
+            "borgitory.utils.security.build_secure_borg_command",
+            side_effect=capture_command,
+        ), patch.object(
             job_manager_with_db.executor, "start_process", return_value=mock_process
         ), patch.object(
             job_manager_with_db.executor, "monitor_process_output", return_value=result
@@ -490,7 +491,9 @@ class TestJobManagerTaskExecution:
 
         # Verify that the --dry-run flag was included in the command
         assert captured_command is not None
-        assert "--dry-run" in captured_command, f"Expected --dry-run in command: {captured_command}"
+        assert "--dry-run" in captured_command, (
+            f"Expected --dry-run in command: {captured_command}"
+        )
 
     @pytest.mark.asyncio
     async def test_execute_prune_task_success(self, job_manager_with_db) -> None:
