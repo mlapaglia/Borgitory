@@ -10,6 +10,7 @@ from borgitory.utils.datetime_utils import (
     parse_datetime_string,
     get_server_timezone,
     format_datetime_for_display,
+    parse_timezone_offset,
     now_utc,
     ensure_utc,
 )
@@ -311,3 +312,60 @@ class TestIntegration:
 
         # Should be converted to UTC and formatted
         assert formatted == "2023-01-15 09:30:45"  # 14:30+05:00 = 09:30 UTC
+
+
+class TestBrowserTimezone:
+    """Test browser timezone functionality"""
+
+    def test_parse_timezone_offset_edt(self) -> None:
+        """Test parsing EDT timezone offset (240 minutes)"""
+        tz = parse_timezone_offset(240)  # EDT is UTC-4, JS returns +240
+        expected_offset = timedelta(hours=-4)
+        assert tz.utcoffset(None) == expected_offset
+
+    def test_parse_timezone_offset_utc(self) -> None:
+        """Test parsing UTC timezone offset (0 minutes)"""
+        tz = parse_timezone_offset(0)
+        expected_offset = timedelta(0)
+        assert tz.utcoffset(None) == expected_offset
+
+    def test_parse_timezone_offset_ahead_utc(self) -> None:
+        """Test parsing timezone ahead of UTC (negative JS offset)"""
+        tz = parse_timezone_offset(-120)  # UTC+2, JS returns -120
+        expected_offset = timedelta(hours=2)
+        assert tz.utcoffset(None) == expected_offset
+
+    def test_format_datetime_for_display_with_browser_offset_edt(self) -> None:
+        """Test formatting datetime with EDT browser timezone offset"""
+        dt = datetime(2025, 9, 22, 17, 53, tzinfo=UTC)
+        result = format_datetime_for_display(dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=240)  # EDT
+        assert result == "2025-09-22 13:53"  # 17:53 UTC - 4 hours = 13:53 EDT
+
+    def test_format_datetime_for_display_with_browser_offset_utc(self) -> None:
+        """Test formatting datetime with UTC browser timezone offset"""
+        dt = datetime(2025, 9, 22, 17, 53, tzinfo=UTC)
+        result = format_datetime_for_display(dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=0)  # UTC
+        assert result == "2025-09-22 17:53"  # No change
+
+    def test_format_datetime_for_display_with_browser_offset_cet(self) -> None:
+        """Test formatting datetime with CET browser timezone offset"""
+        dt = datetime(2025, 9, 22, 17, 53, tzinfo=UTC)
+        result = format_datetime_for_display(dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=-60)  # CET
+        assert result == "2025-09-22 18:53"  # 17:53 UTC + 1 hour = 18:53 CET
+
+    def test_format_datetime_for_display_with_browser_offset_none_input(self) -> None:
+        """Test formatting None datetime with browser timezone offset"""
+        result = format_datetime_for_display(None, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=240)
+        assert result == "N/A"
+
+    def test_format_datetime_for_display_browser_offset_precedence(self) -> None:
+        """Test that browser timezone offset takes precedence over target_timezone"""
+        dt = datetime(2025, 9, 22, 17, 53, tzinfo=UTC)
+        cet_tz = timezone(timedelta(hours=1))
+        # Browser offset should override target_timezone
+        result = format_datetime_for_display(
+            dt, "%Y-%m-%d %H:%M", 
+            target_timezone=cet_tz,  # Would give 18:53
+            browser_tz_offset_minutes=240  # Should give 13:53 (EDT)
+        )
+        assert result == "2025-09-22 13:53"  # Browser offset wins

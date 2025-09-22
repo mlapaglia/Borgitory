@@ -45,7 +45,7 @@ def get_server_timezone() -> timezone:
     Get the server's configured timezone.
 
     Can be overridden with BORGITORY_TIMEZONE environment variable.
-    Defaults to system timezone if available, otherwise UTC.
+    Defaults to UTC for consistency.
 
     Returns:
         Timezone object
@@ -74,6 +74,7 @@ def format_datetime_for_display(
     dt: datetime,
     format_str: str = "%Y-%m-%d %H:%M:%S",
     target_timezone: Optional[timezone] = None,
+    browser_tz_offset_minutes: Optional[int] = None,
 ) -> str:
     """
     Format datetime for display, handling timezone conversion.
@@ -82,6 +83,7 @@ def format_datetime_for_display(
         dt: Datetime object to format
         format_str: Format string for strftime
         target_timezone: Target timezone for display (defaults to server timezone)
+        browser_tz_offset_minutes: Browser timezone offset in minutes (takes precedence over target_timezone)
 
     Returns:
         Formatted datetime string in target timezone
@@ -89,7 +91,10 @@ def format_datetime_for_display(
     if not dt:
         return "N/A"
 
-    if target_timezone is None:
+    # If browser timezone offset is provided, use it instead of target_timezone
+    if browser_tz_offset_minutes is not None:
+        target_timezone = parse_timezone_offset(browser_tz_offset_minutes)
+    elif target_timezone is None:
         target_timezone = get_server_timezone()
 
     # Ensure datetime is UTC-aware
@@ -110,6 +115,27 @@ def now_utc() -> datetime:
         Current datetime with UTC timezone
     """
     return datetime.now(UTC)
+
+
+def parse_timezone_offset(tz_offset_minutes: int) -> timezone:
+    """
+    Parse timezone offset in minutes to timezone object.
+    
+    Args:
+        tz_offset_minutes: Timezone offset in minutes (e.g., -240 for EDT)
+        
+    Returns:
+        Timezone object
+    """
+    # Convert minutes to hours and minutes
+    hours = abs(tz_offset_minutes) // 60
+    minutes = abs(tz_offset_minutes) % 60
+    
+    # Create timedelta (negative offset means behind UTC)
+    sign = -1 if tz_offset_minutes > 0 else 1  # JavaScript getTimezoneOffset() is inverted
+    offset = timedelta(hours=sign * hours, minutes=sign * minutes)
+    
+    return timezone(offset)
 
 
 def ensure_utc(dt: Union[datetime, str, None]) -> Optional[datetime]:

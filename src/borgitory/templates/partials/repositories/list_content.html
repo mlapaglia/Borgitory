@@ -8,7 +8,7 @@
                 <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ repo.name }}</h4>
                 <p class="text-sm text-gray-600 dark:text-gray-300">{{ repo.path }}</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Created: {{ repo.created_at | format_datetime("%Y-%m-%d %H:%M") if repo.created_at else "Unknown" }}
+                    Created: {{ repo.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) if repo.created_at else "Unknown" }}
                 </p>
             </div>
             <div class="flex space-x-2">

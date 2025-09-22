@@ -128,6 +128,32 @@
 
     <div id="notification-area" class="fixed top-4 right-4 z-50"></div>
 
+    <!-- Timezone Detection Script -->
+    <script>
+        function getBrowserTimezoneOffset() {
+            return new Date().getTimezoneOffset();
+        }
+        
+        function setupTimezoneHeaders() {
+            const timezoneOffset = getBrowserTimezoneOffset();
+            
+            // Set on HTMX default headers
+            if (typeof htmx !== 'undefined') {
+                htmx.config.defaultHeaders = htmx.config.defaultHeaders || {};
+                htmx.config.defaultHeaders['X-Browser-Timezone-Offset'] = timezoneOffset.toString();
+            }
+        }
+        
+        // Set up timezone headers when DOM is ready
+        document.addEventListener('DOMContentLoaded', setupTimezoneHeaders);
+        
+        // Also set headers before each HTMX request
+        document.addEventListener('htmx:configRequest', function(evt) {
+            const timezoneOffset = getBrowserTimezoneOffset();
+            evt.detail.headers['X-Browser-Timezone-Offset'] = timezoneOffset.toString();
+        });
+    </script>
+
     <!-- Component JavaScript Files -->
     <script src="/static/js/app.js"></script>
     <script src="/static/js/components/navigation.js"></script>
