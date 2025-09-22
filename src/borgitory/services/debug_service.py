@@ -159,7 +159,9 @@ class DebugService:
         try:
             app_info: ApplicationInfo = {
                 "borgitory_version": self.environment.get_env("BORGITORY_VERSION"),
-                "debug_mode": self.environment.get_env("DEBUG", "false").lower()
+                "debug_mode": (
+                    self.environment.get_env("DEBUG", "false") or "false"
+                ).lower()
                 == "true",
                 "startup_time": self.environment.now_utc().isoformat(),
                 "working_directory": self.environment.get_cwd(),
