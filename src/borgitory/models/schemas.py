@@ -303,8 +303,12 @@ class CleanupConfigBase(BaseModel):
     keep_within_days: Optional[int] = Field(
         None, gt=0, description="Days to keep (simple strategy)"
     )
-    keep_secondly: Optional[int] = Field(None, ge=0, description="Secondly backups to keep")
-    keep_minutely: Optional[int] = Field(None, ge=0, description="Minutely backups to keep")
+    keep_secondly: Optional[int] = Field(
+        None, ge=0, description="Secondly backups to keep"
+    )
+    keep_minutely: Optional[int] = Field(
+        None, ge=0, description="Minutely backups to keep"
+    )
     keep_hourly: Optional[int] = Field(None, ge=0, description="Hourly backups to keep")
     keep_daily: Optional[int] = Field(None, ge=0, description="Daily backups to keep")
     keep_weekly: Optional[int] = Field(None, ge=0, description="Weekly backups to keep")

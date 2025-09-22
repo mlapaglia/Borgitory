@@ -1,7 +1,7 @@
 import os
 import sys
 from logging.config import fileConfig
-from typing import Any, Optional, Literal
+from typing import Optional, Literal
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -39,22 +39,29 @@ target_metadata = Base.metadata
 
 
 def include_object(
-    object: SchemaItem, 
-    name: Optional[str], 
-    type_: Literal['schema', 'table', 'column', 'index', 'unique_constraint', 'foreign_key_constraint'], 
-    reflected: bool, 
-    compare_to: Optional[SchemaItem]
+    object: SchemaItem,
+    name: Optional[str],
+    type_: Literal[
+        "schema",
+        "table",
+        "column",
+        "index",
+        "unique_constraint",
+        "foreign_key_constraint",
+    ],
+    reflected: bool,
+    compare_to: Optional[SchemaItem],
 ) -> bool:
     """
     Filter function to exclude certain objects from autogenerate.
-    
+
     This function is called for every object that Alembic considers
     for inclusion in a migration.
     """
     # Ignore apscheduler_jobs table - it's managed by APScheduler
     if type_ == "table" and name == "apscheduler_jobs":
         return False
-    
+
     # Include all other objects
     return True
 
