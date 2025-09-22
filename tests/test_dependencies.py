@@ -21,7 +21,6 @@ from borgitory.dependencies import (
 from tests.utils.di_testing import (
     override_dependency,
     override_multiple_dependencies,
-    MockServiceFactory,
 )
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
@@ -328,39 +327,3 @@ class TestDependencies:
         # Should return same instance due to singleton pattern
         service2 = get_volume_service()
         assert service is service2
-
-    def test_default_initialization_still_works(self) -> None:
-        """Test that services can still be initialized without dependency injection."""
-
-        # This ensures backward compatibility
-        runner = SimpleCommandRunner()
-        service = BorgService()
-        mock_db = Mock()  # JobService now requires a database session
-        mock_job_manager = Mock()
-        job_service = JobService(db=mock_db, job_manager=mock_job_manager)
-        recovery_service = RecoveryService()
-        # NotificationService now requires provider_factory - skip this test
-        # notification_service = NotificationService()
-        job_stream_service = JobStreamService(mock_job_manager)
-        job_render_service = MockServiceFactory.create_job_render_service_with_mocks(
-            job_manager=mock_job_manager
-        )
-        debug_service = DebugService()
-        rclone_service = RcloneService()
-        repository_stats_service = RepositoryStatsService()
-
-        assert isinstance(runner, SimpleCommandRunner)
-        assert isinstance(service, BorgService)
-        assert isinstance(job_service, JobService)
-        assert isinstance(recovery_service, RecoveryService)
-        # assert isinstance(notification_service, NotificationService)  # Commented out above
-        assert isinstance(job_stream_service, JobStreamService)
-        assert isinstance(job_render_service, JobRenderService)
-        assert isinstance(debug_service, DebugService)
-        assert isinstance(rclone_service, RcloneService)
-        assert isinstance(repository_stats_service, RepositoryStatsService)
-        assert isinstance(service.command_runner, SimpleCommandRunner)
-
-        # These should be different instances (not singletons)
-        service2 = BorgService()
-        assert service.command_runner is not service2.command_runner

@@ -32,6 +32,7 @@ from borgitory.services.jobs.job_stream_service import JobStreamService
 from borgitory.services.jobs.job_render_service import JobRenderService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.debug_service import DebugService
+from borgitory.protocols.environment_protocol import DefaultEnvironment
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
@@ -645,7 +646,11 @@ def get_debug_service(
     Provide a DebugService instance with proper dependency injection.
     Uses FastAPI DI with automatic dependency resolution.
     """
-    return DebugService(volume_service=volume_service, job_manager=job_manager)
+    return DebugService(
+        volume_service=volume_service,
+        job_manager=job_manager,
+        environment=DefaultEnvironment(),
+    )
 
 
 def get_repository_service(
