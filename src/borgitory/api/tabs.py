@@ -108,13 +108,15 @@ async def get_cloud_sync_tab(
 
 @router.get("/archives", response_class=HTMLResponse)
 async def get_archives_tab(
-    request: Request, current_user: User = Depends(get_current_user)
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    preselect_repo: str = "",
 ) -> HTMLResponse:
     return _render_tab_with_nav(
         request,
         "partials/archives/tab.html",
         "archives",
-        {"current_user": current_user},
+        {"current_user": current_user, "preselect_repo": preselect_repo},
     )
 
 

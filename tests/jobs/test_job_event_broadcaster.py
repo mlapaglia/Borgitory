@@ -241,8 +241,15 @@ class TestJobEventBroadcaster:
         await self.broadcaster.initialize()
 
         # Add some clients and events
-        self.broadcaster.subscribe_client()
+        queue = self.broadcaster.subscribe_client()
         self.broadcaster.broadcast_event(EventType.KEEPALIVE)
+
+        # Drain the queue to avoid unawaited coroutines
+        try:
+            while not queue.empty():
+                queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
 
         await self.broadcaster.shutdown()
 

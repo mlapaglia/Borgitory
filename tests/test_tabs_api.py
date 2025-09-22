@@ -219,6 +219,19 @@ class TestTabsAPI:
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
     @pytest.mark.asyncio
+    async def test_get_archives_tab_with_preselect_repo(
+        self, async_client: AsyncClient, mock_current_user: Any
+    ) -> None:
+        """Test getting archives tab with preselected repository."""
+        response = await async_client.get("/api/tabs/archives?preselect_repo=123")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/html; charset=utf-8"
+
+        # Check that preselect_repo parameter is passed to template
+        content = response.text
+        assert "preselect_repo=123" in content
+
+    @pytest.mark.asyncio
     async def test_get_statistics_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:

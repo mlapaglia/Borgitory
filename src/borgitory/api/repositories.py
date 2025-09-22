@@ -552,7 +552,7 @@ async def list_archives_html(
 
 @router.get("/archives/selector")
 async def get_archives_repository_selector(
-    request: Request, db: Session = Depends(get_db)
+    request: Request, db: Session = Depends(get_db), preselect_repo: str = ""
 ) -> _TemplateResponse:
     """Get repository selector for archives with repositories populated"""
     repositories = db.query(Repository).all()
@@ -560,7 +560,7 @@ async def get_archives_repository_selector(
     return templates.TemplateResponse(
         request,
         "partials/archives/repository_selector.html",
-        {"repositories": repositories},
+        {"repositories": repositories, "preselect_repo": preselect_repo},
     )
 
 

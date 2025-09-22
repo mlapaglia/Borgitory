@@ -176,7 +176,12 @@ class TestJobExecutor:
         """Test error during process termination"""
         mock_process = AsyncMock()
         mock_process.returncode = None
-        mock_process.terminate.side_effect = Exception("Termination error")
+
+        # Use a regular function that raises an exception, not an async mock
+        def terminate_error():
+            raise Exception("Termination error")
+
+        mock_process.terminate = terminate_error
 
         result = await self.executor.terminate_process(mock_process)
 

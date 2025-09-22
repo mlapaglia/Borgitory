@@ -4,7 +4,7 @@
         <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Archive Browser</h2>
         
         <div class="mb-4" 
-             hx-get="/api/repositories/archives/selector" 
+             hx-get="/api/repositories/archives/selector{% if preselect_repo %}?preselect_repo={{ preselect_repo }}{% endif %}" 
              hx-trigger="load" 
              hx-swap="innerHTML">
             <div class="flex items-center space-x-4">
