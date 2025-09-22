@@ -7,35 +7,6 @@
 </div>
 {% elif strategy == "advanced" %}
 <div id="advanced-strategy" class="ml-6 space-y-2">
-    <div class="grid grid-cols-2 gap-2">
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Secondly</label>
-            <input type="number" name="keep_secondly" value="7" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Minutely</label>
-            <input type="number" name="keep_minutely" value="7" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Hourly</label>
-            <input type="number" name="keep_minutely" value="7" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Daily</label>
-            <input type="number" name="keep_daily" value="7" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Weekly</label>
-            <input type="number" name="keep_weekly" value="4" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Monthly</label>
-            <input type="number" name="keep_monthly" value="6" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Yearly</label>
-            <input type="number" name="keep_yearly" value="2" min="0" class="input-modern">
-        </div>
-    </div>
+    {% include 'partials/prune/retention_fields.html' %}
 </div>
 {% endif %}

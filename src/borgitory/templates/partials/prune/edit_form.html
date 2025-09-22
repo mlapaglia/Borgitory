@@ -10,36 +10,8 @@
         <input type="text" name="name" required value="{{ config.name }}" class="input-modern mt-1">
     </div>
     
-    <div class="grid grid-cols-2 gap-2">
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Secondly</label>
-            <input type="number" name="keep_secondly" value="{{ config.keep_secondly or '' }}" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Minutely</label>
-            <input type="number" name="keep_minutely" value="{{ config.keep_minutely or '' }}" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Hourly</label>
-            <input type="number" name="keep_hourly" value="{{ config.keep_hourly or '' }}" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Daily</label>
-            <input type="number" name="keep_daily" value="{{ config.keep_daily or '' }}" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Weekly</label>
-            <input type="number" name="keep_weekly" value="{{ config.keep_weekly or '' }}" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Monthly</label>
-            <input type="number" name="keep_monthly" value="{{ config.keep_monthly or '' }}" min="0" class="input-modern">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Yearly</label>
-            <input type="number" name="keep_yearly" value="{{ config.keep_yearly or '' }}" min="0" class="input-modern">
-        </div>
-    </div>
+    {% set retention_config = config %}
+    {% include 'partials/prune/retention_fields.html' %}
     
     <input type="hidden" name="strategy" value="{{ config.strategy }}">
     
