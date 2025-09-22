@@ -1,9 +1,11 @@
 import os
 import sys
 from logging.config import fileConfig
+from typing import Any, Optional, Literal
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.schema import SchemaItem
 
 from alembic import context
 
@@ -36,7 +38,13 @@ target_metadata = Base.metadata
 # ... etc.
 
 
-def include_object(object, name, type_, reflected, compare_to) -> bool:
+def include_object(
+    object: SchemaItem, 
+    name: Optional[str], 
+    type_: Literal['schema', 'table', 'column', 'index', 'unique_constraint', 'foreign_key_constraint'], 
+    reflected: bool, 
+    compare_to: Optional[SchemaItem]
+) -> bool:
     """
     Filter function to exclude certain objects from autogenerate.
     

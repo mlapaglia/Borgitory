@@ -207,7 +207,7 @@ exclude = [
     "^htmlcov/",
     "^\\.",
 ]
-files = ["src/borgitory"]
+files = ["src/borgitory", "tests/test_task_definition_builder.py"]
 
 # Plugins
 plugins = [
