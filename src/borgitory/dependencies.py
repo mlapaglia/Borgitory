@@ -626,20 +626,53 @@ def get_job_manager_dependency() -> "JobManagerProtocol":
     return get_job_manager_singleton()
 
 
-def get_scheduler_service(
-    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-) -> SchedulerService:
+@lru_cache()
+def get_scheduler_service_singleton() -> SchedulerService:
     """
-    Provide a SchedulerService instance with proper FastAPI dependency injection.
+    Create SchedulerService singleton for application-scoped use.
 
-    Uses pure DI pattern - no global singletons, all dependencies injected by FastAPI.
+    📋 USAGE:
+    ✅ Use for: Singletons, direct instantiation, tests, background tasks, application lifecycle
+    ❌ Don't use for: FastAPI endpoints (use get_scheduler_service_dependency instead)
+
+    📋 PATTERN: Dual Functions
+    This is the singleton version that resolves dependencies directly.
+    For FastAPI DI, use get_scheduler_service_dependency() with Depends().
+
+    Returns:
+        SchedulerService: Cached singleton instance
     """
+    # Resolve dependencies directly (not via FastAPI DI)
+    job_manager = get_job_manager_singleton()
     return SchedulerService(job_manager=job_manager, job_service_factory=None)
+
+
+def get_scheduler_service_dependency() -> SchedulerService:
+    """
+    Provide SchedulerService with FastAPI dependency injection.
+
+    📋 USAGE:
+    ✅ Use for: FastAPI endpoints with Depends(get_scheduler_service_dependency)
+    ❌ Don't use for: Direct calls, singletons, tests
+
+    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
+    ⚠️  For direct calls, use get_scheduler_service_singleton() instead.
+
+    📋 PATTERN: Dual Functions
+    This is the FastAPI DI version that returns the same singleton instance.
+    For direct calls, use get_scheduler_service_singleton().
+
+    Returns:
+        SchedulerService: The same singleton instance as get_scheduler_service_singleton()
+    """
+    # Both functions return the same singleton instance
+    # This ensures scheduler state consistency across all usage patterns
+    return get_scheduler_service_singleton()
 
 
 def get_schedule_service(
     db: Session = Depends(get_db),
-    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
 ) -> ScheduleService:
     """
     Provide a ScheduleService instance with database session injection.
@@ -718,7 +751,7 @@ def get_debug_service(
 
 def get_repository_service(
     borg_service: BorgService = Depends(get_borg_service),
-    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
     volume_service: VolumeService = Depends(get_volume_service),
 ) -> RepositoryService:
     """
@@ -826,7 +859,9 @@ RcloneServiceDep = Annotated[RcloneService, Depends(get_rclone_service)]
 RepositoryStatsServiceDep = Annotated[
     RepositoryStatsService, Depends(get_repository_stats_service)
 ]
-SchedulerServiceDep = Annotated[SchedulerService, Depends(get_scheduler_service)]
+SchedulerServiceDep = Annotated[
+    SchedulerService, Depends(get_scheduler_service_dependency)
+]
 VolumeServiceDep = Annotated[VolumeService, Depends(get_volume_service)]
 TaskDefinitionBuilderDep = Annotated[
     TaskDefinitionBuilder, Depends(get_task_definition_builder)

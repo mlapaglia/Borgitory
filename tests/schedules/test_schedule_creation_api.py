@@ -12,7 +12,7 @@ from borgitory.models.database import Repository, User
 from borgitory.dependencies import (
     get_schedule_service,
     get_configuration_service,
-    get_scheduler_service,
+    get_scheduler_service_dependency,
 )
 from borgitory.services.scheduling.schedule_service import ScheduleService
 from borgitory.services.configuration_service import ConfigurationService
@@ -55,7 +55,9 @@ class TestScheduleCreationAPI:
         app.dependency_overrides[get_configuration_service] = (
             lambda: configuration_service
         )
-        app.dependency_overrides[get_scheduler_service] = lambda: mock_scheduler_service
+        app.dependency_overrides[get_scheduler_service_dependency] = (
+            lambda: mock_scheduler_service
+        )
 
         # Create test data
         user = User()
