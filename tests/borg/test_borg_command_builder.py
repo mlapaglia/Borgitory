@@ -344,6 +344,9 @@ class TestBorgCommandBuilder:
         command, env = self.builder.build_prune_command(
             repository=self.mock_repository,
             keep_within="1d",
+            keep_secondly=7,
+            keep_minutely=7,
+            keep_hourly=7,
             keep_daily=7,
             keep_weekly=4,
             keep_monthly=6,

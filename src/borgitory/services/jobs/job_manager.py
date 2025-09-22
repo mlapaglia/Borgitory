@@ -1018,6 +1018,15 @@ class JobManager:
                 keep_within=str(params.get("keep_within"))
                 if params.get("keep_within")
                 else None,
+                keep_secondly=int(str(params.get("keep_secondly") or 0))
+                if params.get("keep_secondly")
+                else None,
+                keep_minutely=int(str(params.get("keep_minutely") or 0))
+                if params.get("keep_minutely")
+                else None,
+                keep_hourly=int(str(params.get("keep_hourly") or 0))
+                if params.get("keep_hourly")
+                else None,
                 keep_daily=int(str(params.get("keep_daily") or 0))
                 if params.get("keep_daily")
                 else None,

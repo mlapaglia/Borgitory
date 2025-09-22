@@ -1,9 +1,11 @@
 import os
 import sys
 from logging.config import fileConfig
+from typing import Optional, Literal
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.schema import SchemaItem
 
 from alembic import context
 
@@ -34,6 +36,46 @@ target_metadata = Base.metadata
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
+
+
+def include_object(
+    object: SchemaItem,
+    name: Optional[str],
+    type_: Literal[
+        "schema",
+        "table",
+        "column",
+        "index",
+        "unique_constraint",
+        "foreign_key_constraint",
+    ],
+    reflected: bool,
+    compare_to: Optional[SchemaItem],
+) -> bool:
+    """
+    Filter function to exclude certain objects from autogenerate.
+
+    This function is called for every object that Alembic considers
+    for inclusion in a migration.
+    """
+    # Ignore anything related to apscheduler - it's managed by APScheduler
+    if name and "apscheduler" in name.lower():
+        return False
+
+    # Specifically ignore apscheduler_jobs table and related objects
+    if type_ == "table" and name == "apscheduler_jobs":
+        return False
+
+    # Ignore indexes on apscheduler tables
+    if (
+        type_ == "index"
+        and name
+        and ("apscheduler" in name.lower() or "ix_apscheduler" in name.lower())
+    ):
+        return False
+
+    # Include all other objects
+    return True
 
 
 def get_database_url() -> str:
@@ -77,6 +119,7 @@ def run_migrations_offline() -> None:
         compare_type=True,
         compare_server_default=True,
         render_as_batch=True,  # Required for SQLite ALTER operations
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -106,6 +149,7 @@ def run_migrations_online() -> None:
             compare_type=True,
             compare_server_default=True,
             render_as_batch=True,  # Required for SQLite ALTER operations
+            include_object=include_object,
         )
 
         with context.begin_transaction():

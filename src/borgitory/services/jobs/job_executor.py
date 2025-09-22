@@ -10,6 +10,9 @@ import re
 import inspect
 from typing import Dict, List, Optional, Callable, Coroutine, TYPE_CHECKING, cast
 
+from borgitory.constants.retention import RetentionFieldHandler
+from borgitory.utils.security import build_secure_borg_command
+
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 from datetime import datetime
@@ -18,7 +21,7 @@ from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.cloud_providers.service import StorageFactory
 from borgitory.services.encryption_service import EncryptionService
-from borgitory.types import ConfigDict
+from borgitory.custom_types import ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +206,9 @@ class JobExecutor:
         repository_path: str,
         passphrase: str,
         keep_within: Optional[str] = None,
+        keep_secondly: Optional[int] = None,
+        keep_minutely: Optional[int] = None,
+        keep_hourly: Optional[int] = None,
         keep_daily: Optional[int] = None,
         keep_weekly: Optional[int] = None,
         keep_monthly: Optional[int] = None,
@@ -221,6 +227,9 @@ class JobExecutor:
             repository_path: Path to the borg repository
             passphrase: Repository passphrase
             keep_within: Keep archives within this time range
+            keep_secondly: Number of secondly archives to keep
+            keep_minutely: Number of minutely archives to keep
+            keep_hourly: Number of hourly archives to keep
             keep_daily: Number of daily archives to keep
             keep_weekly: Number of weekly archives to keep
             keep_monthly: Number of monthly archives to keep
@@ -236,20 +245,20 @@ class JobExecutor:
             ProcessResult with execution details
         """
         try:
-            from borgitory.utils.security import build_secure_borg_command
-
             additional_args = []
 
-            if keep_within:
-                additional_args.extend(["--keep-within", keep_within])
-            if keep_daily:
-                additional_args.extend(["--keep-daily", str(keep_daily)])
-            if keep_weekly:
-                additional_args.extend(["--keep-weekly", str(keep_weekly)])
-            if keep_monthly:
-                additional_args.extend(["--keep-monthly", str(keep_monthly)])
-            if keep_yearly:
-                additional_args.extend(["--keep-yearly", str(keep_yearly)])
+            retention_args = RetentionFieldHandler.build_borg_args_explicit(
+                keep_within=keep_within,
+                keep_secondly=keep_secondly,
+                keep_minutely=keep_minutely,
+                keep_hourly=keep_hourly,
+                keep_daily=keep_daily,
+                keep_weekly=keep_weekly,
+                keep_monthly=keep_monthly,
+                keep_yearly=keep_yearly,
+                include_keep_within=True,
+            )
+            additional_args.extend(retention_args)
             if show_stats:
                 additional_args.append("--stats")
             if show_list:
@@ -353,7 +362,6 @@ class JobExecutor:
                 try:
                     from borgitory.models.database import Repository
 
-                    # Build provider configuration from JSON
                     if not config.provider_config:
                         raise ValueError(
                             f"Cloud sync configuration '{config.name}' has no provider_config. "

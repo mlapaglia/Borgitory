@@ -11,7 +11,12 @@ from typing import Optional
 class AppRunner:
     """Helper class to manage app startup and shutdown for testing."""
 
-    def __init__(self, data_dir: str, port: int = None):
+    def __init__(
+        self,
+        data_dir: str,
+        port: Optional[int] = None,
+        db_filename: Optional[str] = None,
+    ):
         self.data_dir = data_dir
         # Use a different port for each test to avoid conflicts
         if port is None:
@@ -19,6 +24,14 @@ class AppRunner:
 
             port = random.randint(8001, 8999)
         self.port = port
+
+        # Use unique database filename if not provided
+        if db_filename is None:
+            import uuid
+
+            db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"
+        self.db_filename = db_filename
+
         self.process: Optional[subprocess.Popen] = None
         self.base_url = f"http://localhost:{port}"
 
@@ -26,11 +39,14 @@ class AppRunner:
         """Start the application and wait for it to be ready."""
         # Set up environment
         env = os.environ.copy()
+        import uuid
+
+        secret_key = f"test-secret-key-{uuid.uuid4().hex}"
         env.update(
             {
                 "BORGITORY_DATA_DIR": self.data_dir,
-                "BORGITORY_DATABASE_URL": f"sqlite:///{os.path.join(self.data_dir, 'test_borgitory.db')}",
-                "BORGITORY_SECRET_KEY": "test-secret-key-for-integration-tests-only",
+                "BORGITORY_DATABASE_URL": f"sqlite:///{os.path.join(self.data_dir, self.db_filename)}",
+                "BORGITORY_SECRET_KEY": secret_key,
             }
         )
 
@@ -124,9 +140,10 @@ class AppRunner:
         return "", ""
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def app_runner_module(temp_data_dir):
     """Create a single AppRunner instance for all tests in this module."""
+    # Changed from module scope to function scope to ensure test isolation
     runner = AppRunner(temp_data_dir)
 
     # Start the app once for all tests

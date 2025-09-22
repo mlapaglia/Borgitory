@@ -303,6 +303,13 @@ class CleanupConfigBase(BaseModel):
     keep_within_days: Optional[int] = Field(
         None, gt=0, description="Days to keep (simple strategy)"
     )
+    keep_secondly: Optional[int] = Field(
+        None, ge=0, description="Secondly backups to keep"
+    )
+    keep_minutely: Optional[int] = Field(
+        None, ge=0, description="Minutely backups to keep"
+    )
+    keep_hourly: Optional[int] = Field(None, ge=0, description="Hourly backups to keep")
     keep_daily: Optional[int] = Field(None, ge=0, description="Daily backups to keep")
     keep_weekly: Optional[int] = Field(None, ge=0, description="Weekly backups to keep")
     keep_monthly: Optional[int] = Field(
@@ -322,6 +329,9 @@ class CleanupConfigUpdate(BaseModel):
     name: Optional[str] = None
     strategy: Optional[str] = None
     keep_within_days: Optional[int] = None
+    keep_secondly: Optional[int] = None
+    keep_minutely: Optional[int] = None
+    keep_hourly: Optional[int] = None
     keep_daily: Optional[int] = None
     keep_weekly: Optional[int] = None
     keep_monthly: Optional[int] = None
@@ -678,6 +688,9 @@ class PruneRequest(BaseModel):
     # Simple strategy
     keep_within_days: Optional[int] = Field(None, gt=0)
     # Advanced strategy
+    keep_secondly: Optional[int] = Field(None, ge=0)
+    keep_minutely: Optional[int] = Field(None, ge=0)
+    keep_hourly: Optional[int] = Field(None, ge=0)
     keep_daily: Optional[int] = Field(None, ge=0)
     keep_weekly: Optional[int] = Field(None, ge=0)
     keep_monthly: Optional[int] = Field(None, ge=0)

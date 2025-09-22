@@ -24,7 +24,7 @@ from .providers.base import NotificationProvider, NotificationProviderConfig
 from .types import NotificationMessage, NotificationResult, NotificationConfig
 from .registry import get_config_class, get_provider_class, get_supported_providers
 from borgitory.services.encryption_service import EncryptionService
-from borgitory.types import ConfigDict
+from borgitory.custom_types import ConfigDict
 
 logger = logging.getLogger(__name__)
 

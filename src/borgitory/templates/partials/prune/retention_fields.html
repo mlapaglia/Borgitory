@@ -1,0 +1,47 @@
+<!-- Reusable Retention Fields Component -->
+<!-- 
+Usage:
+1. For create forms (default values):
+   Simply include the template
+
+2. For edit forms (with existing config):
+   Set retention_config variable before including
+
+3. For custom default values:
+   Set retention_values variable before including
+-->
+
+{% set field_prefix = retention_prefix|default('keep_') %}
+
+{# Define retention fields in order with labels and default values #}
+{% set retention_fields = [
+    {'name': 'secondly', 'label': 'Keep Secondly', 'default': 0},
+    {'name': 'minutely', 'label': 'Keep Minutely', 'default': 0},
+    {'name': 'hourly', 'label': 'Keep Hourly', 'default': 0},
+    {'name': 'daily', 'label': 'Keep Daily', 'default': 7},
+    {'name': 'weekly', 'label': 'Keep Weekly', 'default': 4},
+    {'name': 'monthly', 'label': 'Keep Monthly', 'default': 6},
+    {'name': 'yearly', 'label': 'Keep Yearly', 'default': 2}
+] %}
+
+{# Override defaults if custom values provided #}
+{% if retention_values %}
+    {% for field in retention_fields %}
+        {% if retention_values[field.name] is defined %}
+            {% set _ = field.update({'default': retention_values[field.name]}) %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+
+<div class="grid grid-cols-2 gap-2">
+    {% for field in retention_fields %}
+    <div>
+        <label class="block text-xs text-gray-900 dark:text-gray-100">{{ field.label }}</label>
+        <input type="number" 
+               name="{{ field_prefix }}{{ field.name }}" 
+               value="{% if retention_config %}{{ retention_config['keep_' + field.name] if retention_config['keep_' + field.name] is not none else '' }}{% else %}{{ field.default }}{% endif %}" 
+               min="0" 
+               class="input-modern">
+    </div>
+    {% endfor %}
+</div>

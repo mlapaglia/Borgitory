@@ -268,6 +268,9 @@ class CleanupConfig(Base):
     keep_within_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Advanced strategy
+    keep_secondly: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    keep_minutely: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    keep_hourly: Mapped[int | None] = mapped_column(Integer, nullable=True)
     keep_daily: Mapped[int | None] = mapped_column(Integer, nullable=True)
     keep_weekly: Mapped[int | None] = mapped_column(Integer, nullable=True)
     keep_monthly: Mapped[int | None] = mapped_column(Integer, nullable=True)

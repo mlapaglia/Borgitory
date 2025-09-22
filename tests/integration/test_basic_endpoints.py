@@ -7,37 +7,24 @@ import json
 from .test_app_startup import AppRunner
 
 
-@pytest.fixture(scope="module")
-def app_runner_module(temp_data_dir):
-    """Create a single AppRunner instance for all tests in this module."""
-    runner = AppRunner(temp_data_dir)
-
-    # Start the app once for all tests
-    success = runner.start(timeout=30)
-    if not success:
-        pytest.skip(
-            "Application failed to start - skipping integration tests. This may be due to missing CLI setup or port conflicts."
-        )
-
-    yield runner
-    runner.stop()
-
-
 @pytest.fixture
 def app_runner(temp_data_dir):
     """Create an AppRunner instance for individual tests that need their own instance."""
     runner = AppRunner(temp_data_dir)
+
+    # Start the app for each test
+    success = runner.start(timeout=30)
+    if not success:
+        pytest.fail("Application failed to start.")
+
     yield runner
     runner.stop()
 
 
-def test_auth_check_users_endpoint(app_runner_module):
+def test_auth_check_users_endpoint(app_runner):
     """Test the auth check-users endpoint returns proper response."""
-    # App is already started by the module fixture
 
-    response = requests.get(
-        f"{app_runner_module.base_url}/auth/check-users", timeout=10
-    )
+    response = requests.get(f"{app_runner.base_url}/auth/check-users", timeout=10)
 
     # Should return 200 OK
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
@@ -65,11 +52,10 @@ def test_auth_check_users_endpoint(app_runner_module):
     )
 
 
-def test_debug_info_endpoint(app_runner_module):
+def test_debug_info_endpoint(app_runner):
     """Test the debug info endpoint returns proper JSON structure."""
-    # App is already started by the module fixture
 
-    response = requests.get(f"{app_runner_module.base_url}/api/debug/info", timeout=10)
+    response = requests.get(f"{app_runner.base_url}/api/debug/info", timeout=10)
 
     # Debug endpoint might require auth, so accept 200, 401, or 403
     assert response.status_code in [200, 401, 403], (
@@ -95,15 +81,14 @@ def test_debug_info_endpoint(app_runner_module):
             pytest.fail(f"Debug endpoint returned invalid JSON: {response.text[:200]}")
 
 
-def test_login_endpoint_post(app_runner_module):
+def test_login_endpoint_post(app_runner):
     """Test the login POST endpoint handles requests properly."""
-    # App is already started by the module fixture
 
     # Test login with invalid credentials (should fail gracefully)
     login_data = {"username": "nonexistent_user", "password": "wrong_password"}
 
     response = requests.post(
-        f"{app_runner_module.base_url}/auth/login", data=login_data, timeout=10
+        f"{app_runner.base_url}/auth/login", data=login_data, timeout=10
     )
 
     # Should handle the request without crashing
@@ -116,15 +101,14 @@ def test_login_endpoint_post(app_runner_module):
     assert len(response.text) > 0, "Login endpoint should return some content"
 
 
-def test_register_endpoint_post(app_runner_module):
+def test_register_endpoint_post(app_runner):
     """Test the register POST endpoint handles requests properly."""
-    # App is already started by the module fixture
 
     # Test registration with valid data
     register_data = {"username": "testuser123", "password": "testpassword123"}
 
     response = requests.post(
-        f"{app_runner_module.base_url}/auth/register", data=register_data, timeout=10
+        f"{app_runner.base_url}/auth/register", data=register_data, timeout=10
     )
 
     # Should handle the request without crashing
@@ -137,11 +121,10 @@ def test_register_endpoint_post(app_runner_module):
     assert len(response.text) > 0, "Register endpoint should return some content"
 
 
-def test_root_endpoint(app_runner_module):
+def test_root_endpoint(app_runner):
     """Test that the root endpoint serves the main application."""
-    # App is already started by the module fixture
 
-    response = requests.get(f"{app_runner_module.base_url}/", timeout=10)
+    response = requests.get(f"{app_runner.base_url}/", timeout=10)
 
     # Should return some form of response (might redirect to login)
     assert response.status_code in [200, 302, 401, 403], (
@@ -159,9 +142,8 @@ def test_root_endpoint(app_runner_module):
         )
 
 
-def test_static_assets_accessible(app_runner_module):
+def test_static_assets_accessible(app_runner):
     """Test that static assets are accessible."""
-    # App is already started by the module fixture
 
     # Test common static asset paths
     static_paths = [
@@ -171,7 +153,7 @@ def test_static_assets_accessible(app_runner_module):
     ]
 
     for path in static_paths:
-        response = requests.get(f"{app_runner_module.base_url}{path}", timeout=5)
+        response = requests.get(f"{app_runner.base_url}{path}", timeout=5)
 
         # Static assets might not exist, but server should handle requests gracefully
         # Accept 200 (found), 404 (not found), or 403 (forbidden)
@@ -180,9 +162,8 @@ def test_static_assets_accessible(app_runner_module):
         )
 
 
-def test_api_endpoints_return_proper_content_types(app_runner_module):
+def test_api_endpoints_return_proper_content_types(app_runner):
     """Test that API endpoints return appropriate content types."""
-    # App is already started by the module fixture
 
     # Test endpoints and their expected content types
     endpoint_tests = [
@@ -194,7 +175,7 @@ def test_api_endpoints_return_proper_content_types(app_runner_module):
     ]
 
     for endpoint, expected_types in endpoint_tests:
-        response = requests.get(f"{app_runner_module.base_url}{endpoint}", timeout=5)
+        response = requests.get(f"{app_runner.base_url}{endpoint}", timeout=5)
 
         # Skip if endpoint requires auth and we get 401/403
         if response.status_code in [401, 403]:
@@ -210,9 +191,8 @@ def test_api_endpoints_return_proper_content_types(app_runner_module):
         )
 
 
-def test_error_handling_graceful(app_runner_module):
+def test_error_handling_graceful(app_runner):
     """Test that the application handles invalid requests gracefully."""
-    # App is already started by the module fixture
 
     # Test various invalid requests
     invalid_requests = [
@@ -227,17 +207,13 @@ def test_error_handling_graceful(app_runner_module):
 
         try:
             if method == "GET":
-                response = requests.get(
-                    f"{app_runner_module.base_url}{path}", timeout=5
-                )
+                response = requests.get(f"{app_runner.base_url}{path}", timeout=5)
             elif method == "POST":
                 response = requests.post(
-                    f"{app_runner_module.base_url}{path}", data=data, timeout=5
+                    f"{app_runner.base_url}{path}", data=data, timeout=5
                 )
             elif method == "PUT":
-                response = requests.put(
-                    f"{app_runner_module.base_url}{path}", timeout=5
-                )
+                response = requests.put(f"{app_runner.base_url}{path}", timeout=5)
             else:
                 continue
 
@@ -250,16 +226,15 @@ def test_error_handling_graceful(app_runner_module):
             pytest.fail(f"Request {method} {path} caused connection error: {e}")
 
 
-def test_concurrent_requests_handling(app_runner_module):
+def test_concurrent_requests_handling(app_runner):
     """Test that the application can handle multiple concurrent requests."""
-    # App is already started by the module fixture
 
     results = []
 
     def make_request():
         try:
             response = requests.get(
-                f"{app_runner_module.base_url}/auth/check-users", timeout=10
+                f"{app_runner.base_url}/auth/check-users", timeout=10
             )
             results.append(response.status_code)
         except Exception as e:
