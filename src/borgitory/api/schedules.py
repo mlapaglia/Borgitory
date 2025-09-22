@@ -179,17 +179,20 @@ def list_schedules(
 @router.get("/{schedule_id}", response_class=HTMLResponse)
 def get_schedule(
     schedule_id: int,
+    request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
 ) -> _TemplateResponse:
     schedule = schedule_service.get_schedule_by_id(schedule_id)
     if schedule is None:
-        return templates.get_template("partials/common/error_message.html").render(
-            error_message="Schedule not found"
+        return templates.TemplateResponse(
+            request,
+            "partials/common/error_message.html",
+            {"error_message": "Schedule not found"},
         )
 
-    return templates.get_template("partials/schedules/schedule_detail.html").render(
-        schedule=schedule
+    return templates.TemplateResponse(
+        request, "partials/schedules/schedule_detail.html", {"schedule": schedule}
     )
 
 
