@@ -690,3 +690,67 @@ class TestArchiveBrowserHTMX:
             # Clean up
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
+
+    @pytest.mark.asyncio
+    async def test_breadcrumb_navigation_paths(
+        self, async_client: AsyncClient, test_db: Session
+    ) -> None:
+        """Test that breadcrumb navigation generates correct paths for nested directories."""
+        repo = Repository()
+        repo.name = "breadcrumb-repo"
+        repo.path = "/tmp/breadcrumb"
+        repo.set_passphrase("breadcrumb-passphrase")
+        test_db.add(repo)
+        test_db.commit()
+
+        mock_contents = [
+            {
+                "name": "file.txt",
+                "path": "mnt/backup-sources/1990/file.txt",
+                "isdir": False,
+                "size": 1024,
+                "mtime": "2023-01-01T10:00:00",
+            }
+        ]
+
+        # Create mock service
+        mock_borg_service = Mock(spec=BorgService)
+        mock_borg_service.list_archive_directory_contents = AsyncMock(
+            return_value=mock_contents
+        )
+
+        # Override dependency injection
+        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
+
+        try:
+            # Test with nested path
+            response = await async_client.get(
+                f"/api/repositories/{repo.id}/archives/test-archive/contents?path=mnt/backup-sources/1990",
+                headers={"hx-request": "true"},
+            )
+
+            assert response.status_code == 200
+            response_text = response.text
+
+            # Check that breadcrumb paths are correctly generated
+            # Root button should not have hx-vals (defaults to empty path)
+            assert "Root" in response_text and "</button>" in response_text
+
+            # First breadcrumb (mnt) should have path="mnt"
+            assert 'hx-vals=\'{"path": "mnt"}\'' in response_text
+
+            # Second breadcrumb (backup-sources) should have path="mnt/backup-sources"
+            assert 'hx-vals=\'{"path": "mnt/backup-sources"}\'' in response_text
+
+            # Third part (1990) should be displayed as text, not a link
+            assert "1990</span>" in response_text  # Should be in a span, not a button
+
+            # Verify the breadcrumb structure shows all parts
+            assert "mnt" in response_text
+            assert "backup-sources" in response_text
+            assert "1990" in response_text
+
+        finally:
+            # Clean up
+            if get_borg_service in app.dependency_overrides:
+                del app.dependency_overrides[get_borg_service]

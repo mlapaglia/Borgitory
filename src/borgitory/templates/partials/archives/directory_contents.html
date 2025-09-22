@@ -13,10 +13,9 @@
                 Root
             </button>
             {% if path %}
-                {% set current_path = "" %}
                 {% for part in breadcrumb_parts %}
                     {% if part %}
-                        {% set current_path = current_path + "/" + part if current_path else part %}
+                        {% set current_path = breadcrumb_parts[:loop.index] | join('/') %}
                         {% if loop.last %}
                             / <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ part }}</span>
                         {% else %}
@@ -45,7 +44,7 @@
                 {% for item in items %}
                     <div class="tree-node flex items-center py-2 px-4 hover:bg-gray-50 dark:hover:bg-gray-600 border-b last:border-b-0 dark:border-gray-600">
                         <!-- File/Directory Icon -->
-                        {% if item.is_directory %}
+                        {% if item.isdir %}
                             <svg class="w-5 h-5 text-blue-500 dark:text-blue-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
                             </svg>
@@ -57,7 +56,7 @@
 
                         <!-- File/Directory Name -->
                         <div class="flex-1">
-                            {% if item.is_directory %}
+                            {% if item.isdir %}
                                 <button 
                                     hx-post="/api/repositories/{{ repository.id }}/archives/{{ archive_name }}/contents/load-with-spinner"
                                     hx-vals='{"path": "{{ item.path }}"}'
@@ -72,7 +71,7 @@
                         </div>
 
                         <!-- File Size -->
-                        {% if not item.is_directory and item.size is not none %}
+                        {% if not item.isdir and item.size is not none %}
                             <span class="text-xs text-gray-500 dark:text-gray-400 mr-4">
                                 {% if item.size < 1024 %}
                                     {{ item.size }} B
@@ -94,7 +93,7 @@
                         {% endif %}
 
                         <!-- Download Button for Files -->
-                        {% if not item.is_directory %}
+                        {% if not item.isdir %}
                             <a href="/api/repositories/{{ repository.id }}/archives/{{ archive_name }}/extract?file={{ item.path | urlencode }}"
                                download="{{ item.name }}"
                                class="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 rounded"
