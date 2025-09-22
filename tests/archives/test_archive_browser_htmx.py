@@ -525,6 +525,75 @@ class TestArchiveBrowserHTMX:
         assert "hx-include" in response.text
 
     @pytest.mark.asyncio
+    async def test_archive_repository_selector_with_preselection(
+        self, async_client: AsyncClient, test_db: Session
+    ) -> None:
+        """Test the repository selector with preselected repository."""
+        # Create test repositories
+        repo1 = Repository()
+        repo1.name = "repo-1"
+        repo1.path = "/tmp/repo-1"
+        repo1.set_passphrase("pass1")
+        repo2 = Repository()
+        repo2.name = "repo-2"
+        repo2.path = "/tmp/repo-2"
+        repo2.set_passphrase("pass2")
+
+        test_db.add_all([repo1, repo2])
+        test_db.commit()
+
+        # Test with preselected repository
+        response = await async_client.get(
+            f"/api/repositories/archives/selector?preselect_repo={repo1.id}",
+            headers={"hx-request": "true"},
+        )
+
+        assert response.status_code == 200
+        content = response.text
+
+        # Check that the correct repository is selected
+        assert f'value="{repo1.id}" selected' in content
+        assert f'value="{repo2.id}" selected' not in content
+
+        # Check that HTMX trigger includes load when preselected
+        assert "hx-trigger" in content
+        assert "change" in content
+
+        # Check repositories are still in options
+        assert "repo-1" in content
+        assert "repo-2" in content
+
+    @pytest.mark.asyncio
+    async def test_archive_repository_selector_htmx_triggers(
+        self, async_client: AsyncClient, test_db: Session
+    ) -> None:
+        """Test that HTMX triggers are properly configured for preselection."""
+        # Create test repository
+        repo = Repository()
+        repo.name = "test-repo"
+        repo.path = "/tmp/test-repo"
+        repo.set_passphrase("testpass")
+        test_db.add(repo)
+        test_db.commit()
+
+        # Test without preselection - should only have 'change' trigger
+        response = await async_client.get(
+            "/api/repositories/archives/selector", headers={"hx-request": "true"}
+        )
+        assert response.status_code == 200
+        content = response.text
+        assert 'hx-trigger="change"' in content
+
+        # Test with preselection - should have 'change, load' trigger
+        response = await async_client.get(
+            f"/api/repositories/archives/selector?preselect_repo={repo.id}",
+            headers={"hx-request": "true"},
+        )
+        assert response.status_code == 200
+        content = response.text
+        assert 'hx-trigger="change, load"' in content
+
+    @pytest.mark.asyncio
     async def test_archives_list_endpoint_form_data(
         self, async_client: AsyncClient, test_db: Session
     ) -> None:

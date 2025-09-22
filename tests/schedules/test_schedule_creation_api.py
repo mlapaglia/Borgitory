@@ -331,7 +331,7 @@ class TestScheduleCreationAPI:
 
     def test_create_schedule_invalid_json(self, client, setup_dependencies) -> None:
         """Test creating a schedule with invalid JSON."""
-        response = client.post("/api/schedules/", data="invalid json")
+        response = client.post("/api/schedules/", content="invalid json")
 
         assert response.status_code == 200  # FastAPI returns 422 for invalid JSON
 

@@ -30,7 +30,7 @@ class TestSimpleCommandRunner:
         """Test successful command execution."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(return_value=(b"output", b""))
+        mock_process.communicate.return_value = (b"output", b"")
 
         with patch(
             "asyncio.create_subprocess_exec", new_callable=AsyncMock
@@ -52,7 +52,7 @@ class TestSimpleCommandRunner:
         """Test failed command execution."""
         mock_process = AsyncMock()
         mock_process.returncode = 1
-        mock_process.communicate = AsyncMock(return_value=(b"", b"error message"))
+        mock_process.communicate.return_value = (b"", b"error message")
 
         with patch(
             "asyncio.create_subprocess_exec", new_callable=AsyncMock
@@ -103,7 +103,7 @@ class TestSimpleCommandRunner:
         """Test command execution with environment variables."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(return_value=(b"test_value", b""))
+        mock_process.communicate.return_value = (b"test_value", b"")
 
         env_vars = {"TEST_VAR": "test_value"}
 
@@ -127,7 +127,7 @@ class TestSimpleCommandRunner:
         """Test command execution with custom timeout override."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(return_value=(b"output", b""))
+        mock_process.communicate.return_value = (b"output", b"")
 
         with patch(
             "asyncio.create_subprocess_exec", new_callable=AsyncMock
@@ -166,7 +166,7 @@ class TestSimpleCommandRunner:
         mock_process = AsyncMock()
         mock_process.returncode = 0
         # Simulate binary output with non-UTF8 bytes
-        mock_process.communicate = AsyncMock(return_value=(b"\xff\xfe\x00", b""))
+        mock_process.communicate.return_value = (b"\xff\xfe\x00", b"")
 
         with patch(
             "asyncio.create_subprocess_exec", new_callable=AsyncMock
@@ -185,7 +185,7 @@ class TestSimpleCommandRunner:
         """Test command execution with empty output."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(return_value=(None, None))
+        mock_process.communicate.return_value = (None, None)
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_process):
             result = await runner.run_command(["true"])
@@ -199,7 +199,7 @@ class TestSimpleCommandRunner:
         """Test that command execution produces appropriate log messages."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
-        mock_process.communicate = AsyncMock(return_value=(b"output", b""))
+        mock_process.communicate.return_value = (b"output", b"")
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_process), patch(
             "borgitory.services.simple_command_runner.logger"
@@ -223,9 +223,7 @@ class TestSimpleCommandRunner:
         """Test that failed commands produce warning logs."""
         mock_process = AsyncMock()
         mock_process.returncode = 1
-        mock_process.communicate = AsyncMock(
-            return_value=(b"", b"command failed with error")
-        )
+        mock_process.communicate.return_value = (b"", b"command failed with error")
 
         with patch(
             "asyncio.create_subprocess_exec", new_callable=AsyncMock

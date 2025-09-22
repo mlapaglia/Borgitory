@@ -12,10 +12,12 @@
                 </p>
             </div>
             <div class="flex space-x-2">
-                <button hx-get="/api/repositories/{{ repo.id }}/archives"
-                        hx-target="#archives-list"
+                <button hx-get="/api/tabs/archives"
+                        hx-target="#main-content"
+                        hx-swap="innerHTML"
+                        hx-push-url="/archives"
                         hx-trigger="click"
-                        onclick="document.querySelector('button[data-tab=archives]').click()"
+                        hx-vals='{"preselect_repo": "{{ repo.id }}"}'
                         class="px-3 py-1 text-sm bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200 rounded hover:bg-green-200 dark:hover:bg-green-700">
                     View Archives
                 </button>

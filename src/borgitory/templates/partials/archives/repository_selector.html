@@ -7,12 +7,12 @@
                 hx-post="/api/repositories/archives/load-with-spinner"
                 hx-target="#archives-list"
                 hx-swap="innerHTML"
-                hx-trigger="change"
+                hx-trigger="change{% if preselect_repo %}, load{% endif %}"
                 hx-include="this"
                 class="select-modern w-full">
             <option value="">Select a repository to view archives...</option>
             {% for repo in repositories %}
-            <option value="{{ repo.id }}">{{ repo.name }}</option>
+            <option value="{{ repo.id }}"{% if preselect_repo and preselect_repo == repo.id|string %} selected{% endif %}>{{ repo.name }}</option>
             {% endfor %}
         </select>
     </div>
