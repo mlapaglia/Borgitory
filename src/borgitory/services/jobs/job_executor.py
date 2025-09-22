@@ -243,25 +243,23 @@ class JobExecutor:
         """
         try:
             from borgitory.utils.security import build_secure_borg_command
+            from borgitory.constants.retention import RetentionFieldHandler
 
             additional_args = []
 
-            if keep_within:
-                additional_args.extend(["--keep-within", keep_within])
-            if keep_secondly:
-                additional_args.extend(["--keep-secondly", str(keep_secondly)])
-            if keep_minutely:
-                additional_args.extend(["--keep-minutely", str(keep_minutely)])
-            if keep_hourly:
-                additional_args.extend(["--keep-hourly", str(keep_hourly)])
-            if keep_daily:
-                additional_args.extend(["--keep-daily", str(keep_daily)])
-            if keep_weekly:
-                additional_args.extend(["--keep-weekly", str(keep_weekly)])
-            if keep_monthly:
-                additional_args.extend(["--keep-monthly", str(keep_monthly)])
-            if keep_yearly:
-                additional_args.extend(["--keep-yearly", str(keep_yearly)])
+            # Add retention parameters using consolidated handler
+            retention_args = RetentionFieldHandler.build_borg_args_explicit(
+                keep_within=keep_within,
+                keep_secondly=keep_secondly,
+                keep_minutely=keep_minutely,
+                keep_hourly=keep_hourly,
+                keep_daily=keep_daily,
+                keep_weekly=keep_weekly,
+                keep_monthly=keep_monthly,
+                keep_yearly=keep_yearly,
+                include_keep_within=True,
+            )
+            additional_args.extend(retention_args)
             if show_stats:
                 additional_args.append("--stats")
             if show_list:

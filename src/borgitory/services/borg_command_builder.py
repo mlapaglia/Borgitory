@@ -13,6 +13,7 @@ from borgitory.utils.security import (
     validate_compression,
     sanitize_path,
 )
+from borgitory.constants.retention import RetentionFieldHandler
 
 logger = logging.getLogger(__name__)
 
@@ -218,23 +219,19 @@ class BorgCommandBuilder:
         """Build command to prune old archives from a repository"""
         additional_args = []
 
-        # Add retention parameters
-        if keep_within:
-            additional_args.extend(["--keep-within", keep_within])
-        if keep_secondly is not None:
-            additional_args.extend(["--keep-secondly", str(keep_secondly)])
-        if keep_minutely is not None:
-            additional_args.extend(["--keep-minutely", str(keep_minutely)])
-        if keep_hourly is not None:
-            additional_args.extend(["--keep-hourly", str(keep_hourly)])
-        if keep_daily is not None:
-            additional_args.extend(["--keep-daily", str(keep_daily)])
-        if keep_weekly is not None:
-            additional_args.extend(["--keep-weekly", str(keep_weekly)])
-        if keep_monthly is not None:
-            additional_args.extend(["--keep-monthly", str(keep_monthly)])
-        if keep_yearly is not None:
-            additional_args.extend(["--keep-yearly", str(keep_yearly)])
+        # Add retention parameters using consolidated handler
+        retention_args = RetentionFieldHandler.build_borg_args_explicit(
+            keep_within=keep_within,
+            keep_secondly=keep_secondly,
+            keep_minutely=keep_minutely,
+            keep_hourly=keep_hourly,
+            keep_daily=keep_daily,
+            keep_weekly=keep_weekly,
+            keep_monthly=keep_monthly,
+            keep_yearly=keep_yearly,
+            include_keep_within=True,
+        )
+        additional_args.extend(retention_args)
 
         # Add options
         if dry_run:

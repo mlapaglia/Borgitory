@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from borgitory.models.database import CleanupConfig, Repository
 from borgitory.models.schemas import CleanupConfigCreate, CleanupConfigUpdate
+from borgitory.constants.retention import RetentionFieldHandler
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,6 @@ class CleanupService:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
-            # Check if name already exists
             existing = (
                 self.db.query(CleanupConfig)
                 .filter(CleanupConfig.name == cleanup_config.name)
@@ -53,18 +53,11 @@ class CleanupService:
             if existing:
                 return False, None, "A prune policy with this name already exists"
 
-            # Create new configuration
             db_config = CleanupConfig()
             db_config.name = cleanup_config.name
             db_config.strategy = cleanup_config.strategy
             db_config.keep_within_days = cleanup_config.keep_within_days
-            db_config.keep_secondly = cleanup_config.keep_secondly
-            db_config.keep_minutely = cleanup_config.keep_minutely
-            db_config.keep_hourly = cleanup_config.keep_hourly
-            db_config.keep_daily = cleanup_config.keep_daily
-            db_config.keep_weekly = cleanup_config.keep_weekly
-            db_config.keep_monthly = cleanup_config.keep_monthly
-            db_config.keep_yearly = cleanup_config.keep_yearly
+            RetentionFieldHandler.copy_fields(cleanup_config, db_config)
             db_config.show_list = cleanup_config.show_list
             db_config.show_stats = cleanup_config.show_stats
             db_config.save_space = cleanup_config.save_space
@@ -98,7 +91,6 @@ class CleanupService:
             if not config:
                 return False, None, "Cleanup configuration not found"
 
-            # Check for name conflicts if name is being updated
             update_dict = config_update.model_dump(exclude_unset=True)
             if "name" in update_dict and update_dict["name"] != config.name:
                 existing = (
@@ -112,7 +104,6 @@ class CleanupService:
                 if existing:
                     return False, None, "A prune policy with this name already exists"
 
-            # Update fields that were provided
             for field, value in update_dict.items():
                 if hasattr(config, field):
                     setattr(config, field, value)
@@ -222,29 +213,12 @@ class CleanupService:
         try:
             cleanup_configs_raw = self.get_cleanup_configs()
 
-            # Process configs to add computed fields for template
             processed_configs = []
             for config in cleanup_configs_raw:
-                # Build description based on strategy
                 if config.strategy == "simple":
                     description = f"Keep archives within {config.keep_within_days} days"
                 else:
-                    parts = []
-                    if config.keep_secondly:
-                        parts.append(f"{config.keep_secondly} secondly")
-                    if config.keep_minutely:
-                        parts.append(f"{config.keep_minutely} minutely")
-                    if config.keep_hourly:
-                        parts.append(f"{config.keep_hourly} hourly")
-                    if config.keep_daily:
-                        parts.append(f"{config.keep_daily} daily")
-                    if config.keep_weekly:
-                        parts.append(f"{config.keep_weekly} weekly")
-                    if config.keep_monthly:
-                        parts.append(f"{config.keep_monthly} monthly")
-                    if config.keep_yearly:
-                        parts.append(f"{config.keep_yearly} yearly")
-                    description = ", ".join(parts) if parts else "No retention rules"
+                    description = RetentionFieldHandler.build_description(config)
 
                 processed_config = config.__dict__.copy()
                 processed_config["description"] = description

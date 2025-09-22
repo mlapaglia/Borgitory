@@ -21,6 +21,7 @@ from enum import Enum
 
 from borgitory.models.database import Repository
 from borgitory.utils.security import build_secure_borg_command
+from borgitory.constants.retention import RetentionFieldHandler
 
 logger = logging.getLogger(__name__)
 
@@ -462,23 +463,11 @@ class BackupExecutor:
         """Build Borg prune command with arguments"""
         additional_args = []
 
-        # Add retention policy arguments
-        if config.keep_within:
-            additional_args.extend(["--keep-within", config.keep_within])
-        if config.keep_secondly:
-            additional_args.extend(["--keep-secondly", str(config.keep_secondly)])
-        if config.keep_minutely:
-            additional_args.extend(["--keep-minutely", str(config.keep_minutely)])
-        if config.keep_hourly:
-            additional_args.extend(["--keep-hourly", str(config.keep_hourly)])
-        if config.keep_daily:
-            additional_args.extend(["--keep-daily", str(config.keep_daily)])
-        if config.keep_weekly:
-            additional_args.extend(["--keep-weekly", str(config.keep_weekly)])
-        if config.keep_monthly:
-            additional_args.extend(["--keep-monthly", str(config.keep_monthly)])
-        if config.keep_yearly:
-            additional_args.extend(["--keep-yearly", str(config.keep_yearly)])
+        # Add retention policy arguments using consolidated handler
+        retention_args = RetentionFieldHandler.build_borg_args(
+            config, include_keep_within=True
+        )
+        additional_args.extend(retention_args)
 
         # Add common options
         if config.show_stats:

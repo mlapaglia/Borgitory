@@ -12,76 +12,36 @@ Usage:
 -->
 
 {% set field_prefix = retention_prefix|default('keep_') %}
-{% set default_values = retention_values|default({
-    'secondly': 0,
-    'minutely': 0,
-    'daily': 7,
-    'weekly': 4,
-    'monthly': 6,
-    'yearly': 2
-}) %}
 
-{# Use config values if provided, otherwise use defaults #}
-{% if retention_config %}
-    {% set field_values = {
-        'secondly': retention_config.keep_secondly if retention_config.keep_secondly is not none else '',
-        'minutely': retention_config.keep_minutely if retention_config.keep_minutely is not none else '',
-        'daily': retention_config.keep_daily if retention_config.keep_daily is not none else '',
-        'weekly': retention_config.keep_weekly if retention_config.keep_weekly is not none else '',
-        'monthly': retention_config.keep_monthly if retention_config.keep_monthly is not none else '',
-        'yearly': retention_config.keep_yearly if retention_config.keep_yearly is not none else ''
-    } %}
-{% else %}
-    {% set field_values = default_values %}
+{# Define retention fields in order with labels and default values #}
+{% set retention_fields = [
+    {'name': 'secondly', 'label': 'Keep Secondly', 'default': 0},
+    {'name': 'minutely', 'label': 'Keep Minutely', 'default': 0},
+    {'name': 'hourly', 'label': 'Keep Hourly', 'default': 0},
+    {'name': 'daily', 'label': 'Keep Daily', 'default': 7},
+    {'name': 'weekly', 'label': 'Keep Weekly', 'default': 4},
+    {'name': 'monthly', 'label': 'Keep Monthly', 'default': 6},
+    {'name': 'yearly', 'label': 'Keep Yearly', 'default': 2}
+] %}
+
+{# Override defaults if custom values provided #}
+{% if retention_values %}
+    {% for field in retention_fields %}
+        {% if retention_values[field.name] is defined %}
+            {% set _ = field.update({'default': retention_values[field.name]}) %}
+        {% endif %}
+    {% endfor %}
 {% endif %}
 
 <div class="grid grid-cols-2 gap-2">
+    {% for field in retention_fields %}
     <div>
-        <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Secondly</label>
+        <label class="block text-xs text-gray-900 dark:text-gray-100">{{ field.label }}</label>
         <input type="number" 
-               name="{{ field_prefix }}secondly" 
-               value="{{ field_values.secondly }}" 
+               name="{{ field_prefix }}{{ field.name }}" 
+               value="{% if retention_config %}{{ retention_config['keep_' + field.name] if retention_config['keep_' + field.name] is not none else '' }}{% else %}{{ field.default }}{% endif %}" 
                min="0" 
                class="input-modern">
     </div>
-    <div>
-        <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Minutely</label>
-        <input type="number" 
-               name="{{ field_prefix }}minutely" 
-               value="{{ field_values.minutely }}" 
-               min="0" 
-               class="input-modern">
-    </div>
-    <div>
-        <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Daily</label>
-        <input type="number" 
-               name="{{ field_prefix }}daily" 
-               value="{{ field_values.daily }}" 
-               min="0" 
-               class="input-modern">
-    </div>
-    <div>
-        <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Weekly</label>
-        <input type="number" 
-               name="{{ field_prefix }}weekly" 
-               value="{{ field_values.weekly }}" 
-               min="0" 
-               class="input-modern">
-    </div>
-    <div>
-        <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Monthly</label>
-        <input type="number" 
-               name="{{ field_prefix }}monthly" 
-               value="{{ field_values.monthly }}" 
-               min="0" 
-               class="input-modern">
-    </div>
-    <div>
-        <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Yearly</label>
-        <input type="number" 
-               name="{{ field_prefix }}yearly" 
-               value="{{ field_values.yearly }}" 
-               min="0" 
-               class="input-modern">
-    </div>
+    {% endfor %}
 </div>

@@ -13,6 +13,7 @@ from borgitory.models.database import (
     NotificationConfig,
 )
 from borgitory.models.schemas import PruneRequest, CheckRequest
+from borgitory.constants.retention import RetentionFieldHandler
 
 
 class TaskDefinitionBuilder:
@@ -94,17 +95,9 @@ class TaskDefinitionBuilder:
         if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
             task["keep_within"] = f"{cleanup_config.keep_within_days}d"
         elif cleanup_config.strategy == "advanced":
-            task.update(
-                {
-                    "keep_secondly": cleanup_config.keep_secondly,
-                    "keep_minutely": cleanup_config.keep_minutely,
-                    "keep_hourly": cleanup_config.keep_hourly,
-                    "keep_daily": cleanup_config.keep_daily,
-                    "keep_weekly": cleanup_config.keep_weekly,
-                    "keep_monthly": cleanup_config.keep_monthly,
-                    "keep_yearly": cleanup_config.keep_yearly,
-                }
-            )
+            # Add retention fields using consolidated handler
+            retention_dict = RetentionFieldHandler.to_dict(cleanup_config)
+            task.update(retention_dict)
 
         return task
 
@@ -135,17 +128,9 @@ class TaskDefinitionBuilder:
         if prune_request.strategy == "simple" and prune_request.keep_within_days:
             task["keep_within"] = f"{prune_request.keep_within_days}d"
         elif prune_request.strategy == "advanced":
-            task.update(
-                {
-                    "keep_secondly": prune_request.keep_secondly,
-                    "keep_minutely": prune_request.keep_minutely,
-                    "keep_hourly": prune_request.keep_hourly,
-                    "keep_daily": prune_request.keep_daily,
-                    "keep_weekly": prune_request.keep_weekly,
-                    "keep_monthly": prune_request.keep_monthly,
-                    "keep_yearly": prune_request.keep_yearly,
-                }
-            )
+            # Add retention fields using consolidated handler
+            retention_dict = RetentionFieldHandler.to_dict(prune_request)
+            task.update(retention_dict)
 
         return task
 
