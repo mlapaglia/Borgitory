@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
@@ -84,7 +84,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             job_type="backup",
         )
         backup_service_with_mock_executor.db.add(job)
@@ -103,7 +103,7 @@ class TestBackupService:
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Backup completed successfully"],
-            completed_at=datetime.now(UTC),
+            completed_at=now_utc(),
         )
         backup_service_with_mock_executor.executor.execute_backup = AsyncMock(
             return_value=mock_result
@@ -138,7 +138,7 @@ class TestBackupService:
             repository_id=999,  # Non-existent repository
             type="backup",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
 
         backup_request = BackupRequest(repository_id=999, source_path="/data")
@@ -156,7 +156,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
@@ -175,7 +175,7 @@ class TestBackupService:
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Test output line"],
-            completed_at=datetime.now(UTC),
+            completed_at=now_utc(),
         )
 
         # Mock executor to call output callback
@@ -207,7 +207,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
@@ -248,7 +248,7 @@ class TestBackupService:
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Prune completed successfully"],
-            completed_at=datetime.now(UTC),
+            completed_at=now_utc(),
         )
         backup_service_with_mock_executor.executor.execute_prune = AsyncMock(
             return_value=mock_result
@@ -304,8 +304,8 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="backup",
             status="completed",
-            started_at=datetime.now(UTC),
-            finished_at=datetime.now(UTC),
+            started_at=now_utc(),
+            finished_at=now_utc(),
         )
         backup_service.db.add(job)
         backup_service.db.commit()
@@ -315,8 +315,8 @@ class TestBackupService:
             task_type="backup",
             task_name="Test Backup",
             status="completed",
-            started_at=datetime.now(UTC),
-            completed_at=datetime.now(UTC),
+            started_at=now_utc(),
+            completed_at=now_utc(),
             return_code=0,
             task_order=1,
         )
@@ -349,8 +349,8 @@ class TestBackupService:
                 repository_id=test_repository.id,
                 type="backup",
                 status="completed",
-                started_at=datetime.now(UTC),
-                finished_at=datetime.now(UTC),
+                started_at=now_utc(),
+                finished_at=now_utc(),
             )
             jobs.append(job)
             backup_service.db.add(job)
@@ -376,7 +376,7 @@ class TestBackupService:
                 repository_id=test_repository.id,
                 type="backup",
                 status="completed",
-                started_at=datetime.now(UTC),
+                started_at=now_utc(),
             )
             backup_service.db.add(job)
 
@@ -396,7 +396,7 @@ class TestBackupService:
             repository_id=1,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
@@ -452,8 +452,8 @@ class TestBackupService:
             repository_id=1,
             type="backup",
             status="completed",
-            started_at=datetime.now(UTC),
-            finished_at=datetime.now(UTC),
+            started_at=now_utc(),
+            finished_at=now_utc(),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()
@@ -538,7 +538,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service.db.add(job)
         backup_service.db.commit()
@@ -566,7 +566,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="prune",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service.db.add(job)
         backup_service.db.commit()
@@ -641,7 +641,7 @@ class TestBackupService:
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Line 1", "Line 2"],
-            completed_at=datetime.now(UTC),
+            completed_at=now_utc(),
         )
 
         backup_service._update_task_from_result(task, result)
@@ -667,7 +667,7 @@ class TestBackupService:
             return_code=1,
             output_lines=["Error occurred"],
             error_message="Backup failed",
-            completed_at=datetime.now(UTC),
+            completed_at=now_utc(),
         )
 
         backup_service._update_task_from_result(task, result)
@@ -720,7 +720,7 @@ class TestBackupService:
             total_tasks=2,
             completed_tasks=0,
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service.db.add(job)
 
@@ -759,7 +759,7 @@ class TestBackupService:
             total_tasks=2,
             completed_tasks=0,
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service.db.add(job)
 
@@ -797,7 +797,7 @@ class TestBackupService:
             total_tasks=3,
             completed_tasks=0,
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service.db.add(job)
 
@@ -835,13 +835,13 @@ class TestBackupService:
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Backup completed"],
-            completed_at=datetime.now(UTC),
+            completed_at=now_utc(),
         )
         prune_result = BackupResult(
             status=BackupStatus.COMPLETED,
             return_code=0,
             output_lines=["Prune completed"],
-            completed_at=datetime.now(UTC),
+            completed_at=now_utc(),
         )
 
         backup_service_with_mock_executor.executor.execute_backup = AsyncMock(
@@ -857,7 +857,7 @@ class TestBackupService:
             repository_id=test_repository.id,
             type="backup",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
         )
         backup_service_with_mock_executor.db.add(job)
         backup_service_with_mock_executor.db.commit()

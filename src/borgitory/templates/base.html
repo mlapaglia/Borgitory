@@ -128,6 +128,27 @@
 
     <div id="notification-area" class="fixed top-4 right-4 z-50"></div>
 
+    <!-- Timezone Detection Script -->
+    <script>
+        function getBrowserTimezoneOffset() {
+            return new Date().getTimezoneOffset();
+        }
+        
+        function setCookie(name, value, days = 30) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+        }
+        
+        function setupTimezoneCookie() {
+            const timezoneOffset = getBrowserTimezoneOffset();
+            setCookie('browser_timezone_offset', timezoneOffset.toString());
+        }
+        
+        // Set timezone cookie when DOM is ready
+        document.addEventListener('DOMContentLoaded', setupTimezoneCookie);
+    </script>
+
     <!-- Component JavaScript Files -->
     <script src="/static/js/app.js"></script>
     <script src="/static/js/components/navigation.js"></script>

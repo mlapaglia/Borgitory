@@ -18,12 +18,12 @@
                 <div><strong>Repository:</strong> {{ schedule.repository.name }}</div>
                 <div><strong>Cron Expression:</strong> {{ schedule.cron_expression }}</div>
                 {% if schedule.last_run %}
-                <div><strong>Last Run:</strong> {{ schedule.last_run.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                <div><strong>Last Run:</strong> {{ schedule.last_run | format_datetime_browser('%Y-%m-%d %H:%M:%S', browser_tz_offset) }}</div>
                 {% endif %}
                 {% if schedule.next_run %}
-                <div><strong>Next Run:</strong> {{ schedule.next_run.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                <div><strong>Next Run:</strong> {{ schedule.next_run | format_datetime_browser('%Y-%m-%d %H:%M:%S', browser_tz_offset) }}</div>
                 {% endif %}
-                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ schedule.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ schedule.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) }}</div>
             </div>
         </div>
         <div class="flex flex-col space-y-2 ml-4">

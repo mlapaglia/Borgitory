@@ -3,12 +3,12 @@ import platform
 import sys
 import os
 import logging
-from datetime import datetime
 from typing import Dict, Optional, TypedDict, List
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job
 from borgitory.protocols import VolumeServiceProtocol, JobManagerProtocol
+from borgitory.protocols.environment_protocol import EnvironmentProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -112,11 +112,13 @@ class DebugService:
 
     def __init__(
         self,
-        volume_service: Optional[VolumeServiceProtocol] = None,
-        job_manager: Optional[JobManagerProtocol] = None,
+        volume_service: VolumeServiceProtocol,
+        job_manager: JobManagerProtocol,
+        environment: EnvironmentProtocol,
     ) -> None:
         self.volume_service = volume_service
         self.job_manager = job_manager
+        self.environment = environment
 
     async def get_debug_info(self, db: Session) -> DebugInfo:
         """Gather comprehensive debug information"""
@@ -156,10 +158,13 @@ class DebugService:
         """Get application information"""
         try:
             app_info: ApplicationInfo = {
-                "borgitory_version": os.getenv("BORGITORY_VERSION"),
-                "debug_mode": os.getenv("DEBUG", "false").lower() == "true",
-                "startup_time": datetime.now().isoformat(),
-                "working_directory": os.getcwd(),
+                "borgitory_version": self.environment.get_env("BORGITORY_VERSION"),
+                "debug_mode": (
+                    self.environment.get_env("DEBUG", "false") or "false"
+                ).lower()
+                == "true",
+                "startup_time": self.environment.now_utc().isoformat(),
+                "working_directory": self.environment.get_cwd(),
             }
             return app_info
         except Exception as e:
@@ -169,12 +174,12 @@ class DebugService:
     def _get_database_info(self, db: Session) -> DatabaseInfo:
         """Get database information"""
         try:
-            from borgitory.config import DATABASE_URL
+            database_url = self.environment.get_database_url()
 
             repository_count = db.query(Repository).count()
             total_jobs = db.query(Job).count()
             # Use started_at instead of created_at for Job model
-            today_start = datetime.now().replace(
+            today_start = self.environment.now_utc().replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
             recent_jobs = db.query(Job).filter(Job.started_at >= today_start).count()
@@ -183,9 +188,9 @@ class DebugService:
             database_size = "Unknown"
             database_size_bytes = 0
             try:
-                if DATABASE_URL.startswith("sqlite:///"):
+                if database_url.startswith("sqlite:///"):
                     # Extract file path from SQLite URL (sqlite:///path/to/file.db)
-                    db_path = DATABASE_URL[10:]  # Remove "sqlite:///" prefix
+                    db_path = database_url[10:]  # Remove "sqlite:///" prefix
                     if os.path.exists(db_path):
                         database_size_bytes = os.path.getsize(db_path)
                         # Convert to human readable format
@@ -203,9 +208,9 @@ class DebugService:
                             )
                     else:
                         database_size = f"File not found: {db_path}"
-                elif DATABASE_URL.startswith("sqlite://"):
+                elif database_url.startswith("sqlite://"):
                     # Handle relative path format (sqlite://path/to/file.db)
-                    db_path = DATABASE_URL[9:]  # Remove "sqlite://" prefix
+                    db_path = database_url[9:]  # Remove "sqlite://" prefix
                     if os.path.exists(db_path):
                         database_size_bytes = os.path.getsize(db_path)
                         # Convert to human readable format
@@ -226,12 +231,22 @@ class DebugService:
             except Exception as size_error:
                 database_size = f"Error: {str(size_error)}"
 
+            # Determine database type from URL
+            if database_url.startswith("sqlite"):
+                db_type = "SQLite"
+            elif database_url.startswith("postgresql"):
+                db_type = "PostgreSQL"
+            elif database_url.startswith("mysql"):
+                db_type = "MySQL"
+            else:
+                db_type = "Unknown"
+
             return {
                 "repository_count": repository_count,
                 "total_jobs": total_jobs,
                 "jobs_today": recent_jobs,
-                "database_type": "SQLite",
-                "database_url": DATABASE_URL,
+                "database_type": db_type,
+                "database_url": database_url,
                 "database_size": database_size,
                 "database_size_bytes": database_size_bytes,
                 "database_accessible": True,
@@ -242,21 +257,10 @@ class DebugService:
     async def _get_volume_info(self) -> VolumeDebugInfo:
         """Get volume mount information"""
         try:
-            # Use the shared volume service for volume discovery
-            if self.volume_service:
-                volume_info = await self.volume_service.get_volume_info()
-                mounted_volumes = volume_info.get("mounted_volumes", [])
-                if not isinstance(mounted_volumes, list):
-                    mounted_volumes = []
-            else:
-                # Fallback: use direct import (for backward compatibility)
-                from borgitory.dependencies import get_volume_service
-
-                volume_service = get_volume_service()
-                volume_info = await volume_service.get_volume_info()
-                mounted_volumes = volume_info.get("mounted_volumes", [])
-                if not isinstance(mounted_volumes, list):
-                    mounted_volumes = []
+            volume_info = await self.volume_service.get_volume_info()
+            mounted_volumes = volume_info.get("mounted_volumes", [])
+            if not isinstance(mounted_volumes, list):
+                mounted_volumes = []
 
             volume_debug_info: VolumeDebugInfo = {
                 "mounted_volumes": mounted_volumes,
@@ -424,7 +428,7 @@ class DebugService:
             ]
 
             for var in safe_env_vars:
-                value = os.environ.get(var)
+                value = self.environment.get_env(var)
                 if value:
                     # Sanitize sensitive information
                     if (
@@ -447,14 +451,6 @@ class DebugService:
     def _get_job_manager_info(self) -> JobManagerInfo:
         """Get job manager information"""
         try:
-            if not self.job_manager:
-                # Return minimal info if no job manager injected
-                return {
-                    "status": "No job manager available",
-                    "active_jobs": 0,
-                    "total_jobs": 0,
-                }
-
             # Count active jobs by checking job statuses
             active_jobs_count = 0
             total_jobs = (

@@ -2,7 +2,7 @@
 FastAPI dependency providers for the application.
 """
 
-from typing import Annotated, TYPE_CHECKING, Optional, Callable, ContextManager
+from typing import Annotated, TYPE_CHECKING, Optional, Callable, ContextManager, Any
 
 from borgitory.services.notifications.registry_factory import (
     NotificationRegistryFactory,
@@ -32,6 +32,7 @@ from borgitory.services.jobs.job_stream_service import JobStreamService
 from borgitory.services.jobs.job_render_service import JobRenderService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.debug_service import DebugService
+from borgitory.protocols.environment_protocol import DefaultEnvironment
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
@@ -55,8 +56,15 @@ from borgitory.services.cleanup_service import CleanupService
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
+from starlette.templating import _TemplateResponse
 from borgitory.services.cloud_providers import StorageFactory
+from borgitory.utils.datetime_utils import (
+    format_datetime_for_display,
+    get_server_timezone,
+)
+from fastapi import Request
 from borgitory.services.encryption_service import EncryptionService
+from datetime import datetime
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncConfigService
@@ -362,15 +370,85 @@ def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
     return get_job_event_broadcaster()
 
 
-@lru_cache()
-def get_templates() -> Jinja2Templates:
+def get_browser_timezone_offset(request: Request) -> Optional[int]:
     """
-    Provide a Jinja2Templates singleton instance.
+    Extract browser timezone offset from request cookies.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        Browser timezone offset in minutes, or None if not available
+    """
+    tz_cookie = request.cookies.get("browser_timezone_offset")
+    if tz_cookie:
+        try:
+            return int(tz_cookie)
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+class TimezoneAwareJinja2Templates(Jinja2Templates):
+    """
+    Custom Jinja2Templates that automatically includes browser timezone offset in context.
+    """
+
+    def TemplateResponse(self, *args: Any, **kwargs: Any) -> _TemplateResponse:
+        """
+        Create template response with automatic timezone offset injection.
+        """
+        # Extract request and context from args/kwargs
+        request = args[0] if len(args) > 0 else kwargs.get("request")
+        context = args[2] if len(args) > 2 else kwargs.get("context", {})
+
+        if context is None:
+            context = {}
+
+        # Automatically add browser timezone offset to context
+        if request:
+            context["browser_tz_offset"] = get_browser_timezone_offset(request)
+
+        # Update context in kwargs if it was passed as kwarg, otherwise update args
+        if len(args) > 2:
+            args_list = list(args)
+            args_list[2] = context
+            args = tuple(args_list)
+        else:
+            kwargs["context"] = context
+
+        return super().TemplateResponse(*args, **kwargs)
+
+
+@lru_cache()
+def get_templates() -> TimezoneAwareJinja2Templates:
+    """
+    Provide a Jinja2Templates singleton instance with custom filters.
 
     Uses FastAPI's built-in caching for singleton behavior.
     """
     template_path = get_template_directory()
-    return Jinja2Templates(directory=template_path)
+    templates = TimezoneAwareJinja2Templates(directory=template_path)
+
+    # Add custom datetime filters
+    def datetime_filter(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+        """Jinja2 filter for datetime formatting with timezone conversion"""
+        return format_datetime_for_display(dt, format_str, get_server_timezone())
+
+    def datetime_browser_filter(
+        dt: datetime,
+        format_str: str = "%Y-%m-%d %H:%M:%S",
+        tz_offset: Optional[int] = None,
+    ) -> str:
+        """Jinja2 filter for datetime formatting with browser timezone conversion"""
+        return format_datetime_for_display(
+            dt, format_str, browser_tz_offset_minutes=tz_offset
+        )
+
+    templates.env.filters["format_datetime"] = datetime_filter
+    templates.env.filters["format_datetime_browser"] = datetime_browser_filter
+
+    return templates
 
 
 @lru_cache()
@@ -548,20 +626,53 @@ def get_job_manager_dependency() -> "JobManagerProtocol":
     return get_job_manager_singleton()
 
 
-def get_scheduler_service(
-    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-) -> SchedulerService:
+@lru_cache()
+def get_scheduler_service_singleton() -> SchedulerService:
     """
-    Provide a SchedulerService instance with proper FastAPI dependency injection.
+    Create SchedulerService singleton for application-scoped use.
 
-    Uses pure DI pattern - no global singletons, all dependencies injected by FastAPI.
+    📋 USAGE:
+    ✅ Use for: Singletons, direct instantiation, tests, background tasks, application lifecycle
+    ❌ Don't use for: FastAPI endpoints (use get_scheduler_service_dependency instead)
+
+    📋 PATTERN: Dual Functions
+    This is the singleton version that resolves dependencies directly.
+    For FastAPI DI, use get_scheduler_service_dependency() with Depends().
+
+    Returns:
+        SchedulerService: Cached singleton instance
     """
+    # Resolve dependencies directly (not via FastAPI DI)
+    job_manager = get_job_manager_singleton()
     return SchedulerService(job_manager=job_manager, job_service_factory=None)
+
+
+def get_scheduler_service_dependency() -> SchedulerService:
+    """
+    Provide SchedulerService with FastAPI dependency injection.
+
+    📋 USAGE:
+    ✅ Use for: FastAPI endpoints with Depends(get_scheduler_service_dependency)
+    ❌ Don't use for: Direct calls, singletons, tests
+
+    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
+    ⚠️  For direct calls, use get_scheduler_service_singleton() instead.
+
+    📋 PATTERN: Dual Functions
+    This is the FastAPI DI version that returns the same singleton instance.
+    For direct calls, use get_scheduler_service_singleton().
+
+    Returns:
+        SchedulerService: The same singleton instance as get_scheduler_service_singleton()
+    """
+    # Both functions return the same singleton instance
+    # This ensures scheduler state consistency across all usage patterns
+    return get_scheduler_service_singleton()
 
 
 def get_schedule_service(
     db: Session = Depends(get_db),
-    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
 ) -> ScheduleService:
     """
     Provide a ScheduleService instance with database session injection.
@@ -631,12 +742,16 @@ def get_debug_service(
     Provide a DebugService instance with proper dependency injection.
     Uses FastAPI DI with automatic dependency resolution.
     """
-    return DebugService(volume_service=volume_service, job_manager=job_manager)
+    return DebugService(
+        volume_service=volume_service,
+        job_manager=job_manager,
+        environment=DefaultEnvironment(),
+    )
 
 
 def get_repository_service(
     borg_service: BorgService = Depends(get_borg_service),
-    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
     volume_service: VolumeService = Depends(get_volume_service),
 ) -> RepositoryService:
     """
@@ -744,7 +859,9 @@ RcloneServiceDep = Annotated[RcloneService, Depends(get_rclone_service)]
 RepositoryStatsServiceDep = Annotated[
     RepositoryStatsService, Depends(get_repository_stats_service)
 ]
-SchedulerServiceDep = Annotated[SchedulerService, Depends(get_scheduler_service)]
+SchedulerServiceDep = Annotated[
+    SchedulerService, Depends(get_scheduler_service_dependency)
+]
 VolumeServiceDep = Annotated[VolumeService, Depends(get_volume_service)]
 TaskDefinitionBuilderDep = Annotated[
     TaskDefinitionBuilder, Depends(get_task_definition_builder)

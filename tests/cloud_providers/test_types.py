@@ -5,7 +5,8 @@ These tests are simple, fast, and focused on single responsibilities.
 No complex mocking or async generators - just pure function testing.
 """
 
-from datetime import datetime, UTC
+from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.services.cloud_providers.types import (
     SyncEvent,
@@ -74,9 +75,9 @@ class TestSyncEvent:
 
     def test_event_timestamp_auto_generated(self) -> None:
         """Test that timestamp is automatically generated"""
-        before = datetime.now(UTC)
+        before = now_utc()
         event = SyncEvent(type=SyncEventType.PROGRESS, message="Test")
-        after = datetime.now(UTC)
+        after = now_utc()
 
         assert before <= event.timestamp <= after
 

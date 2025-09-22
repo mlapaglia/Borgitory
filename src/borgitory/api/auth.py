@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, Response, Form
 from sqlalchemy.orm import Session
 import secrets
-from datetime import datetime, timedelta, UTC
+from datetime import timedelta
+from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, Optional
 
 from borgitory.models.database import User, UserSession, get_db
@@ -123,14 +124,14 @@ def login_user(
         auth_token = secrets.token_urlsafe(32)
 
         if remember_me:
-            expires_at = datetime.now(UTC) + timedelta(days=365)
+            expires_at = now_utc() + timedelta(days=365)
             max_age = 365 * 24 * 60 * 60
         else:
-            expires_at = datetime.now(UTC) + timedelta(minutes=30)
+            expires_at = now_utc() + timedelta(minutes=30)
             max_age = 30 * 60
 
         db.query(UserSession).filter(
-            UserSession.user_id == user.id, UserSession.expires_at < datetime.now(UTC)
+            UserSession.user_id == user.id, UserSession.expires_at < now_utc()
         ).delete()
 
         user_agent = request.headers.get("user-agent") if request else None
@@ -139,7 +140,7 @@ def login_user(
             if request and hasattr(request, "client") and request.client
             else None
         )
-        current_time = datetime.now(UTC)
+        current_time = now_utc()
 
         db_session = UserSession()
         db_session.user_id = user.id
@@ -205,7 +206,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         db.query(UserSession)
         .filter(
             UserSession.session_token == auth_token,
-            UserSession.expires_at > datetime.now(UTC),
+            UserSession.expires_at > now_utc(),
         )
         .first()
     )
@@ -214,8 +215,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         raise HTTPException(status_code=401, detail="Session expired")
 
     if not session.remember_me:
-        session.expires_at = datetime.now(UTC) + timedelta(minutes=30)
-        session.last_activity = datetime.now(UTC)
+        session.expires_at = now_utc() + timedelta(minutes=30)
+        session.last_activity = now_utc()
         db.commit()
 
     user = db.query(User).filter(User.id == session.user_id).first()

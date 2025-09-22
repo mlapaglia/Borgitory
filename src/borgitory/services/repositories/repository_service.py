@@ -6,7 +6,6 @@ Handles all repository-related business operations independent of HTTP concerns.
 import logging
 import os
 from typing import List, Dict, Any
-from datetime import datetime
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job, Schedule
@@ -33,6 +32,10 @@ from borgitory.models.repository_dtos import (
 from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.services.volumes.volume_service import VolumeService
+from borgitory.utils.datetime_utils import (
+    format_datetime_for_display,
+    parse_datetime_string,
+)
 from borgitory.utils.secure_path import (
     create_secure_filename,
     secure_path_join,
@@ -245,12 +248,10 @@ class RepositoryService:
                 )
 
                 if archive_info.time:
-                    try:
-                        dt = datetime.fromisoformat(
-                            archive_info.time.replace("Z", "+00:00")
-                        )
-                        archive_info.formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-                    except (ValueError, TypeError):
+                    dt = parse_datetime_string(archive_info.time)
+                    if dt:
+                        archive_info.formatted_time = format_datetime_for_display(dt)
+                    else:
                         archive_info.formatted_time = archive_info.time
 
                 if archive_info.stats and "original_size" in archive_info.stats:

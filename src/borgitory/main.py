@@ -29,7 +29,7 @@ from borgitory.api import (
     shared,
     tabs,
 )
-from borgitory.dependencies import get_recovery_service, get_scheduler_service
+from borgitory.dependencies import get_recovery_service, get_scheduler_service_singleton
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         recovery_service = get_recovery_service()
         await recovery_service.recover_stale_jobs()
 
-        scheduler_service = get_scheduler_service()
+        scheduler_service = get_scheduler_service_singleton()
         await scheduler_service.start()
         logger.info("Scheduler started")
 

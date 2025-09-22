@@ -3,7 +3,8 @@ import json
 import logging
 import re
 import os
-from datetime import datetime, UTC
+from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from typing import Any, AsyncGenerator, Dict, List, Optional, cast
 
 from starlette.responses import StreamingResponse
@@ -237,7 +238,7 @@ class BorgService:
 
         try:
             validate_compression(compression)
-            archive_name = f"backup-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+            archive_name = f"backup-{now_utc().strftime('%Y-%m-%d_%H-%M-%S')}"
             validate_archive_name(archive_name)
         except Exception as e:
             raise Exception(f"Validation failed: {str(e)}")
@@ -320,7 +321,7 @@ class BorgService:
                 db_job.repository_id = repository.id
                 db_job.type = "list"
                 db_job.status = "running"
-                db_job.started_at = datetime.now(UTC)
+                db_job.started_at = now_utc()
                 db.add(db_job)
                 db.commit()  # Commit the job record
                 logger.info(f"Created database record for list archives job {job_id}")
@@ -364,7 +365,7 @@ class BorgService:
                     existing_job.status = (
                         "completed" if final_status["return_code"] == 0 else "failed"
                     )
-                    existing_job.finished_at = datetime.now(UTC)
+                    existing_job.finished_at = now_utc()
                     if final_status["return_code"] != 0:
                         existing_job.error = str(
                             final_status.get("error", "Unknown error")

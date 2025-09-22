@@ -439,40 +439,40 @@ class TestBorgCommandBuilder:
         assert "--last" in additional_args
         assert "5" in additional_args
 
-    @patch("borgitory.services.borg_command_builder.datetime")
+    @patch("borgitory.services.borg_command_builder.now_utc")
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     def test_generate_archive_name_default(
-        self, mock_validate_archive, mock_datetime
+        self, mock_validate_archive, mock_now_utc
     ) -> None:
         """Test generating default archive name"""
-        mock_datetime.now.return_value.strftime.return_value = "2024-01-15_14-30-45"
+        mock_now_utc.return_value.strftime.return_value = "2024-01-15_14-30-45"
 
         archive_name = self.builder.generate_archive_name()
 
         assert archive_name == "backup-2024-01-15_14-30-45"
         mock_validate_archive.assert_called_once_with("backup-2024-01-15_14-30-45")
 
-    @patch("borgitory.services.borg_command_builder.datetime")
+    @patch("borgitory.services.borg_command_builder.now_utc")
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     def test_generate_archive_name_custom_prefix(
-        self, mock_validate_archive, mock_datetime
+        self, mock_validate_archive, mock_now_utc
     ) -> None:
         """Test generating archive name with custom prefix"""
-        mock_datetime.now.return_value.strftime.return_value = "2024-01-15_14-30-45"
+        mock_now_utc.return_value.strftime.return_value = "2024-01-15_14-30-45"
 
         archive_name = self.builder.generate_archive_name("custom")
 
         assert archive_name == "custom-2024-01-15_14-30-45"
         mock_validate_archive.assert_called_once_with("custom-2024-01-15_14-30-45")
 
-    @patch("borgitory.services.borg_command_builder.datetime")
+    @patch("borgitory.services.borg_command_builder.now_utc")
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     @patch("borgitory.services.borg_command_builder.logger")
     def test_generate_archive_name_validation_fails(
-        self, mock_logger, mock_validate_archive, mock_datetime
+        self, mock_logger, mock_validate_archive, mock_now_utc
     ) -> None:
         """Test generating archive name when validation fails"""
-        mock_datetime.now.return_value.strftime.side_effect = [
+        mock_now_utc.return_value.strftime.side_effect = [
             "2024-01-15_14-30-45",
             "20240115_143045",
         ]

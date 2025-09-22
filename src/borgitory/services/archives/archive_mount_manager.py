@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.models.database import Repository
 from borgitory.utils.security import build_secure_borg_command
@@ -142,8 +143,8 @@ class ArchiveMountManager:
                 repository_path=repository.path,
                 archive_name=archive_name,
                 mount_point=mount_point,
-                mounted_at=datetime.now(),
-                last_accessed=datetime.now(),
+                mounted_at=now_utc(),
+                last_accessed=now_utc(),
                 job_executor_process=process,
             )
             self.active_mounts[mount_key] = mount_info
@@ -320,7 +321,7 @@ class ArchiveMountManager:
 
     async def cleanup_old_mounts(self) -> None:
         """Remove old unused mounts"""
-        cutoff_time = datetime.now() - timedelta(seconds=self.mount_timeout)
+        cutoff_time = now_utc() - timedelta(seconds=self.mount_timeout)
         to_remove = []
 
         for mount_key, mount_info in self.active_mounts.items():

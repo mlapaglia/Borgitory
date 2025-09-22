@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from typing import Generator, AsyncGenerator, Any
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
@@ -120,8 +120,8 @@ class TestBackupResult:
 
     def test_backup_result_creation(self) -> None:
         """Test BackupResult creation"""
-        started = datetime.now(UTC)
-        completed = datetime.now(UTC)
+        started = now_utc()
+        completed = now_utc()
 
         result = BackupResult(
             status=BackupStatus.COMPLETED,

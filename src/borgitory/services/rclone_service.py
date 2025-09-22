@@ -17,6 +17,7 @@ from typing import (
 )
 
 from borgitory.models.database import Repository
+from borgitory.utils.datetime_utils import now_utc
 
 logger = logging.getLogger(__name__)
 
@@ -317,12 +318,8 @@ class RcloneService:
     ) -> ConnectionTestResult:
         """Test write permissions by creating and deleting a small test file"""
         try:
-            from datetime import datetime
-
-            test_content = f"borgitory-test-{datetime.now().isoformat()}"
-            test_filename = (
-                f"borgitory-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
-            )
+            test_content = f"borgitory-test-{now_utc().isoformat()}"
+            test_filename = f"borgitory-test-{now_utc().strftime('%Y%m%d-%H%M%S')}.txt"
 
             with tempfile.NamedTemporaryFile(
                 mode="w", delete=False, suffix=".txt"
@@ -682,12 +679,10 @@ class RcloneService:
         temp_file_path = None
 
         try:
-            from datetime import datetime
+            from borgitory.utils.datetime_utils import now_utc
 
-            test_content = f"borgitory-test-{datetime.now().isoformat()}"
-            test_filename = (
-                f"borgitory-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
-            )
+            test_content = f"borgitory-test-{now_utc().isoformat()}"
+            test_filename = f"borgitory-test-{now_utc().strftime('%Y%m%d-%H%M%S')}.txt"
 
             with tempfile.NamedTemporaryFile(
                 mode="w", delete=False, suffix=".txt"

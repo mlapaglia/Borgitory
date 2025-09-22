@@ -9,12 +9,68 @@ from sqlalchemy.orm import Session
 from borgitory.services.debug_service import DebugService
 
 
+class MockEnvironment:
+    """Mock environment for testing"""
+
+    def __init__(self):
+        self.env_vars = {}
+        self.cwd = "/test/dir"
+        self.current_time = datetime(2023, 1, 1, 12, 0, 0)
+        self.database_url = "sqlite:///test.db"
+
+    def get_env(self, key: str, default: str = None) -> str:
+        return self.env_vars.get(key, default)
+
+    def get_cwd(self) -> str:
+        return self.cwd
+
+    def now_utc(self) -> datetime:
+        return self.current_time
+
+    def get_database_url(self) -> str:
+        return self.database_url
+
+
 @pytest.fixture
-def debug_service():
+def mock_environment():
+    return MockEnvironment()
+
+
+@pytest.fixture
+def mock_volume_service():
+    """Mock volume service for testing"""
+    from unittest.mock import AsyncMock
+
+    mock_service = AsyncMock()
+    mock_service.get_volume_info.return_value = {
+        "mounted_volumes": ["/data", "/backup"],
+        "total_mounted_volumes": 2,
+    }
+    return mock_service
+
+
+@pytest.fixture
+def mock_job_manager():
+    """Mock job manager for testing"""
     from unittest.mock import Mock
 
-    mock_job_manager = Mock()
-    return DebugService(job_manager=mock_job_manager)
+    mock_manager = Mock()
+    mock_manager.jobs = {
+        "job1": Mock(status="running"),
+        "job2": Mock(status="completed"),
+        "job3": Mock(status="running"),
+    }
+    return mock_manager
+
+
+@pytest.fixture
+def debug_service(mock_environment, mock_volume_service, mock_job_manager):
+    """Debug service with all required dependencies injected"""
+    return DebugService(
+        volume_service=mock_volume_service,
+        job_manager=mock_job_manager,
+        environment=mock_environment,
+    )
 
 
 @pytest.fixture
@@ -186,36 +242,31 @@ class TestDebugService:
             assert result["python_executable"] == "/usr/bin/python"
 
     @pytest.mark.asyncio
-    async def test_get_application_info(self, debug_service) -> None:
+    async def test_get_application_info(self, debug_service, mock_environment) -> None:
         """Test application info collection"""
-        test_time = datetime(2023, 1, 1, 12, 0, 0)
+        # Configure mock environment
+        mock_environment.env_vars = {"BORGITORY_VERSION": "1.0.0", "DEBUG": "false"}
+        mock_environment.cwd = "/test/dir"
+        mock_environment.current_time = datetime(2023, 1, 1, 12, 0, 0)
 
-        with patch("os.getenv") as mock_getenv, patch(
-            "borgitory.services.debug_service.datetime"
-        ) as mock_datetime, patch("os.getcwd", return_value="/test/dir"):
-            mock_getenv.return_value = "false"
-            mock_datetime.now.return_value = test_time
+        result = await debug_service._get_application_info()
 
-            result = await debug_service._get_application_info()
-
-            # Version should be read dynamically from pyproject.toml
-            assert "borgitory_version" in result
-            assert result["borgitory_version"] != ""
-            assert result["debug_mode"] is False
-            assert result["working_directory"] == "/test/dir"
-            assert "startup_time" in result
+        assert result["borgitory_version"] == "1.0.0"
+        assert result["debug_mode"] is False
+        assert result["working_directory"] == "/test/dir"
+        assert result["startup_time"] == "2023-01-01T12:00:00"
 
     @pytest.mark.asyncio
-    async def test_get_application_info_debug_mode_true(self, debug_service) -> None:
+    async def test_get_application_info_debug_mode_true(
+        self, debug_service, mock_environment
+    ) -> None:
         """Test application info with debug mode enabled"""
-        with patch("os.getenv", return_value="TRUE"), patch(
-            "borgitory.services.debug_service.datetime"
-        ) as mock_datetime, patch("os.getcwd", return_value="/test/dir"):
-            mock_datetime.now.return_value = datetime(2023, 1, 1, 12, 0, 0)
+        # Configure mock environment for debug mode
+        mock_environment.env_vars = {"DEBUG": "TRUE"}
 
-            result = await debug_service._get_application_info()
+        result = await debug_service._get_application_info()
 
-            assert result["debug_mode"] is True
+        assert result["debug_mode"] is True
 
     def test_get_database_info_success(self, debug_service, mock_db_session) -> None:
         """Test successful database info collection"""
@@ -295,54 +346,52 @@ class TestDebugService:
         assert result["database_accessible"] is False
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_success(self, debug_service) -> None:
+    async def test_get_volume_info_success(
+        self, debug_service, mock_volume_service
+    ) -> None:
         """Test volume info collection success"""
-        mock_volume_service = MagicMock()
-        mock_volume_service.get_volume_info = AsyncMock(
-            return_value={
-                "mounted_volumes": ["/data", "/backup"],
-                "total_mounted_volumes": 2,
-            }
-        )
+        # Configure the mock volume service
+        mock_volume_service.get_volume_info.return_value = {
+            "mounted_volumes": ["/data", "/backup"],
+            "total_mounted_volumes": 2,
+        }
 
-        with patch(
-            "borgitory.dependencies.get_volume_service",
-            return_value=mock_volume_service,
-        ):
-            result = await debug_service._get_volume_info()
+        result = await debug_service._get_volume_info()
 
-            assert result["mounted_volumes"] == ["/data", "/backup"]
-            assert result["total_mounted_volumes"] == 2
+        assert result["mounted_volumes"] == ["/data", "/backup"]
+        assert result["total_mounted_volumes"] == 2
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_with_volumes(self, debug_service) -> None:
+    async def test_get_volume_info_with_volumes(
+        self, debug_service, mock_volume_service
+    ) -> None:
         """Test volume info when volumes are present"""
-        mock_volume_service = MagicMock()
-        mock_volume_service.get_volume_info = AsyncMock(
-            return_value={"mounted_volumes": ["/data"], "total_mounted_volumes": 1}
-        )
+        # Configure the mock volume service for this specific test
+        mock_volume_service.get_volume_info.return_value = {
+            "mounted_volumes": ["/data"],
+            "total_mounted_volumes": 1,
+        }
 
-        with patch(
-            "borgitory.dependencies.get_volume_service",
-            return_value=mock_volume_service,
-        ):
-            result = await debug_service._get_volume_info()
+        result = await debug_service._get_volume_info()
 
-            assert result["mounted_volumes"] == ["/data"]
-            assert result["total_mounted_volumes"] == 1
+        assert result["mounted_volumes"] == ["/data"]
+        assert result["total_mounted_volumes"] == 1
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_service_failure(self, debug_service) -> None:
+    async def test_get_volume_info_service_failure(
+        self, debug_service, mock_volume_service
+    ) -> None:
         """Test volume info when volume service fails"""
-        with patch(
-            "borgitory.dependencies.get_volume_service",
-            side_effect=Exception("Volume service error"),
-        ):
-            result = await debug_service._get_volume_info()
+        # Configure the mock volume service to raise an exception
+        mock_volume_service.get_volume_info.side_effect = Exception(
+            "Volume service error"
+        )
 
-            assert "error" in result
-            assert result["mounted_volumes"] == []
-            assert result["total_mounted_volumes"] == 0
+        result = await debug_service._get_volume_info()
+
+        assert "error" in result
+        assert result["mounted_volumes"] == []
+        assert result["total_mounted_volumes"] == 0
 
     @pytest.mark.asyncio
     async def test_get_tool_versions_success(self, debug_service) -> None:
@@ -402,38 +451,39 @@ class TestDebugService:
             assert result["rclone"]["accessible"] is False
             assert "error" in result["rclone"]
 
-    def test_get_environment_info(self, debug_service) -> None:
+    def test_get_environment_info(self, debug_service, mock_environment) -> None:
         """Test environment info collection"""
-        mock_env = {
+        # Configure mock environment
+        mock_environment.env_vars = {
             "PATH": "/usr/bin:/bin",
             "HOME": "/home/user",
             "DATABASE_URL": "sqlite:///test.db",
             "DEBUG": "false",
-            "SECRET_KEY": "super_secret",
-            "PASSWORD": "hidden_password",
+            "SECRET_KEY": "super_secret",  # Should not appear in result
+            "PASSWORD": "hidden_password",  # Should not appear in result
         }
 
-        with patch("os.environ.get", side_effect=lambda k: mock_env.get(k)):
-            result = debug_service._get_environment_info()
+        result = debug_service._get_environment_info()
 
-            assert result["PATH"] == "/usr/bin:/bin"
-            assert result["HOME"] == "/home/user"
-            assert result["DATABASE_URL"] == "sqlite:///test.db"
-            assert result["DEBUG"] == "false"
-            # Sensitive vars should be hidden
-            assert "SECRET_KEY" not in result  # Not in safe list
-            assert "PASSWORD" not in result  # Not in safe list
+        assert result["PATH"] == "/usr/bin:/bin"
+        assert result["HOME"] == "/home/user"
+        assert result["DATABASE_URL"] == "sqlite:///test.db"
+        assert result["DEBUG"] == "false"
+        # Sensitive vars should be hidden
+        assert "SECRET_KEY" not in result  # Not in safe list
+        assert "PASSWORD" not in result  # Not in safe list
 
     def test_get_environment_info_hides_sensitive_database_url(
-        self, debug_service
+        self, debug_service, mock_environment
     ) -> None:
         """Test that non-sqlite database URLs are hidden"""
-        mock_env = {"DATABASE_URL": "postgresql://user:pass@localhost/db"}
+        mock_environment.env_vars = {
+            "DATABASE_URL": "postgresql://user:pass@localhost/db"
+        }
 
-        with patch("os.environ.get", side_effect=lambda k: mock_env.get(k)):
-            result = debug_service._get_environment_info()
+        result = debug_service._get_environment_info()
 
-            assert result["DATABASE_URL"] == "***HIDDEN***"
+        assert result["DATABASE_URL"] == "***HIDDEN***"
 
     def test_get_job_manager_info_success(self, debug_service) -> None:
         """Test successful job manager info collection"""

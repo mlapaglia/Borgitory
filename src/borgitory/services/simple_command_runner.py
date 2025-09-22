@@ -8,7 +8,7 @@ scanning, etc. that don't need complex job tracking, streaming, or queuing.
 import logging
 import asyncio
 from typing import List, Dict, Optional
-from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.command_protocols import CommandResult
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class SimpleCommandRunner:
         Returns:
             CommandResult with execution details
         """
-        start_time = datetime.now()
+        start_time = now_utc()
         actual_timeout = timeout or self.timeout
 
         logger.info(f"Executing command: {' '.join(command[:3])}...")
@@ -71,7 +71,7 @@ class SimpleCommandRunner:
                     stderr_data.decode("utf-8", errors="replace") if stderr_data else ""
                 )
 
-                duration = (datetime.now() - start_time).total_seconds()
+                duration = (now_utc() - start_time).total_seconds()
                 success = process.returncode == 0
 
                 logger.info(
@@ -97,7 +97,7 @@ class SimpleCommandRunner:
                 process.kill()
                 await process.wait()
 
-                duration = (datetime.now() - start_time).total_seconds()
+                duration = (now_utc() - start_time).total_seconds()
                 error_msg = f"Command timed out after {actual_timeout} seconds"
 
                 logger.error(error_msg)
@@ -112,7 +112,7 @@ class SimpleCommandRunner:
                 )
 
         except Exception as e:
-            duration = (datetime.now() - start_time).total_seconds()
+            duration = (now_utc() - start_time).total_seconds()
             error_msg = f"Failed to execute command: {str(e)}"
 
             logger.error(error_msg)

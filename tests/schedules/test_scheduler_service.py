@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 
@@ -195,7 +195,7 @@ class TestSchedulerService:
         mock_job1 = Mock()
         mock_job1.id = "backup_schedule_123"
         mock_job1.name = "Daily Backup"
-        mock_job1.next_run_time = datetime.now(UTC)
+        mock_job1.next_run_time = now_utc()
         mock_job1.trigger = "cron"
 
         mock_job2 = Mock()
@@ -259,7 +259,7 @@ class TestSchedulerService:
         """Test updating next run time in database"""
         schedule_id = 123
         job_id = "backup_schedule_123"
-        next_run_time = datetime.now(UTC)
+        next_run_time = now_utc()
 
         mock_job = Mock()
         mock_job.next_run_time = next_run_time

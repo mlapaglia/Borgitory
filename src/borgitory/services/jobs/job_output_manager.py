@@ -7,6 +7,7 @@ import logging
 from collections import deque
 from typing import Dict, List, Optional, AsyncGenerator
 from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,7 @@ class JobOutputManager:
         async with self._output_locks[job_id]:
             output_line = OutputLine(
                 text=text,
-                timestamp=datetime.now().isoformat(),
+                timestamp=now_utc().isoformat(),
                 type=line_type,
                 metadata=progress_info or {},
             )

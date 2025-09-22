@@ -8,7 +8,8 @@ with proper separation of concerns.
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Dict
-from datetime import datetime, UTC
+from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 from borgitory.custom_types import ConfigDict
 
 
@@ -38,7 +39,7 @@ class SyncEvent:
 
     def __post_init__(self) -> None:
         if self.timestamp is None:
-            self.timestamp = datetime.now(UTC)
+            self.timestamp = now_utc()
 
 
 @dataclass
