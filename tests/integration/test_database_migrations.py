@@ -10,7 +10,12 @@ import shutil
 @pytest.fixture
 def temp_data_dir():
     """Create a temporary directory for integration test data."""
-    temp_dir = tempfile.mkdtemp(prefix="borgitory_migration_")
+    # Use a more unique prefix with timestamp to avoid conflicts
+    import time
+
+    temp_dir = tempfile.mkdtemp(
+        prefix=f"borgitory_migration_{int(time.time() * 1000000)}_"
+    )
     yield temp_dir
     # Cleanup
     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -20,11 +25,17 @@ def temp_data_dir():
 def migration_env(temp_data_dir):
     """Set up environment variables for migration testing."""
     env = os.environ.copy()
+
+    # Use a unique database filename to avoid any potential conflicts
+    import uuid
+
+    db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"
+
     env.update(
         {
             "BORGITORY_DATA_DIR": temp_data_dir,
-            "BORGITORY_DATABASE_URL": f"sqlite:///{os.path.join(temp_data_dir, 'test_borgitory.db')}",
-            "BORGITORY_SECRET_KEY": "test-secret-key-for-integration-tests-only",
+            "BORGITORY_DATABASE_URL": f"sqlite:///{os.path.join(temp_data_dir, db_filename)}",
+            "BORGITORY_SECRET_KEY": f"test-secret-key-{uuid.uuid4().hex}",
         }
     )
     return env
@@ -78,14 +89,22 @@ def test_migration_command_is_idempotent(migration_env, temp_data_dir):
 
 def test_migration_with_missing_data_dir(migration_env):
     """Test that migration creates data directory if it doesn't exist."""
-    # Use a non-existent data directory
-    nonexistent_dir = "/tmp/borgitory_test_nonexistent"
+    import uuid
+    import tempfile
+
+    # Use a unique non-existent data directory in temp space
+    temp_base = tempfile.gettempdir()
+    nonexistent_dir = os.path.join(
+        temp_base, f"borgitory_test_nonexistent_{uuid.uuid4().hex}"
+    )
+    db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"
+
     migration_env["BORGITORY_DATA_DIR"] = nonexistent_dir
     migration_env["BORGITORY_DATABASE_URL"] = (
-        f"sqlite:///{nonexistent_dir}/test_borgitory.db"
+        f"sqlite:///{os.path.join(nonexistent_dir, db_filename)}"
     )
 
-    # Clean up if it exists from previous test
+    # Clean up if it exists from previous test (should not happen with UUID)
     if os.path.exists(nonexistent_dir):
         shutil.rmtree(nonexistent_dir)
 
@@ -101,7 +120,9 @@ def test_migration_with_missing_data_dir(migration_env):
 
         # Should succeed
         assert result.returncode == 0, (
-            f"Migration failed with exit code {result.returncode}"
+            f"Migration failed with exit code {result.returncode}\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
         )
 
     finally:

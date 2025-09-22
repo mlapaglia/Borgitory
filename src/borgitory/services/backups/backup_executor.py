@@ -117,7 +117,7 @@ class BackupExecutor:
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
         )
-        # Store active operations for tracking
+
         self.active_operations: Dict[str, asyncio.subprocess.Process] = {}
 
     async def execute_backup(
@@ -158,28 +158,23 @@ class BackupExecutor:
         )
 
         try:
-            # Validate inputs
             if not config.source_paths:
                 raise ValueError("No source paths specified for backup")
 
-            # Build Borg command
             command, env = self._build_backup_command(repository, config)
 
             logger.info(f"Executing backup command for {repository.name}")
             logger.debug(f"Backup command: {' '.join(command[:3])}... (args redacted)")
 
-            # Start process
             process = await self._start_process(command, env)
 
             if operation_id:
                 self.active_operations[operation_id] = process
 
-            # Monitor output with integrated callbacks
             await self._monitor_process_output(
                 process, result, output_callback, progress_callback
             )
 
-            # Wait for completion
             return_code = await process.wait()
             result.return_code = return_code
             result.completed_at = datetime.now(UTC)
@@ -189,11 +184,8 @@ class BackupExecutor:
                 logger.info(f"Backup operation {operation_id} completed successfully")
             else:
                 result.status = BackupStatus.FAILED
-                # Extract error from output
                 if result.output_lines:
-                    error_lines = result.output_lines[
-                        -5:
-                    ]  # Last 5 lines likely contain error
+                    error_lines = result.output_lines[-5:]
                     result.error_message = (
                         f"Backup failed (exit code {return_code}): "
                         + "\n".join(error_lines)
@@ -216,7 +208,6 @@ class BackupExecutor:
             return result
 
         finally:
-            # Cleanup process tracking
             if operation_id in self.active_operations:
                 del self.active_operations[operation_id]
 
@@ -254,21 +245,17 @@ class BackupExecutor:
         )
 
         try:
-            # Build Borg prune command
             command, env = self._build_prune_command(repository, config)
 
             logger.info(f"Executing prune command for {repository.name}")
 
-            # Start process
             process = await self._start_process(command, env)
 
             if operation_id:
                 self.active_operations[operation_id] = process
 
-            # Monitor output
             await self._monitor_process_output(process, result, output_callback, None)
 
-            # Wait for completion
             return_code = await process.wait()
             result.return_code = return_code
             result.completed_at = datetime.now(UTC)
@@ -278,7 +265,6 @@ class BackupExecutor:
                 logger.info(f"Prune operation {operation_id} completed successfully")
             else:
                 result.status = BackupStatus.FAILED
-                # Extract error from output
                 if result.output_lines:
                     error_lines = result.output_lines[-5:]
                     result.error_message = (
@@ -303,7 +289,6 @@ class BackupExecutor:
             return result
 
         finally:
-            # Cleanup process tracking
             if operation_id in self.active_operations:
                 del self.active_operations[operation_id]
 
@@ -350,19 +335,15 @@ class BackupExecutor:
         stdout_data = b""
 
         try:
-            # Read output line by line
             if process.stdout:
                 async for line in process.stdout:
                     line_text = line.decode("utf-8", errors="replace").rstrip()
                     stdout_data += line
 
-                    # Store in result
                     result.output_lines.append(line_text)
 
-                    # Parse progress information for backup operations
                     progress_info = self._parse_progress_line(line_text)
 
-                    # Call callbacks if provided
                     if output_callback:
                         if inspect.iscoroutinefunction(output_callback):
                             await output_callback(line_text)
@@ -388,7 +369,6 @@ class BackupExecutor:
         progress_info = {}
 
         try:
-            # Check for Borg progress pattern
             match = self.progress_pattern.search(line)
             if match:
                 progress_info = {
@@ -400,7 +380,6 @@ class BackupExecutor:
                     "timestamp": datetime.now(UTC).isoformat(),
                 }
 
-            # Parse other Borg status lines
             elif "Archive name:" in line:
                 progress_info["archive_name"] = line.split("Archive name:")[-1].strip()
             elif "Archive fingerprint:" in line:
@@ -423,7 +402,6 @@ class BackupExecutor:
         """Build Borg backup command with arguments"""
         additional_args = []
 
-        # Add backup options
         if config.show_stats:
             additional_args.append("--stats")
         if config.show_list:
@@ -431,23 +409,18 @@ class BackupExecutor:
 
         additional_args.extend(["--filter", "AME"])  # Show added, modified, errors
 
-        # Add compression
         if config.compression:
             additional_args.extend(["--compression", config.compression])
 
-        # Add excludes
         if config.excludes:
             for exclude in config.excludes:
                 additional_args.extend(["--exclude", exclude])
 
-        # Add dry run if requested
         if config.dry_run:
             additional_args.append("--dry-run")
 
-        # Repository and archive name
         additional_args.append(f"{repository.path}::{config.archive_name}")
 
-        # Source paths
         additional_args.extend(config.source_paths)
 
         return build_secure_borg_command(
@@ -463,23 +436,18 @@ class BackupExecutor:
         """Build Borg prune command with arguments"""
         additional_args = []
 
-        # Add retention policy arguments using consolidated handler
         retention_args = RetentionFieldHandler.build_borg_args(
             config, include_keep_within=True
         )
         additional_args.extend(retention_args)
 
-        # Add common options
         if config.show_stats:
             additional_args.append("--stats")
         if config.show_list:
             additional_args.append("--list")
-
-        # Add dry run if requested
         if config.dry_run:
             additional_args.append("--dry-run")
 
-        # Repository path as positional argument
         additional_args.append(repository.path)
 
         return build_secure_borg_command(

@@ -10,10 +10,15 @@ from sqlalchemy.orm import sessionmaker
 from borgitory.models.database import Base
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def temp_data_dir():
     """Create a temporary directory for integration test data."""
-    temp_dir = tempfile.mkdtemp(prefix="borgitory_integration_")
+    import time
+
+    # Use function scope and unique naming to ensure test isolation
+    temp_dir = tempfile.mkdtemp(
+        prefix=f"borgitory_integration_{int(time.time() * 1000000)}_"
+    )
     yield temp_dir
     # Cleanup
     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -22,7 +27,11 @@ def temp_data_dir():
 @pytest.fixture
 def temp_db_path(temp_data_dir):
     """Create a temporary database path for testing."""
-    db_path = os.path.join(temp_data_dir, "test_borgitory.db")
+    import uuid
+
+    # Use unique database filename to avoid conflicts
+    db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"
+    db_path = os.path.join(temp_data_dir, db_filename)
     yield db_path
     # Cleanup handled by temp_data_dir fixture
 
@@ -48,11 +57,18 @@ def test_db_session(test_db_engine):
 @pytest.fixture
 def test_env_vars(temp_data_dir):
     """Set up environment variables for integration tests."""
+    import uuid
+
     original_env = {}
+
+    # Use unique database filename and secret key
+    db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"
+    secret_key = f"test-secret-key-{uuid.uuid4().hex}"
+
     test_vars = {
         "BORGITORY_DATA_DIR": temp_data_dir,
-        "BORGITORY_DATABASE_URL": f"sqlite:///{os.path.join(temp_data_dir, 'test_borgitory.db')}",
-        "BORGITORY_SECRET_KEY": "test-secret-key-for-integration-tests-only",
+        "BORGITORY_DATABASE_URL": f"sqlite:///{os.path.join(temp_data_dir, db_filename)}",
+        "BORGITORY_SECRET_KEY": secret_key,
     }
 
     # Store original values and set test values
