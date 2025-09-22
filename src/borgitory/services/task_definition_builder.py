@@ -39,6 +39,7 @@ class TaskDefinitionBuilder:
         source_path: str = "/data",
         compression: str = "zstd",
         dry_run: bool = False,
+        ignore_lock: bool = False,
     ) -> Dict[str, object]:
         """
         Build a backup task definition.
@@ -48,6 +49,7 @@ class TaskDefinitionBuilder:
             source_path: Path to backup from
             compression: Compression algorithm to use
             dry_run: Whether this is a dry run
+            ignore_lock: Whether to run 'borg break-lock' before backup
 
         Returns:
             Task definition dictionary
@@ -58,6 +60,7 @@ class TaskDefinitionBuilder:
             "source_path": source_path,
             "compression": compression,
             "dry_run": dry_run,
+            "ignore_lock": ignore_lock,
         }
 
     def build_prune_task_from_config(
@@ -295,9 +298,10 @@ class TaskDefinitionBuilder:
             source_path = str(backup_params.get("source_path", "/data"))
             compression = str(backup_params.get("compression", "zstd"))
             dry_run = bool(backup_params.get("dry_run", False))
+            ignore_lock = bool(backup_params.get("ignore_lock", False))
             tasks.append(
                 self.build_backup_task(
-                    repository_name, source_path, compression, dry_run
+                    repository_name, source_path, compression, dry_run, ignore_lock
                 )
             )
 

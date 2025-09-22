@@ -52,6 +52,7 @@ class JobService:
             "source_path": backup_request.source_path,
             "compression": backup_request.compression,
             "dry_run": backup_request.dry_run,
+            "ignore_lock": backup_request.ignore_lock,
         }
 
         task_definitions = builder.build_task_list(

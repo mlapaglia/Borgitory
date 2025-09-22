@@ -43,6 +43,8 @@ from borgitory.services.rclone_service import RcloneService
 from borgitory.utils.db_session import get_db_session
 from contextlib import _GeneratorContextManager
 
+from borgitory.utils.security import build_secure_borg_command
+
 if TYPE_CHECKING:
     from asyncio.subprocess import Process
     from borgitory.models.database import Repository, Schedule
@@ -832,8 +834,6 @@ class JobManager:
     ) -> bool:
         """Execute a backup task using JobExecutor"""
         try:
-            from borgitory.utils.security import build_secure_borg_command
-
             params = task.parameters
 
             if job.repository_id is None:
@@ -904,6 +904,17 @@ class JobManager:
                 additional_args.append(str(source_path))
 
             logger.info(f"Final additional_args for Borg command: {additional_args}")
+
+            ignore_lock = params.get("ignore_lock", False)
+            if ignore_lock:
+                logger.info(f"Running borg break-lock on repository: {repository_path}")
+                try:
+                    await self._execute_break_lock(
+                        str(repository_path), passphrase, task_output_callback
+                    )
+                except Exception as e:
+                    logger.warning(f"Break-lock failed, continuing with backup: {e}")
+                    task_output_callback(f"Warning: Break-lock failed: {e}")
 
             command, env = build_secure_borg_command(
                 base_command="borg create",
@@ -982,6 +993,68 @@ class JobManager:
             task.error = f"Backup task failed: {str(e)}"
             task.completed_at = now_utc()
             return False
+
+    async def _execute_break_lock(
+        self,
+        repository_path: str,
+        passphrase: str,
+        output_callback: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        """Execute borg break-lock command to release stale repository locks"""
+        try:
+            if output_callback:
+                output_callback(
+                    "Running 'borg break-lock' to remove stale repository locks..."
+                )
+
+            command, env = build_secure_borg_command(
+                base_command="borg break-lock",
+                repository_path=repository_path,
+                passphrase=passphrase,
+                additional_args=[],
+            )
+
+            process = await self.safe_executor.start_process(command, env)
+
+            try:
+                result = await asyncio.wait_for(
+                    self.safe_executor.monitor_process_output(
+                        process, output_callback=output_callback
+                    ),
+                    timeout=30,
+                )
+            except asyncio.TimeoutError:
+                if output_callback:
+                    output_callback("Break-lock timed out, terminating process")
+                process.kill()
+                await process.wait()
+                raise Exception("Break-lock operation timed out")
+
+            if result.return_code == 0:
+                if output_callback:
+                    output_callback("Successfully released repository lock")
+                logger.info(
+                    f"Successfully released lock on repository: {repository_path}"
+                )
+            else:
+                error_msg = f"Break-lock returned {result.return_code}"
+                if result.stdout:
+                    stdout_text = result.stdout.decode(
+                        "utf-8", errors="replace"
+                    ).strip()
+                    if stdout_text:
+                        error_msg += f": {stdout_text}"
+
+                if output_callback:
+                    output_callback(f"Warning: {error_msg}")
+                logger.warning(f"Break-lock warning for {repository_path}: {error_msg}")
+
+        except Exception as e:
+            error_msg = f"Error executing break-lock: {str(e)}"
+            if output_callback:
+                output_callback(f"Warning: {error_msg}")
+            logger.error(f"Break-lock error for repository {repository_path}: {e}")
+            raise
 
     async def _execute_prune_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
@@ -1073,8 +1146,6 @@ class JobManager:
     ) -> bool:
         """Execute a repository check task"""
         try:
-            from borgitory.utils.security import build_secure_borg_command
-
             params = task.parameters
 
             if job.repository_id is None:
