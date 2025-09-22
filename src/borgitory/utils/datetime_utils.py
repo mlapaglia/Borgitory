@@ -117,24 +117,33 @@ def now_utc() -> datetime:
     return datetime.now(UTC)
 
 
-def parse_timezone_offset(tz_offset_minutes: int) -> timezone:
+def parse_timezone_offset(tz_offset_minutes: Union[int, None]) -> timezone:
     """
     Parse timezone offset in minutes to timezone object.
-    
+
     Args:
-        tz_offset_minutes: Timezone offset in minutes (e.g., -240 for EDT)
-        
+        tz_offset_minutes: Timezone offset in minutes (e.g., -240 for EDT), or None
+
     Returns:
-        Timezone object
+        Timezone object (UTC if input is None)
     """
+    if tz_offset_minutes is None:
+        return UTC
+
+    try:
+        # Ensure we have a valid integer
+        offset_int = int(tz_offset_minutes)
+    except (ValueError, TypeError):
+        return UTC
+
     # Convert minutes to hours and minutes
-    hours = abs(tz_offset_minutes) // 60
-    minutes = abs(tz_offset_minutes) % 60
-    
+    hours = abs(offset_int) // 60
+    minutes = abs(offset_int) % 60
+
     # Create timedelta (negative offset means behind UTC)
-    sign = -1 if tz_offset_minutes > 0 else 1  # JavaScript getTimezoneOffset() is inverted
+    sign = -1 if offset_int > 0 else 1  # JavaScript getTimezoneOffset() is inverted
     offset = timedelta(hours=sign * hours, minutes=sign * minutes)
-    
+
     return timezone(offset)
 
 

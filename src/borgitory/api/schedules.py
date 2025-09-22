@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import HTMLResponse
+from starlette.templating import _TemplateResponse
 from sqlalchemy.orm import Session
 from typing import cast, List, Dict, Any
 
@@ -104,14 +105,14 @@ def get_schedules_html(
     schedule_service: ScheduleServiceDep,
     skip: int = 0,
     limit: int = 100,
-) -> HTMLResponse:
+) -> _TemplateResponse:
     """Get schedules as formatted HTML"""
     schedules = schedule_service.get_schedules(skip=skip, limit=limit)
 
-    return HTMLResponse(
-        templates.get_template("partials/schedules/schedule_list_content.html").render(
-            schedules=schedules
-        )
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/schedule_list_content.html",
+        {"schedules": schedules},
     )
 
 
@@ -161,16 +162,17 @@ async def get_cron_expression_form(
 
 @router.get("/", response_class=HTMLResponse)
 def list_schedules(
+    request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     skip: int = 0,
     limit: int = 100,
-) -> HTMLResponse:
+) -> _TemplateResponse:
     schedules = schedule_service.get_schedules(skip=skip, limit=limit)
-    return HTMLResponse(
-        templates.get_template("partials/schedules/schedule_list_content.html").render(
-            schedules=schedules
-        )
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/schedule_list_content.html",
+        {"schedules": schedules},
     )
 
 
@@ -179,18 +181,15 @@ def get_schedule(
     schedule_id: int,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
-) -> HTMLResponse:
+) -> _TemplateResponse:
     schedule = schedule_service.get_schedule_by_id(schedule_id)
     if schedule is None:
-        return HTMLResponse(
-            templates.get_template("partials/common/error_message.html").render(
-                error_message="Schedule not found"
-            )
+        return templates.get_template("partials/common/error_message.html").render(
+            error_message="Schedule not found"
         )
-    return HTMLResponse(
-        templates.get_template("partials/schedules/schedule_detail.html").render(
-            schedule=schedule
-        )
+
+    return templates.get_template("partials/schedules/schedule_detail.html").render(
+        schedule=schedule
     )
 
 

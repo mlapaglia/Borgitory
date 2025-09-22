@@ -338,24 +338,32 @@ class TestBrowserTimezone:
     def test_format_datetime_for_display_with_browser_offset_edt(self) -> None:
         """Test formatting datetime with EDT browser timezone offset"""
         dt = datetime(2025, 9, 22, 17, 53, tzinfo=UTC)
-        result = format_datetime_for_display(dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=240)  # EDT
+        result = format_datetime_for_display(
+            dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=240
+        )  # EDT
         assert result == "2025-09-22 13:53"  # 17:53 UTC - 4 hours = 13:53 EDT
 
     def test_format_datetime_for_display_with_browser_offset_utc(self) -> None:
         """Test formatting datetime with UTC browser timezone offset"""
         dt = datetime(2025, 9, 22, 17, 53, tzinfo=UTC)
-        result = format_datetime_for_display(dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=0)  # UTC
+        result = format_datetime_for_display(
+            dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=0
+        )  # UTC
         assert result == "2025-09-22 17:53"  # No change
 
     def test_format_datetime_for_display_with_browser_offset_cet(self) -> None:
         """Test formatting datetime with CET browser timezone offset"""
         dt = datetime(2025, 9, 22, 17, 53, tzinfo=UTC)
-        result = format_datetime_for_display(dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=-60)  # CET
+        result = format_datetime_for_display(
+            dt, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=-60
+        )  # CET
         assert result == "2025-09-22 18:53"  # 17:53 UTC + 1 hour = 18:53 CET
 
     def test_format_datetime_for_display_with_browser_offset_none_input(self) -> None:
         """Test formatting None datetime with browser timezone offset"""
-        result = format_datetime_for_display(None, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=240)
+        result = format_datetime_for_display(
+            None, "%Y-%m-%d %H:%M", browser_tz_offset_minutes=240
+        )
         assert result == "N/A"
 
     def test_format_datetime_for_display_browser_offset_precedence(self) -> None:
@@ -364,8 +372,19 @@ class TestBrowserTimezone:
         cet_tz = timezone(timedelta(hours=1))
         # Browser offset should override target_timezone
         result = format_datetime_for_display(
-            dt, "%Y-%m-%d %H:%M", 
+            dt,
+            "%Y-%m-%d %H:%M",
             target_timezone=cet_tz,  # Would give 18:53
-            browser_tz_offset_minutes=240  # Should give 13:53 (EDT)
+            browser_tz_offset_minutes=240,  # Should give 13:53 (EDT)
         )
         assert result == "2025-09-22 13:53"  # Browser offset wins
+
+    def test_parse_timezone_offset_none_input(self) -> None:
+        """Test parsing None timezone offset returns UTC"""
+        tz = parse_timezone_offset(None)
+        assert tz == UTC
+
+    def test_parse_timezone_offset_invalid_input(self) -> None:
+        """Test parsing invalid timezone offset returns UTC"""
+        tz = parse_timezone_offset("invalid")  # type: ignore
+        assert tz == UTC

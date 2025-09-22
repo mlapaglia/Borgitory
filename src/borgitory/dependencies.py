@@ -2,7 +2,7 @@
 FastAPI dependency providers for the application.
 """
 
-from typing import Annotated, TYPE_CHECKING, Optional, Callable, ContextManager, Dict, Any, Mapping
+from typing import Annotated, TYPE_CHECKING, Optional, Callable, ContextManager, Any
 
 from borgitory.services.notifications.registry_factory import (
     NotificationRegistryFactory,
@@ -57,7 +57,6 @@ from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
 from starlette.templating import _TemplateResponse
-from starlette.responses import Response
 from borgitory.services.cloud_providers import StorageFactory
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
@@ -373,18 +372,18 @@ def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
 
 def get_browser_timezone_offset(request: Request) -> Optional[int]:
     """
-    Extract browser timezone offset from request headers.
-    
+    Extract browser timezone offset from request cookies.
+
     Args:
         request: FastAPI request object
-        
+
     Returns:
         Browser timezone offset in minutes, or None if not available
     """
-    tz_header = request.headers.get("X-Browser-Timezone-Offset")
-    if tz_header:
+    tz_cookie = request.cookies.get("browser_timezone_offset")
+    if tz_cookie:
         try:
-            return int(tz_header)
+            return int(tz_cookie)
         except (ValueError, TypeError):
             pass
     return None
@@ -394,30 +393,30 @@ class TimezoneAwareJinja2Templates(Jinja2Templates):
     """
     Custom Jinja2Templates that automatically includes browser timezone offset in context.
     """
-    
+
     def TemplateResponse(self, *args: Any, **kwargs: Any) -> _TemplateResponse:
         """
         Create template response with automatic timezone offset injection.
         """
         # Extract request and context from args/kwargs
-        request = args[0] if len(args) > 0 else kwargs.get('request')
-        context = args[2] if len(args) > 2 else kwargs.get('context', {})
-        
+        request = args[0] if len(args) > 0 else kwargs.get("request")
+        context = args[2] if len(args) > 2 else kwargs.get("context", {})
+
         if context is None:
             context = {}
-        
+
         # Automatically add browser timezone offset to context
         if request:
             context["browser_tz_offset"] = get_browser_timezone_offset(request)
-        
+
         # Update context in kwargs if it was passed as kwarg, otherwise update args
         if len(args) > 2:
             args_list = list(args)
             args_list[2] = context
             args = tuple(args_list)
         else:
-            kwargs['context'] = context
-        
+            kwargs["context"] = context
+
         return super().TemplateResponse(*args, **kwargs)
 
 
@@ -436,9 +435,15 @@ def get_templates() -> TimezoneAwareJinja2Templates:
         """Jinja2 filter for datetime formatting with timezone conversion"""
         return format_datetime_for_display(dt, format_str, get_server_timezone())
 
-    def datetime_browser_filter(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S", tz_offset: Optional[int] = None) -> str:
+    def datetime_browser_filter(
+        dt: datetime,
+        format_str: str = "%Y-%m-%d %H:%M:%S",
+        tz_offset: Optional[int] = None,
+    ) -> str:
         """Jinja2 filter for datetime formatting with browser timezone conversion"""
-        return format_datetime_for_display(dt, format_str, browser_tz_offset_minutes=tz_offset)
+        return format_datetime_for_display(
+            dt, format_str, browser_tz_offset_minutes=tz_offset
+        )
 
     templates.env.filters["format_datetime"] = datetime_filter
     templates.env.filters["format_datetime_browser"] = datetime_browser_filter
