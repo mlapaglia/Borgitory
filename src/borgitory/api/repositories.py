@@ -31,6 +31,10 @@ from borgitory.models.repository_dtos import (
     RepositoryScanRequest,
     DeleteRepositoryRequest,
 )
+from borgitory.utils.datetime_utils import (
+    format_datetime_for_display,
+    parse_datetime_string,
+)
 from borgitory.utils.template_responses import (
     RepositoryResponseHandler,
     ArchiveResponseHandler,
@@ -487,11 +491,6 @@ async def list_archives_html(
                     formatted_time = archive_time
                     if archive_time:
                         try:
-                            from borgitory.utils.datetime_utils import (
-                                parse_datetime_string,
-                                format_datetime_for_display,
-                            )
-
                             dt = parse_datetime_string(archive_time)
                             if dt:
                                 formatted_time = format_datetime_for_display(dt)

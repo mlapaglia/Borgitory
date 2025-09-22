@@ -5,7 +5,7 @@ Comprehensive tests for JobManager - covering missing lines and functionality
 import pytest
 import uuid
 import asyncio
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
@@ -222,7 +222,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="pending",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task1, task2],
             repository_id=sample_repository.id,
         )
@@ -233,13 +233,13 @@ class TestJobManagerTaskExecution:
         async def mock_backup_task(job, task, task_index):
             task.status = "completed"
             task.return_code = 0
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return True
 
         async def mock_prune_task(job, task, task_index):
             task.status = "completed"
             task.return_code = 0
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return True
 
         with patch.object(
@@ -270,7 +270,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="pending",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task1, task2],
             repository_id=sample_repository.id,
         )
@@ -282,7 +282,7 @@ class TestJobManagerTaskExecution:
             task.status = "failed"
             task.return_code = 1
             task.error = "Backup failed"
-            task.completed_at = datetime.now(UTC)
+            task.completed_at = now_utc()
             return False
 
         # Prune should not be called due to critical failure
@@ -320,7 +320,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
             repository_id=sample_repository.id,
         )
@@ -377,7 +377,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
             repository_id=sample_repository.id,
         )
@@ -442,7 +442,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
             repository_id=sample_repository.id,
         )
@@ -515,7 +515,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
             repository_id=1,  # Add repository_id for the updated method
         )
@@ -562,7 +562,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
             repository_id=sample_repository.id,
         )
@@ -618,7 +618,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
             repository_id=1,  # Add repository_id for cloud sync task
         )
@@ -701,7 +701,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
         )
         job_manager_with_db.jobs[job_id] = job
@@ -748,7 +748,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
         )
         job_manager_with_db.jobs[job_id] = job
@@ -772,7 +772,7 @@ class TestJobManagerTaskExecution:
             id=job_id,
             job_type="composite",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             tasks=[task],
         )
         job_manager_with_db.jobs[job_id] = job
@@ -1002,7 +1002,7 @@ class TestJobManagerStreamingAndUtility:
 
     def test_get_job(self, job_manager) -> None:
         """Test getting job by ID"""
-        job = BorgJob(id="test", status="running", started_at=datetime.now(UTC))
+        job = BorgJob(id="test", status="running", started_at=now_utc())
         job_manager.jobs["test"] = job
 
         retrieved = job_manager.get_job("test")
@@ -1012,8 +1012,8 @@ class TestJobManagerStreamingAndUtility:
 
     def test_list_jobs(self, job_manager) -> None:
         """Test listing all jobs"""
-        job1 = BorgJob(id="job1", status="running", started_at=datetime.now(UTC))
-        job2 = BorgJob(id="job2", status="completed", started_at=datetime.now(UTC))
+        job1 = BorgJob(id="job1", status="running", started_at=now_utc())
+        job2 = BorgJob(id="job2", status="completed", started_at=now_utc())
 
         job_manager.jobs["job1"] = job1
         job_manager.jobs["job2"] = job2

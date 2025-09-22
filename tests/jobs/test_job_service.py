@@ -4,7 +4,7 @@ Tests for JobService business logic - Database operations and service methods
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 
 from sqlalchemy.orm import Session
 
@@ -367,7 +367,7 @@ class TestJobService:
         # Create mock JobManager job
         mock_borg_job = Mock()
         mock_borg_job.status = "running"
-        mock_borg_job.started_at = datetime.now(UTC)
+        mock_borg_job.started_at = now_utc()
         mock_borg_job.completed_at = None
         mock_borg_job.error = None
         mock_borg_job.command = ["borg", "create", "repo::archive"]

@@ -5,7 +5,7 @@ Tests for jobs API endpoints
 import pytest
 from typing import Generator
 from unittest.mock import Mock, AsyncMock
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from httpx import AsyncClient
@@ -50,8 +50,8 @@ class TestJobsAPI:
         job.repository_id = sample_repository.id
         job.type = "backup"
         job.status = "completed"
-        job.started_at = datetime.now(UTC)
-        job.finished_at = datetime.now(UTC)
+        job.started_at = now_utc()
+        job.finished_at = now_utc()
         job.log_output = "Test job output"
         job.job_type = "composite"
         job.total_tasks = 1

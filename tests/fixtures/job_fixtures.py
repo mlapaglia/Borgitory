@@ -7,7 +7,7 @@ job services with clean dependency injection patterns.
 
 import pytest
 import uuid
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
 from typing import Any, AsyncGenerator, Dict, List
 from sqlalchemy.orm import Session
@@ -59,8 +59,8 @@ def sample_borg_job() -> BorgJob:
     return BorgJob(
         id=str(uuid.uuid4()),
         status="completed",
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
+        started_at=now_utc(),
+        completed_at=now_utc(),
         command=["borg", "create", "repo::archive", "/data"],
         return_code=0,
         repository_id=1,
@@ -87,8 +87,8 @@ def sample_composite_job() -> BorgJob:
     return BorgJob(
         id=job_id,
         status="completed",
-        started_at=datetime.now(UTC),
-        completed_at=datetime.now(UTC),
+        started_at=now_utc(),
+        completed_at=now_utc(),
         job_type="composite",
         tasks=[task1, task2],
         repository_id=1,
@@ -116,8 +116,8 @@ def sample_database_job(test_db: Session, sample_repository: Repository) -> Job:
     job.repository_id = sample_repository.id
     job.type = "backup"
     job.status = "completed"
-    job.started_at = datetime.now(UTC)
-    job.finished_at = datetime.now(UTC)
+    job.started_at = now_utc()
+    job.finished_at = now_utc()
     test_db.add(job)
     test_db.commit()
     test_db.refresh(job)
@@ -134,8 +134,8 @@ def sample_database_job_with_tasks(
     job.repository_id = sample_repository.id
     job.type = "backup"
     job.status = "completed"
-    job.started_at = datetime.now(UTC)
-    job.finished_at = datetime.now(UTC)
+    job.started_at = now_utc()
+    job.finished_at = now_utc()
     test_db.add(job)
     test_db.flush()  # Get the job ID
 
@@ -206,8 +206,8 @@ def create_mock_job_context(
     mock_job.status = status
     mock_job.job_type = job_type
     mock_job.type = "backup"
-    mock_job.started_at = datetime.now(UTC)
-    mock_job.finished_at = datetime.now(UTC)
+    mock_job.started_at = now_utc()
+    mock_job.finished_at = now_utc()
     mock_job.return_code = 0
     mock_job.error = None
     mock_job.tasks = tasks or []

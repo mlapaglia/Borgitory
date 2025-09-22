@@ -8,7 +8,7 @@ the AttributeError with _db_session_factory that was encountered during cloud sy
 import pytest
 import uuid
 from unittest.mock import Mock, patch
-from datetime import datetime, UTC
+from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.services.jobs.job_database_manager import (
     JobDatabaseManager,
@@ -50,7 +50,7 @@ class TestJobDatabaseManager:
             repository_id=1,
             job_type="backup",
             status="running",
-            started_at=datetime.now(UTC),
+            started_at=now_utc(),
             cloud_sync_config_id=123,
         )
 
@@ -138,7 +138,7 @@ class TestJobDatabaseManager:
             result = await job_database_manager.update_job_status(
                 job_uuid=job_uuid,
                 status="completed",
-                finished_at=datetime.now(UTC),
+                finished_at=now_utc(),
                 output="Job completed successfully",
             )
 
@@ -203,8 +203,8 @@ class TestJobDatabaseManager:
             mock_job_instance.repository_id = 1
             mock_job_instance.type = "backup"
             mock_job_instance.status = "completed"
-            mock_job_instance.started_at = datetime.now(UTC)
-            mock_job_instance.finished_at = datetime.now(UTC)
+            mock_job_instance.started_at = now_utc()
+            mock_job_instance.finished_at = now_utc()
             mock_job_instance.log_output = "Job output"
             mock_job_instance.error = None
             mock_job_instance.cloud_sync_config_id = 123
@@ -239,15 +239,15 @@ class TestJobDatabaseManager:
             mock_job1.id = str(uuid.uuid4())
             mock_job1.type = "backup"
             mock_job1.status = "completed"
-            mock_job1.started_at = datetime.now(UTC)
-            mock_job1.finished_at = datetime.now(UTC)
+            mock_job1.started_at = now_utc()
+            mock_job1.finished_at = now_utc()
             mock_job1.error = None
 
             mock_job2 = Mock()
             mock_job2.id = str(uuid.uuid4())
             mock_job2.type = "prune"
             mock_job2.status = "running"
-            mock_job2.started_at = datetime.now(UTC)
+            mock_job2.started_at = now_utc()
             mock_job2.finished_at = None
             mock_job2.error = None
 
@@ -281,8 +281,8 @@ class TestJobDatabaseManager:
         mock_task1.task_type = "backup"
         mock_task1.task_name = "Create backup"
         mock_task1.status = "completed"
-        mock_task1.started_at = datetime.now(UTC)
-        mock_task1.completed_at = datetime.now(UTC)
+        mock_task1.started_at = now_utc()
+        mock_task1.completed_at = now_utc()
         mock_task1.output_lines = ["Line 1", "Line 2"]
         mock_task1.error = None
         mock_task1.return_code = 0
@@ -291,7 +291,7 @@ class TestJobDatabaseManager:
         mock_task2.task_type = "cloud_sync"
         mock_task2.task_name = "Sync to cloud"
         mock_task2.status = "running"
-        mock_task2.started_at = datetime.now(UTC)
+        mock_task2.started_at = now_utc()
         mock_task2.completed_at = None
         mock_task2.output_lines = []
         mock_task2.error = None
@@ -366,7 +366,7 @@ class TestJobDatabaseManager:
                 repository_id=1,
                 job_type="backup",
                 status="running",
-                started_at=datetime.now(UTC),
+                started_at=now_utc(),
             )
 
             result = await job_database_manager.create_database_job(sample_data)
