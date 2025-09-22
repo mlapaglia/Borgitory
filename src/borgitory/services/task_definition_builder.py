@@ -96,6 +96,9 @@ class TaskDefinitionBuilder:
         elif cleanup_config.strategy == "advanced":
             task.update(
                 {
+                    "keep_secondly": cleanup_config.keep_secondly,
+                    "keep_minutely": cleanup_config.keep_minutely,
+                    "keep_hourly": cleanup_config.keep_hourly,
                     "keep_daily": cleanup_config.keep_daily,
                     "keep_weekly": cleanup_config.keep_weekly,
                     "keep_monthly": cleanup_config.keep_monthly,
@@ -134,6 +137,9 @@ class TaskDefinitionBuilder:
         elif prune_request.strategy == "advanced":
             task.update(
                 {
+                    "keep_secondly": prune_request.keep_secondly,
+                    "keep_minutely": prune_request.keep_minutely,
+                    "keep_hourly": prune_request.keep_hourly,
                     "keep_daily": prune_request.keep_daily,
                     "keep_weekly": prune_request.keep_weekly,
                     "keep_monthly": prune_request.keep_monthly,

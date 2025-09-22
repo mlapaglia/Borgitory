@@ -203,6 +203,9 @@ class JobExecutor:
         repository_path: str,
         passphrase: str,
         keep_within: Optional[str] = None,
+        keep_secondly: Optional[int] = None,
+        keep_minutely: Optional[int] = None,
+        keep_hourly: Optional[int] = None,
         keep_daily: Optional[int] = None,
         keep_weekly: Optional[int] = None,
         keep_monthly: Optional[int] = None,
@@ -221,6 +224,9 @@ class JobExecutor:
             repository_path: Path to the borg repository
             passphrase: Repository passphrase
             keep_within: Keep archives within this time range
+            keep_secondly: Number of secondly archives to keep
+            keep_minutely: Number of minutely archives to keep
+            keep_hourly: Number of hourly archives to keep
             keep_daily: Number of daily archives to keep
             keep_weekly: Number of weekly archives to keep
             keep_monthly: Number of monthly archives to keep
@@ -242,6 +248,12 @@ class JobExecutor:
 
             if keep_within:
                 additional_args.extend(["--keep-within", keep_within])
+            if keep_secondly:
+                additional_args.extend(["--keep-secondly", str(keep_secondly)])
+            if keep_minutely:
+                additional_args.extend(["--keep-minutely", str(keep_minutely)])
+            if keep_hourly:
+                additional_args.extend(["--keep-hourly", str(keep_hourly)])
             if keep_daily:
                 additional_args.extend(["--keep-daily", str(keep_daily)])
             if keep_weekly:

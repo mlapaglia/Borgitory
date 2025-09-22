@@ -58,6 +58,9 @@ class CleanupService:
             db_config.name = cleanup_config.name
             db_config.strategy = cleanup_config.strategy
             db_config.keep_within_days = cleanup_config.keep_within_days
+            db_config.keep_secondly = cleanup_config.keep_secondly
+            db_config.keep_minutely = cleanup_config.keep_minutely
+            db_config.keep_hourly = cleanup_config.keep_hourly
             db_config.keep_daily = cleanup_config.keep_daily
             db_config.keep_weekly = cleanup_config.keep_weekly
             db_config.keep_monthly = cleanup_config.keep_monthly
@@ -227,6 +230,12 @@ class CleanupService:
                     description = f"Keep archives within {config.keep_within_days} days"
                 else:
                     parts = []
+                    if config.keep_secondly:
+                        parts.append(f"{config.keep_secondly} secondly")
+                    if config.keep_minutely:
+                        parts.append(f"{config.keep_minutely} minutely")
+                    if config.keep_hourly:
+                        parts.append(f"{config.keep_hourly} hourly")
                     if config.keep_daily:
                         parts.append(f"{config.keep_daily} daily")
                     if config.keep_weekly:

@@ -36,6 +36,21 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+def include_object(object, name, type_, reflected, compare_to) -> bool:
+    """
+    Filter function to exclude certain objects from autogenerate.
+    
+    This function is called for every object that Alembic considers
+    for inclusion in a migration.
+    """
+    # Ignore apscheduler_jobs table - it's managed by APScheduler
+    if type_ == "table" and name == "apscheduler_jobs":
+        return False
+    
+    # Include all other objects
+    return True
+
+
 def get_database_url() -> str:
     """Get database URL, preferring environment variable over config."""
     # For local development, use local-data path if the file exists
@@ -77,6 +92,7 @@ def run_migrations_offline() -> None:
         compare_type=True,
         compare_server_default=True,
         render_as_batch=True,  # Required for SQLite ALTER operations
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -106,6 +122,7 @@ def run_migrations_online() -> None:
             compare_type=True,
             compare_server_default=True,
             render_as_batch=True,  # Required for SQLite ALTER operations
+            include_object=include_object,
         )
 
         with context.begin_transaction():

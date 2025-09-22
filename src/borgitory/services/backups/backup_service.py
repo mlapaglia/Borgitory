@@ -155,6 +155,9 @@ class BackupService:
             # Create prune configuration
             prune_config = PruneConfig(
                 keep_within=getattr(prune_request, "keep_within", None),
+                keep_secondly=getattr(prune_request, "keep_secondly", None),
+                keep_minutely=getattr(prune_request, "keep_minutely", None),
+                keep_hourly=getattr(prune_request, "keep_hourly", None),
                 keep_daily=getattr(prune_request, "keep_daily", None),
                 keep_weekly=getattr(prune_request, "keep_weekly", None),
                 keep_monthly=getattr(prune_request, "keep_monthly", None),

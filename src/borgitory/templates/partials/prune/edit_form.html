@@ -12,6 +12,18 @@
     
     <div class="grid grid-cols-2 gap-2">
         <div>
+            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Secondly</label>
+            <input type="number" name="keep_secondly" value="{{ config.keep_secondly or '' }}" min="0" class="input-modern">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Minutely</label>
+            <input type="number" name="keep_minutely" value="{{ config.keep_minutely or '' }}" min="0" class="input-modern">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Hourly</label>
+            <input type="number" name="keep_hourly" value="{{ config.keep_hourly or '' }}" min="0" class="input-modern">
+        </div>
+        <div>
             <label class="block text-xs text-gray-900 dark:text-gray-100">Keep Daily</label>
             <input type="number" name="keep_daily" value="{{ config.keep_daily or '' }}" min="0" class="input-modern">
         </div>

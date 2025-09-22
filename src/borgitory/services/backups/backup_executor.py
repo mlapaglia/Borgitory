@@ -71,6 +71,9 @@ class PruneConfig:
     """Configuration for prune operations"""
 
     keep_within: Optional[str] = None
+    keep_secondly: Optional[int] = None
+    keep_minutely: Optional[int] = None
+    keep_hourly: Optional[int] = None
     keep_daily: Optional[int] = None
     keep_weekly: Optional[int] = None
     keep_monthly: Optional[int] = None
@@ -462,6 +465,12 @@ class BackupExecutor:
         # Add retention policy arguments
         if config.keep_within:
             additional_args.extend(["--keep-within", config.keep_within])
+        if config.keep_secondly:
+            additional_args.extend(["--keep-secondly", str(config.keep_secondly)])
+        if config.keep_minutely:
+            additional_args.extend(["--keep-minutely", str(config.keep_minutely)])
+        if config.keep_hourly:
+            additional_args.extend(["--keep-hourly", str(config.keep_hourly)])
         if config.keep_daily:
             additional_args.extend(["--keep-daily", str(config.keep_daily)])
         if config.keep_weekly:
