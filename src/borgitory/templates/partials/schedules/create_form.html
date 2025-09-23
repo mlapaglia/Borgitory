@@ -93,20 +93,29 @@
             
             <!-- Advanced Options: Pre/Post Job Hooks -->
             <div class="border-t pt-4 mt-4">
-                <div class="border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800" id="hooks-section">
-                    <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                         hx-get="/api/shared/toggle-hooks-section?expanded=false"
-                         hx-target="#hooks-section"
-                         hx-swap="outerHTML">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    Pre/Post Job Hooks
-                                </span>
-                            </div>
-                            <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                Advanced Options
+                            </h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Configure optional pre and post job hooks
+                            </p>
+                        </div>
+                        <div id="hooks-display-section">
+                            <button type="button" 
+                                    class="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors"
+                                    hx-post="/api/shared/hooks-modal"
+                                    hx-vals='{"pre_hooks": "[]", "post_hooks": "[]"}'
+                                    hx-target="#modal-container">
+                                <span>⚙️</span>
+                                <span>Configure Pre/Post Job Hooks</span>
+                            </button>
+                            
+                            <!-- Hidden fields for form submission -->
+                            <input type="hidden" name="pre_job_hooks" id="pre-hooks-data" value="">
+                            <input type="hidden" name="post_job_hooks" id="post-hooks-data" value="">
                         </div>
                     </div>
                 </div>
@@ -119,3 +128,6 @@
     </form>
     <div id="schedule-status" class="mt-4"></div>
 </div>
+
+<!-- Modal container for hooks configuration -->
+<div id="modal-container"></div>

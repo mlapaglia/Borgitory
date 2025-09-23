@@ -25,25 +25,27 @@ router = APIRouter()
 def convert_hook_fields_to_json(
     form_data: Dict[str, Any], hook_type: str
 ) -> Optional[str]:
-    """Convert individual hook fields to JSON format."""
+    """Convert individual hook fields to JSON format using position-based form data."""
     hooks = []
 
-    # Find all hook fields for this type
-    name_fields = {}
-    command_fields = {}
+    # Get all names and commands for this hook type (position-based)
+    hook_names = form_data.get(f"{hook_type}_hook_name", [])
+    hook_commands = form_data.get(f"{hook_type}_hook_command", [])
 
-    for key, value in form_data.items():
-        if key.startswith(f"{hook_type}_hook_name_") and value and value.strip():
-            index = key.replace(f"{hook_type}_hook_name_", "")
-            name_fields[index] = value.strip()
-        elif key.startswith(f"{hook_type}_hook_command_") and value and value.strip():
-            index = key.replace(f"{hook_type}_hook_command_", "")
-            command_fields[index] = value.strip()
+    # Ensure they are lists (in case there's only one item)
+    if not isinstance(hook_names, list):
+        hook_names = [hook_names] if hook_names else []
+    if not isinstance(hook_commands, list):
+        hook_commands = [hook_commands] if hook_commands else []
 
-    # Match names with commands
-    for index in name_fields:
-        if index in command_fields:
-            hooks.append({"name": name_fields[index], "command": command_fields[index]})
+    # Pair them up by position
+    for i in range(min(len(hook_names), len(hook_commands))):
+        name = str(hook_names[i]).strip() if hook_names[i] else ""
+        command = str(hook_commands[i]).strip() if hook_commands[i] else ""
+
+        # Only add hooks that have both name and command
+        if name and command:
+            hooks.append({"name": name, "command": command})
 
     return json.dumps(hooks) if hooks else None
 

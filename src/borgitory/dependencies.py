@@ -473,9 +473,16 @@ def get_templates() -> TimezoneAwareJinja2Templates:
         except (json.JSONDecodeError, TypeError):
             return []
 
+    def to_json_filter(obj: Any) -> str:
+        """Jinja2 filter for converting objects to JSON strings"""
+        import json
+
+        return json.dumps(obj) if obj is not None else '""'
+
     templates.env.filters["format_datetime"] = datetime_filter
     templates.env.filters["format_datetime_browser"] = datetime_browser_filter
     templates.env.filters["from_json"] = from_json_filter
+    templates.env.filters["tojson"] = to_json_filter
 
     return templates
 
