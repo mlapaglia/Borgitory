@@ -308,18 +308,28 @@ class TaskDefinitionBuilder:
             repository_name: Optional repository name for display
 
         Returns:
-            List of hook task definitions
+            List containing a single hook task definition with all hooks bundled
         """
         if not hooks_json:
             return []
 
         try:
             hooks = HookConfigParser.parse_hooks_json(hooks_json)
+            if not hooks:
+                return []
+
+            # Create a single task that contains all hooks of this type
+            display_name = f"{hook_type.title()}-job hooks"
+            if repository_name:
+                display_name += f" ({repository_name})"
+
             return [
-                self.build_hook_task(
-                    hook.name, hook.command, hook_type, repository_name
-                )
-                for hook in hooks
+                {
+                    "type": "hook",
+                    "name": display_name,
+                    "hook_type": hook_type,
+                    "hooks": hooks_json,  # Pass the original JSON string
+                }
             ]
         except ValueError as e:
             # Log the error but don't fail the entire job

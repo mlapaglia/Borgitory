@@ -616,6 +616,7 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     encryption_service = get_encryption_service()
     storage_factory = get_storage_factory(rclone_service)
     provider_registry = get_provider_registry()
+    hook_execution_service = get_hook_execution_service()
 
     # Create dependencies using resolved services
     custom_dependencies = JobManagerDependencies(
@@ -629,6 +630,7 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
         encryption_service=encryption_service,
         storage_factory=storage_factory,
         provider_registry=provider_registry,
+        hook_execution_service=hook_execution_service,
     )
 
     # Use the factory to ensure all dependencies are properly initialized

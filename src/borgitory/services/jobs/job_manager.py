@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from borgitory.services.cloud_providers import StorageFactory
     from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers.registry import ProviderRegistry
+    from borgitory.services.hooks.hook_execution_service import HookExecutionService
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ class JobManagerDependencies:
     provider_registry: Optional["ProviderRegistry"] = None
     # Use semantic type alias for application-scoped notification service
     notification_service: Optional["ApplicationScopedNotificationService"] = None
+    hook_execution_service: Optional["HookExecutionService"] = None
 
     def __post_init__(self) -> None:
         """Initialize default dependencies if not provided"""
@@ -121,7 +123,7 @@ class JobManagerDependencies:
 class BorgJobTask:
     """Individual task within a job"""
 
-    task_type: str  # 'backup', 'prune', 'check', 'cloud_sync'
+    task_type: str  # 'backup', 'prune', 'check', 'cloud_sync', 'hook', 'notification'
     task_name: str
     status: str = "pending"  # 'pending', 'running', 'completed', 'failed', 'skipped'
     started_at: Optional[datetime] = None
@@ -193,6 +195,7 @@ class JobManagerFactory:
             storage_factory=custom_dependencies.storage_factory,
             provider_registry=custom_dependencies.provider_registry,
             notification_service=custom_dependencies.notification_service,
+            hook_execution_service=custom_dependencies.hook_execution_service,
         )
 
         # Job Executor
@@ -259,6 +262,7 @@ class JobManagerFactory:
             get_encryption_service,
             get_storage_factory,
             get_provider_registry,
+            get_hook_execution_service,
         )
 
         # Create complete dependencies with all cloud sync and notification services
@@ -271,6 +275,7 @@ class JobManagerFactory:
             storage_factory=get_storage_factory(get_rclone_service()),
             provider_registry=get_provider_registry(),
             notification_service=get_notification_service_singleton(),
+            hook_execution_service=get_hook_execution_service(),
         )
 
         return cls.create_dependencies(config=config, custom_dependencies=complete_deps)
@@ -1545,6 +1550,115 @@ class JobManager:
             task.error = str(e)
             return False
 
+    async def _execute_hook_task(
+        self, job: BorgJob, task: BorgJobTask, task_index: int = 0
+    ) -> bool:
+        """Execute a hook task"""
+        if not self.dependencies.hook_execution_service:
+            logger.error("Hook execution service not available")
+            task.status = "failed"
+            task.error = "Hook execution service not configured"
+            return False
+
+        try:
+            task.status = "running"
+            task.started_at = now_utc()
+
+            # Extract hook configuration from task parameters
+            hook_configs_data = task.parameters.get("hooks", [])
+            hook_type = str(task.parameters.get("hook_type", "unknown"))
+
+            if not hook_configs_data:
+                logger.warning(
+                    f"No hook configurations found for {hook_type} hook task"
+                )
+                task.status = "completed"
+                task.return_code = 0
+                task.completed_at = now_utc()
+                return True
+
+            # Parse hook configurations
+            from borgitory.services.hooks.hook_config import HookConfigParser
+
+            try:
+                hook_configs = HookConfigParser.parse_hooks_json(
+                    hook_configs_data
+                    if isinstance(hook_configs_data, str)
+                    else str(hook_configs_data)
+                )
+            except Exception as e:
+                logger.error(f"Failed to parse hook configurations: {e}")
+                task.status = "failed"
+                task.error = f"Invalid hook configuration: {str(e)}"
+                task.return_code = 1
+                task.completed_at = now_utc()
+                return False
+
+            # Execute hooks
+            hook_results = await self.dependencies.hook_execution_service.execute_hooks(
+                hooks=hook_configs,
+                hook_type=hook_type,
+                job_id=job.id,
+                context={
+                    "repository_id": str(job.repository_id)
+                    if job.repository_id
+                    else "unknown",
+                    "task_index": str(task_index),
+                    "job_type": str(job.job_type),
+                },
+            )
+
+            # Process results
+            all_successful = True
+            error_messages = []
+
+            for result in hook_results:
+                # Add hook output to task
+                if result.output:
+                    task.output_lines.append(
+                        {
+                            "text": f"[{result.hook_name}] {result.output}",
+                            "timestamp": now_utc().isoformat(),
+                        }
+                    )
+
+                if result.error:
+                    task.output_lines.append(
+                        {
+                            "text": f"[{result.hook_name}] ERROR: {result.error}",
+                            "timestamp": now_utc().isoformat(),
+                        }
+                    )
+
+                if not result.success:
+                    all_successful = False
+                    error_messages.append(
+                        f"{result.hook_name}: {result.error or 'Unknown error'}"
+                    )
+
+            # Set final task status
+            task.status = "completed" if all_successful else "failed"
+            task.return_code = 0 if all_successful else 1
+            task.completed_at = now_utc()
+
+            if error_messages:
+                task.error = f"Hook execution failed: {'; '.join(error_messages)}"
+
+            logger.info(
+                f"Hook task {hook_type} completed with {len(hook_results)} hooks "
+                f"({'success' if all_successful else 'failure'})"
+            )
+
+            return all_successful
+
+        except Exception as e:
+            logger.error(f"Error executing hook task: {e}")
+            task.status = "failed"
+            task.error = str(e)
+            task.return_code = 1
+            task.completed_at = now_utc()
+            return False
+
     async def _execute_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
     ) -> bool:
@@ -1560,6 +1674,8 @@ class JobManager:
                 return await self._execute_cloud_sync_task(job, task, task_index)
             elif task.task_type == "notification":
                 return await self._execute_notification_task(job, task, task_index)
+            elif task.task_type == "hook":
+                return await self._execute_hook_task(job, task, task_index)
             else:
                 logger.warning(f"Unknown task type: {task.task_type}")
                 task.status = "failed"
