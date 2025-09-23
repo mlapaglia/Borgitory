@@ -18,8 +18,8 @@ class HookExecutionSummary(NamedTuple):
 
     results: List["HookExecutionResult"]
     all_successful: bool
-    critical_failure: bool  # True if a critical hook failed
-    failed_critical_hook_name: Optional[str]  # Name of the failed critical hook
+    critical_failure: bool
+    failed_critical_hook_name: Optional[str]
 
 
 class HookOutputHandler(Protocol):
@@ -212,9 +212,6 @@ class HookExecutionService:
             env.update(hook.environment_vars)
 
             # Add job context to environment
-            env["BORGITORY_JOB_ID"] = job_id
-            env["BORGITORY_HOOK_NAME"] = hook.name
-
             if context:
                 for key, value in context.items():
                     env[f"BORGITORY_{key.upper()}"] = value

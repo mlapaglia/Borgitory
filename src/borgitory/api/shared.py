@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from borgitory.dependencies import get_templates
-import logging
 
 router = APIRouter()
 templates = get_templates()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/notification", response_class=HTMLResponse)

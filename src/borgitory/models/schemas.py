@@ -4,6 +4,8 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 
+from borgitory.services.hooks.hook_config import validate_hooks_json
+
 
 # Enums for type safety and validation
 class JobStatus(str, Enum):
@@ -210,7 +212,6 @@ class ScheduleCreate(ScheduleBase):
     def validate_pre_job_hooks(cls, v: Union[str, None]) -> Optional[str]:
         if not v or v.strip() == "":
             return None
-        from borgitory.services.hooks.hook_config import validate_hooks_json
 
         is_valid, error_msg = validate_hooks_json(v)
         if not is_valid:
@@ -222,7 +223,6 @@ class ScheduleCreate(ScheduleBase):
     def validate_post_job_hooks(cls, v: Union[str, None]) -> Optional[str]:
         if not v or v.strip() == "":
             return None
-        from borgitory.services.hooks.hook_config import validate_hooks_json
 
         is_valid, error_msg = validate_hooks_json(v)
         if not is_valid:
@@ -257,7 +257,6 @@ class ScheduleUpdate(BaseModel):
     def validate_pre_job_hooks_update(cls, v: Optional[str]) -> Optional[str]:
         if v is None or v.strip() == "":
             return None
-        from borgitory.services.hooks.hook_config import validate_hooks_json
 
         is_valid, error_msg = validate_hooks_json(v)
         if not is_valid:
@@ -269,7 +268,6 @@ class ScheduleUpdate(BaseModel):
     def validate_post_job_hooks_update(cls, v: Optional[str]) -> Optional[str]:
         if v is None or v.strip() == "":
             return None
-        from borgitory.services.hooks.hook_config import validate_hooks_json
 
         is_valid, error_msg = validate_hooks_json(v)
         if not is_valid:

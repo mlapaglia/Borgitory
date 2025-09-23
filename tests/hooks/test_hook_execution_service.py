@@ -136,8 +136,6 @@ class TestHookExecutionService:
         env = call_args[1]["env"]
         assert "TEST_VAR" in env
         assert env["TEST_VAR"] == "test_value"
-        assert env["BORGITORY_JOB_ID"] == "job-789"
-        assert env["BORGITORY_HOOK_NAME"] == "Env Hook"
 
     @pytest.mark.asyncio
     async def test_execute_hook_with_context(self) -> None:
@@ -148,16 +146,22 @@ class TestHookExecutionService:
         )
 
         service = HookExecutionService(command_runner=mock_runner)
-        hook = HookConfig(name="Context Hook", command="echo $BORGITORY_REPOSITORY")
+        hook = HookConfig(name="Context Hook", command="echo $BORGITORY_REPOSITORY_ID")
 
-        # Execute with context
-        context = {"repository": "test-repo"}
+        # Execute with context (matching production usage)
+        context = {
+            "repository_id": "test-repo-id",
+            "task_index": "2",
+            "job_type": "scheduled",
+        }
         await service.execute_hooks([hook], "pre", "job-123", context)
 
         # Verify context was added to environment
         call_args = mock_runner._run_command_mock.call_args
         env = call_args[1]["env"]
-        assert env["BORGITORY_REPOSITORY"] == "test-repo"
+        assert env["BORGITORY_REPOSITORY_ID"] == "test-repo-id"
+        assert env["BORGITORY_TASK_INDEX"] == "2"
+        assert env["BORGITORY_JOB_TYPE"] == "scheduled"
 
     @pytest.mark.asyncio
     async def test_execute_failed_hook(self) -> None:

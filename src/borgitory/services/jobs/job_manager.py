@@ -712,14 +712,11 @@ class JobManager:
                         except Exception as e:
                             logger.error(f"Failed to update tasks in database: {e}")
 
-                    # If task failed and it's critical, stop the job
                     if task.status == "failed":
-                        # Check for critical hook failures
                         is_critical_hook_failure = (
                             task.task_type == "hook"
                             and task.parameters.get("critical_failure", False)
                         )
-                        # Check for critical task types
                         is_critical_task = task.task_type in ["backup"]
 
                         if is_critical_hook_failure or is_critical_task:
@@ -732,7 +729,6 @@ class JobManager:
                                 f"{task.task_type} failed, stopping job"
                             )
 
-                            # Mark all remaining tasks as skipped
                             remaining_tasks = job.tasks[task_index + 1 :]
                             for remaining_task in remaining_tasks:
                                 if remaining_task.status == "pending":
@@ -759,7 +755,6 @@ class JobManager:
                         data={"task_index": task_index, "error": str(e)},
                     )
 
-                    # Update task in database for exception case too
                     if self.database_manager:
                         try:
                             logger.info(
@@ -774,9 +769,7 @@ class JobManager:
                         except Exception as db_e:
                             logger.error(f"Failed to update tasks in database: {db_e}")
 
-                    # If it's a critical task, stop execution
                     if task.task_type in ["backup"]:
-                        # Mark all remaining tasks as skipped
                         remaining_tasks = job.tasks[task_index + 1 :]
                         for remaining_task in remaining_tasks:
                             if remaining_task.status == "pending":
@@ -790,18 +783,13 @@ class JobManager:
                                 )
                         break
 
-            # Determine final job status
             failed_tasks = [t for t in job.tasks if t.status == "failed"]
             completed_tasks = [t for t in job.tasks if t.status == "completed"]
             skipped_tasks = [t for t in job.tasks if t.status == "skipped"]
-            finished_tasks = (
-                completed_tasks + skipped_tasks
-            )  # Both completed and skipped are considered "finished"
+            finished_tasks = completed_tasks + skipped_tasks
 
             if len(finished_tasks) + len(failed_tasks) == len(job.tasks):
-                # All tasks are finished (completed, skipped, or failed)
                 if failed_tasks:
-                    # Check if any critical tasks failed
                     critical_task_failed = any(
                         t.task_type in ["backup"] for t in failed_tasks
                     )
@@ -816,10 +804,8 @@ class JobManager:
                         else "completed"
                     )
                 else:
-                    # No failed tasks - job completed successfully (even if some tasks were skipped)
                     job.status = "completed"
             else:
-                # Some tasks are still pending/running - this shouldn't happen in this context
                 job.status = "failed"
 
             job.completed_at = now_utc()
@@ -1550,12 +1536,10 @@ class JobManager:
                     enabled=config.enabled,
                 )
 
-                # Generate dynamic message based on job status
                 title, message, notification_type_str, priority_value = (
                     self._generate_notification_content(job, task_index)
                 )
 
-                # Allow override from task parameters if provided
                 title_param = params.get("title")
                 message_param = params.get("message")
                 type_param = params.get("type")
@@ -1571,10 +1555,8 @@ class JobManager:
                     try:
                         priority_value = int(str(priority_param))
                     except (ValueError, TypeError):
-                        # Keep the default priority_value if conversion fails
                         pass
 
-                # Convert to proper types
                 try:
                     notification_type = NotificationType(
                         str(notification_type_str).lower()
@@ -1589,7 +1571,6 @@ class JobManager:
                 except ValueError:
                     priority = NotificationPriority.NORMAL
 
-                # Create notification message
                 notification_message = NotificationMessage(
                     title=str(title),
                     message=str(message),
@@ -1597,7 +1578,6 @@ class JobManager:
                     priority=priority,
                 )
 
-                # Log what we're doing
                 task.output_lines.append(
                     f"Sending {config.provider} notification to {config.name}"
                 )
@@ -1615,7 +1595,6 @@ class JobManager:
                     },
                 )
 
-                # Send the notification
                 result = await notification_service.send_notification(
                     notification_config, notification_message
                 )
@@ -1661,12 +1640,10 @@ class JobManager:
         Returns:
             Tuple of (title, message, type, priority_value)
         """
-        # Analyze job status and tasks
         failed_tasks = [t for t in job.tasks if t.status == "failed"]
         completed_tasks = [t for t in job.tasks if t.status == "completed"]
         skipped_tasks = [t for t in job.tasks if t.status == "skipped"]
 
-        # Check for critical failures
         critical_hook_failures = [
             t
             for t in failed_tasks
@@ -1674,16 +1651,13 @@ class JobManager:
         ]
         backup_failures = [t for t in failed_tasks if t.task_type == "backup"]
 
-        # Determine overall job status
         has_critical_failure = bool(critical_hook_failures or backup_failures)
 
-        # Get repository name for context
         repository_name = "Unknown"
         if len(job.tasks) > 0 and "repository_name" in job.tasks[0].parameters:
             repository_name = str(job.tasks[0].parameters["repository_name"])
 
         if has_critical_failure:
-            # Critical failure - high priority error notification
             if critical_hook_failures:
                 failed_hook_name = str(
                     critical_hook_failures[0].parameters.get(
@@ -1704,10 +1678,9 @@ class JobManager:
                     f"Tasks Completed: {len(completed_tasks)}, Skipped: {len(skipped_tasks)}, Total: {len(job.tasks)}\n"
                     f"Job ID: {job.id}"
                 )
-            return title, message, "error", 1  # HIGH priority
+            return title, message, "error", 1
 
         elif failed_tasks:
-            # Non-critical failures - warning notification
             failed_task_types = [t.task_type for t in failed_tasks]
             title = "⚠️ Backup Job Completed with Warnings"
             message = (
@@ -1716,10 +1689,9 @@ class JobManager:
                 f"Tasks Completed: {len(completed_tasks)}, Skipped: {len(skipped_tasks)}, Total: {len(job.tasks)}\n"
                 f"Job ID: {job.id}"
             )
-            return title, message, "warning", 0  # NORMAL priority
+            return title, message, "warning", 0
 
         else:
-            # Success - info notification
             title = "✅ Backup Job Completed Successfully"
             message = (
                 f"Backup job for '{repository_name}' completed successfully.\n\n"
@@ -1728,7 +1700,7 @@ class JobManager:
                 f", Total: {len(job.tasks)}\n"
                 f"Job ID: {job.id}"
             )
-            return title, message, "success", 0  # NORMAL priority
+            return title, message, "success", 0
 
     async def _execute_hook_task(
         self,
@@ -1748,7 +1720,6 @@ class JobManager:
             task.status = "running"
             task.started_at = now_utc()
 
-            # Extract hook configuration from task parameters
             hook_configs_data = task.parameters.get("hooks", [])
             hook_type = str(task.parameters.get("hook_type", "unknown"))
 
@@ -1761,7 +1732,6 @@ class JobManager:
                 task.completed_at = now_utc()
                 return True
 
-            # Parse hook configurations
             from borgitory.services.hooks.hook_config import HookConfigParser
 
             try:
@@ -1778,7 +1748,6 @@ class JobManager:
                 task.completed_at = now_utc()
                 return False
 
-            # Execute hooks
             hook_summary = await self.dependencies.hook_execution_service.execute_hooks(
                 hooks=hook_configs,
                 hook_type=hook_type,
@@ -1793,11 +1762,9 @@ class JobManager:
                 job_failed=job_has_failed,
             )
 
-            # Process results
             error_messages = []
 
             for result in hook_summary.results:
-                # Add hook output to task
                 if result.output:
                     task.output_lines.append(
                         {
@@ -1819,7 +1786,6 @@ class JobManager:
                         f"{result.hook_name}: {result.error or 'Unknown error'}"
                     )
 
-            # Set final task status
             task.status = "completed" if hook_summary.all_successful else "failed"
             task.return_code = 0 if hook_summary.all_successful else 1
             task.completed_at = now_utc()
@@ -1832,7 +1798,6 @@ class JobManager:
                 else:
                     task.error = f"Hook execution failed: {'; '.join(error_messages)}"
 
-            # Store critical failure info for composite job handling
             if hook_summary.critical_failure:
                 task.parameters["critical_failure"] = True
                 task.parameters["failed_critical_hook_name"] = (
