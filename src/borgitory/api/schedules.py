@@ -465,48 +465,6 @@ def _validate_hooks_for_save(form_data: Any) -> tuple[bool, str | None]:
     return True, None
 
 
-@router.get("/hooks/toggle-hooks-section", response_class=HTMLResponse)
-async def toggle_hooks_section(
-    request: Request,
-    templates: TemplatesDep,
-    expanded: str = Query(
-        ..., description="Whether hooks section is currently expanded"
-    ),
-) -> HTMLResponse:
-    """Toggle hooks section expansion via HTMX."""
-    is_expanded = expanded.lower() == "true"
-    new_expanded = not is_expanded
-
-    return templates.TemplateResponse(
-        request,
-        "partials/schedules/hooks_section.html",
-        {"expanded": new_expanded},
-    )
-
-
-@router.get("/hooks/toggle-hooks-edit-section", response_class=HTMLResponse)
-async def toggle_hooks_edit_section(
-    request: Request,
-    templates: TemplatesDep,
-    schedule_service: ScheduleServiceDep,
-    expanded: str = Query(
-        ..., description="Whether hooks section is currently expanded"
-    ),
-    schedule_id: int = Query(..., description="Schedule ID for edit mode"),
-) -> HTMLResponse:
-    """Toggle hooks edit section expansion via HTMX."""
-    is_expanded = expanded.lower() == "true"
-    new_expanded = not is_expanded
-
-    schedule = schedule_service.get_schedule_by_id(schedule_id)
-
-    return templates.TemplateResponse(
-        request,
-        "partials/schedules/hooks/hooks_edit_section.html",
-        {"expanded": new_expanded, "schedule": schedule},
-    )
-
-
 @router.post("/hooks/add-hook-field", response_class=HTMLResponse)
 async def add_hook_field(
     request: Request,
