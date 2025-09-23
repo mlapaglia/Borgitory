@@ -751,10 +751,12 @@ class JobManager:
                                         job.id, job.tasks
                                     )
                                     logger.info(
-                                        f"Successfully saved all tasks to database after critical failure"
+                                        "Successfully saved all tasks to database after critical failure"
                                     )
                                 except Exception as e:
-                                    logger.error(f"Failed to update tasks in database after critical failure: {e}")
+                                    logger.error(
+                                        f"Failed to update tasks in database after critical failure: {e}"
+                                    )
 
                             break
 
@@ -807,10 +809,12 @@ class JobManager:
                                     job.id, job.tasks
                                 )
                                 logger.info(
-                                    f"Successfully saved all tasks to database after critical exception"
+                                    "Successfully saved all tasks to database after critical exception"
                                 )
                             except Exception as db_e:
-                                logger.error(f"Failed to update tasks in database after critical exception: {db_e}")
+                                logger.error(
+                                    f"Failed to update tasks in database after critical exception: {db_e}"
+                                )
 
                         break
 

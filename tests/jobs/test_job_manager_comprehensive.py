@@ -288,7 +288,7 @@ class TestJobManagerTaskExecution:
             task_definitions=task_definitions,
             repository=sample_repository,
         )
-        
+
         # Get the created job
         job = job_manager_with_db.jobs[job_id]
 
@@ -310,6 +310,7 @@ class TestJobManagerTaskExecution:
         ), patch.object(job_manager_with_db, "_execute_prune_task", mock_prune):
             # Wait for the job to complete (it starts automatically)
             import asyncio
+
             await asyncio.sleep(0.1)  # Give the job time to execute
 
         # Get the updated tasks from the job
@@ -323,40 +324,57 @@ class TestJobManagerTaskExecution:
         # Verify remaining task was marked as skipped due to critical failure
         assert task2.status == "skipped"
         assert task2.completed_at is not None
-        assert any("Task skipped due to critical task failure" in line for line in task2.output_lines)
+        assert any(
+            "Task skipped due to critical task failure" in line
+            for line in task2.output_lines
+        )
 
         # Prune should not have been called due to critical failure
         mock_prune.assert_not_called()
-        
+
         # Verify database persistence - actually query the database to confirm the data was saved
-        from src.borgitory.models.database import Job as DatabaseJob, JobTask as DatabaseTask
-        
+        from src.borgitory.models.database import (
+            Job as DatabaseJob,
+            JobTask as DatabaseTask,
+        )
+
         # Get the database session from the job manager
         db_session_factory = job_manager_with_db.dependencies.db_session_factory
         assert db_session_factory is not None
-        
+
         with db_session_factory() as db:
             # Query the database for the job and its tasks
             db_job = db.query(DatabaseJob).filter(DatabaseJob.id == job_id).first()
             assert db_job is not None, f"Job {job_id} should be persisted in database"
-            
+
             # Query for the tasks
-            db_tasks = db.query(DatabaseTask).filter(DatabaseTask.job_id == job_id).order_by(DatabaseTask.task_order).all()
-            assert len(db_tasks) == 2, f"Expected 2 tasks in database, got {len(db_tasks)}"
-            
+            db_tasks = (
+                db.query(DatabaseTask)
+                .filter(DatabaseTask.job_id == job_id)
+                .order_by(DatabaseTask.task_order)
+                .all()
+            )
+            assert len(db_tasks) == 2, (
+                f"Expected 2 tasks in database, got {len(db_tasks)}"
+            )
+
             # Verify the backup task (index 0) is failed
             backup_db_task = db_tasks[0]
             assert backup_db_task.task_type == "backup"
             assert backup_db_task.status == "failed"
             assert backup_db_task.return_code == 1
             assert backup_db_task.completed_at is not None
-            
+
             # Verify the prune task (index 1) is skipped - THIS IS THE KEY TEST
             prune_db_task = db_tasks[1]
             assert prune_db_task.task_type == "prune"
-            assert prune_db_task.status == "skipped", f"Expected prune task to be 'skipped' in database, got '{prune_db_task.status}'"
-            assert prune_db_task.completed_at is not None, "Skipped task should have completed_at timestamp"
-            
+            assert prune_db_task.status == "skipped", (
+                f"Expected prune task to be 'skipped' in database, got '{prune_db_task.status}'"
+            )
+            assert prune_db_task.completed_at is not None, (
+                "Skipped task should have completed_at timestamp"
+            )
+
             # Verify the job status is failed
             assert db_job.status == "failed"
             assert db_job.finished_at is not None
