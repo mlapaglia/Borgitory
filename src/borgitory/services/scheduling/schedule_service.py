@@ -59,6 +59,8 @@ class ScheduleService:
         cloud_sync_config_id: Optional[int] = None,
         cleanup_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
+        pre_job_hooks: Optional[str] = None,
+        post_job_hooks: Optional[str] = None,
     ) -> tuple[bool, Optional[Schedule], Optional[str]]:
         """
         Create a new schedule.
@@ -89,6 +91,8 @@ class ScheduleService:
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
             db_schedule.cleanup_config_id = cleanup_config_id
             db_schedule.notification_config_id = notification_config_id
+            db_schedule.pre_job_hooks = pre_job_hooks
+            db_schedule.post_job_hooks = post_job_hooks
 
             self.db.add(db_schedule)
             self.db.commit()

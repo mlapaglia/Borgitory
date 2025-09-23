@@ -159,6 +159,8 @@ class ScheduleCreate(ScheduleBase):
     cleanup_config_id: Optional[int] = None
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
+    pre_job_hooks: Optional[str] = None
+    post_job_hooks: Optional[str] = None
 
     @field_validator("source_path", mode="before")
     @classmethod
@@ -203,6 +205,30 @@ class ScheduleCreate(ScheduleBase):
             return None
         return int(v)
 
+    @field_validator("pre_job_hooks", mode="before")
+    @classmethod
+    def validate_pre_job_hooks(cls, v: Union[str, None]) -> Optional[str]:
+        if not v or v.strip() == "":
+            return None
+        from borgitory.services.hooks.hook_config import validate_hooks_json
+
+        is_valid, error_msg = validate_hooks_json(v)
+        if not is_valid:
+            raise ValueError(f"Invalid pre-job hooks configuration: {error_msg}")
+        return v.strip()
+
+    @field_validator("post_job_hooks", mode="before")
+    @classmethod
+    def validate_post_job_hooks(cls, v: Union[str, None]) -> Optional[str]:
+        if not v or v.strip() == "":
+            return None
+        from borgitory.services.hooks.hook_config import validate_hooks_json
+
+        is_valid, error_msg = validate_hooks_json(v)
+        if not is_valid:
+            raise ValueError(f"Invalid post-job hooks configuration: {error_msg}")
+        return v.strip()
+
 
 class ScheduleUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=128)
@@ -214,6 +240,8 @@ class ScheduleUpdate(BaseModel):
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
     enabled: Optional[bool] = None
+    pre_job_hooks: Optional[str] = None
+    post_job_hooks: Optional[str] = None
 
     @field_validator("source_path", mode="before")
     @classmethod
@@ -223,6 +251,30 @@ class ScheduleUpdate(BaseModel):
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
 
         return normalize_path_with_mnt_prefix(v)
+
+    @field_validator("pre_job_hooks", mode="before")
+    @classmethod
+    def validate_pre_job_hooks_update(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v.strip() == "":
+            return None
+        from borgitory.services.hooks.hook_config import validate_hooks_json
+
+        is_valid, error_msg = validate_hooks_json(v)
+        if not is_valid:
+            raise ValueError(f"Invalid pre-job hooks configuration: {error_msg}")
+        return v.strip()
+
+    @field_validator("post_job_hooks", mode="before")
+    @classmethod
+    def validate_post_job_hooks_update(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v.strip() == "":
+            return None
+        from borgitory.services.hooks.hook_config import validate_hooks_json
+
+        is_valid, error_msg = validate_hooks_json(v)
+        if not is_valid:
+            raise ValueError(f"Invalid post-job hooks configuration: {error_msg}")
+        return v.strip()
 
     @field_validator("cron_expression")
     @classmethod
@@ -407,6 +459,8 @@ class BackupRequest(BaseModel):
     cleanup_config_id: Optional[int] = Field(None, gt=0)
     check_config_id: Optional[int] = Field(None, gt=0)
     notification_config_id: Optional[int] = Field(None, gt=0)
+    pre_job_hooks: Optional[str] = None
+    post_job_hooks: Optional[str] = None
 
     @field_validator("source_path", mode="before")
     @classmethod

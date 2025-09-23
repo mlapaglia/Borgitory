@@ -1,0 +1,75 @@
+{% if show_hooks %}
+<div class="mt-4 space-y-4">
+    <div>
+        <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Pre-Job Hooks</label>
+            <button type="button" 
+                    class="text-sm bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                    hx-post="/api/shared/add-hook-field"
+                    hx-vals='{"hook_type": "pre"}'
+                    hx-target="#pre-hooks-container"
+                    hx-swap="beforeend">
+                + Add Hook
+            </button>
+        </div>
+        <div id="pre-hooks-container" class="space-y-2">
+            <div class="flex items-center space-x-2">
+                <input type="text" 
+                       name="pre_hook_name_0" 
+                       placeholder="Hook name (e.g., 'Preparation')"
+                       class="flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                <input type="text" 
+                       name="pre_hook_command_0" 
+                       placeholder="Command (e.g., 'echo Starting backup')"
+                       class="flex-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                <button type="button" 
+                        class="text-red-600 hover:text-red-800 p-1"
+                        hx-delete="/api/shared/remove-hook-field"
+                        hx-target="closest div"
+                        hx-swap="outerHTML">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Commands to run before the backup starts</p>
+    </div>
+    
+    <div>
+        <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Post-Job Hooks</label>
+            <button type="button" 
+                    class="text-sm bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                    hx-post="/api/shared/add-hook-field"
+                    hx-vals='{"hook_type": "post"}'
+                    hx-target="#post-hooks-container"
+                    hx-swap="beforeend">
+                + Add Hook
+            </button>
+        </div>
+        <div id="post-hooks-container" class="space-y-2">
+            <div class="flex items-center space-x-2">
+                <input type="text" 
+                       name="post_hook_name_0" 
+                       placeholder="Hook name (e.g., 'Cleanup')"
+                       class="flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                <input type="text" 
+                       name="post_hook_command_0" 
+                       placeholder="Command (e.g., 'echo Backup completed')"
+                       class="flex-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                <button type="button" 
+                        class="text-red-600 hover:text-red-800 p-1"
+                        hx-delete="/api/shared/remove-hook-field"
+                        hx-target="closest div"
+                        hx-swap="outerHTML">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Commands to run after the backup completes</p>
+    </div>
+</div>
+{% endif %}

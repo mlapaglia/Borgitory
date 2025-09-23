@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import HTMLResponse
 from starlette.templating import _TemplateResponse
 from sqlalchemy.orm import Session
-from typing import cast, List, Dict, Any
+from typing import cast, List, Dict, Any, Optional
+import json
 
 from borgitory.models.database import get_db
 from borgitory.models.schemas import (
@@ -19,6 +20,32 @@ from borgitory.dependencies import (
 from borgitory.services.cron_description_service import CronDescriptionService
 
 router = APIRouter()
+
+
+def convert_hook_fields_to_json(
+    form_data: Dict[str, Any], hook_type: str
+) -> Optional[str]:
+    """Convert individual hook fields to JSON format."""
+    hooks = []
+
+    # Find all hook fields for this type
+    name_fields = {}
+    command_fields = {}
+
+    for key, value in form_data.items():
+        if key.startswith(f"{hook_type}_hook_name_") and value and value.strip():
+            index = key.replace(f"{hook_type}_hook_name_", "")
+            name_fields[index] = value.strip()
+        elif key.startswith(f"{hook_type}_hook_command_") and value and value.strip():
+            index = key.replace(f"{hook_type}_hook_command_", "")
+            command_fields[index] = value.strip()
+
+    # Match names with commands
+    for index in name_fields:
+        if index in command_fields:
+            hooks.append({"name": name_fields[index], "command": command_fields[index]})
+
+    return json.dumps(hooks) if hooks else None
 
 
 @router.get("/form", response_class=HTMLResponse)
@@ -46,6 +73,16 @@ async def create_schedule(
 ) -> HTMLResponse:
     try:
         json_data = await request.json()
+
+        # Convert hook fields to JSON format
+        pre_hooks_json = convert_hook_fields_to_json(json_data, "pre")
+        post_hooks_json = convert_hook_fields_to_json(json_data, "post")
+
+        # Add converted hooks to json_data
+        if pre_hooks_json:
+            json_data["pre_job_hooks"] = pre_hooks_json
+        if post_hooks_json:
+            json_data["post_job_hooks"] = post_hooks_json
 
         is_valid, processed_data, error_msg = (
             schedule_service.validate_schedule_creation_data(json_data)
@@ -80,6 +117,8 @@ async def create_schedule(
         cloud_sync_config_id=schedule.cloud_sync_config_id,
         cleanup_config_id=schedule.cleanup_config_id,
         notification_config_id=schedule.notification_config_id,
+        pre_job_hooks=schedule.pre_job_hooks,
+        post_job_hooks=schedule.post_job_hooks,
     )
 
     if not success or not created_schedule:
@@ -224,13 +263,40 @@ async def get_schedule_edit_form(
 @router.put("/{schedule_id}", response_class=HTMLResponse)
 async def update_schedule(
     schedule_id: int,
-    schedule_update: ScheduleUpdate,
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
 ) -> HTMLResponse:
     """Update a schedule"""
-    update_data = schedule_update.model_dump(exclude_unset=True)
+    try:
+        json_data = await request.json()
+
+        # Convert hook fields to JSON format
+        pre_hooks_json = convert_hook_fields_to_json(json_data, "pre")
+        post_hooks_json = convert_hook_fields_to_json(json_data, "post")
+
+        # Add converted hooks to json_data
+        if pre_hooks_json:
+            json_data["pre_job_hooks"] = pre_hooks_json
+        if post_hooks_json:
+            json_data["post_job_hooks"] = post_hooks_json
+
+        schedule_update = ScheduleUpdate(**json_data)
+        update_data = schedule_update.model_dump(exclude_unset=True)
+
+    except ValueError as e:
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/update_error.html",
+            {"error_message": str(e)},
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/update_error.html",
+            {"error_message": f"Invalid form data: {str(e)}"},
+        )
+
     success, updated_schedule, error_msg = await schedule_service.update_schedule(
         schedule_id, update_data
     )

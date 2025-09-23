@@ -5,7 +5,7 @@ This class eliminates duplication between job_service.py and scheduler_service.p
 by providing a consistent interface for building all task types.
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 from borgitory.models.database import (
     CleanupConfig,
@@ -14,6 +14,7 @@ from borgitory.models.database import (
 )
 from borgitory.models.schemas import PruneRequest, CheckRequest
 from borgitory.constants.retention import RetentionFieldHandler
+from borgitory.services.hooks.hook_config import HookConfigParser
 
 
 class TaskDefinitionBuilder:
@@ -98,7 +99,12 @@ class TaskDefinitionBuilder:
         if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
             task["keep_within"] = f"{cleanup_config.keep_within_days}d"
         elif cleanup_config.strategy == "advanced":
-            retention_dict = RetentionFieldHandler.to_dict(cleanup_config)
+            # Cast to protocol for type safety - CleanupConfig implements retention fields
+            from typing import cast
+            from borgitory.constants.retention import RetentionConfigProtocol
+
+            retention_config = cast(RetentionConfigProtocol, cleanup_config)
+            retention_dict = RetentionFieldHandler.to_dict(retention_config)
             task.update(retention_dict)
 
         return task
@@ -256,6 +262,73 @@ class TaskDefinitionBuilder:
             "config_id": notification_config_id,
         }
 
+    def build_hook_task(
+        self,
+        hook_name: str,
+        hook_command: str,
+        hook_type: str,
+        repository_name: Optional[str] = None,
+    ) -> Dict[str, object]:
+        """
+        Build a hook task definition.
+
+        Args:
+            hook_name: Name of the hook
+            hook_command: Command to execute
+            hook_type: Type of hook ("pre" or "post")
+            repository_name: Optional repository name for display
+
+        Returns:
+            Task definition dictionary
+        """
+        display_name = f"{hook_type.title()}-job hook: {hook_name}"
+        if repository_name:
+            display_name += f" ({repository_name})"
+
+        return {
+            "type": "hook",
+            "name": display_name,
+            "hook_name": hook_name,
+            "hook_command": hook_command,
+            "hook_type": hook_type,
+        }
+
+    def build_hooks_from_json(
+        self,
+        hooks_json: Optional[str],
+        hook_type: str,
+        repository_name: Optional[str] = None,
+    ) -> List[Dict[str, object]]:
+        """
+        Build hook task definitions from JSON configuration.
+
+        Args:
+            hooks_json: JSON string containing hook configurations
+            hook_type: Type of hooks ("pre" or "post")
+            repository_name: Optional repository name for display
+
+        Returns:
+            List of hook task definitions
+        """
+        if not hooks_json:
+            return []
+
+        try:
+            hooks = HookConfigParser.parse_hooks_json(hooks_json)
+            return [
+                self.build_hook_task(
+                    hook.name, hook.command, hook_type, repository_name
+                )
+                for hook in hooks
+            ]
+        except ValueError as e:
+            # Log the error but don't fail the entire job
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to parse {hook_type}-job hooks: {e}")
+            return []
+
     def build_task_list(
         self,
         repository_name: str,
@@ -268,7 +341,9 @@ class TaskDefinitionBuilder:
         include_cloud_sync: bool = False,
         cloud_sync_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
-    ) -> list[Dict[str, object]]:
+        pre_job_hooks: Optional[str] = None,
+        post_job_hooks: Optional[str] = None,
+    ) -> List[Dict[str, object]]:
         """
         Build a complete list of task definitions for a job.
 
@@ -285,11 +360,19 @@ class TaskDefinitionBuilder:
             check_request: Request object for manual check task
             include_cloud_sync: Whether to include cloud sync task
             notification_config_id: ID for notification task
+            pre_job_hooks: JSON string of pre-job hook configurations
+            post_job_hooks: JSON string of post-job hook configurations
 
         Returns:
             List of task definition dictionaries
         """
         tasks = []
+
+        # Add pre-job hooks
+        pre_hook_tasks = self.build_hooks_from_json(
+            pre_job_hooks, "pre", repository_name
+        )
+        tasks.extend(pre_hook_tasks)
 
         # Add backup task
         if include_backup:
@@ -342,5 +425,11 @@ class TaskDefinitionBuilder:
             )
             if notification_task:
                 tasks.append(notification_task)
+
+        # Add post-job hooks
+        post_hook_tasks = self.build_hooks_from_json(
+            post_job_hooks, "post", repository_name
+        )
+        tasks.extend(post_hook_tasks)
 
         return tasks

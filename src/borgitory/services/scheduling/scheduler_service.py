@@ -88,6 +88,8 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
                 check_config_id=schedule.check_config_id,
                 cloud_sync_config_id=schedule.cloud_sync_config_id,
                 notification_config_id=schedule.notification_config_id,
+                pre_job_hooks=schedule.pre_job_hooks,
+                post_job_hooks=schedule.post_job_hooks,
             )
 
             factory = cast(Callable[[object, object], object], _job_service_factory)
