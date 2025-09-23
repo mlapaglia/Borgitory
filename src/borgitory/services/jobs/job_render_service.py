@@ -21,6 +21,7 @@ class JobStatusType(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -43,8 +44,10 @@ class JobStatus:
             return cls(JobStatusType.RUNNING, "bg-blue-100 text-blue-800", "⟳")
         elif status_lower == "pending":
             return cls(JobStatusType.PENDING, "bg-yellow-100 text-yellow-800", "◦")
+        elif status_lower == "skipped":
+            return cls(JobStatusType.CANCELLED, "bg-gray-100 text-gray-600", "⊘")
         else:
-            return cls(JobStatusType.PENDING, "bg-gray-100 text-gray-800", "◦")
+            return cls(JobStatusType.UNKNOWN, "bg-gray-100 text-gray-800", "?")
 
 
 @dataclass

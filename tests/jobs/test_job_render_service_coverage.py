@@ -253,8 +253,12 @@ class TestJobDataConverterCoverage:
         assert result.tasks[0].status.type == JobStatusType.FAILED
 
         # Verify subsequent tasks are marked as skipped
-        assert result.tasks[1].status.type == JobStatusType.PENDING  # Should be skipped
-        assert result.tasks[2].status.type == JobStatusType.PENDING  # Should be skipped
+        assert (
+            result.tasks[1].status.type == JobStatusType.CANCELLED
+        )  # Should be skipped
+        assert (
+            result.tasks[2].status.type == JobStatusType.CANCELLED
+        )  # Should be skipped
 
     def test_fix_failed_job_tasks_with_running_task_in_failed_job(self) -> None:
         """Test fix_failed_job_tasks converts running task to failed in failed job"""
@@ -301,7 +305,9 @@ class TestJobDataConverterCoverage:
         assert result.tasks[0].status.type == JobStatusType.FAILED
 
         # Verify subsequent task is skipped
-        assert result.tasks[1].status.type == JobStatusType.PENDING  # Should be skipped
+        assert (
+            result.tasks[1].status.type == JobStatusType.CANCELLED
+        )  # Should be skipped
 
     def test_fix_failed_job_tasks_with_completed_job(self) -> None:
         """Test fix_failed_job_tasks doesn't modify completed jobs"""
