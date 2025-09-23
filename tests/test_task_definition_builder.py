@@ -106,6 +106,7 @@ class TestTaskDefinitionBuilder:
             "source_path": "/data",
             "compression": "zstd",
             "dry_run": False,
+            "ignore_lock": False,
         }
 
         assert task == expected
@@ -124,6 +125,7 @@ class TestTaskDefinitionBuilder:
             "source_path": "/custom/path",
             "compression": "lz4",
             "dry_run": True,
+            "ignore_lock": False,
         }
 
         assert task == expected

@@ -402,6 +402,7 @@ class BackupRequest(BaseModel):
     )
     compression: CompressionType = CompressionType.ZSTD
     dry_run: bool = False
+    ignore_lock: bool = False
     cloud_sync_config_id: Optional[int] = Field(None, gt=0)
     cleanup_config_id: Optional[int] = Field(None, gt=0)
     check_config_id: Optional[int] = Field(None, gt=0)

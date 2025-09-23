@@ -5,6 +5,7 @@ Comprehensive tests for JobManager - covering missing lines and functionality
 import pytest
 import uuid
 import asyncio
+from typing import Generator, Dict, Any, AsyncGenerator
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
@@ -21,8 +22,8 @@ from borgitory.services.jobs.job_manager import (
     get_default_job_manager_dependencies,
     get_test_job_manager_dependencies,
 )
-from borgitory.services.jobs.job_executor import ProcessResult
-from borgitory.models.database import NotificationConfig
+from borgitory.protocols.command_protocols import ProcessResult
+from borgitory.models.database import NotificationConfig, Repository
 
 
 class TestJobManagerFactory:
@@ -123,11 +124,11 @@ class TestJobManagerTaskExecution:
     """Test task execution methods with real database"""
 
     @pytest.fixture
-    def job_manager_with_db(self, test_db: Session):
+    def job_manager_with_db(self, test_db: Session) -> JobManager:
         """Create job manager with real database session and proper notification service injection"""
 
         @contextmanager
-        def db_session_factory():
+        def db_session_factory() -> Generator[Session, None, None]:
             try:
                 yield test_db
             finally:
@@ -167,10 +168,10 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_create_composite_job(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test creating a composite job with multiple tasks"""
-        task_definitions = [
+        task_definitions: list[Dict[str, Any]] = [
             {
                 "type": "backup",
                 "name": "Backup data",
@@ -210,7 +211,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_composite_job_success(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test executing a composite job successfully"""
         # Create a simple composite job
@@ -230,13 +231,17 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock individual task execution to succeed
-        async def mock_backup_task(job, task, task_index):
+        async def mock_backup_task(
+            job: BorgJob, task: BorgJobTask, task_index: int
+        ) -> bool:
             task.status = "completed"
             task.return_code = 0
             task.completed_at = now_utc()
             return True
 
-        async def mock_prune_task(job, task, task_index):
+        async def mock_prune_task(
+            job: BorgJob, task: BorgJobTask, task_index: int
+        ) -> bool:
             task.status = "completed"
             task.return_code = 0
             task.completed_at = now_utc()
@@ -257,7 +262,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_composite_job_critical_failure(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test composite job with critical task failure"""
         job_id = str(uuid.uuid4())
@@ -278,7 +283,9 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock backup to fail (critical)
-        async def mock_backup_fail(job, task, task_index):
+        async def mock_backup_fail(
+            job: BorgJob, task: BorgJobTask, task_index: int
+        ) -> bool:
             task.status = "failed"
             task.return_code = 1
             task.error = "Backup failed"
@@ -302,7 +309,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_backup_task_success(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test successful backup task execution"""
         job_id = str(uuid.uuid4())
@@ -365,7 +372,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_backup_task_failure(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test backup task failure handling"""
         job_id = str(uuid.uuid4())
@@ -423,7 +430,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_backup_task_with_dry_run(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test backup task execution with dry_run flag"""
         job_id = str(uuid.uuid4())
@@ -461,13 +468,18 @@ class TestJobManagerTaskExecution:
         # Capture the actual command built to verify --dry-run flag is included
         captured_command = None
 
-        def capture_command(base_command, repository_path, passphrase, additional_args):
+        def capture_command(
+            base_command: str,
+            repository_path: str,
+            passphrase: str,
+            additional_args: list[str],
+        ) -> tuple[list[str], dict[str, str]]:
             nonlocal captured_command
             captured_command = [base_command] + additional_args
             return (captured_command, {"BORG_PASSPHRASE": passphrase})
 
         with patch(
-            "borgitory.utils.security.build_secure_borg_command",
+            "borgitory.services.jobs.job_manager.build_secure_borg_command",
             side_effect=capture_command,
         ), patch.object(
             job_manager_with_db.executor, "start_process", return_value=mock_process
@@ -496,7 +508,9 @@ class TestJobManagerTaskExecution:
         )
 
     @pytest.mark.asyncio
-    async def test_execute_prune_task_success(self, job_manager_with_db) -> None:
+    async def test_execute_prune_task_success(
+        self, job_manager_with_db: JobManager
+    ) -> None:
         """Test successful prune task execution"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
@@ -548,7 +562,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_check_task_success(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test successful check task execution"""
         job_id = str(uuid.uuid4())
@@ -602,7 +616,9 @@ class TestJobManagerTaskExecution:
         assert task.return_code == 0
 
     @pytest.mark.asyncio
-    async def test_execute_cloud_sync_task_success(self, job_manager_with_db) -> None:
+    async def test_execute_cloud_sync_task_success(
+        self, job_manager_with_db: JobManager
+    ) -> None:
         """Test successful cloud sync task execution"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
@@ -651,7 +667,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_notification_task_success(
-        self, job_manager_with_db, test_db
+        self, job_manager_with_db: JobManager, test_db: Session
     ) -> None:
         """Test successful notification task execution"""
         # Create notification config in database using new model
@@ -736,7 +752,7 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_notification_task_no_config(
-        self, job_manager_with_db
+        self, job_manager_with_db: JobManager
     ) -> None:
         """Test notification task with missing config"""
         job_id = str(uuid.uuid4())
@@ -763,7 +779,9 @@ class TestJobManagerTaskExecution:
         assert "No notification configuration" in task.error
 
     @pytest.mark.asyncio
-    async def test_execute_task_unknown_type(self, job_manager_with_db) -> None:
+    async def test_execute_task_unknown_type(
+        self, job_manager_with_db: JobManager
+    ) -> None:
         """Test executing task with unknown type"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(task_type="unknown_task", task_name="Unknown Task")
@@ -791,11 +809,11 @@ class TestJobManagerExternalIntegration:
     """Test external job registration and management"""
 
     @pytest.fixture
-    def job_manager(self):
+    def job_manager(self) -> JobManager:
         """Create job manager for testing"""
         return JobManager()
 
-    def test_register_external_job(self, job_manager) -> None:
+    def test_register_external_job(self, job_manager: JobManager) -> None:
         """Test registering an external job"""
         job_id = "external-job-123"
 
@@ -814,7 +832,7 @@ class TestJobManagerExternalIntegration:
         assert job.tasks[0].task_name == "External Backup"
         assert job.tasks[0].status == "running"
 
-    def test_update_external_job_status(self, job_manager) -> None:
+    def test_update_external_job_status(self, job_manager: JobManager) -> None:
         """Test updating external job status"""
         job_id = "external-job-456"
         job_manager.register_external_job(job_id, job_type="backup")
@@ -831,7 +849,9 @@ class TestJobManagerExternalIntegration:
         assert job.tasks[0].return_code == 0
         assert job.tasks[0].completed_at is not None
 
-    def test_update_external_job_status_with_error(self, job_manager) -> None:
+    def test_update_external_job_status_with_error(
+        self, job_manager: JobManager
+    ) -> None:
         """Test updating external job with error"""
         job_id = "external-job-error"
         job_manager.register_external_job(job_id, job_type="backup")
@@ -850,14 +870,16 @@ class TestJobManagerExternalIntegration:
         assert job.tasks[0].error == "Backup failed"
         assert job.tasks[0].return_code == 1
 
-    def test_update_external_job_status_not_registered(self, job_manager) -> None:
+    def test_update_external_job_status_not_registered(
+        self, job_manager: JobManager
+    ) -> None:
         """Test updating status for non-registered job"""
         # Should not raise error
         job_manager.update_external_job_status("nonexistent", "completed")
         assert "nonexistent" not in job_manager.jobs
 
     @pytest.mark.asyncio
-    async def test_add_external_job_output(self, job_manager) -> None:
+    async def test_add_external_job_output(self, job_manager: JobManager) -> None:
         """Test adding output to external job"""
         job_id = "external-job-output"
         job_manager.register_external_job(job_id, job_type="backup")
@@ -875,12 +897,14 @@ class TestJobManagerExternalIntegration:
         assert main_task.output_lines[0]["text"] == "Backup progress: 50%"
         assert main_task.output_lines[1]["text"] == "Backup completed"
 
-    def test_add_external_job_output_not_registered(self, job_manager) -> None:
+    def test_add_external_job_output_not_registered(
+        self, job_manager: JobManager
+    ) -> None:
         """Test adding output to non-registered job"""
         job_manager.add_external_job_output("nonexistent", "some output")
         assert "nonexistent" not in job_manager.jobs
 
-    def test_unregister_external_job(self, job_manager) -> None:
+    def test_unregister_external_job(self, job_manager: JobManager) -> None:
         """Test unregistering external job"""
         job_id = "external-job-cleanup"
         job_manager.register_external_job(job_id, job_type="backup")
@@ -891,7 +915,7 @@ class TestJobManagerExternalIntegration:
 
         assert job_id not in job_manager.jobs
 
-    def test_unregister_external_job_not_found(self, job_manager) -> None:
+    def test_unregister_external_job_not_found(self, job_manager: JobManager) -> None:
         """Test unregistering non-existent job"""
         job_manager.unregister_external_job("nonexistent")  # Should not raise error
 
@@ -900,11 +924,11 @@ class TestJobManagerDatabaseIntegration:
     """Test database integration methods"""
 
     @pytest.fixture
-    def job_manager_with_db(self, test_db: Session):
+    def job_manager_with_db(self, test_db: Session) -> JobManager:
         """Create job manager with real database session"""
 
         @contextmanager
-        def db_session_factory():
+        def db_session_factory() -> Generator[Session, None, None]:
             try:
                 yield test_db
             finally:
@@ -917,7 +941,7 @@ class TestJobManagerDatabaseIntegration:
 
     @pytest.mark.asyncio
     async def test_get_repository_data_success(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test getting repository data successfully"""
         # Mock the get_passphrase method to avoid encryption issues
@@ -935,14 +959,16 @@ class TestJobManagerDatabaseIntegration:
         assert result["passphrase"] == "test-passphrase"
 
     @pytest.mark.asyncio
-    async def test_get_repository_data_not_found(self, job_manager_with_db) -> None:
+    async def test_get_repository_data_not_found(
+        self, job_manager_with_db: JobManager
+    ) -> None:
         """Test getting repository data for non-existent repository"""
         result = await job_manager_with_db._get_repository_data(99999)
         assert result is None
 
     @pytest.mark.asyncio
     async def test_get_repository_data_fallback_mechanisms(
-        self, job_manager_with_db, sample_repository
+        self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test repository data fallback when database manager fails"""
         # Mock database manager to fail and fix passphrase
@@ -966,15 +992,15 @@ class TestJobManagerStreamingAndUtility:
     """Test streaming and utility methods"""
 
     @pytest.fixture
-    def job_manager(self):
+    def job_manager(self) -> JobManager:
         return JobManager()
 
     @pytest.mark.asyncio
-    async def test_stream_job_output(self, job_manager) -> None:
+    async def test_stream_job_output(self, job_manager: JobManager) -> None:
         """Test streaming job output"""
         job_id = "test-job"
 
-        async def mock_stream():
+        async def mock_stream() -> AsyncGenerator[Dict[str, Any], None]:
             yield {"line": "output line 1", "progress": {}}
             yield {"line": "output line 2", "progress": {"percent": 50}}
 
@@ -1000,7 +1026,7 @@ class TestJobManagerStreamingAndUtility:
 
         assert len(output_list) == 0
 
-    def test_get_job(self, job_manager) -> None:
+    def test_get_job(self, job_manager: JobManager) -> None:
         """Test getting job by ID"""
         job = BorgJob(id="test", status="running", started_at=now_utc())
         job_manager.jobs["test"] = job
@@ -1010,7 +1036,7 @@ class TestJobManagerStreamingAndUtility:
 
         assert job_manager.get_job("nonexistent") is None
 
-    def test_list_jobs(self, job_manager) -> None:
+    def test_list_jobs(self, job_manager: JobManager) -> None:
         """Test listing all jobs"""
         job1 = BorgJob(id="job1", status="running", started_at=now_utc())
         job2 = BorgJob(id="job2", status="completed", started_at=now_utc())
@@ -1026,7 +1052,7 @@ class TestJobManagerStreamingAndUtility:
         assert jobs is not job_manager.jobs  # Should return copy
 
     @pytest.mark.asyncio
-    async def test_get_job_output_stream(self, job_manager) -> None:
+    async def test_get_job_output_stream(self, job_manager: JobManager) -> None:
         """Test getting job output stream data"""
         job_id = "test-job"
 
@@ -1048,7 +1074,9 @@ class TestJobManagerStreamingAndUtility:
         assert result["progress"]["percent"] == 75
 
     @pytest.mark.asyncio
-    async def test_get_job_output_stream_no_output(self, job_manager) -> None:
+    async def test_get_job_output_stream_no_output(
+        self, job_manager: JobManager
+    ) -> None:
         """Test getting output stream when no output exists"""
         job_manager.output_manager.get_job_output = Mock(return_value=None)
 
@@ -1057,7 +1085,7 @@ class TestJobManagerStreamingAndUtility:
         assert result["lines"] == []
         assert result["progress"] == {}
 
-    def test_get_active_jobs_count(self, job_manager) -> None:
+    def test_get_active_jobs_count(self, job_manager: JobManager) -> None:
         """Test getting count of active jobs"""
         job_manager.jobs = {
             "job1": Mock(status="running"),
@@ -1071,7 +1099,7 @@ class TestJobManagerStreamingAndUtility:
         assert count == 3  # 2 running + 1 queued
 
     @pytest.mark.asyncio
-    async def test_cancel_job_success(self, job_manager) -> None:
+    async def test_cancel_job_success(self, job_manager: JobManager) -> None:
         """Test cancelling a job successfully"""
         job = Mock(status="running")
         job_manager.jobs["test"] = job
@@ -1088,7 +1116,7 @@ class TestJobManagerStreamingAndUtility:
         assert "test" not in job_manager._processes
 
     @pytest.mark.asyncio
-    async def test_cancel_job_not_cancellable(self, job_manager) -> None:
+    async def test_cancel_job_not_cancellable(self, job_manager: JobManager) -> None:
         """Test cancelling job in non-cancellable state"""
         job = Mock(status="completed")
         job_manager.jobs["test"] = job
@@ -1097,7 +1125,7 @@ class TestJobManagerStreamingAndUtility:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_cancel_job_not_found(self, job_manager) -> None:
+    async def test_cancel_job_not_found(self, job_manager: JobManager) -> None:
         """Test cancelling non-existent job"""
         result = await job_manager.cancel_job("nonexistent")
         assert result is False
