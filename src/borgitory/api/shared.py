@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from borgitory.dependencies import get_templates
 
-
 router = APIRouter()
 templates = get_templates()
 

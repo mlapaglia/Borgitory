@@ -1,0 +1,133 @@
+<!-- Individual Hook Field for Modal -->
+<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+    <!-- Header with reorder and remove buttons -->
+    <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ "🔄 Pre-Job Hook" if hook_type == "pre" else "✅ Post-Job Hook" }}
+        </span>
+        <div class="flex items-center space-x-1">
+            <!-- Move Up Button (hidden if first item) -->
+            {% if loop is defined and loop.index0 > 0 %}
+            <button type="button"
+                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    hx-post="/api/schedules/hooks/move-hook"
+                    hx-include="form"
+                    hx-vals='{"hook_type": "{{ hook_type }}", "index": {{ loop.index0 }}, "direction": "up"}'
+                    hx-target="#{{ hook_type }}-hooks-container"
+                    hx-swap="innerHTML"
+                    title="Move up">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                </svg>
+            </button>
+            {% else %}
+            <!-- Invisible placeholder to maintain spacing -->
+            <div class="w-6 h-6"></div>
+            {% endif %}
+            
+            <!-- Move Down Button (hidden if last item) -->
+            {% if loop is defined and not loop.last %}
+            <button type="button"
+                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    hx-post="/api/schedules/hooks/move-hook"
+                    hx-include="form"
+                    hx-vals='{"hook_type": "{{ hook_type }}", "index": {{ loop.index0 }}, "direction": "down"}'
+                    hx-target="#{{ hook_type }}-hooks-container"
+                    hx-swap="innerHTML"
+                    title="Move down">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+            {% else %}
+            <!-- Invisible placeholder to maintain spacing -->
+            <div class="w-6 h-6"></div>
+            {% endif %}
+            
+            <!-- Remove Button -->
+            <button type="button"
+                    class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    hx-post="/api/schedules/hooks/remove-hook-field"
+                    hx-include="form"
+                    hx-vals='{"hook_type": "{{ hook_type }}", "index": {{ loop.index0 if loop is defined else 0 }}}'
+                    hx-target="#{{ hook_type }}-hooks-container"
+                    hx-swap="innerHTML"
+                    hx-confirm="Are you sure you want to remove this hook?"
+                    title="Remove hook">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Hook fields with better spacing -->
+    <div class="space-y-4">
+        <!-- Hook Name -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Hook Name <span class="text-red-500">*</span>
+            </label>
+            <input type="text" 
+                   name="{{ hook_type }}_hook_name" 
+                   value="{{ hook.name if hook is defined else '' }}"
+                   placeholder="e.g., {{ 'Database Backup, System Prep' if hook_type == 'pre' else 'Cleanup, Notification, Health Check' }}"
+                   required
+                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 invalid:border-red-500 invalid:ring-red-500">
+        </div>
+
+        <!-- Hook Command -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Command <span class="text-red-500">*</span>
+            </label>
+            <textarea name="{{ hook_type }}_hook_command" 
+                      rows="3"
+                      placeholder="e.g., {{ '/usr/bin/mysqldump -u backup_user --password=secret mydb > /tmp/mydb.sql' if hook_type == 'pre' else 'curl -X POST https://api.example.com/backup-complete -d \"{\"status\":\"success\"}\"' }}"
+                      required
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-vertical font-mono text-sm invalid:border-red-500 invalid:ring-red-500">{{ hook.command if hook is defined else '' }}</textarea>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ 'Commands run before the backup starts' if hook_type == 'pre' else 'Commands run after the backup completes' }}
+            </p>
+        </div>
+
+        <!-- Hook Options -->
+        <div class="space-y-3">
+            <!-- Critical Flag - for all hooks -->
+            <div class="flex items-start">
+                <input type="checkbox" 
+                       name="{{ hook_type }}_hook_critical" 
+                       value="true"
+                       {{ 'checked' if hook is defined and hook.critical else '' }}
+                       class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <div class="ml-3">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Critical Hook
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ 'Fail the entire job if this pre-hook fails (stops backup and all remaining tasks)' if hook_type == 'pre' else 'Fail the entire job if this post-hook fails (stops remaining post-hooks)' }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Run on Job Failure - only for post-hooks -->
+            {% if hook_type == 'post' %}
+            <div class="flex items-start">
+                <input type="checkbox" 
+                       name="{{ hook_type }}_hook_run_on_failure" 
+                       value="true"
+                       {{ 'checked' if hook is defined and hook.run_on_job_failure else '' }}
+                       class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <div class="ml-3">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Run Even If Job Failed
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Execute this post-hook even if the backup or other tasks failed (useful for cleanup or notifications)
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

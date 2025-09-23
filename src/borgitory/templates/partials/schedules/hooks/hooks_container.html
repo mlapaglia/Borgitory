@@ -1,0 +1,15 @@
+<!-- Hooks Container Template for Reordering -->
+{% for hook in hooks %}
+    {% set index = loop.index0 %}
+    {% include 'partials/schedules/hooks/hook_field_modal.html' with context %}
+{% endfor %}
+
+{% if not hooks %}
+<div class="text-center py-8 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+    </svg>
+    <p class="text-sm">No {{ hook_type }}-job hooks configured</p>
+    <p class="text-xs">Click "Add {{ hook_type | title }}-Hook" to get started</p>
+</div>
+{% endif %}

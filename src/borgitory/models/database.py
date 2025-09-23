@@ -178,6 +178,8 @@ class Schedule(Base):
     notification_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("notification_configs.id"), nullable=True
     )
+    pre_job_hooks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    post_job_hooks: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     repository: Mapped["Repository"] = relationship(
         "Repository", back_populates="schedules"

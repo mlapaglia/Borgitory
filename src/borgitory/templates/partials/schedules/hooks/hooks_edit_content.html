@@ -1,0 +1,167 @@
+<div class="border-t dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-700">
+    <div class="space-y-4">           
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Pre-Job Hooks</label>
+                <button type="button" 
+                        class="text-sm bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                        hx-post="/api/schedules/hooks/add-hook-field"
+                        hx-vals='{"hook_type": "pre"}'
+                        hx-target="#pre-hooks-container"
+                        hx-swap="beforeend">
+                    + Add Hook
+                </button>
+            </div>
+            <div id="pre-hooks-container" class="space-y-3">
+                {% if schedule.pre_job_hooks %}
+                    {% set pre_hooks = schedule.pre_job_hooks | from_json %}
+                    {% for hook in pre_hooks %}
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3 relative">
+                            <button type="button" 
+                                    class="absolute top-2 right-2 text-red-600 hover:text-red-800 p-1"
+                                    hx-delete="/api/schedules/hooks/remove-hook-field"
+                                    hx-target="closest div"
+                                    hx-swap="outerHTML">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                            
+                            <div class="space-y-3 pr-8">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Hook Name</label>
+                                    <input type="text" 
+                                           name="pre_hook_name_{{ loop.index0 }}" 
+                                           value="{{ hook.name }}"
+                                           placeholder="e.g., Preparation, Setup, Pre-check"
+                                           class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Command</label>
+                                    <textarea name="pre_hook_command_{{ loop.index0 }}" 
+                                              rows="2"
+                                              placeholder="e.g., echo 'Starting backup', /path/to/setup.sh"
+                                              class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm resize-vertical">{{ hook.command }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3 relative">
+                        <button type="button" 
+                                class="absolute top-2 right-2 text-red-600 hover:text-red-800 p-1"
+                                hx-delete="/api/schedules/hooks/remove-hook-field"
+                                hx-target="closest div"
+                                hx-swap="outerHTML">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                        
+                        <div class="space-y-3 pr-8">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Hook Name</label>
+                                <input type="text" 
+                                       name="pre_hook_name_0" 
+                                       placeholder="e.g., Preparation, Setup, Pre-check"
+                                       class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Command</label>
+                                <textarea name="pre_hook_command_0" 
+                                          rows="2"
+                                          placeholder="e.g., echo 'Starting backup', /path/to/setup.sh"
+                                          class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm resize-vertical"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Commands to run before the backup starts</p>
+        </div>
+        
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Post-Job Hooks</label>
+                <button type="button" 
+                        class="text-sm bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                        hx-post="/api/schedules/hooks/add-hook-field"
+                        hx-vals='{"hook_type": "post"}'
+                        hx-target="#post-hooks-container"
+                        hx-swap="beforeend">
+                    + Add Hook
+                </button>
+            </div>
+            <div id="post-hooks-container" class="space-y-3">
+                {% if schedule.post_job_hooks %}
+                    {% set post_hooks = schedule.post_job_hooks | from_json %}
+                    {% for hook in post_hooks %}
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3 relative">
+                            <button type="button" 
+                                    class="absolute top-2 right-2 text-red-600 hover:text-red-800 p-1"
+                                    hx-delete="/api/schedules/hooks/remove-hook-field"
+                                    hx-target="closest div"
+                                    hx-swap="outerHTML">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                            
+                            <div class="space-y-3 pr-8">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Hook Name</label>
+                                    <input type="text" 
+                                           name="post_hook_name_{{ loop.index0 }}" 
+                                           value="{{ hook.name }}"
+                                           placeholder="e.g., Cleanup, Notification, Finalization"
+                                           class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Command</label>
+                                    <textarea name="post_hook_command_{{ loop.index0 }}" 
+                                              rows="2"
+                                              placeholder="e.g., echo 'Backup completed', /path/to/cleanup.sh"
+                                              class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm resize-vertical">{{ hook.command }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3 relative">
+                        <button type="button" 
+                                class="absolute top-2 right-2 text-red-600 hover:text-red-800 p-1"
+                                hx-delete="/api/schedules/hooks/remove-hook-field"
+                                hx-target="closest div"
+                                hx-swap="outerHTML">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                        
+                        <div class="space-y-3 pr-8">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Hook Name</label>
+                                <input type="text" 
+                                       name="post_hook_name_0" 
+                                       placeholder="e.g., Cleanup, Notification, Finalization"
+                                       class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Command</label>
+                                <textarea name="post_hook_command_0" 
+                                          rows="2"
+                                          placeholder="e.g., echo 'Backup completed', /path/to/cleanup.sh"
+                                          class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm resize-vertical"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Commands to run after the backup completes</p>
+        </div>
+    </div>
+</div>

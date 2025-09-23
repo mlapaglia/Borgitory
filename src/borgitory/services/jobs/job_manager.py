@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from borgitory.services.cloud_providers import StorageFactory
     from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers.registry import ProviderRegistry
+    from borgitory.services.hooks.hook_execution_service import HookExecutionService
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ class JobManagerDependencies:
     provider_registry: Optional["ProviderRegistry"] = None
     # Use semantic type alias for application-scoped notification service
     notification_service: Optional["ApplicationScopedNotificationService"] = None
+    hook_execution_service: Optional["HookExecutionService"] = None
 
     def __post_init__(self) -> None:
         """Initialize default dependencies if not provided"""
@@ -121,7 +123,7 @@ class JobManagerDependencies:
 class BorgJobTask:
     """Individual task within a job"""
 
-    task_type: str  # 'backup', 'prune', 'check', 'cloud_sync'
+    task_type: str  # 'backup', 'prune', 'check', 'cloud_sync', 'hook', 'notification'
     task_name: str
     status: str = "pending"  # 'pending', 'running', 'completed', 'failed', 'skipped'
     started_at: Optional[datetime] = None
@@ -193,6 +195,7 @@ class JobManagerFactory:
             storage_factory=custom_dependencies.storage_factory,
             provider_registry=custom_dependencies.provider_registry,
             notification_service=custom_dependencies.notification_service,
+            hook_execution_service=custom_dependencies.hook_execution_service,
         )
 
         # Job Executor
@@ -259,6 +262,7 @@ class JobManagerFactory:
             get_encryption_service,
             get_storage_factory,
             get_provider_registry,
+            get_hook_execution_service,
         )
 
         # Create complete dependencies with all cloud sync and notification services
@@ -271,6 +275,7 @@ class JobManagerFactory:
             storage_factory=get_storage_factory(get_rclone_service()),
             provider_registry=get_provider_registry(),
             notification_service=get_notification_service_singleton(),
+            hook_execution_service=get_hook_execution_service(),
         )
 
         return cls.create_dependencies(config=config, custom_dependencies=complete_deps)
@@ -651,6 +656,27 @@ class JobManager:
                         await self._execute_cloud_sync_task(job, task, task_index)
                     elif task.task_type == "notification":
                         await self._execute_notification_task(job, task, task_index)
+                    elif task.task_type == "hook":
+                        # For post-hooks, determine if job has failed so far
+                        hook_type = task.parameters.get("hook_type", "unknown")
+                        job_has_failed = False
+                        if hook_type == "post":
+                            # Check if any previous tasks have failed
+                            previous_tasks = job.tasks[:task_index]
+                            job_has_failed = any(
+                                t.status == "failed"
+                                and (
+                                    t.task_type in ["backup"]  # Critical task types
+                                    or (
+                                        t.task_type == "hook"
+                                        and t.parameters.get("critical_failure", False)
+                                    )  # Critical hooks
+                                )
+                                for t in previous_tasks
+                            )
+                        await self._execute_hook_task(
+                            job, task, task_index, job_has_failed
+                        )
                     else:
                         await self._execute_task(job, task, task_index)
 
@@ -686,12 +712,36 @@ class JobManager:
                         except Exception as e:
                             logger.error(f"Failed to update tasks in database: {e}")
 
-                    # If task failed and it's critical, stop the job
-                    if task.status == "failed" and task.task_type in ["backup"]:
-                        logger.error(
-                            f"Critical task {task.task_type} failed, stopping job"
+                    if task.status == "failed":
+                        is_critical_hook_failure = (
+                            task.task_type == "hook"
+                            and task.parameters.get("critical_failure", False)
                         )
-                        break
+                        is_critical_task = task.task_type in ["backup"]
+
+                        if is_critical_hook_failure or is_critical_task:
+                            failed_hook_name = task.parameters.get(
+                                "failed_critical_hook_name", "unknown"
+                            )
+                            logger.error(
+                                f"Critical {'hook' if is_critical_hook_failure else 'task'} "
+                                f"{'(' + str(failed_hook_name) + ') ' if is_critical_hook_failure else ''}"
+                                f"{task.task_type} failed, stopping job"
+                            )
+
+                            remaining_tasks = job.tasks[task_index + 1 :]
+                            for remaining_task in remaining_tasks:
+                                if remaining_task.status == "pending":
+                                    remaining_task.status = "skipped"
+                                    remaining_task.completed_at = now_utc()
+                                    remaining_task.output_lines.append(
+                                        f"Task skipped due to critical {'hook' if is_critical_hook_failure else 'task'} failure"
+                                    )
+                                    logger.info(
+                                        f"Marked task {remaining_task.task_type} as skipped due to critical failure"
+                                    )
+
+                            break
 
                 except Exception as e:
                     task.status = "failed"
@@ -705,7 +755,6 @@ class JobManager:
                         data={"task_index": task_index, "error": str(e)},
                     )
 
-                    # Update task in database for exception case too
                     if self.database_manager:
                         try:
                             logger.info(
@@ -720,20 +769,42 @@ class JobManager:
                         except Exception as db_e:
                             logger.error(f"Failed to update tasks in database: {db_e}")
 
-                    # If it's a critical task, stop execution
                     if task.task_type in ["backup"]:
+                        remaining_tasks = job.tasks[task_index + 1 :]
+                        for remaining_task in remaining_tasks:
+                            if remaining_task.status == "pending":
+                                remaining_task.status = "skipped"
+                                remaining_task.completed_at = now_utc()
+                                remaining_task.output_lines.append(
+                                    "Task skipped due to critical task exception"
+                                )
+                                logger.info(
+                                    f"Marked task {remaining_task.task_type} as skipped due to critical task exception"
+                                )
                         break
 
-            # Determine final job status
             failed_tasks = [t for t in job.tasks if t.status == "failed"]
             completed_tasks = [t for t in job.tasks if t.status == "completed"]
+            skipped_tasks = [t for t in job.tasks if t.status == "skipped"]
+            finished_tasks = completed_tasks + skipped_tasks
 
-            if len(completed_tasks) == len(job.tasks):
-                job.status = "completed"
-            elif failed_tasks:
-                # Check if any critical tasks failed
-                critical_failed = any(t.task_type in ["backup"] for t in failed_tasks)
-                job.status = "failed" if critical_failed else "completed"
+            if len(finished_tasks) + len(failed_tasks) == len(job.tasks):
+                if failed_tasks:
+                    critical_task_failed = any(
+                        t.task_type in ["backup"] for t in failed_tasks
+                    )
+                    critical_hook_failed = any(
+                        t.task_type == "hook"
+                        and t.parameters.get("critical_failure", False)
+                        for t in failed_tasks
+                    )
+                    job.status = (
+                        "failed"
+                        if (critical_task_failed or critical_hook_failed)
+                        else "completed"
+                    )
+                else:
+                    job.status = "completed"
             else:
                 job.status = "failed"
 
@@ -1465,13 +1536,27 @@ class JobManager:
                     enabled=config.enabled,
                 )
 
-                # Extract message details from task parameters
-                title = params.get("title", "Borgitory Notification")
-                message = params.get("message", "Job completed")
-                notification_type_str = params.get("type", "info")
-                priority_value = params.get("priority", 0)
+                title, message, notification_type_str, priority_value = (
+                    self._generate_notification_content(job, task_index)
+                )
 
-                # Convert to proper types
+                title_param = params.get("title")
+                message_param = params.get("message")
+                type_param = params.get("type")
+                priority_param = params.get("priority")
+
+                if title_param is not None:
+                    title = str(title_param)
+                if message_param is not None:
+                    message = str(message_param)
+                if type_param is not None:
+                    notification_type_str = str(type_param)
+                if priority_param is not None:
+                    try:
+                        priority_value = int(str(priority_param))
+                    except (ValueError, TypeError):
+                        pass
+
                 try:
                     notification_type = NotificationType(
                         str(notification_type_str).lower()
@@ -1486,7 +1571,6 @@ class JobManager:
                 except ValueError:
                     priority = NotificationPriority.NORMAL
 
-                # Create notification message
                 notification_message = NotificationMessage(
                     title=str(title),
                     message=str(message),
@@ -1494,7 +1578,6 @@ class JobManager:
                     priority=priority,
                 )
 
-                # Log what we're doing
                 task.output_lines.append(
                     f"Sending {config.provider} notification to {config.name}"
                 )
@@ -1512,7 +1595,6 @@ class JobManager:
                     },
                 )
 
-                # Send the notification
                 result = await notification_service.send_notification(
                     notification_config, notification_message
                 )
@@ -1545,6 +1627,199 @@ class JobManager:
             task.error = str(e)
             return False
 
+    def _generate_notification_content(
+        self, job: BorgJob, task_index: int
+    ) -> tuple[str, str, str, int]:
+        """
+        Generate notification title, message, type, and priority based on job status.
+
+        Args:
+            job: The job to generate notification content for
+            task_index: Current task index (for context)
+
+        Returns:
+            Tuple of (title, message, type, priority_value)
+        """
+        failed_tasks = [t for t in job.tasks if t.status == "failed"]
+        completed_tasks = [t for t in job.tasks if t.status == "completed"]
+        skipped_tasks = [t for t in job.tasks if t.status == "skipped"]
+
+        critical_hook_failures = [
+            t
+            for t in failed_tasks
+            if t.task_type == "hook" and t.parameters.get("critical_failure", False)
+        ]
+        backup_failures = [t for t in failed_tasks if t.task_type == "backup"]
+
+        has_critical_failure = bool(critical_hook_failures or backup_failures)
+
+        repository_name = "Unknown"
+        if len(job.tasks) > 0 and "repository_name" in job.tasks[0].parameters:
+            repository_name = str(job.tasks[0].parameters["repository_name"])
+
+        if has_critical_failure:
+            if critical_hook_failures:
+                failed_hook_name = str(
+                    critical_hook_failures[0].parameters.get(
+                        "failed_critical_hook_name", "unknown"
+                    )
+                )
+                title = "❌ Backup Job Failed - Critical Hook Error"
+                message = (
+                    f"Backup job for '{repository_name}' failed due to critical hook failure.\n\n"
+                    f"Failed Hook: {failed_hook_name}\n"
+                    f"Tasks Completed: {len(completed_tasks)}, Skipped: {len(skipped_tasks)}, Total: {len(job.tasks)}\n"
+                    f"Job ID: {job.id}"
+                )
+            else:
+                title = "❌ Backup Job Failed - Backup Error"
+                message = (
+                    f"Backup job for '{repository_name}' failed during backup process.\n\n"
+                    f"Tasks Completed: {len(completed_tasks)}, Skipped: {len(skipped_tasks)}, Total: {len(job.tasks)}\n"
+                    f"Job ID: {job.id}"
+                )
+            return title, message, "error", 1
+
+        elif failed_tasks:
+            failed_task_types = [t.task_type for t in failed_tasks]
+            title = "⚠️ Backup Job Completed with Warnings"
+            message = (
+                f"Backup job for '{repository_name}' completed but some tasks failed.\n\n"
+                f"Failed Tasks: {', '.join(failed_task_types)}\n"
+                f"Tasks Completed: {len(completed_tasks)}, Skipped: {len(skipped_tasks)}, Total: {len(job.tasks)}\n"
+                f"Job ID: {job.id}"
+            )
+            return title, message, "warning", 0
+
+        else:
+            title = "✅ Backup Job Completed Successfully"
+            message = (
+                f"Backup job for '{repository_name}' completed successfully.\n\n"
+                f"Tasks Completed: {len(completed_tasks)}"
+                f"{f', Skipped: {len(skipped_tasks)}' if skipped_tasks else ''}"
+                f", Total: {len(job.tasks)}\n"
+                f"Job ID: {job.id}"
+            )
+            return title, message, "success", 0
+
+    async def _execute_hook_task(
+        self,
+        job: BorgJob,
+        task: BorgJobTask,
+        task_index: int = 0,
+        job_has_failed: bool = False,
+    ) -> bool:
+        """Execute a hook task"""
+        if not self.dependencies.hook_execution_service:
+            logger.error("Hook execution service not available")
+            task.status = "failed"
+            task.error = "Hook execution service not configured"
+            return False
+
+        try:
+            task.status = "running"
+            task.started_at = now_utc()
+
+            hook_configs_data = task.parameters.get("hooks", [])
+            hook_type = str(task.parameters.get("hook_type", "unknown"))
+
+            if not hook_configs_data:
+                logger.warning(
+                    f"No hook configurations found for {hook_type} hook task"
+                )
+                task.status = "completed"
+                task.return_code = 0
+                task.completed_at = now_utc()
+                return True
+
+            from borgitory.services.hooks.hook_config import HookConfigParser
+
+            try:
+                hook_configs = HookConfigParser.parse_hooks_json(
+                    hook_configs_data
+                    if isinstance(hook_configs_data, str)
+                    else str(hook_configs_data)
+                )
+            except Exception as e:
+                logger.error(f"Failed to parse hook configurations: {e}")
+                task.status = "failed"
+                task.error = f"Invalid hook configuration: {str(e)}"
+                task.return_code = 1
+                task.completed_at = now_utc()
+                return False
+
+            hook_summary = await self.dependencies.hook_execution_service.execute_hooks(
+                hooks=hook_configs,
+                hook_type=hook_type,
+                job_id=job.id,
+                context={
+                    "repository_id": str(job.repository_id)
+                    if job.repository_id
+                    else "unknown",
+                    "task_index": str(task_index),
+                    "job_type": str(job.job_type),
+                },
+                job_failed=job_has_failed,
+            )
+
+            error_messages = []
+
+            for result in hook_summary.results:
+                if result.output:
+                    task.output_lines.append(
+                        {
+                            "text": f"[{result.hook_name}] {result.output}",
+                            "timestamp": now_utc().isoformat(),
+                        }
+                    )
+
+                if result.error:
+                    task.output_lines.append(
+                        {
+                            "text": f"[{result.hook_name}] ERROR: {result.error}",
+                            "timestamp": now_utc().isoformat(),
+                        }
+                    )
+
+                if not result.success:
+                    error_messages.append(
+                        f"{result.hook_name}: {result.error or 'Unknown error'}"
+                    )
+
+            task.status = "completed" if hook_summary.all_successful else "failed"
+            task.return_code = 0 if hook_summary.all_successful else 1
+            task.completed_at = now_utc()
+
+            if error_messages:
+                if hook_summary.critical_failure:
+                    task.error = (
+                        f"Critical hook execution failed: {'; '.join(error_messages)}"
+                    )
+                else:
+                    task.error = f"Hook execution failed: {'; '.join(error_messages)}"
+
+            if hook_summary.critical_failure:
+                task.parameters["critical_failure"] = True
+                task.parameters["failed_critical_hook_name"] = (
+                    hook_summary.failed_critical_hook_name
+                )
+
+            logger.info(
+                f"Hook task {hook_type} completed with {len(hook_summary.results)} hooks "
+                f"({'success' if hook_summary.all_successful else 'failure'})"
+                f"{' (CRITICAL)' if hook_summary.critical_failure else ''}"
+            )
+
+            return hook_summary.all_successful
+
+        except Exception as e:
+            logger.error(f"Error executing hook task: {e}")
+            task.status = "failed"
+            task.error = str(e)
+            task.return_code = 1
+            task.completed_at = now_utc()
+            return False
+
     async def _execute_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
     ) -> bool:
@@ -1560,6 +1835,10 @@ class JobManager:
                 return await self._execute_cloud_sync_task(job, task, task_index)
             elif task.task_type == "notification":
                 return await self._execute_notification_task(job, task, task_index)
+            elif task.task_type == "hook":
+                return await self._execute_hook_task(
+                    job, task, task_index, job_has_failed=False
+                )
             else:
                 logger.warning(f"Unknown task type: {task.task_type}")
                 task.status = "failed"

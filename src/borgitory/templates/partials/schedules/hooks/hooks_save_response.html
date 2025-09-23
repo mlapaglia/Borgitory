@@ -1,0 +1,22 @@
+<!-- Close the modal -->
+<div id="modal-container" hx-swap-oob="innerHTML"></div>
+
+<!-- Update the hooks display section -->
+<div id="hooks-display-section" hx-swap-oob="outerHTML">
+    <button type="button" 
+            class="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors"
+            hx-post="/api/schedules/hooks/hooks-modal"
+            hx-vals='{"pre_hooks": {{ (pre_hooks_json if pre_hooks_json else "") | tojson }}, "post_hooks": {{ (post_hooks_json if post_hooks_json else "") | tojson }}}'
+            hx-target="#modal-container">
+        <span>Pre/Post Job Hooks</span>
+        {% if total_count > 0 %}
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+            {{ total_count }}
+        </span>
+        {% endif %}
+    </button>
+    
+    <!-- Hidden fields for form submission -->
+    <input type="hidden" name="pre_job_hooks" id="pre-hooks-data" value="{{ pre_hooks_json if pre_hooks_json else '' }}">
+    <input type="hidden" name="post_job_hooks" id="post-hooks-data" value="{{ post_hooks_json if post_hooks_json else '' }}">
+</div>

@@ -2,7 +2,15 @@
 FastAPI dependency providers for the application.
 """
 
-from typing import Annotated, TYPE_CHECKING, Optional, Callable, ContextManager, Any
+from typing import (
+    Annotated,
+    TYPE_CHECKING,
+    Optional,
+    Callable,
+    ContextManager,
+    Any,
+    List,
+)
 
 from borgitory.services.notifications.registry_factory import (
     NotificationRegistryFactory,
@@ -48,6 +56,7 @@ from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     get_job_event_broadcaster,
 )
 from borgitory.services.scheduling.schedule_service import ScheduleService
+from borgitory.services.hooks.hook_execution_service import HookExecutionService
 from borgitory.services.configuration_service import ConfigurationService
 from borgitory.services.repositories.repository_check_config_service import (
     RepositoryCheckConfigService,
@@ -329,6 +338,16 @@ def get_volume_service() -> "VolumeServiceProtocol":
     return VolumeService()
 
 
+def get_hook_execution_service() -> HookExecutionService:
+    """
+    Provide a HookExecutionService instance with proper dependency injection.
+
+    Uses SimpleCommandRunner as the command runner for consistent command execution.
+    """
+    command_runner = get_simple_command_runner()
+    return HookExecutionService(command_runner=command_runner)
+
+
 def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinitionBuilder:
     """
     Provide a TaskDefinitionBuilder instance with database session.
@@ -445,8 +464,25 @@ def get_templates() -> TimezoneAwareJinja2Templates:
             dt, format_str, browser_tz_offset_minutes=tz_offset
         )
 
+    def from_json_filter(json_str: str) -> List[Any]:
+        """Jinja2 filter for parsing JSON strings"""
+        import json
+
+        try:
+            return json.loads(json_str) if json_str else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def to_json_filter(obj: Any) -> str:
+        """Jinja2 filter for converting objects to JSON strings"""
+        import json
+
+        return json.dumps(obj) if obj is not None else '""'
+
     templates.env.filters["format_datetime"] = datetime_filter
     templates.env.filters["format_datetime_browser"] = datetime_browser_filter
+    templates.env.filters["from_json"] = from_json_filter
+    templates.env.filters["tojson"] = to_json_filter
 
     return templates
 
@@ -580,6 +616,7 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     encryption_service = get_encryption_service()
     storage_factory = get_storage_factory(rclone_service)
     provider_registry = get_provider_registry()
+    hook_execution_service = get_hook_execution_service()
 
     # Create dependencies using resolved services
     custom_dependencies = JobManagerDependencies(
@@ -593,6 +630,7 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
         encryption_service=encryption_service,
         storage_factory=storage_factory,
         provider_registry=provider_registry,
+        hook_execution_service=hook_execution_service,
     )
 
     # Use the factory to ensure all dependencies are properly initialized
@@ -895,6 +933,9 @@ UpcomingBackupsServiceDep = Annotated[
 ]
 CloudSyncServiceDep = Annotated[
     "CloudSyncConfigService", Depends(get_cloud_sync_service)
+]
+HookExecutionServiceDep = Annotated[
+    HookExecutionService, Depends(get_hook_execution_service)
 ]
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
 

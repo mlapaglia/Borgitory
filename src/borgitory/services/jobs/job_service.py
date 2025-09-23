@@ -64,6 +64,8 @@ class JobService:
             include_cloud_sync=backup_request.cloud_sync_config_id is not None,
             cloud_sync_config_id=backup_request.cloud_sync_config_id,
             notification_config_id=backup_request.notification_config_id,
+            pre_job_hooks=backup_request.pre_job_hooks,
+            post_job_hooks=backup_request.post_job_hooks,
         )
 
         # Create composite job using unified manager
