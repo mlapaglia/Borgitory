@@ -1,6 +1,6 @@
 <div class="border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800" id="hooks-section">
     <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-         hx-get="/api/shared/toggle-hooks-edit-section?expanded={{ expanded }}&schedule_id={{ schedule.id }}"
+         hx-get="/api/schedules/hooks/toggle-hooks-edit-section?expanded={{ expanded }}&schedule_id={{ schedule.id }}"
          hx-target="#hooks-section"
          hx-swap="outerHTML">
         <div class="flex items-center justify-between">
@@ -19,6 +19,6 @@
     </div>
     
     {% if expanded %}
-        {% include 'partials/schedules/hooks_edit_content.html' %}
+        {% include 'partials/schedules/hooks/hooks_edit_content.html' %}
     {% endif %}
 </div>

@@ -23,22 +23,11 @@
         const cronExpression = document.getElementById('cron-expression');
         const customCron = document.getElementById('custom-cron');
         const cronDescription = document.getElementById('cron-description');
-        const hooksSection = document.getElementById('hooks-section');
         
         if (preset) preset.value = '';
         if (cronExpression) cronExpression.value = '';
         if (customCron) customCron.classList.add('hidden');
         if (cronDescription) cronDescription.classList.add('hidden');
-        
-        // Reset hooks section to collapsed state
-        if (hooksSection) {
-            hooksSection.querySelector('[hx-get]').setAttribute('hx-get', '/api/shared/toggle-hooks-section?expanded=false');
-            const chevron = hooksSection.querySelector('svg');
-            if (chevron) chevron.classList.remove('rotate-180');
-            const expandedContent = hooksSection.querySelector('.border-t');
-            if (expandedContent) expandedContent.remove();
-        }
     }
 })();
-
 </script>

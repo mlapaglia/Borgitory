@@ -119,7 +119,7 @@
                             
                             <button type="button" 
                                     class="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors"
-                                    hx-post="/api/shared/hooks-modal"
+                                    hx-post="/api/schedules/hooks/hooks-modal"
                                     hx-vals='{"pre_hooks": {{ (schedule.pre_job_hooks if schedule.pre_job_hooks else "[]") | tojson }}, "post_hooks": {{ (schedule.post_job_hooks if schedule.post_job_hooks else "[]") | tojson }}}'
                                     hx-target="#modal-container">
                                 <span>⚙️</span>

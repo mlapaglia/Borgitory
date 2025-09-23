@@ -1,9 +1,7 @@
 <!-- Hooks Container Template for Reordering -->
-<!-- DEBUG: hook_type={{ hook_type }}, hooks_count={{ hooks|length }} -->
 {% for hook in hooks %}
     {% set index = loop.index0 %}
-    <!-- DEBUG: rendering hook {{ index }}: name='{{ hook.name }}', command='{{ hook.command }}' for type '{{ hook_type }}' -->
-    {% include 'partials/shared/hook_field_modal.html' with context %}
+    {% include 'partials/schedules/hooks/hook_field_modal.html' with context %}
 {% endfor %}
 
 {% if not hooks %}
