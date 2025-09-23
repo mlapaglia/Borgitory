@@ -22,6 +22,8 @@ class HookConfig:
     environment_vars: Dict[str, str] = field(default_factory=dict)
     continue_on_failure: bool = True
     log_output: bool = True
+    critical: bool = False
+    run_on_job_failure: bool = False
 
     def __post_init__(self) -> None:
         """Validate hook configuration after initialization."""
@@ -78,6 +80,8 @@ class HookConfigParser:
                 environment_vars = hook_data.get("environment_vars", {})
                 continue_on_failure = hook_data.get("continue_on_failure", True)
                 log_output = hook_data.get("log_output", True)
+                critical = hook_data.get("critical", False)
+                run_on_job_failure = hook_data.get("run_on_job_failure", False)
 
                 # Validate types
                 if not isinstance(name, str):
@@ -100,6 +104,10 @@ class HookConfigParser:
                     raise ValueError(f"Hook {i} continue_on_failure must be a boolean")
                 if not isinstance(log_output, bool):
                     raise ValueError(f"Hook {i} log_output must be a boolean")
+                if not isinstance(critical, bool):
+                    raise ValueError(f"Hook {i} critical must be a boolean")
+                if not isinstance(run_on_job_failure, bool):
+                    raise ValueError(f"Hook {i} run_on_job_failure must be a boolean")
 
                 hook = HookConfig(
                     name=name,
@@ -110,6 +118,8 @@ class HookConfigParser:
                     environment_vars=environment_vars,
                     continue_on_failure=continue_on_failure,
                     log_output=log_output,
+                    critical=critical,
+                    run_on_job_failure=run_on_job_failure,
                 )
                 hooks.append(hook)
 
@@ -141,6 +151,8 @@ class HookConfigParser:
                 "shell": hook.shell,
                 "continue_on_failure": hook.continue_on_failure,
                 "log_output": hook.log_output,
+                "critical": hook.critical,
+                "run_on_job_failure": hook.run_on_job_failure,
             }
 
             if hook.working_directory:

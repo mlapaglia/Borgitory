@@ -5,12 +5,21 @@ Hook execution service for running pre and post job commands.
 import asyncio
 import logging
 import os
-from typing import Dict, List, Optional, Protocol
+from typing import Dict, List, Optional, Protocol, NamedTuple
 
 from borgitory.services.hooks.hook_config import HookConfig
 from borgitory.protocols.command_protocols import CommandRunnerProtocol
 
 logger = logging.getLogger(__name__)
+
+
+class HookExecutionSummary(NamedTuple):
+    """Summary of hook execution results."""
+
+    results: List["HookExecutionResult"]
+    all_successful: bool
+    critical_failure: bool  # True if a critical hook failed
+    failed_critical_hook_name: Optional[str]  # Name of the failed critical hook
 
 
 class HookOutputHandler(Protocol):
@@ -80,7 +89,8 @@ class HookExecutionService:
         hook_type: str,
         job_id: str,
         context: Optional[Dict[str, str]] = None,
-    ) -> List[HookExecutionResult]:
+        job_failed: bool = False,
+    ) -> HookExecutionSummary:
         """
         Execute a list of hooks sequentially.
 
@@ -89,39 +99,94 @@ class HookExecutionService:
             hook_type: Type of hooks being executed ("pre" or "post")
             job_id: ID of the job these hooks are associated with
             context: Additional context variables for hook execution
+            job_failed: Whether the job has failed (used for post-hook filtering)
 
         Returns:
-            List of execution results for each hook
+            Summary of hook execution results including critical failure info
         """
         if not hooks:
             logger.debug(f"No {hook_type}-job hooks to execute for job {job_id}")
-            return []
+            return HookExecutionSummary(
+                results=[],
+                all_successful=True,
+                critical_failure=False,
+                failed_critical_hook_name=None,
+            )
 
-        logger.info(f"Executing {len(hooks)} {hook_type}-job hooks for job {job_id}")
+        # Filter post-hooks based on job status and run_on_job_failure setting
+        hooks_to_execute = hooks
+        if hook_type == "post":
+            hooks_to_execute = []
+            skipped_hooks = []
+            for hook in hooks:
+                should_run = hook.run_on_job_failure or not job_failed
+                if should_run:
+                    hooks_to_execute.append(hook)
+                else:
+                    skipped_hooks.append(hook)
+                    logger.info(
+                        f"Skipping post-hook '{hook.name}' because job failed and "
+                        f"run_on_job_failure=False"
+                    )
+
+            if skipped_hooks:
+                logger.info(
+                    f"Skipped {len(skipped_hooks)} post-hooks due to job failure, "
+                    f"executing {len(hooks_to_execute)} hooks"
+                )
+
+        logger.info(
+            f"Executing {len(hooks_to_execute)} {hook_type}-job hooks for job {job_id}"
+        )
         results = []
+        critical_failure = False
+        failed_critical_hook_name = None
 
-        for i, hook in enumerate(hooks):
+        for i, hook in enumerate(hooks_to_execute):
             logger.info(
-                f"Executing {hook_type}-job hook {i + 1}/{len(hooks)}: {hook.name}"
+                f"Executing {hook_type}-job hook {i + 1}/{len(hooks_to_execute)}: {hook.name} "
+                f"(critical: {hook.critical})"
             )
 
             result = await self._execute_single_hook(hook, job_id, context)
             results.append(result)
 
-            if not result.success and not hook.continue_on_failure:
-                logger.error(
-                    f"Hook '{hook.name}' failed and continue_on_failure=False, "
-                    f"stopping execution of remaining {hook_type}-job hooks"
-                )
-                break
+            if not result.success:
+                if hook.critical:
+                    critical_failure = True
+                    failed_critical_hook_name = hook.name
+                    logger.error(
+                        f"Critical hook '{hook.name}' failed, stopping execution of "
+                        f"remaining {hook_type}-job hooks and failing entire job"
+                    )
+                    break
+                elif not hook.continue_on_failure:
+                    logger.error(
+                        f"Hook '{hook.name}' failed and continue_on_failure=False, "
+                        f"stopping execution of remaining {hook_type}-job hooks"
+                    )
+                    break
+                else:
+                    logger.warning(
+                        f"Hook '{hook.name}' failed but continue_on_failure=True, "
+                        f"continuing with remaining hooks"
+                    )
 
         successful_hooks = sum(1 for r in results if r.success)
+        all_successful = all(r.success for r in results)
+
         logger.info(
             f"Completed {hook_type}-job hooks for job {job_id}: "
             f"{successful_hooks}/{len(results)} successful"
+            f"{' (CRITICAL FAILURE)' if critical_failure else ''}"
         )
 
-        return results
+        return HookExecutionSummary(
+            results=results,
+            all_successful=all_successful,
+            critical_failure=critical_failure,
+            failed_critical_hook_name=failed_critical_hook_name,
+        )
 
     async def _execute_single_hook(
         self, hook: HookConfig, job_id: str, context: Optional[Dict[str, str]] = None

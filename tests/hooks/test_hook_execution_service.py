@@ -58,9 +58,11 @@ class TestHookExecutionService:
         mock_runner = MockCommandRunner()
         service = HookExecutionService(command_runner=mock_runner)
 
-        results = await service.execute_hooks([], "pre", "job-123")
+        summary = await service.execute_hooks([], "pre", "job-123")
 
-        assert results == []
+        assert summary.results == []
+        assert summary.all_successful is True
+        assert summary.critical_failure is False
         mock_runner._run_command_mock.assert_not_called()
 
     @pytest.mark.asyncio
@@ -74,15 +76,17 @@ class TestHookExecutionService:
         service = HookExecutionService(command_runner=mock_runner)
         hook = HookConfig(name="Test Hook", command="echo 'Hello World'")
 
-        results = await service.execute_hooks([hook], "pre", "job-123")
+        summary = await service.execute_hooks([hook], "pre", "job-123")
 
-        assert len(results) == 1
-        result = results[0]
+        assert len(summary.results) == 1
+        result = summary.results[0]
         assert result.hook_name == "Test Hook"
         assert result.success is True
         assert result.return_code == 0
         assert result.output == "Hello World"
         assert result.error == ""
+        assert summary.all_successful is True
+        assert summary.critical_failure is False
 
         # Verify command was called correctly
         mock_runner._run_command_mock.assert_called_once()
@@ -170,10 +174,10 @@ class TestHookExecutionService:
         service = HookExecutionService(command_runner=mock_runner)
         hook = HookConfig(name="Failing Hook", command="exit 1")
 
-        results = await service.execute_hooks([hook], "pre", "job-123")
+        summary = await service.execute_hooks([hook], "pre", "job-123")
 
-        assert len(results) == 1
-        result = results[0]
+        assert len(summary.results) == 1
+        result = summary.results[0]
         assert result.hook_name == "Failing Hook"
         assert result.success is False
         assert result.return_code == 1
@@ -200,11 +204,11 @@ class TestHookExecutionService:
             HookConfig(name="Hook 2", command="echo Success", continue_on_failure=True),
         ]
 
-        results = await service.execute_hooks(hooks, "pre", "job-123")
+        summary = await service.execute_hooks(hooks, "pre", "job-123")
 
-        assert len(results) == 2
-        assert results[0].success is False
-        assert results[1].success is True
+        assert len(summary.results) == 2
+        assert summary.results[0].success is False
+        assert summary.results[1].success is True
         assert mock_runner._run_command_mock.call_count == 2
 
     @pytest.mark.asyncio
@@ -221,11 +225,11 @@ class TestHookExecutionService:
             HookConfig(name="Hook 2", command="echo Success", continue_on_failure=True),
         ]
 
-        results = await service.execute_hooks(hooks, "pre", "job-123")
+        summary = await service.execute_hooks(hooks, "pre", "job-123")
 
         # Should only execute first hook
-        assert len(results) == 1
-        assert results[0].success is False
+        assert len(summary.results) == 1
+        assert summary.results[0].success is False
         assert mock_runner._run_command_mock.call_count == 1
 
     @pytest.mark.asyncio
@@ -286,7 +290,7 @@ class TestHookExecutionService:
 class TestDefaultHookOutputHandler:
     """Test DefaultHookOutputHandler functionality."""
 
-    def test_log_hook_output_info(self, caplog) -> None:
+    def test_log_hook_output_info(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test logging hook output as info."""
         handler = DefaultHookOutputHandler()
 
@@ -295,7 +299,7 @@ class TestDefaultHookOutputHandler:
 
         assert "Hook 'Test Hook' output: Test output" in caplog.text
 
-    def test_log_hook_output_error(self, caplog) -> None:
+    def test_log_hook_output_error(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test logging hook output as error."""
         handler = DefaultHookOutputHandler()
 

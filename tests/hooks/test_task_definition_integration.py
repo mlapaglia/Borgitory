@@ -3,6 +3,7 @@ Tests for hook integration with TaskDefinitionBuilder.
 """
 
 from unittest.mock import Mock
+import pytest
 from sqlalchemy.orm import Session
 
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
@@ -69,19 +70,28 @@ class TestTaskDefinitionBuilderHookIntegration:
 
         tasks = builder.build_hooks_from_json(hooks_json, "pre", "test-repo")
 
-        assert len(tasks) == 2
+        # Now returns a single bundled task containing all hooks
+        assert len(tasks) == 1
 
-        assert tasks[0]["type"] == "hook"
-        assert tasks[0]["hook_name"] == "Pre Hook 1"
-        assert tasks[0]["hook_command"] == "echo starting"
-        assert tasks[0]["hook_type"] == "pre"
+        task = tasks[0]
+        assert task["type"] == "hook"
+        assert task["hook_type"] == "pre"
+        assert task["name"] == "Pre-job hooks (test-repo)"
 
-        assert tasks[1]["type"] == "hook"
-        assert tasks[1]["hook_name"] == "Pre Hook 2"
-        assert tasks[1]["hook_command"] == "mkdir -p /tmp/backup"
-        assert tasks[1]["hook_type"] == "pre"
+        # The hooks JSON should be passed as a parameter
+        assert "hooks" in task
+        import json
 
-    def test_build_hooks_from_json_invalid(self, caplog) -> None:
+        parsed_hooks = json.loads(task["hooks"])
+        assert len(parsed_hooks) == 2
+        assert parsed_hooks[0]["name"] == "Pre Hook 1"
+        assert parsed_hooks[0]["command"] == "echo starting"
+        assert parsed_hooks[1]["name"] == "Pre Hook 2"
+        assert parsed_hooks[1]["command"] == "mkdir -p /tmp/backup"
+
+    def test_build_hooks_from_json_invalid(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test building hooks from invalid JSON logs error and returns empty list."""
         mock_db = Mock(spec=Session)
         builder = TaskDefinitionBuilder(mock_db)
@@ -118,15 +128,15 @@ class TestTaskDefinitionBuilderHookIntegration:
         # Should have: pre-hook, backup, post-hook
         assert len(tasks) >= 3
 
-        # First task should be pre-hook
+        # First task should be pre-hook (bundled)
         assert tasks[0]["type"] == "hook"
         assert tasks[0]["hook_type"] == "pre"
-        assert tasks[0]["hook_name"] == "Pre Hook"
+        assert "Pre-job hooks" in tasks[0]["name"]
 
-        # Last task should be post-hook
+        # Last task should be post-hook (bundled)
         assert tasks[-1]["type"] == "hook"
         assert tasks[-1]["hook_type"] == "post"
-        assert tasks[-1]["hook_name"] == "Post Hook"
+        assert "Post-job hooks" in tasks[-1]["name"]
 
         # Should have backup task somewhere in the middle
         backup_tasks = [task for task in tasks if task["type"] == "backup"]
@@ -177,8 +187,8 @@ class TestTaskDefinitionBuilderHookIntegration:
         # Verify hooks are correctly positioned
         pre_hook_task = tasks[0]
         assert pre_hook_task["hook_type"] == "pre"
-        assert pre_hook_task["hook_name"] == "Setup"
+        assert "Pre-job hooks" in pre_hook_task["name"]
 
         post_hook_task = tasks[-1]
         assert post_hook_task["hook_type"] == "post"
-        assert post_hook_task["hook_name"] == "Cleanup"
+        assert "Post-job hooks" in post_hook_task["name"]

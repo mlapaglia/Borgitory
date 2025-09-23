@@ -28,24 +28,43 @@ def convert_hook_fields_to_json(
     """Convert individual hook fields to JSON format using position-based form data."""
     hooks = []
 
-    # Get all names and commands for this hook type (position-based)
+    # Get all hook field data for this hook type (position-based)
     hook_names = form_data.get(f"{hook_type}_hook_name", [])
     hook_commands = form_data.get(f"{hook_type}_hook_command", [])
+    hook_critical = form_data.get(f"{hook_type}_hook_critical", [])
+    hook_run_on_failure = form_data.get(f"{hook_type}_hook_run_on_failure", [])
 
     # Ensure they are lists (in case there's only one item)
     if not isinstance(hook_names, list):
         hook_names = [hook_names] if hook_names else []
     if not isinstance(hook_commands, list):
         hook_commands = [hook_commands] if hook_commands else []
+    if not isinstance(hook_critical, list):
+        hook_critical = [hook_critical] if hook_critical else []
+    if not isinstance(hook_run_on_failure, list):
+        hook_run_on_failure = [hook_run_on_failure] if hook_run_on_failure else []
 
     # Pair them up by position
     for i in range(min(len(hook_names), len(hook_commands))):
         name = str(hook_names[i]).strip() if hook_names[i] else ""
         command = str(hook_commands[i]).strip() if hook_commands[i] else ""
 
+        # Handle checkboxes - they're only present if checked
+        critical = len(hook_critical) > i and hook_critical[i] == "true"
+        run_on_failure = (
+            len(hook_run_on_failure) > i and hook_run_on_failure[i] == "true"
+        )
+
         # Only add hooks that have both name and command
         if name and command:
-            hooks.append({"name": name, "command": command})
+            hooks.append(
+                {
+                    "name": name,
+                    "command": command,
+                    "critical": critical,
+                    "run_on_job_failure": run_on_failure,
+                }
+            )
 
     return json.dumps(hooks) if hooks else None
 
@@ -405,21 +424,36 @@ async def describe_cron_expression(
     )
 
 
-def _extract_hooks_from_form(form_data: Any, hook_type: str) -> List[Dict[str, str]]:
+def _extract_hooks_from_form(form_data: Any, hook_type: str) -> List[Dict[str, Any]]:
     """Extract hooks from form data and return as list of dicts."""
     hooks = []
 
     # Get all names and commands for this hook type
     hook_names = form_data.getlist(f"{hook_type}_hook_name")
     hook_commands = form_data.getlist(f"{hook_type}_hook_command")
+    hook_critical = form_data.getlist(f"{hook_type}_hook_critical")
+    hook_run_on_failure = form_data.getlist(f"{hook_type}_hook_run_on_failure")
 
     # Pair them up by position
     for i in range(min(len(hook_names), len(hook_commands))):
         name = str(hook_names[i]).strip() if hook_names[i] else ""
         command = str(hook_commands[i]).strip() if hook_commands[i] else ""
 
+        # Handle checkboxes - they're only present if checked
+        critical = len(hook_critical) > i and hook_critical[i] == "true"
+        run_on_failure = (
+            len(hook_run_on_failure) > i and hook_run_on_failure[i] == "true"
+        )
+
         # Add all hooks, even if name or command is empty (for reordering)
-        hooks.append({"name": name, "command": command})
+        hooks.append(
+            {
+                "name": name,
+                "command": command,
+                "critical": critical,
+                "run_on_job_failure": run_on_failure,
+            }
+        )
 
     return hooks
 

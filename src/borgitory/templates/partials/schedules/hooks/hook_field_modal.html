@@ -90,5 +90,44 @@
                 {{ 'Commands run before the backup starts' if hook_type == 'pre' else 'Commands run after the backup completes' }}
             </p>
         </div>
+
+        <!-- Hook Options -->
+        <div class="space-y-3">
+            <!-- Critical Flag - for all hooks -->
+            <div class="flex items-start">
+                <input type="checkbox" 
+                       name="{{ hook_type }}_hook_critical" 
+                       value="true"
+                       {{ 'checked' if hook is defined and hook.critical else '' }}
+                       class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <div class="ml-3">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Critical Hook
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ 'Fail the entire job if this pre-hook fails (stops backup and all remaining tasks)' if hook_type == 'pre' else 'Fail the entire job if this post-hook fails (stops remaining post-hooks)' }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Run on Job Failure - only for post-hooks -->
+            {% if hook_type == 'post' %}
+            <div class="flex items-start">
+                <input type="checkbox" 
+                       name="{{ hook_type }}_hook_run_on_failure" 
+                       value="true"
+                       {{ 'checked' if hook is defined and hook.run_on_job_failure else '' }}
+                       class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <div class="ml-3">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Run Even If Job Failed
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Execute this post-hook even if the backup or other tasks failed (useful for cleanup or notifications)
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
