@@ -265,22 +265,32 @@ class TestJobManagerTaskExecution:
         self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test composite job with critical task failure"""
-        job_id = str(uuid.uuid4())
-        task1 = BorgJobTask(
-            task_type="backup", task_name="Test Backup"
-        )  # Critical task
-        task2 = BorgJobTask(task_type="prune", task_name="Test Prune")
+        # Create task definitions for backup and prune
+        task_definitions = [
+            {
+                "type": "backup",
+                "name": "Test Backup",
+                "source_path": "/tmp/test",
+                "compression": "lz4",
+                "dry_run": False,
+            },
+            {
+                "type": "prune",
+                "name": "Test Prune",
+                "keep_daily": 7,
+                "keep_weekly": 4,
+            },
+        ]
 
-        job = BorgJob(
-            id=job_id,
-            job_type="composite",
-            status="pending",
-            started_at=now_utc(),
-            tasks=[task1, task2],
-            repository_id=sample_repository.id,
+        # Use the proper job creation method that creates database records
+        job_id = await job_manager_with_db.create_composite_job(
+            job_type="backup",
+            task_definitions=task_definitions,
+            repository=sample_repository,
         )
-        job_manager_with_db.jobs[job_id] = job
-        job_manager_with_db.output_manager.create_job_output(job_id)
+        
+        # Get the created job
+        job = job_manager_with_db.jobs[job_id]
 
         # Mock backup to fail (critical)
         async def mock_backup_fail(
@@ -298,14 +308,58 @@ class TestJobManagerTaskExecution:
         with patch.object(
             job_manager_with_db, "_execute_backup_task", side_effect=mock_backup_fail
         ), patch.object(job_manager_with_db, "_execute_prune_task", mock_prune):
-            await job_manager_with_db._execute_composite_job(job)
+            # Wait for the job to complete (it starts automatically)
+            import asyncio
+            await asyncio.sleep(0.1)  # Give the job time to execute
+
+        # Get the updated tasks from the job
+        task1 = job.tasks[0]  # backup task
+        task2 = job.tasks[1]  # prune task
 
         # Verify job failed due to critical task failure
         assert job.status == "failed"
         assert task1.status == "failed"
 
-        # Prune should not have been called
+        # Verify remaining task was marked as skipped due to critical failure
+        assert task2.status == "skipped"
+        assert task2.completed_at is not None
+        assert any("Task skipped due to critical task failure" in line for line in task2.output_lines)
+
+        # Prune should not have been called due to critical failure
         mock_prune.assert_not_called()
+        
+        # Verify database persistence - actually query the database to confirm the data was saved
+        from src.borgitory.models.database import Job as DatabaseJob, JobTask as DatabaseTask
+        
+        # Get the database session from the job manager
+        db_session_factory = job_manager_with_db.dependencies.db_session_factory
+        assert db_session_factory is not None
+        
+        with db_session_factory() as db:
+            # Query the database for the job and its tasks
+            db_job = db.query(DatabaseJob).filter(DatabaseJob.id == job_id).first()
+            assert db_job is not None, f"Job {job_id} should be persisted in database"
+            
+            # Query for the tasks
+            db_tasks = db.query(DatabaseTask).filter(DatabaseTask.job_id == job_id).order_by(DatabaseTask.task_order).all()
+            assert len(db_tasks) == 2, f"Expected 2 tasks in database, got {len(db_tasks)}"
+            
+            # Verify the backup task (index 0) is failed
+            backup_db_task = db_tasks[0]
+            assert backup_db_task.task_type == "backup"
+            assert backup_db_task.status == "failed"
+            assert backup_db_task.return_code == 1
+            assert backup_db_task.completed_at is not None
+            
+            # Verify the prune task (index 1) is skipped - THIS IS THE KEY TEST
+            prune_db_task = db_tasks[1]
+            assert prune_db_task.task_type == "prune"
+            assert prune_db_task.status == "skipped", f"Expected prune task to be 'skipped' in database, got '{prune_db_task.status}'"
+            assert prune_db_task.completed_at is not None, "Skipped task should have completed_at timestamp"
+            
+            # Verify the job status is failed
+            assert db_job.status == "failed"
+            assert db_job.finished_at is not None
 
     @pytest.mark.asyncio
     async def test_execute_backup_task_success(

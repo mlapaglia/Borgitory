@@ -741,6 +741,21 @@ class JobManager:
                                         f"Marked task {remaining_task.task_type} as skipped due to critical failure"
                                     )
 
+                            # Save all tasks to database after marking remaining as skipped
+                            if self.database_manager:
+                                try:
+                                    logger.info(
+                                        f"Saving all tasks to database after critical failure - Job: {job.id}"
+                                    )
+                                    await self.database_manager.save_job_tasks(
+                                        job.id, job.tasks
+                                    )
+                                    logger.info(
+                                        f"Successfully saved all tasks to database after critical failure"
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Failed to update tasks in database after critical failure: {e}")
+
                             break
 
                 except Exception as e:
@@ -781,6 +796,22 @@ class JobManager:
                                 logger.info(
                                     f"Marked task {remaining_task.task_type} as skipped due to critical task exception"
                                 )
+
+                        # Save all tasks to database after marking remaining as skipped
+                        if self.database_manager:
+                            try:
+                                logger.info(
+                                    f"Saving all tasks to database after critical exception - Job: {job.id}"
+                                )
+                                await self.database_manager.save_job_tasks(
+                                    job.id, job.tasks
+                                )
+                                logger.info(
+                                    f"Successfully saved all tasks to database after critical exception"
+                                )
+                            except Exception as db_e:
+                                logger.error(f"Failed to update tasks in database after critical exception: {db_e}")
+
                         break
 
             failed_tasks = [t for t in job.tasks if t.status == "failed"]
@@ -1021,6 +1052,7 @@ class JobManager:
             # Set task status based on result
             task.return_code = result.return_code
             task.status = "completed" if result.return_code == 0 else "failed"
+            task.completed_at = now_utc()
 
             # Always add the full process output to task output_lines for debugging
             if result.stdout:
@@ -1199,6 +1231,7 @@ class JobManager:
             # Set task status based on result
             task.return_code = result.return_code
             task.status = "completed" if result.return_code == 0 else "failed"
+            task.completed_at = now_utc()
             if result.error:
                 task.error = result.error
 
@@ -1453,6 +1486,7 @@ class JobManager:
 
         task.return_code = result.return_code
         task.status = "completed" if result.return_code == 0 else "failed"
+        task.completed_at = now_utc()
         if result.error:
             task.error = result.error
 

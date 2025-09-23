@@ -12,11 +12,12 @@ class MockDependencies:
     """Mock dependencies for JobManager testing."""
 
     def __init__(self) -> None:
+        from unittest.mock import Mock, AsyncMock
         self.hook_execution_service = None
-        self.event_broadcaster = None
-        self.database_manager = None
+        self.event_broadcaster = Mock()  # Mock event broadcaster
+        self.database_manager = AsyncMock()   # Mock database manager (async)
+        self.output_manager = Mock()     # Mock output manager
         self.job_executor = None
-        self.output_manager = None
         self.queue_manager = None
         self.notification_service = None
 
@@ -131,44 +132,61 @@ class TestCompositeJobCriticalFailure:
             "critical hook failure" in line for line in notification_task.output_lines
         )
 
-    def test_critical_backup_task_failure_marks_remaining_tasks_skipped(self) -> None:
+    async def test_critical_backup_task_failure_marks_remaining_tasks_skipped(self) -> None:
         """Test that critical backup task failure marks remaining tasks as skipped."""
+        from unittest.mock import AsyncMock, patch
+        
         # Create job with pre-hook, backup (critical failure), post-hook, notification
         pre_hook_task = self.create_hook_task("pre")
         backup_task = self.create_backup_task()
         post_hook_task = self.create_hook_task("post")
         notification_task = self.create_notification_task()
 
-        # Set pre-hook as completed, backup as failed
-        pre_hook_task.status = "completed"
-        backup_task.status = "failed"
-
         tasks = [pre_hook_task, backup_task, post_hook_task, notification_task]
         job = self.create_test_job(tasks)
 
-        # Simulate the critical failure logic for backup task
-        task_index = 1  # Backup failed
-        task = tasks[task_index]
+        # Mock individual task methods
+        async def mock_hook_success(job, task, task_index, job_has_failed=False):
+            task.status = "completed"
+            task.return_code = 0
+            task.completed_at = now_utc()
+            return True
 
-        # Check for critical task failure
-        is_critical_task = task.task_type in ["backup"]
+        async def mock_backup_fail(job, task, task_index):
+            task.status = "failed"
+            task.return_code = 1
+            task.error = "Backup failed"
+            task.completed_at = now_utc()
+            return False
 
-        if is_critical_task:
-            # Mark all remaining tasks as skipped
-            remaining_tasks = job.tasks[task_index + 1 :]
-            for remaining_task in remaining_tasks:
-                if remaining_task.status == "pending":
-                    remaining_task.status = "skipped"
-                    remaining_task.completed_at = now_utc()
-                    remaining_task.output_lines.append(
-                        "Task skipped due to critical task failure"
-                    )
+        # Mock all task execution methods
+        with patch.object(self.job_manager, '_execute_hook_task', side_effect=mock_hook_success), \
+             patch.object(self.job_manager, '_execute_backup_task', side_effect=mock_backup_fail), \
+             patch.object(self.job_manager, '_execute_notification_task', side_effect=AsyncMock()) as mock_notification:
 
-        # Verify remaining tasks are marked as skipped
+            # Execute the composite job
+            await self.job_manager._execute_composite_job(job)
+
+        # Verify task statuses after execution
         assert pre_hook_task.status == "completed"  # Should remain completed
-        assert backup_task.status == "failed"  # Should remain failed
-        assert post_hook_task.status == "skipped"
-        assert notification_task.status == "skipped"
+        assert backup_task.status == "failed"  # Should be failed
+        assert post_hook_task.status == "skipped"  # Should be skipped due to critical failure
+        assert notification_task.status == "skipped"  # Should be skipped due to critical failure
+        
+        # Verify completed_at is set for skipped tasks
+        assert post_hook_task.completed_at is not None
+        assert notification_task.completed_at is not None
+        
+        # Verify output messages for skipped tasks
+        assert any("Task skipped due to critical task failure" in line for line in post_hook_task.output_lines)
+        assert any("Task skipped due to critical task failure" in line for line in notification_task.output_lines)
+        
+        # Verify job status
+        assert job.status == "failed"
+        assert job.completed_at is not None
+        
+        # Verify notification task was never called due to critical failure
+        mock_notification.assert_not_called()
 
     def test_non_critical_hook_failure_does_not_skip_tasks(self) -> None:
         """Test that non-critical hook failure does not skip remaining tasks."""
