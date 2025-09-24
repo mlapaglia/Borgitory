@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Callable, Any
 from anyio import create_task_group
 from fastapi import Request
 from functools import wraps
@@ -7,14 +8,14 @@ from borgitory.services.repositories.repository_stats_service import logger
 
 
 @asynccontextmanager
-async def cancel_on_disconnect(request: Request):
+async def cancel_on_disconnect(request: Request) -> AsyncGenerator[None, None]:
     """
     Async context manager for async code that needs to be cancelled if client disconnects prematurely.
     The client disconnect is monitored through the Request object.
     """
     async with create_task_group() as tg:
 
-        async def watch_disconnect():
+        async def watch_disconnect() -> None:
             while True:
                 message = await request.receive()
                 if message["type"] == "http.disconnect":
@@ -36,14 +37,14 @@ async def cancel_on_disconnect(request: Request):
             tg.cancel_scope.cancel()
 
 
-def with_cancel_on_disconnect(func):
+def with_cancel_on_disconnect(func: Callable[..., Any]) -> Callable[..., Any]:
     """
     Decorator that automatically wraps the endpoint logic in cancel_on_disconnect.
     The endpoint must have a 'request: Request' parameter.
     """
 
     @wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         # Find the request object
         request = None
 
