@@ -50,22 +50,24 @@ class TestRepositoryStatsHTML:
         app.dependency_overrides[get_db] = override_get_db
 
         # Mock the stats service to return test data
-        async def mock_get_stats(repo: Any, db: Any, progress_callback=None) -> dict[str, Any]:
+        async def mock_get_stats(
+            repo: Any, db: Any, progress_callback=None
+        ) -> dict[str, Any]:
             return {
                 "repository_path": repo.path,
                 "total_archives": 3,
                 "archive_stats": [],
                 "size_over_time": {
                     "labels": ["2023-01-01"],
-                    "datasets": [{"label": "Original Size", "data": [100]}]
+                    "datasets": [{"label": "Original Size", "data": [100]}],
                 },
                 "dedup_compression_stats": {
                     "labels": ["2023-01-01"],
-                    "datasets": [{"label": "Compression", "data": [25]}]
+                    "datasets": [{"label": "Compression", "data": [25]}],
                 },
                 "file_type_stats": {
                     "count_chart": {"labels": ["2023-01-01"], "datasets": []},
-                    "size_chart": {"labels": ["2023-01-01"], "datasets": []}
+                    "size_chart": {"labels": ["2023-01-01"], "datasets": []},
                 },
                 "summary": {
                     "total_archives": 3,
@@ -76,7 +78,7 @@ class TestRepositoryStatsHTML:
                     "overall_compression_ratio": 25.0,
                     "overall_deduplication_ratio": 33.3,
                     "space_saved_gb": 0.5,
-                    "average_archive_size_gb": 0.33
+                    "average_archive_size_gb": 0.33,
                 },
             }
 
@@ -116,12 +118,12 @@ class TestRepositoryStatsHTML:
 
                 # Verify chart data is embedded
                 assert 'id="chart-data"' in html_content
-                assert 'data-size-chart=' in html_content
-                assert 'data-ratio-chart=' in html_content
+                assert "data-size-chart=" in html_content
+                assert "data-ratio-chart=" in html_content
 
                 # Verify inline chart initialization script is present
-                assert 'new Chart(' in html_content
-                assert 'Error initializing charts' in html_content
+                assert "new Chart(" in html_content
+                assert "Error initializing charts" in html_content
 
         finally:
             # Clean up dependency override
@@ -144,7 +146,9 @@ class TestRepositoryStatsHTML:
         app.dependency_overrides[get_db] = override_get_db
 
         # Mock the stats service to return an error
-        async def mock_get_stats_error(repo: Any, db: Any, progress_callback=None) -> dict[str, Any]:
+        async def mock_get_stats_error(
+            repo: Any, db: Any, progress_callback=None
+        ) -> dict[str, Any]:
             return {"error": "No archives found in repository"}
 
         # Mock the dependency injection for error case
@@ -200,24 +204,26 @@ class TestRepositoryStatsHTML:
                 # In testing, this causes the client to raise the exception instead of returning a response
                 try:
                     response = await ac.get("/api/repositories/999/stats/html")
-                    
+
                     # If we get a response, it should be 404
                     assert response.status_code == 404
                     response_data = response.json()
                     assert "Repository not found" in response_data["detail"]
-                    
+
                 except Exception as e:
                     # The exception was wrapped - check that it contains our HTTPException
                     exception_str = str(e)
                     # Check if it's an exception group and look for the inner HTTPException
-                    if hasattr(e, 'exceptions'):
+                    if hasattr(e, "exceptions"):
                         # It's an ExceptionGroup - check the inner exceptions
                         found_repo_error = False
                         for inner_exc in e.exceptions:
                             if "Repository not found" in str(inner_exc):
                                 found_repo_error = True
                                 break
-                        assert found_repo_error, f"Expected 'Repository not found' in inner exceptions, got: {[str(exc) for exc in e.exceptions]}"
+                        assert found_repo_error, (
+                            f"Expected 'Repository not found' in inner exceptions, got: {[str(exc) for exc in e.exceptions]}"
+                        )
                     else:
                         # Regular exception
                         assert "Repository not found" in exception_str
@@ -250,17 +256,11 @@ class TestRepositoryStatsHTML:
         assert 'hx-target="#statistics-content"' in html_content, (
             "Should target statistics content div"
         )
-        assert 'hx-swap="innerHTML"' in html_content, (
-            "Should swap innerHTML"
-        )
-        assert 'hx-trigger="load"' in html_content, (
-            "Should trigger on load"
-        )
+        assert 'hx-swap="innerHTML"' in html_content, "Should swap innerHTML"
+        assert 'hx-trigger="load"' in html_content, "Should trigger on load"
 
         # Verify loading spinner structure
-        assert "animate-spin" in html_content, (
-            "Should have loading spinner"
-        )
+        assert "animate-spin" in html_content, "Should have loading spinner"
         assert "Loading repository statistics" in html_content, (
             "Should have loading message"
         )

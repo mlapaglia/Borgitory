@@ -3,16 +3,9 @@ Tests for repository statistics HTML endpoint functionality
 """
 
 import pytest
-from typing import Any
 from unittest.mock import Mock
-from httpx import AsyncClient, ASGITransport
 
-from borgitory.main import app
-from borgitory.models.database import Repository, get_db
-from borgitory.services.repositories.repository_stats_service import (
-    RepositoryStatsService,
-)
-from borgitory.dependencies import get_repository_stats_service
+from borgitory.models.database import Repository
 
 
 class TestRepositoryStatsHTML:
@@ -59,17 +52,11 @@ class TestRepositoryStatsHTML:
         assert 'hx-target="#statistics-content"' in html_content, (
             "Should target statistics content div"
         )
-        assert 'hx-swap="innerHTML"' in html_content, (
-            "Should swap innerHTML"
-        )
-        assert 'hx-trigger="load"' in html_content, (
-            "Should trigger on load"
-        )
+        assert 'hx-swap="innerHTML"' in html_content, "Should swap innerHTML"
+        assert 'hx-trigger="load"' in html_content, "Should trigger on load"
 
         # Verify loading spinner structure
-        assert "animate-spin" in html_content, (
-            "Should have loading spinner"
-        )
+        assert "animate-spin" in html_content, "Should have loading spinner"
         assert "Loading repository statistics" in html_content, (
             "Should have loading message"
         )
