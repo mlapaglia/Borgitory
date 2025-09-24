@@ -5,12 +5,12 @@
         <select 
             id="stats-repository-select" 
             class="select-modern w-64"
-            hx-get="/api/repositories/stats/content"
+            hx-get="/api/repositories/stats/loading"
             hx-target="#statistics-content"
             hx-swap="innerHTML"
             hx-trigger="change"
-            hx-vals='js:{"repository_id": event.target.value}'
-            hx-on::before-request="if(event.target.value) { htmx.ajax('GET', '/api/repositories/stats/loading?repository_id=' + event.target.value, {target: '#statistics-content', swap: 'innerHTML'}); return false; }"
+            hx-include="this"
+            name="repository_id"
         >
             <option value="">Select a repository...</option>
             {% for repo in repositories %}
