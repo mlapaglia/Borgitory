@@ -11,11 +11,6 @@ function borgitoryApp() {
     };
 }
 
-// HTMX Event Listeners
-document.body.addEventListener('htmx:afterSwap', function(e) {
-    // Chart initialization is now handled by inline scripts in templates
-});
-
 // Dark Mode Functions
 function toggleDarkMode() {
     const html = document.documentElement;
