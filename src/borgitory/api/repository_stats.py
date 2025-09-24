@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-import asyncio
-from typing import Dict, AsyncGenerator
 
 from borgitory.api.cancel_on_disconnect import with_cancel_on_disconnect
 from borgitory.models.database import get_db, Repository
@@ -35,8 +33,6 @@ async def get_stats_loading(request: Request, repository_id: int = 0) -> HTMLRes
         "partials/statistics/loading_state.html",
         {"repository_id": repository_id},
     )
-
-
 
 
 @router.get("/{repository_id}/stats")
@@ -73,12 +69,12 @@ async def get_repository_statistics_html(
         raise HTTPException(status_code=404, detail="Repository not found")
 
     # Generate statistics (no timeout for now)
-    stats = await stats_svc.get_repository_statistics(repository)
+    stats = await stats_svc.get_repository_statistics(repository, db)
 
     if "error" in stats:
         return HTMLResponse(
             content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>{stats['error']}</p>",
-            status_code=500
+            status_code=500,
         )
 
     return templates.TemplateResponse(

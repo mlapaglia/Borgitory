@@ -131,4 +131,174 @@
          data-file-type-size-chart='{{ stats.file_type_stats.size_chart | tojson }}'
          style="display: none;">
     </div>
+
+    <!-- Initialize charts when this template loads -->
+    <script>
+    (function() {
+        const chartDataEl = document.getElementById('chart-data');
+        if (!chartDataEl) return;
+
+        try {
+            const sizeData = JSON.parse(chartDataEl.getAttribute('data-size-chart'));
+            const ratioData = JSON.parse(chartDataEl.getAttribute('data-ratio-chart'));
+            const fileTypeCountData = JSON.parse(chartDataEl.getAttribute('data-file-type-count-chart'));
+            const fileTypeSizeData = JSON.parse(chartDataEl.getAttribute('data-file-type-size-chart'));
+
+            // Create Size Chart
+            const sizeCtx = document.getElementById('sizeChart');
+            if (sizeCtx) {
+                new Chart(sizeCtx, {
+                    type: 'line',
+                    data: sizeData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Size (MB)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Archive Date'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Repository Size Growth'
+                            },
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Create Ratio Chart
+            const ratioCtx = document.getElementById('ratioChart');
+            if (ratioCtx) {
+                new Chart(ratioCtx, {
+                    type: 'line',
+                    data: ratioData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Compression %'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Deduplication %'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Compression & Deduplication Efficiency'
+                            },
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Create File Type Count Chart
+            const fileTypeCountCtx = document.getElementById('fileTypeCountChart');
+            if (fileTypeCountCtx && fileTypeCountData) {
+                new Chart(fileTypeCountCtx, {
+                    type: 'line',
+                    data: fileTypeCountData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'File Count'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Archive Date'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Create File Type Size Chart
+            const fileTypeSizeCtx = document.getElementById('fileTypeSizeChart');
+            if (fileTypeSizeCtx && fileTypeSizeData) {
+                new Chart(fileTypeSizeCtx, {
+                    type: 'line',
+                    data: fileTypeSizeData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Size (MB)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Archive Date'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        }
+                    }
+                });
+            }
+
+        } catch (error) {
+            console.error('Error initializing charts:', error);
+        }
+    })();
+    </script>
 {% endif %}

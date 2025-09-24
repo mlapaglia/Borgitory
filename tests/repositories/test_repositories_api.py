@@ -1226,9 +1226,6 @@ class TestRepositoriesAPI:
 
         assert response.status_code == 200
 
-
-
-
     @pytest.mark.asyncio
     async def test_get_repository_statistics_direct(
         self, async_client: AsyncClient, test_db: Session
@@ -1429,4 +1426,3 @@ class TestRepositoriesAPI:
             repositories.user_secure_exists = original_exists
             repositories.user_secure_isdir = original_isdir
             repositories.user_get_directory_listing = original_listing
-
