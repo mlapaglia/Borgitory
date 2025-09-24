@@ -59,6 +59,23 @@
                 </div>
             </div>
         </div>
+
+        {% if stats.execution_time_stats and stats.execution_time_stats|length > 0 %}
+        <div class="bg-indigo-50 rounded-lg p-4">
+            <div class="flex items-center">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-indigo-600">Avg Task Time</p>
+                    <p class="text-2xl font-bold text-indigo-900">
+                        {% set avg_time = (stats.execution_time_stats | sum(attribute='average_duration_minutes') / stats.execution_time_stats|length) | round(1) %}
+                        {{ avg_time }} min
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Charts -->
@@ -94,6 +111,36 @@
                 <canvas id="fileTypeSizeChart"></canvas>
             </div>
         </div>
+
+        <!-- Job Execution Times -->
+        {% if stats.execution_time_stats and stats.execution_time_stats|length > 0 %}
+        <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Average Job Execution Times</h3>
+            <div class="relative h-64">
+                <canvas id="executionTimeChart"></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Success/Failure Rates by Task Type -->
+        {% if stats.success_failure_stats and stats.success_failure_stats|length > 0 %}
+        <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Task Success & Failure Rates</h3>
+            <div class="relative h-64">
+                <canvas id="successFailureChart"></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Backup Success/Failure Timeline -->
+        {% if stats.timeline_success_failure and stats.timeline_success_failure.labels|length > 0 %}
+        <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Backup Success/Failure Timeline (Last 30 Days)</h3>
+            <div class="relative h-64">
+                <canvas id="timelineSuccessFailureChart"></canvas>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Detailed Statistics Table -->
@@ -120,6 +167,62 @@
                     <span class="font-semibold text-gray-900 ml-2">{{ stats.summary.average_archive_size_gb }} GB</span>
                 </div>
             </div>
+
+            <!-- Execution Time Statistics -->
+            {% if stats.execution_time_stats and stats.execution_time_stats|length > 0 %}
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <h4 class="text-md font-semibold text-gray-900 mb-4">Job Execution Statistics</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                    {% for stat in stats.execution_time_stats %}
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="font-semibold text-gray-900 mb-2">{{ stat.task_type.replace('_', ' ').title() }}</div>
+                        <div class="space-y-1">
+                            <div>
+                                <span class="text-gray-600">Avg Duration:</span>
+                                <span class="font-medium text-gray-900 ml-1">{{ stat.average_duration_minutes }} min</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Total Runs:</span>
+                                <span class="font-medium text-gray-900 ml-1">{{ stat.total_executions }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Range:</span>
+                                <span class="font-medium text-gray-900 ml-1">{{ stat.min_duration_minutes }}-{{ stat.max_duration_minutes }} min</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Success/Failure Statistics -->
+            {% if stats.success_failure_stats and stats.success_failure_stats|length > 0 %}
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <h4 class="text-md font-semibold text-gray-900 mb-4">Task Success/Failure Statistics</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                    {% for stat in stats.success_failure_stats %}
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="font-semibold text-gray-900 mb-2">{{ stat.task_type.replace('_', ' ').title() }}</div>
+                        <div class="space-y-1">
+                            <div>
+                                <span class="text-gray-600">Success Rate:</span>
+                                <span class="font-medium text-green-700 ml-1">{{ stat.success_rate }}%</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Successful:</span>
+                                <span class="font-medium text-green-700 ml-1">{{ stat.successful_count }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Failed:</span>
+                                <span class="font-medium text-red-700 ml-1">{{ stat.failed_count }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -129,6 +232,9 @@
          data-ratio-chart='{{ stats.dedup_compression_stats | tojson }}'
          data-file-type-count-chart='{{ stats.file_type_stats.count_chart | tojson }}'
          data-file-type-size-chart='{{ stats.file_type_stats.size_chart | tojson }}'
+         {% if stats.execution_time_chart %}data-execution-time-chart='{{ stats.execution_time_chart | tojson }}'{% endif %}
+         {% if stats.success_failure_chart %}data-success-failure-chart='{{ stats.success_failure_chart | tojson }}'{% endif %}
+         {% if stats.timeline_success_failure %}data-timeline-success-failure-chart='{{ stats.timeline_success_failure | tojson }}'{% endif %}
          style="display: none;">
     </div>
 
@@ -143,6 +249,12 @@
             const ratioData = JSON.parse(chartDataEl.getAttribute('data-ratio-chart'));
             const fileTypeCountData = JSON.parse(chartDataEl.getAttribute('data-file-type-count-chart'));
             const fileTypeSizeData = JSON.parse(chartDataEl.getAttribute('data-file-type-size-chart'));
+            const executionTimeData = chartDataEl.getAttribute('data-execution-time-chart') ? 
+                JSON.parse(chartDataEl.getAttribute('data-execution-time-chart')) : null;
+            const successFailureData = chartDataEl.getAttribute('data-success-failure-chart') ? 
+                JSON.parse(chartDataEl.getAttribute('data-success-failure-chart')) : null;
+            const timelineSuccessFailureData = chartDataEl.getAttribute('data-timeline-success-failure-chart') ? 
+                JSON.parse(chartDataEl.getAttribute('data-timeline-success-failure-chart')) : null;
 
             // Create Size Chart
             const sizeCtx = document.getElementById('sizeChart');
@@ -290,6 +402,167 @@
                             legend: {
                                 display: true,
                                 position: 'top'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Create Execution Time Chart
+            const executionTimeCtx = document.getElementById('executionTimeChart');
+            if (executionTimeCtx && executionTimeData) {
+                new Chart(executionTimeCtx, {
+                    type: 'bar',
+                    data: executionTimeData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Duration (minutes)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Task Type'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Job Execution Times by Task Type'
+                            },
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' minutes';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Create Success/Failure Chart
+            const successFailureCtx = document.getElementById('successFailureChart');
+            if (successFailureCtx && successFailureData) {
+                new Chart(successFailureCtx, {
+                    type: 'bar',
+                    data: successFailureData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Count'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                    display: true,
+                                    text: 'Success Rate (%)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Task Type'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Task Success & Failure Statistics'
+                            },
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        if (context.dataset.label === 'Success Rate (%)') {
+                                            return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '%';
+                                        }
+                                        return context.dataset.label + ': ' + context.parsed.y;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Create Timeline Success/Failure Chart
+            const timelineSuccessFailureCtx = document.getElementById('timelineSuccessFailureChart');
+            if (timelineSuccessFailureCtx && timelineSuccessFailureData) {
+                new Chart(timelineSuccessFailureCtx, {
+                    type: 'line',
+                    data: timelineSuccessFailureData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Number of Backups'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Backup Success/Failure Timeline'
+                            },
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.parsed.y + ' backups';
+                                    }
+                                }
                             }
                         }
                     }
