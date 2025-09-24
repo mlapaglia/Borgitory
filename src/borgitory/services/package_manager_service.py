@@ -64,7 +64,6 @@ class PackageManagerService:
         self._validate_package_name(package_name)
 
         try:
-            # Get package info using apt-cache show
             result = await self.command_runner.run_command(
                 ["apt-cache", "show", package_name], timeout=10
             )
@@ -72,10 +71,8 @@ class PackageManagerService:
             if result.return_code != 0:
                 return None
 
-            # Parse the output
             package_info = self._parse_package_info(result.stdout)
             if package_info:
-                # Check if installed
                 installed_result = await self.command_runner.run_command(
                     ["dpkg", "-l", package_name], timeout=5
                 )
@@ -92,7 +89,6 @@ class PackageManagerService:
         validated_packages = self._validate_package_names(packages)
 
         try:
-            # Update package cache first
             update_result = await self.command_runner.run_command(
                 ["apt-get", "update"], timeout=120
             )
@@ -278,7 +274,6 @@ class PackageManagerService:
             return
 
         try:
-            # Check if package already exists
             existing = (
                 self.db_session.query(UserInstalledPackage)
                 .filter(UserInstalledPackage.package_name == package_name)
@@ -286,7 +281,6 @@ class PackageManagerService:
             )
 
             if existing:
-                # Update existing record
                 existing.version = version
                 existing.installed_at = now_utc()
                 existing.install_command = install_command
@@ -294,7 +288,6 @@ class PackageManagerService:
                     json.dumps(dependencies) if dependencies else None
                 )
             else:
-                # Create new record
                 package_record = UserInstalledPackage()
                 package_record.package_name = package_name
                 package_record.version = version

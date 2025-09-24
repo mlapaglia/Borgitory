@@ -1,0 +1,32 @@
+<!-- Selected Packages Container -->
+<!-- Hidden form fields for state persistence -->
+{% for package in selected_packages | default([]) %}
+    <input type="hidden" name="selected_package_{{ loop.index0 }}" value="{{ package }}">
+{% endfor %}
+
+<!-- Visual package display -->
+{% if selected_packages | default([]) %}
+    <div class="flex flex-wrap gap-2">
+        {% for package in selected_packages %}
+            <div class="inline-flex items-center bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm">
+                <span class="mr-2">{{ package }}</span>
+                <button type="button" 
+                        class="ml-1 text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100"
+                        hx-post="/api/packages/remove-selection"
+                        hx-include="closest form"
+                        hx-vals='{"package_name": "{{ package }}"}'
+                        hx-target="#selected-packages-container"
+                        hx-swap="innerHTML">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-sm text-gray-500 dark:text-gray-400">
+        Use the search above to select packages for installation
+    </div>
+{% endif %}
+

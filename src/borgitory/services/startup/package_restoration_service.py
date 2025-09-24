@@ -32,7 +32,6 @@ class PackageRestorationService:
         except Exception as e:
             logger.error(f"Error during package restoration: {e}")
         finally:
-            # Close the database session if it exists
             if (
                 hasattr(self.package_manager, "db_session")
                 and self.package_manager.db_session

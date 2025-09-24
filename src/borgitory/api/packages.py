@@ -4,7 +4,7 @@ Provides functionality to search, install, and manage Debian packages.
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse
 from starlette.templating import _TemplateResponse
 
@@ -116,7 +116,7 @@ async def install_packages(
         packages = []
 
         for key, value in form_data.items():
-            if key.startswith("package_") and value:
+            if key.startswith("selected_package_") and value:
                 package_value = value if isinstance(value, str) else ""
                 if package_value:
                     packages.append(package_value)
@@ -131,11 +131,14 @@ async def install_packages(
         success, message = await package_service.install_packages(packages)
 
         if success:
-            return templates.TemplateResponse(
+            # Return success message with HX-Trigger to clear selections
+            response = templates.TemplateResponse(
                 request,
                 "partials/packages/install_success.html",
                 {"message": message, "packages": packages},
             )
+            response.headers["HX-Trigger"] = "clear-selections"
+            return response
         else:
             return templates.TemplateResponse(
                 request, "partials/packages/install_error.html", {"error": message}
@@ -230,3 +233,91 @@ async def get_package_info(
             {"error": f"Failed to get package info: {str(e)}"},
             status_code=500,
         )
+
+
+@router.post("/select", response_class=HTMLResponse)
+async def select_package(
+    request: Request,
+    templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
+    package_name: str = Form(...),
+) -> _TemplateResponse:
+    """Add a package to the selection state."""
+    try:
+        # Get current selections from form data if present
+        form_data = await request.form()
+        selected_packages = []
+
+        # Extract existing selections from hidden fields
+        for key, value in form_data.items():
+            if key.startswith("selected_package_"):
+                selected_packages.append(value)
+
+        # Add new package if not already selected
+        if package_name not in selected_packages:
+            selected_packages.append(package_name)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/packages/selected_packages.html",
+            {"selected_packages": selected_packages},
+        )
+
+    except Exception as e:
+        logger.error(f"Error selecting package: {e}")
+        return templates.TemplateResponse(
+            request,
+            "partials/packages/error.html",
+            {"error": f"Failed to select package: {str(e)}"},
+        )
+
+
+@router.post("/remove-selection", response_class=HTMLResponse)
+async def remove_package_selection(
+    request: Request,
+    templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
+    package_name: str = Form(...),
+) -> _TemplateResponse:
+    """Remove a package from the selection state."""
+    try:
+        # Get current selections from form data
+        form_data = await request.form()
+        selected_packages = []
+
+        # Extract existing selections from hidden fields
+        for key, value in form_data.items():
+            if key.startswith("selected_package_"):
+                selected_packages.append(value)
+
+        # Remove the specified package
+        if package_name in selected_packages:
+            selected_packages.remove(package_name)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/packages/selected_packages.html",
+            {"selected_packages": selected_packages},
+        )
+
+    except Exception as e:
+        logger.error(f"Error removing package selection: {e}")
+        return templates.TemplateResponse(
+            request,
+            "partials/packages/error.html",
+            {"error": f"Failed to remove package: {str(e)}"},
+        )
+
+
+@router.get("/clear-selections", response_class=HTMLResponse)
+async def clear_package_selections(
+    request: Request,
+    templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
+) -> _TemplateResponse:
+    """Clear all package selections."""
+    return templates.TemplateResponse(
+        request,
+        "partials/packages/selected_packages.html",
+        {"selected_packages": []},
+    )

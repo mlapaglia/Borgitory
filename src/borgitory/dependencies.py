@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy.orm import Session
-from borgitory.models.database import get_db
+from borgitory.models.database import SessionLocal, get_db
 from borgitory.utils.template_paths import get_template_directory
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
@@ -987,7 +987,6 @@ def get_package_restoration_service_for_startup() -> PackageRestorationService:
     This creates its own database session context for the restoration process.
     Uses the same pattern as other startup services.
     """
-    from borgitory.models.database import SessionLocal
 
     # The service will manage its own database session during restoration
     db = SessionLocal()
