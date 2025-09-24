@@ -30,7 +30,11 @@ from borgitory.api import (
     tabs,
     packages,
 )
-from borgitory.dependencies import get_recovery_service, get_scheduler_service_singleton
+from borgitory.dependencies import (
+    get_recovery_service,
+    get_scheduler_service_singleton,
+    get_package_restoration_service_for_startup,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,16 +59,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await init_db()
         logger.info("Database initialized")
 
-        # Restore user-installed packages
         try:
-            from borgitory.models.database import SessionLocal
-            from borgitory.services.startup.package_restoration_service import (
-                PackageRestorationService,
-            )
-
-            with SessionLocal() as db:
-                restoration_service = PackageRestorationService(db_session=db)
-                await restoration_service.restore_user_packages()
+            restoration_service = get_package_restoration_service_for_startup()
+            await restoration_service.restore_user_packages()
         except Exception as e:
             logger.error(f"Package restoration failed during startup: {e}")
 

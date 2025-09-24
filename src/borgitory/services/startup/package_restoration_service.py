@@ -4,9 +4,7 @@ This service runs on application startup to reinstall packages that were previou
 """
 
 import logging
-from sqlalchemy.orm import Session
 from borgitory.services.package_manager_service import PackageManagerService
-from borgitory.services.simple_command_runner import SimpleCommandRunner
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +12,8 @@ logger = logging.getLogger(__name__)
 class PackageRestorationService:
     """Service to restore user-installed packages on startup."""
 
-    def __init__(self, db_session: Session):
-        self.db_session = db_session
-        self.package_manager = PackageManagerService(
-            command_runner=SimpleCommandRunner(), db_session=db_session
-        )
+    def __init__(self, package_manager: PackageManagerService):
+        self.package_manager = package_manager
 
     async def restore_user_packages(self) -> None:
         """Restore all user-installed packages from database."""
@@ -36,3 +31,10 @@ class PackageRestorationService:
 
         except Exception as e:
             logger.error(f"Error during package restoration: {e}")
+        finally:
+            # Close the database session if it exists
+            if (
+                hasattr(self.package_manager, "db_session")
+                and self.package_manager.db_session
+            ):
+                self.package_manager.db_session.close()

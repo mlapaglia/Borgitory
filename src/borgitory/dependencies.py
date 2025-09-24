@@ -49,6 +49,9 @@ from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.services.package_manager_service import PackageManagerService
+from borgitory.services.startup.package_restoration_service import (
+    PackageRestorationService,
+)
 from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.repositories.repository_service import RepositoryService
@@ -963,3 +966,32 @@ def get_package_manager_service(db: Session = Depends(get_db)) -> PackageManager
 PackageManagerServiceDep = Annotated[
     PackageManagerService, Depends(get_package_manager_service)
 ]
+
+
+def get_package_restoration_service(
+    package_manager: PackageManagerServiceDep,
+) -> PackageRestorationService:
+    """Get PackageRestorationService instance with injected dependencies."""
+    return PackageRestorationService(package_manager=package_manager)
+
+
+PackageRestorationServiceDep = Annotated[
+    PackageRestorationService, Depends(get_package_restoration_service)
+]
+
+
+def get_package_restoration_service_for_startup() -> PackageRestorationService:
+    """
+    Create PackageRestorationService for application startup.
+
+    This creates its own database session context for the restoration process.
+    Uses the same pattern as other startup services.
+    """
+    from borgitory.models.database import SessionLocal
+
+    # The service will manage its own database session during restoration
+    db = SessionLocal()
+    package_manager = PackageManagerService(
+        command_runner=SimpleCommandRunner(), db_session=db
+    )
+    return PackageRestorationService(package_manager=package_manager)

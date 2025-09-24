@@ -3,9 +3,10 @@ Tests for PackageManagerService database integration and startup restoration
 """
 
 import pytest
-from unittest.mock import AsyncMock
+from typing import Any, Dict, List, Optional, Generator
+from unittest.mock import AsyncMock, Mock
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.services.startup.package_restoration_service import (
     PackageRestorationService,
@@ -18,15 +19,24 @@ from borgitory.utils.datetime_utils import now_utc
 class MockCommandRunner:
     """Mock command runner for testing"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._run_command_mock = AsyncMock()
 
-    async def run_command(self, command, timeout=None, **kwargs):
-        return await self._run_command_mock(command, timeout=timeout, **kwargs)
+    async def run_command(
+        self,
+        command: List[str],
+        env: Optional[Dict[str, str]] = None,
+        timeout: Optional[int] = None,
+        **kwargs: Any,
+    ) -> CommandResult:
+        result = await self._run_command_mock(
+            command, env=env, timeout=timeout, **kwargs
+        )
+        return result  # type: ignore[no-any-return]
 
 
 @pytest.fixture
-def in_memory_db():
+def in_memory_db() -> Any:
     """Create an in-memory SQLite database for testing"""
     engine = create_engine("sqlite:///:memory:", echo=False)
     Base.metadata.create_all(engine)
@@ -35,7 +45,7 @@ def in_memory_db():
 
 
 @pytest.fixture
-def db_session(in_memory_db):
+def db_session(in_memory_db: Any) -> Generator[Session, None, None]:
     """Create a database session for testing"""
     session = in_memory_db()
     try:
@@ -45,12 +55,14 @@ def db_session(in_memory_db):
 
 
 @pytest.fixture
-def mock_command_runner():
+def mock_command_runner() -> MockCommandRunner:
     return MockCommandRunner()
 
 
 @pytest.fixture
-def package_service_with_db(mock_command_runner, db_session):
+def package_service_with_db(
+    mock_command_runner: MockCommandRunner, db_session: Session
+) -> PackageManagerService:
     return PackageManagerService(
         command_runner=mock_command_runner, db_session=db_session
     )
@@ -59,8 +71,11 @@ def package_service_with_db(mock_command_runner, db_session):
 @pytest.mark.asyncio
 class TestPackageManagerDatabaseIntegration:
     async def test_install_package_saves_to_database(
-        self, package_service_with_db, mock_command_runner, db_session
-    ):
+        self,
+        package_service_with_db: PackageManagerService,
+        mock_command_runner: MockCommandRunner,
+        db_session: Session,
+    ) -> None:
         """Test that installing a package saves it to the database"""
         # Mock successful installation
         mock_command_runner._run_command_mock.side_effect = [
@@ -114,16 +129,18 @@ class TestPackageManagerDatabaseIntegration:
         assert package_record.installed_at is not None
 
     async def test_remove_package_removes_from_database(
-        self, package_service_with_db, mock_command_runner, db_session
-    ):
+        self,
+        package_service_with_db: PackageManagerService,
+        mock_command_runner: MockCommandRunner,
+        db_session: Session,
+    ) -> None:
         """Test that removing a package removes it from the database"""
         # First create a package record in database
-        package_record = UserInstalledPackage(
-            package_name="curl",
-            version="7.81.0-1ubuntu1.15",
-            installed_at=now_utc(),
-            install_command="apt-get install curl",
-        )
+        package_record = UserInstalledPackage()
+        package_record.package_name = "curl"
+        package_record.version = "7.81.0-1ubuntu1.15"
+        package_record.installed_at = now_utc()
+        package_record.install_command = "apt-get install curl"
         db_session.add(package_record)
         db_session.commit()
 
@@ -152,24 +169,23 @@ class TestPackageManagerDatabaseIntegration:
         assert remaining_record is None
 
     async def test_get_user_installed_packages(
-        self, package_service_with_db, db_session
-    ):
+        self, package_service_with_db: PackageManagerService, db_session: Session
+    ) -> None:
         """Test getting user-installed packages from database"""
         # Create test package records
-        packages = [
-            UserInstalledPackage(
-                package_name="curl",
-                version="7.81.0-1ubuntu1.15",
-                installed_at=now_utc(),
-                install_command="apt-get install curl",
-            ),
-            UserInstalledPackage(
-                package_name="jq",
-                version="1.6-2.1ubuntu3",
-                installed_at=now_utc(),
-                install_command="apt-get install jq",
-            ),
-        ]
+        package1 = UserInstalledPackage()
+        package1.package_name = "curl"
+        package1.version = "7.81.0-1ubuntu1.15"
+        package1.installed_at = now_utc()
+        package1.install_command = "apt-get install curl"
+
+        package2 = UserInstalledPackage()
+        package2.package_name = "jq"
+        package2.version = "1.6-2.1ubuntu3"
+        package2.installed_at = now_utc()
+        package2.install_command = "apt-get install jq"
+
+        packages = [package1, package2]
 
         for pkg in packages:
             db_session.add(pkg)
@@ -184,16 +200,18 @@ class TestPackageManagerDatabaseIntegration:
         assert "jq" in package_names
 
     async def test_ensure_user_packages_installed_no_missing(
-        self, package_service_with_db, mock_command_runner, db_session
-    ):
+        self,
+        package_service_with_db: PackageManagerService,
+        mock_command_runner: MockCommandRunner,
+        db_session: Session,
+    ) -> None:
         """Test ensure_user_packages_installed when all packages are already installed"""
         # Create package record in database
-        package_record = UserInstalledPackage(
-            package_name="curl",
-            version="7.81.0-1ubuntu1.15",
-            installed_at=now_utc(),
-            install_command="apt-get install curl",
-        )
+        package_record = UserInstalledPackage()
+        package_record.package_name = "curl"
+        package_record.version = "7.81.0-1ubuntu1.15"
+        package_record.installed_at = now_utc()
+        package_record.install_command = "apt-get install curl"
         db_session.add(package_record)
         db_session.commit()
 
@@ -227,16 +245,18 @@ class TestPackageManagerDatabaseIntegration:
         assert mock_command_runner._run_command_mock.call_count == 2
 
     async def test_ensure_user_packages_installed_with_missing(
-        self, package_service_with_db, mock_command_runner, db_session
-    ):
+        self,
+        package_service_with_db: PackageManagerService,
+        mock_command_runner: MockCommandRunner,
+        db_session: Session,
+    ) -> None:
         """Test ensure_user_packages_installed when packages need to be reinstalled"""
         # Create package record in database
-        package_record = UserInstalledPackage(
-            package_name="curl",
-            version="7.81.0-1ubuntu1.15",
-            installed_at=now_utc(),
-            install_command="apt-get install curl",
-        )
+        package_record = UserInstalledPackage()
+        package_record.package_name = "curl"
+        package_record.version = "7.81.0-1ubuntu1.15"
+        package_record.installed_at = now_utc()
+        package_record.install_command = "apt-get install curl"
         db_session.add(package_record)
         db_session.commit()
 
@@ -299,48 +319,57 @@ class TestPackageManagerDatabaseIntegration:
 
 @pytest.mark.asyncio
 class TestPackageRestorationService:
-    async def test_restore_user_packages_success(self, in_memory_db):
+    async def test_restore_user_packages_success(self, in_memory_db: Any) -> None:
         """Test successful package restoration on startup"""
         db_session = in_memory_db()
 
         # Create package record in database
-        package_record = UserInstalledPackage(
-            package_name="curl",
-            version="7.81.0-1ubuntu1.15",
-            installed_at=now_utc(),
-            install_command="apt-get install curl",
-        )
+        package_record = UserInstalledPackage()
+        package_record.package_name = "curl"
+        package_record.version = "7.81.0-1ubuntu1.15"
+        package_record.installed_at = now_utc()
+        package_record.install_command = "apt-get install curl"
         db_session.add(package_record)
         db_session.commit()
 
-        # Create restoration service with mocked package manager
-        restoration_service = PackageRestorationService(db_session=db_session)
-        restoration_service.package_manager.ensure_user_packages_installed = AsyncMock(
+        # Create mock package manager
+        mock_package_manager = Mock(spec=PackageManagerService)
+        mock_package_manager.ensure_user_packages_installed = AsyncMock(
             return_value=(True, "Restored 1 packages: curl")
+        )
+
+        # Create restoration service with injected package manager
+        restoration_service = PackageRestorationService(
+            package_manager=mock_package_manager
         )
 
         # Test restoration
         await restoration_service.restore_user_packages()
 
         # Verify the method was called
-        restoration_service.package_manager.ensure_user_packages_installed.assert_called_once()
+        mock_package_manager.ensure_user_packages_installed.assert_called_once()
 
         db_session.close()
 
-    async def test_restore_user_packages_failure(self, in_memory_db):
+    async def test_restore_user_packages_failure(self, in_memory_db: Any) -> None:
         """Test package restoration failure handling"""
         db_session = in_memory_db()
 
-        # Create restoration service with mocked package manager that fails
-        restoration_service = PackageRestorationService(db_session=db_session)
-        restoration_service.package_manager.ensure_user_packages_installed = AsyncMock(
+        # Create mock package manager that fails
+        mock_package_manager = Mock(spec=PackageManagerService)
+        mock_package_manager.ensure_user_packages_installed = AsyncMock(
             return_value=(False, "Installation failed: Package not found")
+        )
+
+        # Create restoration service with injected package manager
+        restoration_service = PackageRestorationService(
+            package_manager=mock_package_manager
         )
 
         # Test restoration (should not raise exception)
         await restoration_service.restore_user_packages()
 
         # Verify the method was called
-        restoration_service.package_manager.ensure_user_packages_installed.assert_called_once()
+        mock_package_manager.ensure_user_packages_installed.assert_called_once()
 
         db_session.close()

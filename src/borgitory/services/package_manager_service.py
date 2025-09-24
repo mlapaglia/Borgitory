@@ -100,7 +100,6 @@ class PackageManagerService:
             if update_result.return_code != 0:
                 return False, f"Failed to update package cache: {update_result.stderr}"
 
-            # Install packages
             install_result = await self.command_runner.run_command(
                 ["apt-get", "install", "-y", "--no-install-recommends"]
                 + validated_packages,
@@ -108,13 +107,10 @@ class PackageManagerService:
             )
 
             if install_result.return_code == 0:
-                # Clear cache to refresh installed status
                 self._cache_updated = False
 
-                # Track installed packages in database
                 install_command = f"apt-get install {' '.join(validated_packages)}"
                 for package_name in validated_packages:
-                    # Get the actual installed version
                     package_info = await self.get_package_info(package_name)
                     if package_info and package_info.installed:
                         self._save_installed_package(
@@ -142,10 +138,8 @@ class PackageManagerService:
             )
 
             if result.return_code == 0:
-                # Clear cache to refresh installed status
                 self._cache_updated = False
 
-                # Remove packages from database tracking
                 for package_name in validated_packages:
                     self._remove_installed_package(package_name)
 
@@ -197,16 +191,13 @@ class PackageManagerService:
             return
 
         try:
-            # Update apt cache first to get latest package information
             update_result = await self.command_runner.run_command(
                 ["apt-get", "update"], timeout=60
             )
 
             if update_result.return_code != 0:
                 logger.warning(f"apt update failed: {update_result.stderr}")
-                # Continue anyway - might still have some cached data
 
-            # Get available packages using apt-cache search
             result = await self.command_runner.run_command(
                 ["apt-cache", "search", "."], timeout=30
             )
@@ -242,11 +233,9 @@ class PackageManagerService:
 
     def _validate_package_name(self, package_name: str) -> None:
         """Validate a single package name."""
-        # Allow alphanumeric, hyphens, dots, plus signs (standard Debian package naming)
         if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9+\-\.]+$", package_name):
             raise ValueError(f"Invalid package name: {package_name}")
 
-        # Prevent overly long names
         if len(package_name) > 100:
             raise ValueError(f"Package name too long: {package_name}")
 
@@ -379,7 +368,6 @@ class PackageManagerService:
 
         missing_packages = []
 
-        # Check which packages are actually missing
         for package_record in user_packages:
             package_info = await self.get_package_info(package_record.package_name)
             if not package_info or not package_info.installed:
@@ -393,7 +381,6 @@ class PackageManagerService:
             f"Reinstalling {len(missing_packages)} missing packages: {', '.join(missing_packages)}"
         )
 
-        # Reinstall missing packages
         success, message = await self.install_packages(missing_packages)
 
         if success:

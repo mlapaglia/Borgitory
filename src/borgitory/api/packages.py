@@ -25,13 +25,11 @@ async def search_packages_autocomplete(
 ) -> _TemplateResponse:
     """Search packages for autocomplete functionality."""
 
-    # Get the search query from form data or query params
     form_data = (
         await request.form() if request.method == "POST" else request.query_params
     )
 
     query = ""
-    # Try to get the input value from various possible parameter names
     for param_name in form_data.keys():
         if param_name in ["package_search", "package_name", "search"]:
             value = form_data[param_name]
@@ -39,7 +37,6 @@ async def search_packages_autocomplete(
             break
 
     if not query or len(query) < 2:
-        # Get the target input ID from headers
         target_input = request.headers.get("hx-target-input", "package-search")
         return templates.TemplateResponse(
             request,
@@ -53,7 +50,6 @@ async def search_packages_autocomplete(
     try:
         packages = await package_service.search_packages(query, limit=20)
 
-        # Get the target input ID from headers
         target_input = request.headers.get("hx-target-input", "package-search")
 
         return templates.TemplateResponse(
@@ -64,7 +60,7 @@ async def search_packages_autocomplete(
 
     except Exception as e:
         logger.error(f"Error searching packages: {e}")
-        # Get the target input ID from headers
+
         target_input = request.headers.get("hx-target-input", "package-search")
         return templates.TemplateResponse(
             request,
@@ -83,14 +79,11 @@ async def list_installed_packages(
     """List all installed packages."""
 
     try:
-        # Get all installed packages
         packages = await package_service.list_installed_packages()
 
-        # Get user-installed packages from database
         user_packages = package_service.get_user_installed_packages()
         user_package_names = {pkg.package_name for pkg in user_packages}
 
-        # Add user_installed flag to packages
         for package in packages:
             package.user_installed = package.name in user_package_names
 
@@ -122,7 +115,6 @@ async def install_packages(
         form_data = await request.form()
         packages = []
 
-        # Get packages from form data
         for key, value in form_data.items():
             if key.startswith("package_") and value:
                 package_value = value if isinstance(value, str) else ""
@@ -171,7 +163,6 @@ async def remove_packages(
         form_data = await request.form()
         packages = []
 
-        # Get packages from form data
         for key, value in form_data.items():
             if key.startswith("remove_package_") and value:
                 package_value = value if isinstance(value, str) else ""
