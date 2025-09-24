@@ -358,6 +358,25 @@ class RepositoryCheckConfig(Base):
     )
 
 
+class UserInstalledPackage(Base):
+    """Model for tracking user-installed packages for persistence across container restarts."""
+
+    __tablename__ = "user_installed_packages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    package_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    version: Mapped[str] = mapped_column(String, nullable=False)
+    installed_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
+
+    # Metadata about the installation
+    install_command: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # The exact command used
+    dependencies_installed: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # JSON list of deps that were also installed
+
+
 async def init_db() -> None:
     """Initialize database - assumes migrations have already been run"""
 

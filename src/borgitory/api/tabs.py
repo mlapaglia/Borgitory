@@ -194,6 +194,18 @@ async def get_repository_check_tab(
     )
 
 
+@router.get("/packages", response_class=HTMLResponse)
+async def get_packages_tab(
+    request: Request, current_user: User = Depends(get_current_user)
+) -> HTMLResponse:
+    return _render_tab_with_nav(
+        request,
+        "partials/packages/tab.html",
+        "packages",
+        {"current_user": current_user},
+    )
+
+
 @router.get("/debug", response_class=HTMLResponse)
 async def get_debug_tab(
     request: Request, current_user: User = Depends(get_current_user)

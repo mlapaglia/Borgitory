@@ -28,8 +28,13 @@ from borgitory.api import (
     repository_check_configs,
     shared,
     tabs,
+    packages,
 )
-from borgitory.dependencies import get_recovery_service, get_scheduler_service_singleton
+from borgitory.dependencies import (
+    get_recovery_service,
+    get_scheduler_service_singleton,
+    get_package_restoration_service_for_startup,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,6 +58,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         await init_db()
         logger.info("Database initialized")
+
+        try:
+            restoration_service = get_package_restoration_service_for_startup()
+            await restoration_service.restore_user_packages()
+        except Exception as e:
+            logger.error(f"Package restoration failed during startup: {e}")
 
         recovery_service = get_recovery_service()
         await recovery_service.recover_stale_jobs()
@@ -189,6 +200,12 @@ app.include_router(
     tags=["tabs"],
 )
 
+app.include_router(
+    packages.router,
+    prefix="/api/packages",
+    tags=["packages"],
+)
+
 app.include_router(debug.router)
 
 
@@ -202,6 +219,7 @@ VALID_TABS = {
     "statistics": "/api/tabs/statistics",
     "jobs": "/api/tabs/jobs",
     "notifications": "/api/tabs/notifications",
+    "packages": "/api/tabs/packages",
     "prune": "/api/tabs/prune",
     "repository-check": "/api/tabs/repository-check",
     "debug": "/api/tabs/debug",

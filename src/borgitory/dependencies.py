@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy.orm import Session
-from borgitory.models.database import get_db
+from borgitory.models.database import SessionLocal, get_db
 from borgitory.utils.template_paths import get_template_directory
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
@@ -48,6 +48,10 @@ from borgitory.services.repositories.repository_stats_service import (
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.services.volumes.volume_service import VolumeService
+from borgitory.services.package_manager_service import PackageManagerService
+from borgitory.services.startup.package_restoration_service import (
+    PackageRestorationService,
+)
 from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.repositories.repository_service import RepositoryService
@@ -952,3 +956,41 @@ def get_archive_mount_manager() -> "ArchiveMountManager":
 ArchiveMountManagerDep = Annotated[
     "ArchiveMountManager", Depends(get_archive_mount_manager)
 ]
+
+
+def get_package_manager_service(db: Session = Depends(get_db)) -> PackageManagerService:
+    """Get PackageManagerService instance with database session."""
+    return PackageManagerService(command_runner=SimpleCommandRunner(), db_session=db)
+
+
+PackageManagerServiceDep = Annotated[
+    PackageManagerService, Depends(get_package_manager_service)
+]
+
+
+def get_package_restoration_service(
+    package_manager: PackageManagerServiceDep,
+) -> PackageRestorationService:
+    """Get PackageRestorationService instance with injected dependencies."""
+    return PackageRestorationService(package_manager=package_manager)
+
+
+PackageRestorationServiceDep = Annotated[
+    PackageRestorationService, Depends(get_package_restoration_service)
+]
+
+
+def get_package_restoration_service_for_startup() -> PackageRestorationService:
+    """
+    Create PackageRestorationService for application startup.
+
+    This creates its own database session context for the restoration process.
+    Uses the same pattern as other startup services.
+    """
+
+    # The service will manage its own database session during restoration
+    db = SessionLocal()
+    package_manager = PackageManagerService(
+        command_runner=SimpleCommandRunner(), db_session=db
+    )
+    return PackageRestorationService(package_manager=package_manager)

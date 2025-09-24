@@ -1,0 +1,30 @@
+<!-- HTMX Package Autocomplete Component -->
+<!-- Usage: Include this template with input_id, input_name, and optional input_value, placeholder -->
+<div class="relative" 
+     data-package-autocomplete
+     hx-on:htmx:after-request="if (event.detail.target.id === '{{ input_id }}-dropdown') { event.detail.target.style.display = 'block'; }">
+    <!-- Input field with package icon -->
+    <div class="flex items-center border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus-within:ring-blue-500 focus-within:border-blue-500 dark:bg-gray-700">
+        <span class="px-3 py-2 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-600 border-r border-gray-300 dark:border-gray-600 rounded-l-md select-none">📦</span>
+        <input type="text" 
+               id="{{ input_id }}"
+               name="{{ input_name }}"
+               value="{{ input_value | default('') }}"
+               placeholder="{{ placeholder | default('Search packages...') }}"
+               class="flex-1 px-3 py-2 border-0 rounded-r-md focus:outline-none focus:ring-0 dark:bg-gray-700 dark:text-white input-modern"
+               hx-get="/api/packages/search/autocomplete"
+               hx-trigger="input changed delay:300ms, focus delay:100ms"
+               hx-target="#{{ input_id }}-dropdown"
+               hx-include="this"
+               hx-headers='{"hx-target-input": "{{ input_id }}"}'
+               autocomplete="off"
+               {% if required %}required{% endif %} />
+    </div>
+    
+    <!-- Dropdown container -->
+    <div id="{{ input_id }}-dropdown" 
+         class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto"
+         style="display: none;">
+        <!-- Dropdown content will be loaded here -->
+    </div>
+</div>

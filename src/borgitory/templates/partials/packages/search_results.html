@@ -1,0 +1,45 @@
+<!-- Package Search Results -->
+{% if packages %}
+<div class="max-h-60 overflow-y-auto">
+    {% for package in packages %}
+    <div class="p-3 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0"
+         hx-post="/api/packages/select"
+         hx-include="closest form"
+         hx-vals='{"package_name": "{{ package.name }}"}'
+         hx-target="#selected-packages-container"
+         hx-swap="innerHTML"
+         onclick="this.closest('[id$=\'-dropdown\']').style.display='none'; document.getElementById('{{ input_id if input_id else 'package-search' }}').value=''">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <div class="font-medium text-gray-900 dark:text-gray-100">
+                    {{ package.name }}
+                    {% if package.version %}
+                    <span class="text-sm text-gray-500 dark:text-gray-400">({{ package.version }})</span>
+                    {% endif %}
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 truncate">
+                    {{ package.description[:100] }}{% if package.description|length > 100 %}...{% endif %}
+                </div>
+                {% if package.section %}
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Section: {{ package.section }}
+                </div>
+                {% endif %}
+            </div>
+            {% if package.installed %}
+            <div class="ml-2">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    Installed
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="p-3 text-center text-gray-500 dark:text-gray-400">
+    No packages found for "{{ query }}"
+</div>
+{% endif %}
