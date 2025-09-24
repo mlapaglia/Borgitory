@@ -48,6 +48,7 @@ from borgitory.services.repositories.repository_stats_service import (
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.services.volumes.volume_service import VolumeService
+from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.repositories.repository_service import RepositoryService
@@ -951,4 +952,14 @@ def get_archive_mount_manager() -> "ArchiveMountManager":
 
 ArchiveMountManagerDep = Annotated[
     "ArchiveMountManager", Depends(get_archive_mount_manager)
+]
+
+
+def get_package_manager_service(db: Session = Depends(get_db)) -> PackageManagerService:
+    """Get PackageManagerService instance with database session."""
+    return PackageManagerService(command_runner=SimpleCommandRunner(), db_session=db)
+
+
+PackageManagerServiceDep = Annotated[
+    PackageManagerService, Depends(get_package_manager_service)
 ]

@@ -1,0 +1,145 @@
+<!-- Package Manager -->
+<div class="space-y-6">
+    <!-- Status Messages -->
+    <div id="package-status"></div>
+    
+    <!-- Package Search and Install -->
+    <div class="border dark:border-gray-600 rounded-lg p-4">
+        <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Install Packages</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Search and install Debian packages needed for your pre/post hooks (e.g., curl, sqlite3, postgresql-client).
+        </p>
+        
+        <form hx-post="/api/packages/install" 
+              hx-target="#package-status"
+              hx-swap="innerHTML">
+            
+            <div class="space-y-4">
+                <!-- Package Search -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                        Search Packages
+                    </label>
+                    {% set input_id = "package-search" %}
+                    {% set input_name = "package_search" %}
+                    {% set input_value = "" %}
+                    {% set placeholder = "Type package name (e.g., curl, sqlite3, jq)" %}
+                    {% set required = false %}
+                    {% include "partials/shared/package_autocomplete.html" %}
+                </div>
+                
+                <!-- Selected Packages -->
+                <div id="selected-packages" class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Selected Packages
+                    </label>
+                    <div id="package-list" class="min-h-[2rem] p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800">
+                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                            Use the search above to select packages for installation
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Install Button -->
+                <div class="flex justify-end">
+                    <button type="submit" 
+                            id="install-btn"
+                            disabled
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
+                        Install Selected Packages
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Installed Packages -->
+    <div class="border dark:border-gray-600 rounded-lg p-4">
+        <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Installed Packages</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Manage packages currently installed in the container.
+        </p>
+        
+        <div id="installed-packages-container">
+            <div hx-get="/api/packages/installed" 
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-20 rounded"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Package selection management
+let selectedPackages = new Set();
+
+function selectPackage(packageName, inputId) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(inputId + '-dropdown');
+    
+    // Add package to selection
+    if (!selectedPackages.has(packageName)) {
+        selectedPackages.add(packageName);
+        updatePackageList();
+    }
+    
+    // Clear input
+    if (input) {
+        input.value = '';
+    }
+    
+    // Hide dropdown
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
+}
+
+function removePackage(packageName) {
+    selectedPackages.delete(packageName);
+    updatePackageList();
+}
+
+function updatePackageList() {
+    const packageList = document.getElementById('package-list');
+    const installBtn = document.getElementById('install-btn');
+    
+    if (selectedPackages.size === 0) {
+        packageList.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400">Use the search above to select packages for installation</div>';
+        installBtn.disabled = true;
+    } else {
+        const packageTags = Array.from(selectedPackages).map((pkg, index) => `
+            <div class="inline-flex items-center bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm mr-2 mb-2">
+                <input type="hidden" name="package_${index}" value="${pkg}">
+                <span class="mr-2">${pkg}</span>
+                <button type="button" onclick="removePackage('${pkg}')" class="ml-1 text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+        
+        packageList.innerHTML = packageTags;
+        installBtn.disabled = false;
+    }
+}
+
+// Hide dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const dropdowns = document.querySelectorAll('[id$="-dropdown"]');
+    dropdowns.forEach(dropdown => {
+        if (!dropdown.contains(event.target) && !dropdown.previousElementSibling.contains(event.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+});
+
+// Clear selections after successful install
+document.addEventListener('htmx:afterRequest', function(event) {
+    if (event.detail.xhr.status === 200 && event.detail.elt.matches('form[hx-post*="/api/packages/install"]')) {
+        selectedPackages.clear();
+        updatePackageList();
+    }
+});
+</script>

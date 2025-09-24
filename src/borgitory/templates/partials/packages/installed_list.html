@@ -1,0 +1,122 @@
+<!-- Installed Packages List -->
+{% if packages %}
+<div class="space-y-4">
+    {% set user_installed_count = packages | selectattr('user_installed', 'equalto', true) | list | length %}
+    {% set system_count = packages | length - user_installed_count %}
+    
+    <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+        {{ packages|length }} package(s) installed 
+        ({{ user_installed_count }} user-installed, {{ system_count }} system)
+    </div>
+    
+    <!-- User-Installed Packages Section -->
+    {% set user_packages_list = packages | selectattr('user_installed', 'equalto', true) | list %}
+    {% if user_packages_list %}
+    <div class="border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
+        <h4 class="font-medium text-blue-900 dark:text-blue-100 mb-3">
+            📦 User-Installed Packages ({{ user_packages_list | length }})
+        </h4>
+        <p class="text-xs text-blue-700 dark:text-blue-300 mb-3">
+            These packages will be automatically restored if the container is restarted.
+        </p>
+        
+        <form hx-post="/api/packages/remove" 
+              hx-target="#package-status"
+              hx-swap="innerHTML">
+            
+            <div class="space-y-1 max-h-64 overflow-y-auto">
+                {% for package in user_packages_list %}
+                <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <div class="flex items-center flex-1">
+                        <input type="checkbox" 
+                               name="remove_package_{{ loop.index0 }}" 
+                               value="{{ package.name }}"
+                               id="remove_{{ package.name }}"
+                               class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded">
+                        
+                        <div class="flex-1">
+                            <label for="remove_{{ package.name }}" class="cursor-pointer">
+                                <div class="font-medium text-gray-900 dark:text-gray-100">
+                                    {{ package.name }}
+                                    {% if package.version %}
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">({{ package.version }})</span>
+                                    {% endif %}
+                                </div>
+                                {% if package.description %}
+                                <div class="text-sm text-gray-600 dark:text-gray-300 truncate">
+                                    {{ package.description[:80] }}{% if package.description|length > 80 %}...{% endif %}
+                                </div>
+                                {% endif %}
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="ml-3">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            User-Installed
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="mt-3 flex justify-end">
+                <button type="submit" 
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
+                    Remove Selected
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+    
+    <!-- System Packages Section -->
+    {% set system_packages_list = packages | rejectattr('user_installed', 'equalto', true) | list %}
+    {% if system_packages_list %}
+    <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+        <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-3">
+            🔧 System Packages ({{ system_packages_list | length }})
+        </h4>
+        <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
+            These packages came with the system and cannot be removed through this interface.
+        </p>
+        
+        <div class="space-y-1 max-h-64 overflow-y-auto">
+            {% for package in system_packages_list %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div class="flex items-center flex-1">
+                    <div class="mr-3 w-4 h-4"></div> <!-- Spacer where checkbox would be -->
+                    
+                    <div class="flex-1">
+                        <div class="font-medium text-gray-900 dark:text-gray-100">
+                            {{ package.name }}
+                            {% if package.version %}
+                            <span class="text-sm text-gray-500 dark:text-gray-400">({{ package.version }})</span>
+                            {% endif %}
+                        </div>
+                        {% if package.description %}
+                        <div class="text-sm text-gray-600 dark:text-gray-300 truncate">
+                            {{ package.description[:80] }}{% if package.description|length > 80 %}...{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="ml-3">
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                        System
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="text-center py-8 text-gray-500 dark:text-gray-400">
+    <div class="mb-2">📦</div>
+    <div>No packages installed</div>
+    <div class="text-sm mt-1">Use the search above to install packages</div>
+</div>
+{% endif %}

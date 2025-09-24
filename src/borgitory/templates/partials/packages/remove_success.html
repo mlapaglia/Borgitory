@@ -1,0 +1,21 @@
+<!-- Remove Success Message -->
+<div class="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md" 
+     hx-swap-oob="true" id="package-status">
+    <div class="flex items-center">
+        <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <div class="text-green-800 dark:text-green-200">
+            <strong>Success!</strong> {{ message }}
+        </div>
+    </div>
+</div>
+
+<!-- Refresh installed packages list -->
+<div hx-swap-oob="true" id="installed-packages-container">
+    <div hx-get="/api/packages/installed" 
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-20 rounded"></div>
+    </div>
+</div>
