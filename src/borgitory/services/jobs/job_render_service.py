@@ -534,28 +534,36 @@ class JobRenderService:
         try:
             # Send initial HTML
             initial_html = self.render_current_jobs_html()
-            yield f"data: {initial_html}\n\n"
+            for line in initial_html.splitlines():
+                yield f"data: {line}\n"
+            yield "data: \n\n"
 
             # Subscribe to job events for real-time updates
             async for event in self.job_manager.stream_all_job_updates():
                 try:
                     # Re-render current jobs HTML when events occur
                     updated_html = self.render_current_jobs_html()
-                    yield f"data: {updated_html}\n\n"
+                    for line in updated_html.splitlines():
+                        yield f"data: {line}\n"
+                    yield "data: \n\n"
                 except Exception as e:
                     logger.error(f"Error generating HTML update: {e}")
                     # Send error state
                     error_html = self.templates.get_template(
                         "partials/jobs/error_state.html"
                     ).render(message="Error updating job status", padding="4")
-                    yield f"data: {error_html}\n\n"
+                    for line in error_html.splitlines():
+                        yield f"data: {line}\n"
+                    yield "data: \n\n"
 
         except Exception as e:
             logger.error(f"Error in HTML job stream: {e}")
             error_html = self.templates.get_template(
                 "partials/jobs/error_state.html"
             ).render(message=f"Error streaming jobs: {str(e)}", padding="4")
-            yield f"data: {error_html}\n\n"
+            for line in error_html.splitlines():
+                yield f"data: {line}\n"
+            yield "data: \n\n"
 
     def get_job_for_template(
         self, job_id: str, db: Session, expand_details: bool = False
