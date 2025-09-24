@@ -80,7 +80,7 @@ class FileTypeChartData(TypedDict):
 
 class ExecutionTimeStats(TypedDict):
     """Job execution time statistics structure"""
-    
+
     task_type: str
     average_duration_minutes: float
     total_executions: int
@@ -90,14 +90,14 @@ class ExecutionTimeStats(TypedDict):
 
 class ExecutionTimeChartData(TypedDict):
     """Chart data for execution times"""
-    
+
     labels: List[str]
     datasets: List[ChartDataset]
 
 
 class SuccessFailureStats(TypedDict):
     """Success/failure statistics structure"""
-    
+
     task_type: str
     successful_count: int
     failed_count: int
@@ -106,14 +106,14 @@ class SuccessFailureStats(TypedDict):
 
 class SuccessFailureChartData(TypedDict):
     """Chart data for success/failure rates"""
-    
+
     labels: List[str]
     datasets: List[ChartDataset]
 
 
 class TimelineSuccessFailureData(TypedDict):
     """Timeline data for success/failure over time"""
-    
+
     labels: List[str]
     datasets: List[ChartDataset]
 
@@ -354,18 +354,26 @@ class RepositoryStatsService:
 
             if progress_callback:
                 progress_callback("Calculating job execution time statistics...", 80)
-            
+
             # Get execution time statistics
             execution_time_stats = await self._get_execution_time_stats(repository, db)
-            execution_time_chart = self._build_execution_time_chart(execution_time_stats)
+            execution_time_chart = self._build_execution_time_chart(
+                execution_time_stats
+            )
 
             if progress_callback:
                 progress_callback("Calculating success/failure statistics...", 85)
-            
+
             # Get success/failure statistics
-            success_failure_stats = await self._get_success_failure_stats(repository, db)
-            success_failure_chart = self._build_success_failure_chart(success_failure_stats)
-            timeline_success_failure = await self._get_timeline_success_failure_data(repository, db)
+            success_failure_stats = await self._get_success_failure_stats(
+                repository, db
+            )
+            success_failure_chart = self._build_success_failure_chart(
+                success_failure_stats
+            )
+            timeline_success_failure = await self._get_timeline_success_failure_data(
+                repository, db
+            )
 
             if progress_callback:
                 progress_callback("Finalizing statistics and building charts...", 90)
@@ -824,51 +832,51 @@ class RepositoryStatsService:
         from borgitory.models.database import Job, JobTask
         from sqlalchemy import and_
         from collections import defaultdict
-        
+
         try:
             # Query completed jobs and tasks for this repository
             completed_tasks = (
-                db.query(
-                    JobTask.task_type,
-                    JobTask.started_at,
-                    JobTask.completed_at
-                )
+                db.query(JobTask.task_type, JobTask.started_at, JobTask.completed_at)
                 .join(Job, Job.id == JobTask.job_id)
                 .filter(
                     and_(
                         Job.repository_id == repository.id,
                         JobTask.status == "completed",
                         JobTask.started_at.isnot(None),
-                        JobTask.completed_at.isnot(None)
+                        JobTask.completed_at.isnot(None),
                     )
                 )
                 .all()
             )
-            
+
             # Group by task type and calculate durations in Python
             task_durations = defaultdict(list)
             for task in completed_tasks:
                 if task.started_at and task.completed_at:
                     # Calculate duration in minutes
-                    duration = (task.completed_at - task.started_at).total_seconds() / 60.0
+                    duration = (
+                        task.completed_at - task.started_at
+                    ).total_seconds() / 60.0
                     # Only include positive durations (completed_at > started_at)
                     if duration > 0:
                         task_durations[task.task_type].append(duration)
-            
+
             execution_stats: List[ExecutionTimeStats] = []
             for task_type, durations in task_durations.items():
                 if durations:  # Only include task types with valid durations
                     stat_entry: ExecutionTimeStats = {
                         "task_type": task_type,
-                        "average_duration_minutes": round(sum(durations) / len(durations), 2),
+                        "average_duration_minutes": round(
+                            sum(durations) / len(durations), 2
+                        ),
                         "total_executions": len(durations),
                         "min_duration_minutes": round(min(durations), 2),
                         "max_duration_minutes": round(max(durations), 2),
                     }
                     execution_stats.append(stat_entry)
-            
+
             return execution_stats
-            
+
         except Exception as e:
             logger.error(f"Error calculating execution time stats: {str(e)}")
             return []
@@ -879,68 +887,69 @@ class RepositoryStatsService:
         """Build execution time chart data"""
         if not execution_stats:
             return {"labels": [], "datasets": []}
-            
+
         # Sort by average duration for better visualization
         sorted_stats = sorted(
-            execution_stats, 
-            key=lambda x: x["average_duration_minutes"], 
-            reverse=True
+            execution_stats, key=lambda x: x["average_duration_minutes"], reverse=True
         )
-        
+
         # Color palette for different task types
         colors = [
-            "rgb(59, 130, 246)",   # Blue - backup
-            "rgb(16, 185, 129)",   # Green - cloud_sync
+            "rgb(59, 130, 246)",  # Blue - backup
+            "rgb(16, 185, 129)",  # Green - cloud_sync
             "rgb(245, 101, 101)",  # Red - prune
-            "rgb(139, 92, 246)",   # Purple - check
-            "rgb(245, 158, 11)",   # Yellow - notification
-            "rgb(236, 72, 153)",   # Pink - hook
-            "rgb(14, 165, 233)",   # Light Blue
-            "rgb(34, 197, 94)",    # Light Green
-            "rgb(168, 85, 247)",   # Violet
-            "rgb(251, 146, 60)",   # Orange
+            "rgb(139, 92, 246)",  # Purple - check
+            "rgb(245, 158, 11)",  # Yellow - notification
+            "rgb(236, 72, 153)",  # Pink - hook
+            "rgb(14, 165, 233)",  # Light Blue
+            "rgb(34, 197, 94)",  # Light Green
+            "rgb(168, 85, 247)",  # Violet
+            "rgb(251, 146, 60)",  # Orange
         ]
-        
+
         labels = [stat["task_type"].replace("_", " ").title() for stat in sorted_stats]
         avg_data = [stat["average_duration_minutes"] for stat in sorted_stats]
         min_data = [stat["min_duration_minutes"] for stat in sorted_stats]
         max_data = [stat["max_duration_minutes"] for stat in sorted_stats]
-        
+
         datasets: List[ChartDataset] = [
             {
                 "label": "Average Duration (minutes)",
                 "data": avg_data,
                 "borderColor": colors[0],
-                "backgroundColor": colors[0].replace("rgb", "rgba").replace(")", ", 0.2)"),
+                "backgroundColor": colors[0]
+                .replace("rgb", "rgba")
+                .replace(")", ", 0.2)"),
                 "fill": False,
                 "borderWidth": 2,
-                "type": "bar"
+                "type": "bar",
             },
             {
-                "label": "Min Duration (minutes)", 
+                "label": "Min Duration (minutes)",
                 "data": min_data,
                 "borderColor": colors[1],
-                "backgroundColor": colors[1].replace("rgb", "rgba").replace(")", ", 0.1)"),
+                "backgroundColor": colors[1]
+                .replace("rgb", "rgba")
+                .replace(")", ", 0.1)"),
                 "fill": False,
                 "type": "line",
-                "pointRadius": 4
+                "pointRadius": 4,
             },
             {
                 "label": "Max Duration (minutes)",
-                "data": max_data, 
+                "data": max_data,
                 "borderColor": colors[2],
-                "backgroundColor": colors[2].replace("rgb", "rgba").replace(")", ", 0.1)"),
+                "backgroundColor": colors[2]
+                .replace("rgb", "rgba")
+                .replace(")", ", 0.1)"),
                 "fill": False,
                 "type": "line",
-                "pointRadius": 4
-            }
+                "pointRadius": 4,
+            },
         ]
-        
-        chart_data: ExecutionTimeChartData = {
-            "labels": labels,
-            "datasets": datasets
-        }
-        
+
+        chart_data: ExecutionTimeChartData = {"labels": labels, "datasets": datasets}
+
         return chart_data
 
     async def _get_success_failure_stats(
@@ -948,39 +957,38 @@ class RepositoryStatsService:
     ) -> List[SuccessFailureStats]:
         """Calculate success/failure statistics for different task types"""
         from borgitory.models.database import Job, JobTask
-        from sqlalchemy import and_, func
+        from sqlalchemy import and_
         from collections import defaultdict
-        
+
         try:
             # Query all completed and failed tasks for this repository
             task_results = (
-                db.query(
-                    JobTask.task_type,
-                    JobTask.status
-                )
+                db.query(JobTask.task_type, JobTask.status)
                 .join(Job, Job.id == JobTask.job_id)
                 .filter(
                     and_(
                         Job.repository_id == repository.id,
-                        JobTask.status.in_(["completed", "failed"])
+                        JobTask.status.in_(["completed", "failed"]),
                     )
                 )
                 .all()
             )
-            
+
             # Group by task type and count successes/failures
-            task_counts: defaultdict[str, dict[str, int]] = defaultdict(lambda: {"successful": 0, "failed": 0})
+            task_counts: defaultdict[str, dict[str, int]] = defaultdict(
+                lambda: {"successful": 0, "failed": 0}
+            )
             for task in task_results:
                 if task.status == "completed":
                     task_counts[task.task_type]["successful"] += 1
                 elif task.status == "failed":
                     task_counts[task.task_type]["failed"] += 1
-            
+
             success_failure_stats: List[SuccessFailureStats] = []
             for task_type, counts in task_counts.items():
                 total = counts["successful"] + counts["failed"]
                 success_rate = (counts["successful"] / total * 100) if total > 0 else 0
-                
+
                 stat_entry: SuccessFailureStats = {
                     "task_type": task_type,
                     "successful_count": counts["successful"],
@@ -988,9 +996,9 @@ class RepositoryStatsService:
                     "success_rate": round(success_rate, 2),
                 }
                 success_failure_stats.append(stat_entry)
-            
+
             return success_failure_stats
-            
+
         except Exception as e:
             logger.error(f"Error calculating success/failure stats: {str(e)}")
             return []
@@ -1001,19 +1009,17 @@ class RepositoryStatsService:
         """Build success/failure rate chart data"""
         if not success_failure_stats:
             return {"labels": [], "datasets": []}
-            
+
         # Sort by success rate for better visualization
         sorted_stats = sorted(
-            success_failure_stats, 
-            key=lambda x: x["success_rate"], 
-            reverse=True
+            success_failure_stats, key=lambda x: x["success_rate"], reverse=True
         )
-        
+
         labels = [stat["task_type"].replace("_", " ").title() for stat in sorted_stats]
         successful_data = [float(stat["successful_count"]) for stat in sorted_stats]
         failed_data = [float(stat["failed_count"]) for stat in sorted_stats]
         success_rate_data = [stat["success_rate"] for stat in sorted_stats]
-        
+
         datasets: List[ChartDataset] = [
             {
                 "label": "Successful",
@@ -1021,7 +1027,7 @@ class RepositoryStatsService:
                 "borderColor": "rgb(34, 197, 94)",
                 "backgroundColor": "rgba(34, 197, 94, 0.8)",
                 "fill": False,
-                "type": "bar"
+                "type": "bar",
             },
             {
                 "label": "Failed",
@@ -1029,7 +1035,7 @@ class RepositoryStatsService:
                 "borderColor": "rgb(239, 68, 68)",
                 "backgroundColor": "rgba(239, 68, 68, 0.8)",
                 "fill": False,
-                "type": "bar"
+                "type": "bar",
             },
             {
                 "label": "Success Rate (%)",
@@ -1039,15 +1045,12 @@ class RepositoryStatsService:
                 "fill": False,
                 "type": "line",
                 "yAxisID": "y1",
-                "pointRadius": 4
-            }
+                "pointRadius": 4,
+            },
         ]
-        
-        chart_data: SuccessFailureChartData = {
-            "labels": labels,
-            "datasets": datasets
-        }
-        
+
+        chart_data: SuccessFailureChartData = {"labels": labels, "datasets": datasets}
+
         return chart_data
 
     async def _get_timeline_success_failure_data(
@@ -1055,19 +1058,16 @@ class RepositoryStatsService:
     ) -> TimelineSuccessFailureData:
         """Get timeline data for successful vs failed backups over time"""
         from borgitory.models.database import Job, JobTask
-        from sqlalchemy import and_, func, extract
+        from sqlalchemy import and_, func
         from collections import defaultdict
         from datetime import datetime, timedelta
-        
+
         try:
             # Get backup tasks from the last 30 days
             thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-            
+
             backup_results = (
-                db.query(
-                    func.date(JobTask.completed_at).label('date'),
-                    JobTask.status
-                )
+                db.query(func.date(JobTask.completed_at).label("date"), JobTask.status)
                 .join(Job, Job.id == JobTask.job_id)
                 .filter(
                     and_(
@@ -1075,28 +1075,32 @@ class RepositoryStatsService:
                         JobTask.task_type.in_(["backup", "scheduled_backup"]),
                         JobTask.status.in_(["completed", "failed"]),
                         JobTask.completed_at >= thirty_days_ago,
-                        JobTask.completed_at.isnot(None)
+                        JobTask.completed_at.isnot(None),
                     )
                 )
-                .order_by('date')
+                .order_by("date")
                 .all()
             )
-            
+
             # Group by date and count successes/failures
-            daily_counts: defaultdict[str, dict[str, int]] = defaultdict(lambda: {"successful": 0, "failed": 0})
+            daily_counts: defaultdict[str, dict[str, int]] = defaultdict(
+                lambda: {"successful": 0, "failed": 0}
+            )
             for result in backup_results:
                 date_str = str(result.date) if result.date else "unknown"
                 if result.status == "completed":
                     daily_counts[date_str]["successful"] += 1
                 elif result.status == "failed":
                     daily_counts[date_str]["failed"] += 1
-            
+
             # Sort dates and create chart data
             sorted_dates = sorted(daily_counts.keys())
             labels = sorted_dates
-            successful_data = [float(daily_counts[date]["successful"]) for date in sorted_dates]
+            successful_data = [
+                float(daily_counts[date]["successful"]) for date in sorted_dates
+            ]
             failed_data = [float(daily_counts[date]["failed"]) for date in sorted_dates]
-            
+
             datasets: List[ChartDataset] = [
                 {
                     "label": "Successful Backups",
@@ -1104,7 +1108,7 @@ class RepositoryStatsService:
                     "borderColor": "rgb(34, 197, 94)",
                     "backgroundColor": "rgba(34, 197, 94, 0.2)",
                     "fill": True,
-                    "type": "line"
+                    "type": "line",
                 },
                 {
                     "label": "Failed Backups",
@@ -1112,17 +1116,17 @@ class RepositoryStatsService:
                     "borderColor": "rgb(239, 68, 68)",
                     "backgroundColor": "rgba(239, 68, 68, 0.2)",
                     "fill": True,
-                    "type": "line"
-                }
+                    "type": "line",
+                },
             ]
-            
+
             chart_data: TimelineSuccessFailureData = {
                 "labels": labels,
-                "datasets": datasets
+                "datasets": datasets,
             }
-            
+
             return chart_data
-            
+
         except Exception as e:
             logger.error(f"Error calculating timeline success/failure data: {str(e)}")
             return {"labels": [], "datasets": []}
