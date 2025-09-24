@@ -252,7 +252,6 @@ class RepositoryStatsService:
     async def get_repository_statistics(
         self,
         repository: Repository,
-        db: Session,
         progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> RepositoryStats:
         """Gather comprehensive repository statistics"""
