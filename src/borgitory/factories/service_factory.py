@@ -19,22 +19,13 @@ from typing import (
 from abc import ABC
 import logging
 
-from borgitory.protocols.command_protocols import CommandRunnerProtocol
-from borgitory.protocols.repository_protocols import BackupServiceProtocol
 from borgitory.protocols.notification_protocols import NotificationServiceProtocol
 from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
-from borgitory.services.borg_service import BorgService
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
     from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers import StorageFactory
-    from borgitory.protocols import (
-        VolumeServiceProtocol,
-        JobManagerProtocol,
-        ProcessExecutorProtocol,
-    )
-    from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
     from borgitory.services.rclone_service import RcloneService
 
 logger = logging.getLogger(__name__)
@@ -193,72 +184,3 @@ class CloudProviderServiceFactory(ServiceFactory[CloudSyncConfigServiceProtocol]
     ) -> CloudSyncConfigServiceProtocol:
         """Create a cloud sync service."""
         return self.create_service(service_type, db=db)
-
-
-class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
-    """Factory for creating backup services with proper dependency injection."""
-
-    def __init__(
-        self,
-        job_executor: "ProcessExecutorProtocol",
-        command_runner: CommandRunnerProtocol,
-        volume_service: "VolumeServiceProtocol",
-        job_manager: "JobManagerProtocol",
-        archive_service: "ArchiveServiceProtocol",
-    ) -> None:
-        super().__init__()
-        # Inject dependencies instead of using service locator
-        self._job_executor = job_executor
-        self._command_runner = command_runner
-        self._volume_service = volume_service
-        self._job_manager = job_manager
-        self._archive_service = archive_service
-        self._register_default_implementations()
-
-    def _register_default_implementations(self) -> None:
-        """Register default backup service implementations."""
-
-        def create_borg_service(
-            job_executor: Optional["ProcessExecutorProtocol"] = None,
-            command_runner: Optional[CommandRunnerProtocol] = None,
-            job_manager: Optional["JobManagerProtocol"] = None,
-            volume_service: Optional["VolumeServiceProtocol"] = None,
-            archive_service: Optional["ArchiveServiceProtocol"] = None,
-        ) -> BackupServiceProtocol:
-            """Factory function to create BorgService."""
-
-            # Use provided dependencies or injected defaults - no more service locator!
-            final_job_executor = job_executor or self._job_executor
-            final_command_runner = command_runner or self._command_runner
-            final_volume_service = volume_service or self._volume_service
-            final_job_manager = job_manager or self._job_manager
-            final_archive_service = archive_service or self._archive_service
-
-            return BorgService(
-                job_executor=final_job_executor,
-                command_runner=final_command_runner,
-                volume_service=final_volume_service,
-                job_manager=final_job_manager,
-                archive_service=final_archive_service,
-            )
-
-        self.register_implementation("borg", create_borg_service, set_as_default=True)
-
-    def create_backup_service(
-        self,
-        backup_type: str = "borg",
-        job_executor: Optional["ProcessExecutorProtocol"] = None,
-        command_runner: Optional[CommandRunnerProtocol] = None,
-        job_manager: Optional["JobManagerProtocol"] = None,
-        volume_service: Optional["VolumeServiceProtocol"] = None,
-        archive_service: Optional["ArchiveServiceProtocol"] = None,
-    ) -> BackupServiceProtocol:
-        """Create a backup service."""
-        return self.create_service(
-            backup_type,
-            job_executor=job_executor,
-            command_runner=command_runner,
-            job_manager=job_manager,
-            volume_service=volume_service,
-            archive_service=archive_service,
-        )

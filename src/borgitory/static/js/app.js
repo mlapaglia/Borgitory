@@ -1,11 +1,6 @@
 // Core Alpine.js App Component
 function borgitoryApp() {
     return {
-        cloudSyncConfigs: [],
-        notificationConfigs: [],
-        pruneConfigs: [],
-        checkConfigs: [],
-        
         initApp() {
         },
     };
