@@ -2,7 +2,15 @@
 Protocol interfaces for command execution services.
 """
 
-from typing import Protocol, Dict, Optional, List, Callable, TYPE_CHECKING, runtime_checkable
+from typing import (
+    Protocol,
+    Dict,
+    Optional,
+    List,
+    Callable,
+    TYPE_CHECKING,
+    runtime_checkable,
+)
 import asyncio
 
 if TYPE_CHECKING:

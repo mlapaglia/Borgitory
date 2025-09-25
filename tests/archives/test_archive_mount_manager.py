@@ -91,8 +91,7 @@ class TestArchiveMountManager:
             custom_mount_path = os.path.join(temp_dir, "custom_mounts")
             mock_executor = Mock(spec=JobExecutor)
             manager = ArchiveMountManager(
-                job_executor=mock_executor,
-                base_mount_dir=custom_mount_path
+                job_executor=mock_executor, base_mount_dir=custom_mount_path
             )
             assert str(manager.base_mount_dir) == custom_mount_path
             assert manager.base_mount_dir.exists()

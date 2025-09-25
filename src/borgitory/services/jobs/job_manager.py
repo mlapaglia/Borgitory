@@ -261,6 +261,7 @@ class JobManagerFactory:
             get_rclone_service,
             get_encryption_service,
             get_storage_factory,
+            get_registry_factory,
             get_provider_registry,
             get_hook_execution_service,
         )
@@ -273,7 +274,9 @@ class JobManagerFactory:
             rclone_service=get_rclone_service(),
             encryption_service=get_encryption_service(),
             storage_factory=get_storage_factory(get_rclone_service()),
-            provider_registry=get_provider_registry(),
+            provider_registry=get_provider_registry(
+                registry_factory=get_registry_factory()
+            ),
             notification_service=get_notification_service_singleton(),
             hook_execution_service=get_hook_execution_service(),
         )

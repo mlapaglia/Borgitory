@@ -22,6 +22,21 @@ from borgitory.models.database import Repository
 from borgitory.services.simple_command_runner import CommandResult
 
 
+def create_test_borg_service(
+    job_executor=None,
+    command_runner=None,
+    job_manager=None,
+    volume_service=None,
+):
+    """Helper function to create BorgService with all required dependencies for testing."""
+    return BorgService(
+        job_executor=job_executor or Mock(),
+        command_runner=command_runner or Mock(),
+        job_manager=job_manager or Mock(),
+        volume_service=volume_service or Mock(),
+    )
+
+
 class TestBorgServiceCore:
     """Test core BorgService functionality."""
 
@@ -29,7 +44,7 @@ class TestBorgServiceCore:
         """Set up test fixtures."""
         # Create mock job manager
         self.mock_job_manager = Mock()
-        self.borg_service = BorgService(job_manager=self.mock_job_manager)
+        self.borg_service = create_test_borg_service(job_manager=self.mock_job_manager)
 
         # Create mock repository
         self.mock_repository = Mock(spec=Repository)
@@ -40,7 +55,7 @@ class TestBorgServiceCore:
 
     def test_init(self) -> None:
         """Test BorgService initialization."""
-        service = BorgService()
+        service = create_test_borg_service()
         assert hasattr(service, "progress_pattern")
         assert service.progress_pattern is not None
 
@@ -63,7 +78,7 @@ class TestParseBorgConfig:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
     def test_parse_config_file_not_exists(self) -> None:
         """Test parsing when config file doesn't exist."""
@@ -185,7 +200,9 @@ class TestRepositoryOperations:
     def setup_method(self) -> None:
         """Set up test fixtures."""
         self.mock_command_runner = Mock()
-        self.borg_service = BorgService(command_runner=self.mock_command_runner)
+        self.borg_service = create_test_borg_service(
+            command_runner=self.mock_command_runner
+        )
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.id = 1
@@ -303,7 +320,7 @@ class TestGetRepoInfo:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
@@ -326,7 +343,7 @@ class TestGetRepoInfo:
             return_value=mock_process_result
         )
 
-        borg_service = BorgService(job_executor=mock_job_executor)
+        borg_service = create_test_borg_service(job_executor=mock_job_executor)
 
         with patch(
             "borgitory.utils.security.build_secure_borg_command"
@@ -354,7 +371,7 @@ class TestGetRepoInfo:
             return_value=mock_process_result
         )
 
-        borg_service = BorgService(job_executor=mock_job_executor)
+        borg_service = create_test_borg_service(job_executor=mock_job_executor)
 
         with patch(
             "borgitory.utils.security.build_secure_borg_command"
@@ -382,7 +399,7 @@ class TestGetRepoInfo:
             return_value=mock_process_result
         )
 
-        borg_service = BorgService(job_executor=mock_job_executor)
+        borg_service = create_test_borg_service(job_executor=mock_job_executor)
 
         with patch(
             "borgitory.utils.security.build_secure_borg_command"
@@ -400,7 +417,7 @@ class TestListArchiveContents:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
@@ -423,7 +440,7 @@ class TestListArchiveContents:
             return_value=mock_process_result
         )
 
-        borg_service = BorgService(job_executor=mock_job_executor)
+        borg_service = create_test_borg_service(job_executor=mock_job_executor)
 
         with patch(
             "borgitory.utils.security.build_secure_borg_command"
@@ -465,7 +482,7 @@ class TestListArchiveContents:
             return_value=mock_process_result
         )
 
-        borg_service = BorgService(job_executor=mock_job_executor)
+        borg_service = create_test_borg_service(job_executor=mock_job_executor)
 
         with patch(
             "borgitory.utils.security.build_secure_borg_command"
@@ -486,7 +503,7 @@ class TestExtractFileStream:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
@@ -549,7 +566,7 @@ class TestSecurityIntegrationExtended:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
@@ -633,7 +650,7 @@ class TestEdgeCasesAndBoundaryConditions:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
@@ -709,7 +726,7 @@ key = résumé_ñoño
     async def test_concurrent_operation_safety(self) -> None:
         """Test that service handles concurrent operations safely."""
         # Create multiple service instances to simulate concurrent usage
-        services = [BorgService() for _ in range(3)]
+        services = [create_test_borg_service() for _ in range(3)]
 
         # All should have independent regex patterns and state
         for service in services:
@@ -763,7 +780,7 @@ class TestBorgServiceRepositoryScanning:
         self.mock_volume_service = Mock()
 
         # Create BorgService with mocked dependencies
-        self.borg_service = BorgService(
+        self.borg_service = create_test_borg_service(
             command_runner=self.mock_command_runner,
             volume_service=self.mock_volume_service,
         )

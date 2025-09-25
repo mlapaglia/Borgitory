@@ -1315,7 +1315,7 @@ class TestRepositoriesAPI:
         }
 
         app.dependency_overrides[get_repository_stats_service] = (
-            lambda: mock_stats_service
+            lambda command_executor=None: mock_stats_service
         )
 
         try:

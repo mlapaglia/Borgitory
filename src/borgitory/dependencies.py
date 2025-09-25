@@ -10,17 +10,21 @@ from typing import (
     ContextManager,
     Any,
     List,
+    Coroutine,
 )
+import asyncio
 
-from borgitory.services.notifications.registry_factory import (
-    NotificationRegistryFactory,
-)
+from borgitory.services.notifications.registry import get_metadata
 
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
     from borgitory.services.notifications.service import NotificationProviderFactory
     from borgitory.services.notifications.providers.discord_provider import HttpClient
     from borgitory.config.command_runner_config import CommandRunnerConfig
+    from borgitory.config.job_manager_config import JobManagerEnvironmentConfig
+    from borgitory.services.jobs.job_manager import JobManagerConfig
+    from borgitory.services.cloud_providers.registry_factory import RegistryFactory
+    from borgitory.services.volumes.file_system_interface import FileSystemInterface
     from sqlalchemy.orm import Session
 from functools import lru_cache
 from fastapi import Depends
@@ -43,6 +47,8 @@ from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.debug_service import DebugService
 from borgitory.protocols.environment_protocol import DefaultEnvironment
 from borgitory.services.rclone_service import RcloneService
+from borgitory.services.encryption_service import EncryptionService
+from borgitory.services.cloud_providers import StorageFactory
 from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
 )
@@ -71,13 +77,11 @@ from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
 from starlette.templating import _TemplateResponse
-from borgitory.services.cloud_providers import StorageFactory
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
     get_server_timezone,
 )
 from fastapi import Request
-from borgitory.services.encryption_service import EncryptionService
 from datetime import datetime
 
 if TYPE_CHECKING:
@@ -93,6 +97,9 @@ if TYPE_CHECKING:
     )
     from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
     from borgitory.factories.service_factory import CloudProviderServiceFactory
+    from borgitory.services.repositories.repository_stats_service import (
+        CommandExecutorInterface,
+    )
     from borgitory.services.jobs.job_manager import JobManagerConfig
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.jobs.job_output_manager import JobOutputManager
@@ -101,15 +108,35 @@ from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
 
 # Job Manager Sub-Services (defined first to avoid forward references)
-@lru_cache()
-def get_job_executor() -> "ProcessExecutorProtocol":
+def get_subprocess_executor() -> Callable[
+    ..., Coroutine[None, None, "asyncio.subprocess.Process"]
+]:
     """
-    Provide a ProcessExecutorProtocol implementation (JobExecutor).
+    Provide subprocess executor function for process creation.
 
-    Request-scoped - new instance per request for proper isolation.
-    Returns protocol interface for loose coupling.
+    Returns:
+        Callable: Function that creates subprocess processes (asyncio.create_subprocess_exec)
     """
-    return JobExecutor()
+    import asyncio
+
+    return asyncio.create_subprocess_exec
+
+
+def get_job_executor(
+    subprocess_executor: Callable[
+        ..., Coroutine[None, None, "asyncio.subprocess.Process"]
+    ] = Depends(get_subprocess_executor),
+) -> "ProcessExecutorProtocol":
+    """
+    Provide a ProcessExecutorProtocol implementation (JobExecutor) with injected subprocess executor.
+
+    Args:
+        subprocess_executor: Injected function for creating subprocess processes
+
+    Returns:
+        ProcessExecutorProtocol: JobExecutor instance with injected dependencies
+    """
+    return JobExecutor(subprocess_executor=subprocess_executor)
 
 
 def get_job_output_manager() -> JobOutputManager:
@@ -163,27 +190,29 @@ def get_job_database_manager(
 def get_command_runner_config() -> "CommandRunnerConfig":
     """
     Provide CommandRunnerConfig from environment variables.
-    
+
     Returns:
         CommandRunnerConfig: Configuration loaded from environment
     """
     from borgitory.config.command_runner_config import CommandRunnerConfig
+
     return CommandRunnerConfig.from_env()
 
 
 def get_simple_command_runner(
-    config: "CommandRunnerConfig" = Depends(get_command_runner_config)
+    config: "CommandRunnerConfig" = Depends(get_command_runner_config),
 ) -> "CommandRunnerProtocol":
     """
     Provide a CommandRunnerProtocol implementation with injected configuration.
-    
+
     Args:
         config: Configuration for command runner behavior
-        
+
     Returns:
         CommandRunnerProtocol: Configured SimpleCommandRunner instance
     """
     from borgitory.services.simple_command_runner import SimpleCommandRunner
+
     return SimpleCommandRunner(config=config)
 
 
@@ -197,43 +226,23 @@ def get_backup_service(db: Session = Depends(get_db)) -> BackupService:
     return BackupService(db)
 
 
-@lru_cache()
 def get_recovery_service() -> RecoveryService:
     """
-    Provide a RecoveryService singleton instance.
+    Provide a RecoveryService instance with proper FastAPI dependency injection.
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Returns:
+        RecoveryService: New RecoveryService instance for each request
     """
     return RecoveryService()
 
 
-@lru_cache()
-def get_notification_registry_factory() -> "NotificationRegistryFactory":
-    """
-    Provide a NotificationRegistryFactory singleton instance.
-
-    Uses FastAPI's built-in caching for singleton behavior.
-    """
-    from borgitory.services.notifications.registry_factory import _production_factory
-
-    return _production_factory
-
-
-@lru_cache()
-def get_notification_provider_registry() -> "NotificationProviderRegistry":
-    """
-    Provide a NotificationProviderRegistry singleton instance with proper dependency injection.
-
-    Uses FastAPI's built-in caching for singleton behavior.
-    Ensures all notification providers are registered by importing the provider modules.
-    """
-    factory = get_notification_registry_factory()
-    return factory.create_production_registry()
-
-
-@lru_cache()
 def get_http_client() -> "HttpClient":
-    """Provide HTTP client singleton for notification providers."""
+    """
+    Provide HTTP client instance with proper FastAPI dependency injection.
+
+    Returns:
+        HttpClient: New AiohttpClient instance for each request
+    """
     from borgitory.services.notifications.providers.discord_provider import (
         AiohttpClient,
     )
@@ -328,35 +337,70 @@ def get_notification_config_service(
     return NotificationConfigService(db=db, notification_service=notification_service)
 
 
-@lru_cache()
 def get_rclone_service() -> RcloneService:
     """
-    Provide a RcloneService singleton instance.
+    Provide a RcloneService instance with proper FastAPI dependency injection.
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Returns:
+        RcloneService: New RcloneService instance for each request
     """
     return RcloneService()
 
 
-@lru_cache()
-def get_repository_stats_service() -> RepositoryStatsService:
+def get_command_executor() -> "CommandExecutorInterface":
     """
-    Provide a RepositoryStatsService singleton instance.
+    Provide a CommandExecutorInterface implementation for repository statistics.
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Returns:
+        CommandExecutorInterface: SubprocessCommandExecutor instance for Borg command execution
     """
-    return RepositoryStatsService()
+    from borgitory.services.repositories.repository_stats_service import (
+        SubprocessCommandExecutor,
+    )
+
+    return SubprocessCommandExecutor()
 
 
-@lru_cache()
-def get_volume_service() -> "VolumeServiceProtocol":
+def get_repository_stats_service(
+    command_executor: "CommandExecutorInterface" = Depends(get_command_executor),
+) -> RepositoryStatsService:
     """
-    Provide a VolumeServiceProtocol implementation (VolumeService).
+    Provide a RepositoryStatsService with injected command executor.
 
-    Uses FastAPI's built-in caching for singleton behavior.
-    Returns protocol interface for loose coupling.
+    Args:
+        command_executor: Injected command executor for Borg operations
+
+    Returns:
+        RepositoryStatsService: Service instance with injected dependencies
     """
-    return VolumeService()
+    return RepositoryStatsService(command_executor=command_executor)
+
+
+def get_file_system() -> "FileSystemInterface":
+    """
+    Provide FileSystemInterface implementation for filesystem operations.
+
+    Returns:
+        FileSystemInterface: OS-based filesystem implementation
+    """
+    from borgitory.services.volumes.os_file_system import OsFileSystem
+
+    return OsFileSystem()
+
+
+def get_volume_service(
+    filesystem: "FileSystemInterface" = Depends(get_file_system),
+) -> "VolumeServiceProtocol":
+    """
+    Provide VolumeServiceProtocol with injected filesystem dependency.
+
+    Args:
+        filesystem: Injected filesystem interface for volume operations
+
+    Returns:
+        VolumeServiceProtocol: Volume service with injected filesystem
+    """
+    return VolumeService(filesystem=filesystem)
 
 
 def get_hook_execution_service() -> HookExecutionService:
@@ -379,12 +423,12 @@ def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinition
     return TaskDefinitionBuilder(db)
 
 
-@lru_cache()
 def get_borg_command_builder() -> BorgCommandBuilder:
     """
-    Provide a BorgCommandBuilder singleton instance.
+    Provide a BorgCommandBuilder instance with proper FastAPI dependency injection.
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Returns:
+        BorgCommandBuilder: New BorgCommandBuilder instance for each request
     """
     return BorgCommandBuilder()
 
@@ -509,28 +553,44 @@ def get_templates() -> TimezoneAwareJinja2Templates:
     return templates
 
 
-@lru_cache()
-def get_provider_registry() -> ProviderRegistry:
+def get_registry_factory() -> "RegistryFactory":
     """
-    Provide a ProviderRegistry singleton instance with proper dependency injection.
+    Provide RegistryFactory for creating provider registries.
 
-    Uses FastAPI's built-in caching for singleton behavior.
-    Ensures all cloud storage providers are registered by importing the storage modules.
+    Returns:
+        RegistryFactory: Factory for creating provider registries
     """
-    # Use the factory to ensure all providers are properly registered
     from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
-    return RegistryFactory.create_production_registry()
+    return RegistryFactory()
 
 
-@lru_cache()
-def get_configuration_service() -> ConfigurationService:
+def get_provider_registry(
+    registry_factory: "RegistryFactory" = Depends(get_registry_factory),
+) -> ProviderRegistry:
     """
-    Provide a ConfigurationService singleton instance.
+    Provide ProviderRegistry with injected factory.
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Args:
+        registry_factory: Injected factory for creating registries
+
+    Returns:
+        ProviderRegistry: Registry with all production providers registered
     """
-    return ConfigurationService()
+    return registry_factory.create_production_registry()
+
+
+def get_configuration_service(db: Session = Depends(get_db)) -> ConfigurationService:
+    """
+    Provide ConfigurationService with injected database session.
+
+    Args:
+        db: Database session for configuration queries
+
+    Returns:
+        ConfigurationService: Configured service instance
+    """
+    return ConfigurationService(db=db)
 
 
 def get_repository_check_config_service(
@@ -553,12 +613,12 @@ def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
     return CleanupService(db=db)
 
 
-@lru_cache()
 def get_cron_description_service() -> CronDescriptionService:
     """
-    Provide a CronDescriptionService singleton instance.
+    Provide a CronDescriptionService instance with proper FastAPI dependency injection.
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Returns:
+        CronDescriptionService: New CronDescriptionService instance for each request
     """
     return CronDescriptionService()
 
@@ -584,24 +644,40 @@ def get_storage_factory(
     return StorageFactory(rclone)
 
 
-@lru_cache()
-def _create_job_manager_config() -> "JobManagerConfig":
-    """Create JobManager configuration from environment variables."""
-    import os
+def get_job_manager_env_config() -> "JobManagerEnvironmentConfig":
+    """
+    Provide JobManagerEnvironmentConfig from environment variables.
+
+    Returns:
+        JobManagerEnvironmentConfig: Configuration loaded from environment
+    """
+    from borgitory.config.job_manager_config import JobManagerEnvironmentConfig
+
+    return JobManagerEnvironmentConfig.from_env()
+
+
+def get_job_manager_config(
+    env_config: "JobManagerEnvironmentConfig" = Depends(get_job_manager_env_config),
+) -> "JobManagerConfig":
+    """
+    Provide JobManagerConfig with injected environment configuration.
+
+    Args:
+        env_config: Environment-based configuration values
+
+    Returns:
+        JobManagerConfig: Configured JobManager instance
+    """
     from borgitory.services.jobs.job_manager import JobManagerConfig
 
     return JobManagerConfig(
-        max_concurrent_backups=int(os.getenv("BORG_MAX_CONCURRENT_BACKUPS", "5")),
-        max_output_lines_per_job=int(os.getenv("BORG_MAX_OUTPUT_LINES", "1000")),
-        max_concurrent_operations=int(
-            os.getenv("BORG_MAX_CONCURRENT_OPERATIONS", "10")
-        ),
-        queue_poll_interval=float(os.getenv("BORG_QUEUE_POLL_INTERVAL", "0.1")),
-        sse_keepalive_timeout=float(os.getenv("BORG_SSE_KEEPALIVE_TIMEOUT", "30.0")),
-        sse_max_queue_size=int(os.getenv("BORG_SSE_MAX_QUEUE_SIZE", "100")),
-        max_concurrent_cloud_uploads=int(
-            os.getenv("BORG_MAX_CONCURRENT_CLOUD_UPLOADS", "3")
-        ),
+        max_concurrent_backups=env_config.max_concurrent_backups,
+        max_output_lines_per_job=env_config.max_output_lines_per_job,
+        max_concurrent_operations=env_config.max_concurrent_operations,
+        queue_poll_interval=env_config.queue_poll_interval,
+        sse_keepalive_timeout=env_config.sse_keepalive_timeout,
+        sse_max_queue_size=env_config.sse_max_queue_size,
+        max_concurrent_cloud_uploads=env_config.max_concurrent_cloud_uploads,
     )
 
 
@@ -627,8 +703,10 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     )
 
     # Resolve all dependencies directly (not via FastAPI DI)
-    config = _create_job_manager_config()
-    job_executor = get_job_executor()
+    env_config = get_job_manager_env_config()
+    config = get_job_manager_config(env_config)
+    subprocess_executor = get_subprocess_executor()
+    job_executor = get_job_executor(subprocess_executor)
     output_manager = get_job_output_manager()
     queue_manager = get_job_queue_manager()
     database_manager = get_job_database_manager()
@@ -637,7 +715,8 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     notification_service = get_notification_service_singleton()  # Use singleton version
     encryption_service = get_encryption_service()
     storage_factory = get_storage_factory(rclone_service)
-    provider_registry = get_provider_registry()
+    registry_factory = get_registry_factory()
+    provider_registry = get_provider_registry(registry_factory)
     hook_execution_service = get_hook_execution_service()
 
     # Create dependencies using resolved services
@@ -755,19 +834,28 @@ def get_job_service(
 
 
 def get_borg_service(
+    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
     command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
-    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
 ) -> BorgService:
     """
-    Provide a BorgService instance with proper dependency injection.
+    Provide BorgService with all mandatory dependencies injected.
 
-    Uses FastAPI DI with automatic dependency resolution.
+    Args:
+        job_executor: Injected job executor for running Borg processes
+        command_runner: Injected command runner for system commands
+        job_manager: Injected job manager for job lifecycle
+        volume_service: Injected volume service for mounted volumes
+
+    Returns:
+        BorgService: Fully configured service with all dependencies
     """
     return BorgService(
+        job_executor=job_executor,
         command_runner=command_runner,
-        volume_service=volume_service,
         job_manager=job_manager,
+        volume_service=volume_service,
     )
 
 
@@ -826,22 +914,26 @@ def get_repository_service(
     )
 
 
-@lru_cache()
-def get_cloud_provider_service_factory() -> "CloudProviderServiceFactory":
+def get_cloud_provider_service_factory(
+    rclone_service: RcloneService = Depends(get_rclone_service),
+    storage_factory: StorageFactory = Depends(get_storage_factory),
+    encryption_service: EncryptionService = Depends(get_encryption_service),
+) -> "CloudProviderServiceFactory":
     """
-    Provide CloudProviderServiceFactory singleton instance with proper DI.
+    Provide CloudProviderServiceFactory with proper FastAPI dependency injection.
 
-    Uses FastAPI's built-in caching for singleton behavior.
-    Now properly injects dependencies instead of using service locator pattern.
+    Args:
+        rclone_service: Injected RcloneService instance
+        storage_factory: Injected StorageFactory instance
+        encryption_service: Injected EncryptionService instance
+
+    Returns:
+        CloudProviderServiceFactory: Configured factory instance
     """
-    # **DI CHECK**: Factory gets dependencies injected, no more service locator!
-    from borgitory.factories.service_factory import CloudProviderServiceFactory
-    from borgitory.services.cloud_providers.registry import get_metadata
-
     return CloudProviderServiceFactory(
-        rclone_service=get_rclone_service(),
-        storage_factory=get_storage_factory(get_rclone_service()),
-        encryption_service=get_encryption_service(),
+        rclone_service=rclone_service,
+        storage_factory=storage_factory,
+        encryption_service=encryption_service,
         metadata_func=get_metadata,
     )
 
@@ -899,9 +991,20 @@ RecoveryServiceDep = RequestScopedRecoveryService
 NotificationConfigServiceDep = Annotated[
     NotificationConfigService, Depends(get_notification_config_service)
 ]
-NotificationRegistryFactoryDep = Annotated[
-    "NotificationRegistryFactory", Depends(get_notification_registry_factory)
-]
+
+
+def get_notification_provider_registry() -> "NotificationProviderRegistry":
+    """
+    Provide a NotificationProviderRegistry instance with proper FastAPI dependency injection.
+
+    Returns:
+        NotificationProviderRegistry: Registry with all production providers registered
+    """
+    from borgitory.services.notifications.registry_factory import _production_factory
+
+    return _production_factory.create_production_registry()
+
+
 NotificationProviderRegistryDep = Annotated[
     "NotificationProviderRegistry", Depends(get_notification_provider_registry)
 ]
@@ -963,11 +1066,11 @@ ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)
 
 
 def get_archive_mount_manager(
-    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor)
+    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
 ) -> "ArchiveMountManager":
     """Get the ArchiveMountManager instance with proper DI."""
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
-    
+
     return ArchiveMountManager(job_executor=job_executor)
 
 
@@ -1012,6 +1115,7 @@ def get_package_restoration_service_for_startup() -> PackageRestorationService:
     # The service will manage its own database session during restoration
     db = SessionLocal()
     from borgitory.config.command_runner_config import CommandRunnerConfig
+
     config = CommandRunnerConfig()
     command_runner = SimpleCommandRunner(config=config)
     package_manager = PackageManagerService(

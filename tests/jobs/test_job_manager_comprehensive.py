@@ -150,6 +150,7 @@ class TestJobManagerTaskExecution:
             get_rclone_service,
             get_encryption_service,
             get_storage_factory,
+            get_registry_factory,
             get_provider_registry,
         )
 
@@ -160,7 +161,7 @@ class TestJobManagerTaskExecution:
             rclone_service=get_rclone_service(),
             encryption_service=get_encryption_service(),
             storage_factory=get_storage_factory(get_rclone_service()),
-            provider_registry=get_provider_registry(),
+            provider_registry=get_provider_registry(get_registry_factory()),
         )
         full_deps = JobManagerFactory.create_dependencies(custom_dependencies=deps)
         manager = JobManager(dependencies=full_deps)

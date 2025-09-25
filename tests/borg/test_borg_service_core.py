@@ -8,12 +8,27 @@ from borgitory.services.borg_service import BorgService
 from borgitory.models.database import Repository
 
 
+def create_test_borg_service(
+    job_executor=None,
+    command_runner=None,
+    job_manager=None,
+    volume_service=None,
+):
+    """Helper function to create BorgService with all required dependencies for testing."""
+    return BorgService(
+        job_executor=job_executor or Mock(),
+        command_runner=command_runner or Mock(),
+        job_manager=job_manager or Mock(),
+        volume_service=volume_service or Mock(),
+    )
+
+
 class TestBorgServiceCore:
     """Test core BorgService functionality and security."""
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         # Create mock repository
         self.mock_repository = Mock(spec=Repository)
@@ -24,7 +39,7 @@ class TestBorgServiceCore:
 
     def test_service_initialization(self) -> None:
         """Test BorgService initializes correctly."""
-        service = BorgService()
+        service = create_test_borg_service()
         assert hasattr(service, "progress_pattern")
         assert service.progress_pattern is not None
 
@@ -51,7 +66,7 @@ class TestBorgConfigParsingSecurity:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
     def test_parse_config_file_not_found(self) -> None:
         """Test handling when config file doesn't exist."""
@@ -221,7 +236,7 @@ class TestBorgServiceSecurityIntegration:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
     def test_config_parsing_path_validation(self) -> None:
         """Test that config parsing validates repository paths."""
@@ -329,7 +344,7 @@ class TestBorgServiceEdgeCases:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
     def test_empty_config_file(self) -> None:
         """Test parsing completely empty config file."""

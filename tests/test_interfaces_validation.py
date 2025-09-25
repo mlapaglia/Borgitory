@@ -25,6 +25,7 @@ from borgitory.services.borg_service import BorgService as ConcreteBorgService
 def test_simple_command_runner_implements_protocol():
     """Verify SimpleCommandRunner implements CommandRunner protocol"""
     from borgitory.config.command_runner_config import CommandRunnerConfig
+
     runner: CommandRunner = SimpleCommandRunner(config=CommandRunnerConfig())
     assert isinstance(runner, SimpleCommandRunner)
 
@@ -97,7 +98,14 @@ def test_job_manager_implements_protocol():
 
 def test_borg_service_implements_protocol():
     """Verify BorgService implements BorgService protocol"""
-    service: BorgService = ConcreteBorgService()
+    from unittest.mock import Mock
+
+    service: BorgService = ConcreteBorgService(
+        job_executor=Mock(),
+        command_runner=Mock(),
+        job_manager=Mock(),
+        volume_service=Mock(),
+    )
     assert isinstance(service, ConcreteBorgService)
 
     # Check that required methods exist
@@ -120,6 +128,7 @@ def test_protocol_methods_match_implementations():
 
     # CommandRunner
     from borgitory.config.command_runner_config import CommandRunnerConfig
+
     runner = SimpleCommandRunner(config=CommandRunnerConfig())
     assert hasattr(runner, "run_command")
 
@@ -129,7 +138,14 @@ def test_protocol_methods_match_implementations():
     assert hasattr(volume_service, "get_volume_info")
 
     # BorgService
-    borg_service = ConcreteBorgService()
+    from unittest.mock import Mock
+
+    borg_service = ConcreteBorgService(
+        job_executor=Mock(),
+        command_runner=Mock(),
+        job_manager=Mock(),
+        volume_service=Mock(),
+    )
     assert hasattr(borg_service, "initialize_repository")
     assert hasattr(borg_service, "create_backup")
     assert hasattr(borg_service, "list_archives")

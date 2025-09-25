@@ -34,7 +34,9 @@ class ProtocolComplianceChecker:
     """Utility class for checking protocol compliance."""
 
     @staticmethod
-    def check_protocol_compliance(service_class: Type[Any], protocol_class: Type[Any]) -> Dict[str, Any]:
+    def check_protocol_compliance(
+        service_class: Type[Any], protocol_class: Type[Any]
+    ) -> Dict[str, Any]:
         """Check if a service class satisfies a protocol."""
         results = {
             "compliant": True,
@@ -118,6 +120,7 @@ class TestProtocolCompliance:
 
         # Check that we can instantiate it
         from borgitory.config.command_runner_config import CommandRunnerConfig
+
         runner = SimpleCommandRunner(config=CommandRunnerConfig())
         assert runner is not None
         assert hasattr(runner, "run_command")
@@ -176,8 +179,13 @@ class TestProtocolCompliance:
                 f"BorgService should have {method} method"
             )
 
-        # Check instantiation (with minimal dependencies)
-        service = BorgService()
+        # Check instantiation (with all required dependencies)
+        service = BorgService(
+            job_executor=Mock(),
+            command_runner=Mock(),
+            job_manager=Mock(),
+            volume_service=Mock(),
+        )
         assert service is not None
 
     def test_archive_manager_compliance(self) -> None:
@@ -259,6 +267,7 @@ class TestProtocolInstantiation:
 
         # Test with real implementations
         from borgitory.config.command_runner_config import CommandRunnerConfig
+
         use_command_runner(SimpleCommandRunner(config=CommandRunnerConfig()))
         use_volume_service(VolumeService())
 

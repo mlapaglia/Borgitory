@@ -3,5 +3,12 @@
 # Re-export everything from the main config module to maintain compatibility
 from borgitory.config_module import *  # noqa: F403, F401
 from .command_runner_config import CommandRunnerConfig
+from .job_manager_config import JobManagerEnvironmentConfig
 
-__all__ = ["CommandRunnerConfig", "DATABASE_URL", "get_secret_key", "DATA_DIR"]
+__all__ = [
+    "CommandRunnerConfig",
+    "JobManagerEnvironmentConfig",
+    "DATABASE_URL",
+    "get_secret_key",
+    "DATA_DIR",
+]

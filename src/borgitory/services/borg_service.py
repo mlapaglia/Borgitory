@@ -10,10 +10,9 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, cast
 from starlette.responses import StreamingResponse
 
 from borgitory.models.database import Repository, Job
-from borgitory.services.jobs.job_executor import JobExecutor
-from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.protocols import (
     CommandRunnerProtocol,
+    ProcessExecutorProtocol,
     VolumeServiceProtocol,
     JobManagerProtocol,
 )
@@ -31,15 +30,21 @@ logger = logging.getLogger(__name__)
 class BorgService:
     def __init__(
         self,
-        job_executor: Optional[JobExecutor] = None,
-        command_runner: Optional[CommandRunnerProtocol] = None,
-        job_manager: Optional[JobManagerProtocol] = None,
-        volume_service: Optional[VolumeServiceProtocol] = None,
+        job_executor: ProcessExecutorProtocol,
+        command_runner: CommandRunnerProtocol,
+        job_manager: JobManagerProtocol,
+        volume_service: VolumeServiceProtocol,
     ) -> None:
-        self.job_executor = job_executor or JobExecutor()
-        if command_runner is None:
-            from borgitory.config.command_runner_config import CommandRunnerConfig
-            command_runner = SimpleCommandRunner(config=CommandRunnerConfig())
+        """
+        Initialize BorgService with mandatory dependency injection.
+
+        Args:
+            job_executor: Job executor for running Borg processes
+            command_runner: Command runner for executing system commands
+            job_manager: Job manager for handling job lifecycle
+            volume_service: Volume service for discovering mounted volumes
+        """
+        self.job_executor = job_executor
         self.command_runner = command_runner
         self.job_manager = job_manager
         self.volume_service = volume_service
@@ -49,11 +54,7 @@ class BorgService:
         )
 
     def _get_job_manager(self) -> JobManagerProtocol:
-        """Get job manager instance - must be injected via DI"""
-        if self.job_manager is None:
-            raise RuntimeError(
-                "JobManager not provided - must be injected via dependency injection"
-            )
+        """Get job manager instance - guaranteed to be available via DI"""
         return self.job_manager
 
     def _parse_borg_config(self, repo_path: str) -> Dict[str, Any]:
@@ -663,14 +664,11 @@ class BorgService:
 
     async def _get_mounted_volumes(self) -> List[str]:
         """Get mounted volumes (abstracted for testing)"""
-        if self.volume_service:
-            return await self.volume_service.get_mounted_volumes()
-        else:
-            # Fallback: use direct import (for backward compatibility)
-            from borgitory.dependencies import get_volume_service
-
-            volume_service = get_volume_service()
-            return await volume_service.get_mounted_volumes()
+        if self.volume_service is None:
+            raise RuntimeError(
+                "VolumeService not provided - must be injected via dependency injection"
+            )
+        return await self.volume_service.get_mounted_volumes()
 
     async def scan_for_repositories(self) -> List[Dict[str, Any]]:
         """Scan for Borg repositories using SimpleCommandRunner"""

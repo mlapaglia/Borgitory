@@ -77,7 +77,7 @@ async def get_schedules_form(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Get schedules form with all dropdowns populated"""
-    form_data = config_service.get_schedule_form_data(db)
+    form_data = config_service.get_schedule_form_data()
 
     return templates.TemplateResponse(
         request,
@@ -271,7 +271,7 @@ async def get_schedule_edit_form(
         if schedule is None:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
-        form_data = config_service.get_schedule_form_data(db)
+        form_data = config_service.get_schedule_form_data()
         context = {**form_data, "schedule": schedule, "is_edit_mode": True}
 
         return templates.TemplateResponse(

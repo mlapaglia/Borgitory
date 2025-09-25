@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class MountStatEntry(TypedDict):
     """Statistics for a single mount entry"""
+
     archive: str
     mount_point: str
     mounted_at: str
@@ -31,6 +32,7 @@ class MountStatEntry(TypedDict):
 
 class MountStatsResponse(TypedDict):
     """Response structure for mount statistics"""
+
     active_mounts: int
     mounts: List[MountStatEntry]
 

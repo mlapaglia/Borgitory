@@ -41,7 +41,7 @@ class TestSchedulesAPI:
 
         # Create real services with test database
         schedule_service = ScheduleService(test_db, mock_scheduler_service)
-        configuration_service = ConfigurationService()
+        configuration_service = ConfigurationService(test_db)
 
         # Override dependencies
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
