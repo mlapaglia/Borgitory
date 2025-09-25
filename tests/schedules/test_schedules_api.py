@@ -10,7 +10,7 @@ from borgitory.models.database import (
     Schedule,
     Repository,
     CloudSyncConfig,
-    CleanupConfig,
+    PruneConfig,
     NotificationConfig,
 )
 from borgitory.dependencies import (
@@ -78,7 +78,7 @@ class TestSchedulesAPI:
     ) -> None:
         """Test getting schedules form returns HTML template."""
         # Create some test configurations with required fields
-        cleanup_config = CleanupConfig()
+        cleanup_config = PruneConfig()
         cleanup_config.name = "test-cleanup"
         cleanup_config.strategy = "simple"
         cleanup_config.keep_daily = 7

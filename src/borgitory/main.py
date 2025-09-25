@@ -20,10 +20,10 @@ from borgitory.api import (
     auth,
     schedules,
     cloud_sync,
-    cleanup,
     backups,
     notifications,
     debug,
+    prune,
     repository_stats,
     repository_check_configs,
     shared,
@@ -145,7 +145,7 @@ app.include_router(
 )
 
 app.include_router(
-    cleanup.router,
+    prune.router,
     prefix="/api/prune",
     tags=["prune"],
 )

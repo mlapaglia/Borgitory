@@ -4,6 +4,7 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 
+from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 
 
@@ -25,7 +26,7 @@ class JobType(str, Enum):
     CHECK = "check"
 
 
-class CleanupStrategy(str, Enum):
+class PruneStrategy(str, Enum):
     SIMPLE = "simple"
     ADVANCED = "advanced"
 
@@ -345,11 +346,11 @@ class Schedule(ScheduleBase):
     }
 
 
-class CleanupConfigBase(BaseModel):
+class PruneConfigBase(BaseModel):
     name: str = Field(
-        min_length=1, max_length=128, description="Cleanup configuration name"
+        min_length=1, max_length=128, description="Prune configuration name"
     )
-    strategy: CleanupStrategy = CleanupStrategy.SIMPLE
+    strategy: PruneStrategy = PruneStrategy.SIMPLE
     keep_within_days: Optional[int] = Field(
         None, gt=0, description="Days to keep (simple strategy)"
     )
@@ -371,11 +372,11 @@ class CleanupConfigBase(BaseModel):
     save_space: bool = False
 
 
-class CleanupConfigCreate(CleanupConfigBase):
+class PruneConfigCreate(PruneConfigBase):
     pass
 
 
-class CleanupConfigUpdate(BaseModel):
+class PruneConfigUpdate(BaseModel):
     name: Optional[str] = None
     strategy: Optional[str] = None
     keep_within_days: Optional[int] = None
@@ -392,7 +393,7 @@ class CleanupConfigUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
-class CleanupConfig(CleanupConfigBase):
+class PruneConfig(PruneConfigBase):
     id: int = Field(gt=0)
     enabled: bool
     created_at: datetime
@@ -522,7 +523,7 @@ class CloudSyncConfigBase(BaseModel):
     path_prefix: str = Field(
         default="", max_length=255, description="Optional path prefix for cloud storage"
     )
-    provider_config: Dict[str, Union[str, int, float, bool]] = Field(
+    provider_config: ConfigDict = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
 
@@ -568,7 +569,7 @@ class CloudSyncConfigUpdate(BaseModel):
     )
     provider: Optional[str] = None
     path_prefix: Optional[str] = Field(None, max_length=255)
-    provider_config: Optional[Dict[str, Union[str, int, float, bool]]] = Field(
+    provider_config: Optional[ConfigDict] = Field(
         None, description="Provider-specific configuration"
     )
     enabled: Optional[bool] = None
@@ -737,7 +738,7 @@ class RepositoryCheckConfig(RepositoryCheckConfigBase):
 
 class PruneRequest(BaseModel):
     repository_id: int = Field(gt=0)
-    strategy: CleanupStrategy = CleanupStrategy.SIMPLE
+    strategy: PruneStrategy = PruneStrategy.SIMPLE
     # Simple strategy
     keep_within_days: Optional[int] = Field(None, gt=0)
     # Advanced strategy

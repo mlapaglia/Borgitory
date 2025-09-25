@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from borgitory.models.database import (
     Repository,
-    CleanupConfig,
+    PruneConfig,
     CloudSyncConfig,
     NotificationConfig,
     RepositoryCheckConfig,
@@ -69,7 +69,7 @@ class TestBackupsAPI:
         test_db.add(repository)
 
         # Create enabled cleanup config
-        cleanup_config = CleanupConfig(
+        cleanup_config = PruneConfig(
             name="test-cleanup",
             enabled=True,
             strategy="advanced",
@@ -141,7 +141,7 @@ class TestBackupsAPI:
     ) -> None:
         """Test that only enabled configs are returned in the form."""
         # Create disabled cleanup config
-        disabled_cleanup = CleanupConfig(
+        disabled_cleanup = PruneConfig(
             name="disabled-cleanup",
             enabled=False,  # This should not appear
             strategy="advanced",
@@ -153,7 +153,7 @@ class TestBackupsAPI:
         test_db.add(disabled_cleanup)
 
         # Create enabled cleanup config
-        enabled_cleanup = CleanupConfig(
+        enabled_cleanup = PruneConfig(
             name="enabled-cleanup",
             enabled=True,  # This should appear
             strategy="advanced",
@@ -178,7 +178,7 @@ class TestBackupsAPI:
         # Create multiple configs of each type with different enabled states
         configs = [
             # Cleanup configs
-            CleanupConfig(
+            PruneConfig(
                 name="cleanup-1",
                 enabled=True,
                 strategy="advanced",
@@ -190,7 +190,7 @@ class TestBackupsAPI:
                 keep_monthly=6,
                 keep_yearly=1,
             ),
-            CleanupConfig(
+            PruneConfig(
                 name="cleanup-2",
                 enabled=False,
                 strategy="advanced",
@@ -202,7 +202,7 @@ class TestBackupsAPI:
                 keep_monthly=6,
                 keep_yearly=1,
             ),
-            CleanupConfig(
+            PruneConfig(
                 name="cleanup-3",
                 enabled=True,
                 strategy="advanced",
@@ -336,7 +336,7 @@ class TestBackupsAPI:
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
 
-        cleanup_config = CleanupConfig(
+        cleanup_config = PruneConfig(
             name="context-cleanup",
             enabled=True,
             strategy="advanced",

@@ -2,6 +2,7 @@
 Tests for hook integration with TaskDefinitionBuilder.
 """
 
+import json
 from unittest.mock import Mock
 import pytest
 from sqlalchemy.orm import Session
@@ -24,11 +25,11 @@ class TestTaskDefinitionBuilderHookIntegration:
             repository_name="test-repo",
         )
 
-        assert task["type"] == "hook"
-        assert task["name"] == "Pre-job hook: Test Hook (test-repo)"
-        assert task["hook_name"] == "Test Hook"
-        assert task["hook_command"] == "echo 'hello'"
-        assert task["hook_type"] == "pre"
+        assert task.type == "hook"  # type: ignore
+        assert task.name == "Pre-job hook: Test Hook (test-repo)"
+        assert task.parameters["hook_name"] == "Test Hook"
+        assert task.parameters["hook_command"] == "echo 'hello'"
+        assert task.parameters["hook_type"] == "pre"
 
     def test_build_hook_task_without_repository_name(self) -> None:
         """Test building hook task without repository name."""
@@ -39,7 +40,7 @@ class TestTaskDefinitionBuilderHookIntegration:
             hook_name="Simple Hook", hook_command="ls -la", hook_type="post"
         )
 
-        assert task["name"] == "Post-job hook: Simple Hook"
+        assert task.name == "Post-job hook: Simple Hook"
 
     def test_build_hooks_from_json_empty(self) -> None:
         """Test building hooks from empty JSON."""
@@ -74,15 +75,14 @@ class TestTaskDefinitionBuilderHookIntegration:
         assert len(tasks) == 1
 
         task = tasks[0]
-        assert task["type"] == "hook"
-        assert task["hook_type"] == "pre"
-        assert task["name"] == "Pre-job hooks (test-repo)"
+        assert task.type == "hook"
+        assert task.parameters["hook_type"] == "pre"
+        assert task.name == "Pre-job hooks (test-repo)"
 
         # The hooks JSON should be passed as a parameter
-        assert "hooks" in task
-        import json
+        assert task.parameters["hooks"] is not None
 
-        parsed_hooks = json.loads(task["hooks"])
+        parsed_hooks = json.loads(str(task.parameters["hooks"]))
         assert len(parsed_hooks) == 2
         assert parsed_hooks[0]["name"] == "Pre Hook 1"
         assert parsed_hooks[0]["command"] == "echo starting"
@@ -129,17 +129,17 @@ class TestTaskDefinitionBuilderHookIntegration:
         assert len(tasks) >= 3
 
         # First task should be pre-hook (bundled)
-        assert tasks[0]["type"] == "hook"
-        assert tasks[0]["hook_type"] == "pre"
-        assert "Pre-job hooks" in tasks[0]["name"]
+        assert tasks[0].type == "hook"
+        assert tasks[0].parameters["hook_type"] == "pre"
+        assert "Pre-job hooks" in tasks[0].name
 
         # Last task should be post-hook (bundled)
-        assert tasks[-1]["type"] == "hook"
-        assert tasks[-1]["hook_type"] == "post"
-        assert "Post-job hooks" in tasks[-1]["name"]
+        assert tasks[-1].type == "hook"
+        assert tasks[-1].parameters["hook_type"] == "post"
+        assert "Post-job hooks" in tasks[-1].name
 
         # Should have backup task somewhere in the middle
-        backup_tasks = [task for task in tasks if task["type"] == "backup"]
+        backup_tasks = [task for task in tasks if task.type == "backup"]
         assert len(backup_tasks) == 1
 
     def test_build_task_list_with_hooks_and_other_tasks(self) -> None:
@@ -173,7 +173,7 @@ class TestTaskDefinitionBuilderHookIntegration:
         )
 
         # Extract task types in order
-        task_types = [task["type"] for task in tasks]
+        task_types = [task.type for task in tasks]
 
         # Should start with pre-hook and end with post-hook
         assert task_types[0] == "hook"
@@ -186,9 +186,9 @@ class TestTaskDefinitionBuilderHookIntegration:
 
         # Verify hooks are correctly positioned
         pre_hook_task = tasks[0]
-        assert pre_hook_task["hook_type"] == "pre"
-        assert "Pre-job hooks" in pre_hook_task["name"]
+        assert pre_hook_task.parameters["hook_type"] == "pre"
+        assert "Pre-job hooks" in pre_hook_task.name
 
         post_hook_task = tasks[-1]
-        assert post_hook_task["hook_type"] == "post"
-        assert "Post-job hooks" in post_hook_task["name"]
+        assert post_hook_task.parameters["hook_type"] == "post"
+        assert "Post-job hooks" in post_hook_task.name

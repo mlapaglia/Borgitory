@@ -3,7 +3,7 @@ function borgitoryApp() {
     return {
         cloudSyncConfigs: [],
         notificationConfigs: [],
-        cleanupConfigs: [],
+        pruneConfigs: [],
         checkConfigs: [],
         
         initApp() {

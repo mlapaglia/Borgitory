@@ -185,7 +185,7 @@ class Schedule(Base):
         "Repository", back_populates="schedules"
     )
     cloud_sync_config: Mapped["CloudSyncConfig"] = relationship("CloudSyncConfig")
-    cleanup_config: Mapped["CleanupConfig"] = relationship("CleanupConfig")
+    cleanup_config: Mapped["PruneConfig"] = relationship("PruneConfig")
     check_config: Mapped["RepositoryCheckConfig"] = relationship(
         "RepositoryCheckConfig"
     )
@@ -248,7 +248,7 @@ class Setting(Base):
     )
 
 
-class CleanupConfig(Base):
+class PruneConfig(Base):
     __tablename__ = "cleanup_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

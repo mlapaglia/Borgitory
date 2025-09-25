@@ -13,8 +13,8 @@
     
     <!-- Existing Prune Policies -->
     <div id="cleanup-config-list" 
-         hx-get="/api/prune/html" 
-         hx-trigger="load, cleanupConfigUpdate from:body" 
+         hx-get="/api/prune/" 
+         hx-trigger="load, pruneConfigUpdate from:body" 
          hx-swap="innerHTML">
         <div class="text-gray-600 dark:text-gray-400 text-sm">Loading prune policies...</div>
     </div>

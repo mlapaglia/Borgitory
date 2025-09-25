@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from borgitory.models.database import (
     Repository,
-    CleanupConfig,
+    PruneConfig,
     CloudSyncConfig,
     NotificationConfig,
     RepositoryCheckConfig,
@@ -25,9 +25,7 @@ async def get_backup_form(
 ) -> HTMLResponse:
     """Get backup form with all dropdowns populated"""
     repositories = db.query(Repository).all()
-    cleanup_configs = (
-        db.query(CleanupConfig).filter(CleanupConfig.enabled.is_(True)).all()
-    )
+    prune_configs = db.query(PruneConfig).filter(PruneConfig.enabled.is_(True)).all()
     cloud_sync_configs = (
         db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled.is_(True)).all()
     )
@@ -45,7 +43,7 @@ async def get_backup_form(
         "partials/backups/manual_form.html",
         {
             "repositories": repositories,
-            "cleanup_configs": cleanup_configs,
+            "prune_configs": prune_configs,
             "cloud_sync_configs": cloud_sync_configs,
             "notification_configs": notification_configs,
             "check_configs": check_configs,

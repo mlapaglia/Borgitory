@@ -1,66 +1,62 @@
 """
-Cleanup Config Business Logic Service.
-Handles all cleanup configuration-related business operations independent of HTTP concerns.
+Pruning Config Business Logic Service.
+Handles all prune configuration-related business operations independent of HTTP concerns.
 """
 
 import logging
 from typing import List, Optional, Dict, Tuple, Union
 from sqlalchemy.orm import Session
 
-from borgitory.models.database import CleanupConfig, Repository
-from borgitory.models.schemas import CleanupConfigCreate, CleanupConfigUpdate
+from borgitory.models.database import PruneConfig, Repository
+from borgitory.models.schemas import PruneConfigCreate, PruneConfigUpdate
 from borgitory.constants.retention import RetentionFieldHandler
 
 logger = logging.getLogger(__name__)
 
 
-class CleanupService:
-    """Service for cleanup configuration business logic operations."""
+class PruneService:
+    """Service for prune configuration business logic operations."""
 
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def get_cleanup_configs(
-        self, skip: int = 0, limit: int = 100
-    ) -> List[CleanupConfig]:
-        """Get all cleanup configurations with pagination."""
-        return self.db.query(CleanupConfig).offset(skip).limit(limit).all()
+    def get_prune_configs(self, skip: int = 0, limit: int = 100) -> List[PruneConfig]:
+        """Get all prune configurations with pagination."""
+        return self.db.query(PruneConfig).offset(skip).limit(limit).all()
 
-    def get_cleanup_config_by_id(self, config_id: int) -> Optional[CleanupConfig]:
-        """Get a cleanup configuration by ID."""
-        config = (
-            self.db.query(CleanupConfig).filter(CleanupConfig.id == config_id).first()
-        )
+    def get_prune_config_by_id(self, config_id: int) -> Optional[PruneConfig]:
+        """Get a prune configuration by ID."""
+        config = self.db.query(PruneConfig).filter(PruneConfig.id == config_id).first()
         if not config:
-            raise Exception(f"Cleanup configuration with id {config_id} not found")
+            raise Exception(f"Prune configuration with id {config_id} not found")
         return config
 
-    def create_cleanup_config(
-        self, cleanup_config: CleanupConfigCreate
-    ) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
+    def create_prune_config(
+        self, prune_config: PruneConfigCreate
+    ) -> Tuple[bool, Optional[PruneConfig], Optional[str]]:
         """
-        Create a new cleanup configuration.
+        Create a new prune configuration.
 
         Returns:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
             existing = (
-                self.db.query(CleanupConfig)
-                .filter(CleanupConfig.name == cleanup_config.name)
+                self.db.query(PruneConfig)
+                .filter(PruneConfig.name == prune_config.name)
                 .first()
             )
             if existing:
                 return False, None, "A prune policy with this name already exists"
 
-            db_config = CleanupConfig()
-            db_config.name = cleanup_config.name
-            db_config.strategy = cleanup_config.strategy
-            db_config.keep_within_days = cleanup_config.keep_within_days
-            RetentionFieldHandler.copy_fields(cleanup_config, db_config)
-            db_config.show_list = cleanup_config.show_list
-            db_config.show_stats = cleanup_config.show_stats
-            db_config.save_space = cleanup_config.save_space
+            db_config = PruneConfig()
+            db_config.name = prune_config.name
+            db_config.strategy = prune_config.strategy
+            db_config.keep_within_days = prune_config.keep_within_days
+            RetentionFieldHandler.copy_fields(prune_config, db_config)
+            db_config.show_list = prune_config.show_list
+            db_config.show_stats = prune_config.show_stats
+            db_config.save_space = prune_config.save_space
             db_config.enabled = True
 
             self.db.add(db_config)
@@ -71,33 +67,31 @@ class CleanupService:
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to create cleanup configuration: {str(e)}"
+            return False, None, f"Failed to create prune configuration: {str(e)}"
 
-    def update_cleanup_config(
-        self, config_id: int, config_update: CleanupConfigUpdate
-    ) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
+    def update_prune_config(
+        self, config_id: int, prune_config_update: PruneConfigUpdate
+    ) -> Tuple[bool, Optional[PruneConfig], Optional[str]]:
         """
-        Update an existing cleanup configuration.
+        Update an existing prune configuration.
 
         Returns:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
             config = (
-                self.db.query(CleanupConfig)
-                .filter(CleanupConfig.id == config_id)
-                .first()
+                self.db.query(PruneConfig).filter(PruneConfig.id == config_id).first()
             )
             if not config:
-                return False, None, "Cleanup configuration not found"
+                return False, None, "Prune configuration not found"
 
-            update_dict = config_update.model_dump(exclude_unset=True)
+            update_dict = prune_config_update.model_dump(exclude_unset=True)
             if "name" in update_dict and update_dict["name"] != config.name:
                 existing = (
-                    self.db.query(CleanupConfig)
+                    self.db.query(PruneConfig)
                     .filter(
-                        CleanupConfig.name == update_dict["name"],
-                        CleanupConfig.id != config_id,
+                        PruneConfig.name == update_dict["name"],
+                        PruneConfig.id != config_id,
                     )
                     .first()
                 )
@@ -115,25 +109,25 @@ class CleanupService:
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to update cleanup configuration: {str(e)}"
+            return False, None, f"Failed to update prune configuration: {str(e)}"
 
-    def enable_cleanup_config(
-        self, config_id: int
-    ) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
+    def enable_prune_config(
+        self, prune_config_id: int
+    ) -> Tuple[bool, Optional[PruneConfig], Optional[str]]:
         """
-        Enable a cleanup configuration.
+        Enable a prune configuration.
 
         Returns:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
             config = (
-                self.db.query(CleanupConfig)
-                .filter(CleanupConfig.id == config_id)
+                self.db.query(PruneConfig)
+                .filter(PruneConfig.id == prune_config_id)
                 .first()
             )
             if not config:
-                return False, None, "Cleanup configuration not found"
+                return False, None, "Prune configuration not found"
 
             config.enabled = True
             self.db.commit()
@@ -143,25 +137,25 @@ class CleanupService:
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to enable cleanup configuration: {str(e)}"
+            return False, None, f"Failed to enable prune configuration: {str(e)}"
 
-    def disable_cleanup_config(
-        self, config_id: int
-    ) -> Tuple[bool, Optional[CleanupConfig], Optional[str]]:
+    def disable_prune_config(
+        self, prune_config_id: int
+    ) -> Tuple[bool, Optional[PruneConfig], Optional[str]]:
         """
-        Disable a cleanup configuration.
+        Disable a prune configuration.
 
         Returns:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
             config = (
-                self.db.query(CleanupConfig)
-                .filter(CleanupConfig.id == config_id)
+                self.db.query(PruneConfig)
+                .filter(PruneConfig.id == prune_config_id)
                 .first()
             )
             if not config:
-                return False, None, "Cleanup configuration not found"
+                return False, None, "Prune configuration not found"
 
             config.enabled = False
             self.db.commit()
@@ -171,25 +165,25 @@ class CleanupService:
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to disable cleanup configuration: {str(e)}"
+            return False, None, f"Failed to disable prune configuration: {str(e)}"
 
-    def delete_cleanup_config(
-        self, config_id: int
+    def delete_prune_config(
+        self, prune_config_id: int
     ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
-        Delete a cleanup configuration.
+        Delete a prune configuration.
 
         Returns:
             tuple: (success, config_name_or_none, error_message_or_none)
         """
         try:
             config = (
-                self.db.query(CleanupConfig)
-                .filter(CleanupConfig.id == config_id)
+                self.db.query(PruneConfig)
+                .filter(PruneConfig.id == prune_config_id)
                 .first()
             )
             if not config:
-                return False, None, "Cleanup configuration not found"
+                return False, None, "Prune configuration not found"
 
             config_name = config.name
             self.db.delete(config)
@@ -199,22 +193,22 @@ class CleanupService:
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to delete cleanup configuration: {str(e)}"
+            return False, None, f"Failed to delete prune configuration: {str(e)}"
 
     def get_configs_with_descriptions(
         self,
     ) -> List[Dict[str, Union[str, int, bool, None]]]:
         """
-        Get all cleanup configurations with computed description fields.
+        Get all prune configurations with computed description fields.
 
         Returns:
             List of dictionaries with config data and computed fields
         """
         try:
-            cleanup_configs_raw = self.get_cleanup_configs()
+            prune_configs_raw = self.get_prune_configs()
 
             processed_configs = []
-            for config in cleanup_configs_raw:
+            for config in prune_configs_raw:
                 if config.strategy == "simple":
                     description = f"Keep archives within {config.keep_within_days} days"
                 else:
@@ -231,7 +225,7 @@ class CleanupService:
             return []
 
     def get_form_data(self) -> Dict[str, List[Repository]]:
-        """Get data needed for cleanup form."""
+        """Get data needed for prune form."""
         try:
             repositories = self.db.query(Repository).all()
 

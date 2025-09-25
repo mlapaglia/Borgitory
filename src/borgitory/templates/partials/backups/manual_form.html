@@ -36,9 +36,9 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Prune (Optional)</label>
-                <select name="cleanup_config_id" id="backup-cleanup-select" class="select-modern w-full">
-                    <option value="">No cleanup</option>
-                    {% for config in cleanup_configs %}
+                <select name="prune_config_id" id="backup-cleanup-select" class="select-modern w-full">
+                    <option value="">No prune</option>
+                    {% for config in prune_configs %}
                     <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>

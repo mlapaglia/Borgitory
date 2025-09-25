@@ -267,10 +267,10 @@ class TestTabsAPI:
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
     @pytest.mark.asyncio
-    async def test_get_cleanup_tab(
+    async def test_get_prune_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
-        """Test getting cleanup tab content."""
+        """Test getting prune tab content."""
         response = await async_client.get("/api/tabs/prune")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"

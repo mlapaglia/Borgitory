@@ -3,7 +3,7 @@ Tests for JobService business logic - Database operations and service methods
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 from borgitory.utils.datetime_utils import now_utc
 
 from sqlalchemy.orm import Session
@@ -12,7 +12,7 @@ from borgitory.services.jobs.job_service import JobService
 from borgitory.models.database import (
     Repository,
     Job,
-    CleanupConfig,
+    PruneConfig,
     RepositoryCheckConfig,
 )
 from borgitory.models.schemas import (
@@ -20,7 +20,7 @@ from borgitory.models.schemas import (
     PruneRequest,
     CheckRequest,
     CompressionType,
-    CleanupStrategy,
+    PruneStrategy,
     CheckType,
 )
 from borgitory.models.enums import JobType
@@ -31,7 +31,9 @@ class TestJobService:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
+        # Create properly configured mocks with async methods
         self.mock_job_manager = Mock()
+        self.mock_job_manager.create_composite_job = AsyncMock()
         self.mock_db = Mock()
         self.job_service = JobService(
             db=self.mock_db, job_manager=self.mock_job_manager
@@ -48,8 +50,8 @@ class TestJobService:
         test_db.add(repository)
         test_db.commit()
 
-        # Mock the job manager
-        self.mock_job_manager.create_composite_job = AsyncMock(return_value="job-123")
+        # Configure mock return value
+        self.mock_job_manager.create_composite_job.return_value = "job-123"
 
         backup_request = BackupRequest(
             repository_id=repository.id,
@@ -76,7 +78,7 @@ class TestJobService:
         call_args = self.mock_job_manager.create_composite_job.call_args
         assert call_args.kwargs["job_type"] == JobType.MANUAL_BACKUP
         assert len(call_args.kwargs["task_definitions"]) == 1
-        assert call_args.kwargs["task_definitions"][0]["type"] == "backup"
+        assert call_args.kwargs["task_definitions"][0].type == "backup"
 
     @pytest.mark.asyncio
     async def test_create_backup_job_with_cleanup(self, test_db: Session) -> None:
@@ -86,7 +88,7 @@ class TestJobService:
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
-        cleanup_config = CleanupConfig()
+        cleanup_config = PruneConfig()
         cleanup_config.name = "test-cleanup"
         cleanup_config.strategy = "simple"
         cleanup_config.keep_within_days = 30
@@ -122,9 +124,9 @@ class TestJobService:
         call_args = self.mock_job_manager.create_composite_job.call_args
         task_definitions = call_args.kwargs["task_definitions"]
         assert len(task_definitions) == 2
-        assert task_definitions[0]["type"] == "backup"
-        assert task_definitions[1]["type"] == "prune"
-        assert task_definitions[1]["keep_within"] == "30d"
+        assert task_definitions[0].type == "backup"
+        assert task_definitions[1].type == "prune"
+        assert task_definitions[1].parameters["keep_within"] == "30d"
 
     @pytest.mark.asyncio
     async def test_create_backup_job_repository_not_found(
@@ -159,38 +161,39 @@ class TestJobService:
         test_db.add(repository)
         test_db.commit()
 
-        with patch.object(
-            self.job_service.job_manager, "create_composite_job", new_callable=AsyncMock
-        ) as mock_create_job:
-            mock_create_job.return_value = "prune-job-123"
+        # Configure mock return value
+        self.mock_job_manager.create_composite_job.return_value = "prune-job-123"
 
-            prune_request = PruneRequest(
-                repository_id=repository.id,
-                strategy=CleanupStrategy.SIMPLE,
-                keep_within_days=7,
-                keep_daily=None,
-                keep_weekly=None,
-                keep_monthly=None,
-                keep_yearly=None,
-                dry_run=False,
-                show_list=True,
-                show_stats=True,
-                save_space=False,
-                force_prune=False,
-            )
+        prune_request = PruneRequest(
+            repository_id=repository.id,
+            strategy=PruneStrategy.SIMPLE,
+            keep_within_days=7,
+            keep_daily=None,
+            keep_weekly=None,
+            keep_monthly=None,
+            keep_yearly=None,
+            keep_secondly=None,
+            keep_minutely=None,
+            keep_hourly=None,
+            dry_run=False,
+            show_list=True,
+            show_stats=True,
+            save_space=False,
+            force_prune=False,
+        )
 
-            # Override mock db with real test_db for this test
-            self.job_service.db = test_db
-            result = await self.job_service.create_prune_job(prune_request)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = await self.job_service.create_prune_job(prune_request)
 
-            assert result["job_id"] == "prune-job-123"
-            assert result["status"] == "started"
+        assert result["job_id"] == "prune-job-123"
+        assert result["status"] == "started"
 
-            # Verify task definition
-            call_args = mock_create_job.call_args
-            task_def = call_args.kwargs["task_definitions"][0]
-            assert task_def["type"] == "prune"
-            assert task_def["keep_within"] == "7d"
+        # Verify task definition
+        call_args = self.mock_job_manager.create_composite_job.call_args
+        task_def = call_args.kwargs["task_definitions"][0]
+        assert task_def.type == "prune"
+        assert task_def.parameters["keep_within"] == "7d"
 
     @pytest.mark.asyncio
     async def test_create_prune_job_advanced_strategy(self, test_db: Session) -> None:
@@ -202,39 +205,40 @@ class TestJobService:
         test_db.add(repository)
         test_db.commit()
 
-        with patch.object(
-            self.job_service.job_manager, "create_composite_job", new_callable=AsyncMock
-        ) as mock_create_job:
-            mock_create_job.return_value = "prune-job-123"
+        # Configure mock return value
+        self.mock_job_manager.create_composite_job.return_value = "prune-job-123"
 
-            prune_request = PruneRequest(
-                repository_id=repository.id,
-                strategy=CleanupStrategy.ADVANCED,
-                keep_within_days=None,
-                keep_daily=7,
-                keep_weekly=4,
-                keep_monthly=6,
-                keep_yearly=1,
-                dry_run=False,
-                show_list=True,
-                show_stats=True,
-                save_space=False,
-                force_prune=False,
-            )
+        prune_request = PruneRequest(
+            repository_id=repository.id,
+            strategy=PruneStrategy.ADVANCED,
+            keep_within_days=None,
+            keep_daily=7,
+            keep_weekly=4,
+            keep_monthly=6,
+            keep_yearly=1,
+            keep_secondly=None,
+            keep_minutely=None,
+            keep_hourly=None,
+            dry_run=False,
+            show_list=True,
+            show_stats=True,
+            save_space=False,
+            force_prune=False,
+        )
 
-            # Override mock db with real test_db for this test
-            self.job_service.db = test_db
-            result = await self.job_service.create_prune_job(prune_request)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = await self.job_service.create_prune_job(prune_request)
 
-            assert result["job_id"] == "prune-job-123"
+        assert result["job_id"] == "prune-job-123"
 
-            # Verify task definition includes all retention parameters
-            call_args = mock_create_job.call_args
-            task_def = call_args.kwargs["task_definitions"][0]
-            assert task_def["keep_daily"] == 7
-            assert task_def["keep_weekly"] == 4
-            assert task_def["keep_monthly"] == 6
-            assert task_def["keep_yearly"] == 1
+        # Verify task definition includes all retention parameters
+        call_args = self.mock_job_manager.create_composite_job.call_args
+        task_def = call_args.kwargs["task_definitions"][0]
+        assert task_def.parameters["keep_daily"] == 7
+        assert task_def.parameters["keep_weekly"] == 4
+        assert task_def.parameters["keep_monthly"] == 6
+        assert task_def.parameters["keep_yearly"] == 1
 
     @pytest.mark.asyncio
     async def test_create_check_job_with_config(self, test_db: Session) -> None:
@@ -254,35 +258,33 @@ class TestJobService:
         test_db.add_all([repository, check_config])
         test_db.commit()
 
-        with patch.object(
-            self.job_service.job_manager, "create_composite_job", new_callable=AsyncMock
-        ) as mock_create_job:
-            mock_create_job.return_value = "check-job-123"
+        # Configure mock return value
+        self.mock_job_manager.create_composite_job.return_value = "check-job-123"
 
-            check_request = CheckRequest(
-                repository_id=repository.id,
-                check_config_id=check_config.id,
-                max_duration=None,
-                archive_prefix=None,
-                archive_glob=None,
-                first_n_archives=None,
-                last_n_archives=None,
-            )
+        check_request = CheckRequest(
+            repository_id=repository.id,
+            check_config_id=check_config.id,
+            max_duration=None,
+            archive_prefix=None,
+            archive_glob=None,
+            first_n_archives=None,
+            last_n_archives=None,
+        )
 
-            # Override mock db with real test_db for this test
-            self.job_service.db = test_db
-            result = await self.job_service.create_check_job(check_request)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = await self.job_service.create_check_job(check_request)
 
-            assert result["job_id"] == "check-job-123"
-            assert result["status"] == "started"
+        assert result["job_id"] == "check-job-123"
+        assert result["status"] == "started"
 
-            # Verify task definition uses config parameters
-            call_args = mock_create_job.call_args
-            task_def = call_args.kwargs["task_definitions"][0]
-            assert task_def["type"] == "check"
-            assert task_def["check_type"] == "repository"
-            assert task_def["verify_data"] is True
-            assert task_def["save_space"] is True
+        # Verify task definition uses config parameters
+        call_args = self.mock_job_manager.create_composite_job.call_args
+        task_def = call_args.kwargs["task_definitions"][0]
+        assert task_def.type == "check"
+        assert task_def.parameters["check_type"] == "repository"
+        assert task_def.parameters["verify_data"] is True
+        assert task_def.parameters["save_space"] is True
 
     @pytest.mark.asyncio
     async def test_create_check_job_custom_parameters(self, test_db: Session) -> None:
@@ -294,38 +296,36 @@ class TestJobService:
         test_db.add(repository)
         test_db.commit()
 
-        with patch.object(
-            self.job_service.job_manager, "create_composite_job", new_callable=AsyncMock
-        ) as mock_create_job:
-            mock_create_job.return_value = "check-job-123"
+        # Configure mock return value
+        self.mock_job_manager.create_composite_job.return_value = "check-job-123"
 
-            check_request = CheckRequest(
-                repository_id=repository.id,
-                check_config_id=None,
-                check_type=CheckType.ARCHIVES_ONLY,
-                verify_data=False,
-                repair_mode=False,
-                save_space=False,
-                max_duration=None,
-                archive_prefix=None,
-                archive_glob=None,
-                first_n_archives=10,
-                last_n_archives=None,
-            )
+        check_request = CheckRequest(
+            repository_id=repository.id,
+            check_config_id=None,
+            check_type=CheckType.ARCHIVES_ONLY,
+            verify_data=False,
+            repair_mode=False,
+            save_space=False,
+            max_duration=None,
+            archive_prefix=None,
+            archive_glob=None,
+            first_n_archives=10,
+            last_n_archives=None,
+        )
 
-            # Override mock db with real test_db for this test
-            self.job_service.db = test_db
-            result = await self.job_service.create_check_job(check_request)
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = await self.job_service.create_check_job(check_request)
 
-            assert result["job_id"] == "check-job-123"
+        assert result["job_id"] == "check-job-123"
 
-            # Verify task definition uses custom parameters
-            call_args = mock_create_job.call_args
-            task_def = call_args.kwargs["task_definitions"][0]
-            assert task_def["check_type"] == "archives_only"
-            assert task_def["verify_data"] is False
-            assert task_def["repair_mode"] is False
-            assert task_def["first_n_archives"] == 10
+        # Verify task definition uses custom parameters
+        call_args = self.mock_job_manager.create_composite_job.call_args
+        task_def = call_args.kwargs["task_definitions"][0]
+        assert task_def.parameters["check_type"] == "archives_only"
+        assert task_def.parameters["verify_data"] is False
+        assert task_def.parameters["repair_mode"] is False
+        assert task_def.parameters["first_n_archives"] == 10
 
     def test_list_jobs_database_only(self, test_db: Session) -> None:
         """Test listing jobs from database only."""

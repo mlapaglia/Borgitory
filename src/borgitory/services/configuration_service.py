@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from borgitory.models.database import (
     Repository,
-    CleanupConfig,
+    PruneConfig,
     CloudSyncConfig,
     NotificationConfig,
     RepositoryCheckConfig,
@@ -22,7 +22,7 @@ class ScheduleFormData(TypedDict):
     """Type definition for schedule form data"""
 
     repositories: List[Repository]
-    cleanup_configs: List[CleanupConfig]
+    prune_configs: List[PruneConfig]
     cloud_sync_configs: List[CloudSyncConfig]
     notification_configs: List[NotificationConfig]
     check_configs: List[RepositoryCheckConfig]
@@ -58,8 +58,8 @@ class ConfigurationService:
         """
         return {
             "repositories": self.db.query(Repository).all(),
-            "cleanup_configs": self.db.query(CleanupConfig)
-            .filter(CleanupConfig.enabled)
+            "prune_configs": self.db.query(PruneConfig)
+            .filter(PruneConfig.enabled)
             .all(),
             "cloud_sync_configs": self.db.query(CloudSyncConfig)
             .filter(CloudSyncConfig.enabled)

@@ -74,7 +74,7 @@ from borgitory.services.configuration_service import ConfigurationService
 from borgitory.services.repositories.repository_check_config_service import (
     RepositoryCheckConfigService,
 )
-from borgitory.services.cleanup_service import CleanupService
+from borgitory.services.prune_service import PruneService
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
 from fastapi.templating import Jinja2Templates
@@ -593,13 +593,13 @@ def get_repository_check_config_service(
     return RepositoryCheckConfigService(db=db)
 
 
-def get_cleanup_service(db: Session = Depends(get_db)) -> CleanupService:
+def get_prune_service(db: Session = Depends(get_db)) -> PruneService:
     """
-    Provide a CleanupService instance with database session injection.
+    Provide a PruneService instance with database session injection.
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return CleanupService(db=db)
+    return PruneService(db=db)
 
 
 def get_cron_description_service() -> CronDescriptionService:
@@ -1011,7 +1011,7 @@ JobQueueManagerDep = Annotated[JobQueueManager, Depends(get_job_queue_manager)]
 JobDatabaseManagerDep = Annotated[JobDatabaseManager, Depends(get_job_database_manager)]
 EncryptionServiceDep = Annotated[EncryptionService, Depends(get_encryption_service)]
 StorageFactoryDep = Annotated[StorageFactory, Depends(get_storage_factory)]
-CleanupServiceDep = Annotated[CleanupService, Depends(get_cleanup_service)]
+PruneServiceDep = Annotated[PruneService, Depends(get_prune_service)]
 CronDescriptionServiceDep = Annotated[
     CronDescriptionService, Depends(get_cron_description_service)
 ]

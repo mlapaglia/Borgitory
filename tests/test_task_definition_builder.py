@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.models.database import (
-    CleanupConfig,
+    PruneConfig,
     RepositoryCheckConfig,
     NotificationConfig,
 )
@@ -31,7 +31,7 @@ def task_builder(mock_db: MagicMock) -> TaskDefinitionBuilder:
 @pytest.fixture
 def mock_cleanup_config() -> MagicMock:
     """Mock cleanup configuration"""
-    config = MagicMock(spec=CleanupConfig)
+    config = MagicMock(spec=PruneConfig)
     config.id = 1
     config.strategy = "simple"
     config.keep_within_days = 30
@@ -44,7 +44,7 @@ def mock_cleanup_config() -> MagicMock:
 @pytest.fixture
 def mock_advanced_cleanup_config() -> MagicMock:
     """Mock advanced cleanup configuration"""
-    config = MagicMock(spec=CleanupConfig)
+    config = MagicMock(spec=PruneConfig)
     config.id = 2
     config.strategy = "advanced"
     config.keep_secondly = None
@@ -433,7 +433,7 @@ class TestTaskDefinitionBuilder:
         # Setup mock returns for different configs
         def mock_query_side_effect(model: Any) -> MagicMock:
             query_mock = MagicMock()
-            if model == CleanupConfig:
+            if model == PruneConfig:
                 query_mock.filter.return_value.first.return_value = mock_cleanup_config
             elif model == RepositoryCheckConfig:
                 query_mock.filter.return_value.first.return_value = mock_check_config

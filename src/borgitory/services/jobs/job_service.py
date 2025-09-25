@@ -1,4 +1,5 @@
 import logging
+from borgitory.custom_types import ConfigDict
 from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
@@ -48,7 +49,7 @@ class JobService:
         # Use TaskDefinitionBuilder to create all task definitions
         builder = TaskDefinitionBuilder(self.db)
 
-        backup_params = {
+        backup_params: ConfigDict = {
             "source_path": backup_request.source_path,
             "compression": backup_request.compression,
             "dry_run": backup_request.dry_run,

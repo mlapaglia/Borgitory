@@ -6,10 +6,10 @@ by providing a consistent interface for building all task types.
 """
 
 import logging
-from typing import Dict, List, Optional, Union, cast
+from typing import List, Optional, cast
 from sqlalchemy.orm import Session
 from borgitory.models.database import (
-    CleanupConfig,
+    PruneConfig,
     RepositoryCheckConfig,
     NotificationConfig,
 )
@@ -17,6 +17,7 @@ from borgitory.models.schemas import PruneRequest, CheckRequest
 from borgitory.constants.retention import RetentionConfigProtocol, RetentionFieldHandler
 from borgitory.services.hooks.hook_config import HookConfigParser
 from borgitory.protocols.job_protocols import TaskDefinition
+from borgitory.custom_types import ConfigDict
 
 
 class TaskDefinitionBuilder:
@@ -82,15 +83,15 @@ class TaskDefinitionBuilder:
             Task definition dictionary or None if config not found
         """
         cleanup_config = (
-            self.db_session.query(CleanupConfig)
-            .filter(CleanupConfig.id == cleanup_config_id)
+            self.db_session.query(PruneConfig)
+            .filter(PruneConfig.id == cleanup_config_id)
             .first()
         )
 
         if not cleanup_config:
             return None
 
-        parameters: Dict[str, Union[str, int, float, bool, None]] = {
+        parameters: ConfigDict = {
             "dry_run": False,
             "show_list": cleanup_config.show_list,
             "show_stats": cleanup_config.show_stats,
@@ -122,7 +123,7 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary
         """
-        parameters: Dict[str, Union[str, int, float, bool, None]] = {
+        parameters: ConfigDict = {
             "dry_run": prune_request.dry_run,
             "show_list": True,  # Default for manual requests
             "show_stats": True,  # Default for manual requests
@@ -347,7 +348,7 @@ class TaskDefinitionBuilder:
         self,
         repository_name: str,
         include_backup: bool = True,
-        backup_params: Optional[Dict[str, object]] = None,
+        backup_params: Optional[ConfigDict] = None,
         cleanup_config_id: Optional[int] = None,
         prune_request: Optional[PruneRequest] = None,
         check_config_id: Optional[int] = None,

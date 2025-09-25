@@ -2,10 +2,11 @@
 Protocol interfaces for job management services.
 """
 
-from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING, Union
+from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
 from dataclasses import dataclass, field
 import asyncio
+from borgitory.custom_types import ConfigDict
 
 
 @dataclass
@@ -16,9 +17,7 @@ class TaskDefinition:
     name: str  # Human-readable task name
 
     # Additional parameters specific to the task type
-    parameters: Dict[str, Union[str, int, float, bool, None]] = field(
-        default_factory=dict
-    )
+    parameters: ConfigDict = field(default_factory=dict)
 
     # Optional scheduling/execution parameters
     priority: Optional[int] = None

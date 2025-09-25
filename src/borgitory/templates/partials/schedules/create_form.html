@@ -54,7 +54,7 @@
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Cleanup (Optional)</label>
                 <select name="cleanup_config_id" id="schedule-cleanup-select" class="select-modern w-full">
                     <option value="">No cleanup</option>
-                    {% for config in cleanup_configs %}
+                    {% for config in prune_configs %}
                     <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>

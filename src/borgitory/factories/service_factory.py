@@ -129,11 +129,10 @@ class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
             encryption_service: Optional[Any] = None,
         ) -> NotificationServiceProtocol:
             """Factory function to create NotificationService."""
-            # Use injected dependencies - no more service locator!
             provider_factory = NotificationProviderFactory(
                 http_client=self._http_client
             )
-            return NotificationService(  # type: ignore[return-value]
+            return NotificationService(
                 provider_factory=provider_factory, encryption_service=encryption_service
             )
 

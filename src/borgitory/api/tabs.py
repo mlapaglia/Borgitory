@@ -174,7 +174,7 @@ async def get_notifications_tab(
 
 
 @router.get("/prune", response_class=HTMLResponse)
-async def get_cleanup_tab(
+async def get_prune_tab(
     request: Request, current_user: User = Depends(get_current_user)
 ) -> HTMLResponse:
     return _render_tab_with_nav(
