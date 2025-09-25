@@ -46,6 +46,22 @@ class ProviderMetadata:
             self.additional_info = {}
 
 
+@dataclass
+class CloudProviderInfo:
+    """Complete cloud provider information including metadata."""
+
+    name: str
+    label: str
+    description: str
+    config_class: str
+    storage_class: str
+    supports_encryption: bool
+    supports_versioning: bool
+    requires_credentials: bool
+    additional_info: Dict[str, object]
+    rclone_mapping: Optional[RcloneMethodMapping]
+
+
 class ProviderRegistry:
     """
     Registry for cloud storage providers.
@@ -100,32 +116,35 @@ class ProviderRegistry:
         """Get list of all registered provider names."""
         return list(self._config_classes.keys())
 
-    def get_provider_info(self, provider: str) -> Optional[Dict[str, object]]:
+    def get_provider_info(self, provider: str) -> Optional[CloudProviderInfo]:
         """
         Get complete provider information including metadata.
 
         Returns:
-            Dictionary with provider info or None if not found
+            CloudProviderInfo with provider info or None if not found
         """
         if provider not in self._config_classes:
             return None
 
         metadata = self._metadata.get(provider)
-        return {
-            "name": provider,
-            "label": metadata.label if metadata else provider.upper(),
-            "description": metadata.description
+        return CloudProviderInfo(
+            name=provider,
+            label=metadata.label if metadata else provider.upper(),
+            description=metadata.description
             if metadata
             else f"{provider.upper()} storage",
-            "config_class": self._config_classes[provider].__name__,
-            "storage_class": self._storage_classes[provider].__name__,
-            "supports_encryption": metadata.supports_encryption if metadata else True,
-            "supports_versioning": metadata.supports_versioning if metadata else False,
-            "requires_credentials": metadata.requires_credentials if metadata else True,
-            "additional_info": metadata.additional_info if metadata else {},
-        }
+            config_class=self._config_classes[provider].__name__,
+            storage_class=self._storage_classes[provider].__name__,
+            supports_encryption=metadata.supports_encryption if metadata else True,
+            supports_versioning=metadata.supports_versioning if metadata else False,
+            requires_credentials=metadata.requires_credentials if metadata else True,
+            additional_info=metadata.additional_info
+            if metadata and metadata.additional_info
+            else {},
+            rclone_mapping=metadata.rclone_mapping if metadata else None,
+        )
 
-    def get_all_provider_info(self) -> Dict[str, Dict[str, object]]:
+    def get_all_provider_info(self) -> Dict[str, CloudProviderInfo]:
         """Get information for all registered providers."""
         return {
             provider: info
@@ -267,12 +286,12 @@ def get_supported_providers() -> List[str]:
     return _registry.get_supported_providers()
 
 
-def get_provider_info(provider: str) -> Optional[Dict[str, object]]:
+def get_provider_info(provider: str) -> Optional[CloudProviderInfo]:
     """Get complete provider information including metadata."""
     return _registry.get_provider_info(provider)
 
 
-def get_all_provider_info() -> Dict[str, Dict[str, object]]:
+def get_all_provider_info() -> Dict[str, CloudProviderInfo]:
     """Get information for all registered providers."""
     return _registry.get_all_provider_info()
 

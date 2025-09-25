@@ -89,8 +89,8 @@ async def get_cloud_sync_tab(
         supported_providers.append(
             {
                 "value": provider_name,
-                "label": info["label"],
-                "description": info["description"],
+                "label": info.label,
+                "description": info.description,
             }
         )
         supported_providers = sorted(supported_providers, key=lambda x: str(x["value"]))
@@ -155,8 +155,8 @@ async def get_notifications_tab(
         supported_providers.append(
             {
                 "value": provider_name,
-                "label": info["label"],
-                "description": info["description"],
+                "label": info.label,
+                "description": info.description,
             }
         )
         supported_providers = sorted(supported_providers, key=lambda x: str(x["value"]))

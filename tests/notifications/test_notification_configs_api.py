@@ -41,8 +41,8 @@ class TestNotificationConfigsAPIHTMX:
         # Should include pushover provider
         assert "pushover" in provider_info
         pushover_info = provider_info["pushover"]
-        assert pushover_info["label"] == "Pushover"
-        assert "description" in pushover_info
+        assert pushover_info.label == "Pushover"
+        assert hasattr(pushover_info, "description")
 
     @pytest.mark.asyncio
     async def test_get_provider_fields_pushover(

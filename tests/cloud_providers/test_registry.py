@@ -133,14 +133,14 @@ class TestProviderRegistry:
 
         info = registry.get_provider_info("test")
         assert info is not None
-        assert info["name"] == "test"
-        assert info["label"] == "Test Provider"
-        assert info["description"] == "Test storage provider"
-        assert info["config_class"] == "MockConfigClass"
-        assert info["storage_class"] == "MockStorageClass"
-        assert info["supports_encryption"] is True
-        assert info["supports_versioning"] is False
-        assert info["requires_credentials"] is True
+        assert info.name == "test"
+        assert info.label == "Test Provider"
+        assert info.description == "Test storage provider"
+        assert info.config_class == "MockConfigClass"
+        assert info.storage_class == "MockStorageClass"
+        assert info.supports_encryption is True
+        assert info.supports_versioning is False
+        assert info.requires_credentials is True
 
     def test_get_all_provider_info(self, registry) -> None:
         """Test getting info for all providers"""
@@ -162,8 +162,8 @@ class TestProviderRegistry:
         assert len(all_info) == 2
         assert "test1" in all_info
         assert "test2" in all_info
-        assert all_info["test1"]["label"] == "Test 1"
-        assert all_info["test2"]["label"] == "Test 2"
+        assert all_info["test1"].label == "Test 1"
+        assert all_info["test2"].label == "Test 2"
 
     def test_is_provider_registered(self, registry, sample_metadata) -> None:
         """Test checking if provider is registered"""
@@ -301,7 +301,7 @@ class TestGlobalRegistryFunctions:
         assert "test" in get_supported_providers()
         provider_info = get_provider_info("test")
         assert provider_info is not None
-        assert provider_info["name"] == "test"
+        assert provider_info.name == "test"
         assert "test" in get_all_provider_info()
         assert is_provider_registered("test")
 

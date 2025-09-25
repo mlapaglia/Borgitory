@@ -37,8 +37,8 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
         supported_providers.append(
             {
                 "value": provider_name,
-                "label": info["label"],
-                "description": info["description"],
+                "label": info.label,
+                "description": info.description,
             }
         )
 
@@ -90,7 +90,7 @@ def _get_submit_button_text(
     provider_data = provider_info.get(provider)
 
     if provider_data:
-        provider_label = provider_data["label"]
+        provider_label = provider_data.label
         action = "Add" if mode == "create" else "Update"
         return f"{action} {provider_label} Location"
     else:

@@ -130,12 +130,12 @@ class TestNotificationConfigService:
 
         # Check structure
         for provider in providers:
-            assert "value" in provider
-            assert "label" in provider
-            assert "description" in provider
+            assert hasattr(provider, "value")
+            assert hasattr(provider, "label")
+            assert hasattr(provider, "description")
 
         # Should include pushover and discord
-        provider_values = [p["value"] for p in providers]
+        provider_values = [p.value for p in providers]
         assert "pushover" in provider_values
         assert "discord" in provider_values
 

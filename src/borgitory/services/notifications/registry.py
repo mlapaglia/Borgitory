@@ -31,6 +31,22 @@ class NotificationProviderMetadata:
             self.additional_info = {}
 
 
+@dataclass
+class ProviderInfo:
+    """Complete provider information including metadata."""
+
+    name: str
+    label: str
+    description: str
+    config_class: str
+    provider_class: str
+    supports_priority: bool
+    supports_attachments: bool
+    supports_formatting: bool
+    requires_credentials: bool
+    additional_info: Dict[str, object]
+
+
 class NotificationProviderRegistry:
     """
     Registry for notification providers.
@@ -85,35 +101,35 @@ class NotificationProviderRegistry:
         """Get list of all registered provider names."""
         return list(self._config_classes.keys())
 
-    def get_provider_info(self, provider: str) -> Optional[Dict[str, object]]:
+    def get_provider_info(self, provider: str) -> Optional[ProviderInfo]:
         """
         Get complete provider information including metadata.
 
         Returns:
-            Dictionary with provider info or None if not found
+            ProviderInfo with provider info or None if not found
         """
         if provider not in self._config_classes:
             return None
 
         metadata = self._metadata.get(provider)
-        return {
-            "name": provider,
-            "label": metadata.label if metadata else provider.upper(),
-            "description": metadata.description
+        return ProviderInfo(
+            name=provider,
+            label=metadata.label if metadata else provider.upper(),
+            description=metadata.description
             if metadata
             else f"{provider.upper()} notifications",
-            "config_class": self._config_classes[provider].__name__,
-            "provider_class": self._provider_classes[provider].__name__,
-            "supports_priority": metadata.supports_priority if metadata else False,
-            "supports_attachments": metadata.supports_attachments
-            if metadata
-            else False,
-            "supports_formatting": metadata.supports_formatting if metadata else False,
-            "requires_credentials": metadata.requires_credentials if metadata else True,
-            "additional_info": metadata.additional_info if metadata else {},
-        }
+            config_class=self._config_classes[provider].__name__,
+            provider_class=self._provider_classes[provider].__name__,
+            supports_priority=metadata.supports_priority if metadata else False,
+            supports_attachments=metadata.supports_attachments if metadata else False,
+            supports_formatting=metadata.supports_formatting if metadata else False,
+            requires_credentials=metadata.requires_credentials if metadata else True,
+            additional_info=metadata.additional_info
+            if metadata and metadata.additional_info
+            else {},
+        )
 
-    def get_all_provider_info(self) -> Dict[str, Dict[str, object]]:
+    def get_all_provider_info(self) -> Dict[str, ProviderInfo]:
         """Get information for all registered providers."""
         return {
             provider: info
@@ -236,12 +252,12 @@ def get_supported_providers() -> List[str]:
     return _registry.get_supported_providers()
 
 
-def get_provider_info(provider: str) -> Optional[Dict[str, object]]:
+def get_provider_info(provider: str) -> Optional[ProviderInfo]:
     """Get complete provider information including metadata."""
     return _registry.get_provider_info(provider)
 
 
-def get_all_provider_info() -> Dict[str, Dict[str, object]]:
+def get_all_provider_info() -> Dict[str, ProviderInfo]:
     """Get information for all registered providers."""
     return _registry.get_all_provider_info()
 

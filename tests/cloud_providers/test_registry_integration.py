@@ -28,20 +28,19 @@ class TestRegistryBusinessLogic:
 
         # Check S3 info
         s3_info = provider_info["s3"]
-        assert s3_info["label"] == "AWS S3"
-        assert s3_info["description"] == "Amazon S3 compatible storage"
-        assert s3_info["supports_encryption"] is True
-        assert s3_info["supports_versioning"] is True
+        assert s3_info.label == "AWS S3"
+        assert s3_info.description == "Amazon S3 compatible storage"
+        assert s3_info.supports_encryption is True
+        assert s3_info.supports_versioning is True
 
         # Check SMB info
         smb_info = provider_info["smb"]
-        assert smb_info["label"] == "SMB/CIFS"
+        assert smb_info.label == "SMB/CIFS"
         assert (
-            smb_info["description"]
-            == "Server Message Block / Common Internet File System"
+            smb_info.description == "Server Message Block / Common Internet File System"
         )
-        assert smb_info["supports_encryption"] is True
-        assert smb_info["supports_versioning"] is False
+        assert smb_info.supports_encryption is True
+        assert smb_info.supports_versioning is False
 
     def test_get_supported_providers_returns_sorted_list(
         self, production_registry
