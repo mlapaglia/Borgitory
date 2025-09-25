@@ -434,3 +434,178 @@ class TestJobManager:
         """Test cancelling non-existent job"""
         result = await job_manager.cancel_job("nonexistent")
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_execute_composite_task_success(
+        self, job_manager: JobManager
+    ) -> None:
+        """Test successful execution of a composite task"""
+        # Create a test job and task
+        job = BorgJob(
+            id="test-job-id",
+            command=["borg", "list", "test-repo"],
+            job_type="composite",
+            status="running",
+            started_at=now_utc(),
+            tasks=[],
+        )
+
+        task = BorgJobTask(
+            task_type="command",
+            task_name="Test Command",
+            status="running",
+            started_at=now_utc(),
+        )
+
+        # Mock the underlying dependencies
+        with patch.object(job_manager, "executor") as mock_executor, patch.object(
+            job_manager, "output_manager"
+        ) as mock_output_manager, patch.object(
+            job_manager, "event_broadcaster"
+        ) as mock_broadcaster:
+            # Mock process and result
+            mock_process = Mock()
+            mock_result = Mock()
+            mock_result.return_code = 0
+            mock_result.error = None
+
+            mock_executor.start_process = AsyncMock(return_value=mock_process)
+            mock_executor.monitor_process_output = AsyncMock(return_value=mock_result)
+            mock_output_manager.add_output_line = AsyncMock()
+
+            # Execute the task
+            await job_manager._execute_composite_task(
+                job=job,
+                task=task,
+                command=["borg", "list", "test-repo"],
+                env={"TEST": "value"},
+            )
+
+            # Verify the task was updated correctly
+            assert task.status == "completed"
+            assert task.return_code == 0
+            assert task.completed_at is not None
+            assert task.error is None
+
+            # Verify job was updated correctly
+            assert job.status == "completed"
+            assert job.return_code == 0
+            assert job.completed_at is not None
+
+            # Verify executor was called correctly
+            mock_executor.start_process.assert_called_once_with(
+                ["borg", "list", "test-repo"], {"TEST": "value"}
+            )
+            # Verify monitor_process_output was called with the process and a callback
+            mock_executor.monitor_process_output.assert_called_once()
+            call_args = mock_executor.monitor_process_output.call_args
+            assert (
+                call_args[0][0] == mock_process
+            )  # First positional arg is the process
+            assert "output_callback" in call_args.kwargs  # Has output_callback
+            assert callable(call_args.kwargs["output_callback"])  # Callback is callable
+
+            # Verify events were broadcast
+            assert mock_broadcaster.broadcast_event.call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_execute_composite_task_failure(
+        self, job_manager: JobManager
+    ) -> None:
+        """Test execution of a composite task that fails"""
+        # Create a test job and task
+        job = BorgJob(
+            id="test-job-id",
+            command=["borg", "list", "invalid-repo"],
+            job_type="composite",
+            status="running",
+            started_at=now_utc(),
+            tasks=[],
+        )
+
+        task = BorgJobTask(
+            task_type="command",
+            task_name="Test Command",
+            status="running",
+            started_at=now_utc(),
+        )
+
+        # Mock the underlying dependencies
+        with patch.object(job_manager, "executor") as mock_executor, patch.object(
+            job_manager, "output_manager"
+        ) as mock_output_manager, patch.object(job_manager, "event_broadcaster"):
+            # Mock process and result with failure
+            mock_process = Mock()
+            mock_result = Mock()
+            mock_result.return_code = 1
+            mock_result.error = "Repository not found"
+
+            mock_executor.start_process = AsyncMock(return_value=mock_process)
+            mock_executor.monitor_process_output = AsyncMock(return_value=mock_result)
+            mock_output_manager.add_output_line = AsyncMock()
+
+            # Execute the task
+            await job_manager._execute_composite_task(
+                job=job, task=task, command=["borg", "list", "invalid-repo"], env=None
+            )
+
+            # Verify the task was updated correctly
+            assert task.status == "failed"
+            assert task.return_code == 1
+            assert task.completed_at is not None
+            assert task.error == "Repository not found"
+
+            # Verify job was updated correctly
+            assert job.status == "failed"
+            assert job.return_code == 1
+            assert job.error == "Repository not found"
+
+            # Verify executor was called correctly
+            mock_executor.start_process.assert_called_once_with(
+                ["borg", "list", "invalid-repo"], None
+            )
+
+    @pytest.mark.asyncio
+    async def test_execute_composite_task_exception(
+        self, job_manager: JobManager
+    ) -> None:
+        """Test execution of a composite task that raises an exception"""
+        # Create a test job and task
+        job = BorgJob(
+            id="test-job-id",
+            command=["borg", "list", "test-repo"],
+            job_type="composite",
+            status="running",
+            started_at=now_utc(),
+            tasks=[],
+        )
+
+        task = BorgJobTask(
+            task_type="command",
+            task_name="Test Command",
+            status="running",
+            started_at=now_utc(),
+        )
+
+        # Mock the underlying dependencies to raise an exception
+        with patch.object(job_manager, "executor") as mock_executor, patch.object(
+            job_manager, "output_manager"
+        ) as mock_output_manager, patch.object(job_manager, "event_broadcaster"):
+            mock_executor.start_process = AsyncMock(
+                side_effect=Exception("Process failed to start")
+            )
+            mock_output_manager.add_output_line = AsyncMock()
+
+            # Execute the task
+            await job_manager._execute_composite_task(
+                job=job, task=task, command=["borg", "list", "test-repo"], env=None
+            )
+
+            # Verify the task was updated correctly
+            assert task.status == "failed"
+            assert task.error == "Process failed to start"
+            assert task.completed_at is not None
+
+            # Verify job was updated correctly
+            assert job.status == "failed"
+            assert job.error == "Process failed to start"
