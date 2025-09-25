@@ -101,16 +101,24 @@ class TestTabsAPI:
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
         """Test that cloud sync tab uses registry to get providers."""
+        from borgitory.services.cloud_providers.registry import CloudProviderInfo
+
         # Create a mock registry
         mock_registry = Mock()
+        mock_provider_info = CloudProviderInfo(
+            name="mock_provider",
+            label="Mock Provider",
+            description="Test provider",
+            config_class="MockConfig",
+            storage_class="MockStorage",
+            supports_encryption=True,
+            supports_versioning=False,
+            requires_credentials=True,
+            additional_info={},
+            rclone_mapping=None,
+        )
         mock_registry.get_all_provider_info.return_value = {
-            "mock_provider": {
-                "label": "Mock Provider",
-                "description": "Test provider",
-                "supports_encryption": True,
-                "supports_versioning": False,
-                "requires_credentials": True,
-            }
+            "mock_provider": mock_provider_info
         }
 
         # Override the registry dependency
