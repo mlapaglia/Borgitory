@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from unittest.mock import patch
 
 from borgitory.models.database import NotificationConfig
+from borgitory.services.notifications.registry import NotificationProviderRegistry
 
 
 def create_pushover_notification_config(
@@ -31,7 +32,9 @@ def create_pushover_notification_config(
 class TestNotificationConfigsAPIHTMX:
     """Test class for notification API HTMX responses."""
 
-    def test_get_supported_providers(self, notification_registry) -> None:
+    def test_get_supported_providers(
+        self, notification_registry: NotificationProviderRegistry
+    ) -> None:
         """Test getting supported providers from registry directly."""
         provider_info = notification_registry.get_all_provider_info()
 

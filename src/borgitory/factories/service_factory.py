@@ -23,6 +23,7 @@ from borgitory.protocols.command_protocols import CommandRunnerProtocol
 from borgitory.protocols.repository_protocols import BackupServiceProtocol
 from borgitory.protocols.notification_protocols import NotificationServiceProtocol
 from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
+from borgitory.services.borg_service import BorgService
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -226,7 +227,6 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
             archive_service: Optional["ArchiveServiceProtocol"] = None,
         ) -> BackupServiceProtocol:
             """Factory function to create BorgService."""
-            from borgitory.services.borg_service import BorgService
 
             # Use provided dependencies or injected defaults - no more service locator!
             final_job_executor = job_executor or self._job_executor

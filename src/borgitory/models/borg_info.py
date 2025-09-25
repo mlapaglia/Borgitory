@@ -268,3 +268,71 @@ class RepositoryScanResponse:
             scan_paths=scan_paths,
             total_found=len(repositories),
         )
+
+
+@dataclass
+class BorgRepositoryConfig:
+    """Parsed Borg repository configuration information."""
+
+    mode: (
+        str  # "repokey", "keyfile", "none", "encrypted", "unknown", "invalid", "error"
+    )
+    requires_keyfile: bool
+    preview: str
+
+    @classmethod
+    def unknown_config(cls) -> "BorgRepositoryConfig":
+        """Create config for unknown repository."""
+        return cls(
+            mode="unknown", requires_keyfile=False, preview="Config file not found"
+        )
+
+    @classmethod
+    def invalid_config(cls) -> "BorgRepositoryConfig":
+        """Create config for invalid repository."""
+        return cls(
+            mode="invalid",
+            requires_keyfile=False,
+            preview="Not a valid Borg repository (no [repository] section)",
+        )
+
+    @classmethod
+    def error_config(cls, error_message: str) -> "BorgRepositoryConfig":
+        """Create config for error during parsing."""
+        return cls(
+            mode="error",
+            requires_keyfile=False,
+            preview=f"Error reading config: {error_message}",
+        )
+
+
+@dataclass
+class RepositoryInitializationResult:
+    """Result of repository initialization operation."""
+
+    success: bool
+    message: str
+    repository_path: Optional[str] = None
+    encryption_mode: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    @classmethod
+    def success_result(
+        cls,
+        message: str,
+        repository_path: Optional[str] = None,
+        encryption_mode: str = "repokey",
+    ) -> "RepositoryInitializationResult":
+        """Create a successful initialization result."""
+        return cls(
+            success=True,
+            message=message,
+            repository_path=repository_path,
+            encryption_mode=encryption_mode,
+            created_at=datetime.now(),
+        )
+
+    @classmethod
+    def failure_result(cls, message: str) -> "RepositoryInitializationResult":
+        """Create a failed initialization result."""
+        return cls(success=False, message=message)

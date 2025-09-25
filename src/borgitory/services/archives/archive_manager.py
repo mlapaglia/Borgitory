@@ -3,6 +3,7 @@ ArchiveManager - Handles Borg archive operations and content management
 """
 
 import asyncio
+from dataclasses import dataclass
 import json
 import logging
 from typing import Dict, List, Optional, AsyncGenerator, TypedDict
@@ -15,28 +16,26 @@ from borgitory.utils.security import validate_archive_name, sanitize_path
 logger = logging.getLogger(__name__)
 
 
-# TypedDict definitions for archive operations
-class ArchiveEntryRequired(TypedDict):
-    """Required fields for archive entry"""
+@dataclass
+class ArchiveEntry:
+    """Individual archive entry (file/directory) structure"""
 
+    # Required fields
     path: str
     name: str
     type: str  # 'f' for file, 'd' for directory, etc.
     size: int
     isdir: bool
 
-
-class ArchiveEntry(ArchiveEntryRequired, total=False):
-    """Individual archive entry (file/directory) structure"""
-
     # Optional fields from Borg JSON output
-    mtime: str
-    mode: str
-    uid: int
-    gid: int
-    healthy: bool
+    mtime: Optional[str] = None
+    mode: Optional[str] = None
+    uid: Optional[int] = None
+    gid: Optional[int] = None
+    healthy: Optional[bool] = None
+
     # Additional computed fields
-    children_count: Optional[int]
+    children_count: Optional[int] = None
 
 
 class ArchiveMetadata(TypedDict, total=False):
@@ -99,9 +98,9 @@ class ArchiveManager:
             f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
         )
 
-        from borgitory.dependencies import get_archive_mount_manager
+        from borgitory.dependencies import get_archive_mount_manager_singleton
 
-        mount_manager = get_archive_mount_manager()
+        mount_manager = get_archive_mount_manager_singleton()
 
         # Mount the archive if not already mounted
         await mount_manager.mount_archive(repository, archive_name)
@@ -128,7 +127,7 @@ class ArchiveManager:
         children: Dict[str, ArchiveEntry] = {}
 
         for entry in all_entries:
-            entry_path = entry.get("path", "").lstrip("/")
+            entry_path = entry.path.lstrip("/")
 
             logger.debug(f"Processing entry path: '{entry_path}'")
 
@@ -164,50 +163,56 @@ class ArchiveManager:
             if immediate_child not in children:
                 # Determine if this is a directory or file
                 # Use the actual Borg entry type - 'd' means directory
-                is_directory = len(path_parts) > 1 or entry.get("type") == "d"
+                is_directory = len(path_parts) > 1 or entry.type == "d"
 
-                archive_entry: ArchiveEntry = {
-                    "path": full_path,
-                    "name": immediate_child,
-                    "type": "d" if is_directory else entry.get("type", "f"),
-                    "size": 0 if is_directory else entry.get("size", 0),
-                    "isdir": is_directory,
-                }
+                archive_entry: ArchiveEntry = ArchiveEntry(
+                    path=full_path,
+                    name=immediate_child,
+                    type="d" if is_directory else entry.type,
+                    size=0 if is_directory else entry.size,
+                    isdir=is_directory,
+                    mtime=entry.mtime,
+                    mode=entry.mode,
+                    uid=entry.uid,
+                    gid=entry.gid,
+                    healthy=entry.healthy,
+                    children_count=None if not is_directory else 0,
+                )
 
                 # Add optional fields if they exist
-                mtime = entry.get("mtime")
+                mtime = entry.mtime
                 if mtime:
-                    archive_entry["mtime"] = mtime
-                mode = entry.get("mode")
+                    archive_entry.mtime = mtime
+                mode = entry.mode
                 if mode:
-                    archive_entry["mode"] = mode
-                uid = entry.get("uid")
+                    archive_entry.mode = mode
+                uid = entry.uid
                 if uid is not None:
-                    archive_entry["uid"] = uid
-                gid = entry.get("gid")
+                    archive_entry.uid = uid
+                gid = entry.gid
                 if gid is not None:
-                    archive_entry["gid"] = gid
-                healthy = entry.get("healthy")
+                    archive_entry.gid = gid
+                healthy = entry.healthy
                 if healthy is not None:
-                    archive_entry["healthy"] = healthy
+                    archive_entry.healthy = healthy
                 if not is_directory:
-                    archive_entry["children_count"] = None
+                    archive_entry.children_count = None
                 else:
-                    archive_entry["children_count"] = 0
+                    archive_entry.children_count = 0
                 children[immediate_child] = archive_entry
             else:
                 # This is another item in the same directory, possibly update info
                 existing = children[immediate_child]
-                if existing.get("type") == "d":
+                if existing.type == "d":
                     # It's a directory, we might want to count children
-                    current_count = existing.get("children_count")
+                    current_count = existing.children_count
                     if isinstance(current_count, int):
-                        existing["children_count"] = current_count + 1
+                        existing.children_count = current_count + 1
 
         result = list(children.values())
 
         # Sort results: directories first, then files, both alphabetically
-        result.sort(key=lambda x: (x.get("type") != "d", x.get("name", "").lower()))
+        result.sort(key=lambda x: (x.type != "d", x.name.lower()))
 
         logger.info(f"Filtered to {len(result)} immediate children")
         return result
@@ -338,7 +343,7 @@ class ArchiveManager:
         directory_path = directory_path.strip().strip("/")
 
         for entry in entries:
-            entry_path = entry.get("path", "").lstrip("/")
+            entry_path = entry.path.lstrip("/")
 
             # Check if this entry is within the target directory
             if directory_path:
@@ -349,8 +354,8 @@ class ArchiveManager:
                     continue
 
             # Add size if it's a file (not a directory)
-            if entry.get("type") != "d":
-                total_size += entry.get("size", 0)
+            if entry.type != "d":
+                total_size += entry.size
 
         return total_size
 
@@ -370,8 +375,8 @@ class ArchiveManager:
 
         matching_entries = []
         for entry in entries:
-            path = entry.get("path", "")
-            name = entry.get("name", path.split("/")[-1] if path else "")
+            path = entry.path
+            name = entry.name
 
             if regex.search(path) or regex.search(name):
                 matching_entries.append(entry)
@@ -383,10 +388,10 @@ class ArchiveManager:
         type_counts: Dict[str, int] = {}
 
         for entry in entries:
-            if entry.get("type") == "d":
+            if entry.type == "d":
                 entry_type = "directory"
             else:
-                path = entry.get("path", "")
+                path = entry.path
                 if "." in path:
                     extension = path.split(".")[-1].lower()
                     entry_type = f".{extension}"

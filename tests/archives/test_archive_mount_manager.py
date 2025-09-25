@@ -382,19 +382,19 @@ class TestArchiveMountManager:
         assert len(contents) == 3
 
         # Check sorting (directories first, then files, both alphabetically)
-        names = [item["name"] for item in contents]
+        names = [item.name for item in contents]
         assert names == ["subdir", "file1.txt", "file2.txt"]
 
         # Check directory entry
-        subdir_entry = next(item for item in contents if item["name"] == "subdir")
-        assert subdir_entry["isdir"] is True
-        assert subdir_entry["type"] == "d"
+        subdir_entry = next(item for item in contents if item.name == "subdir")
+        assert subdir_entry.isdir is True
+        assert subdir_entry.type == "d"
 
         # Check file entry
-        file_entry = next(item for item in contents if item["name"] == "file1.txt")
-        assert file_entry["isdir"] is False
-        assert file_entry["type"] == "f"
-        assert file_entry["size"] == 0  # Empty file
+        file_entry = next(item for item in contents if item.name == "file1.txt")
+        assert file_entry.isdir is False
+        assert file_entry.type == "f"
+        assert file_entry.size == 0  # Empty file
 
     def test_list_directory_with_path(self) -> None:
         """Test directory listing with specific path."""
@@ -421,10 +421,10 @@ class TestArchiveMountManager:
         )
 
         assert len(contents) == 1
-        assert contents[0]["name"] == "nested_file.txt"
+        assert contents[0].name == "nested_file.txt"
         # Handle cross-platform path separators
         expected_path = str(Path("data") / "nested_file.txt")
-        assert contents[0]["path"] == expected_path
+        assert contents[0].path == expected_path
 
     def test_list_directory_path_not_exists(self) -> None:
         """Test listing non-existent directory."""

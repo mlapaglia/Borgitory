@@ -12,10 +12,10 @@ from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.models.database import Repository
 from borgitory.utils.security import build_secure_borg_command
+from borgitory.services.archives.archive_manager import ArchiveEntry
 
 if TYPE_CHECKING:
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
-    from borgitory.services.archives.archive_manager import ArchiveEntry
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +254,7 @@ class ArchiveMountManager:
 
     def list_directory(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List["ArchiveEntry"]:
+    ) -> List[ArchiveEntry]:
         """List directory contents from mounted filesystem"""
         mount_key = self._get_mount_key(repository, archive_name)
 
@@ -283,18 +283,16 @@ class ArchiveMountManager:
 
                     # Create ArchiveEntry compatible structure
                     is_directory = item.is_dir()
-                    entry: "ArchiveEntry" = {
-                        "path": str(item.relative_to(mount_info.mount_point)),
-                        "name": item.name,
-                        "type": "d" if is_directory else "f",
-                        "size": stat_info.st_size if item.is_file() else 0,
-                        "isdir": is_directory,
-                        "mode": oct(stat_info.st_mode)[
-                            -4:
-                        ],  # Last 4 digits of octal mode
-                        "mtime": datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
-                        "healthy": True,
-                    }
+                    entry = ArchiveEntry(
+                        path=str(item.relative_to(mount_info.mount_point)),
+                        name=item.name,
+                        type="d" if is_directory else "f",
+                        size=stat_info.st_size if item.is_file() else 0,
+                        isdir=is_directory,
+                        mode=oct(stat_info.st_mode)[-4:],  # Last 4 digits of octal mode
+                        mtime=datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
+                        healthy=True,
+                    )
                     entries.append(entry)
 
                 except (OSError, PermissionError) as e:
@@ -304,8 +302,8 @@ class ArchiveMountManager:
             # Sort: directories first, then files, both alphabetically
             entries.sort(
                 key=lambda x: (
-                    not x.get("isdir", False),
-                    str(x.get("name", "")).lower(),
+                    not x.isdir,
+                    x.name.lower(),
                 )
             )
 

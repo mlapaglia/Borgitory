@@ -79,8 +79,8 @@ class RepositoryService:
 
             # Initialize repository with Borg
             init_result = await self.borg_service.initialize_repository(db_repo)
-            if not init_result["success"]:
-                borg_error = init_result["message"]
+            if not init_result.success:
+                borg_error = init_result.message
                 error_message = self._parse_borg_initialization_error(borg_error)
 
                 logger.error(
@@ -363,11 +363,11 @@ class RepositoryService:
             items = []
             for item in contents:
                 directory_item = DirectoryItem(
-                    name=item.get("name", ""),
-                    type=item.get("type", "file"),
-                    path=item.get("path", ""),
-                    size=item.get("size"),
-                    modified=item.get("modified"),
+                    name=item.name,
+                    type=item.type,
+                    path=item.path,
+                    size=item.size,
+                    modified=item.mtime,
                 )
                 items.append(directory_item)
 

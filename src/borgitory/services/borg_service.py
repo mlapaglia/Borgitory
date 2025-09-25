@@ -3,13 +3,19 @@ import json
 import logging
 import re
 import os
+from borgitory.services.archives.archive_manager import ArchiveEntry
 from borgitory.utils.datetime_utils import now_utc
-from typing import AsyncGenerator, Dict, List, Optional, Union, cast
+from typing import AsyncGenerator, List, Optional
 
 from starlette.responses import StreamingResponse
 
 from borgitory.models.database import Repository, Job
-from borgitory.models.borg_info import BorgArchiveListResponse, RepositoryScanResponse
+from borgitory.models.borg_info import (
+    BorgArchiveListResponse,
+    BorgRepositoryConfig,
+    RepositoryInitializationResult,
+    RepositoryScanResponse,
+)
 from borgitory.protocols import (
     CommandRunnerProtocol,
     ProcessExecutorProtocol,
@@ -60,19 +66,13 @@ class BorgService:
         """Get job manager instance - guaranteed to be available via DI"""
         return self.job_manager
 
-    def _parse_borg_config(
-        self, repo_path: str
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    def _parse_borg_config(self, repo_path: str) -> "BorgRepositoryConfig":
         """Parse a Borg repository config file to determine encryption mode"""
         config_path = os.path.join(repo_path, "config")
 
         try:
             if not os.path.exists(config_path):
-                return {
-                    "mode": "unknown",
-                    "requires_keyfile": False,
-                    "preview": "Config file not found",
-                }
+                return BorgRepositoryConfig.unknown_config()
 
             with open(config_path, "r", encoding="utf-8") as f:
                 config_content = f.read()
@@ -89,11 +89,7 @@ class BorgService:
 
             # Check if this looks like a Borg repository
             if not config.has_section("repository"):
-                return {
-                    "mode": "invalid",
-                    "requires_keyfile": False,
-                    "preview": "Not a valid Borg repository (no [repository] section)",
-                }
+                return BorgRepositoryConfig.invalid_config()
 
             # Log all options in repository section
             if config.has_section("repository"):
@@ -169,23 +165,19 @@ class BorgService:
                     requires_keyfile = False
                     preview = "Unencrypted repository (no encryption detected)"
 
-            return {
-                "mode": encryption_mode,
-                "requires_keyfile": requires_keyfile,
-                "preview": preview,
-            }
+            return BorgRepositoryConfig(
+                mode=encryption_mode,
+                requires_keyfile=requires_keyfile,
+                preview=preview,
+            )
 
         except Exception as e:
             logger.error(f"Error parsing Borg config at {config_path}: {e}")
-            return {
-                "mode": "error",
-                "requires_keyfile": False,
-                "preview": f"Error reading config: {str(e)}",
-            }
+            return BorgRepositoryConfig.error_config(str(e))
 
     async def initialize_repository(
         self, repository: Repository
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> RepositoryInitializationResult:
         """Initialize a new Borg repository"""
         logger.info(f"Initializing Borg repository at {repository.path}")
 
@@ -198,41 +190,42 @@ class BorgService:
             )
         except Exception as e:
             logger.error(f"Failed to build secure command: {e}")
-            return {
-                "success": False,
-                "message": f"Security validation failed: {str(e)}",
-            }
+            return RepositoryInitializationResult.failure_result(
+                f"Security validation failed: {str(e)}"
+            )
 
         try:
-            # Execute the command directly and wait for result
             result = await self.command_runner.run_command(command, env, timeout=60)
 
             if result.success:
-                return {
-                    "success": True,
-                    "message": "Repository initialized successfully",
-                }
+                return RepositoryInitializationResult.success_result(
+                    "Repository initialized successfully",
+                    repository_path=repository.path,
+                )
             else:
                 # Check if it's just because repo already exists
                 if "already exists" in result.stderr.lower():
                     logger.info("Repository already exists, which is fine")
-                    return {
-                        "success": True,
-                        "message": "Repository already exists",
-                    }
+                    return RepositoryInitializationResult.success_result(
+                        "Repository already exists", repository_path=repository.path
+                    )
 
                 # Return the actual error from borg
                 error_msg = (
                     result.stderr.strip() or result.stdout.strip() or "Unknown error"
                 )
-                return {
-                    "success": False,
-                    "message": f"Initialization failed: {error_msg.decode('utf-8', errors='replace') if isinstance(error_msg, bytes) else error_msg}",
-                }
+                decoded_error = (
+                    error_msg.decode("utf-8", errors="replace")
+                    if isinstance(error_msg, bytes)
+                    else error_msg
+                )
+                return RepositoryInitializationResult.failure_result(
+                    f"Initialization failed: {decoded_error}"
+                )
 
         except Exception as e:
             logger.error(f"Failed to initialize repository: {e}")
-            return {"success": False, "message": str(e)}
+            return RepositoryInitializationResult.failure_result(str(e))
 
     async def create_backup(
         self,
@@ -342,13 +335,13 @@ class BorgService:
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
+    ) -> List[ArchiveEntry]:
         """List contents of a specific directory within an archive using FUSE mount"""
         entries = await self.archive_service.list_archive_directory_contents(
             repository, archive_name, path
         )
-        # ArchiveEntry is a TypedDict, which is compatible with Dict[str, Union[...]]
-        return cast(List[Dict[str, Union[str, int, float, bool, None]]], entries)
+
+        return entries
 
     async def extract_file_stream(
         self, repository: Repository, archive_name: str, file_path: str
@@ -562,10 +555,10 @@ class BorgService:
                         {
                             "path": line_text,
                             "id": f"repo_{hash(line_text)}",
-                            "encryption_mode": encryption_info["mode"],
-                            "requires_keyfile": encryption_info["requires_keyfile"],
+                            "encryption_mode": encryption_info.mode,
+                            "requires_keyfile": encryption_info.requires_keyfile,
                             "detected": True,
-                            "config_preview": encryption_info["preview"],
+                            "config_preview": encryption_info.preview,
                         }
                     )
 

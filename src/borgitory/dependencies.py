@@ -84,7 +84,7 @@ from borgitory.utils.datetime_utils import (
     get_server_timezone,
 )
 from fastapi import Request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncConfigService
@@ -1100,17 +1100,61 @@ HookExecutionServiceDep = Annotated[
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
 
 
-def get_archive_mount_manager(
-    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
-) -> "ArchiveMountManager":
-    """Get the ArchiveMountManager instance with proper DI."""
+@lru_cache()
+def get_archive_mount_manager_singleton() -> "ArchiveMountManager":
+    """
+    Create ArchiveMountManager singleton for application-scoped use.
+
+    📋 USAGE:
+    ✅ Use for: Singletons, direct instantiation, tests, background tasks
+    ❌ Don't use for: FastAPI endpoints (use get_archive_mount_manager_dependency instead)
+
+    📋 PATTERN: Dual Functions
+    This is the singleton version that resolves dependencies directly.
+    For FastAPI DI, use get_archive_mount_manager_dependency() with Depends().
+
+    Returns:
+        ArchiveMountManager: Cached singleton instance with persistent mount state
+    """
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
 
-    return ArchiveMountManager(job_executor=job_executor)
+    # Resolve dependencies directly (not via FastAPI DI)
+    subprocess_executor = get_subprocess_executor()
+    job_executor = get_job_executor(subprocess_executor)
+
+    return ArchiveMountManager(
+        job_executor=job_executor,
+        base_mount_dir="/tmp/borgitory-mounts",  # More appropriate mount directory
+        mount_timeout=timedelta(seconds=1800),
+        mounting_timeout=timedelta(seconds=30),
+    )
+
+
+def get_archive_mount_manager_dependency() -> "ArchiveMountManager":
+    """
+    Provide ArchiveMountManager with FastAPI dependency injection.
+
+    📋 USAGE:
+    ✅ Use for: FastAPI endpoints with Depends(get_archive_mount_manager_dependency)
+    ❌ Don't use for: Direct calls, singletons, tests
+
+    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
+    ⚠️  For direct calls, use get_archive_mount_manager_singleton() instead.
+
+    📋 PATTERN: Dual Functions
+    This is the FastAPI DI version that returns the same singleton instance.
+    For direct calls, use get_archive_mount_manager_singleton().
+
+    Returns:
+        ArchiveMountManager: The same singleton instance as get_archive_mount_manager_singleton()
+    """
+    # Both functions return the same singleton instance
+    # This ensures mount state consistency across all usage patterns
+    return get_archive_mount_manager_singleton()
 
 
 ArchiveMountManagerDep = Annotated[
-    "ArchiveMountManager", Depends(get_archive_mount_manager)
+    "ArchiveMountManager", Depends(get_archive_mount_manager_dependency)
 ]
 
 

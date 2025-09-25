@@ -4,8 +4,10 @@ Borg service protocol interface.
 Defines the contract for Borg backup operations.
 """
 
-from typing import Protocol, Dict, Optional, Union, TYPE_CHECKING
+from typing import Protocol, Optional, TYPE_CHECKING
 from starlette.responses import StreamingResponse
+
+from borgitory.models.repository_dtos import RepositoryOperationResult
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository
@@ -20,7 +22,7 @@ class BorgService(Protocol):
 
     async def initialize_repository(
         self, repository: "Repository"
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> RepositoryOperationResult:
         """
         Initialize a new Borg repository.
 

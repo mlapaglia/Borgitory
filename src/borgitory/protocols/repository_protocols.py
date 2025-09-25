@@ -5,6 +5,9 @@ Protocol interfaces for repository and backup services.
 from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
 
+from borgitory.models.borg_info import BorgArchiveListResponse, RepositoryScanResponse
+from borgitory.models.repository_dtos import RepositoryOperationResult
+
 if TYPE_CHECKING:
     from borgitory.models.database import Repository
     from borgitory.services.archives.archive_manager import ArchiveEntry
@@ -34,7 +37,7 @@ class BackupServiceProtocol(Protocol):
     async def initialize_repository(
         self,
         repository: "Repository",  # Repository model
-    ) -> Dict[str, object]:
+    ) -> RepositoryOperationResult:
         """Initialize a new repository."""
         ...
 
@@ -52,7 +55,7 @@ class BackupServiceProtocol(Protocol):
     async def list_archives(
         self,
         repository: "Repository",  # Repository model
-    ) -> List[Dict[str, object]]:
+    ) -> "BorgArchiveListResponse":
         """List all archives in a repository."""
         ...
 
@@ -62,8 +65,10 @@ class BackupServiceProtocol(Protocol):
         """Verify repository can be accessed."""
         ...
 
-    async def scan_for_repositories(self) -> List[Dict[str, object]]:
-        """Scan mounted volumes for Borg repositories."""
+    async def scan_for_repositories(
+        self,
+    ) -> "RepositoryScanResponse":
+        """Scan for Borg repositories."""
         ...
 
 
@@ -79,7 +84,7 @@ class ArchiveServiceProtocol(Protocol):
         """List contents of a directory within an archive."""
         ...
 
-    async def extract_file_stream(
+    def extract_file_stream(
         self,
         repository: "Repository",  # Repository model
         archive_name: str,

@@ -31,6 +31,7 @@ from borgitory.api import (
     packages,
 )
 from borgitory.dependencies import (
+    get_archive_mount_manager_singleton,
     get_recovery_service,
     get_scheduler_service_singleton,
     get_package_restoration_service_for_startup,
@@ -72,9 +73,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await scheduler_service.start()
         logger.info("Scheduler started")
 
-        from borgitory.dependencies import get_archive_mount_manager
-
-        mount_manager = get_archive_mount_manager()
+        mount_manager = get_archive_mount_manager_singleton()
 
         yield
 

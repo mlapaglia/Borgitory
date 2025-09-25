@@ -7,7 +7,7 @@ import json
 from unittest.mock import Mock, AsyncMock, patch
 from types import SimpleNamespace
 
-from borgitory.services.archives.archive_manager import ArchiveManager
+from borgitory.services.archives.archive_manager import ArchiveManager, ArchiveEntry
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.borg_command_builder import BorgCommandBuilder
@@ -96,14 +96,22 @@ class TestArchiveManager:
     ) -> None:
         """Test listing directory contents using FUSE mount."""
         with patch(
-            "borgitory.dependencies.get_archive_mount_manager"
+            "borgitory.dependencies.get_archive_mount_manager_singleton"
         ) as mock_get_manager:
             mock_mount_manager = Mock()
             mock_mount_manager.mount_archive = AsyncMock()
             mock_mount_manager.list_directory = Mock(
                 return_value=[
-                    {"name": "file1.txt", "type": "f", "size": 100, "isdir": False},
-                    {"name": "subdir", "type": "d", "size": 0, "isdir": True},
+                    ArchiveEntry(
+                        name="file1.txt",
+                        type="f",
+                        size=100,
+                        isdir=False,
+                        path="file1.txt",
+                    ),
+                    ArchiveEntry(
+                        name="subdir", type="d", size=0, isdir=True, path="subdir"
+                    ),
                 ]
             )
             mock_get_manager.return_value = mock_mount_manager
@@ -113,8 +121,8 @@ class TestArchiveManager:
             )
 
             assert len(result) == 2
-            assert result[0]["name"] == "file1.txt"
-            assert result[1]["name"] == "subdir"
+            assert result[0].name == "file1.txt"
+            assert result[1].name == "subdir"
 
             mock_mount_manager.mount_archive.assert_called_once_with(
                 test_repository, "test-archive"
@@ -128,42 +136,66 @@ class TestArchiveManager:
     ) -> None:
         """Test filtering directory contents for root path."""
         all_entries = [
-            {"path": "file1.txt", "type": "f", "size": 100},
-            {"path": "dir1/file2.txt", "type": "f", "size": 200},
-            {"path": "dir1/subdir/file3.txt", "type": "f", "size": 300},
-            {"path": "dir2/file4.txt", "type": "f", "size": 400},
+            ArchiveEntry(
+                path="file1.txt", type="f", size=100, name="file1.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="dir1/file2.txt", type="f", size=200, name="file2.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="dir1/subdir/file3.txt",
+                type="f",
+                size=300,
+                name="file3.txt",
+                isdir=False,
+            ),
+            ArchiveEntry(
+                path="dir2/file4.txt", type="f", size=400, name="file4.txt", isdir=False
+            ),
         ]
 
         result = archive_manager._filter_directory_contents(all_entries, "")
 
         # Should return immediate children at root level
         assert len(result) == 3
-        names = [item["name"] for item in result]
+        names = [item.name for item in result]
         assert "file1.txt" in names
         assert "dir1" in names
         assert "dir2" in names
 
         # Check directory detection
-        dir1_item = next(item for item in result if item["name"] == "dir1")
-        assert dir1_item["type"] == "d"
-        assert dir1_item["isdir"] is True
+        dir1_item = next(item for item in result if item.name == "dir1")
+        assert dir1_item.type == "d"
+        assert dir1_item.isdir is True
 
     def test_filter_directory_contents_subdirectory(
         self, archive_manager: ArchiveManager
     ) -> None:
         """Test filtering directory contents for subdirectory path."""
         all_entries = [
-            {"path": "dir1/file1.txt", "type": "f", "size": 100},
-            {"path": "dir1/file2.txt", "type": "f", "size": 200},
-            {"path": "dir1/subdir/file3.txt", "type": "f", "size": 300},
-            {"path": "dir2/file4.txt", "type": "f", "size": 400},
+            ArchiveEntry(
+                path="dir1/file1.txt", type="f", size=100, name="file1.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="dir1/file2.txt", type="f", size=200, name="file2.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="dir1/subdir/file3.txt",
+                type="f",
+                size=300,
+                name="file3.txt",
+                isdir=False,
+            ),
+            ArchiveEntry(
+                path="dir2/file4.txt", type="f", size=400, name="file4.txt", isdir=False
+            ),
         ]
 
         result = archive_manager._filter_directory_contents(all_entries, "dir1")
 
         # Should return immediate children of dir1
         assert len(result) == 3
-        names = [item["name"] for item in result]
+        names = [item.name for item in result]
         assert "file1.txt" in names
         assert "file2.txt" in names
         assert "subdir" in names
@@ -173,16 +205,24 @@ class TestArchiveManager:
     ) -> None:
         """Test that results are sorted correctly (directories first, then alphabetically)."""
         all_entries = [
-            {"path": "zebra.txt", "type": "f", "size": 100},
-            {"path": "bdir/file.txt", "type": "f", "size": 200},
-            {"path": "adir/file.txt", "type": "f", "size": 300},
-            {"path": "alpha.txt", "type": "f", "size": 400},
+            ArchiveEntry(
+                path="zebra.txt", type="f", size=100, name="zebra.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="bdir/file.txt", type="f", size=200, name="file.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="adir/file.txt", type="f", size=300, name="file.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="alpha.txt", type="f", size=400, name="alpha.txt", isdir=False
+            ),
         ]
 
         result = archive_manager._filter_directory_contents(all_entries, "")
 
         # Should be: directories first (adir, bdir), then files (alpha.txt, zebra.txt)
-        names = [item["name"] for item in result]
+        names = [item.name for item in result]
         assert names == ["adir", "bdir", "alpha.txt", "zebra.txt"]
 
     @pytest.mark.asyncio
@@ -331,10 +371,16 @@ class TestArchiveManager:
     ) -> None:
         """Test calculating total size for root directory."""
         entries = [
-            {"path": "file1.txt", "type": "f", "size": 100},
-            {"path": "file2.txt", "type": "f", "size": 200},
-            {"path": "dir1", "type": "d", "size": 0},
-            {"path": "dir1/file3.txt", "type": "f", "size": 300},
+            ArchiveEntry(
+                path="file1.txt", type="f", size=100, name="file1.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="file2.txt", type="f", size=200, name="file2.txt", isdir=False
+            ),
+            ArchiveEntry(path="dir1", type="d", size=0, name="dir1", isdir=True),
+            ArchiveEntry(
+                path="dir1/file3.txt", type="f", size=300, name="file3.txt", isdir=False
+            ),
         ]
 
         total_size = archive_manager.calculate_directory_size(entries, "")
@@ -347,10 +393,18 @@ class TestArchiveManager:
     ) -> None:
         """Test calculating size for specific subdirectory."""
         entries = [
-            {"path": "file1.txt", "type": "f", "size": 100},
-            {"path": "dir1/file2.txt", "type": "f", "size": 200},
-            {"path": "dir1/file3.txt", "type": "f", "size": 300},
-            {"path": "dir2/file4.txt", "type": "f", "size": 400},
+            ArchiveEntry(
+                path="file1.txt", type="f", size=100, name="file1.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="dir1/file2.txt", type="f", size=200, name="file2.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="dir1/file3.txt", type="f", size=300, name="file3.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="dir2/file4.txt", type="f", size=400, name="file4.txt", isdir=False
+            ),
         ]
 
         total_size = archive_manager.calculate_directory_size(entries, "dir1")
@@ -363,9 +417,15 @@ class TestArchiveManager:
     ) -> None:
         """Test finding entries by pattern (case sensitive)."""
         entries = [
-            {"path": "Test.txt", "name": "Test.txt"},
-            {"path": "test.log", "name": "test.log"},
-            {"path": "data/Test.cfg", "name": "Test.cfg"},
+            ArchiveEntry(
+                path="Test.txt", type="f", size=100, name="Test.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="test.log", type="f", size=100, name="test.log", isdir=False
+            ),
+            ArchiveEntry(
+                path="data/Test.cfg", type="f", size=100, name="Test.cfg", isdir=False
+            ),
         ]
 
         matches = archive_manager.find_entries_by_pattern(
@@ -373,7 +433,7 @@ class TestArchiveManager:
         )
 
         assert len(matches) == 2
-        names = [entry["name"] for entry in matches]
+        names = [entry.name for entry in matches]
         assert "Test.txt" in names
         assert "Test.cfg" in names
 
@@ -382,9 +442,19 @@ class TestArchiveManager:
     ) -> None:
         """Test finding entries by pattern (case insensitive)."""
         entries = [
-            {"path": "Test.txt", "name": "Test.txt"},
-            {"path": "test.log", "name": "test.log"},
-            {"path": "data/config.cfg", "name": "borgitory.config.cfg"},
+            ArchiveEntry(
+                path="Test.txt", type="f", size=100, name="Test.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="test.log", type="f", size=100, name="test.log", isdir=False
+            ),
+            ArchiveEntry(
+                path="data/config.cfg",
+                type="f",
+                size=100,
+                name="borgitory.config.cfg",
+                isdir=False,
+            ),
         ]
 
         matches = archive_manager.find_entries_by_pattern(
@@ -392,7 +462,7 @@ class TestArchiveManager:
         )
 
         assert len(matches) == 2
-        names = [entry["name"] for entry in matches]
+        names = [entry.name for entry in matches]
         assert "Test.txt" in names
         assert "test.log" in names
 
@@ -401,40 +471,62 @@ class TestArchiveManager:
     ) -> None:
         """Test finding entries using regex pattern."""
         entries = [
-            {"path": "file1.txt", "name": "file1.txt"},
-            {"path": "file2.log", "name": "file2.log"},
-            {"path": "backup.tar.gz", "name": "backup.tar.gz"},
+            ArchiveEntry(
+                path="file1.txt", type="f", size=100, name="file1.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="file2.log", type="f", size=100, name="file2.log", isdir=False
+            ),
+            ArchiveEntry(
+                path="backup.tar.gz",
+                type="f",
+                size=100,
+                name="backup.tar.gz",
+                isdir=False,
+            ),
         ]
 
         matches = archive_manager.find_entries_by_pattern(entries, r"\.txt$")
 
         assert len(matches) == 1
-        assert matches[0]["name"] == "file1.txt"
+        assert matches[0].name == "file1.txt"
 
     def test_find_entries_by_pattern_invalid_regex(
         self, archive_manager: ArchiveManager
     ) -> None:
         """Test finding entries with invalid regex (fallback to literal)."""
         entries = [
-            {"path": "test[.txt", "name": "test[.txt"},
-            {"path": "normal.txt", "name": "normal.txt"},
+            ArchiveEntry(
+                path="test[.txt", type="f", size=100, name="test[.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="normal.txt", type="f", size=100, name="normal.txt", isdir=False
+            ),
         ]
 
         # This should treat the pattern as literal string
         matches = archive_manager.find_entries_by_pattern(entries, "[")
 
         assert len(matches) == 1
-        assert matches[0]["name"] == "test[.txt"
+        assert matches[0].name == "test[.txt"
 
     def test_get_file_type_summary(self, archive_manager: ArchiveManager) -> None:
         """Test generating file type summary."""
         entries = [
-            {"path": "doc1.txt", "type": "f"},
-            {"path": "doc2.txt", "type": "f"},
-            {"path": "image.jpg", "type": "f"},
-            {"path": "folder1", "type": "d"},
-            {"path": "folder2", "type": "d"},
-            {"path": "script", "type": "f"},  # no extension
+            ArchiveEntry(
+                path="doc1.txt", type="f", size=100, name="doc1.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="doc2.txt", type="f", size=100, name="doc2.txt", isdir=False
+            ),
+            ArchiveEntry(
+                path="image.jpg", type="f", size=100, name="image.jpg", isdir=False
+            ),
+            ArchiveEntry(path="folder1", type="d", size=0, name="folder1", isdir=True),
+            ArchiveEntry(path="folder2", type="d", size=0, name="folder2", isdir=True),
+            ArchiveEntry(
+                path="script", type="f", size=100, name="script", isdir=False
+            ),  # no extension
         ]
 
         summary = archive_manager.get_file_type_summary(entries)

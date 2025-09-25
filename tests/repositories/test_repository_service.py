@@ -7,8 +7,11 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy.orm import Session
 
+from borgitory.models.borg_info import RepositoryInitializationResult
+from borgitory.protocols.repository_protocols import BackupServiceProtocol
 from borgitory.services.repositories.repository_service import RepositoryService
 from borgitory.models.repository_dtos import (
+    ArchiveInfo,
     CreateRepositoryRequest,
     ImportRepositoryRequest,
     RepositoryOperationResult,
@@ -22,9 +25,9 @@ class TestRepositoryService:
     """Test cases for repository service business logic."""
 
     @pytest.fixture
-    def mock_borg_service(self):
+    def mock_borg_service(self) -> BackupServiceProtocol:
         """Mock borg service."""
-        mock = Mock()
+        mock: BackupServiceProtocol = Mock()
         mock.initialize_repository = AsyncMock()
         mock.verify_repository_access = AsyncMock()
         mock.scan_for_repositories = AsyncMock()
@@ -70,7 +73,10 @@ class TestRepositoryService:
 
     @pytest.mark.asyncio
     async def test_create_repository_success(
-        self, repository_service, mock_borg_service, mock_db_session
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        mock_db_session: Mock,
     ) -> None:
         """Test successful repository creation."""
         # Arrange
@@ -82,7 +88,12 @@ class TestRepositoryService:
         )
 
         # Mock successful initialization
-        mock_borg_service.initialize_repository.return_value = {"success": True}
+        mock_borg_service.initialize_repository.return_value = (
+            RepositoryInitializationResult.success_result(
+                "Repository initialized successfully",
+                repository_path="/mnt/backup/test-repo",
+            )
+        )
 
         # Mock repository object
         mock_repo = Mock()
@@ -105,6 +116,7 @@ class TestRepositoryService:
             assert result.success is True
             assert result.repository_id == 123
             assert result.repository_name == "test-repo"
+            assert result.message is not None
             assert "created successfully" in result.message
             mock_borg_service.initialize_repository.assert_called_once()
             mock_db_session.add.assert_called_once()
@@ -146,9 +158,14 @@ class TestRepositoryService:
 
     @pytest.mark.asyncio
     async def test_create_repository_borg_initialization_fails(
-        self, repository_service, mock_borg_service, mock_db_session
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        mock_db_session: Mock,
     ) -> None:
         """Test repository creation fails when Borg initialization fails."""
+        from borgitory.models.borg_info import RepositoryInitializationResult
+
         # Arrange
         request = CreateRepositoryRequest(
             name="test-repo",
@@ -157,34 +174,28 @@ class TestRepositoryService:
             user_id=1,
         )
 
-        # Mock failed initialization
-        mock_borg_service.initialize_repository.return_value = {
-            "success": False,
-            "message": "Permission denied",
-        }
-
-        mock_repo = Mock()
-        mock_repo.name = "test-repo"
-
-        with patch(
-            "borgitory.services.repositories.repository_service.Repository",
-            return_value=mock_repo,
-        ):
-            # Act
-            result = await repository_service.create_repository(
-                request, mock_db_session
+        # Test different types of Borg failures
+        mock_borg_service.initialize_repository.return_value = (
+            RepositoryInitializationResult.failure_result(
+                "Read-only file system"  # This should trigger specific error parsing
             )
+        )
 
-            # Assert
-            assert result.success is False
-            assert result.is_borg_error is True
-            assert "Permission denied" in result.error_message
-            # No rollback needed since repository wasn't added to session yet
-            mock_db_session.rollback.assert_not_called()
+        # Act
+        result = await repository_service.create_repository(request, mock_db_session)
+
+        # Assert - Test that business logic parses the error correctly
+        assert result.success is False
+        assert result.is_borg_error is True
+        assert result.error_message is not None
+        assert "read-only" in result.error_message  # Tests error parsing logic
+        assert (
+            "writable location" in result.error_message
+        )  # Tests user-friendly message
 
     @pytest.mark.asyncio
     async def test_scan_repositories_success(
-        self, repository_service, mock_borg_service
+        self, repository_service: RepositoryService, mock_borg_service: Mock
     ) -> None:
         """Test successful repository scanning."""
         # Arrange
@@ -239,7 +250,7 @@ class TestRepositoryService:
 
     @pytest.mark.asyncio
     async def test_delete_repository_blocked_by_active_jobs(
-        self, repository_service, mock_db_session
+        self, repository_service: RepositoryService, mock_db_session: Mock
     ) -> None:
         """Test repository deletion blocked by active jobs."""
         # Arrange
@@ -279,11 +290,15 @@ class TestRepositoryService:
             assert result.success is False
             assert result.has_conflicts is True
             assert result.conflict_jobs == ["backup", "prune"]
+            assert result.error_message is not None
             assert "active job(s) running" in result.error_message
 
     @pytest.mark.asyncio
     async def test_import_repository_success(
-        self, repository_service, mock_borg_service, mock_db_session
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        mock_db_session: Mock,
     ) -> None:
         """Test successful repository import."""
         # Arrange
@@ -298,8 +313,8 @@ class TestRepositoryService:
         # Mock successful verification
         mock_borg_service.verify_repository_access.return_value = True
         mock_borg_service.list_archives.return_value = [
-            {"name": "archive1"},
-            {"name": "archive2"},
+            ArchiveInfo(name="archive1", time="2023-01-01T10:00:00"),
+            ArchiveInfo(name="archive2", time="2023-01-02T10:00:00"),
         ]
 
         # Mock repository object
@@ -337,6 +352,7 @@ class TestRepositoryService:
         # Assert
         assert result.is_validation_error is True
         assert result.is_borg_error is False
+        assert result.validation_errors is not None
         assert len(result.validation_errors) == 2
 
     def test_borg_error_properties(self) -> None:
