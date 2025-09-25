@@ -39,7 +39,6 @@ from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.jobs.job_service import JobService
-from borgitory.services.backups.backup_service import BackupService
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.recovery_service import RecoveryService
 from borgitory.services.notifications.service import NotificationService
@@ -215,16 +214,6 @@ def get_simple_command_runner(
     from borgitory.services.simple_command_runner import SimpleCommandRunner
 
     return SimpleCommandRunner(config=config)
-
-
-def get_backup_service(db: Session = Depends(get_db)) -> BackupService:
-    """
-    Provide a BackupService instance with database session.
-
-    Pure backup execution service. Job creation is handled by JobService.
-    Note: This creates a new instance per request since it depends on the database session.
-    """
-    return BackupService(db)
 
 
 def get_recovery_service() -> RecoveryService:

@@ -278,7 +278,7 @@ class TestScheduleCreationAPI:
             {"cloud_sync_config_id": ""},
             {"cloud_sync_config_id": "2"},
             {"cloud_sync_config_id": "not-a-number"},  # Should be converted to None
-            {"cleanup_config_id": "3"},
+            {"prune_config_id": "3"},
             {"notification_config_id": "4"},
         ]
 

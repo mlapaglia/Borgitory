@@ -888,7 +888,7 @@ class TestRepositoriesAPI:
 
         # Create mock success result with schedule cleanup
         mock_result = DeleteRepositoryResult(
-            success=True, repository_name="schedule-cleanup-repo", deleted_schedules=1
+            success=True, repository_name="schedule-prune-repo", deleted_schedules=1
         )
 
         # Create mock repository service
@@ -910,7 +910,7 @@ class TestRepositoriesAPI:
             # Verify HTMX response contains notification and repository list update
             content = response.text
             assert "/api/shared/notification" in content
-            assert "schedule-cleanup-repo" in content
+            assert "schedule-prune-repo" in content
             assert "deleted successfully" in content
             assert "/api/repositories/html" in content
 

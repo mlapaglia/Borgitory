@@ -100,8 +100,8 @@ class Job(Base):
     cloud_sync_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("cloud_sync_configs.id"), nullable=True
     )
-    cleanup_config_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("cleanup_configs.id"), nullable=True
+    prune_config_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("prune_configs.id"), nullable=True
     )
     check_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("repository_check_configs.id"), nullable=True
@@ -169,8 +169,8 @@ class Schedule(Base):
     cloud_sync_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("cloud_sync_configs.id"), nullable=True
     )
-    cleanup_config_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("cleanup_configs.id"), nullable=True
+    prune_config_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("prune_configs.id"), nullable=True
     )
     check_config_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("repository_check_configs.id"), nullable=True
@@ -185,7 +185,7 @@ class Schedule(Base):
         "Repository", back_populates="schedules"
     )
     cloud_sync_config: Mapped["CloudSyncConfig"] = relationship("CloudSyncConfig")
-    cleanup_config: Mapped["PruneConfig"] = relationship("PruneConfig")
+    prune_config: Mapped["PruneConfig"] = relationship("PruneConfig")
     check_config: Mapped["RepositoryCheckConfig"] = relationship(
         "RepositoryCheckConfig"
     )
@@ -249,7 +249,7 @@ class Setting(Base):
 
 
 class PruneConfig(Base):
-    __tablename__ = "cleanup_configs"
+    __tablename__ = "prune_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False, index=True)

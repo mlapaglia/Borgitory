@@ -126,7 +126,7 @@ class TestJobsAPI:
         mock_job_render_service: Mock,
         mock_job_manager: Mock,
         mock_templates: Mock,
-    ) -> Generator[None, None, None]:
+    ) -> Generator[dict[str, Mock], None, None]:
         """Setup dependency overrides for testing."""
         app.dependency_overrides[get_job_service] = lambda: mock_job_service
         app.dependency_overrides[get_job_stream_service] = (
@@ -200,7 +200,10 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_backup_general_error(
-        self, async_client: AsyncClient, setup_dependencies, sample_repository
+        self,
+        async_client: AsyncClient,
+        setup_dependencies: dict[str, Mock],
+        sample_repository: Repository,
     ) -> None:
         """Test backup job creation with general error."""
         setup_dependencies["job_service"].create_backup_job.side_effect = Exception(
@@ -222,7 +225,10 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_prune_success(
-        self, async_client: AsyncClient, setup_dependencies, sample_repository
+        self,
+        async_client: AsyncClient,
+        setup_dependencies: dict[str, Mock],
+        sample_repository: Repository,
     ) -> None:
         """Test successful prune job creation."""
         setup_dependencies["job_service"].create_prune_job.return_value = {
@@ -244,7 +250,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_prune_error(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test prune job creation with error."""
         setup_dependencies["job_service"].create_prune_job.side_effect = ValueError(
@@ -266,7 +272,10 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_check_success(
-        self, async_client: AsyncClient, setup_dependencies, sample_repository
+        self,
+        async_client: AsyncClient,
+        setup_dependencies: dict[str, Mock],
+        sample_repository: Repository,
     ) -> None:
         """Test successful check job creation."""
         setup_dependencies["job_service"].create_check_job.return_value = {
@@ -287,7 +296,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_create_check_error(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test check job creation with error."""
         setup_dependencies["job_service"].create_check_job.side_effect = Exception(
@@ -308,7 +317,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_get_jobs_html(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting jobs as HTML."""
         setup_dependencies[
@@ -323,7 +332,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_get_current_jobs_html(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting current jobs as HTML."""
         setup_dependencies[
@@ -340,7 +349,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_get_job_not_found(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting non-existent job."""
         setup_dependencies["job_service"].get_job.return_value = None
@@ -351,7 +360,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_get_job_status_success(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting job status."""
         status_data = {
@@ -383,7 +392,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_get_job_status_error(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting job status with error."""
         setup_dependencies["job_service"].get_job_status.return_value = {
@@ -398,7 +407,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_stream_all_jobs(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test streaming all jobs endpoint."""
         from fastapi.responses import StreamingResponse
@@ -417,7 +426,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_stream_job_output(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test streaming specific job output."""
         from fastapi.responses import StreamingResponse
@@ -438,7 +447,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_stream_task_output(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test streaming specific task output."""
         from fastapi.responses import StreamingResponse
@@ -459,7 +468,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_toggle_job_details(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test toggling job details visibility."""
         # The mock already handles this case properly
@@ -476,7 +485,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_toggle_job_details_not_found(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test toggling details for non-existent job."""
         # The mock already handles non-existent jobs by returning None
@@ -487,7 +496,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_get_job_details_static(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting static job details."""
         # The mock already handles this case properly
@@ -499,7 +508,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_toggle_task_details(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test toggling task details visibility."""
         from types import SimpleNamespace
@@ -524,7 +533,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_toggle_task_details_task_not_found(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test toggling details for non-existent task."""
         # The mock will return a job with tasks 0 and 1, but task 999 doesn't exist
@@ -538,7 +547,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_copy_job_output(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test copying job output to clipboard."""
         response = await async_client.post("/api/jobs/test-job-123/copy-output")
@@ -548,7 +557,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_copy_task_output(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test copying task output to clipboard."""
         response = await async_client.post("/api/jobs/test-job-123/tasks/1/copy-output")
@@ -560,7 +569,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_backup_request_validation(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test backup request validation."""
         # Test missing repository_id
@@ -584,7 +593,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_prune_request_validation(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test prune request validation."""
         # Test missing repository_id
@@ -598,7 +607,7 @@ class TestJobsAPI:
 
     @pytest.mark.asyncio
     async def test_check_request_validation(
-        self, async_client: AsyncClient, setup_dependencies
+        self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test check request validation."""
         # Test missing repository_id

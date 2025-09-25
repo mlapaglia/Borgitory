@@ -148,15 +148,15 @@ class TestTaskDefinitionBuilderHookIntegration:
         builder = TaskDefinitionBuilder(mock_db)
 
         # Mock cleanup config
-        mock_cleanup_config = Mock()
-        mock_cleanup_config.strategy = "simple"
-        mock_cleanup_config.keep_within_days = 30
-        mock_cleanup_config.show_list = True
-        mock_cleanup_config.show_stats = True
-        mock_cleanup_config.save_space = False
+        mock_prune_config = Mock()
+        mock_prune_config.strategy = "simple"
+        mock_prune_config.keep_within_days = 30
+        mock_prune_config.show_list = True
+        mock_prune_config.show_stats = True
+        mock_prune_config.save_space = False
 
         mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_cleanup_config
+            mock_prune_config
         )
 
         pre_hooks = '[{"name": "Setup", "command": "echo setup"}]'

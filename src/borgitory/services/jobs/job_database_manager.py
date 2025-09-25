@@ -63,7 +63,7 @@ class JobDatabaseManager:
                 db_job.error = job_data.error_message
                 db_job.container_id = None  # Explicitly set to None
                 db_job.cloud_sync_config_id = job_data.cloud_sync_config_id
-                db_job.cleanup_config_id = None  # Explicitly set to None
+                db_job.prune_config_id = None  # Explicitly set to None
                 db_job.check_config_id = None  # Explicitly set to None
                 db_job.notification_config_id = None  # Explicitly set to None
                 db_job.job_type = "composite"  # Set as composite since we have tasks

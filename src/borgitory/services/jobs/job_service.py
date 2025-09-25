@@ -9,7 +9,6 @@ from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from borgitory.models.enums import JobType
 from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
-from borgitory.services.backups.backup_service import BackupService
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +26,9 @@ class JobService:
         self,
         db: Session,
         job_manager: JobManagerProtocol,
-        backup_service: Optional[BackupService] = None,
     ) -> None:
         self.db = db
         self.job_manager = job_manager
-        self.backup_service = backup_service or BackupService(db)
 
     async def create_backup_job(
         self, backup_request: BackupRequest, job_type: JobType

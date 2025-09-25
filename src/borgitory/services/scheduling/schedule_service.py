@@ -89,7 +89,7 @@ class ScheduleService:
             db_schedule.source_path = source_path
             db_schedule.enabled = True
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
-            db_schedule.cleanup_config_id = prune_config_id
+            db_schedule.prune_config_id = prune_config_id
             db_schedule.notification_config_id = notification_config_id
             db_schedule.pre_job_hooks = pre_job_hooks
             db_schedule.post_job_hooks = post_job_hooks

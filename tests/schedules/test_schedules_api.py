@@ -1,6 +1,5 @@
 import pytest
 from datetime import datetime
-from typing import Any, Dict
 from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -30,7 +29,7 @@ class TestSchedulesAPI:
     """Test the Schedules API endpoints - HTMX/HTTP behavior"""
 
     @pytest.fixture(scope="function")
-    def setup_test_dependencies(self, test_db: Session) -> Dict[str, Any]:
+    def setup_test_dependencies(self, test_db: Session):
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -78,11 +77,11 @@ class TestSchedulesAPI:
     ) -> None:
         """Test getting schedules form returns HTML template."""
         # Create some test configurations with required fields
-        cleanup_config = PruneConfig()
-        cleanup_config.name = "test-cleanup"
-        cleanup_config.strategy = "simple"
-        cleanup_config.keep_daily = 7
-        cleanup_config.enabled = True
+        prune_config = PruneConfig()
+        prune_config.name = "test-prune"
+        prune_config.strategy = "simple"
+        prune_config.keep_daily = 7
+        prune_config.enabled = True
         import json
 
         cloud_config = CloudSyncConfig()
@@ -110,7 +109,7 @@ class TestSchedulesAPI:
         )
         notification_config.enabled = True
 
-        test_db.add_all([cleanup_config, cloud_config, notification_config])
+        test_db.add_all([prune_config, cloud_config, notification_config])
         test_db.commit()
 
         response = client.get("/api/schedules/form")

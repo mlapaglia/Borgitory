@@ -81,22 +81,22 @@ class TestJobService:
         assert call_args.kwargs["task_definitions"][0].type == "backup"
 
     @pytest.mark.asyncio
-    async def test_create_backup_job_with_cleanup(self, test_db: Session) -> None:
-        """Test creating a backup job with cleanup task."""
+    async def test_create_backup_job_with_prune(self, test_db: Session) -> None:
+        """Test creating a backup job with prune task."""
         # Create test data
         repository = Repository()
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
-        cleanup_config = PruneConfig()
-        cleanup_config.name = "test-cleanup"
-        cleanup_config.strategy = "simple"
-        cleanup_config.keep_within_days = 30
-        cleanup_config.enabled = True
-        cleanup_config.show_list = True
-        cleanup_config.show_stats = True
-        cleanup_config.save_space = False
-        test_db.add_all([repository, cleanup_config])
+        prune_config = PruneConfig()
+        prune_config.name = "test-prune"
+        prune_config.strategy = "simple"
+        prune_config.keep_within_days = 30
+        prune_config.enabled = True
+        prune_config.show_list = True
+        prune_config.show_stats = True
+        prune_config.save_space = False
+        test_db.add_all([repository, prune_config])
         test_db.commit()
 
         self.mock_job_manager.create_composite_job = AsyncMock(return_value="job-123")
@@ -106,7 +106,7 @@ class TestJobService:
             source_path="/data",
             compression=CompressionType.LZ4,
             dry_run=False,
-            prune_config_id=cleanup_config.id,
+            prune_config_id=prune_config.id,
             cloud_sync_config_id=None,
             check_config_id=None,
             notification_config_id=None,
