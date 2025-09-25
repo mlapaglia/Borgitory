@@ -57,7 +57,7 @@ class ScheduleService:
         cron_expression: str,
         source_path: str,
         cloud_sync_config_id: Optional[int] = None,
-        cleanup_config_id: Optional[int] = None,
+        prune_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
@@ -89,7 +89,7 @@ class ScheduleService:
             db_schedule.source_path = source_path
             db_schedule.enabled = True
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
-            db_schedule.cleanup_config_id = cleanup_config_id
+            db_schedule.cleanup_config_id = prune_config_id
             db_schedule.notification_config_id = notification_config_id
             db_schedule.pre_job_hooks = pre_job_hooks
             db_schedule.post_job_hooks = post_job_hooks
@@ -282,7 +282,7 @@ class ScheduleService:
                 "cron_expression": cron_expression,
                 "source_path": json_data.get("source_path", ""),
                 "cloud_sync_config_id": safe_int(json_data.get("cloud_sync_config_id")),
-                "cleanup_config_id": safe_int(json_data.get("cleanup_config_id")),
+                "prune_config_id": safe_int(json_data.get("prune_config_id")),
                 "notification_config_id": safe_int(
                     json_data.get("notification_config_id")
                 ),

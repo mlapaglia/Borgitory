@@ -1,11 +1,12 @@
 """Tests for schedule creation API with cron validation."""
 
-from _pytest.main import Session
 import pytest
-from typing import Any, Dict
+from typing import Any, Dict, Generator
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from urllib.parse import unquote
+
+from sqlalchemy.orm import Session
 
 from borgitory.main import app
 from borgitory.models.database import Repository, User
@@ -37,7 +38,9 @@ class TestScheduleCreationAPI:
         return TestClient(app)
 
     @pytest.fixture(scope="function")
-    def setup_dependencies(self, test_db: Session) -> Dict[str, Any]:
+    def setup_dependencies(
+        self, test_db: Session
+    ) -> Generator[Dict[str, Any], None, None]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -83,7 +86,9 @@ class TestScheduleCreationAPI:
         # Clean up overrides after test
         app.dependency_overrides.clear()
 
-    def test_create_schedule_valid_data(self, client, setup_dependencies) -> None:
+    def test_create_schedule_valid_data(
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    ) -> None:
         """Test creating a schedule with valid data."""
         valid_data = {
             "name": "Daily Backup",
@@ -91,7 +96,7 @@ class TestScheduleCreationAPI:
             "cron_expression": "0 2 * * *",
             "source_path": "/data",
             "cloud_sync_config_id": None,
-            "cleanup_config_id": None,
+            "prune_config_id": None,
             "notification_config_id": None,
         }
 
@@ -106,7 +111,9 @@ class TestScheduleCreationAPI:
             or "Daily Backup" in html_content
         )
 
-    def test_create_schedule_missing_name(self, client, setup_dependencies) -> None:
+    def test_create_schedule_missing_name(
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    ) -> None:
         """Test creating a schedule without a name."""
         invalid_data = {
             "name": "",
@@ -123,7 +130,7 @@ class TestScheduleCreationAPI:
         assert "Schedule name is required" in error_message
 
     def test_create_schedule_missing_repository(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule without a repository."""
         invalid_data = {
@@ -141,7 +148,7 @@ class TestScheduleCreationAPI:
         assert "Repository is required" in error_message
 
     def test_create_schedule_invalid_repository_id(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with invalid repository ID."""
         invalid_data = {
@@ -159,7 +166,7 @@ class TestScheduleCreationAPI:
         assert "Invalid repository ID" in error_message
 
     def test_create_schedule_missing_cron_expression(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule without cron expression."""
         invalid_data = {
@@ -177,7 +184,7 @@ class TestScheduleCreationAPI:
         assert "Cron expression is required" in error_message
 
     def test_create_schedule_invalid_cron_expression_too_few_parts(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with cron expression having too few parts."""
         invalid_data = {
@@ -195,7 +202,7 @@ class TestScheduleCreationAPI:
         assert "must have 5 parts" in error_message
 
     def test_create_schedule_invalid_cron_expression_too_many_parts(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with cron expression having too many parts."""
         invalid_data = {
@@ -213,7 +220,7 @@ class TestScheduleCreationAPI:
         assert "must have 5 parts" in error_message
 
     def test_create_schedule_complex_valid_cron_expressions(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating schedules with various valid cron expressions."""
         test_cases = [
@@ -244,7 +251,7 @@ class TestScheduleCreationAPI:
             )
 
     def test_create_schedule_whitespace_handling(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with whitespace in inputs."""
         data_with_whitespace = {
@@ -264,7 +271,7 @@ class TestScheduleCreationAPI:
         )
 
     def test_create_schedule_optional_fields_handling(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with various optional field values."""
         test_cases = [
@@ -291,7 +298,7 @@ class TestScheduleCreationAPI:
             )
 
     def test_create_schedule_nonexistent_repository(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with non-existent repository."""
         invalid_data = {
@@ -308,7 +315,7 @@ class TestScheduleCreationAPI:
         assert "Repository not found" in html_content or "error" in html_content.lower()
 
     def test_create_schedule_scheduler_service_failure(
-        self, client, setup_dependencies
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule when scheduler service fails."""
         # Make the scheduler service fail
@@ -331,13 +338,17 @@ class TestScheduleCreationAPI:
             "Failed to schedule job" in html_content or "error" in html_content.lower()
         )
 
-    def test_create_schedule_invalid_json(self, client, setup_dependencies) -> None:
+    def test_create_schedule_invalid_json(
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    ) -> None:
         """Test creating a schedule with invalid JSON."""
         response = client.post("/api/schedules/", content="invalid json")
 
         assert response.status_code == 200  # FastAPI returns 422 for invalid JSON
 
-    def test_create_schedule_empty_json(self, client, setup_dependencies) -> None:
+    def test_create_schedule_empty_json(
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    ) -> None:
         """Test creating a schedule with empty JSON."""
         response = client.post("/api/schedules/", json={})
 
@@ -345,7 +356,9 @@ class TestScheduleCreationAPI:
         html_content = response.text
         assert "required" in html_content.lower()
 
-    def test_create_schedule_htmx_headers(self, client, setup_dependencies) -> None:
+    def test_create_schedule_htmx_headers(
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    ) -> None:
         """Test that successful creation returns proper HTMX headers."""
         valid_data = {
             "name": "Test Schedule",
@@ -361,7 +374,9 @@ class TestScheduleCreationAPI:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "scheduleUpdate"
 
-    def test_create_schedule_response_format(self, client, setup_dependencies) -> None:
+    def test_create_schedule_response_format(
+        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    ) -> None:
         """Test that responses are properly formatted HTML for HTMX."""
         valid_data = {
             "name": "Test Schedule",

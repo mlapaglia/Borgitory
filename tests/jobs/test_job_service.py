@@ -59,7 +59,7 @@ class TestJobService:
             compression=CompressionType.LZ4,
             dry_run=False,
             cloud_sync_config_id=None,
-            cleanup_config_id=None,
+            prune_config_id=None,
             check_config_id=None,
             notification_config_id=None,
         )
@@ -106,7 +106,7 @@ class TestJobService:
             source_path="/data",
             compression=CompressionType.LZ4,
             dry_run=False,
-            cleanup_config_id=cleanup_config.id,
+            prune_config_id=cleanup_config.id,
             cloud_sync_config_id=None,
             check_config_id=None,
             notification_config_id=None,
@@ -139,7 +139,7 @@ class TestJobService:
             compression=CompressionType.LZ4,
             dry_run=False,
             cloud_sync_config_id=None,
-            cleanup_config_id=None,
+            prune_config_id=None,
             check_config_id=None,
             notification_config_id=None,
         )

@@ -136,7 +136,7 @@ async def create_schedule(
         cron_expression=schedule.cron_expression,
         source_path=schedule.source_path or "",
         cloud_sync_config_id=schedule.cloud_sync_config_id,
-        cleanup_config_id=schedule.cleanup_config_id,
+        prune_config_id=schedule.prune_config_id,
         notification_config_id=schedule.notification_config_id,
         pre_job_hooks=schedule.pre_job_hooks,
         post_job_hooks=schedule.post_job_hooks,

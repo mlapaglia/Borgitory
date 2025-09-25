@@ -159,7 +159,7 @@ class ScheduleCreate(ScheduleBase):
     repository_id: int
     source_path: Optional[str] = "/data"
     cloud_sync_config_id: Optional[int] = None
-    cleanup_config_id: Optional[int] = None
+    prune_config_id: Optional[int] = None
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
     pre_job_hooks: Optional[str] = None
@@ -181,9 +181,9 @@ class ScheduleCreate(ScheduleBase):
             return None
         return int(v)
 
-    @field_validator("cleanup_config_id", mode="before")
+    @field_validator("prune_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
+    def validate_prune_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -237,7 +237,7 @@ class ScheduleUpdate(BaseModel):
     repository_id: Optional[int] = None
     source_path: Optional[str] = None
     cloud_sync_config_id: Optional[int] = None
-    cleanup_config_id: Optional[int] = None
+    prune_config_id: Optional[int] = None
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
     enabled: Optional[bool] = None
@@ -299,9 +299,9 @@ class ScheduleUpdate(BaseModel):
             return None
         return int(v)
 
-    @field_validator("cleanup_config_id", mode="before")
+    @field_validator("prune_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
+    def validate_prune_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -336,7 +336,7 @@ class Schedule(ScheduleBase):
     next_run: Optional[datetime] = None
     created_at: datetime
     cloud_sync_config_id: Optional[int] = Field(None, gt=0)
-    cleanup_config_id: Optional[int] = Field(None, gt=0)
+    prune_config_id: Optional[int] = Field(None, gt=0)
 
     model_config = {
         "from_attributes": True,
@@ -455,7 +455,7 @@ class BackupRequest(BaseModel):
     dry_run: bool = False
     ignore_lock: bool = False
     cloud_sync_config_id: Optional[int] = Field(None, gt=0)
-    cleanup_config_id: Optional[int] = Field(None, gt=0)
+    prune_config_id: Optional[int] = Field(None, gt=0)
     check_config_id: Optional[int] = Field(None, gt=0)
     notification_config_id: Optional[int] = Field(None, gt=0)
     pre_job_hooks: Optional[str] = None
@@ -484,9 +484,9 @@ class BackupRequest(BaseModel):
             return None
         return int(v)
 
-    @field_validator("cleanup_config_id", mode="before")
+    @field_validator("prune_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
+    def validate_prune_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:

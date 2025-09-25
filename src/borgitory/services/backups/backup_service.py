@@ -325,7 +325,7 @@ class BackupService:
         if hasattr(request, "cloud_sync_config_id"):
             job.cloud_sync_config_id = request.cloud_sync_config_id
         if hasattr(request, "cleanup_config_id"):
-            job.cleanup_config_id = request.cleanup_config_id
+            job.cleanup_config_id = request.prune_config_id
         if hasattr(request, "check_config_id"):
             job.check_config_id = request.check_config_id
         if hasattr(request, "notification_config_id"):

@@ -84,7 +84,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
                 source_path=schedule.source_path,
                 compression=CompressionType.ZSTD,
                 dry_run=False,
-                cleanup_config_id=schedule.cleanup_config_id,
+                prune_config_id=schedule.cleanup_config_id,
                 check_config_id=schedule.check_config_id,
                 cloud_sync_config_id=schedule.cloud_sync_config_id,
                 notification_config_id=schedule.notification_config_id,

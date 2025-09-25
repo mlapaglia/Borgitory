@@ -70,39 +70,39 @@ class TaskDefinitionBuilder:
         )
 
     def build_prune_task_from_config(
-        self, cleanup_config_id: int, repository_name: str
+        self, prune_config_id: int, repository_name: str
     ) -> Optional[TaskDefinition]:
         """
-        Build a prune task definition from a stored cleanup configuration.
+        Build a prune task definition from a stored prune configuration.
 
         Args:
-            cleanup_config_id: ID of the cleanup configuration
+            prune_config_id: ID of the prune configuration
             repository_name: Name of the repository for display
 
         Returns:
             Task definition dictionary or None if config not found
         """
-        cleanup_config = (
+        prune_config = (
             self.db_session.query(PruneConfig)
-            .filter(PruneConfig.id == cleanup_config_id)
+            .filter(PruneConfig.id == prune_config_id)
             .first()
         )
 
-        if not cleanup_config:
+        if not prune_config:
             return None
 
         parameters: ConfigDict = {
             "dry_run": False,
-            "show_list": cleanup_config.show_list,
-            "show_stats": cleanup_config.show_stats,
-            "save_space": cleanup_config.save_space,
+            "show_list": prune_config.show_list,
+            "show_stats": prune_config.show_stats,
+            "save_space": prune_config.save_space,
         }
 
         # Add retention parameters based on strategy
-        if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
-            parameters["keep_within"] = f"{cleanup_config.keep_within_days}d"
-        elif cleanup_config.strategy == "advanced":
-            retention_config = cast(RetentionConfigProtocol, cleanup_config)
+        if prune_config.strategy == "simple" and prune_config.keep_within_days:
+            parameters["keep_within"] = f"{prune_config.keep_within_days}d"
+        elif prune_config.strategy == "advanced":
+            retention_config = cast(RetentionConfigProtocol, prune_config)
             retention_dict = RetentionFieldHandler.to_dict(retention_config)
             parameters.update(retention_dict)
 
@@ -349,7 +349,7 @@ class TaskDefinitionBuilder:
         repository_name: str,
         include_backup: bool = True,
         backup_params: Optional[ConfigDict] = None,
-        cleanup_config_id: Optional[int] = None,
+        prune_config_id: Optional[int] = None,
         prune_request: Optional[PruneRequest] = None,
         check_config_id: Optional[int] = None,
         check_request: Optional[CheckRequest] = None,
@@ -369,7 +369,7 @@ class TaskDefinitionBuilder:
             repository_name: Name of the repository
             include_backup: Whether to include a backup task
             backup_params: Parameters for backup task (source_path, compression, etc.)
-            cleanup_config_id: ID for prune task from borgitory.config
+            prune_config_id: ID for prune task from borgitory.config
             prune_request: Request object for manual prune task
             check_config_id: ID for check task from borgitory.config
             check_request: Request object for manual check task
@@ -404,9 +404,9 @@ class TaskDefinitionBuilder:
             tasks.append(
                 self.build_prune_task_from_request(prune_request, repository_name)
             )
-        elif cleanup_config_id:
+        elif prune_config_id:
             prune_task = self.build_prune_task_from_config(
-                cleanup_config_id, repository_name
+                prune_config_id, repository_name
             )
             if prune_task:
                 tasks.append(prune_task)

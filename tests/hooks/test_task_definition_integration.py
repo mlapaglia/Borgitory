@@ -25,7 +25,7 @@ class TestTaskDefinitionBuilderHookIntegration:
             repository_name="test-repo",
         )
 
-        assert task.type == "hook"  # type: ignore
+        assert task.type == "hook"
         assert task.name == "Pre-job hook: Test Hook (test-repo)"
         assert task.parameters["hook_name"] == "Test Hook"
         assert task.parameters["hook_command"] == "echo 'hello'"
@@ -165,7 +165,7 @@ class TestTaskDefinitionBuilderHookIntegration:
         tasks = builder.build_task_list(
             repository_name="test-repo",
             include_backup=True,
-            cleanup_config_id=1,
+            prune_config_id=1,
             include_cloud_sync=True,
             cloud_sync_config_id=1,
             pre_job_hooks=pre_hooks,

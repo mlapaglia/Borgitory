@@ -29,7 +29,7 @@ def task_builder(mock_db: MagicMock) -> TaskDefinitionBuilder:
 
 
 @pytest.fixture
-def mock_cleanup_config() -> MagicMock:
+def mock_prune_config() -> MagicMock:
     """Mock cleanup configuration"""
     config = MagicMock(spec=PruneConfig)
     config.id = 1
@@ -42,7 +42,7 @@ def mock_cleanup_config() -> MagicMock:
 
 
 @pytest.fixture
-def mock_advanced_cleanup_config() -> MagicMock:
+def mock_advanced_prune_config() -> MagicMock:
     """Mock advanced cleanup configuration"""
     config = MagicMock(spec=PruneConfig)
     config.id = 2
@@ -139,11 +139,11 @@ class TestTaskDefinitionBuilder:
         self,
         task_builder: TaskDefinitionBuilder,
         mock_db: MagicMock,
-        mock_cleanup_config: MagicMock,
+        mock_prune_config: MagicMock,
     ) -> None:
         """Test building prune task from simple strategy config"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_cleanup_config
+            mock_prune_config
         )
 
         task = task_builder.build_prune_task_from_config(1, "test-repo")
@@ -166,11 +166,11 @@ class TestTaskDefinitionBuilder:
         self,
         task_builder: TaskDefinitionBuilder,
         mock_db: MagicMock,
-        mock_advanced_cleanup_config: MagicMock,
+        mock_advanced_prune_config: MagicMock,
     ) -> None:
         """Test building prune task from advanced strategy config"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_advanced_cleanup_config
+            mock_advanced_prune_config
         )
 
         task = task_builder.build_prune_task_from_config(2, "test-repo")
@@ -424,7 +424,7 @@ class TestTaskDefinitionBuilder:
         self,
         task_builder: TaskDefinitionBuilder,
         mock_db: MagicMock,
-        mock_cleanup_config: MagicMock,
+        mock_prune_config: MagicMock,
         mock_check_config: MagicMock,
         mock_notification_config: MagicMock,
     ) -> None:
@@ -434,7 +434,7 @@ class TestTaskDefinitionBuilder:
         def mock_query_side_effect(model: Any) -> MagicMock:
             query_mock = MagicMock()
             if model == PruneConfig:
-                query_mock.filter.return_value.first.return_value = mock_cleanup_config
+                query_mock.filter.return_value.first.return_value = mock_prune_config
             elif model == RepositoryCheckConfig:
                 query_mock.filter.return_value.first.return_value = mock_check_config
             elif model == NotificationConfig:
@@ -449,7 +449,7 @@ class TestTaskDefinitionBuilder:
             repository_name="test-repo",
             include_backup=True,
             backup_params={"source_path": "/custom", "compression": "lz4"},
-            cleanup_config_id=1,
+            prune_config_id=1,
             check_config_id=1,
             include_cloud_sync=True,
             notification_config_id=1,
@@ -484,17 +484,17 @@ class TestTaskDefinitionBuilder:
         self,
         task_builder: TaskDefinitionBuilder,
         mock_db: MagicMock,
-        mock_cleanup_config: MagicMock,
+        mock_prune_config: MagicMock,
     ) -> None:
         """Test building task list without backup task"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_cleanup_config
+            mock_prune_config
         )
 
         tasks = task_builder.build_task_list(
             repository_name="test-repo",
             include_backup=False,
-            cleanup_config_id=1,
+            prune_config_id=1,
             include_cloud_sync=True,
         )
 
@@ -516,7 +516,7 @@ class TestTaskDefinitionBuilder:
         tasks = task_builder.build_task_list(
             repository_name="test-repo",
             include_backup=False,
-            cleanup_config_id=1,  # This should be ignored
+            prune_config_id=1,  # This should be ignored
             prune_request=prune_request,  # This should be used
         )
 
