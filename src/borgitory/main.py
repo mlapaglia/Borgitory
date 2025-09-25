@@ -76,28 +76,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         mount_manager = get_archive_mount_manager()
 
-        import asyncio
-
-        async def cleanup_task() -> None:
-            while True:
-                try:
-                    await asyncio.sleep(300)  # 5 minutes
-                    await mount_manager.cleanup_old_mounts()
-                except Exception as e:
-                    logger.error(f"Mount cleanup error: {e}")
-
-        cleanup_task_handle = asyncio.create_task(cleanup_task())
-        logger.info("Mount cleanup task started")
-
         yield
 
         logger.info("Shutting down...")
-
-        cleanup_task_handle.cancel()
-        try:
-            await cleanup_task_handle
-        except asyncio.CancelledError:
-            pass
 
         await mount_manager.unmount_all()
         logger.info("All mounts cleaned up")

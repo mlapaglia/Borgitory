@@ -12,6 +12,7 @@ from borgitory.services.jobs.job_manager import (
     BorgJobTask,
 )
 from borgitory.models.database import Repository
+from borgitory.utils.datetime_utils import now_utc
 
 
 class TestJobManagerConfig:
@@ -79,7 +80,7 @@ class TestBorgJob:
     def test_simple_job(self) -> None:
         """Test simple job creation"""
         job_id = str(uuid.uuid4())
-        started_at = datetime.now()
+        started_at = now_utc()
 
         job = BorgJob(
             id=job_id,
@@ -99,7 +100,7 @@ class TestBorgJob:
     def test_composite_job(self) -> None:
         """Test composite job creation"""
         job_id = str(uuid.uuid4())
-        started_at = datetime.now()
+        started_at = now_utc()
         task1 = BorgJobTask(task_type="backup", task_name="Backup")
         task2 = BorgJobTask(task_type="prune", task_name="Prune")
 
@@ -126,7 +127,7 @@ class TestBorgJob:
         job = BorgJob(
             id="test",
             status="running",
-            started_at=datetime.now(),
+            started_at=now_utc(),
             job_type="composite",
             tasks=[task1, task2],
             current_task_index=0,
@@ -147,7 +148,7 @@ class TestBorgJob:
         assert current_task is None
 
         # Test simple job
-        simple_job = BorgJob(id="simple", status="running", started_at=datetime.now())
+        simple_job = BorgJob(id="simple", status="running", started_at=now_utc())
         assert simple_job.get_current_task() is None
 
     def test_unified_composite_jobs(self) -> None:
@@ -157,7 +158,7 @@ class TestBorgJob:
         job_with_tasks = BorgJob(
             id="job1",
             status="running",
-            started_at=datetime.now(),
+            started_at=now_utc(),
             job_type="composite",
             tasks=[task],
         )
@@ -169,7 +170,7 @@ class TestBorgJob:
         job_without_tasks = BorgJob(
             id="job2",
             status="running",
-            started_at=datetime.now(),
+            started_at=now_utc(),
             job_type="composite",
         )
         assert job_without_tasks.job_type == "composite"
@@ -243,7 +244,7 @@ class TestJobManager:
         job = BorgJob(
             id=job_id,
             status="running",
-            started_at=datetime.now(),
+            started_at=now_utc(),
         )
 
         assert job.id == job_id

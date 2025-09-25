@@ -957,76 +957,6 @@ class TestRepositoriesAPI:
                 del app.dependency_overrides[get_repository_service]
 
     @pytest.mark.asyncio
-    async def test_list_archives_html_success(
-        self, async_client: AsyncClient, test_db: Session
-    ) -> None:
-        """Test listing archives as HTML."""
-        repo = Repository()
-        repo.name = "html-archives-repo"
-        repo.path = "/tmp/html-archives"
-        repo.set_passphrase("html-archives-passphrase")
-        test_db.add(repo)
-        test_db.commit()
-
-        mock_archives = [
-            {
-                "name": "archive1",
-                "time": "2023-01-01T12:00:00Z",
-                "stats": {"original_size": 1024000},
-            }
-        ]
-
-        # Create mock service
-        mock_borg_service = AsyncMock(spec=BorgService)
-        mock_borg_service.list_archives.return_value = mock_archives
-
-        # Override dependency injection
-        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
-
-        try:
-            response = await async_client.get(
-                f"/api/repositories/{repo.id}/archives/html"
-            )
-
-            assert response.status_code == 200
-            assert "text/html" in response.headers["content-type"]
-        finally:
-            # Clean up
-            if get_borg_service in app.dependency_overrides:
-                del app.dependency_overrides[get_borg_service]
-
-    @pytest.mark.asyncio
-    async def test_list_archives_html_error_handling(
-        self, async_client: AsyncClient, test_db: Session
-    ) -> None:
-        """Test archives HTML with error handling."""
-        repo = Repository()
-        repo.name = "html-error-repo"
-        repo.path = "/tmp/html-error"
-        repo.set_passphrase("html-error-passphrase")
-        test_db.add(repo)
-        test_db.commit()
-
-        # Create mock service
-        mock_borg_service = AsyncMock(spec=BorgService)
-        mock_borg_service.list_archives.side_effect = Exception("List archives error")
-
-        # Override dependency injection
-        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
-
-        try:
-            response = await async_client.get(
-                f"/api/repositories/{repo.id}/archives/html"
-            )
-
-            assert response.status_code == 200  # Returns error template
-            assert "text/html" in response.headers["content-type"]
-        finally:
-            # Clean up
-            if get_borg_service in app.dependency_overrides:
-                del app.dependency_overrides[get_borg_service]
-
-    @pytest.mark.asyncio
     async def test_get_archives_repository_selector(
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
@@ -1081,51 +1011,6 @@ class TestRepositoriesAPI:
             # Clean up
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
-
-    @pytest.mark.asyncio
-    async def test_get_repository_info_success(
-        self, async_client: AsyncClient, test_db: Session
-    ) -> None:
-        """Test getting repository info."""
-        repo = Repository()
-        repo.name = "info-repo"
-        repo.path = "/tmp/info"
-        repo.set_passphrase("info-passphrase")
-        test_db.add(repo)
-        test_db.commit()
-
-        mock_info = {
-            "repository": {"id": "test-repo-id", "location": "/tmp/info"},
-            "encryption": {"mode": "repokey"},
-            "cache": {"stats": {"total_size": 1024}},
-        }
-
-        # Create mock service
-        mock_borg_service = AsyncMock(spec=BorgService)
-        mock_borg_service.get_repo_info.return_value = mock_info
-
-        # Override dependency injection
-        app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
-
-        try:
-            response = await async_client.get(f"/api/repositories/{repo.id}/info")
-
-            assert response.status_code == 200
-            response_data = response.json()
-            assert "repository" in response_data
-        finally:
-            # Clean up
-            if get_borg_service in app.dependency_overrides:
-                del app.dependency_overrides[get_borg_service]
-
-    @pytest.mark.asyncio
-    async def test_get_repository_info_not_found(
-        self, async_client: AsyncClient
-    ) -> None:
-        """Test getting info for non-existent repository."""
-        response = await async_client.get("/api/repositories/999/info")
-
-        assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_get_archive_contents_not_found(

@@ -34,8 +34,8 @@ class TestArchiveMountManager:
         self.manager = ArchiveMountManager(
             job_executor=self.mock_job_executor,
             base_mount_dir=self.test_mount_dir,
-            cleanup_interval=60,  # 1 minute for testing
-            mount_timeout=300,  # 5 minutes for testing
+            mounting_timeout=timedelta(seconds=60),  # 1 minute for testing
+            mount_timeout=timedelta(seconds=300),  # 5 minutes for testing
         )
 
         # Mock repository
@@ -58,10 +58,14 @@ class TestArchiveMountManager:
     def test_initialization_with_defaults(self) -> None:
         """Test ArchiveMountManager initialization with defaults."""
         mock_executor = Mock(spec=JobExecutor)
-        manager = ArchiveMountManager(job_executor=mock_executor)
+        manager = ArchiveMountManager(
+            job_executor=mock_executor,
+            base_mount_dir=self.test_mount_dir,
+            mount_timeout=timedelta(seconds=1800),
+            mounting_timeout=timedelta(seconds=30),
+        )
         assert manager.base_mount_dir.exists()
-        assert manager.cleanup_interval == 300
-        assert manager.mount_timeout == 1800
+        assert manager.mount_timeout == timedelta(seconds=1800)
         assert manager.job_executor is mock_executor
         assert len(manager.active_mounts) == 0
 
@@ -75,51 +79,13 @@ class TestArchiveMountManager:
             manager = ArchiveMountManager(
                 job_executor=custom_job_executor,
                 base_mount_dir=custom_dir,
-                cleanup_interval=120,
-                mount_timeout=600,
+                mounting_timeout=timedelta(seconds=120),
+                mount_timeout=timedelta(seconds=600),
             )
             # Use Path comparison to handle cross-platform differences
             assert manager.base_mount_dir == Path(custom_dir)
-            assert manager.cleanup_interval == 120
-            assert manager.mount_timeout == 600
+            assert manager.mount_timeout == timedelta(seconds=600)
             assert manager.job_executor is custom_job_executor
-
-    def test_initialization_cross_platform_paths(self) -> None:
-        """Test that path handling works across platforms."""
-        # Test that explicit path setting always works regardless of OS
-        with tempfile.TemporaryDirectory() as temp_dir:
-            custom_mount_path = os.path.join(temp_dir, "custom_mounts")
-            mock_executor = Mock(spec=JobExecutor)
-            manager = ArchiveMountManager(
-                job_executor=mock_executor, base_mount_dir=custom_mount_path
-            )
-            assert str(manager.base_mount_dir) == custom_mount_path
-            assert manager.base_mount_dir.exists()
-
-        # Test default behavior on current platform
-        mock_executor_default = Mock(spec=JobExecutor)
-        manager_default = ArchiveMountManager(job_executor=mock_executor_default)
-        assert manager_default.base_mount_dir.exists()
-
-        # Test that the path construction logic handles different scenarios correctly
-        # by testing the logic directly without platform mocking that causes Path issues
-        original_temp = os.environ.get("TEMP")
-
-        try:
-            # Test Windows logic by setting environment
-            os.environ["TEMP"] = "/tmp/test"
-            mock_executor_temp = Mock(spec=JobExecutor)
-            temp_manager = ArchiveMountManager(job_executor=mock_executor_temp)
-            # Should have created some path
-            assert temp_manager.base_mount_dir is not None
-            assert "borgitory_mounts" in str(temp_manager.base_mount_dir)
-
-        finally:
-            # Restore original environment
-            if original_temp:
-                os.environ["TEMP"] = original_temp
-            elif "TEMP" in os.environ:
-                del os.environ["TEMP"]
 
     def test_get_mount_key(self) -> None:
         """Test mount key generation."""
@@ -506,58 +472,6 @@ class TestArchiveMountManager:
         assert "Path is not a directory: file.txt" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_cleanup_old_mounts(self) -> None:
-        """Test cleanup of old unused mounts."""
-        # Setup old mount
-        mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
-        mount_point = self.manager._get_mount_point(
-            self.mock_repository, "test-archive"
-        )
-
-        mock_process = Mock()
-        mock_process.terminate = Mock()
-        mock_process.wait = AsyncMock(return_value=0)
-
-        old_mount_info = MountInfo(
-            repository_path="/path/to/repo",
-            archive_name="test-archive",
-            mount_point=mount_point,
-            mounted_at=now_utc() - timedelta(hours=2),
-            last_accessed=now_utc() - timedelta(hours=1),  # Older than mount_timeout
-            job_executor_process=mock_process,
-        )
-        self.manager.active_mounts[mount_key] = old_mount_info
-
-        with patch.object(self.manager, "_unmount_path", return_value=True):
-            await self.manager.cleanup_old_mounts()
-
-            assert mount_key not in self.manager.active_mounts
-            mock_process.terminate.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_cleanup_old_mounts_recent_access(self) -> None:
-        """Test that recently accessed mounts are not cleaned up."""
-        # Setup recent mount
-        mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
-        mount_point = self.manager._get_mount_point(
-            self.mock_repository, "test-archive"
-        )
-
-        recent_mount_info = MountInfo(
-            repository_path="/path/to/repo",
-            archive_name="test-archive",
-            mount_point=mount_point,
-            mounted_at=now_utc() - timedelta(minutes=10),
-            last_accessed=now_utc() - timedelta(minutes=1),  # Recent access
-        )
-        self.manager.active_mounts[mount_key] = recent_mount_info
-
-        await self.manager.cleanup_old_mounts()
-
-        # Should still be mounted
-        assert mount_key in self.manager.active_mounts
-
-    @pytest.mark.asyncio
     async def test_unmount_all(self) -> None:
         """Test unmounting all active mounts."""
         # Setup multiple mounts
@@ -583,34 +497,6 @@ class TestArchiveMountManager:
             await self.manager.unmount_all()
 
             assert len(self.manager.active_mounts) == 0
-
-    def test_get_mount_stats(self) -> None:
-        """Test getting mount statistics."""
-        # Setup mount
-        mount_key = self.manager._get_mount_key(self.mock_repository, "test-archive")
-        mount_point = self.manager._get_mount_point(
-            self.mock_repository, "test-archive"
-        )
-
-        mount_info = MountInfo(
-            repository_path="/path/to/repo",
-            archive_name="test-archive",
-            mount_point=mount_point,
-            mounted_at=now_utc(),
-            last_accessed=now_utc(),
-        )
-        self.manager.active_mounts[mount_key] = mount_info
-
-        stats = self.manager.get_mount_stats()
-
-        assert stats["active_mounts"] == 1
-        assert len(stats["mounts"]) == 1
-
-        mount_stat = stats["mounts"][0]
-        assert mount_stat["archive"] == "test-archive"
-        assert mount_stat["mount_point"] == str(mount_point)
-        assert "mounted_at" in mount_stat
-        assert "last_accessed" in mount_stat
 
 
 class TestMountInfoDataclass:
@@ -675,7 +561,10 @@ class TestArchiveMountManagerIntegration:
         custom_job_executor = Mock(spec=JobExecutor)
 
         manager = ArchiveMountManager(
-            base_mount_dir=self.test_mount_dir, job_executor=custom_job_executor
+            base_mount_dir=self.test_mount_dir,
+            mount_timeout=timedelta(seconds=300),
+            mounting_timeout=timedelta(seconds=30),
+            job_executor=custom_job_executor,
         )
 
         assert manager.job_executor is custom_job_executor
@@ -685,7 +574,10 @@ class TestArchiveMountManagerIntegration:
     async def test_mount_unmount_lifecycle(self) -> None:
         """Test complete mount/unmount lifecycle."""
         manager = ArchiveMountManager(
-            base_mount_dir=self.test_mount_dir, job_executor=self.mock_job_executor
+            base_mount_dir=self.test_mount_dir,
+            mount_timeout=timedelta(seconds=300),
+            mounting_timeout=timedelta(seconds=30),
+            job_executor=self.mock_job_executor,
         )
 
         mock_repository = Mock(spec=Repository)

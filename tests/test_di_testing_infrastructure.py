@@ -89,7 +89,6 @@ class TestMockServiceFactory:
         assert isinstance(mock, Mock)
         assert hasattr(mock, "create_backup")
         assert hasattr(mock, "list_archives")
-        assert hasattr(mock, "get_repo_info")
         assert hasattr(mock, "verify_repository_access")
 
         # Verify default return values are set
@@ -146,12 +145,10 @@ class TestMockServiceFactory:
         mock = MockServiceFactory.create_mock_archive_manager()
 
         assert isinstance(mock, Mock)
-        assert hasattr(mock, "list_archive_contents")
         assert hasattr(mock, "get_archive_metadata")
         assert hasattr(mock, "validate_archive_path")
 
         # Verify return values
-        assert mock.list_archive_contents.return_value == []
         assert mock.validate_archive_path.return_value is True
 
     def test_create_mock_repository_service(self):

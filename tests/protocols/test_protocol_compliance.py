@@ -168,7 +168,6 @@ class TestProtocolCompliance:
         key_methods = [
             "create_backup",
             "list_archives",
-            "get_repo_info",
             "scan_for_repositories",
             "initialize_repository",
             "verify_repository_access",
@@ -196,7 +195,6 @@ class TestProtocolCompliance:
 
         # Check for key methods
         key_methods = [
-            "list_archive_contents",
             "list_archive_directory_contents",
             "extract_file_stream",
         ]

@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, Optional, Union
 
 from borgitory.services.jobs.broadcaster.event_type import EventType
+from borgitory.utils.datetime_utils import now_utc
 
 
 @dataclass
@@ -16,7 +17,7 @@ class JobEvent:
 
     def __post_init__(self) -> None:
         if self.timestamp is None:
-            self.timestamp = datetime.now()
+            self.timestamp = now_utc()
         if self.data is None:
             self.data = {}
 

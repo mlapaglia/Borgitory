@@ -29,7 +29,6 @@ class TestRepositoryService:
         mock.verify_repository_access = AsyncMock()
         mock.scan_for_repositories = AsyncMock()
         mock.list_archives = AsyncMock()
-        mock.get_repo_info = AsyncMock()
         return mock
 
     @pytest.fixture
@@ -191,35 +190,52 @@ class TestRepositoryService:
         # Arrange
         request = RepositoryScanRequest()
 
-        mock_borg_service.scan_for_repositories.return_value = [
-            {
-                "name": "repo1",
-                "path": "/mnt/backup/repo1",
-                "encryption_mode": "repokey",
-                "requires_keyfile": False,
-                "preview": "Encrypted repository",
-                "is_existing": False,
-            },
-            {
-                "name": "repo2",
-                "path": "/mnt/backup/repo2",
-                "encryption_mode": "none",
-                "requires_keyfile": False,
-                "preview": "Unencrypted repository",
-                "is_existing": True,
-            },
+        from borgitory.models.borg_info import (
+            BorgScannedRepository,
+            RepositoryScanResponse,
+        )
+
+        mock_repos = [
+            BorgScannedRepository(
+                path="/mnt/backup/repo1",
+                id="repo_1",
+                encryption_mode="repokey",
+                requires_keyfile=False,
+                detected=True,
+                config_preview="Encrypted repository",
+            ),
+            BorgScannedRepository(
+                path="/mnt/backup/repo2",
+                id="repo_2",
+                encryption_mode="none",
+                requires_keyfile=False,
+                detected=True,
+                config_preview="Unencrypted repository",
+            ),
         ]
+
+        mock_borg_service.scan_for_repositories.return_value = RepositoryScanResponse(
+            repositories=mock_repos, scan_paths=["/mnt/backup"]
+        )
 
         # Act
         result = await repository_service.scan_repositories(request)
 
         # Assert
         assert result.success is True
-        assert result.repository_count == 2
-        assert result.repositories[0].name == "repo1"
+        assert len(result.repositories) == 2
+        assert (
+            result.repositories[0].name == ""
+        )  # Borg doesn't provide name, will be set by user
+        assert result.repositories[0].path == "/mnt/backup/repo1"
         assert result.repositories[0].encryption_mode == "repokey"
-        assert result.repositories[1].name == "repo2"
+        assert result.repositories[0].requires_keyfile is False
+        assert (
+            result.repositories[1].name == ""
+        )  # Borg doesn't provide name, will be set by user
+        assert result.repositories[1].path == "/mnt/backup/repo2"
         assert result.repositories[1].encryption_mode == "none"
+        assert result.repositories[1].requires_keyfile is False
 
     @pytest.mark.asyncio
     async def test_delete_repository_blocked_by_active_jobs(

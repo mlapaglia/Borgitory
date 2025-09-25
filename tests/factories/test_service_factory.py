@@ -273,7 +273,6 @@ class TestBackupServiceFactory:
         # Should satisfy the BackupServiceProtocol
         assert hasattr(service, "create_backup")
         assert hasattr(service, "list_archives")
-        assert hasattr(service, "get_repo_info")
 
 
 class TestFactoryIntegration:
@@ -338,7 +337,6 @@ class TestFactoryIntegration:
         # Test that service satisfies the BackupServiceProtocol
         assert hasattr(service, "create_backup")
         assert hasattr(service, "list_archives")
-        assert hasattr(service, "get_repo_info")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 import logging
-from typing import Union, Dict, List
+from typing import Dict, List
 from fastapi import (
     APIRouter,
     Depends,
@@ -21,9 +21,8 @@ from borgitory.models.schemas import (
 )
 from borgitory.dependencies import (
     BorgServiceDep,
-    VolumeServiceDep,
+    TemplatesDep,
     RepositoryServiceDep,
-    get_templates,
 )
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
@@ -55,7 +54,6 @@ from starlette.templating import _TemplateResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-templates = get_templates()
 
 
 class DirectoryInfo(BaseModel):
@@ -120,7 +118,9 @@ async def scan_repositories(
 
 @router.get("/html", response_class=HTMLResponse)
 def get_repositories_html(
-    request: Request, db: Session = Depends(get_db)
+    request: Request,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
 ) -> _TemplateResponse:
     """Get repositories as HTML for frontend display"""
     try:
@@ -170,7 +170,7 @@ async def list_directories(path: str = "/mnt") -> DirectoryListResponse:
 @router.get("/directories/autocomplete", response_class=HTMLResponse)
 async def list_directories_autocomplete(
     request: Request,
-    volume_svc: VolumeServiceDep,
+    templates: TemplatesDep,
     current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """List directories as HTML for autocomplete functionality."""
@@ -257,7 +257,11 @@ async def list_directories_autocomplete(
 
 @router.get("/import-form-update", response_class=HTMLResponse)
 async def update_import_form(
-    request: Request, borg_svc: BorgServiceDep, path: str, loading: str = ""
+    request: Request,
+    templates: TemplatesDep,
+    borg_svc: BorgServiceDep,
+    path: str,
+    loading: str = "",
 ) -> _TemplateResponse:
     """Update import form fields based on selected repository path"""
 
@@ -285,11 +289,11 @@ async def update_import_form(
         )
 
     try:
-        available_repos = await borg_svc.scan_for_repositories()
+        repository_scan_response = await borg_svc.scan_for_repositories()
         selected_repo = None
 
-        for repo in available_repos:
-            if repo.get("path") == path:
+        for repo in repository_scan_response.repositories:
+            if repo.path == path:
                 selected_repo = repo
                 break
 
@@ -308,21 +312,14 @@ async def update_import_form(
                 },
             )
 
-        encryption_mode = selected_repo.get("encryption_mode", "unknown")
-        requires_keyfile = selected_repo.get("requires_keyfile", False)
-        preview = selected_repo.get("preview", f"Encryption: {encryption_mode}")
-
-        show_passphrase = encryption_mode != "none"
-        show_keyfile = requires_keyfile
-
         return templates.TemplateResponse(
             request,
             "partials/repositories/import_form_simple.html",
             {
                 "path": path,
-                "show_passphrase": show_passphrase,
-                "show_keyfile": show_keyfile,
-                "preview": preview,
+                "show_passphrase": selected_repo.encryption_mode != "none",
+                "show_keyfile": selected_repo.requires_keyfile,
+                "preview": selected_repo.config_preview,
             },
         )
 
@@ -341,13 +338,17 @@ async def update_import_form(
 
 
 @router.get("/import-form", response_class=HTMLResponse)
-async def get_import_form(request: Request) -> _TemplateResponse:
+async def get_import_form(
+    request: Request, templates: TemplatesDep
+) -> _TemplateResponse:
     """Get the import repository form"""
     return templates.TemplateResponse(request, "partials/repositories/form_import.html")
 
 
 @router.get("/import-form-inner", response_class=HTMLResponse)
-async def get_import_form_inner(request: Request) -> _TemplateResponse:
+async def get_import_form_inner(
+    request: Request, templates: TemplatesDep
+) -> _TemplateResponse:
     """Get the import repository form inner content (preserves tab state)"""
     return templates.TemplateResponse(
         request, "partials/repositories/form_import_inner.html"
@@ -355,7 +356,9 @@ async def get_import_form_inner(request: Request) -> _TemplateResponse:
 
 
 @router.get("/import-form-clear", response_class=HTMLResponse)
-async def get_import_form_clear(request: Request) -> _TemplateResponse:
+async def get_import_form_clear(
+    request: Request, templates: TemplatesDep
+) -> _TemplateResponse:
     """Clear the selected repository form after successful import"""
     return templates.TemplateResponse(
         request, "partials/repositories/import_form_clear.html"
@@ -363,7 +366,9 @@ async def get_import_form_clear(request: Request) -> _TemplateResponse:
 
 
 @router.get("/create-form", response_class=HTMLResponse)
-async def get_create_form(request: Request) -> _TemplateResponse:
+async def get_create_form(
+    request: Request, templates: TemplatesDep
+) -> _TemplateResponse:
     """Get the create repository form"""
     return templates.TemplateResponse(request, "partials/repositories/form_create.html")
 
@@ -379,7 +384,6 @@ async def import_repository(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
-    # Convert to DTO
     import_request = ImportRepositoryRequest(
         name=name,
         path=path,
@@ -433,17 +437,14 @@ async def delete_repository(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Delete a repository - thin controller using business logic service."""
-    # Convert to DTO
     delete_request = DeleteRepositoryRequest(
         repository_id=repo_id,
         delete_borg_repo=delete_borg_repo,
         user_id=None,  # Delete doesn't require user ID currently
     )
 
-    # Call business service
     result = await repo_svc.delete_repository(delete_request, db)
 
-    # Handle response formatting
     return RepositoryResponseHandler.handle_delete_response(request, result)
 
 
@@ -455,107 +456,17 @@ async def list_archives(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """List repository archives - thin controller using business logic service."""
-    # Call business service
     result = await repo_svc.list_archives(repo_id, db)
 
-    # Handle response formatting
     return ArchiveResponseHandler.handle_archive_listing_response(request, result)
-
-
-@router.get("/{repo_id}/archives/html", response_class=HTMLResponse)
-async def list_archives_html(
-    repo_id: int,
-    request: Request,
-    borg_svc: BorgServiceDep,
-    db: Session = Depends(get_db),
-) -> _TemplateResponse:
-    """Get repository archives as HTML"""
-    try:
-        repository = db.query(Repository).filter(Repository.id == repo_id).first()
-        if repository is None:
-            raise HTTPException(status_code=404, detail="Repository not found")
-
-        try:
-            archives = await borg_svc.list_archives(repository)
-
-            processed_archives = []
-
-            if archives:
-                recent_archives = archives[-10:] if len(archives) > 10 else archives
-                recent_archives.reverse()
-
-                for archive in recent_archives:
-                    archive_name = archive.get("name", "Unknown")
-                    archive_time = archive.get("time", "")
-
-                    formatted_time = archive_time
-                    if archive_time:
-                        try:
-                            dt = parse_datetime_string(archive_time)
-                            if dt:
-                                formatted_time = format_datetime_for_display(dt)
-                            else:
-                                formatted_time = archive_time
-                        except (ValueError, TypeError):
-                            pass
-
-                    size_info = ""
-                    if "stats" in archive:
-                        stats = archive["stats"]
-                        if "original_size" in stats:
-                            size_bytes = stats["original_size"]
-                            for unit in ["B", "KB", "MB", "GB", "TB"]:
-                                if size_bytes < 1024.0:
-                                    size_info = f"{size_bytes:.1f} {unit}"
-                                    break
-                                size_bytes /= 1024.0
-
-                    processed_archives.append(
-                        {
-                            "name": archive_name,
-                            "formatted_time": formatted_time,
-                            "size_info": size_info,
-                        }
-                    )
-
-            return templates.TemplateResponse(
-                request,
-                "partials/archives/list_content.html",
-                {
-                    "repository": repository,
-                    "archives": archives,
-                    "recent_archives": processed_archives,
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"Error listing archives for repository {repo_id}: {e}")
-            return templates.TemplateResponse(
-                request,
-                "partials/archives/error_message.html",
-                {
-                    "error_message": str(e),
-                    "show_help": True,
-                },
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in list_archives_html: {e}")
-        return templates.TemplateResponse(
-            request,
-            "partials/archives/error_message.html",
-            {
-                "error_message": "An unexpected error occurred while loading archives.",
-                "show_help": False,
-            },
-        )
 
 
 @router.get("/archives/selector")
 async def get_archives_repository_selector(
-    request: Request, db: Session = Depends(get_db), preselect_repo: str = ""
+    request: Request,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+    preselect_repo: str = "",
 ) -> _TemplateResponse:
     """Get repository selector for archives with repositories populated"""
     repositories = db.query(Repository).all()
@@ -568,7 +479,9 @@ async def get_archives_repository_selector(
 
 
 @router.get("/archives/loading")
-async def get_archives_loading(request: Request) -> _TemplateResponse:
+async def get_archives_loading(
+    request: Request, templates: TemplatesDep
+) -> _TemplateResponse:
     """Get loading state for archives"""
     return templates.TemplateResponse(
         request, "partials/archives/loading_state.html", {}
@@ -577,7 +490,7 @@ async def get_archives_loading(request: Request) -> _TemplateResponse:
 
 @router.post("/archives/load-with-spinner")
 async def load_archives_with_spinner(
-    request: Request, repository_id: str = Form("")
+    request: Request, templates: TemplatesDep, repository_id: str = Form("")
 ) -> _TemplateResponse:
     """Show loading spinner then trigger loading actual archives"""
     if not repository_id or repository_id == "":
@@ -602,6 +515,7 @@ async def load_archives_with_spinner(
 async def get_archives_list(
     request: Request,
     borg_svc: BorgServiceDep,
+    templates: TemplatesDep,
     repository_id: str = "",
     db: Session = Depends(get_db),
 ) -> _TemplateResponse:
@@ -613,26 +527,94 @@ async def get_archives_list(
 
     try:
         repo_id = int(repository_id)
-        return await list_archives_html(repo_id, request, borg_svc, db)
+        repository = db.query(Repository).filter(Repository.id == repo_id).first()
+        if repository is None:
+            raise HTTPException(status_code=404, detail="Repository not found")
+
+        try:
+            archives_response = await borg_svc.list_archives(repository)
+
+            processed_archives = []
+
+            if archives_response.archives:
+                recent_archives = (
+                    archives_response.archives[-10:]
+                    if len(archives_response.archives) > 10
+                    else archives_response.archives
+                )
+                recent_archives.reverse()
+
+                for archive in recent_archives:
+                    archive_name = archive.name
+                    archive_time = (
+                        archive.start
+                    )  # Use start time as the primary timestamp
+
+                    formatted_time = archive_time
+                    if archive_time:
+                        try:
+                            dt = parse_datetime_string(archive_time)
+                            if dt:
+                                formatted_time = format_datetime_for_display(dt)
+                            else:
+                                formatted_time = archive_time
+                        except (ValueError, TypeError):
+                            pass
+
+                    size_info = ""
+                    if archive.original_size is not None:
+                        size_bytes = float(archive.original_size)
+                        for unit in ["B", "KB", "MB", "GB", "TB"]:
+                            if size_bytes < 1024.0:
+                                size_info = f"{size_bytes:.1f} {unit}"
+                                break
+                            size_bytes /= 1024.0
+
+                    processed_archives.append(
+                        {
+                            "name": archive_name,
+                            "formatted_time": formatted_time,
+                            "size_info": size_info,
+                        }
+                    )
+
+            return templates.TemplateResponse(
+                request,
+                "partials/archives/list_content.html",
+                {
+                    "repository": repository,
+                    "archives": archives_response.archives,
+                    "recent_archives": processed_archives,
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"Error listing archives for repository {repo_id}: {e}")
+            return templates.TemplateResponse(
+                request,
+                "partials/archives/error_message.html",
+                {
+                    "error_message": str(e),
+                    "show_help": True,
+                },
+            )
+
+    except HTTPException:
+        raise
     except (ValueError, TypeError):
         return templates.TemplateResponse(
             request, "partials/archives/empty_state.html", {}
         )
-
-
-@router.get("/{repo_id}/info")
-async def get_repository_info(
-    repo_id: int, borg_svc: BorgServiceDep, db: Session = Depends(get_db)
-) -> Dict[str, Dict[str, Union[str, Dict[str, int]]]]:
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
-    if repository is None:
-        raise HTTPException(status_code=404, detail="Repository not found")
-
-    try:
-        info = await borg_svc.get_repo_info(repository)
-        return info
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in list_archives_html: {e}")
+        return templates.TemplateResponse(
+            request,
+            "partials/archives/error_message.html",
+            {
+                "error_message": "An unexpected error occurred while loading archives.",
+                "show_help": False,
+            },
+        )
 
 
 @router.post("/{repo_id}/archives/{archive_name}/contents/load-with-spinner")
@@ -640,6 +622,7 @@ async def load_archive_contents_with_spinner(
     request: Request,
     repo_id: int,
     archive_name: str,
+    templates: TemplatesDep,
     path: str = Form(""),
     db: Session = Depends(get_db),
 ) -> _TemplateResponse:
@@ -661,6 +644,7 @@ async def get_archive_contents(
     repo_id: int,
     archive_name: str,
     borg_svc: BorgServiceDep,
+    templates: TemplatesDep,
     path: str = "",
     db: Session = Depends(get_db),
 ) -> _TemplateResponse:

@@ -4,11 +4,15 @@ Borg service protocol interface.
 Defines the contract for Borg backup operations.
 """
 
-from typing import Protocol, Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Protocol, Dict, Optional, Union, TYPE_CHECKING
 from starlette.responses import StreamingResponse
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository
+    from borgitory.models.borg_info import (
+        BorgArchiveListResponse,
+        RepositoryScanResponse,
+    )
 
 
 class BorgService(Protocol):
@@ -51,7 +55,7 @@ class BorgService(Protocol):
 
     async def list_archives(
         self, repository: "Repository"
-    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
+    ) -> "BorgArchiveListResponse":
         """
         List all archives in a repository.
 
@@ -59,36 +63,7 @@ class BorgService(Protocol):
             repository: Repository object
 
         Returns:
-            List of archive information dictionaries
-        """
-        ...
-
-    async def get_repo_info(
-        self, repository: "Repository"
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
-        """
-        Get repository information.
-
-        Args:
-            repository: Repository object
-
-        Returns:
-            Repository information dictionary
-        """
-        ...
-
-    async def list_archive_contents(
-        self, repository: "Repository", archive_name: str
-    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
-        """
-        List contents of a specific archive.
-
-        Args:
-            repository: Repository object
-            archive_name: Name of the archive
-
-        Returns:
-            List of archive contents
+            Structured archive list response with strongly typed archive data
         """
         ...
 
@@ -122,11 +97,11 @@ class BorgService(Protocol):
 
     async def scan_for_repositories(
         self,
-    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
+    ) -> "RepositoryScanResponse":
         """
         Scan for Borg repositories.
 
         Returns:
-            List of discovered repositories
+            Structured response containing discovered repositories with metadata
         """
         ...

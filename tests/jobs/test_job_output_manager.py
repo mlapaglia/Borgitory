@@ -3,9 +3,10 @@ Tests for JobOutputManager - job output collection, storage, and streaming
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from borgitory.services.jobs.job_output_manager import JobOutputManager
+from borgitory.utils.datetime_utils import now_utc
 
 
 class TestJobOutputManager:
@@ -216,7 +217,7 @@ class TestJobOutputManager:
         new_job = self.output_manager.create_job_output("new-job")
 
         # Simulate old timestamp by adding a line with old timestamp
-        old_timestamp = (datetime.now() - timedelta(hours=2)).isoformat()
+        old_timestamp = (now_utc() - timedelta(hours=2)).isoformat()
         old_job.lines.append(
             {
                 "text": "Old line",
@@ -227,7 +228,7 @@ class TestJobOutputManager:
         )
 
         # New job gets recent timestamp
-        new_timestamp = datetime.now().isoformat()
+        new_timestamp = now_utc().isoformat()
         new_job.lines.append(
             {
                 "text": "New line",

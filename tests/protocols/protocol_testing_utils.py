@@ -65,7 +65,6 @@ class ProtocolMockFactory:
         mock = Mock(spec=BackupServiceProtocol)
         mock.create_backup = AsyncMock(return_value="mock-job-123")
         mock.list_archives = AsyncMock(return_value=[])
-        mock.get_repo_info = AsyncMock(return_value={"mock": "repo"})
         mock.scan_for_repositories = AsyncMock(return_value=[])
         mock.initialize_repository = AsyncMock(return_value={"success": True})
         mock.verify_repository_access = AsyncMock(return_value={"success": True})

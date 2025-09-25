@@ -56,13 +56,6 @@ class BackupServiceProtocol(Protocol):
         """List all archives in a repository."""
         ...
 
-    async def get_repo_info(
-        self,
-        repository: "Repository",  # Repository model
-    ) -> Dict[str, object]:
-        """Get repository information."""
-        ...
-
     async def verify_repository_access(
         self, repo_path: str, passphrase: str, keyfile_path: str = ""
     ) -> bool:
@@ -76,14 +69,6 @@ class BackupServiceProtocol(Protocol):
 
 class ArchiveServiceProtocol(Protocol):
     """Protocol for archive content operations (ArchiveManager)."""
-
-    async def list_archive_contents(
-        self,
-        repository: "Repository",  # Repository model
-        archive_name: str,
-    ) -> List["ArchiveEntry"]:
-        """List contents of an archive."""
-        ...
 
     async def list_archive_directory_contents(
         self,

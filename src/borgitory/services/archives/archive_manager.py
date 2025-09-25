@@ -91,50 +91,6 @@ class ArchiveManager:
         self.job_executor = job_executor or JobExecutor()
         self.command_builder = command_builder or BorgCommandBuilder()
 
-    async def list_archive_contents(
-        self, repository: Repository, archive_name: str
-    ) -> List[ArchiveEntry]:
-        """List contents of a specific archive"""
-        try:
-            command, env = self.command_builder.build_list_archive_contents_command(
-                repository, archive_name
-            )
-        except Exception as e:
-            raise Exception(f"Command building failed: {str(e)}")
-
-        try:
-            # Use JobExecutor directly for simple synchronous operations
-            process = await self.job_executor.start_process(command, env)
-            result = await self.job_executor.monitor_process_output(process)
-
-            if result.return_code == 0:
-                # Parse JSON lines output from stdout
-                output_text = result.stdout.decode("utf-8", errors="replace")
-                contents = []
-
-                for line in output_text.split("\n"):
-                    line = line.strip()
-                    if line.startswith("{"):
-                        try:
-                            item = json.loads(line)
-                            contents.append(item)
-                        except json.JSONDecodeError:
-                            continue
-
-                return contents
-            else:
-                error_text = (
-                    result.stderr.decode("utf-8", errors="replace")
-                    if result.stderr
-                    else "Unknown error"
-                )
-                raise Exception(
-                    f"Borg list failed with code {result.return_code}: {error_text}"
-                )
-
-        except Exception as e:
-            raise Exception(f"Failed to list archive contents: {str(e)}")
-
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
     ) -> List[ArchiveEntry]:

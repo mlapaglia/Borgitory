@@ -4,7 +4,6 @@ Archive Mount Manager - FUSE-based archive browsing system
 
 import asyncio
 import logging
-import os
 from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING, TypedDict
 from dataclasses import dataclass
@@ -55,24 +54,15 @@ class ArchiveMountManager:
     def __init__(
         self,
         job_executor: "ProcessExecutorProtocol",
-        base_mount_dir: Optional[str] = None,
-        cleanup_interval: int = 300,
-        mount_timeout: int = 1800,
+        base_mount_dir: str,
+        mount_timeout: timedelta = timedelta(seconds=1800),
+        mounting_timeout: timedelta = timedelta(seconds=30),
     ) -> None:
-        # Use environment variable or sensible default based on platform
-        if base_mount_dir is None:
-            if os.name == "nt":  # Windows
-                base_mount_dir = os.path.join(
-                    os.environ.get("TEMP", "C:\\temp"), "borgitory_mounts"
-                )
-            else:  # Unix-like
-                base_mount_dir = "/tmp/borgitory_mounts"
-
         self.base_mount_dir = Path(base_mount_dir)
         self.base_mount_dir.mkdir(parents=True, exist_ok=True)
         self.active_mounts: Dict[str, MountInfo] = {}  # key: repo_path::archive_name
-        self.cleanup_interval = cleanup_interval  # 5 minutes default
-        self.mount_timeout = mount_timeout  # 30 minutes before auto-unmount
+        self.mount_timeout = mount_timeout
+        self.mounting_timeout = mounting_timeout
         self.job_executor = job_executor
 
     def _get_mount_key(self, repository: Repository, archive_name: str) -> str:
@@ -89,20 +79,17 @@ class ArchiveMountManager:
         """Mount an archive and return the mount point"""
         mount_key = self._get_mount_key(repository, archive_name)
 
-        # Check if already mounted
         if mount_key in self.active_mounts:
             mount_info = self.active_mounts[mount_key]
-            mount_info.last_accessed = datetime.now()
+            mount_info.last_accessed = now_utc()
             logger.info(f"Archive already mounted at {mount_info.mount_point}")
             return mount_info.mount_point
 
         mount_point = self._get_mount_point(repository, archive_name)
 
         try:
-            # Create mount point directory
             mount_point.mkdir(parents=True, exist_ok=True)
 
-            # Build borg mount command
             command, env = build_secure_borg_command(
                 base_command="borg mount",
                 repository_path="",
@@ -116,7 +103,6 @@ class ArchiveMountManager:
 
             logger.info(f"Mounting archive {archive_name} at {mount_point}")
 
-            # Start borg mount process
             process = await asyncio.create_subprocess_exec(
                 *command,
                 env=env,
@@ -124,13 +110,11 @@ class ArchiveMountManager:
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            # Wait for the mount to establish by polling until it's ready
             mount_ready = await self._wait_for_mount_ready(
-                mount_point, process, timeout=5
+                mount_point, process, self.mounting_timeout.seconds
             )
 
             if not mount_ready:
-                # Try to get error information from the process
                 try:
                     # Check if process has already exited with error
                     if process.returncode is not None:
@@ -154,7 +138,6 @@ class ArchiveMountManager:
                         "Archive contents not available after 5 seconds - mount failed"
                     )
 
-            # Store mount info
             mount_info = MountInfo(
                 repository_path=repository.path,
                 archive_name=archive_name,
@@ -170,7 +153,6 @@ class ArchiveMountManager:
 
         except Exception as e:
             logger.error(f"Failed to mount archive {archive_name}: {e}")
-            # Cleanup on failure
             try:
                 if mount_point.exists():
                     await self._unmount_path(mount_point)
@@ -184,7 +166,6 @@ class ArchiveMountManager:
             if not mount_point.exists() or not mount_point.is_dir():
                 return False
 
-            # Check if directory has actual contents (files/folders)
             contents = list(mount_point.iterdir())
             return len(contents) > 0
 
@@ -194,7 +175,7 @@ class ArchiveMountManager:
     async def _wait_for_mount_ready(
         self, mount_point: Path, process: asyncio.subprocess.Process, timeout: int = 5
     ) -> bool:
-        """Wait for mount to have contents, checking every second for up to 5 seconds"""
+        """Wait for mount to have contents, checking every second up to timeout"""
         for attempt in range(int(timeout)):
             # Check if process has exited with error
             if process.returncode is not None and process.returncode != 0:
@@ -281,7 +262,7 @@ class ArchiveMountManager:
             raise Exception(f"Archive {archive_name} is not mounted")
 
         mount_info = self.active_mounts[mount_key]
-        mount_info.last_accessed = datetime.now()
+        mount_info.last_accessed = now_utc()
 
         # Build the full path
         target_path = mount_info.mount_point
@@ -334,32 +315,6 @@ class ArchiveMountManager:
         except Exception as e:
             logger.error(f"Error listing directory {path}: {e}")
             raise Exception(f"Failed to list directory: {str(e)}")
-
-    async def cleanup_old_mounts(self) -> None:
-        """Remove old unused mounts"""
-        cutoff_time = now_utc() - timedelta(seconds=self.mount_timeout)
-        to_remove = []
-
-        for mount_key, mount_info in self.active_mounts.items():
-            if mount_info.last_accessed < cutoff_time:
-                to_remove.append(mount_key)
-
-        for mount_key in to_remove:
-            mount_info = self.active_mounts[mount_key]
-            logger.info(f"Cleaning up old mount: {mount_info.archive_name}")
-            await self._unmount_path(mount_info.mount_point)
-
-            # Terminate process
-            if mount_info.job_executor_process:
-                try:
-                    mount_info.job_executor_process.terminate()
-                    await asyncio.wait_for(
-                        mount_info.job_executor_process.wait(), timeout=5
-                    )
-                except (ProcessLookupError, asyncio.TimeoutError):
-                    pass
-
-            del self.active_mounts[mount_key]
 
     async def unmount_all(self) -> None:
         """Unmount all active mounts"""
