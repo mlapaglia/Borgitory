@@ -36,8 +36,6 @@ from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.backups.backup_service import BackupService
 from borgitory.services.jobs.job_manager import JobManager
-
-# Note: JobManager singleton is handled by FastAPI's dependency caching system
 from borgitory.services.recovery_service import RecoveryService
 from borgitory.services.notifications.service import NotificationService
 from borgitory.services.notifications.config_service import NotificationConfigService
@@ -505,12 +503,12 @@ class TimezoneAwareJinja2Templates(Jinja2Templates):
         return super().TemplateResponse(*args, **kwargs)
 
 
-@lru_cache()
 def get_templates() -> TimezoneAwareJinja2Templates:
     """
-    Provide a Jinja2Templates singleton instance with custom filters.
+    Provide a TimezoneAwareJinja2Templates instance with custom filters and proper FastAPI dependency injection.
 
-    Uses FastAPI's built-in caching for singleton behavior.
+    Returns:
+        TimezoneAwareJinja2Templates: New templates instance with custom filters for each request
     """
     template_path = get_template_directory()
     templates = TimezoneAwareJinja2Templates(directory=template_path)

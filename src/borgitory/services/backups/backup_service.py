@@ -124,8 +124,6 @@ class BackupService:
             job.finished_at = now_utc()
             self.db.commit()
 
-            # Note: JobManager status updates are now handled by JobService
-
             logger.error(f"Backup job {job.id} failed: {e}")
             raise
 
@@ -148,8 +146,6 @@ class BackupService:
         job = self._create_job_record(repository, JobType.PRUNE, prune_request)
 
         logger.info(f"Starting prune job {job.id} for repository {repository.name}")
-
-        # Note: JobManager registration is now handled by JobService
 
         try:
             # Create prune configuration
@@ -191,8 +187,6 @@ class BackupService:
             job.error = str(e)
             job.finished_at = now_utc()
             self.db.commit()
-
-            # Note: JobManager status updates are now handled by JobService
 
             logger.error(f"Prune job {job.id} failed: {e}")
             raise
@@ -383,8 +377,6 @@ class BackupService:
             task.output = line
         else:
             task.output += "\n" + line
-
-        # Note: Output forwarding to JobManager is now handled by JobService via output_callback
 
         # Commit periodically (every 10 lines to avoid too many commits)
         if task.output.count("\n") % 10 == 0:

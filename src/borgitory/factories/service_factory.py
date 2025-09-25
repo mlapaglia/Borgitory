@@ -28,8 +28,11 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
     from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers import StorageFactory
-    from borgitory.services.jobs.job_executor import JobExecutor
-    from borgitory.protocols import VolumeServiceProtocol, JobManagerProtocol
+    from borgitory.protocols import (
+        VolumeServiceProtocol,
+        JobManagerProtocol,
+        ProcessExecutorProtocol,
+    )
     from borgitory.services.rclone_service import RcloneService
 
 logger = logging.getLogger(__name__)
@@ -196,12 +199,14 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
 
     def __init__(
         self,
+        job_executor: "ProcessExecutorProtocol",
         command_runner: CommandRunnerProtocol,
         volume_service: "VolumeServiceProtocol",
         job_manager: "JobManagerProtocol",
     ) -> None:
         super().__init__()
         # Inject dependencies instead of using service locator
+        self._job_executor = job_executor
         self._command_runner = command_runner
         self._volume_service = volume_service
         self._job_manager = job_manager
@@ -211,7 +216,7 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
         """Register default backup service implementations."""
 
         def create_borg_service(
-            job_executor: Optional["JobExecutor"] = None,
+            job_executor: Optional["ProcessExecutorProtocol"] = None,
             command_runner: Optional[CommandRunnerProtocol] = None,
             job_manager: Optional["JobManagerProtocol"] = None,
             volume_service: Optional["VolumeServiceProtocol"] = None,
@@ -220,12 +225,13 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
             from borgitory.services.borg_service import BorgService
 
             # Use provided dependencies or injected defaults - no more service locator!
+            final_job_executor = job_executor or self._job_executor
             final_command_runner = command_runner or self._command_runner
             final_volume_service = volume_service or self._volume_service
             final_job_manager = job_manager or self._job_manager
 
             return BorgService(
-                job_executor=job_executor,
+                job_executor=final_job_executor,
                 command_runner=final_command_runner,
                 volume_service=final_volume_service,
                 job_manager=final_job_manager,
@@ -236,7 +242,7 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
     def create_backup_service(
         self,
         backup_type: str = "borg",
-        job_executor: Optional["JobExecutor"] = None,
+        job_executor: Optional["ProcessExecutorProtocol"] = None,
         command_runner: Optional[CommandRunnerProtocol] = None,
         job_manager: Optional["JobManagerProtocol"] = None,
         volume_service: Optional["VolumeServiceProtocol"] = None,
@@ -249,7 +255,3 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
             job_manager=job_manager,
             volume_service=volume_service,
         )
-
-
-# Note: Global convenience functions removed to avoid circular imports
-# Use the factory directly via dependencies.py

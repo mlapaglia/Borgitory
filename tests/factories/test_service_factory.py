@@ -233,11 +233,13 @@ class TestBackupServiceFactory:
     def test_factory_has_default_implementations(self):
         """Test that factory comes with default implementations."""
         # Create factory with injected dependencies - clean and simple!
+        mock_job_executor = Mock()
         mock_command_runner = Mock()
         mock_volume_service = Mock()
         mock_job_manager = Mock()
 
         factory = BackupServiceFactory(
+            job_executor=mock_job_executor,
             command_runner=mock_command_runner,
             volume_service=mock_volume_service,
             job_manager=mock_job_manager,
@@ -256,6 +258,7 @@ class TestBackupServiceFactory:
         mock_job_manager = Mock()
 
         factory = BackupServiceFactory(
+            job_executor=mock_job_executor,
             command_runner=mock_command_runner,
             volume_service=mock_volume_service,
             job_manager=mock_job_manager,
@@ -322,6 +325,7 @@ class TestFactoryIntegration:
         mock_job_manager = Mock()
 
         factory = BackupServiceFactory(
+            job_executor=mock_job_executor,
             command_runner=mock_command_runner,
             volume_service=mock_volume_service,
             job_manager=mock_job_manager,
