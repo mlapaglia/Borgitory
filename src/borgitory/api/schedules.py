@@ -77,7 +77,7 @@ async def get_schedules_form(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Get schedules form with all dropdowns populated"""
-    form_data = config_service.get_schedule_form_data(db)
+    form_data = config_service.get_schedule_form_data()
 
     return templates.TemplateResponse(
         request,
@@ -136,7 +136,7 @@ async def create_schedule(
         cron_expression=schedule.cron_expression,
         source_path=schedule.source_path or "",
         cloud_sync_config_id=schedule.cloud_sync_config_id,
-        cleanup_config_id=schedule.cleanup_config_id,
+        prune_config_id=schedule.prune_config_id,
         notification_config_id=schedule.notification_config_id,
         pre_job_hooks=schedule.pre_job_hooks,
         post_job_hooks=schedule.post_job_hooks,
@@ -271,7 +271,7 @@ async def get_schedule_edit_form(
         if schedule is None:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
-        form_data = config_service.get_schedule_form_data(db)
+        form_data = config_service.get_schedule_form_data()
         context = {**form_data, "schedule": schedule, "is_edit_mode": True}
 
         return templates.TemplateResponse(

@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Optional, Union
+from typing import Dict, Optional
 
+from borgitory.custom_types import ConfigDict
 from borgitory.services.jobs.broadcaster.event_type import EventType
+from borgitory.utils.datetime_utils import now_utc
 
 
 @dataclass
@@ -11,12 +13,12 @@ class JobEvent:
 
     event_type: EventType
     job_id: Optional[str] = None
-    data: Optional[Dict[str, Union[str, int, float, bool, None]]] = None
+    data: Optional[ConfigDict] = None
     timestamp: Optional[datetime] = None
 
     def __post_init__(self) -> None:
         if self.timestamp is None:
-            self.timestamp = datetime.now()
+            self.timestamp = now_utc()
         if self.data is None:
             self.data = {}
 

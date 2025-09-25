@@ -2,7 +2,15 @@
 Protocol interfaces for command execution services.
 """
 
-from typing import Protocol, Dict, Optional, List, Callable, TYPE_CHECKING
+from typing import (
+    Protocol,
+    Dict,
+    Optional,
+    List,
+    Callable,
+    TYPE_CHECKING,
+    runtime_checkable,
+)
 import asyncio
 
 if TYPE_CHECKING:
@@ -49,6 +57,7 @@ class ProcessResult:
         self.error = error
 
 
+@runtime_checkable
 class CommandRunnerProtocol(Protocol):
     """Protocol for command execution services."""
 

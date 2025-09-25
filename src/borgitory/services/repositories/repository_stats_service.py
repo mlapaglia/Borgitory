@@ -6,6 +6,7 @@ from typing import Dict, List, Callable, Optional, TypedDict
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository
+from borgitory.utils.datetime_utils import now_utc
 from borgitory.utils.security import build_secure_borg_command
 
 logger = logging.getLogger(__name__)
@@ -1060,11 +1061,11 @@ class RepositoryStatsService:
         from borgitory.models.database import Job, JobTask
         from sqlalchemy import and_, func
         from collections import defaultdict
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         try:
             # Get backup tasks from the last 30 days
-            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            thirty_days_ago = now_utc() - timedelta(days=30)
 
             backup_results = (
                 db.query(func.date(JobTask.completed_at).label("date"), JobTask.status)

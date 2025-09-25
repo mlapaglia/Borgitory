@@ -9,6 +9,8 @@ from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 
+from borgitory.utils.datetime_utils import now_utc
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,7 +35,7 @@ class QueuedJob:
 
     def __post_init__(self) -> None:
         if self.queued_at is None:
-            self.queued_at = datetime.now()
+            self.queued_at = now_utc()
         if self.metadata is None:
             self.metadata = {}
 

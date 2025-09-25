@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
+from borgitory.custom_types import ConfigDict
 from borgitory.models.database import get_db, CloudSyncConfig
 from borgitory.models.schemas import (
     CloudSyncConfigCreate,
@@ -37,15 +38,13 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
         supported_providers.append(
             {
                 "value": provider_name,
-                "label": info["label"],
-                "description": info["description"],
+                "label": info.label,
+                "description": info.description,
             }
         )
 
     # Sort by provider name for consistent ordering
-    return sorted(
-        cast(List[Dict[str, str]], supported_providers), key=lambda x: str(x["value"])
-    )
+    return sorted(supported_providers, key=lambda x: str(x["value"]))
 
 
 def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]:
@@ -90,7 +89,7 @@ def _get_submit_button_text(
     provider_data = provider_info.get(provider)
 
     if provider_data:
-        provider_label = provider_data["label"]
+        provider_label = provider_data.label
         action = "Add" if mode == "create" else "Update"
         return f"{action} {provider_label} Location"
     else:
@@ -127,7 +126,7 @@ def _parse_form_data_to_config(
     form_data: Mapping[str, Union[str, object]],
 ) -> CloudSyncConfigCreate:
     """Parse form data with bracket notation into CloudSyncConfigCreate object"""
-    provider_config = {}
+    provider_config: ConfigDict = {}
     regular_fields = {}
 
     for key, value in form_data.items():
@@ -143,7 +142,7 @@ def _parse_form_data_to_config(
         name=regular_fields["name"],
         provider=regular_fields["provider"],
         path_prefix=regular_fields.get("path_prefix", ""),
-        provider_config=cast(Dict[str, Union[str, int, float, bool]], provider_config),
+        provider_config=provider_config,
     )
 
 
@@ -166,9 +165,7 @@ def _parse_form_data_to_config_update(
         name=regular_fields.get("name"),
         provider=regular_fields.get("provider"),
         path_prefix=regular_fields.get("path_prefix"),
-        provider_config=cast(Dict[str, Union[str, int, float, bool]], provider_config)
-        if provider_config
-        else None,
+        provider_config=cast(ConfigDict, provider_config) if provider_config else None,
     )
 
 

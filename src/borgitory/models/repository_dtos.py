@@ -3,9 +3,10 @@ Data Transfer Objects for Repository operations.
 Clean data structures for business logic layer.
 """
 
-from typing import Optional, List, Dict, Union
+from typing import Optional, List
 from dataclasses import dataclass
 from fastapi import UploadFile
+from borgitory.custom_types import ConfigDict
 
 
 @dataclass
@@ -68,7 +69,7 @@ class ArchiveInfo:
     time: str
     formatted_time: Optional[str] = None
     size_info: Optional[str] = None
-    stats: Optional[Dict[str, Union[str, int, float, bool, None]]] = None
+    stats: Optional[ConfigDict] = None
 
 
 @dataclass
@@ -186,7 +187,7 @@ class RepositoryInfoResult:
 
     success: bool
     repository_id: int
-    info: Optional[Dict[str, Union[str, int, float, bool, None]]] = None
+    info: Optional[ConfigDict] = None
     error_message: Optional[str] = None
 
 

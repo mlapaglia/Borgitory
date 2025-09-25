@@ -211,7 +211,7 @@ class JobOutputManager:
 
     def cleanup_old_outputs(self, max_age_seconds: int = 3600) -> int:
         """Clean up old job outputs"""
-        current_time = datetime.now()
+        current_time = now_utc()
         cleaned_count = 0
 
         job_ids_to_remove = []

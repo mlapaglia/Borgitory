@@ -7,7 +7,8 @@ providing a single source of truth for encryption operations.
 """
 
 import logging
-from typing import Dict, List, Union
+from typing import List
+from borgitory.custom_types import ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +25,9 @@ class EncryptionService:
 
     def encrypt_sensitive_fields(
         self,
-        config: Dict[str, Union[str, int, float, bool, None]],
+        config: ConfigDict,
         sensitive_fields: List[str],
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> ConfigDict:
         """
         Encrypt sensitive fields in configuration.
 
@@ -60,9 +61,9 @@ class EncryptionService:
 
     def decrypt_sensitive_fields(
         self,
-        config: Dict[str, Union[str, int, float, bool, None]],
+        config: ConfigDict,
         sensitive_fields: List[str],
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> ConfigDict:
         """
         Decrypt sensitive fields in configuration.
 

@@ -9,7 +9,8 @@ import pytest
 from unittest.mock import Mock
 from borgitory.services.jobs.job_render_service import JobRenderService
 from borgitory.services.jobs.job_manager import BorgJob
-from datetime import datetime
+
+from borgitory.utils.datetime_utils import now_utc
 
 
 class TestSSEMultilineFormatting:
@@ -50,7 +51,7 @@ class TestSSEMultilineFormatting:
         running_job = Mock(spec=BorgJob)
         running_job.id = "test-job-123"
         running_job.status = "running"
-        running_job.started_at = datetime.now()
+        running_job.started_at = now_utc()
         running_job.tasks = []
 
         mock.jobs = {"test-job-123": running_job}

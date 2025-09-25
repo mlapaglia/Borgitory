@@ -1,6 +1,5 @@
 import pytest
 from datetime import datetime
-from typing import Any, Dict
 from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -10,7 +9,7 @@ from borgitory.models.database import (
     Schedule,
     Repository,
     CloudSyncConfig,
-    CleanupConfig,
+    PruneConfig,
     NotificationConfig,
 )
 from borgitory.dependencies import (
@@ -30,7 +29,7 @@ class TestSchedulesAPI:
     """Test the Schedules API endpoints - HTMX/HTTP behavior"""
 
     @pytest.fixture(scope="function")
-    def setup_test_dependencies(self, test_db: Session) -> Dict[str, Any]:
+    def setup_test_dependencies(self, test_db: Session):
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -41,7 +40,7 @@ class TestSchedulesAPI:
 
         # Create real services with test database
         schedule_service = ScheduleService(test_db, mock_scheduler_service)
-        configuration_service = ConfigurationService()
+        configuration_service = ConfigurationService(test_db)
 
         # Override dependencies
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
@@ -78,11 +77,11 @@ class TestSchedulesAPI:
     ) -> None:
         """Test getting schedules form returns HTML template."""
         # Create some test configurations with required fields
-        cleanup_config = CleanupConfig()
-        cleanup_config.name = "test-cleanup"
-        cleanup_config.strategy = "simple"
-        cleanup_config.keep_daily = 7
-        cleanup_config.enabled = True
+        prune_config = PruneConfig()
+        prune_config.name = "test-prune"
+        prune_config.strategy = "simple"
+        prune_config.keep_daily = 7
+        prune_config.enabled = True
         import json
 
         cloud_config = CloudSyncConfig()
@@ -110,7 +109,7 @@ class TestSchedulesAPI:
         )
         notification_config.enabled = True
 
-        test_db.add_all([cleanup_config, cloud_config, notification_config])
+        test_db.add_all([prune_config, cloud_config, notification_config])
         test_db.commit()
 
         response = client.get("/api/schedules/form")

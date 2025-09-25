@@ -126,26 +126,16 @@ class NotificationRegistryFactory:
                 test_registry._config_classes[provider_name] = config_class
                 test_registry._provider_classes[provider_name] = provider_class
                 test_registry._metadata[provider_name] = NotificationProviderMetadata(
-                    name=str(metadata.get("name", provider_name)),
-                    label=str(metadata.get("label", provider_name.title())),
-                    description=str(metadata.get("description", "")),
-                    supports_priority=bool(metadata.get("supports_priority", False)),
-                    supports_attachments=bool(
-                        metadata.get("supports_attachments", False)
-                    ),
-                    supports_formatting=bool(
-                        metadata.get("supports_formatting", False)
-                    ),
-                    requires_credentials=bool(
-                        metadata.get("requires_credentials", True)
-                    ),
-                    additional_info=metadata.get("additional_info")
-                    if isinstance(metadata.get("additional_info"), dict)
-                    else None,  # type: ignore[arg-type]
+                    name=metadata.name,
+                    label=metadata.label,
+                    description=metadata.description,
+                    supports_priority=metadata.supports_priority,
+                    supports_attachments=metadata.supports_attachments,
+                    supports_formatting=metadata.supports_formatting,
+                    requires_credentials=metadata.requires_credentials,
+                    additional_info=metadata.additional_info
+                    if isinstance(metadata.additional_info, dict)
+                    else None,
                 )
 
         return test_registry
-
-
-# Global factory instance for production use
-_production_factory = NotificationRegistryFactory()

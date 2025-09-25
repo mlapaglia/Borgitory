@@ -7,7 +7,7 @@ from alembic.config import Config
 from alembic import command
 from alembic.runtime.migration import MigrationContext
 
-from borgitory.config import DATA_DIR
+from borgitory.config_module import DATA_DIR
 from borgitory.models.database import engine
 
 logger = logging.getLogger(__name__)

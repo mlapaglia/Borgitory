@@ -5,8 +5,15 @@ Protocol interfaces for repository and backup services.
 from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
 
+from borgitory.models.borg_info import (
+    BorgArchiveListResponse,
+    RepositoryScanResponse,
+    RepositoryInitializationResult,
+)
+
 if TYPE_CHECKING:
     from borgitory.models.database import Repository
+    from borgitory.services.archives.archive_manager import ArchiveEntry
 
 
 class RepositoryInfo:
@@ -33,7 +40,7 @@ class BackupServiceProtocol(Protocol):
     async def initialize_repository(
         self,
         repository: "Repository",  # Repository model
-    ) -> Dict[str, object]:
+    ) -> RepositoryInitializationResult:
         """Initialize a new repository."""
         ...
 
@@ -51,15 +58,8 @@ class BackupServiceProtocol(Protocol):
     async def list_archives(
         self,
         repository: "Repository",  # Repository model
-    ) -> List[Dict[str, object]]:
+    ) -> "BorgArchiveListResponse":
         """List all archives in a repository."""
-        ...
-
-    async def get_repo_info(
-        self,
-        repository: "Repository",  # Repository model
-    ) -> Dict[str, object]:
-        """Get repository information."""
         ...
 
     async def verify_repository_access(
@@ -68,32 +68,26 @@ class BackupServiceProtocol(Protocol):
         """Verify repository can be accessed."""
         ...
 
-    async def scan_for_repositories(self) -> List[Dict[str, object]]:
-        """Scan mounted volumes for Borg repositories."""
+    async def scan_for_repositories(
+        self,
+    ) -> "RepositoryScanResponse":
+        """Scan for Borg repositories."""
         ...
 
 
 class ArchiveServiceProtocol(Protocol):
     """Protocol for archive content operations (ArchiveManager)."""
 
-    async def list_archive_contents(
-        self,
-        repository: "Repository",  # Repository model
-        archive_name: str,
-    ) -> List[Dict[str, object]]:
-        """List contents of an archive."""
-        ...
-
     async def list_archive_directory_contents(
         self,
         repository: "Repository",  # Repository model
         archive_name: str,
-        directory_path: str,
-    ) -> List[Dict[str, object]]:
+        path: str = "",
+    ) -> List["ArchiveEntry"]:
         """List contents of a directory within an archive."""
         ...
 
-    async def extract_file_stream(
+    def extract_file_stream(
         self,
         repository: "Repository",  # Repository model
         archive_name: str,

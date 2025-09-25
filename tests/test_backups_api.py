@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from borgitory.models.database import (
     Repository,
-    CleanupConfig,
+    PruneConfig,
     CloudSyncConfig,
     NotificationConfig,
     RepositoryCheckConfig,
@@ -68,9 +68,9 @@ class TestBackupsAPI:
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
 
-        # Create enabled cleanup config
-        cleanup_config = CleanupConfig(
-            name="test-cleanup",
+        # Create enabled prune config
+        prune_config = PruneConfig(
+            name="test-prune",
             enabled=True,
             strategy="advanced",
             keep_secondly=7,
@@ -81,7 +81,7 @@ class TestBackupsAPI:
             keep_monthly=6,
             keep_yearly=1,
         )
-        test_db.add(cleanup_config)
+        test_db.add(prune_config)
 
         # Create enabled cloud sync config
         import json
@@ -140,9 +140,9 @@ class TestBackupsAPI:
         self, async_client: AsyncClient, test_db: Session
     ) -> None:
         """Test that only enabled configs are returned in the form."""
-        # Create disabled cleanup config
-        disabled_cleanup = CleanupConfig(
-            name="disabled-cleanup",
+        # Create disabled prune config
+        disabled_prune = PruneConfig(
+            name="disabled-prune",
             enabled=False,  # This should not appear
             strategy="advanced",
             keep_daily=7,
@@ -150,11 +150,11 @@ class TestBackupsAPI:
             keep_monthly=6,
             keep_yearly=1,
         )
-        test_db.add(disabled_cleanup)
+        test_db.add(disabled_prune)
 
-        # Create enabled cleanup config
-        enabled_cleanup = CleanupConfig(
-            name="enabled-cleanup",
+        # Create enabled prune config
+        enabled_prune = PruneConfig(
+            name="enabled-prune",
             enabled=True,  # This should appear
             strategy="advanced",
             keep_daily=7,
@@ -162,7 +162,7 @@ class TestBackupsAPI:
             keep_monthly=6,
             keep_yearly=1,
         )
-        test_db.add(enabled_cleanup)
+        test_db.add(enabled_prune)
 
         test_db.commit()
 
@@ -177,9 +177,9 @@ class TestBackupsAPI:
         """Test form generation with mix of enabled and disabled configurations."""
         # Create multiple configs of each type with different enabled states
         configs = [
-            # Cleanup configs
-            CleanupConfig(
-                name="cleanup-1",
+            # Prune configs
+            PruneConfig(
+                name="prune-1",
                 enabled=True,
                 strategy="advanced",
                 keep_secondly=7,
@@ -190,8 +190,8 @@ class TestBackupsAPI:
                 keep_monthly=6,
                 keep_yearly=1,
             ),
-            CleanupConfig(
-                name="cleanup-2",
+            PruneConfig(
+                name="prune-2",
                 enabled=False,
                 strategy="advanced",
                 keep_secondly=7,
@@ -202,8 +202,8 @@ class TestBackupsAPI:
                 keep_monthly=6,
                 keep_yearly=1,
             ),
-            CleanupConfig(
-                name="cleanup-3",
+            PruneConfig(
+                name="prune-3",
                 enabled=True,
                 strategy="advanced",
                 keep_secondly=7,
@@ -336,8 +336,8 @@ class TestBackupsAPI:
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
 
-        cleanup_config = CleanupConfig(
-            name="context-cleanup",
+        prune_config = PruneConfig(
+            name="context-prune",
             enabled=True,
             strategy="advanced",
             keep_secondly=7,
@@ -348,7 +348,7 @@ class TestBackupsAPI:
             keep_monthly=6,
             keep_yearly=1,
         )
-        test_db.add(cleanup_config)
+        test_db.add(prune_config)
 
         cloud_sync_config = CloudSyncConfig(
             name="context-cloud",

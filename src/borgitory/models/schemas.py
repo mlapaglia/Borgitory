@@ -4,6 +4,7 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 
+from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 
 
@@ -25,7 +26,7 @@ class JobType(str, Enum):
     CHECK = "check"
 
 
-class CleanupStrategy(str, Enum):
+class PruneStrategy(str, Enum):
     SIMPLE = "simple"
     ADVANCED = "advanced"
 
@@ -158,7 +159,7 @@ class ScheduleCreate(ScheduleBase):
     repository_id: int
     source_path: Optional[str] = "/data"
     cloud_sync_config_id: Optional[int] = None
-    cleanup_config_id: Optional[int] = None
+    prune_config_id: Optional[int] = None
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
     pre_job_hooks: Optional[str] = None
@@ -180,9 +181,9 @@ class ScheduleCreate(ScheduleBase):
             return None
         return int(v)
 
-    @field_validator("cleanup_config_id", mode="before")
+    @field_validator("prune_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
+    def validate_prune_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -236,7 +237,7 @@ class ScheduleUpdate(BaseModel):
     repository_id: Optional[int] = None
     source_path: Optional[str] = None
     cloud_sync_config_id: Optional[int] = None
-    cleanup_config_id: Optional[int] = None
+    prune_config_id: Optional[int] = None
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
     enabled: Optional[bool] = None
@@ -298,9 +299,9 @@ class ScheduleUpdate(BaseModel):
             return None
         return int(v)
 
-    @field_validator("cleanup_config_id", mode="before")
+    @field_validator("prune_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
+    def validate_prune_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -335,7 +336,7 @@ class Schedule(ScheduleBase):
     next_run: Optional[datetime] = None
     created_at: datetime
     cloud_sync_config_id: Optional[int] = Field(None, gt=0)
-    cleanup_config_id: Optional[int] = Field(None, gt=0)
+    prune_config_id: Optional[int] = Field(None, gt=0)
 
     model_config = {
         "from_attributes": True,
@@ -345,11 +346,11 @@ class Schedule(ScheduleBase):
     }
 
 
-class CleanupConfigBase(BaseModel):
+class PruneConfigBase(BaseModel):
     name: str = Field(
-        min_length=1, max_length=128, description="Cleanup configuration name"
+        min_length=1, max_length=128, description="Prune configuration name"
     )
-    strategy: CleanupStrategy = CleanupStrategy.SIMPLE
+    strategy: PruneStrategy = PruneStrategy.SIMPLE
     keep_within_days: Optional[int] = Field(
         None, gt=0, description="Days to keep (simple strategy)"
     )
@@ -371,11 +372,11 @@ class CleanupConfigBase(BaseModel):
     save_space: bool = False
 
 
-class CleanupConfigCreate(CleanupConfigBase):
+class PruneConfigCreate(PruneConfigBase):
     pass
 
 
-class CleanupConfigUpdate(BaseModel):
+class PruneConfigUpdate(BaseModel):
     name: Optional[str] = None
     strategy: Optional[str] = None
     keep_within_days: Optional[int] = None
@@ -392,7 +393,7 @@ class CleanupConfigUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
-class CleanupConfig(CleanupConfigBase):
+class PruneConfig(PruneConfigBase):
     id: int = Field(gt=0)
     enabled: bool
     created_at: datetime
@@ -454,7 +455,7 @@ class BackupRequest(BaseModel):
     dry_run: bool = False
     ignore_lock: bool = False
     cloud_sync_config_id: Optional[int] = Field(None, gt=0)
-    cleanup_config_id: Optional[int] = Field(None, gt=0)
+    prune_config_id: Optional[int] = Field(None, gt=0)
     check_config_id: Optional[int] = Field(None, gt=0)
     notification_config_id: Optional[int] = Field(None, gt=0)
     pre_job_hooks: Optional[str] = None
@@ -483,9 +484,9 @@ class BackupRequest(BaseModel):
             return None
         return int(v)
 
-    @field_validator("cleanup_config_id", mode="before")
+    @field_validator("prune_config_id", mode="before")
     @classmethod
-    def validate_cleanup_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
+    def validate_prune_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
         if v == "" or v == "none":
             return None
         if v is None:
@@ -522,7 +523,7 @@ class CloudSyncConfigBase(BaseModel):
     path_prefix: str = Field(
         default="", max_length=255, description="Optional path prefix for cloud storage"
     )
-    provider_config: Dict[str, Union[str, int, float, bool]] = Field(
+    provider_config: ConfigDict = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
 
@@ -568,7 +569,7 @@ class CloudSyncConfigUpdate(BaseModel):
     )
     provider: Optional[str] = None
     path_prefix: Optional[str] = Field(None, max_length=255)
-    provider_config: Optional[Dict[str, Union[str, int, float, bool]]] = Field(
+    provider_config: Optional[ConfigDict] = Field(
         None, description="Provider-specific configuration"
     )
     enabled: Optional[bool] = None
@@ -737,7 +738,7 @@ class RepositoryCheckConfig(RepositoryCheckConfigBase):
 
 class PruneRequest(BaseModel):
     repository_id: int = Field(gt=0)
-    strategy: CleanupStrategy = CleanupStrategy.SIMPLE
+    strategy: PruneStrategy = PruneStrategy.SIMPLE
     # Simple strategy
     keep_within_days: Optional[int] = Field(None, gt=0)
     # Advanced strategy

@@ -38,7 +38,7 @@ class TestScheduleHooksAPI:
 
         # Create real services with test database
         schedule_service = ScheduleService(test_db, mock_scheduler_service)
-        configuration_service = ConfigurationService()
+        configuration_service = ConfigurationService(test_db)
 
         # Create mock templates service that returns proper HTMLResponse
         mock_templates = Mock()

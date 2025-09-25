@@ -20,10 +20,10 @@ from borgitory.api import (
     auth,
     schedules,
     cloud_sync,
-    cleanup,
     backups,
     notifications,
     debug,
+    prune,
     repository_stats,
     repository_check_configs,
     shared,
@@ -31,6 +31,7 @@ from borgitory.api import (
     packages,
 )
 from borgitory.dependencies import (
+    get_archive_mount_manager_singleton,
     get_recovery_service,
     get_scheduler_service_singleton,
     get_package_restoration_service_for_startup,
@@ -50,7 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         logger.info("Starting Borgitory application...")
 
-        from borgitory.config import DATA_DIR
+        from borgitory.config_module import DATA_DIR
 
         secret_key = get_or_generate_secret_key(DATA_DIR)
         os.environ["SECRET_KEY"] = secret_key
@@ -72,32 +73,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await scheduler_service.start()
         logger.info("Scheduler started")
 
-        from borgitory.dependencies import get_archive_mount_manager
-
-        mount_manager = get_archive_mount_manager()
-
-        import asyncio
-
-        async def cleanup_task() -> None:
-            while True:
-                try:
-                    await asyncio.sleep(300)  # 5 minutes
-                    await mount_manager.cleanup_old_mounts()
-                except Exception as e:
-                    logger.error(f"Mount cleanup error: {e}")
-
-        cleanup_task_handle = asyncio.create_task(cleanup_task())
-        logger.info("Mount cleanup task started")
+        mount_manager = get_archive_mount_manager_singleton()
 
         yield
 
         logger.info("Shutting down...")
-
-        cleanup_task_handle.cancel()
-        try:
-            await cleanup_task_handle
-        except asyncio.CancelledError:
-            pass
 
         await mount_manager.unmount_all()
         logger.info("All mounts cleaned up")
@@ -165,7 +145,7 @@ app.include_router(
 )
 
 app.include_router(
-    cleanup.router,
+    prune.router,
     prefix="/api/prune",
     tags=["prune"],
 )

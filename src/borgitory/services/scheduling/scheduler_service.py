@@ -10,7 +10,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
-from borgitory.config import DATABASE_URL
+from borgitory.config_module import DATABASE_URL
 from borgitory.models.database import Schedule
 from borgitory.models.schemas import BackupRequest, CompressionType
 from borgitory.models.enums import JobType
@@ -84,7 +84,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
                 source_path=schedule.source_path,
                 compression=CompressionType.ZSTD,
                 dry_run=False,
-                cleanup_config_id=schedule.cleanup_config_id,
+                prune_config_id=schedule.prune_config_id,
                 check_config_id=schedule.check_config_id,
                 cloud_sync_config_id=schedule.cloud_sync_config_id,
                 notification_config_id=schedule.notification_config_id,

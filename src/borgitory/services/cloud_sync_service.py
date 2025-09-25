@@ -2,7 +2,7 @@ import inspect
 import json
 import logging
 from borgitory.utils.datetime_utils import now_utc
-from typing import Any, List, Dict, Callable, cast, Optional, TYPE_CHECKING
+from typing import Any, List, Dict, Callable, cast, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_providers.registry import ProviderMetadata
@@ -10,7 +10,6 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import CloudSyncConfig
-from borgitory.custom_types import ConfigDict
 from borgitory.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
@@ -111,7 +110,7 @@ class CloudSyncConfigService:
 
         try:
             storage = self._storage_factory.create_storage(
-                config.provider, cast(ConfigDict, config.provider_config)
+                config.provider, config.provider_config
             )
         except Exception as e:
             raise HTTPException(
@@ -120,7 +119,7 @@ class CloudSyncConfigService:
 
         sensitive_fields = storage.get_sensitive_fields()
         encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-            cast(ConfigDict, config.provider_config), sensitive_fields
+            config.provider_config, sensitive_fields
         )
 
         db_config = CloudSyncConfig()
@@ -192,7 +191,7 @@ class CloudSyncConfigService:
             )
             try:
                 storage = self._storage_factory.create_storage(
-                    provider, cast(ConfigDict, config_update.provider_config)
+                    provider, config_update.provider_config
                 )
             except Exception as e:
                 raise HTTPException(
@@ -201,7 +200,7 @@ class CloudSyncConfigService:
 
             sensitive_fields = storage.get_sensitive_fields()
             encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-                cast(ConfigDict, config_update.provider_config), sensitive_fields
+                config_update.provider_config, sensitive_fields
             )
 
             config.provider_config = json.dumps(encrypted_config)
@@ -283,7 +282,7 @@ class CloudSyncConfigService:
             )
 
         # Build parameters for the test method using parameter mapping
-        test_params = {}
+        test_params: Dict[str, Union[str, int, float, bool, None]] = {}
         logger.info(f"Decrypted config fields: {list(decrypted_config.keys())}")
         logger.info(f"Parameter mapping: {mapping.parameter_mapping}")
 
@@ -300,7 +299,13 @@ class CloudSyncConfigService:
         if mapping.optional_params:
             for param, default_value in mapping.optional_params.items():
                 if param not in test_params:
-                    test_params[param] = cast(ConfigDict, {param: default_value})[param]
+                    if (
+                        isinstance(default_value, (str, int, float, bool))
+                        or default_value is None
+                    ):
+                        test_params[param] = default_value
+                    else:
+                        test_params[param] = str(default_value)
 
         logger.info(
             f"Built test params: {list(test_params.keys())}"

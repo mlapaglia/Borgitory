@@ -7,7 +7,7 @@ This ensures we can safely migrate to protocol-based dependency injection.
 
 import inspect
 import pytest
-from typing import Dict, Any
+from typing import Dict, Any, Type
 from unittest.mock import Mock
 
 # Import protocols
@@ -34,7 +34,9 @@ class ProtocolComplianceChecker:
     """Utility class for checking protocol compliance."""
 
     @staticmethod
-    def check_protocol_compliance(service_class, protocol_class) -> Dict[str, Any]:
+    def check_protocol_compliance(
+        service_class: Type[Any], protocol_class: Type[Any]
+    ) -> Dict[str, Any]:
         """Check if a service class satisfies a protocol."""
         results = {
             "compliant": True,
@@ -98,7 +100,7 @@ class ProtocolComplianceChecker:
 class TestProtocolCompliance:
     """Test that existing services comply with their protocols."""
 
-    def test_simple_command_runner_compliance(self):
+    def test_simple_command_runner_compliance(self) -> None:
         """Test that SimpleCommandRunner satisfies CommandRunnerProtocol."""
         checker = ProtocolComplianceChecker()
         results = checker.check_protocol_compliance(
@@ -117,11 +119,13 @@ class TestProtocolCompliance:
         )
 
         # Check that we can instantiate it
-        runner = SimpleCommandRunner()
+        from borgitory.config.command_runner_config import CommandRunnerConfig
+
+        runner = SimpleCommandRunner(config=CommandRunnerConfig())
         assert runner is not None
         assert hasattr(runner, "run_command")
 
-    def test_job_executor_compliance(self):
+    def test_job_executor_compliance(self) -> None:
         """Test that JobExecutor satisfies ProcessExecutorProtocol."""
         checker = ProtocolComplianceChecker()
         checker.check_protocol_compliance(JobExecutor, ProcessExecutorProtocol)
@@ -138,7 +142,7 @@ class TestProtocolCompliance:
         executor = JobExecutor()
         assert executor is not None
 
-    def test_volume_service_compliance(self):
+    def test_volume_service_compliance(self) -> None:
         """Test that VolumeService satisfies VolumeServiceProtocol."""
         checker = ProtocolComplianceChecker()
         checker.check_protocol_compliance(VolumeService, VolumeServiceProtocol)
@@ -155,7 +159,7 @@ class TestProtocolCompliance:
         service = VolumeService()
         assert service is not None
 
-    def test_borg_service_compliance(self):
+    def test_borg_service_compliance(self) -> None:
         """Test that BorgService satisfies BackupServiceProtocol."""
         checker = ProtocolComplianceChecker()
         checker.check_protocol_compliance(BorgService, BackupServiceProtocol)
@@ -164,7 +168,6 @@ class TestProtocolCompliance:
         key_methods = [
             "create_backup",
             "list_archives",
-            "get_repo_info",
             "scan_for_repositories",
             "initialize_repository",
             "verify_repository_access",
@@ -175,18 +178,23 @@ class TestProtocolCompliance:
                 f"BorgService should have {method} method"
             )
 
-        # Check instantiation (with minimal dependencies)
-        service = BorgService()
+        # Check instantiation (with all required dependencies)
+        service = BorgService(
+            job_executor=Mock(),
+            command_runner=Mock(),
+            job_manager=Mock(),
+            volume_service=Mock(),
+            archive_service=Mock(),
+        )
         assert service is not None
 
-    def test_archive_manager_compliance(self):
+    def test_archive_manager_compliance(self) -> None:
         """Test that ArchiveManager satisfies ArchiveServiceProtocol."""
         checker = ProtocolComplianceChecker()
         checker.check_protocol_compliance(ArchiveManager, ArchiveServiceProtocol)
 
         # Check for key methods
         key_methods = [
-            "list_archive_contents",
             "list_archive_directory_contents",
             "extract_file_stream",
         ]
@@ -197,10 +205,18 @@ class TestProtocolCompliance:
             )
 
         # Check instantiation
-        manager = ArchiveManager()
+        from unittest.mock import Mock
+        from borgitory.services.jobs.job_executor import JobExecutor
+        from borgitory.services.borg_command_builder import BorgCommandBuilder
+
+        manager = ArchiveManager(
+            job_executor=JobExecutor(),
+            command_builder=BorgCommandBuilder(),
+            mount_manager=Mock(),
+        )
         assert manager is not None
 
-    def test_notification_service_compliance(self):
+    def test_notification_service_compliance(self) -> None:
         """Test that NotificationService satisfies NotificationServiceProtocol."""
         checker = ProtocolComplianceChecker()
         checker.check_protocol_compliance(
@@ -227,7 +243,7 @@ class TestProtocolCompliance:
         service = NotificationService(provider_factory=provider_factory)
         assert service is not None
 
-    def test_job_manager_basic_compliance(self):
+    def test_job_manager_basic_compliance(self) -> None:
         """Test basic JobManager compliance (complex service, basic check only)."""
         # JobManager is complex, so we'll just do basic checks
         key_methods = ["list_jobs", "get_job_status", "start_borg_command"]
@@ -245,7 +261,7 @@ class TestProtocolCompliance:
 class TestProtocolInstantiation:
     """Test that protocols can be used for type hints and mocking."""
 
-    def test_protocol_type_hints(self):
+    def test_protocol_type_hints(self) -> None:
         """Test that protocols work as type hints."""
 
         def use_command_runner(runner: CommandRunnerProtocol) -> None:
@@ -257,7 +273,9 @@ class TestProtocolInstantiation:
             assert service is not None
 
         # Test with real implementations
-        use_command_runner(SimpleCommandRunner())
+        from borgitory.config.command_runner_config import CommandRunnerConfig
+
+        use_command_runner(SimpleCommandRunner(config=CommandRunnerConfig()))
         use_volume_service(VolumeService())
 
         # Test with mocks
@@ -267,7 +285,7 @@ class TestProtocolInstantiation:
         use_command_runner(mock_runner)
         use_volume_service(mock_volume)
 
-    def test_protocol_mocking(self):
+    def test_protocol_mocking(self) -> None:
         """Test that protocols can be easily mocked."""
 
         # Create protocol mocks

@@ -4,7 +4,8 @@ Volume service protocol interface.
 Defines the contract for volume and filesystem services.
 """
 
-from typing import Protocol, List, Dict, Union
+from typing import Protocol, List
+from borgitory.custom_types import ConfigDict
 
 
 class VolumeService(Protocol):
@@ -19,7 +20,7 @@ class VolumeService(Protocol):
         """
         ...
 
-    async def get_volume_info(self) -> Dict[str, Union[str, int, float, bool, None]]:
+    async def get_volume_info(self) -> ConfigDict:
         """
         Get information about available volumes.
 

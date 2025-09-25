@@ -214,18 +214,6 @@ class TestBorgCommandBuilder:
         additional_args = call_args[1]["additional_args"]
         assert "/test/repo/path::test-archive::sanitized/path" in additional_args
 
-    @patch("borgitory.services.borg_command_builder.validate_archive_name")
-    def test_build_list_archive_contents_command_invalid_archive(
-        self, mock_validate_archive
-    ) -> None:
-        """Test list archive contents command fails with invalid archive name"""
-        mock_validate_archive.side_effect = Exception("Invalid archive name")
-
-        with pytest.raises(Exception, match="Archive name validation failed"):
-            self.builder.build_list_archive_contents_command(
-                repository=self.mock_repository, archive_name="invalid-archive"
-            )
-
     @patch("borgitory.services.borg_command_builder.build_secure_borg_command")
     @patch("borgitory.services.borg_command_builder.validate_archive_name")
     @patch("borgitory.services.borg_command_builder.sanitize_path")

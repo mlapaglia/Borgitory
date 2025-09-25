@@ -94,7 +94,6 @@ class MockServiceFactory:
         # Setup common return values
         mock.create_backup.return_value = {"job_id": "test-job-123"}
         mock.list_archives.return_value = []
-        mock.get_repo_info.return_value = {"location": "/test/repo"}
         mock.verify_repository_access.return_value = True
         mock.scan_for_repositories.return_value = []
 
@@ -255,7 +254,6 @@ class MockServiceFactory:
         mock = Mock(spec=ArchiveManager)
 
         # Setup common return values
-        mock.list_archive_contents.return_value = []
         mock.get_archive_metadata.return_value = {"name": "test-archive"}
         mock.list_archive_directory_contents.return_value = []
         mock.validate_archive_path.return_value = True

@@ -8,8 +8,10 @@ scanning, etc. that don't need complex job tracking, streaming, or queuing.
 import logging
 import asyncio
 from typing import List, Dict, Optional
+
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.command_protocols import CommandResult
+from borgitory.config.command_runner_config import CommandRunnerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +19,18 @@ logger = logging.getLogger(__name__)
 class SimpleCommandRunner:
     """Simple command runner that executes commands and returns results directly"""
 
-    def __init__(self, timeout: int = 300) -> None:
+    def __init__(self, config: CommandRunnerConfig) -> None:
         """
-        Initialize the command runner.
+        Initialize the command runner with configuration.
 
         Args:
-            timeout: Maximum time to wait for command completion (seconds)
+            config: Configuration for command execution behavior
         """
-        self.timeout = timeout
+        self.config = config
+        self.timeout = config.timeout
+        self.max_retries = config.max_retries
+        self.log_commands = config.log_commands
+        self.buffer_size = config.buffer_size
 
     async def run_command(
         self,
@@ -46,7 +52,8 @@ class SimpleCommandRunner:
         start_time = now_utc()
         actual_timeout = timeout or self.timeout
 
-        logger.info(f"Executing command: {' '.join(command[:3])}...")
+        if self.log_commands:
+            logger.info(f"Executing command: {' '.join(command[:3])}...")
 
         try:
             # Create subprocess
@@ -74,11 +81,12 @@ class SimpleCommandRunner:
                 duration = (now_utc() - start_time).total_seconds()
                 success = process.returncode == 0
 
-                logger.info(
-                    f"Command completed in {duration:.2f}s with return code {process.returncode}"
-                )
+                if self.log_commands:
+                    logger.info(
+                        f"Command completed in {duration:.2f}s with return code {process.returncode}"
+                    )
 
-                if not success:
+                if not success and self.log_commands:
                     logger.warning(f"Command failed: {stderr[:200]}...")
 
                 return CommandResult(
@@ -100,7 +108,8 @@ class SimpleCommandRunner:
                 duration = (now_utc() - start_time).total_seconds()
                 error_msg = f"Command timed out after {actual_timeout} seconds"
 
-                logger.error(error_msg)
+                if self.log_commands:
+                    logger.error(error_msg)
 
                 return CommandResult(
                     success=False,
@@ -115,7 +124,8 @@ class SimpleCommandRunner:
             duration = (now_utc() - start_time).total_seconds()
             error_msg = f"Failed to execute command: {str(e)}"
 
-            logger.error(error_msg)
+            if self.log_commands:
+                logger.error(error_msg)
 
             return CommandResult(
                 success=False,

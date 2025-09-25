@@ -1,4 +1,5 @@
 import logging
+from borgitory.custom_types import ConfigDict
 from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
@@ -8,7 +9,6 @@ from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from borgitory.models.enums import JobType
 from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
-from borgitory.services.backups.backup_service import BackupService
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +26,9 @@ class JobService:
         self,
         db: Session,
         job_manager: JobManagerProtocol,
-        backup_service: Optional[BackupService] = None,
     ) -> None:
         self.db = db
         self.job_manager = job_manager
-        self.backup_service = backup_service or BackupService(db)
 
     async def create_backup_job(
         self, backup_request: BackupRequest, job_type: JobType
@@ -48,7 +46,7 @@ class JobService:
         # Use TaskDefinitionBuilder to create all task definitions
         builder = TaskDefinitionBuilder(self.db)
 
-        backup_params = {
+        backup_params: ConfigDict = {
             "source_path": backup_request.source_path,
             "compression": backup_request.compression,
             "dry_run": backup_request.dry_run,
@@ -59,7 +57,7 @@ class JobService:
             repository_name=repository.name,
             include_backup=True,
             backup_params=backup_params,
-            cleanup_config_id=backup_request.cleanup_config_id,
+            prune_config_id=backup_request.prune_config_id,
             check_config_id=backup_request.check_config_id,
             include_cloud_sync=backup_request.cloud_sync_config_id is not None,
             cloud_sync_config_id=backup_request.cloud_sync_config_id,

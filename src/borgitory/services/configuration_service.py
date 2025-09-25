@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from borgitory.models.database import (
     Repository,
-    CleanupConfig,
+    PruneConfig,
     CloudSyncConfig,
     NotificationConfig,
     RepositoryCheckConfig,
@@ -22,7 +22,7 @@ class ScheduleFormData(TypedDict):
     """Type definition for schedule form data"""
 
     repositories: List[Repository]
-    cleanup_configs: List[CleanupConfig]
+    prune_configs: List[PruneConfig]
     cloud_sync_configs: List[CloudSyncConfig]
     notification_configs: List[NotificationConfig]
     check_configs: List[RepositoryCheckConfig]
@@ -40,10 +40,16 @@ class CronFormContext(TypedDict):
 class ConfigurationService:
     """Service for configuration and form data operations."""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, db: Session) -> None:
+        """
+        Initialize ConfigurationService with injected database session.
 
-    def get_schedule_form_data(self, db: Session) -> ScheduleFormData:
+        Args:
+            db: Database session for configuration queries
+        """
+        self.db = db
+
+    def get_schedule_form_data(self) -> ScheduleFormData:
         """
         Get all configuration data needed for schedule forms.
 
@@ -51,17 +57,17 @@ class ConfigurationService:
             Dict containing lists of repositories and enabled configurations
         """
         return {
-            "repositories": db.query(Repository).all(),
-            "cleanup_configs": db.query(CleanupConfig)
-            .filter(CleanupConfig.enabled)
+            "repositories": self.db.query(Repository).all(),
+            "prune_configs": self.db.query(PruneConfig)
+            .filter(PruneConfig.enabled)
             .all(),
-            "cloud_sync_configs": db.query(CloudSyncConfig)
+            "cloud_sync_configs": self.db.query(CloudSyncConfig)
             .filter(CloudSyncConfig.enabled)
             .all(),
-            "notification_configs": db.query(NotificationConfig)
+            "notification_configs": self.db.query(NotificationConfig)
             .filter(NotificationConfig.enabled)
             .all(),
-            "check_configs": db.query(RepositoryCheckConfig)
+            "check_configs": self.db.query(RepositoryCheckConfig)
             .filter(RepositoryCheckConfig.enabled)
             .all(),
         }

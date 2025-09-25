@@ -4,7 +4,12 @@ Job manager protocol interfaces.
 Defines the contracts for job management and execution services.
 """
 
-from typing import Protocol, Dict, List, Optional, Union
+from typing import Protocol, Dict, List, Optional, TYPE_CHECKING
+
+from borgitory.custom_types import ConfigDict
+
+if TYPE_CHECKING:
+    from borgitory.models.database import Repository, Schedule
 
 
 class JobExecutor(Protocol):
@@ -50,9 +55,9 @@ class JobManager(Protocol):
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict[str, Union[str, int, float, bool, None]]],
-        repository: object,
-        schedule: Optional[object] = None,
+        task_definitions: List[ConfigDict],
+        repository: "Repository",
+        schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
     ) -> str:
         """
@@ -68,15 +73,13 @@ class JobManager(Protocol):
         """
         ...
 
-    def get_job_status(
-        self, job_id: str
-    ) -> Optional[Dict[str, Union[str, int, float, bool, None]]]:
+    def get_job_status(self, job_id: str) -> Optional[ConfigDict]:
         """Get status information for a job"""
         ...
 
     async def get_job_output_stream(
         self, job_id: str, last_n_lines: Optional[int] = None
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> ConfigDict:
         """Get job output stream data"""
         ...
 
@@ -88,6 +91,6 @@ class JobManager(Protocol):
         """Clean up job resources"""
         ...
 
-    def get_queue_stats(self) -> Dict[str, Union[str, int, float, bool, None]]:
+    def get_queue_stats(self) -> ConfigDict:
         """Get queue statistics"""
         ...

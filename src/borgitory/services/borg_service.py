@@ -3,21 +3,26 @@ import json
 import logging
 import re
 import os
-from datetime import datetime
+from borgitory.services.archives.archive_manager import ArchiveEntry
 from borgitory.utils.datetime_utils import now_utc
-from typing import Any, AsyncGenerator, Dict, List, Optional, cast
+from typing import AsyncGenerator, List, Optional
 
 from starlette.responses import StreamingResponse
 
 from borgitory.models.database import Repository, Job
-from borgitory.services.jobs.job_executor import JobExecutor
-from borgitory.services.simple_command_runner import SimpleCommandRunner
+from borgitory.models.borg_info import (
+    BorgArchiveListResponse,
+    BorgRepositoryConfig,
+    RepositoryInitializationResult,
+    RepositoryScanResponse,
+)
 from borgitory.protocols import (
     CommandRunnerProtocol,
+    ProcessExecutorProtocol,
     VolumeServiceProtocol,
     JobManagerProtocol,
 )
-from borgitory.utils.db_session import get_db_session
+from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
 from borgitory.utils.security import (
     build_secure_borg_command,
     validate_archive_name,
@@ -31,39 +36,43 @@ logger = logging.getLogger(__name__)
 class BorgService:
     def __init__(
         self,
-        job_executor: Optional[JobExecutor] = None,
-        command_runner: Optional[CommandRunnerProtocol] = None,
-        job_manager: Optional[JobManagerProtocol] = None,
-        volume_service: Optional[VolumeServiceProtocol] = None,
+        job_executor: ProcessExecutorProtocol,
+        command_runner: CommandRunnerProtocol,
+        job_manager: JobManagerProtocol,
+        volume_service: VolumeServiceProtocol,
+        archive_service: ArchiveServiceProtocol,
     ) -> None:
-        self.job_executor = job_executor or JobExecutor()
-        self.command_runner = command_runner or SimpleCommandRunner()
+        """
+        Initialize BorgService with mandatory dependency injection.
+
+        Args:
+            job_executor: Job executor for running Borg processes
+            command_runner: Command runner for executing system commands
+            job_manager: Job manager for handling job lifecycle
+            volume_service: Volume service for discovering mounted volumes
+            archive_service: Archive service for managing archive operations
+        """
+        self.job_executor = job_executor
+        self.command_runner = command_runner
         self.job_manager = job_manager
         self.volume_service = volume_service
+        self.archive_service = archive_service
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
         )
 
     def _get_job_manager(self) -> JobManagerProtocol:
-        """Get job manager instance - must be injected via DI"""
-        if self.job_manager is None:
-            raise RuntimeError(
-                "JobManager not provided - must be injected via dependency injection"
-            )
+        """Get job manager instance - guaranteed to be available via DI"""
         return self.job_manager
 
-    def _parse_borg_config(self, repo_path: str) -> Dict[str, Any]:
+    def _parse_borg_config(self, repo_path: str) -> "BorgRepositoryConfig":
         """Parse a Borg repository config file to determine encryption mode"""
         config_path = os.path.join(repo_path, "config")
 
         try:
             if not os.path.exists(config_path):
-                return {
-                    "mode": "unknown",
-                    "requires_keyfile": False,
-                    "preview": "Config file not found",
-                }
+                return BorgRepositoryConfig.unknown_config()
 
             with open(config_path, "r", encoding="utf-8") as f:
                 config_content = f.read()
@@ -80,11 +89,7 @@ class BorgService:
 
             # Check if this looks like a Borg repository
             if not config.has_section("repository"):
-                return {
-                    "mode": "invalid",
-                    "requires_keyfile": False,
-                    "preview": "Not a valid Borg repository (no [repository] section)",
-                }
+                return BorgRepositoryConfig.invalid_config()
 
             # Log all options in repository section
             if config.has_section("repository"):
@@ -160,21 +165,19 @@ class BorgService:
                     requires_keyfile = False
                     preview = "Unencrypted repository (no encryption detected)"
 
-            return {
-                "mode": encryption_mode,
-                "requires_keyfile": requires_keyfile,
-                "preview": preview,
-            }
+            return BorgRepositoryConfig(
+                mode=encryption_mode,
+                requires_keyfile=requires_keyfile,
+                preview=preview,
+            )
 
         except Exception as e:
             logger.error(f"Error parsing Borg config at {config_path}: {e}")
-            return {
-                "mode": "error",
-                "requires_keyfile": False,
-                "preview": f"Error reading config: {str(e)}",
-            }
+            return BorgRepositoryConfig.error_config(str(e))
 
-    async def initialize_repository(self, repository: Repository) -> Dict[str, Any]:
+    async def initialize_repository(
+        self, repository: Repository
+    ) -> RepositoryInitializationResult:
         """Initialize a new Borg repository"""
         logger.info(f"Initializing Borg repository at {repository.path}")
 
@@ -187,41 +190,42 @@ class BorgService:
             )
         except Exception as e:
             logger.error(f"Failed to build secure command: {e}")
-            return {
-                "success": False,
-                "message": f"Security validation failed: {str(e)}",
-            }
+            return RepositoryInitializationResult.failure_result(
+                f"Security validation failed: {str(e)}"
+            )
 
         try:
-            # Execute the command directly and wait for result
             result = await self.command_runner.run_command(command, env, timeout=60)
 
             if result.success:
-                return {
-                    "success": True,
-                    "message": "Repository initialized successfully",
-                }
+                return RepositoryInitializationResult.success_result(
+                    "Repository initialized successfully",
+                    repository_path=repository.path,
+                )
             else:
                 # Check if it's just because repo already exists
                 if "already exists" in result.stderr.lower():
                     logger.info("Repository already exists, which is fine")
-                    return {
-                        "success": True,
-                        "message": "Repository already exists",
-                    }
+                    return RepositoryInitializationResult.success_result(
+                        "Repository already exists", repository_path=repository.path
+                    )
 
                 # Return the actual error from borg
                 error_msg = (
                     result.stderr.strip() or result.stdout.strip() or "Unknown error"
                 )
-                return {
-                    "success": False,
-                    "message": f"Initialization failed: {error_msg.decode('utf-8', errors='replace') if isinstance(error_msg, bytes) else error_msg}",
-                }
+                decoded_error = (
+                    error_msg.decode("utf-8", errors="replace")
+                    if isinstance(error_msg, bytes)
+                    else error_msg
+                )
+                return RepositoryInitializationResult.failure_result(
+                    f"Initialization failed: {decoded_error}"
+                )
 
         except Exception as e:
             logger.error(f"Failed to initialize repository: {e}")
-            return {"success": False, "message": str(e)}
+            return RepositoryInitializationResult.failure_result(str(e))
 
     async def create_backup(
         self,
@@ -285,7 +289,7 @@ class BorgService:
                 job.repository_id = repository.id
                 job.type = "backup"
                 job.status = "queued"  # Will be updated to 'running' when started
-                job.started_at = datetime.now()
+                job.started_at = now_utc()
                 job.cloud_sync_config_id = cloud_sync_config_id
                 db.add(job)
                 db.refresh(job)
@@ -297,7 +301,7 @@ class BorgService:
             logger.error(f"Failed to start backup: {e}")
             raise Exception(f"Failed to start backup: {str(e)}")
 
-    async def list_archives(self, repository: Repository) -> List[Dict[str, Any]]:
+    async def list_archives(self, repository: Repository) -> BorgArchiveListResponse:
         """List all archives in a repository"""
         try:
             command, env = build_secure_borg_command(
@@ -310,213 +314,34 @@ class BorgService:
             raise Exception(f"Security validation failed: {str(e)}")
 
         try:
-            # Start the borg list command
-            job_manager = self._get_job_manager()
-            job_id = await job_manager.start_borg_command(command, env=env)
+            result = await self.command_runner.run_command(command, env, timeout=30)
 
-            # Create database job record for tracking
-            with get_db_session() as db:
-                db_job = Job()
-                db_job.id = job_id  # Store the JobManager UUID as the primary key
-                db_job.repository_id = repository.id
-                db_job.type = "list"
-                db_job.status = "running"
-                db_job.started_at = now_utc()
-                db.add(db_job)
-                db.commit()  # Commit the job record
-                logger.info(f"Created database record for list archives job {job_id}")
+            if result.success and result.return_code == 0:
+                try:
+                    data = json.loads(result.stdout)
+                    return BorgArchiveListResponse.from_borg_json(data)
+                except json.JSONDecodeError as je:
+                    logger.error(f"JSON decode error: {je}")
+                    logger.error(f"Raw output: {result.stdout[:500]}...")
 
-            # Wait for completion (list is usually quick)
-            max_wait = 30  # 30 seconds max
-            wait_time = 0.0
-            final_status = None
-
-            while wait_time < max_wait:
-                status = job_manager.get_job_status(job_id)
-                if not status:
-                    final_status = {
-                        "status": "failed",
-                        "return_code": -1,
-                        "error": "Job not found",
-                    }
-                    break
-
-                if status["completed"] or status["status"] in ["completed", "failed"]:
-                    final_status = status
-                    break
-
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            # Handle timeout
-            if final_status is None:
-                final_status = {
-                    "status": "failed",
-                    "return_code": -1,
-                    "error": "List archives timed out",
-                }
-
-            # Single database update at the end
-            with get_db_session() as db:
-                existing_job: Optional[Job] = (
-                    db.query(Job).filter(Job.id == job_id).first()
+                    return BorgArchiveListResponse(archives=[])
+            else:
+                raise Exception(
+                    f"Borg list failed with code {result.return_code}: {result.stderr}"
                 )
-                if existing_job:
-                    existing_job.status = (
-                        "completed" if final_status["return_code"] == 0 else "failed"
-                    )
-                    existing_job.finished_at = now_utc()
-                    if final_status["return_code"] != 0:
-                        existing_job.error = str(
-                            final_status.get("error", "Unknown error")
-                        )
-                    db.commit()
-
-            # Handle the result
-            if final_status["return_code"] != 0:
-                error_msg = final_status.get("error", "Unknown error")
-                raise Exception(f"Borg list failed: {error_msg}")
-
-            # Get and process the output
-            output = await self._get_job_manager().get_job_output_stream(job_id)
-
-            # Parse JSON output - look for complete JSON structure
-            json_lines = []
-            for line in cast(List[Dict[str, str]], output.get("lines", [])):
-                line_text = line["text"].strip()
-                if line_text:
-                    json_lines.append(line_text)
-
-            # Try to parse the complete JSON output
-            full_json = "\n".join(json_lines)
-            try:
-                data = json.loads(full_json)
-                if "archives" in data:
-                    logger.info(
-                        f"Successfully parsed {len(data['archives'])} archives from repository"
-                    )
-                    return cast(List[Dict[str, Any]], data["archives"])
-            except json.JSONDecodeError as je:
-                logger.error(f"JSON decode error: {je}")
-                logger.error(f"Raw output: {full_json[:500]}...")  # Log first 500 chars
-
-            # Fallback: return empty list if no valid JSON found
-            logger.warning(
-                "No valid archives JSON found in output, returning empty list"
-            )
-            return []
 
         except Exception as e:
             raise Exception(f"Failed to list archives: {str(e)}")
 
-    async def get_repo_info(self, repository: Repository) -> Dict[str, Any]:
-        """Get repository information using direct process execution"""
-        try:
-            command, env = build_secure_borg_command(
-                base_command="borg info",
-                repository_path=repository.path,
-                passphrase=repository.get_passphrase(),
-                additional_args=["--json"],
-            )
-        except Exception as e:
-            raise Exception(f"Security validation failed: {str(e)}")
-
-        try:
-            # Use JobExecutor directly for simple synchronous operations
-            process = await self.job_executor.start_process(command, env)
-            result = await self.job_executor.monitor_process_output(process)
-
-            if result.return_code == 0:
-                # Parse JSON output from stdout
-                output_text = result.stdout.decode("utf-8", errors="replace")
-                for line in output_text.split("\n"):
-                    line = line.strip()
-                    if line.startswith("{"):
-                        try:
-                            return cast(Dict[str, Any], json.loads(line))
-                        except json.JSONDecodeError:
-                            continue
-
-                raise Exception("No valid JSON output found")
-            else:
-                error_text = (
-                    result.stderr.decode("utf-8", errors="replace")
-                    if result.stderr
-                    else "Unknown error"
-                )
-                raise Exception(
-                    f"Borg info failed with code {result.return_code}: {error_text}"
-                )
-
-        except Exception as e:
-            raise Exception(f"Failed to get repository info: {str(e)}")
-
-    async def list_archive_contents(
-        self, repository: Repository, archive_name: str
-    ) -> List[Dict[str, Any]]:
-        """List contents of a specific archive"""
-        try:
-            validate_archive_name(archive_name)
-            command, env = build_secure_borg_command(
-                base_command="borg list",
-                repository_path="",  # Path is in archive specification
-                passphrase=repository.get_passphrase(),
-                additional_args=["--json-lines", f"{repository.path}::{archive_name}"],
-            )
-        except Exception as e:
-            raise Exception(f"Validation failed: {str(e)}")
-
-        try:
-            # Use JobExecutor directly for simple synchronous operations
-            process = await self.job_executor.start_process(command, env)
-            result = await self.job_executor.monitor_process_output(process)
-
-            if result.return_code == 0:
-                # Parse JSON lines output from stdout
-                output_text = result.stdout.decode("utf-8", errors="replace")
-                contents = []
-
-                for line in output_text.split("\n"):
-                    line = line.strip()
-                    if line.startswith("{"):
-                        try:
-                            item = json.loads(line)
-                            contents.append(item)
-                        except json.JSONDecodeError:
-                            continue
-
-                return contents
-            else:
-                error_text = (
-                    result.stderr.decode("utf-8", errors="replace")
-                    if result.stderr
-                    else "Unknown error"
-                )
-                raise Exception(
-                    f"Borg list failed with code {result.return_code}: {error_text}"
-                )
-
-        except Exception as e:
-            raise Exception(f"Failed to list archive contents: {str(e)}")
-
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List[Dict[str, Any]]:
+    ) -> List[ArchiveEntry]:
         """List contents of a specific directory within an archive using FUSE mount"""
-        # Use the archive manager which now uses FUSE mounting
-        if not hasattr(self, "_archive_manager"):
-            from borgitory.services.archives.archive_manager import ArchiveManager
-
-            self._archive_manager = ArchiveManager()
-
-        entries = await self._archive_manager.list_archive_directory_contents(
+        entries = await self.archive_service.list_archive_directory_contents(
             repository, archive_name, path
         )
-        # Convert ArchiveEntry objects to dictionaries
-        return [
-            entry.__dict__ if hasattr(entry, "__dict__") else dict(entry)
-            for entry in entries
-        ]
+
+        return entries
 
     async def extract_file_stream(
         self, repository: Repository, archive_name: str, file_path: str
@@ -658,45 +483,28 @@ class BorgService:
             and os.path.isdir(path)  # Must be a valid directory
         )
 
-    async def _get_mounted_volumes(self) -> List[str]:
-        """Get mounted volumes (abstracted for testing)"""
-        if self.volume_service:
-            return await self.volume_service.get_mounted_volumes()
-        else:
-            # Fallback: use direct import (for backward compatibility)
-            from borgitory.dependencies import get_volume_service
-
-            volume_service = get_volume_service()
-            return await volume_service.get_mounted_volumes()
-
-    async def scan_for_repositories(self) -> List[Dict[str, Any]]:
+    async def scan_for_repositories(self) -> RepositoryScanResponse:
         """Scan for Borg repositories using SimpleCommandRunner"""
         logger.info("Starting repository scan")
 
-        mounted_volumes = await self._get_mounted_volumes()
+        mounted_volumes = await self.volume_service.get_mounted_volumes()
 
         if not mounted_volumes:
-            logger.warning("No mounted volumes found, falling back to /mnt")
-            scan_paths = ["/mnt"]
-        else:
-            scan_paths = mounted_volumes
+            logger.warning("No mounted volumes found")
 
-        logger.info(f"Scanning across {len(scan_paths)} mounted volumes: {scan_paths}")
+        logger.info(
+            f"Scanning across {len(mounted_volumes)} mounted volumes: {mounted_volumes}"
+        )
 
         # Build command to scan multiple paths
         command_parts = ["find"]
 
         # Add all valid scan paths
-        for path in scan_paths:
+        for path in mounted_volumes:
             if self._validate_scan_path(path):
                 command_parts.append(sanitize_path(path))
             else:
                 logger.warning(f"Skipping invalid scan path {path}")
-
-        # If no valid paths found, use /mnt as fallback
-        if len(command_parts) == 1:  # Only "find" command
-            logger.warning("No valid scan paths found, using /mnt as fallback")
-            command_parts.append("/mnt")
 
         # Add find parameters
         command_parts.extend(
@@ -727,10 +535,12 @@ class BorgService:
 
             if not result.success:
                 logger.error(f"Scan failed: {result.error}")
-                return []
+                return RepositoryScanResponse(
+                    repositories=[], scan_paths=mounted_volumes
+                )
 
             # Process the output to find repositories
-            repo_paths = []
+            repo_data = []
             for line in result.stdout.splitlines():
                 line_text = (
                     line.decode("utf-8", errors="replace").strip()
@@ -741,20 +551,20 @@ class BorgService:
                     # Parse the Borg config file to get encryption info
                     encryption_info = self._parse_borg_config(line_text)
 
-                    repo_paths.append(
+                    repo_data.append(
                         {
                             "path": line_text,
                             "id": f"repo_{hash(line_text)}",
-                            "encryption_mode": encryption_info["mode"],
-                            "requires_keyfile": encryption_info["requires_keyfile"],
+                            "encryption_mode": encryption_info.mode,
+                            "requires_keyfile": encryption_info.requires_keyfile,
                             "detected": True,
-                            "config_preview": encryption_info["preview"],
+                            "config_preview": encryption_info.preview,
                         }
                     )
 
-            logger.info(f"Scan completed, found {len(repo_paths)} repositories")
-            return repo_paths
+            logger.info(f"Scan completed, found {len(repo_data)} repositories")
+            return RepositoryScanResponse.from_scan_results(repo_data, mounted_volumes)
 
         except Exception as e:
             logger.error(f"Failed to scan for repositories: {e}")
-            return []
+            return RepositoryScanResponse(repositories=[], scan_paths=mounted_volumes)

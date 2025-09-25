@@ -24,8 +24,6 @@ from borgitory.models.repository_dtos import (
     RepositoryScanRequest,
     RepositoryScanResult,
     ScannedRepository,
-    RepositoryInfoRequest,
-    RepositoryInfoResult,
     DeleteRepositoryRequest,
     DeleteRepositoryResult,
 )
@@ -81,8 +79,8 @@ class RepositoryService:
 
             # Initialize repository with Borg
             init_result = await self.borg_service.initialize_repository(db_repo)
-            if not init_result["success"]:
-                borg_error = init_result["message"]
+            if not init_result.success:
+                borg_error = init_result.message
                 error_message = self._parse_borg_initialization_error(borg_error)
 
                 logger.error(
@@ -165,9 +163,9 @@ class RepositoryService:
                 )
 
             try:
-                archives = await self.borg_service.list_archives(db_repo)
+                archives_response = await self.borg_service.list_archives(db_repo)
                 logger.info(
-                    f"Successfully imported repository '{request.name}' with {len(archives)} archives"
+                    f"Successfully imported repository '{request.name}' with {len(archives_response.archives)} archives"
                 )
             except Exception:
                 logger.info(
@@ -192,17 +190,17 @@ class RepositoryService:
     ) -> RepositoryScanResult:
         """Scan for existing repositories."""
         try:
-            available_repos = await self.borg_service.scan_for_repositories()
+            scan_response = await self.borg_service.scan_for_repositories()
 
             scanned_repos = []
-            for repo in available_repos:
+            for borg_repo in scan_response.repositories:
                 scanned_repo = ScannedRepository(
-                    name=repo.get("name", ""),
-                    path=repo.get("path", ""),
-                    encryption_mode=repo.get("encryption_mode", "unknown"),
-                    requires_keyfile=repo.get("requires_keyfile", False),
-                    preview=repo.get("preview", "Repository detected"),
-                    is_existing=repo.get("is_existing", False),
+                    name="",  # Borg doesn't provide name, will be set by user
+                    path=borg_repo.path,
+                    encryption_mode=borg_repo.encryption_mode,
+                    requires_keyfile=borg_repo.requires_keyfile,
+                    preview=borg_repo.config_preview,
+                    is_existing=False,  # These are newly discovered repos
                 )
                 scanned_repos.append(scanned_repo)
 
@@ -237,14 +235,16 @@ class RepositoryService:
                     error_message="Repository not found",
                 )
 
-            archives = await self.borg_service.list_archives(repository)
+            archives_response = await self.borg_service.list_archives(repository)
 
             archive_infos = []
-            for archive in archives:
+            for archive in archives_response.archives:
                 archive_info = ArchiveInfo(
-                    name=archive.get("name", "Unknown"),
-                    time=archive.get("time", ""),
-                    stats=archive.get("stats"),
+                    name=archive.name,
+                    time=archive.start,  # Use start time as primary timestamp
+                    stats={"original_size": archive.original_size}
+                    if archive.original_size
+                    else None,
                 )
 
                 if archive_info.time:
@@ -363,11 +363,11 @@ class RepositoryService:
             items = []
             for item in contents:
                 directory_item = DirectoryItem(
-                    name=item.get("name", ""),
-                    type=item.get("type", "file"),
-                    path=item.get("path", ""),
-                    size=item.get("size"),
-                    modified=item.get("modified"),
+                    name=item.name,
+                    type=item.type,
+                    path=item.path,
+                    size=item.size,
+                    modified=item.mtime,
                 )
                 items.append(directory_item)
 
@@ -394,39 +394,6 @@ class RepositoryService:
                 items=[],
                 breadcrumb_parts=[],
                 error_message=f"Error loading directory contents: {str(e)}",
-            )
-
-    async def get_repository_info(
-        self, request: RepositoryInfoRequest, db: Session
-    ) -> RepositoryInfoResult:
-        """Get repository information."""
-        try:
-            repository = (
-                db.query(Repository)
-                .filter(Repository.id == request.repository_id)
-                .first()
-            )
-            if not repository:
-                return RepositoryInfoResult(
-                    success=False,
-                    repository_id=request.repository_id,
-                    error_message="Repository not found",
-                )
-
-            info = await self.borg_service.get_repo_info(repository)
-
-            return RepositoryInfoResult(
-                success=True, repository_id=request.repository_id, info=info
-            )
-
-        except Exception as e:
-            logger.error(
-                f"Error getting repository info for {request.repository_id}: {e}"
-            )
-            return RepositoryInfoResult(
-                success=False,
-                repository_id=request.repository_id,
-                error_message=str(e),
             )
 
     async def delete_repository(

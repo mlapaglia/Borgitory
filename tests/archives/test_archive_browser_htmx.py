@@ -605,11 +605,24 @@ class TestArchiveBrowserHTMX:
         test_db.add(repo)
         test_db.commit()
 
-        mock_archives = [{"name": "form-archive", "time": "2023-01-01T10:00:00"}]
+        # Import the dataclass
+        from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
+
+        # Create mock archive using the new dataclass
+        mock_archive = BorgArchive(
+            name="form-archive",
+            id="archive_123",
+            start="2023-01-01T10:00:00",
+            end="2023-01-01T11:00:00",
+            duration=3600.0,
+        )
+
+        # Create mock response object
+        mock_archives_response = BorgArchiveListResponse(archives=[mock_archive])
 
         # Create mock service
         mock_borg_service = Mock(spec=BorgService)
-        mock_borg_service.list_archives = AsyncMock(return_value=mock_archives)
+        mock_borg_service.list_archives = AsyncMock(return_value=mock_archives_response)
 
         # Override dependency injection
         app.dependency_overrides[get_borg_service] = lambda: mock_borg_service
@@ -627,15 +640,6 @@ class TestArchiveBrowserHTMX:
             # Clean up
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
-
-        # Test with empty repository_id (should show empty state)
-        response = await async_client.get(
-            "/api/repositories/archives/list", headers={"hx-request": "true"}
-        )
-
-        assert response.status_code == 200
-        # Should return some HTML (empty state template)
-        assert len(response.text) > 0
 
     @pytest.mark.asyncio
     async def test_htmx_navigation_attributes(

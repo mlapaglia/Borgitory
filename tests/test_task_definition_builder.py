@@ -6,9 +6,10 @@ import pytest
 from typing import Any
 from unittest.mock import MagicMock
 from sqlalchemy.orm import Session
+from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.models.database import (
-    CleanupConfig,
+    PruneConfig,
     RepositoryCheckConfig,
     NotificationConfig,
 )
@@ -28,9 +29,9 @@ def task_builder(mock_db: MagicMock) -> TaskDefinitionBuilder:
 
 
 @pytest.fixture
-def mock_cleanup_config() -> MagicMock:
+def mock_prune_config() -> MagicMock:
     """Mock cleanup configuration"""
-    config = MagicMock(spec=CleanupConfig)
+    config = MagicMock(spec=PruneConfig)
     config.id = 1
     config.strategy = "simple"
     config.keep_within_days = 30
@@ -41,9 +42,9 @@ def mock_cleanup_config() -> MagicMock:
 
 
 @pytest.fixture
-def mock_advanced_cleanup_config() -> MagicMock:
+def mock_advanced_prune_config() -> MagicMock:
     """Mock advanced cleanup configuration"""
-    config = MagicMock(spec=CleanupConfig)
+    config = MagicMock(spec=PruneConfig)
     config.id = 2
     config.strategy = "advanced"
     config.keep_secondly = None
@@ -100,14 +101,16 @@ class TestTaskDefinitionBuilder:
         """Test building backup task with default parameters"""
         task = task_builder.build_backup_task("test-repo")
 
-        expected = {
-            "type": "backup",
-            "name": "Backup test-repo",
-            "source_path": "/data",
-            "compression": "zstd",
-            "dry_run": False,
-            "ignore_lock": False,
-        }
+        expected = TaskDefinition(
+            type="backup",
+            name="Backup test-repo",
+            parameters={
+                "source_path": "/data",
+                "compression": "zstd",
+                "dry_run": False,
+                "ignore_lock": False,
+            },
+        )
 
         assert task == expected
 
@@ -119,14 +122,16 @@ class TestTaskDefinitionBuilder:
             "custom-repo", source_path="/custom/path", compression="lz4", dry_run=True
         )
 
-        expected = {
-            "type": "backup",
-            "name": "Backup custom-repo",
-            "source_path": "/custom/path",
-            "compression": "lz4",
-            "dry_run": True,
-            "ignore_lock": False,
-        }
+        expected = TaskDefinition(
+            type="backup",
+            name="Backup custom-repo",
+            parameters={
+                "source_path": "/custom/path",
+                "compression": "lz4",
+                "dry_run": True,
+                "ignore_lock": False,
+            },
+        )
 
         assert task == expected
 
@@ -134,24 +139,26 @@ class TestTaskDefinitionBuilder:
         self,
         task_builder: TaskDefinitionBuilder,
         mock_db: MagicMock,
-        mock_cleanup_config: MagicMock,
+        mock_prune_config: MagicMock,
     ) -> None:
         """Test building prune task from simple strategy config"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_cleanup_config
+            mock_prune_config
         )
 
         task = task_builder.build_prune_task_from_config(1, "test-repo")
 
-        expected = {
-            "type": "prune",
-            "name": "Prune test-repo",
-            "dry_run": False,
-            "show_list": True,
-            "show_stats": True,
-            "save_space": False,
-            "keep_within": "30d",
-        }
+        expected = TaskDefinition(
+            type="prune",
+            name="Prune test-repo",
+            parameters={
+                "dry_run": False,
+                "show_list": True,
+                "show_stats": True,
+                "save_space": False,
+                "keep_within": "30d",
+            },
+        )
 
         assert task == expected
 
@@ -159,30 +166,32 @@ class TestTaskDefinitionBuilder:
         self,
         task_builder: TaskDefinitionBuilder,
         mock_db: MagicMock,
-        mock_advanced_cleanup_config: MagicMock,
+        mock_advanced_prune_config: MagicMock,
     ) -> None:
         """Test building prune task from advanced strategy config"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_advanced_cleanup_config
+            mock_advanced_prune_config
         )
 
         task = task_builder.build_prune_task_from_config(2, "test-repo")
 
-        expected = {
-            "type": "prune",
-            "name": "Prune test-repo",
-            "dry_run": False,
-            "show_list": True,
-            "show_stats": False,
-            "save_space": True,
-            "keep_secondly": None,
-            "keep_minutely": None,
-            "keep_hourly": None,
-            "keep_daily": 7,
-            "keep_weekly": 4,
-            "keep_monthly": 6,
-            "keep_yearly": 1,
-        }
+        expected = TaskDefinition(
+            type="prune",
+            name="Prune test-repo",
+            parameters={
+                "dry_run": False,
+                "show_list": True,
+                "show_stats": False,
+                "save_space": True,
+                "keep_secondly": None,
+                "keep_minutely": None,
+                "keep_hourly": None,
+                "keep_daily": 7,
+                "keep_weekly": 4,
+                "keep_monthly": 6,
+                "keep_yearly": 1,
+            },
+        )
 
         assert task == expected
 
@@ -209,16 +218,18 @@ class TestTaskDefinitionBuilder:
 
         task = task_builder.build_prune_task_from_request(prune_request, "test-repo")
 
-        expected = {
-            "type": "prune",
-            "name": "Prune test-repo",
-            "dry_run": True,
-            "show_list": True,
-            "show_stats": True,
-            "save_space": True,
-            "force_prune": True,
-            "keep_within": "7d",
-        }
+        expected = TaskDefinition(
+            type="prune",
+            name="Prune test-repo",
+            parameters={
+                "dry_run": True,
+                "show_list": True,
+                "show_stats": True,
+                "save_space": True,
+                "force_prune": True,
+                "keep_within": "7d",
+            },
+        )
 
         assert task == expected
 
@@ -239,22 +250,24 @@ class TestTaskDefinitionBuilder:
 
         task = task_builder.build_prune_task_from_request(prune_request, "test-repo")
 
-        expected = {
-            "type": "prune",
-            "name": "Prune test-repo",
-            "dry_run": False,
-            "show_list": True,
-            "show_stats": True,
-            "save_space": True,  # Default
-            "force_prune": False,  # Default
-            "keep_secondly": None,
-            "keep_minutely": None,
-            "keep_hourly": None,
-            "keep_daily": 14,
-            "keep_weekly": 8,
-            "keep_monthly": 12,
-            "keep_yearly": 2,
-        }
+        expected = TaskDefinition(
+            type="prune",
+            name="Prune test-repo",
+            parameters={
+                "dry_run": False,
+                "show_list": True,
+                "show_stats": True,
+                "save_space": True,
+                "force_prune": False,
+                "keep_secondly": None,
+                "keep_minutely": None,
+                "keep_hourly": None,
+                "keep_daily": 14,
+                "keep_weekly": 8,
+                "keep_monthly": 12,
+                "keep_yearly": 2,
+            },
+        )
 
         assert task == expected
 
@@ -271,19 +284,21 @@ class TestTaskDefinitionBuilder:
 
         task = task_builder.build_check_task_from_config(1, "test-repo")
 
-        expected = {
-            "type": "check",
-            "name": "Check test-repo (Full Check)",
-            "check_type": "full",
-            "verify_data": True,
-            "repair_mode": False,
-            "save_space": True,
-            "max_duration": 3600,
-            "archive_prefix": "test-",
-            "archive_glob": "*",
-            "first_n_archives": 5,
-            "last_n_archives": None,
-        }
+        expected = TaskDefinition(
+            type="check",
+            name="Check test-repo (Full Check)",
+            parameters={
+                "check_type": "full",
+                "verify_data": True,
+                "repair_mode": False,
+                "save_space": True,
+                "max_duration": 3600,
+                "archive_prefix": "test-",
+                "archive_glob": "*",
+                "first_n_archives": 5,
+                "last_n_archives": None,
+            },
+        )
 
         assert task == expected
 
@@ -314,19 +329,21 @@ class TestTaskDefinitionBuilder:
 
         task = task_builder.build_check_task_from_request(check_request, "test-repo")
 
-        expected = {
-            "type": "check",
-            "name": "Check test-repo",
-            "check_type": "repository_only",
-            "verify_data": False,
-            "repair_mode": True,
-            "save_space": False,
-            "max_duration": 1800,
-            "archive_prefix": "backup-",
-            "archive_glob": "backup-*",
-            "first_n_archives": 10,
-            "last_n_archives": None,
-        }
+        expected = TaskDefinition(
+            type="check",
+            name="Check test-repo",
+            parameters={
+                "check_type": "repository_only",
+                "verify_data": False,
+                "repair_mode": True,
+                "save_space": False,
+                "max_duration": 1800,
+                "archive_prefix": "backup-",
+                "archive_glob": "backup-*",
+                "first_n_archives": 10,
+                "last_n_archives": None,
+            },
+        )
 
         assert task == expected
 
@@ -336,11 +353,11 @@ class TestTaskDefinitionBuilder:
         """Test building cloud sync task with repository name"""
         task = task_builder.build_cloud_sync_task("test-repo")
 
-        expected = {
-            "type": "cloud_sync",
-            "name": "Sync test-repo to Cloud",
-            "cloud_sync_config_id": None,
-        }
+        expected = TaskDefinition(
+            type="cloud_sync",
+            name="Sync test-repo to Cloud",
+            parameters={"cloud_sync_config_id": None},
+        )
 
         assert task == expected
 
@@ -350,11 +367,11 @@ class TestTaskDefinitionBuilder:
         """Test building cloud sync task without repository name"""
         task = task_builder.build_cloud_sync_task()
 
-        expected = {
-            "type": "cloud_sync",
-            "name": "Sync to Cloud",
-            "cloud_sync_config_id": None,
-        }
+        expected = TaskDefinition(
+            type="cloud_sync",
+            name="Sync to Cloud",
+            parameters={"cloud_sync_config_id": None},
+        )
 
         assert task == expected
 
@@ -364,11 +381,11 @@ class TestTaskDefinitionBuilder:
         """Test building cloud sync task with config ID"""
         task = task_builder.build_cloud_sync_task("test-repo", cloud_sync_config_id=123)
 
-        expected = {
-            "type": "cloud_sync",
-            "name": "Sync test-repo to Cloud",
-            "cloud_sync_config_id": 123,
-        }
+        expected = TaskDefinition(
+            type="cloud_sync",
+            name="Sync test-repo to Cloud",
+            parameters={"cloud_sync_config_id": 123},
+        )
 
         assert task == expected
 
@@ -385,12 +402,11 @@ class TestTaskDefinitionBuilder:
 
         task = task_builder.build_notification_task(1, "test-repo")
 
-        expected = {
-            "type": "notification",
-            "name": "Send notification for test-repo",
-            "provider": "pushover",
-            "config_id": 1,
-        }
+        expected = TaskDefinition(
+            type="notification",
+            name="Send notification for test-repo",
+            parameters={"provider": "pushover", "config_id": 1},
+        )
 
         assert task == expected
 
@@ -408,7 +424,7 @@ class TestTaskDefinitionBuilder:
         self,
         task_builder: TaskDefinitionBuilder,
         mock_db: MagicMock,
-        mock_cleanup_config: MagicMock,
+        mock_prune_config: MagicMock,
         mock_check_config: MagicMock,
         mock_notification_config: MagicMock,
     ) -> None:
@@ -417,8 +433,8 @@ class TestTaskDefinitionBuilder:
         # Setup mock returns for different configs
         def mock_query_side_effect(model: Any) -> MagicMock:
             query_mock = MagicMock()
-            if model == CleanupConfig:
-                query_mock.filter.return_value.first.return_value = mock_cleanup_config
+            if model == PruneConfig:
+                query_mock.filter.return_value.first.return_value = mock_prune_config
             elif model == RepositoryCheckConfig:
                 query_mock.filter.return_value.first.return_value = mock_check_config
             elif model == NotificationConfig:
@@ -433,7 +449,7 @@ class TestTaskDefinitionBuilder:
             repository_name="test-repo",
             include_backup=True,
             backup_params={"source_path": "/custom", "compression": "lz4"},
-            cleanup_config_id=1,
+            prune_config_id=1,
             check_config_id=1,
             include_cloud_sync=True,
             notification_config_id=1,
@@ -442,7 +458,7 @@ class TestTaskDefinitionBuilder:
         assert len(tasks) == 5  # backup + prune + check + cloud_sync + notification
 
         # Verify task types
-        task_types = [task["type"] for task in tasks]
+        task_types = [task.type for task in tasks]
         assert "backup" in task_types
         assert "prune" in task_types
         assert "check" in task_types
@@ -450,9 +466,9 @@ class TestTaskDefinitionBuilder:
         assert "notification" in task_types
 
         # Verify backup task uses custom params
-        backup_task = next(task for task in tasks if task["type"] == "backup")
-        assert backup_task["source_path"] == "/custom"
-        assert backup_task["compression"] == "lz4"
+        backup_task = next(task for task in tasks if task.type == "backup")
+        assert backup_task.parameters["source_path"] == "/custom"
+        assert backup_task.parameters["compression"] == "lz4"
 
     def test_build_task_list_minimal(self, task_builder: TaskDefinitionBuilder) -> None:
         """Test building minimal task list with only backup"""
@@ -461,29 +477,29 @@ class TestTaskDefinitionBuilder:
         )
 
         assert len(tasks) == 1
-        assert tasks[0]["type"] == "backup"
-        assert tasks[0]["name"] == "Backup test-repo"
+        assert tasks[0].type == "backup"
+        assert tasks[0].name == "Backup test-repo"
 
     def test_build_task_list_no_backup(
         self,
         task_builder: TaskDefinitionBuilder,
         mock_db: MagicMock,
-        mock_cleanup_config: MagicMock,
+        mock_prune_config: MagicMock,
     ) -> None:
         """Test building task list without backup task"""
         mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_cleanup_config
+            mock_prune_config
         )
 
         tasks = task_builder.build_task_list(
             repository_name="test-repo",
             include_backup=False,
-            cleanup_config_id=1,
+            prune_config_id=1,
             include_cloud_sync=True,
         )
 
         assert len(tasks) == 2  # prune + cloud_sync
-        task_types = [task["type"] for task in tasks]
+        task_types = [task.type for task in tasks]
         assert "backup" not in task_types
         assert "prune" in task_types
         assert "cloud_sync" in task_types
@@ -500,15 +516,15 @@ class TestTaskDefinitionBuilder:
         tasks = task_builder.build_task_list(
             repository_name="test-repo",
             include_backup=False,
-            cleanup_config_id=1,  # This should be ignored
+            prune_config_id=1,  # This should be ignored
             prune_request=prune_request,  # This should be used
         )
 
         assert len(tasks) == 1
         prune_task = tasks[0]
-        assert prune_task["type"] == "prune"
-        assert prune_task["dry_run"] is True
-        assert prune_task["keep_within"] == "14d"
+        assert prune_task.type == "prune"
+        assert prune_task.parameters["dry_run"] is True
+        assert prune_task.parameters["keep_within"] == "14d"
 
     def test_build_task_list_check_request_over_config(
         self, task_builder: TaskDefinitionBuilder
@@ -527,6 +543,6 @@ class TestTaskDefinitionBuilder:
 
         assert len(tasks) == 1
         check_task = tasks[0]
-        assert check_task["type"] == "check"
-        assert check_task["check_type"] == "archives_only"
-        assert check_task["verify_data"] is True
+        assert check_task.type == "check"
+        assert check_task.parameters["check_type"] == "archives_only"
+        assert check_task.parameters["verify_data"] is True

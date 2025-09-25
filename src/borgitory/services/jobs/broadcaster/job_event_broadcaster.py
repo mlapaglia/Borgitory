@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import Dict, List, AsyncGenerator, Optional, Union
 from datetime import datetime
+from borgitory.custom_types import ConfigDict
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.services.jobs.broadcaster.event_type import EventType
@@ -56,7 +57,7 @@ class JobEventBroadcaster:
         self,
         event_type: EventType,
         job_id: Optional[str] = None,
-        data: Optional[Dict[str, Union[str, int, float, bool, None]]] = None,
+        data: Optional[ConfigDict] = None,
     ) -> None:
         """Broadcast an event to all connected clients"""
         event = JobEvent(event_type=event_type, job_id=job_id, data=data or {})

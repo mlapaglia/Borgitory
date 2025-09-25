@@ -4,7 +4,26 @@ Protocol interfaces for job management services.
 
 from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
+from dataclasses import dataclass, field
 import asyncio
+from borgitory.custom_types import ConfigDict
+
+
+@dataclass
+class TaskDefinition:
+    """Definition for a task in a composite job."""
+
+    type: str  # Task type: 'backup', 'prune', 'check', 'cloud_sync', 'hook', 'notification'
+    name: str  # Human-readable task name
+
+    # Additional parameters specific to the task type
+    parameters: ConfigDict = field(default_factory=dict)
+
+    # Optional scheduling/execution parameters
+    priority: Optional[int] = None
+    timeout: Optional[int] = None
+    retry_count: Optional[int] = None
+
 
 if TYPE_CHECKING:
     from borgitory.services.jobs.job_manager import BorgJob
@@ -89,7 +108,7 @@ class JobManagerProtocol(Protocol):
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict[str, object]],
+        task_definitions: List[TaskDefinition],
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,

@@ -12,7 +12,6 @@ from borgitory.factories.service_factory import (
     ServiceFactory,
     NotificationServiceFactory,
     CloudProviderServiceFactory,
-    BackupServiceFactory,
 )
 
 from borgitory.protocols.notification_protocols import NotificationServiceProtocol
@@ -227,50 +226,6 @@ class TestCloudProviderServiceFactory:
         # Dependencies are already injected - no need to verify function calls!
 
 
-class TestBackupServiceFactory:
-    """Test the BackupServiceFactory."""
-
-    def test_factory_has_default_implementations(self):
-        """Test that factory comes with default implementations."""
-        # Create factory with injected dependencies - clean and simple!
-        mock_command_runner = Mock()
-        mock_volume_service = Mock()
-        mock_job_manager = Mock()
-
-        factory = BackupServiceFactory(
-            command_runner=mock_command_runner,
-            volume_service=mock_volume_service,
-            job_manager=mock_job_manager,
-        )
-
-        implementations = factory.list_implementations()
-        assert "borg" in implementations
-        assert factory.get_default_implementation() == "borg"
-
-    def test_create_borg_service(self):
-        """Test creating a BorgService through the factory."""
-        # Create factory with injected dependencies - no more complex patching!
-        mock_job_executor = Mock()
-        mock_command_runner = Mock()
-        mock_volume_service = Mock()
-        mock_job_manager = Mock()
-
-        factory = BackupServiceFactory(
-            command_runner=mock_command_runner,
-            volume_service=mock_volume_service,
-            job_manager=mock_job_manager,
-        )
-
-        # Pass job_executor as it's still optional per the method signature
-        service = factory.create_backup_service("borg", job_executor=mock_job_executor)
-
-        assert service is not None
-        # Should satisfy the BackupServiceProtocol
-        assert hasattr(service, "create_backup")
-        assert hasattr(service, "list_archives")
-        assert hasattr(service, "get_repo_info")
-
-
 class TestFactoryIntegration:
     """Integration tests for factory system."""
 
@@ -312,26 +267,6 @@ class TestFactoryIntegration:
         assert hasattr(service, "delete_cloud_sync_config")
         assert hasattr(service, "enable_cloud_sync_config")
         assert hasattr(service, "disable_cloud_sync_config")
-
-    def test_backup_factory_creates_protocol_compliant_services(self):
-        """Test that backup factory creates protocol-compliant services."""
-        # Create factory with injected dependencies - no more complex patching!
-        mock_job_executor = Mock()
-        mock_command_runner = Mock()
-        mock_volume_service = Mock()
-        mock_job_manager = Mock()
-
-        factory = BackupServiceFactory(
-            command_runner=mock_command_runner,
-            volume_service=mock_volume_service,
-            job_manager=mock_job_manager,
-        )
-        service = factory.create_backup_service("borg", job_executor=mock_job_executor)
-
-        # Test that service satisfies the BackupServiceProtocol
-        assert hasattr(service, "create_backup")
-        assert hasattr(service, "list_archives")
-        assert hasattr(service, "get_repo_info")
 
 
 if __name__ == "__main__":

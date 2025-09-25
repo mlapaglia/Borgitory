@@ -63,7 +63,7 @@ class JobDatabaseManager:
                 db_job.error = job_data.error_message
                 db_job.container_id = None  # Explicitly set to None
                 db_job.cloud_sync_config_id = job_data.cloud_sync_config_id
-                db_job.cleanup_config_id = None  # Explicitly set to None
+                db_job.prune_config_id = None  # Explicitly set to None
                 db_job.check_config_id = None  # Explicitly set to None
                 db_job.notification_config_id = None  # Explicitly set to None
                 db_job.job_type = "composite"  # Set as composite since we have tasks
@@ -189,53 +189,6 @@ class JobDatabaseManager:
         except Exception as e:
             logger.error(f"Failed to get jobs for repository {repository_id}: {e}")
             return []
-
-    async def cleanup_old_jobs(
-        self, older_than_days: int = 30, keep_count: int = 10
-    ) -> int:
-        """Clean up old job records"""
-        try:
-            from borgitory.models.database import Job
-            from datetime import timedelta
-
-            cutoff_date = now_utc() - timedelta(days=older_than_days)
-            cleaned_count = 0
-
-            with self.db_session_factory() as db:
-                # For each repository, keep at least keep_count recent jobs
-                repositories = db.query(Job.repository_id).distinct().all()
-
-                for (repo_id,) in repositories:
-                    # Get jobs older than cutoff date
-                    old_jobs_query = (
-                        db.query(Job)
-                        .filter(Job.repository_id == repo_id)
-                        .filter(Job.started_at < cutoff_date)
-                        .order_by(Job.started_at.desc())
-                    )
-
-                    # Keep at least keep_count jobs
-                    total_jobs = (
-                        db.query(Job).filter(Job.repository_id == repo_id).count()
-                    )
-
-                    if total_jobs > keep_count:
-                        # Skip the most recent keep_count jobs
-                        jobs_to_delete = old_jobs_query.offset(keep_count).all()
-
-                        for job in jobs_to_delete:
-                            db.delete(job)
-                            cleaned_count += 1
-
-                if cleaned_count > 0:
-                    db.commit()
-                    logger.info(f"Cleaned up {cleaned_count} old job records")
-
-                return cleaned_count
-
-        except Exception as e:
-            logger.error(f"Failed to cleanup old jobs: {e}")
-            return 0
 
     async def _get_repository_data(
         self, repository_id: int

@@ -2,7 +2,8 @@
 Protocol interfaces for cloud storage and synchronization services.
 """
 
-from typing import Protocol, Dict, List, Optional, Callable, Union, TYPE_CHECKING
+from typing import Protocol, List, Optional, Callable, TYPE_CHECKING
+from borgitory.custom_types import ConfigDict
 
 if TYPE_CHECKING:
     from borgitory.models.database import CloudSyncConfig
@@ -33,7 +34,7 @@ class CloudStorageProtocol(Protocol):
     async def list_files(
         self,
         remote_path: str = "",
-    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
+    ) -> List[ConfigDict]:
         """List files in cloud storage."""
         ...
 
@@ -48,7 +49,7 @@ class CloudStorageProtocol(Protocol):
         """Test connection to cloud storage."""
         ...
 
-    def get_connection_info(self) -> Dict[str, Union[str, int, float, bool, None]]:
+    def get_connection_info(self) -> ConfigDict:
         """Get connection information for display."""
         ...
 
@@ -65,7 +66,7 @@ class CloudSyncServiceProtocol(Protocol):
         config: "CloudSyncConfig",  # CloudSyncConfig
         repository_path: str,
         output_callback: Optional[Callable[[str], None]] = None,
-    ) -> Dict[str, Union[str, int, float, bool, None]]:  # SyncResult
+    ) -> ConfigDict:  # SyncResult
         """Execute a cloud sync operation."""
         ...
 
@@ -86,7 +87,7 @@ class CloudSyncServiceProtocol(Protocol):
     def prepare_config_for_storage(
         self,
         provider: str,
-        config: Dict[str, Union[str, int, float, bool, None]],
+        config: ConfigDict,
     ) -> str:
         """Prepare configuration for database storage by encrypting sensitive fields."""
         ...
@@ -95,7 +96,7 @@ class CloudSyncServiceProtocol(Protocol):
         self,
         provider: str,
         stored_config: str,
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> ConfigDict:
         """Load configuration from database storage by decrypting sensitive fields."""
         ...
 
@@ -140,7 +141,7 @@ class CloudSyncConfigServiceProtocol(Protocol):
         config_id: int,
         encryption_service: "EncryptionService",
         storage_factory: "StorageFactory",
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> ConfigDict:
         """Get decrypted configuration for editing."""
         ...
 
@@ -150,17 +151,17 @@ class EncryptionServiceProtocol(Protocol):
 
     def encrypt_sensitive_fields(
         self,
-        config: Dict[str, Union[str, int, float, bool, None]],
+        config: ConfigDict,
         sensitive_fields: List[str],
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> ConfigDict:
         """Encrypt sensitive fields in configuration."""
         ...
 
     def decrypt_sensitive_fields(
         self,
-        config: Dict[str, Union[str, int, float, bool, None]],
+        config: ConfigDict,
         sensitive_fields: List[str],
-    ) -> Dict[str, Union[str, int, float, bool, None]]:
+    ) -> ConfigDict:
         """Decrypt sensitive fields in configuration."""
         ...
 
@@ -171,7 +172,7 @@ class StorageFactoryProtocol(Protocol):
     def create_storage(
         self,
         provider: str,
-        config: Dict[str, Union[str, int, float, bool, None]],
+        config: ConfigDict,
     ) -> CloudStorageProtocol:
         """Create a cloud storage instance."""
         ...

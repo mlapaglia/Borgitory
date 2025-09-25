@@ -3,40 +3,42 @@ ArchiveManager - Handles Borg archive operations and content management
 """
 
 import asyncio
+from dataclasses import dataclass
 import json
 import logging
-from typing import Dict, List, Optional, AsyncGenerator, TypedDict
+from typing import Dict, List, Optional, AsyncGenerator, TypedDict, TYPE_CHECKING
 
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.utils.security import validate_archive_name, sanitize_path
 
+if TYPE_CHECKING:
+    from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
+
 logger = logging.getLogger(__name__)
 
 
-# TypedDict definitions for archive operations
-class ArchiveEntryRequired(TypedDict):
-    """Required fields for archive entry"""
+@dataclass
+class ArchiveEntry:
+    """Individual archive entry (file/directory) structure"""
 
+    # Required fields
     path: str
     name: str
     type: str  # 'f' for file, 'd' for directory, etc.
     size: int
     isdir: bool
 
-
-class ArchiveEntry(ArchiveEntryRequired, total=False):
-    """Individual archive entry (file/directory) structure"""
-
     # Optional fields from Borg JSON output
-    mtime: str
-    mode: str
-    uid: int
-    gid: int
-    healthy: bool
+    mtime: Optional[str] = None
+    mode: Optional[str] = None
+    uid: Optional[int] = None
+    gid: Optional[int] = None
+    healthy: Optional[bool] = None
+
     # Additional computed fields
-    children_count: Optional[int]
+    children_count: Optional[int] = None
 
 
 class ArchiveMetadata(TypedDict, total=False):
@@ -85,55 +87,13 @@ class ArchiveManager:
 
     def __init__(
         self,
-        job_executor: Optional[JobExecutor] = None,
-        command_builder: Optional[BorgCommandBuilder] = None,
+        job_executor: JobExecutor,
+        command_builder: BorgCommandBuilder,
+        mount_manager: "ArchiveMountManager",
     ) -> None:
-        self.job_executor = job_executor or JobExecutor()
-        self.command_builder = command_builder or BorgCommandBuilder()
-
-    async def list_archive_contents(
-        self, repository: Repository, archive_name: str
-    ) -> List[ArchiveEntry]:
-        """List contents of a specific archive"""
-        try:
-            command, env = self.command_builder.build_list_archive_contents_command(
-                repository, archive_name
-            )
-        except Exception as e:
-            raise Exception(f"Command building failed: {str(e)}")
-
-        try:
-            # Use JobExecutor directly for simple synchronous operations
-            process = await self.job_executor.start_process(command, env)
-            result = await self.job_executor.monitor_process_output(process)
-
-            if result.return_code == 0:
-                # Parse JSON lines output from stdout
-                output_text = result.stdout.decode("utf-8", errors="replace")
-                contents = []
-
-                for line in output_text.split("\n"):
-                    line = line.strip()
-                    if line.startswith("{"):
-                        try:
-                            item = json.loads(line)
-                            contents.append(item)
-                        except json.JSONDecodeError:
-                            continue
-
-                return contents
-            else:
-                error_text = (
-                    result.stderr.decode("utf-8", errors="replace")
-                    if result.stderr
-                    else "Unknown error"
-                )
-                raise Exception(
-                    f"Borg list failed with code {result.return_code}: {error_text}"
-                )
-
-        except Exception as e:
-            raise Exception(f"Failed to list archive contents: {str(e)}")
+        self.job_executor = job_executor
+        self.command_builder = command_builder
+        self.mount_manager = mount_manager
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
@@ -143,9 +103,7 @@ class ArchiveManager:
             f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
         )
 
-        from borgitory.dependencies import get_archive_mount_manager
-
-        mount_manager = get_archive_mount_manager()
+        mount_manager = self.mount_manager
 
         # Mount the archive if not already mounted
         await mount_manager.mount_archive(repository, archive_name)
@@ -172,7 +130,7 @@ class ArchiveManager:
         children: Dict[str, ArchiveEntry] = {}
 
         for entry in all_entries:
-            entry_path = entry.get("path", "").lstrip("/")
+            entry_path = entry.path.lstrip("/")
 
             logger.debug(f"Processing entry path: '{entry_path}'")
 
@@ -208,50 +166,36 @@ class ArchiveManager:
             if immediate_child not in children:
                 # Determine if this is a directory or file
                 # Use the actual Borg entry type - 'd' means directory
-                is_directory = len(path_parts) > 1 or entry.get("type") == "d"
+                is_directory = len(path_parts) > 1 or entry.type == "d"
 
-                archive_entry: ArchiveEntry = {
-                    "path": full_path,
-                    "name": immediate_child,
-                    "type": "d" if is_directory else entry.get("type", "f"),
-                    "size": 0 if is_directory else entry.get("size", 0),
-                    "isdir": is_directory,
-                }
+                archive_entry: ArchiveEntry = ArchiveEntry(
+                    path=full_path,
+                    name=immediate_child,
+                    type="d" if is_directory else entry.type,
+                    size=0 if is_directory else entry.size,
+                    isdir=is_directory,
+                    mtime=entry.mtime,
+                    mode=entry.mode,
+                    uid=entry.uid,
+                    gid=entry.gid,
+                    healthy=entry.healthy,
+                    children_count=None if not is_directory else 0,
+                )
 
-                # Add optional fields if they exist
-                mtime = entry.get("mtime")
-                if mtime:
-                    archive_entry["mtime"] = mtime
-                mode = entry.get("mode")
-                if mode:
-                    archive_entry["mode"] = mode
-                uid = entry.get("uid")
-                if uid is not None:
-                    archive_entry["uid"] = uid
-                gid = entry.get("gid")
-                if gid is not None:
-                    archive_entry["gid"] = gid
-                healthy = entry.get("healthy")
-                if healthy is not None:
-                    archive_entry["healthy"] = healthy
-                if not is_directory:
-                    archive_entry["children_count"] = None
-                else:
-                    archive_entry["children_count"] = 0
                 children[immediate_child] = archive_entry
             else:
                 # This is another item in the same directory, possibly update info
                 existing = children[immediate_child]
-                if existing.get("type") == "d":
+                if existing.type == "d":
                     # It's a directory, we might want to count children
-                    current_count = existing.get("children_count")
+                    current_count = existing.children_count
                     if isinstance(current_count, int):
-                        existing["children_count"] = current_count + 1
+                        existing.children_count = current_count + 1
 
         result = list(children.values())
 
         # Sort results: directories first, then files, both alphabetically
-        result.sort(key=lambda x: (x.get("type") != "d", x.get("name", "").lower()))
+        result.sort(key=lambda x: (x.type != "d", x.name.lower()))
 
         logger.info(f"Filtered to {len(result)} immediate children")
         return result
@@ -269,7 +213,6 @@ class ArchiveManager:
 
         logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
-        # Start the borg process
         process = await asyncio.create_subprocess_exec(
             *command,
             env=env,
@@ -279,20 +222,16 @@ class ArchiveManager:
 
         try:
             while True:
-                # Read chunk from Borg process - this already yields control to event loop
                 if not process.stdout:
                     break
                 chunk = await process.stdout.read(65536)  # 64KB chunks for efficiency
                 if not chunk:
                     break
 
-                # Yield chunk to client
                 yield chunk
 
-            # Wait for the process to complete and check for errors
             return_code = await process.wait()
             if return_code != 0:
-                # Read any error messages
                 stderr_data = await process.stderr.read() if process.stderr else b""
                 error_msg = stderr_data.decode("utf-8", errors="replace")
                 raise Exception(
@@ -300,7 +239,6 @@ class ArchiveManager:
                 )
 
         except Exception as e:
-            # Ensure the process is terminated
             if process.returncode is None:
                 process.terminate()
                 try:
@@ -382,7 +320,7 @@ class ArchiveManager:
         directory_path = directory_path.strip().strip("/")
 
         for entry in entries:
-            entry_path = entry.get("path", "").lstrip("/")
+            entry_path = entry.path.lstrip("/")
 
             # Check if this entry is within the target directory
             if directory_path:
@@ -393,8 +331,8 @@ class ArchiveManager:
                     continue
 
             # Add size if it's a file (not a directory)
-            if entry.get("type") != "d":
-                total_size += entry.get("size", 0)
+            if entry.type != "d":
+                total_size += entry.size
 
         return total_size
 
@@ -414,8 +352,8 @@ class ArchiveManager:
 
         matching_entries = []
         for entry in entries:
-            path = entry.get("path", "")
-            name = entry.get("name", path.split("/")[-1] if path else "")
+            path = entry.path
+            name = entry.name
 
             if regex.search(path) or regex.search(name):
                 matching_entries.append(entry)
@@ -427,10 +365,10 @@ class ArchiveManager:
         type_counts: Dict[str, int] = {}
 
         for entry in entries:
-            if entry.get("type") == "d":
+            if entry.type == "d":
                 entry_type = "directory"
             else:
-                path = entry.get("path", "")
+                path = entry.path
                 if "." in path:
                     extension = path.split(".")[-1].lower()
                     entry_type = f".{extension}"

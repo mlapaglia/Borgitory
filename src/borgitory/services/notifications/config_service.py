@@ -7,6 +7,7 @@ CRUD operations, following the project's service layer patterns.
 
 import logging
 from typing import Dict, Any, List, Optional, Tuple
+from dataclasses import dataclass
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
@@ -18,6 +19,15 @@ from borgitory.services.notifications.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SupportedProvider:
+    """Represents a supported notification provider."""
+
+    value: str
+    label: str
+    description: str
 
 
 class NotificationConfigService:
@@ -61,22 +71,22 @@ class NotificationConfigService:
             .first()
         )
 
-    def get_supported_providers(self) -> List[Dict[str, Any]]:
+    def get_supported_providers(self) -> List[SupportedProvider]:
         """Get supported notification providers from the registry."""
         provider_info = get_all_provider_info()
         supported_providers = []
 
         for provider_name, info in provider_info.items():
             supported_providers.append(
-                {
-                    "value": provider_name,
-                    "label": info["label"],
-                    "description": info["description"],
-                }
+                SupportedProvider(
+                    value=provider_name,
+                    label=info.label,
+                    description=info.description,
+                )
             )
 
         # Sort by provider name for consistent ordering
-        return sorted(supported_providers, key=lambda x: x["value"])
+        return sorted(supported_providers, key=lambda x: x.value)
 
     def create_config(
         self, name: str, provider: str, provider_config: Dict[str, Any]

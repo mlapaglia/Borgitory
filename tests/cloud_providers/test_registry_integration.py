@@ -9,13 +9,14 @@ import pytest
 from unittest.mock import Mock, patch
 from borgitory.services.cloud_sync_service import _get_sensitive_fields_for_provider
 from borgitory.api.cloud_sync import _get_supported_providers
+from borgitory.services.cloud_providers.registry import ProviderRegistry
 
 
 class TestRegistryBusinessLogic:
     """Test registry functions directly (business logic)"""
 
     def test_get_all_provider_info_with_registered_providers(
-        self, production_registry
+        self, production_registry: ProviderRegistry
     ) -> None:
         """Test getting all provider info when providers are registered"""
         provider_info = production_registry.get_all_provider_info()
@@ -28,23 +29,22 @@ class TestRegistryBusinessLogic:
 
         # Check S3 info
         s3_info = provider_info["s3"]
-        assert s3_info["label"] == "AWS S3"
-        assert s3_info["description"] == "Amazon S3 compatible storage"
-        assert s3_info["supports_encryption"] is True
-        assert s3_info["supports_versioning"] is True
+        assert s3_info.label == "AWS S3"
+        assert s3_info.description == "Amazon S3 compatible storage"
+        assert s3_info.supports_encryption is True
+        assert s3_info.supports_versioning is True
 
         # Check SMB info
         smb_info = provider_info["smb"]
-        assert smb_info["label"] == "SMB/CIFS"
+        assert smb_info.label == "SMB/CIFS"
         assert (
-            smb_info["description"]
-            == "Server Message Block / Common Internet File System"
+            smb_info.description == "Server Message Block / Common Internet File System"
         )
-        assert smb_info["supports_encryption"] is True
-        assert smb_info["supports_versioning"] is False
+        assert smb_info.supports_encryption is True
+        assert smb_info.supports_versioning is False
 
     def test_get_supported_providers_returns_sorted_list(
-        self, production_registry
+        self, production_registry: ProviderRegistry
     ) -> None:
         """Test that supported providers are returned in sorted order"""
         providers = production_registry.get_supported_providers()
@@ -58,7 +58,7 @@ class TestRegistryBusinessLogic:
         assert providers == sorted(providers)
 
     def test_get_config_class_returns_correct_classes(
-        self, production_registry
+        self, production_registry: ProviderRegistry
     ) -> None:
         """Test that config classes are returned correctly"""
         # Test by class name to avoid identity issues after module reloading
@@ -75,7 +75,7 @@ class TestRegistryBusinessLogic:
         assert production_registry.get_config_class("unknown") is None
 
     def test_get_storage_class_returns_correct_classes(
-        self, production_registry
+        self, production_registry: ProviderRegistry
     ) -> None:
         """Test that storage classes are returned correctly"""
         # Test by class name to avoid identity issues after module reloading
@@ -95,7 +95,9 @@ class TestRegistryBusinessLogic:
 class TestSensitiveFieldsIntegration:
     """Test sensitive fields detection using registry"""
 
-    def test_get_sensitive_fields_for_registered_providers(self) -> None:
+    def test_get_sensitive_fields_for_registered_providers(
+        self, production_registry: ProviderRegistry
+    ) -> None:
         """Test that sensitive fields are correctly retrieved from registry"""
         # Import storage modules to trigger registration (if not already done)
 
