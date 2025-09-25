@@ -139,7 +139,3 @@ class NotificationRegistryFactory:
                 )
 
         return test_registry
-
-
-# Global factory instance for production use
-_production_factory = NotificationRegistryFactory()

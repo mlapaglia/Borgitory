@@ -18,6 +18,9 @@ from borgitory.services.notifications.registry import get_metadata
 
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
+    from borgitory.services.notifications.registry_factory import (
+        NotificationRegistryFactory,
+    )
     from borgitory.services.notifications.service import NotificationProviderFactory
     from borgitory.services.notifications.providers.discord_provider import HttpClient
     from borgitory.config.command_runner_config import CommandRunnerConfig
@@ -991,18 +994,38 @@ NotificationConfigServiceDep = Annotated[
 ]
 
 
-def get_notification_provider_registry() -> "NotificationProviderRegistry":
+def get_notification_registry_factory() -> "NotificationRegistryFactory":
+    """
+    Provide a NotificationRegistryFactory instance with proper FastAPI dependency injection.
+
+    Returns:
+        NotificationRegistryFactory: Factory for creating registries
+    """
+    from borgitory.services.notifications.registry_factory import (
+        NotificationRegistryFactory,
+    )
+
+    return NotificationRegistryFactory()
+
+
+def get_notification_provider_registry(
+    factory: "NotificationRegistryFactory" = Depends(get_notification_registry_factory),
+) -> "NotificationProviderRegistry":
     """
     Provide a NotificationProviderRegistry instance with proper FastAPI dependency injection.
+
+    Args:
+        factory: NotificationRegistryFactory instance from DI
 
     Returns:
         NotificationProviderRegistry: Registry with all production providers registered
     """
-    from borgitory.services.notifications.registry_factory import _production_factory
-
-    return _production_factory.create_production_registry()
+    return factory.create_production_registry()
 
 
+NotificationRegistryFactoryDep = Annotated[
+    "NotificationRegistryFactory", Depends(get_notification_registry_factory)
+]
 NotificationProviderRegistryDep = Annotated[
     "NotificationProviderRegistry", Depends(get_notification_provider_registry)
 ]
