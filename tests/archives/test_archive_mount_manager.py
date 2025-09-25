@@ -32,8 +32,8 @@ class TestArchiveMountManager:
 
         # Create ArchiveMountManager with dependency injection
         self.manager = ArchiveMountManager(
-            base_mount_dir=self.test_mount_dir,
             job_executor=self.mock_job_executor,
+            base_mount_dir=self.test_mount_dir,
             cleanup_interval=60,  # 1 minute for testing
             mount_timeout=300,  # 5 minutes for testing
         )
@@ -57,11 +57,12 @@ class TestArchiveMountManager:
 
     def test_initialization_with_defaults(self) -> None:
         """Test ArchiveMountManager initialization with defaults."""
-        manager = ArchiveMountManager()
+        mock_executor = Mock(spec=JobExecutor)
+        manager = ArchiveMountManager(job_executor=mock_executor)
         assert manager.base_mount_dir.exists()
         assert manager.cleanup_interval == 300
         assert manager.mount_timeout == 1800
-        assert isinstance(manager.job_executor, JobExecutor)
+        assert manager.job_executor is mock_executor
         assert len(manager.active_mounts) == 0
 
     def test_initialization_with_custom_params(self) -> None:
@@ -72,8 +73,8 @@ class TestArchiveMountManager:
         with tempfile.TemporaryDirectory() as temp_dir:
             custom_dir = os.path.join(temp_dir, "custom_mount_dir")
             manager = ArchiveMountManager(
-                base_mount_dir=custom_dir,
                 job_executor=custom_job_executor,
+                base_mount_dir=custom_dir,
                 cleanup_interval=120,
                 mount_timeout=600,
             )
@@ -88,12 +89,17 @@ class TestArchiveMountManager:
         # Test that explicit path setting always works regardless of OS
         with tempfile.TemporaryDirectory() as temp_dir:
             custom_mount_path = os.path.join(temp_dir, "custom_mounts")
-            manager = ArchiveMountManager(base_mount_dir=custom_mount_path)
+            mock_executor = Mock(spec=JobExecutor)
+            manager = ArchiveMountManager(
+                job_executor=mock_executor,
+                base_mount_dir=custom_mount_path
+            )
             assert str(manager.base_mount_dir) == custom_mount_path
             assert manager.base_mount_dir.exists()
 
         # Test default behavior on current platform
-        manager_default = ArchiveMountManager()
+        mock_executor_default = Mock(spec=JobExecutor)
+        manager_default = ArchiveMountManager(job_executor=mock_executor_default)
         assert manager_default.base_mount_dir.exists()
 
         # Test that the path construction logic handles different scenarios correctly
@@ -103,7 +109,8 @@ class TestArchiveMountManager:
         try:
             # Test Windows logic by setting environment
             os.environ["TEMP"] = "/tmp/test"
-            temp_manager = ArchiveMountManager()
+            mock_executor_temp = Mock(spec=JobExecutor)
+            temp_manager = ArchiveMountManager(job_executor=mock_executor_temp)
             # Should have created some path
             assert temp_manager.base_mount_dir is not None
             assert "borgitory_mounts" in str(temp_manager.base_mount_dir)

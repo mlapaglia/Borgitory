@@ -49,6 +49,6 @@ class DefaultEnvironment:
 
     def get_database_url(self) -> str:
         """Get database URL"""
-        from borgitory.config import DATABASE_URL
+        from borgitory.config_module import DATABASE_URL
 
         return DATABASE_URL

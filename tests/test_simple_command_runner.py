@@ -6,27 +6,40 @@ import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 
-from borgitory.services.simple_command_runner import SimpleCommandRunner, CommandResult
+from borgitory.services.simple_command_runner import SimpleCommandRunner
+from borgitory.protocols.command_protocols import CommandResult
+from borgitory.config.command_runner_config import CommandRunnerConfig
 
 
 class TestSimpleCommandRunner:
     """Test class for SimpleCommandRunner."""
 
     @pytest.fixture
-    def runner(self):
+    def test_config(self) -> CommandRunnerConfig:
+        """Create test configuration."""
+        return CommandRunnerConfig(timeout=30, max_retries=1, log_commands=False)
+    
+    @pytest.fixture
+    def runner(self, test_config: CommandRunnerConfig) -> SimpleCommandRunner:
         """Create SimpleCommandRunner instance for testing."""
-        return SimpleCommandRunner(timeout=30)
+        return SimpleCommandRunner(config=test_config)
 
     def test_initialization(self) -> None:
         """Test SimpleCommandRunner initialization."""
-        runner = SimpleCommandRunner()
+        default_config = CommandRunnerConfig()
+        runner = SimpleCommandRunner(config=default_config)
         assert runner.timeout == 300  # Default timeout
+        assert runner.max_retries == 3
+        assert runner.log_commands is True
 
-        runner_custom = SimpleCommandRunner(timeout=60)
+        custom_config = CommandRunnerConfig(timeout=60, max_retries=5, log_commands=False)
+        runner_custom = SimpleCommandRunner(config=custom_config)
         assert runner_custom.timeout == 60
+        assert runner_custom.max_retries == 5
+        assert runner_custom.log_commands is False
 
     @pytest.mark.asyncio
-    async def test_run_command_success(self, runner) -> None:
+    async def test_run_command_success(self, runner: SimpleCommandRunner) -> None:
         """Test successful command execution."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -48,7 +61,7 @@ class TestSimpleCommandRunner:
             assert result.error is None
 
     @pytest.mark.asyncio
-    async def test_run_command_failure(self, runner) -> None:
+    async def test_run_command_failure(self, runner: SimpleCommandRunner) -> None:
         """Test failed command execution."""
         mock_process = AsyncMock()
         mock_process.returncode = 1
@@ -70,7 +83,7 @@ class TestSimpleCommandRunner:
             assert result.error == "error message"
 
     @pytest.mark.asyncio
-    async def test_run_command_timeout(self, runner) -> None:
+    async def test_run_command_timeout(self, runner: SimpleCommandRunner) -> None:
         """Test command execution timeout."""
         mock_process = AsyncMock()
         mock_process.kill = Mock()
@@ -92,6 +105,7 @@ class TestSimpleCommandRunner:
             assert result.stdout == ""
             assert "timed out after 1 seconds" in result.stderr
             assert result.duration > 0
+            assert result.error is not None
             assert "timed out after 1 seconds" in result.error
 
             # Verify process was killed
@@ -99,7 +113,7 @@ class TestSimpleCommandRunner:
             mock_process.wait.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_run_command_with_env(self, runner) -> None:
+    async def test_run_command_with_env(self, runner: SimpleCommandRunner) -> None:
         """Test command execution with environment variables."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -123,7 +137,7 @@ class TestSimpleCommandRunner:
             assert call_args[1]["env"] == env_vars
 
     @pytest.mark.asyncio
-    async def test_run_command_custom_timeout(self, runner) -> None:
+    async def test_run_command_custom_timeout(self, runner: SimpleCommandRunner) -> None:
         """Test command execution with custom timeout override."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -145,7 +159,7 @@ class TestSimpleCommandRunner:
             assert call_args[1]["timeout"] == 60
 
     @pytest.mark.asyncio
-    async def test_run_command_exception_during_creation(self, runner) -> None:
+    async def test_run_command_exception_during_creation(self, runner: SimpleCommandRunner) -> None:
         """Test handling of exception during subprocess creation."""
         with patch(
             "asyncio.create_subprocess_exec", side_effect=OSError("Command not found")
@@ -158,10 +172,11 @@ class TestSimpleCommandRunner:
             assert result.stdout == ""
             assert "Failed to execute command: Command not found" in result.stderr
             assert result.duration > 0
+            assert result.error is not None
             assert "Failed to execute command: Command not found" in result.error
 
     @pytest.mark.asyncio
-    async def test_run_command_with_binary_output(self, runner) -> None:
+    async def test_run_command_with_binary_output(self, runner: SimpleCommandRunner) -> None:
         """Test command execution with binary output."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -181,7 +196,7 @@ class TestSimpleCommandRunner:
             assert isinstance(result.stderr, str)
 
     @pytest.mark.asyncio
-    async def test_run_command_empty_output(self, runner) -> None:
+    async def test_run_command_empty_output(self, runner: SimpleCommandRunner) -> None:
         """Test command execution with empty output."""
         mock_process = AsyncMock()
         mock_process.returncode = 0
@@ -195,8 +210,12 @@ class TestSimpleCommandRunner:
             assert result.stderr == ""
 
     @pytest.mark.asyncio
-    async def test_run_command_logging(self, runner) -> None:
+    async def test_run_command_logging(self) -> None:
         """Test that command execution produces appropriate log messages."""
+        # Create runner with logging enabled
+        config = CommandRunnerConfig(timeout=30, log_commands=True)
+        runner = SimpleCommandRunner(config=config)
+        
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"output", b"")
@@ -219,8 +238,12 @@ class TestSimpleCommandRunner:
             assert len(completion_calls) > 0
 
     @pytest.mark.asyncio
-    async def test_run_command_failure_logging(self, runner) -> None:
+    async def test_run_command_failure_logging(self) -> None:
         """Test that failed commands produce warning logs."""
+        # Create runner with logging enabled
+        config = CommandRunnerConfig(timeout=30, log_commands=True)
+        runner = SimpleCommandRunner(config=config)
+        
         mock_process = AsyncMock()
         mock_process.returncode = 1
         mock_process.communicate.return_value = (b"", b"command failed with error")

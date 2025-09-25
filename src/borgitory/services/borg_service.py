@@ -37,7 +37,10 @@ class BorgService:
         volume_service: Optional[VolumeServiceProtocol] = None,
     ) -> None:
         self.job_executor = job_executor or JobExecutor()
-        self.command_runner = command_runner or SimpleCommandRunner()
+        if command_runner is None:
+            from borgitory.config.command_runner_config import CommandRunnerConfig
+            command_runner = SimpleCommandRunner(config=CommandRunnerConfig())
+        self.command_runner = command_runner
         self.job_manager = job_manager
         self.volume_service = volume_service
         self.progress_pattern = re.compile(

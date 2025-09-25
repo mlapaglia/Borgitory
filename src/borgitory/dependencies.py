@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
     from borgitory.services.notifications.service import NotificationProviderFactory
     from borgitory.services.notifications.providers.discord_provider import HttpClient
+    from borgitory.config.command_runner_config import CommandRunnerConfig
     from sqlalchemy.orm import Session
 from functools import lru_cache
 from fastapi import Depends
@@ -159,15 +160,31 @@ def get_job_database_manager(
     return JobDatabaseManager(db_session_factory=db_session_factory)
 
 
-@lru_cache()
-def get_simple_command_runner() -> "CommandRunnerProtocol":
+def get_command_runner_config() -> "CommandRunnerConfig":
     """
-    Provide a CommandRunnerProtocol implementation (SimpleCommandRunner).
+    Provide CommandRunnerConfig from environment variables.
+    
+    Returns:
+        CommandRunnerConfig: Configuration loaded from environment
+    """
+    from borgitory.config.command_runner_config import CommandRunnerConfig
+    return CommandRunnerConfig.from_env()
 
-    Uses FastAPI's built-in caching for singleton behavior.
-    Returns protocol interface for loose coupling.
+
+def get_simple_command_runner(
+    config: "CommandRunnerConfig" = Depends(get_command_runner_config)
+) -> "CommandRunnerProtocol":
     """
-    return SimpleCommandRunner()
+    Provide a CommandRunnerProtocol implementation with injected configuration.
+    
+    Args:
+        config: Configuration for command runner behavior
+        
+    Returns:
+        CommandRunnerProtocol: Configured SimpleCommandRunner instance
+    """
+    from borgitory.services.simple_command_runner import SimpleCommandRunner
+    return SimpleCommandRunner(config=config)
 
 
 def get_backup_service(db: Session = Depends(get_db)) -> BackupService:
@@ -348,7 +365,8 @@ def get_hook_execution_service() -> HookExecutionService:
 
     Uses SimpleCommandRunner as the command runner for consistent command execution.
     """
-    command_runner = get_simple_command_runner()
+    command_runner_config = get_command_runner_config()
+    command_runner = get_simple_command_runner(command_runner_config)
     return HookExecutionService(command_runner=command_runner)
 
 
@@ -854,7 +872,7 @@ def get_cloud_sync_service(
 
 # Core Services - Request Scoped (FastAPI Endpoints)
 RequestScopedSimpleCommandRunner = Annotated[
-    SimpleCommandRunner, Depends(get_simple_command_runner)
+    "CommandRunnerProtocol", Depends(get_simple_command_runner)
 ]
 RequestScopedBorgService = Annotated[BorgService, Depends(get_borg_service)]
 RequestScopedJobService = Annotated[JobService, Depends(get_job_service)]
@@ -944,13 +962,13 @@ HookExecutionServiceDep = Annotated[
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
 
 
-@lru_cache()
-def get_archive_mount_manager() -> "ArchiveMountManager":
-    """Get the ArchiveMountManager instance."""
+def get_archive_mount_manager(
+    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor)
+) -> "ArchiveMountManager":
+    """Get the ArchiveMountManager instance with proper DI."""
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
-    from borgitory.services.jobs.job_executor import JobExecutor
-
-    return ArchiveMountManager(job_executor=JobExecutor())
+    
+    return ArchiveMountManager(job_executor=job_executor)
 
 
 ArchiveMountManagerDep = Annotated[
@@ -958,9 +976,12 @@ ArchiveMountManagerDep = Annotated[
 ]
 
 
-def get_package_manager_service(db: Session = Depends(get_db)) -> PackageManagerService:
+def get_package_manager_service(
+    db: Session = Depends(get_db),
+    command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
+) -> PackageManagerService:
     """Get PackageManagerService instance with database session."""
-    return PackageManagerService(command_runner=SimpleCommandRunner(), db_session=db)
+    return PackageManagerService(command_runner=command_runner, db_session=db)
 
 
 PackageManagerServiceDep = Annotated[
@@ -990,7 +1011,10 @@ def get_package_restoration_service_for_startup() -> PackageRestorationService:
 
     # The service will manage its own database session during restoration
     db = SessionLocal()
+    from borgitory.config.command_runner_config import CommandRunnerConfig
+    config = CommandRunnerConfig()
+    command_runner = SimpleCommandRunner(config=config)
     package_manager = PackageManagerService(
-        command_runner=SimpleCommandRunner(), db_session=db
+        command_runner=command_runner, db_session=db
     )
     return PackageRestorationService(package_manager=package_manager)

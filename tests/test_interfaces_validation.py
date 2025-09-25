@@ -24,7 +24,8 @@ from borgitory.services.borg_service import BorgService as ConcreteBorgService
 
 def test_simple_command_runner_implements_protocol():
     """Verify SimpleCommandRunner implements CommandRunner protocol"""
-    runner: CommandRunner = SimpleCommandRunner()
+    from borgitory.config.command_runner_config import CommandRunnerConfig
+    runner: CommandRunner = SimpleCommandRunner(config=CommandRunnerConfig())
     assert isinstance(runner, SimpleCommandRunner)
 
     # Check that the required method exists
@@ -118,7 +119,8 @@ def test_protocol_methods_match_implementations():
     # For now, we'll just verify the basic structure is correct
 
     # CommandRunner
-    runner = SimpleCommandRunner()
+    from borgitory.config.command_runner_config import CommandRunnerConfig
+    runner = SimpleCommandRunner(config=CommandRunnerConfig())
     assert hasattr(runner, "run_command")
 
     # VolumeService

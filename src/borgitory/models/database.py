@@ -22,7 +22,7 @@ from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from typing import Generator
 
-from borgitory.config import DATABASE_URL, get_secret_key, DATA_DIR
+from borgitory.config_module import DATABASE_URL, get_secret_key, DATA_DIR
 
 logger = logging.getLogger(__name__)
 

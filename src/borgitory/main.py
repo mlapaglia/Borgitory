@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         logger.info("Starting Borgitory application...")
 
-        from borgitory.config import DATA_DIR
+        from borgitory.config_module import DATA_DIR
 
         secret_key = get_or_generate_secret_key(DATA_DIR)
         os.environ["SECRET_KEY"] = secret_key

@@ -6,19 +6,33 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING, TypedDict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.models.database import Repository
 from borgitory.utils.security import build_secure_borg_command
-from borgitory.services.jobs.job_executor import JobExecutor
 
 if TYPE_CHECKING:
+    from borgitory.protocols.command_protocols import ProcessExecutorProtocol
     from borgitory.services.archives.archive_manager import ArchiveEntry
 
 logger = logging.getLogger(__name__)
+
+
+class MountStatEntry(TypedDict):
+    """Statistics for a single mount entry"""
+    archive: str
+    mount_point: str
+    mounted_at: str
+    last_accessed: str
+
+
+class MountStatsResponse(TypedDict):
+    """Response structure for mount statistics"""
+    active_mounts: int
+    mounts: List[MountStatEntry]
 
 
 @dataclass
@@ -38,8 +52,8 @@ class ArchiveMountManager:
 
     def __init__(
         self,
+        job_executor: "ProcessExecutorProtocol",
         base_mount_dir: Optional[str] = None,
-        job_executor: Optional[JobExecutor] = None,
         cleanup_interval: int = 300,
         mount_timeout: int = 1800,
     ) -> None:
@@ -57,7 +71,7 @@ class ArchiveMountManager:
         self.active_mounts: Dict[str, MountInfo] = {}  # key: repo_path::archive_name
         self.cleanup_interval = cleanup_interval  # 5 minutes default
         self.mount_timeout = mount_timeout  # 30 minutes before auto-unmount
-        self.job_executor = job_executor or JobExecutor()
+        self.job_executor = job_executor
 
     def _get_mount_key(self, repository: Repository, archive_name: str) -> str:
         """Generate unique key for mount"""
@@ -364,17 +378,17 @@ class ArchiveMountManager:
 
         self.active_mounts.clear()
 
-    def get_mount_stats(self) -> Dict[str, object]:
+    def get_mount_stats(self) -> MountStatsResponse:
         """Get statistics about active mounts"""
-        return {
-            "active_mounts": len(self.active_mounts),
-            "mounts": [
-                {
-                    "archive": info.archive_name,
-                    "mount_point": str(info.mount_point),
-                    "mounted_at": info.mounted_at.isoformat(),
-                    "last_accessed": info.last_accessed.isoformat(),
-                }
+        return MountStatsResponse(
+            active_mounts=len(self.active_mounts),
+            mounts=[
+                MountStatEntry(
+                    archive=info.archive_name,
+                    mount_point=str(info.mount_point),
+                    mounted_at=info.mounted_at.isoformat(),
+                    last_accessed=info.last_accessed.isoformat(),
+                )
                 for info in self.active_mounts.values()
             ],
-        }
+        )

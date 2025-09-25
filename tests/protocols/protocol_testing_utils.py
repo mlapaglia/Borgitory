@@ -5,7 +5,7 @@ This module provides utilities for testing protocol-based services,
 including enhanced mocking capabilities and validation helpers.
 """
 
-from typing import Type, Any, Dict, List
+from typing import Type, Any, Dict, List, Callable
 from unittest.mock import Mock, AsyncMock
 import inspect
 
@@ -14,7 +14,7 @@ class ProtocolMockFactory:
     """Factory for creating protocol-compliant mocks."""
 
     @staticmethod
-    def create_protocol_mock(protocol_class: Type) -> Mock:
+    def create_protocol_mock(protocol_class: Type[Any]) -> Mock:
         """Create a mock that satisfies a protocol interface."""
         mock = Mock(spec=protocol_class)
 
@@ -101,7 +101,7 @@ class ProtocolValidator:
 
     @staticmethod
     def validate_service_implements_protocol(
-        service_instance: Any, protocol_class: Type
+        service_instance: Any, protocol_class: Type[Any]
     ) -> Dict[str, Any]:
         """Validate that a service instance implements a protocol."""
 
@@ -191,11 +191,11 @@ class ProtocolValidator:
 
 
 def create_protocol_test_suite(
-    service_class: Type, protocol_class: Type
-) -> List[callable]:
+    service_class: Type[Any], protocol_class: Type[Any]
+) -> List[Callable[..., None]]:
     """Create a standard test suite for protocol compliance."""
 
-    def test_service_has_protocol_methods():
+    def test_service_has_protocol_methods() -> None:
         """Test that service has all protocol methods."""
         validator = ProtocolValidator()
         service_instance = service_class()
@@ -210,7 +210,7 @@ def create_protocol_test_suite(
             f"{service_class.__name__} does not fully implement {protocol_class.__name__}"
         )
 
-    def test_service_can_be_used_as_protocol():
+    def test_service_can_be_used_as_protocol() -> None:
         """Test that service instance can be used where protocol is expected."""
 
         def use_protocol_service(service: protocol_class) -> None:
@@ -219,7 +219,7 @@ def create_protocol_test_suite(
         service_instance = service_class()
         use_protocol_service(service_instance)  # Should not raise type errors
 
-    def test_protocol_mock_compatibility():
+    def test_protocol_mock_compatibility() -> None:
         """Test that protocol mocks work with service-using code."""
         mock = ProtocolMockFactory.create_protocol_mock(protocol_class)
 

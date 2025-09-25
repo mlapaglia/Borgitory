@@ -7,6 +7,7 @@ from unittest.mock import Mock, AsyncMock
 
 from borgitory.dependencies import (
     get_simple_command_runner,
+    get_command_runner_config,
     get_borg_service,
     get_job_service,
     get_recovery_service,
@@ -23,6 +24,8 @@ from tests.utils.di_testing import (
     override_multiple_dependencies,
 )
 from borgitory.services.simple_command_runner import SimpleCommandRunner
+from borgitory.config.command_runner_config import CommandRunnerConfig
+from borgitory.protocols.command_protocols import CommandRunnerProtocol
 from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.recovery_service import RecoveryService
@@ -40,16 +43,35 @@ from borgitory.services.volumes.volume_service import VolumeService
 class TestDependencies:
     """Test class for dependency providers."""
 
+    def test_get_command_runner_config(self) -> None:
+        """Test CommandRunnerConfig dependency provider."""
+        config = get_command_runner_config()
+        
+        assert isinstance(config, CommandRunnerConfig)
+        assert config.timeout == 300  # Default timeout
+        assert config.max_retries == 3
+        assert config.log_commands is True
+        
     def test_get_simple_command_runner(self) -> None:
         """Test SimpleCommandRunner dependency provider."""
-        runner = get_simple_command_runner()
+        config = get_command_runner_config()
+        runner = get_simple_command_runner(config)
 
         assert isinstance(runner, SimpleCommandRunner)
-        assert runner.timeout == 300  # Default timeout
-
-        # Should return same instance due to singleton pattern
-        runner2 = get_simple_command_runner()
-        assert runner is runner2
+        assert isinstance(runner, CommandRunnerProtocol)
+        assert runner.timeout == 300  # Default timeout from config
+        assert runner.max_retries == 3
+        assert runner.log_commands is True
+        
+    def test_get_simple_command_runner_custom_config(self) -> None:
+        """Test SimpleCommandRunner with custom configuration."""
+        custom_config = CommandRunnerConfig(timeout=120, max_retries=5, log_commands=False)
+        runner = get_simple_command_runner(custom_config)
+        
+        assert isinstance(runner, SimpleCommandRunner)
+        assert runner.timeout == 120
+        assert runner.max_retries == 5
+        assert runner.log_commands is False
 
     def test_get_borg_service(self) -> None:
         """Test BorgService dependency provider with FastAPI DI."""

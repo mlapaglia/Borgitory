@@ -10,7 +10,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
-from borgitory.config import DATABASE_URL
+from borgitory.config_module import DATABASE_URL
 from borgitory.models.database import Schedule
 from borgitory.models.schemas import BackupRequest, CompressionType
 from borgitory.models.enums import JobType
