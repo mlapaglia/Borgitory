@@ -21,6 +21,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
 )
+
+from borgitory.protocols.job_protocols import TaskDefinition
 from dataclasses import dataclass, field
 
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -555,7 +557,7 @@ class JobManager:
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict[str, Union[str, int, float, bool, None]]],
+        task_definitions: List["TaskDefinition"],
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
@@ -567,10 +569,23 @@ class JobManager:
 
         tasks = []
         for task_def in task_definitions:
+            # Create parameters dict from the TaskDefinition
+            parameters: Dict[str, object] = {
+                "type": task_def.type,
+                "name": task_def.name,
+                **task_def.parameters,
+            }
+            if task_def.priority is not None:
+                parameters["priority"] = task_def.priority
+            if task_def.timeout is not None:
+                parameters["timeout"] = task_def.timeout
+            if task_def.retry_count is not None:
+                parameters["retry_count"] = task_def.retry_count
+
             task = BorgJobTask(
-                task_type=str(task_def["type"]),
-                task_name=str(task_def["name"]),
-                parameters=task_def,
+                task_type=task_def.type,
+                task_name=task_def.name,
+                parameters=parameters,
             )
             tasks.append(task)
 

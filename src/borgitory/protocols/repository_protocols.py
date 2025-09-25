@@ -5,8 +5,11 @@ Protocol interfaces for repository and backup services.
 from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
 
-from borgitory.models.borg_info import BorgArchiveListResponse, RepositoryScanResponse
-from borgitory.models.repository_dtos import RepositoryOperationResult
+from borgitory.models.borg_info import (
+    BorgArchiveListResponse,
+    RepositoryScanResponse,
+    RepositoryInitializationResult,
+)
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository
@@ -37,7 +40,7 @@ class BackupServiceProtocol(Protocol):
     async def initialize_repository(
         self,
         repository: "Repository",  # Repository model
-    ) -> RepositoryOperationResult:
+    ) -> RepositoryInitializationResult:
         """Initialize a new repository."""
         ...
 

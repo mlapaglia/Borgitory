@@ -109,7 +109,6 @@ from borgitory.services.jobs.job_queue_manager import JobQueueManager
 from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
 
-# Job Manager Sub-Services (defined first to avoid forward references)
 def get_subprocess_executor() -> Callable[
     ..., Coroutine[None, None, "asyncio.subprocess.Process"]
 ]:
@@ -433,18 +432,6 @@ def get_borg_command_builder() -> BorgCommandBuilder:
         BorgCommandBuilder: New BorgCommandBuilder instance for each request
     """
     return BorgCommandBuilder()
-
-
-def get_archive_manager(
-    job_executor: JobExecutor = Depends(get_job_executor),
-    command_builder: BorgCommandBuilder = Depends(get_borg_command_builder),
-) -> ArchiveManager:
-    """
-    Provide an ArchiveManager instance with proper dependency injection.
-
-    Uses FastAPI DI with automatic dependency resolution.
-    """
-    return ArchiveManager(job_executor=job_executor, command_builder=command_builder)
 
 
 def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
@@ -835,45 +822,6 @@ def get_job_service(
     return JobService(db, job_manager)
 
 
-def get_archive_service() -> "ArchiveServiceProtocol":
-    """
-    Provide ArchiveManager service for archive operations.
-
-    Returns:
-        ArchiveServiceProtocol: Archive service implementation
-    """
-    return ArchiveManager()
-
-
-def get_borg_service(
-    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
-    command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
-    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
-    archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
-) -> BorgService:
-    """
-    Provide BorgService with all mandatory dependencies injected.
-
-    Args:
-        job_executor: Injected job executor for running Borg processes
-        command_runner: Injected command runner for system commands
-        job_manager: Injected job manager for job lifecycle
-        volume_service: Injected volume service for mounted volumes
-        archive_service: Injected archive service for archive operations
-
-    Returns:
-        BorgService: Fully configured service with all dependencies
-    """
-    return BorgService(
-        job_executor=job_executor,
-        command_runner=command_runner,
-        job_manager=job_manager,
-        volume_service=volume_service,
-        archive_service=archive_service,
-    )
-
-
 def get_job_stream_service(
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> JobStreamService:
@@ -909,23 +857,6 @@ def get_debug_service(
         volume_service=volume_service,
         job_manager=job_manager,
         environment=DefaultEnvironment(),
-    )
-
-
-def get_repository_service(
-    borg_service: BorgService = Depends(get_borg_service),
-    scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
-    volume_service: VolumeService = Depends(get_volume_service),
-) -> RepositoryService:
-    """
-    Provide a RepositoryService instance with proper dependency injection.
-
-    Uses FastAPI DI with automatic dependency resolution.
-    """
-    return RepositoryService(
-        borg_service=borg_service,
-        scheduler_service=scheduler_service,
-        volume_service=volume_service,
     )
 
 
@@ -981,7 +912,7 @@ def get_cloud_sync_service(
 RequestScopedSimpleCommandRunner = Annotated[
     "CommandRunnerProtocol", Depends(get_simple_command_runner)
 ]
-RequestScopedBorgService = Annotated[BorgService, Depends(get_borg_service)]
+# RequestScopedBorgService will be defined after get_borg_service
 RequestScopedJobService = Annotated[JobService, Depends(get_job_service)]
 RequestScopedRecoveryService = Annotated[RecoveryService, Depends(get_recovery_service)]
 
@@ -997,9 +928,7 @@ RequestScopedJobManager = Annotated[
     "JobManagerProtocol", Depends(get_job_manager_dependency)
 ]
 
-# Modern type aliases (use these)
 SimpleCommandRunnerDep = RequestScopedSimpleCommandRunner
-BorgServiceDep = RequestScopedBorgService
 JobServiceDep = RequestScopedJobService
 JobManagerDep = RequestScopedJobManager
 RecoveryServiceDep = RequestScopedRecoveryService
@@ -1065,8 +994,6 @@ TaskDefinitionBuilderDep = Annotated[
     TaskDefinitionBuilder, Depends(get_task_definition_builder)
 ]
 BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
-ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
-RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
 JobEventBroadcasterDep = Annotated[
     JobEventBroadcaster, Depends(get_job_event_broadcaster_dep)
 ]
@@ -1156,6 +1083,89 @@ def get_archive_mount_manager_dependency() -> "ArchiveMountManager":
 ArchiveMountManagerDep = Annotated[
     "ArchiveMountManager", Depends(get_archive_mount_manager_dependency)
 ]
+
+
+def get_archive_manager(
+    job_executor: JobExecutor = Depends(get_job_executor),
+    command_builder: BorgCommandBuilder = Depends(get_borg_command_builder),
+    mount_manager: "ArchiveMountManager" = Depends(
+        get_archive_mount_manager_dependency
+    ),
+) -> ArchiveManager:
+    """
+    Provide an ArchiveManager instance with proper dependency injection.
+
+    Uses FastAPI DI with automatic dependency resolution.
+    """
+    return ArchiveManager(
+        job_executor=job_executor,
+        command_builder=command_builder,
+        mount_manager=mount_manager,
+    )
+
+
+def get_archive_service(
+    archive_manager: ArchiveManager = Depends(get_archive_manager),
+) -> "ArchiveServiceProtocol":
+    """
+    Provide ArchiveManager service for archive operations.
+
+    Returns:
+        ArchiveServiceProtocol: Archive service implementation
+    """
+    return archive_manager
+
+
+def get_borg_service(
+    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
+    command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
+    archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
+) -> BorgService:
+    """
+    Provide BorgService with all mandatory dependencies injected.
+
+    Args:
+        job_executor: Injected job executor for running Borg processes
+        command_runner: Injected command runner for system commands
+        job_manager: Injected job manager for job lifecycle
+        volume_service: Injected volume service for mounted volumes
+        archive_service: Injected archive service for archive operations
+
+    Returns:
+        BorgService: Fully configured service with all dependencies
+    """
+    return BorgService(
+        job_executor=job_executor,
+        command_runner=command_runner,
+        job_manager=job_manager,
+        volume_service=volume_service,
+        archive_service=archive_service,
+    )
+
+
+def get_repository_service(
+    borg_service: BorgService = Depends(get_borg_service),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
+    volume_service: VolumeService = Depends(get_volume_service),
+) -> RepositoryService:
+    """
+    Provide a RepositoryService instance with proper dependency injection.
+
+    Uses FastAPI DI with automatic dependency resolution.
+    """
+    return RepositoryService(
+        borg_service=borg_service,
+        scheduler_service=scheduler_service,
+        volume_service=volume_service,
+    )
+
+
+RequestScopedBorgService = Annotated[BorgService, Depends(get_borg_service)]
+BorgServiceDep = RequestScopedBorgService
+ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
+RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
 
 
 def get_package_manager_service(

@@ -22,6 +22,7 @@ from borgitory.services.jobs.job_manager import (
     get_default_job_manager_dependencies,
     get_test_job_manager_dependencies,
 )
+from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.models.database import NotificationConfig, Repository
 
@@ -172,19 +173,23 @@ class TestJobManagerTaskExecution:
         self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
         """Test creating a composite job with multiple tasks"""
-        task_definitions: list[Dict[str, Any]] = [
-            {
-                "type": "backup",
-                "name": "Backup data",
-                "paths": ["/tmp"],
-                "excludes": ["*.tmp"],
-            },
-            {
-                "type": "prune",
-                "name": "Prune old archives",
-                "keep_daily": 7,
-                "keep_weekly": 4,
-            },
+        task_definitions = [
+            TaskDefinition(
+                type="backup",
+                name="Backup data",
+                parameters={
+                    "paths": ["/tmp"],
+                    "excludes": ["*.tmp"],
+                },
+            ),
+            TaskDefinition(
+                type="prune",
+                name="Prune old archives",
+                parameters={
+                    "keep_daily": 7,
+                    "keep_weekly": 4,
+                },
+            ),
         ]
 
         # Mock the execution so we don't actually run the job
@@ -268,19 +273,23 @@ class TestJobManagerTaskExecution:
         """Test composite job with critical task failure"""
         # Create task definitions for backup and prune
         task_definitions = [
-            {
-                "type": "backup",
-                "name": "Test Backup",
-                "source_path": "/tmp/test",
-                "compression": "lz4",
-                "dry_run": False,
-            },
-            {
-                "type": "prune",
-                "name": "Test Prune",
-                "keep_daily": 7,
-                "keep_weekly": 4,
-            },
+            TaskDefinition(
+                type="backup",
+                name="Test Backup",
+                parameters={
+                    "source_path": "/tmp/test",
+                    "compression": "lz4",
+                    "dry_run": False,
+                },
+            ),
+            TaskDefinition(
+                type="prune",
+                name="Test Prune",
+                parameters={
+                    "keep_daily": 7,
+                    "keep_weekly": 4,
+                },
+            ),
         ]
 
         # Use the proper job creation method that creates database records

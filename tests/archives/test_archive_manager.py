@@ -43,8 +43,13 @@ def archive_manager(
     mock_job_executor: Mock, mock_command_builder: Mock
 ) -> ArchiveManager:
     """ArchiveManager instance with mocked dependencies."""
+    mock_mount_manager = Mock()
+    mock_mount_manager.mount_archive = AsyncMock()
+    mock_mount_manager.list_directory = Mock(return_value=[])
     return ArchiveManager(
-        job_executor=mock_job_executor, command_builder=mock_command_builder
+        job_executor=mock_job_executor,
+        command_builder=mock_command_builder,
+        mount_manager=mock_mount_manager,
     )
 
 
@@ -75,61 +80,64 @@ class TestArchiveManager:
         """Test ArchiveManager initialization with provided dependencies."""
         mock_executor = Mock(spec=JobExecutor)
         mock_builder = Mock(spec=BorgCommandBuilder)
+        mock_mount_manager = Mock()
 
         manager = ArchiveManager(
-            job_executor=mock_executor, command_builder=mock_builder
+            job_executor=mock_executor,
+            command_builder=mock_builder,
+            mount_manager=mock_mount_manager,
         )
 
         assert manager.job_executor is mock_executor
         assert manager.command_builder is mock_builder
+        assert manager.mount_manager is mock_mount_manager
 
     def test_init_with_defaults(self) -> None:
         """Test ArchiveManager initialization with default dependencies."""
-        manager = ArchiveManager()
+
+        mock_mount_manager = Mock()
+        manager = ArchiveManager(
+            job_executor=JobExecutor(),
+            command_builder=BorgCommandBuilder(),
+            mount_manager=mock_mount_manager,
+        )
 
         assert isinstance(manager.job_executor, JobExecutor)
         assert isinstance(manager.command_builder, BorgCommandBuilder)
+        assert manager.mount_manager is mock_mount_manager
 
     @pytest.mark.asyncio
     async def test_list_archive_directory_contents_success(
         self, archive_manager, test_repository
     ) -> None:
         """Test listing directory contents using FUSE mount."""
-        with patch(
-            "borgitory.dependencies.get_archive_mount_manager_singleton"
-        ) as mock_get_manager:
-            mock_mount_manager = Mock()
-            mock_mount_manager.mount_archive = AsyncMock()
-            mock_mount_manager.list_directory = Mock(
-                return_value=[
-                    ArchiveEntry(
-                        name="file1.txt",
-                        type="f",
-                        size=100,
-                        isdir=False,
-                        path="file1.txt",
-                    ),
-                    ArchiveEntry(
-                        name="subdir", type="d", size=0, isdir=True, path="subdir"
-                    ),
-                ]
-            )
-            mock_get_manager.return_value = mock_mount_manager
+        # Configure the mount manager that's already injected in the fixture
+        archive_manager.mount_manager.list_directory.return_value = [
+            ArchiveEntry(
+                name="file1.txt",
+                type="f",
+                size=100,
+                isdir=False,
+                path="file1.txt",
+            ),
+            ArchiveEntry(name="subdir", type="d", size=0, isdir=True, path="subdir"),
+        ]
 
-            result = await archive_manager.list_archive_directory_contents(
-                test_repository, "test-archive", "/data"
-            )
+        result = await archive_manager.list_archive_directory_contents(
+            test_repository, "test-archive", "/data"
+        )
 
-            assert len(result) == 2
-            assert result[0].name == "file1.txt"
-            assert result[1].name == "subdir"
+        assert len(result) == 2
+        assert result[0].name == "file1.txt"
+        assert result[1].name == "subdir"
 
-            mock_mount_manager.mount_archive.assert_called_once_with(
-                test_repository, "test-archive"
-            )
-            mock_mount_manager.list_directory.assert_called_once_with(
-                test_repository, "test-archive", "/data"
-            )
+        # Verify the mount manager was called correctly
+        archive_manager.mount_manager.mount_archive.assert_called_once_with(
+            test_repository, "test-archive"
+        )
+        archive_manager.mount_manager.list_directory.assert_called_once_with(
+            test_repository, "test-archive", "/data"
+        )
 
     def test_filter_directory_contents_root(
         self, archive_manager: ArchiveManager

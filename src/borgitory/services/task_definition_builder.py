@@ -6,7 +6,7 @@ by providing a consistent interface for building all task types.
 """
 
 import logging
-from typing import Dict, List, Optional, cast
+from typing import Dict, List, Optional, Union, cast
 from sqlalchemy.orm import Session
 from borgitory.models.database import (
     CleanupConfig,
@@ -16,6 +16,7 @@ from borgitory.models.database import (
 from borgitory.models.schemas import PruneRequest, CheckRequest
 from borgitory.constants.retention import RetentionConfigProtocol, RetentionFieldHandler
 from borgitory.services.hooks.hook_config import HookConfigParser
+from borgitory.protocols.job_protocols import TaskDefinition
 
 
 class TaskDefinitionBuilder:
@@ -42,7 +43,7 @@ class TaskDefinitionBuilder:
         compression: str = "zstd",
         dry_run: bool = False,
         ignore_lock: bool = False,
-    ) -> Dict[str, object]:
+    ) -> TaskDefinition:
         """
         Build a backup task definition.
 
@@ -56,18 +57,20 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary
         """
-        return {
-            "type": "backup",
-            "name": f"Backup {repository_name}",
-            "source_path": source_path,
-            "compression": compression,
-            "dry_run": dry_run,
-            "ignore_lock": ignore_lock,
-        }
+        return TaskDefinition(
+            type="backup",
+            name=f"Backup {repository_name}",
+            parameters={
+                "source_path": source_path,
+                "compression": compression,
+                "dry_run": dry_run,
+                "ignore_lock": ignore_lock,
+            },
+        )
 
     def build_prune_task_from_config(
         self, cleanup_config_id: int, repository_name: str
-    ) -> Optional[Dict[str, object]]:
+    ) -> Optional[TaskDefinition]:
         """
         Build a prune task definition from a stored cleanup configuration.
 
@@ -87,9 +90,7 @@ class TaskDefinitionBuilder:
         if not cleanup_config:
             return None
 
-        task = {
-            "type": "prune",
-            "name": f"Prune {repository_name}",
+        parameters: Dict[str, Union[str, int, float, bool, None]] = {
             "dry_run": False,
             "show_list": cleanup_config.show_list,
             "show_stats": cleanup_config.show_stats,
@@ -98,17 +99,19 @@ class TaskDefinitionBuilder:
 
         # Add retention parameters based on strategy
         if cleanup_config.strategy == "simple" and cleanup_config.keep_within_days:
-            task["keep_within"] = f"{cleanup_config.keep_within_days}d"
+            parameters["keep_within"] = f"{cleanup_config.keep_within_days}d"
         elif cleanup_config.strategy == "advanced":
             retention_config = cast(RetentionConfigProtocol, cleanup_config)
             retention_dict = RetentionFieldHandler.to_dict(retention_config)
-            task.update(retention_dict)
+            parameters.update(retention_dict)
 
-        return task
+        return TaskDefinition(
+            type="prune", name=f"Prune {repository_name}", parameters=parameters
+        )
 
     def build_prune_task_from_request(
         self, prune_request: PruneRequest, repository_name: str
-    ) -> Dict[str, object]:
+    ) -> TaskDefinition:
         """
         Build a prune task definition from a manual prune request.
 
@@ -119,9 +122,7 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary
         """
-        task = {
-            "type": "prune",
-            "name": f"Prune {repository_name}",
+        parameters: Dict[str, Union[str, int, float, bool, None]] = {
             "dry_run": prune_request.dry_run,
             "show_list": True,  # Default for manual requests
             "show_stats": True,  # Default for manual requests
@@ -131,16 +132,18 @@ class TaskDefinitionBuilder:
 
         # Add retention parameters based on strategy
         if prune_request.strategy == "simple" and prune_request.keep_within_days:
-            task["keep_within"] = f"{prune_request.keep_within_days}d"
+            parameters["keep_within"] = f"{prune_request.keep_within_days}d"
         elif prune_request.strategy == "advanced":
             retention_dict = RetentionFieldHandler.to_dict(prune_request)
-            task.update(retention_dict)
+            parameters.update(retention_dict)
 
-        return task
+        return TaskDefinition(
+            type="prune", name=f"Prune {repository_name}", parameters=parameters
+        )
 
     def build_check_task_from_config(
         self, check_config_id: int, repository_name: str
-    ) -> Optional[Dict[str, object]]:
+    ) -> Optional[TaskDefinition]:
         """
         Build a check task definition from a stored check configuration.
 
@@ -160,25 +163,25 @@ class TaskDefinitionBuilder:
         if not check_config:
             return None
 
-        task = {
-            "type": "check",
-            "name": f"Check {repository_name} ({check_config.name})",
-            "check_type": check_config.check_type,
-            "verify_data": check_config.verify_data,
-            "repair_mode": check_config.repair_mode,
-            "save_space": check_config.save_space,
-            "max_duration": check_config.max_duration,
-            "archive_prefix": check_config.archive_prefix,
-            "archive_glob": check_config.archive_glob,
-            "first_n_archives": check_config.first_n_archives,
-            "last_n_archives": check_config.last_n_archives,
-        }
-
-        return task
+        return TaskDefinition(
+            type="check",
+            name=f"Check {repository_name} ({check_config.name})",
+            parameters={
+                "check_type": check_config.check_type,
+                "verify_data": check_config.verify_data,
+                "repair_mode": check_config.repair_mode,
+                "save_space": check_config.save_space,
+                "max_duration": check_config.max_duration,
+                "archive_prefix": check_config.archive_prefix,
+                "archive_glob": check_config.archive_glob,
+                "first_n_archives": check_config.first_n_archives,
+                "last_n_archives": check_config.last_n_archives,
+            },
+        )
 
     def build_check_task_from_request(
         self, check_request: CheckRequest, repository_name: str
-    ) -> Dict[str, object]:
+    ) -> TaskDefinition:
         """
         Build a check task definition from a manual check request.
 
@@ -189,27 +192,27 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary
         """
-        task = {
-            "type": "check",
-            "name": f"Check {repository_name}",
-            "check_type": check_request.check_type,
-            "verify_data": getattr(check_request, "verify_data", False),
-            "repair_mode": getattr(check_request, "repair_mode", False),
-            "save_space": getattr(check_request, "save_space", False),
-            "max_duration": getattr(check_request, "max_duration", None),
-            "archive_prefix": getattr(check_request, "archive_prefix", None),
-            "archive_glob": getattr(check_request, "archive_glob", None),
-            "first_n_archives": getattr(check_request, "first_n_archives", None),
-            "last_n_archives": getattr(check_request, "last_n_archives", None),
-        }
-
-        return task
+        return TaskDefinition(
+            type="check",
+            name=f"Check {repository_name}",
+            parameters={
+                "check_type": check_request.check_type,
+                "verify_data": getattr(check_request, "verify_data", False),
+                "repair_mode": getattr(check_request, "repair_mode", False),
+                "save_space": getattr(check_request, "save_space", False),
+                "max_duration": getattr(check_request, "max_duration", None),
+                "archive_prefix": getattr(check_request, "archive_prefix", None),
+                "archive_glob": getattr(check_request, "archive_glob", None),
+                "first_n_archives": getattr(check_request, "first_n_archives", None),
+                "last_n_archives": getattr(check_request, "last_n_archives", None),
+            },
+        )
 
     def build_cloud_sync_task(
         self,
         repository_name: Optional[str] = None,
         cloud_sync_config_id: Optional[int] = None,
-    ) -> Dict[str, object]:
+    ) -> TaskDefinition:
         """
         Build a cloud sync task definition.
 
@@ -224,15 +227,17 @@ class TaskDefinitionBuilder:
             f"Sync {repository_name} to Cloud" if repository_name else "Sync to Cloud"
         )
 
-        return {
-            "type": "cloud_sync",
-            "name": name,
-            "cloud_sync_config_id": cloud_sync_config_id,
-        }
+        return TaskDefinition(
+            type="cloud_sync",
+            name=name,
+            parameters={
+                "cloud_sync_config_id": cloud_sync_config_id,
+            },
+        )
 
     def build_notification_task(
         self, notification_config_id: int, repository_name: str
-    ) -> Optional[Dict[str, object]]:
+    ) -> Optional[TaskDefinition]:
         """
         Build a notification task definition from a stored notification configuration.
 
@@ -252,12 +257,14 @@ class TaskDefinitionBuilder:
         if not notification_config:
             return None
 
-        return {
-            "type": "notification",
-            "name": f"Send notification for {repository_name}",
-            "provider": notification_config.provider,
-            "config_id": notification_config_id,
-        }
+        return TaskDefinition(
+            type="notification",
+            name=f"Send notification for {repository_name}",
+            parameters={
+                "provider": notification_config.provider,
+                "config_id": notification_config_id,
+            },
+        )
 
     def build_hook_task(
         self,
@@ -265,7 +272,7 @@ class TaskDefinitionBuilder:
         hook_command: str,
         hook_type: str,
         repository_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+    ) -> TaskDefinition:
         """
         Build a hook task definition.
 
@@ -282,20 +289,22 @@ class TaskDefinitionBuilder:
         if repository_name:
             display_name += f" ({repository_name})"
 
-        return {
-            "type": "hook",
-            "name": display_name,
-            "hook_name": hook_name,
-            "hook_command": hook_command,
-            "hook_type": hook_type,
-        }
+        return TaskDefinition(
+            type="hook",
+            name=display_name,
+            parameters={
+                "hook_name": hook_name,
+                "hook_command": hook_command,
+                "hook_type": hook_type,
+            },
+        )
 
     def build_hooks_from_json(
         self,
         hooks_json: Optional[str],
         hook_type: str,
         repository_name: Optional[str] = None,
-    ) -> List[Dict[str, object]]:
+    ) -> List[TaskDefinition]:
         """
         Build hook task definitions from JSON configuration.
 
@@ -320,12 +329,14 @@ class TaskDefinitionBuilder:
                 display_name += f" ({repository_name})"
 
             return [
-                {
-                    "type": "hook",
-                    "name": display_name,
-                    "hook_type": hook_type,
-                    "hooks": hooks_json,
-                }
+                TaskDefinition(
+                    type="hook",
+                    name=display_name,
+                    parameters={
+                        "hook_type": hook_type,
+                        "hooks": hooks_json,
+                    },
+                )
             ]
         except ValueError as e:
             logger = logging.getLogger(__name__)
@@ -346,7 +357,7 @@ class TaskDefinitionBuilder:
         notification_config_id: Optional[int] = None,
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
-    ) -> List[Dict[str, object]]:
+    ) -> List[TaskDefinition]:
         """
         Build a complete list of task definitions for a job.
 
@@ -369,7 +380,7 @@ class TaskDefinitionBuilder:
         Returns:
             List of task definition dictionaries
         """
-        tasks = []
+        tasks: List[TaskDefinition] = []
 
         pre_hook_tasks = self.build_hooks_from_json(
             pre_job_hooks, "pre", repository_name

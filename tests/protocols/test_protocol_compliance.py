@@ -205,7 +205,15 @@ class TestProtocolCompliance:
             )
 
         # Check instantiation
-        manager = ArchiveManager()
+        from unittest.mock import Mock
+        from borgitory.services.jobs.job_executor import JobExecutor
+        from borgitory.services.borg_command_builder import BorgCommandBuilder
+
+        manager = ArchiveManager(
+            job_executor=JobExecutor(),
+            command_builder=BorgCommandBuilder(),
+            mount_manager=Mock(),
+        )
         assert manager is not None
 
     def test_notification_service_compliance(self) -> None:

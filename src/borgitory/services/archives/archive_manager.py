@@ -6,12 +6,15 @@ import asyncio
 from dataclasses import dataclass
 import json
 import logging
-from typing import Dict, List, Optional, AsyncGenerator, TypedDict
+from typing import Dict, List, Optional, AsyncGenerator, TypedDict, TYPE_CHECKING
 
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.utils.security import validate_archive_name, sanitize_path
+
+if TYPE_CHECKING:
+    from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +87,13 @@ class ArchiveManager:
 
     def __init__(
         self,
-        job_executor: Optional[JobExecutor] = None,
-        command_builder: Optional[BorgCommandBuilder] = None,
+        job_executor: JobExecutor,
+        command_builder: BorgCommandBuilder,
+        mount_manager: "ArchiveMountManager",
     ) -> None:
-        self.job_executor = job_executor or JobExecutor()
-        self.command_builder = command_builder or BorgCommandBuilder()
+        self.job_executor = job_executor
+        self.command_builder = command_builder
+        self.mount_manager = mount_manager
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
@@ -98,9 +103,7 @@ class ArchiveManager:
             f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
         )
 
-        from borgitory.dependencies import get_archive_mount_manager_singleton
-
-        mount_manager = get_archive_mount_manager_singleton()
+        mount_manager = self.mount_manager
 
         # Mount the archive if not already mounted
         await mount_manager.mount_archive(repository, archive_name)
@@ -179,26 +182,6 @@ class ArchiveManager:
                     children_count=None if not is_directory else 0,
                 )
 
-                # Add optional fields if they exist
-                mtime = entry.mtime
-                if mtime:
-                    archive_entry.mtime = mtime
-                mode = entry.mode
-                if mode:
-                    archive_entry.mode = mode
-                uid = entry.uid
-                if uid is not None:
-                    archive_entry.uid = uid
-                gid = entry.gid
-                if gid is not None:
-                    archive_entry.gid = gid
-                healthy = entry.healthy
-                if healthy is not None:
-                    archive_entry.healthy = healthy
-                if not is_directory:
-                    archive_entry.children_count = None
-                else:
-                    archive_entry.children_count = 0
                 children[immediate_child] = archive_entry
             else:
                 # This is another item in the same directory, possibly update info
@@ -230,7 +213,6 @@ class ArchiveManager:
 
         logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
-        # Start the borg process
         process = await asyncio.create_subprocess_exec(
             *command,
             env=env,
@@ -240,20 +222,16 @@ class ArchiveManager:
 
         try:
             while True:
-                # Read chunk from Borg process - this already yields control to event loop
                 if not process.stdout:
                     break
                 chunk = await process.stdout.read(65536)  # 64KB chunks for efficiency
                 if not chunk:
                     break
 
-                # Yield chunk to client
                 yield chunk
 
-            # Wait for the process to complete and check for errors
             return_code = await process.wait()
             if return_code != 0:
-                # Read any error messages
                 stderr_data = await process.stderr.read() if process.stderr else b""
                 error_msg = stderr_data.decode("utf-8", errors="replace")
                 raise Exception(
@@ -261,7 +239,6 @@ class ArchiveManager:
                 )
 
         except Exception as e:
-            # Ensure the process is terminated
             if process.returncode is None:
                 process.terminate()
                 try:
