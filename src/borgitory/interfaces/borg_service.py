@@ -4,15 +4,18 @@ Borg service protocol interface.
 Defines the contract for Borg backup operations.
 """
 
-from typing import Protocol, Dict, List, Optional, Union
+from typing import Protocol, Dict, List, Optional, Union, TYPE_CHECKING
 from starlette.responses import StreamingResponse
+
+if TYPE_CHECKING:
+    from borgitory.models.database import Repository
 
 
 class BorgService(Protocol):
     """Protocol for Borg backup services"""
 
     async def initialize_repository(
-        self, repository: object
+        self, repository: "Repository"
     ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Initialize a new Borg repository.
@@ -27,7 +30,7 @@ class BorgService(Protocol):
 
     async def create_backup(
         self,
-        repository: object,
+        repository: "Repository",
         source_path: str,
         compression: str = "zstd",
         dry_run: bool = False,
@@ -47,7 +50,7 @@ class BorgService(Protocol):
         ...
 
     async def list_archives(
-        self, repository: object
+        self, repository: "Repository"
     ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """
         List all archives in a repository.
@@ -61,7 +64,7 @@ class BorgService(Protocol):
         ...
 
     async def get_repo_info(
-        self, repository: object
+        self, repository: "Repository"
     ) -> Dict[str, Union[str, int, float, bool, None]]:
         """
         Get repository information.
@@ -75,7 +78,7 @@ class BorgService(Protocol):
         ...
 
     async def list_archive_contents(
-        self, repository: object, archive_name: str
+        self, repository: "Repository", archive_name: str
     ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """
         List contents of a specific archive.
@@ -90,7 +93,7 @@ class BorgService(Protocol):
         ...
 
     async def extract_file_stream(
-        self, repository: object, archive_name: str, file_path: str
+        self, repository: "Repository", archive_name: str, file_path: str
     ) -> StreamingResponse:
         """
         Extract a single file from an archive and stream it.

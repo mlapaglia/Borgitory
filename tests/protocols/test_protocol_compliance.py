@@ -185,6 +185,7 @@ class TestProtocolCompliance:
             command_runner=Mock(),
             job_manager=Mock(),
             volume_service=Mock(),
+            archive_service=Mock(),
         )
         assert service is not None
 

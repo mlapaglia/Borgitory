@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         JobManagerProtocol,
         ProcessExecutorProtocol,
     )
+    from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
     from borgitory.services.rclone_service import RcloneService
 
 logger = logging.getLogger(__name__)
@@ -203,6 +204,7 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
         command_runner: CommandRunnerProtocol,
         volume_service: "VolumeServiceProtocol",
         job_manager: "JobManagerProtocol",
+        archive_service: "ArchiveServiceProtocol",
     ) -> None:
         super().__init__()
         # Inject dependencies instead of using service locator
@@ -210,6 +212,7 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
         self._command_runner = command_runner
         self._volume_service = volume_service
         self._job_manager = job_manager
+        self._archive_service = archive_service
         self._register_default_implementations()
 
     def _register_default_implementations(self) -> None:
@@ -220,6 +223,7 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
             command_runner: Optional[CommandRunnerProtocol] = None,
             job_manager: Optional["JobManagerProtocol"] = None,
             volume_service: Optional["VolumeServiceProtocol"] = None,
+            archive_service: Optional["ArchiveServiceProtocol"] = None,
         ) -> BackupServiceProtocol:
             """Factory function to create BorgService."""
             from borgitory.services.borg_service import BorgService
@@ -229,12 +233,14 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
             final_command_runner = command_runner or self._command_runner
             final_volume_service = volume_service or self._volume_service
             final_job_manager = job_manager or self._job_manager
+            final_archive_service = archive_service or self._archive_service
 
             return BorgService(
                 job_executor=final_job_executor,
                 command_runner=final_command_runner,
                 volume_service=final_volume_service,
                 job_manager=final_job_manager,
+                archive_service=final_archive_service,
             )
 
         self.register_implementation("borg", create_borg_service, set_as_default=True)
@@ -246,6 +252,7 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
         command_runner: Optional[CommandRunnerProtocol] = None,
         job_manager: Optional["JobManagerProtocol"] = None,
         volume_service: Optional["VolumeServiceProtocol"] = None,
+        archive_service: Optional["ArchiveServiceProtocol"] = None,
     ) -> BackupServiceProtocol:
         """Create a backup service."""
         return self.create_service(
@@ -254,4 +261,5 @@ class BackupServiceFactory(ServiceFactory[BackupServiceProtocol]):
             command_runner=command_runner,
             job_manager=job_manager,
             volume_service=volume_service,
+            archive_service=archive_service,
         )

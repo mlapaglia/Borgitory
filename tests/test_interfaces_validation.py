@@ -105,6 +105,7 @@ def test_borg_service_implements_protocol():
         command_runner=Mock(),
         job_manager=Mock(),
         volume_service=Mock(),
+        archive_service=Mock(),
     )
     assert isinstance(service, ConcreteBorgService)
 
@@ -145,6 +146,7 @@ def test_protocol_methods_match_implementations():
         command_runner=Mock(),
         job_manager=Mock(),
         volume_service=Mock(),
+        archive_service=Mock(),
     )
     assert hasattr(borg_service, "initialize_repository")
     assert hasattr(borg_service, "create_backup")

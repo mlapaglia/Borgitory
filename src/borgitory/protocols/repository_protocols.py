@@ -7,6 +7,7 @@ from datetime import datetime
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository
+    from borgitory.services.archives.archive_manager import ArchiveEntry
 
 
 class RepositoryInfo:
@@ -80,7 +81,7 @@ class ArchiveServiceProtocol(Protocol):
         self,
         repository: "Repository",  # Repository model
         archive_name: str,
-    ) -> List[Dict[str, object]]:
+    ) -> List["ArchiveEntry"]:
         """List contents of an archive."""
         ...
 
@@ -88,8 +89,8 @@ class ArchiveServiceProtocol(Protocol):
         self,
         repository: "Repository",  # Repository model
         archive_name: str,
-        directory_path: str,
-    ) -> List[Dict[str, object]]:
+        path: str = "",
+    ) -> List["ArchiveEntry"]:
         """List contents of a directory within an archive."""
         ...
 

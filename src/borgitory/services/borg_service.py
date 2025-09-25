@@ -5,7 +5,7 @@ import re
 import os
 from datetime import datetime
 from borgitory.utils.datetime_utils import now_utc
-from typing import Any, AsyncGenerator, Dict, List, Optional, cast
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union, cast
 
 from starlette.responses import StreamingResponse
 
@@ -16,6 +16,7 @@ from borgitory.protocols import (
     VolumeServiceProtocol,
     JobManagerProtocol,
 )
+from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
 from borgitory.utils.db_session import get_db_session
 from borgitory.utils.security import (
     build_secure_borg_command,
@@ -34,6 +35,7 @@ class BorgService:
         command_runner: CommandRunnerProtocol,
         job_manager: JobManagerProtocol,
         volume_service: VolumeServiceProtocol,
+        archive_service: ArchiveServiceProtocol,
     ) -> None:
         """
         Initialize BorgService with mandatory dependency injection.
@@ -43,11 +45,13 @@ class BorgService:
             command_runner: Command runner for executing system commands
             job_manager: Job manager for handling job lifecycle
             volume_service: Volume service for discovering mounted volumes
+            archive_service: Archive service for managing archive operations
         """
         self.job_executor = job_executor
         self.command_runner = command_runner
         self.job_manager = job_manager
         self.volume_service = volume_service
+        self.archive_service = archive_service
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
@@ -57,7 +61,9 @@ class BorgService:
         """Get job manager instance - guaranteed to be available via DI"""
         return self.job_manager
 
-    def _parse_borg_config(self, repo_path: str) -> Dict[str, Any]:
+    def _parse_borg_config(
+        self, repo_path: str
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """Parse a Borg repository config file to determine encryption mode"""
         config_path = os.path.join(repo_path, "config")
 
@@ -178,7 +184,9 @@ class BorgService:
                 "preview": f"Error reading config: {str(e)}",
             }
 
-    async def initialize_repository(self, repository: Repository) -> Dict[str, Any]:
+    async def initialize_repository(
+        self, repository: Repository
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """Initialize a new Borg repository"""
         logger.info(f"Initializing Borg repository at {repository.path}")
 
@@ -301,7 +309,9 @@ class BorgService:
             logger.error(f"Failed to start backup: {e}")
             raise Exception(f"Failed to start backup: {str(e)}")
 
-    async def list_archives(self, repository: Repository) -> List[Dict[str, Any]]:
+    async def list_archives(
+        self, repository: Repository
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """List all archives in a repository"""
         try:
             command, env = build_secure_borg_command(
@@ -413,7 +423,9 @@ class BorgService:
         except Exception as e:
             raise Exception(f"Failed to list archives: {str(e)}")
 
-    async def get_repo_info(self, repository: Repository) -> Dict[str, Any]:
+    async def get_repo_info(
+        self, repository: Repository
+    ) -> Dict[str, Union[str, int, float, bool, None]]:
         """Get repository information using direct process execution"""
         try:
             command, env = build_secure_borg_command(
@@ -457,7 +469,7 @@ class BorgService:
 
     async def list_archive_contents(
         self, repository: Repository, archive_name: str
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """List contents of a specific archive"""
         try:
             validate_archive_name(archive_name)
@@ -505,22 +517,13 @@ class BorgService:
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """List contents of a specific directory within an archive using FUSE mount"""
-        # Use the archive manager which now uses FUSE mounting
-        if not hasattr(self, "_archive_manager"):
-            from borgitory.services.archives.archive_manager import ArchiveManager
-
-            self._archive_manager = ArchiveManager()
-
-        entries = await self._archive_manager.list_archive_directory_contents(
+        entries = await self.archive_service.list_archive_directory_contents(
             repository, archive_name, path
         )
-        # Convert ArchiveEntry objects to dictionaries
-        return [
-            entry.__dict__ if hasattr(entry, "__dict__") else dict(entry)
-            for entry in entries
-        ]
+        # ArchiveEntry is a TypedDict, which is compatible with Dict[str, Union[...]]
+        return cast(List[Dict[str, Union[str, int, float, bool, None]]], entries)
 
     async def extract_file_stream(
         self, repository: Repository, archive_name: str, file_path: str
@@ -670,7 +673,9 @@ class BorgService:
             )
         return await self.volume_service.get_mounted_volumes()
 
-    async def scan_for_repositories(self) -> List[Dict[str, Any]]:
+    async def scan_for_repositories(
+        self,
+    ) -> List[Dict[str, Union[str, int, float, bool, None]]]:
         """Scan for Borg repositories using SimpleCommandRunner"""
         logger.info("Starting repository scan")
 

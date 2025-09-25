@@ -13,6 +13,7 @@ def create_test_borg_service(
     command_runner=None,
     job_manager=None,
     volume_service=None,
+    archive_service=None,
 ):
     """Helper function to create BorgService with all required dependencies for testing."""
     return BorgService(
@@ -20,6 +21,7 @@ def create_test_borg_service(
         command_runner=command_runner or Mock(),
         job_manager=job_manager or Mock(),
         volume_service=volume_service or Mock(),
+        archive_service=archive_service or Mock(),
     )
 
 

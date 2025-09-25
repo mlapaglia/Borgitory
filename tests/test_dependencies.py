@@ -284,6 +284,7 @@ class TestDependencies:
             command_runner=mock_runner,
             job_manager=Mock(),
             volume_service=Mock(),
+            archive_service=Mock(),
         )
 
         assert service.command_runner is mock_runner

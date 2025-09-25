@@ -4,7 +4,10 @@ Job manager protocol interfaces.
 Defines the contracts for job management and execution services.
 """
 
-from typing import Protocol, Dict, List, Optional, Union
+from typing import Protocol, Dict, List, Optional, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from borgitory.models.database import Repository, Schedule
 
 
 class JobExecutor(Protocol):
@@ -51,8 +54,8 @@ class JobManager(Protocol):
         self,
         job_type: str,
         task_definitions: List[Dict[str, Union[str, int, float, bool, None]]],
-        repository: object,
-        schedule: Optional[object] = None,
+        repository: "Repository",
+        schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
     ) -> str:
         """

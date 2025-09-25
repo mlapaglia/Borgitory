@@ -555,7 +555,7 @@ class JobManager:
     async def create_composite_job(
         self,
         job_type: str,
-        task_definitions: List[Dict[str, object]],
+        task_definitions: List[Dict[str, Union[str, int, float, bool, None]]],
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,

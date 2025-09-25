@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from borgitory.services.jobs.job_manager import JobManagerConfig
     from borgitory.services.cloud_providers.registry_factory import RegistryFactory
     from borgitory.services.volumes.file_system_interface import FileSystemInterface
+    from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
     from sqlalchemy.orm import Session
 from functools import lru_cache
 from fastapi import Depends
@@ -36,6 +37,7 @@ from borgitory.models.database import SessionLocal, get_db
 from borgitory.utils.template_paths import get_template_directory
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
+from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.backups.backup_service import BackupService
 from borgitory.services.jobs.job_manager import JobManager
@@ -61,7 +63,6 @@ from borgitory.services.startup.package_restoration_service import (
     PackageRestorationService,
 )
 from borgitory.services.borg_command_builder import BorgCommandBuilder
-from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.repositories.repository_service import RepositoryService
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
@@ -834,11 +835,22 @@ def get_job_service(
     return JobService(db, job_manager)
 
 
+def get_archive_service() -> "ArchiveServiceProtocol":
+    """
+    Provide ArchiveManager service for archive operations.
+
+    Returns:
+        ArchiveServiceProtocol: Archive service implementation
+    """
+    return ArchiveManager()
+
+
 def get_borg_service(
     job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
     command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
     volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
+    archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
 ) -> BorgService:
     """
     Provide BorgService with all mandatory dependencies injected.
@@ -848,6 +860,7 @@ def get_borg_service(
         command_runner: Injected command runner for system commands
         job_manager: Injected job manager for job lifecycle
         volume_service: Injected volume service for mounted volumes
+        archive_service: Injected archive service for archive operations
 
     Returns:
         BorgService: Fully configured service with all dependencies
@@ -857,6 +870,7 @@ def get_borg_service(
         command_runner=command_runner,
         job_manager=job_manager,
         volume_service=volume_service,
+        archive_service=archive_service,
     )
 
 

@@ -243,6 +243,7 @@ class TestBackupServiceFactory:
             command_runner=mock_command_runner,
             volume_service=mock_volume_service,
             job_manager=mock_job_manager,
+            archive_service=Mock(),
         )
 
         implementations = factory.list_implementations()
@@ -262,6 +263,7 @@ class TestBackupServiceFactory:
             command_runner=mock_command_runner,
             volume_service=mock_volume_service,
             job_manager=mock_job_manager,
+            archive_service=Mock(),
         )
 
         # Pass job_executor as it's still optional per the method signature
@@ -329,6 +331,7 @@ class TestFactoryIntegration:
             command_runner=mock_command_runner,
             volume_service=mock_volume_service,
             job_manager=mock_job_manager,
+            archive_service=Mock(),
         )
         service = factory.create_backup_service("borg", job_executor=mock_job_executor)
 
