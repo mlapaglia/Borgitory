@@ -24,7 +24,7 @@ class MockConfigClass(BaseModel):
 
 
 class MockStorageClass:
-    def __init__(self, config, rclone_service: RcloneService) -> None:
+    def __init__(self, config: MockConfigClass, rclone_service: RcloneService) -> None:
         self.config = config
         self.rclone_service = rclone_service
 
@@ -68,18 +68,20 @@ class TestProviderRegistry:
     """Test ProviderRegistry class"""
 
     @pytest.fixture
-    def registry(self):
+    def registry(self) -> ProviderRegistry:
         """Create a fresh registry for each test"""
         return ProviderRegistry()
 
     @pytest.fixture
-    def sample_metadata(self):
+    def sample_metadata(self) -> ProviderMetadata:
         """Sample metadata for testing"""
         return ProviderMetadata(
             name="test", label="Test Provider", description="Test storage provider"
         )
 
-    def test_register_provider(self, registry, sample_metadata) -> None:
+    def test_register_provider(
+        self, registry: ProviderRegistry, sample_metadata: ProviderMetadata
+    ) -> None:
         """Test registering a provider"""
         registry.register_provider(
             name="test",
@@ -93,7 +95,9 @@ class TestProviderRegistry:
         assert registry.get_metadata("test") == sample_metadata
         assert "test" in registry.get_supported_providers()
 
-    def test_register_duplicate_provider(self, registry, sample_metadata) -> None:
+    def test_register_duplicate_provider(
+        self, registry: ProviderRegistry, sample_metadata: ProviderMetadata
+    ) -> None:
         """Test registering a provider with the same name twice"""
         # First registration
         registry.register_provider(
@@ -116,13 +120,15 @@ class TestProviderRegistry:
 
         assert registry.get_config_class("test") == AnotherConfigClass
 
-    def test_get_nonexistent_provider(self, registry) -> None:
+    def test_get_nonexistent_provider(self, registry: ProviderRegistry) -> None:
         """Test getting a provider that doesn't exist"""
         assert registry.get_config_class("nonexistent") is None
         assert registry.get_storage_class("nonexistent") is None
         assert registry.get_metadata("nonexistent") is None
 
-    def test_get_provider_info(self, registry, sample_metadata) -> None:
+    def test_get_provider_info(
+        self, registry: ProviderRegistry, sample_metadata: ProviderMetadata
+    ) -> None:
         """Test getting provider info"""
         registry.register_provider(
             name="test",
@@ -142,7 +148,7 @@ class TestProviderRegistry:
         assert info.supports_versioning is False
         assert info.requires_credentials is True
 
-    def test_get_all_provider_info(self, registry) -> None:
+    def test_get_all_provider_info(self, registry: ProviderRegistry) -> None:
         """Test getting info for all providers"""
         metadata1 = ProviderMetadata(
             name="test1", label="Test 1", description="First test"
@@ -165,7 +171,9 @@ class TestProviderRegistry:
         assert all_info["test1"].label == "Test 1"
         assert all_info["test2"].label == "Test 2"
 
-    def test_is_provider_registered(self, registry, sample_metadata) -> None:
+    def test_is_provider_registered(
+        self, registry: ProviderRegistry, sample_metadata: ProviderMetadata
+    ) -> None:
         """Test checking if provider is registered"""
         assert not registry.is_provider_registered("test")
 
@@ -175,7 +183,9 @@ class TestProviderRegistry:
 
         assert registry.is_provider_registered("test")
 
-    def test_unregister_provider(self, registry, sample_metadata) -> None:
+    def test_unregister_provider(
+        self, registry: ProviderRegistry, sample_metadata: ProviderMetadata
+    ) -> None:
         """Test unregistering a provider"""
         registry.register_provider(
             "test", MockConfigClass, MockStorageClass, sample_metadata

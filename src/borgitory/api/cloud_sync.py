@@ -43,9 +43,7 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
         )
 
     # Sort by provider name for consistent ordering
-    return sorted(
-        cast(List[Dict[str, str]], supported_providers), key=lambda x: str(x["value"])
-    )
+    return sorted(supported_providers, key=lambda x: str(x["value"]))
 
 
 def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]:
