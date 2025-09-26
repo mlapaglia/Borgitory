@@ -192,23 +192,9 @@ class StorageFactory:
             logger.error(
                 f"Failed to create storage {storage_class.__name__} with DI: {e}"
             )
-            # Fallback to basic instantiation (backward compatibility)
-            try:
-                # Try the old way as fallback
-                rclone_service = self._dependencies.get("rclone_service")
-                if rclone_service is not None:
-                    return cast(
-                        CloudStorage, storage_class(validated_config, rclone_service)
-                    )
-                else:
-                    raise ValueError(
-                        "RcloneService dependency not available for fallback"
-                    )
-            except Exception as fallback_error:
-                logger.error(f"Fallback creation also failed: {fallback_error}")
-                raise ValueError(
-                    f"Could not create storage {storage_class.__name__}: {e}"
-                ) from e
+            raise ValueError(
+                f"Could not create storage {storage_class.__name__}: {e}"
+            ) from e
 
     def get_supported_providers(self) -> list[str]:
         """Get list of supported provider names."""

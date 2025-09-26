@@ -191,14 +191,9 @@ class NotificationProviderFactory:
             logger.error(
                 f"Failed to create provider {provider_class.__name__} with DI: {e}"
             )
-            # Fallback to basic instantiation
-            try:
-                return provider_class(validated_config)
-            except Exception as fallback_error:
-                logger.error(f"Fallback creation also failed: {fallback_error}")
-                raise ValueError(
-                    f"Could not create provider {provider_class.__name__}: {e}"
-                ) from e
+            raise ValueError(
+                f"Could not create provider {provider_class.__name__}: {e}"
+            ) from e
 
     def get_supported_providers(self) -> List[str]:
         """Get list of supported provider names."""
