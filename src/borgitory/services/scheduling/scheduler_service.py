@@ -316,8 +316,9 @@ class SchedulerService:
         if not self._running:
             raise RuntimeError("Scheduler is not running")
 
-        # Create a unique job ID for the one-time run
-        job_id = f"manual_run_{schedule_id}_{int(now_utc().timestamp())}"
+        # Create a unique job ID for the one-time run (include microseconds for uniqueness)
+        timestamp = now_utc()
+        job_id = f"manual_run_{schedule_id}_{int(timestamp.timestamp())}_{timestamp.microsecond}"
 
         try:
             # Schedule the job to run immediately using DateTrigger
