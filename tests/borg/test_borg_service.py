@@ -392,18 +392,24 @@ class TestExtractFileStream:
     @pytest.mark.asyncio
     async def test_extract_file_stream_security_error(self) -> None:
         """Test file extraction with security validation error."""
-        with patch("borgitory.utils.security.validate_archive_name"), patch(
-            "borgitory.utils.security.build_secure_borg_command_with_keyfile",
-            side_effect=Exception("Security error"),
-        ):
+        # Mock build_secure_borg_command_with_keyfile to raise an exception
+        with patch(
+            "borgitory.services.borg_service.build_secure_borg_command_with_keyfile"
+        ) as mock_build:
+            mock_build.side_effect = Exception("Security error")
+
             with pytest.raises(Exception) as exc_info:
                 await self.borg_service.extract_file_stream(
                     self.mock_repository, "test-archive", "file.txt"
                 )
 
+            # Verify the mock was called
+            assert mock_build.called
+
             # The error may be wrapped in "Failed to extract file" message
+            error_message = str(exc_info.value)
             assert any(
-                phrase in str(exc_info.value)
+                phrase in error_message
                 for phrase in ["Security error", "Failed to extract file"]
             )
 
