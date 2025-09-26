@@ -207,11 +207,9 @@ class TestProtocolCompliance:
         # Check instantiation
         from unittest.mock import Mock
         from borgitory.services.jobs.job_executor import JobExecutor
-        from borgitory.services.borg_command_builder import BorgCommandBuilder
 
         manager = ArchiveManager(
             job_executor=JobExecutor(),
-            command_builder=BorgCommandBuilder(),
             mount_manager=Mock(),
         )
         assert manager is not None

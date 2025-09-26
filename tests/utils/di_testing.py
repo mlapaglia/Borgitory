@@ -340,21 +340,6 @@ class MockServiceFactory:
 
         return mock
 
-    @staticmethod
-    def create_mock_borg_command_builder() -> Mock:
-        """Create a mock BorgCommandBuilder with common method signatures."""
-        from borgitory.services.borg_command_builder import BorgCommandBuilder
-
-        mock = Mock(spec=BorgCommandBuilder)
-
-        # Setup common return values
-        mock.build_list_archives_command.return_value = ["borg", "list"]
-        mock.build_backup_command.return_value = ["borg", "create"]
-        mock.build_check_command.return_value = ["borg", "check"]
-        mock.generate_archive_name.return_value = "test-archive-2025-01-19"
-
-        return mock
-
 
 class DependencyTestHelper:
     """Helper class for testing dependency injection behavior."""

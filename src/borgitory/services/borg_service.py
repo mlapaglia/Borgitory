@@ -1,4 +1,5 @@
 import asyncio
+import configparser
 import json
 import logging
 import re
@@ -25,6 +26,9 @@ from borgitory.protocols import (
 from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
 from borgitory.utils.security import (
     build_secure_borg_command,
+    build_secure_borg_command_with_keyfile,
+    secure_borg_command,
+    cleanup_temp_keyfile,
     validate_archive_name,
     validate_compression,
     sanitize_path,
@@ -67,7 +71,7 @@ class BorgService:
         return self.job_manager
 
     def _parse_borg_config(self, repo_path: str) -> "BorgRepositoryConfig":
-        """Parse a Borg repository config file to determine encryption mode"""
+        """Parse a Borg repository config file to verify it's a valid Borg repository"""
         config_path = os.path.join(repo_path, "config")
 
         try:
@@ -77,98 +81,16 @@ class BorgService:
             with open(config_path, "r", encoding="utf-8") as f:
                 config_content = f.read()
 
-            # Parse the config file (it's an INI-like format)
-            import configparser
-
             config = configparser.ConfigParser()
             config.read_string(config_content)
 
-            # Debug: log the actual config content to understand structure
-            logger.info(f"Parsing Borg config at {config_path}")
-            logger.info(f"Sections found: {config.sections()}")
-
-            # Check if this looks like a Borg repository
             if not config.has_section("repository"):
                 return BorgRepositoryConfig.invalid_config()
 
-            # Log all options in repository section
-            if config.has_section("repository"):
-                repo_options = dict(config.items("repository"))
-                logger.info(f"Repository section options: {repo_options}")
-
-            # The key insight: Borg stores encryption info differently
-            # Check for a key file in the repository directory
-            key_files = []
-            try:
-                for item in os.listdir(repo_path):
-                    if item.startswith("key.") or "key" in item.lower():
-                        key_files.append(item)
-            except (OSError, ValueError):
-                pass
-
-            # Method 1: Check for repokey data in config
-            encryption_mode = "unknown"
-            requires_keyfile = False
-            preview = "Repository detected"
-
-            # Look for key-related sections
-            key_sections = [s for s in config.sections() if "key" in s.lower()]
-            logger.info(f"Key-related sections: {key_sections}")
-
-            # Check repository section for encryption hints
-            repo_section = dict(config.items("repository"))
-
-            # Check for encryption by looking for the 'key' field in repository section
-            if "key" in repo_section:
-                # Repository has a key field - this means it's encrypted
-                key_value = repo_section["key"]
-
-                if (
-                    key_value and len(key_value) > 50
-                ):  # Key data is present and substantial
-                    # This is repokey mode - key is embedded in the repository
-                    encryption_mode = "repokey"
-                    requires_keyfile = False
-                    preview = "Encrypted repository (repokey mode) - key embedded in repository"
-                else:
-                    # Key field exists but might be empty/reference - possibly keyfile mode
-                    if key_files:
-                        encryption_mode = "keyfile"
-                        requires_keyfile = True
-                        preview = f"Encrypted repository (keyfile mode) - found key files: {', '.join(key_files)}"
-                    else:
-                        encryption_mode = "encrypted"
-                        requires_keyfile = False
-                        preview = (
-                            "Encrypted repository (key field present but unclear mode)"
-                        )
-            elif key_files:
-                # No key in config but key files found - definitely keyfile mode
-                encryption_mode = "keyfile"
-                requires_keyfile = True
-                preview = f"Encrypted repository (keyfile mode) - found key files: {', '.join(key_files)}"
-            else:
-                # No key field and no key files - check for other encryption indicators
-                all_content_lower = config_content.lower()
-                if any(
-                    word in all_content_lower
-                    for word in ["encrypt", "cipher", "algorithm", "blake2", "aes"]
-                ):
-                    encryption_mode = "encrypted"
-                    requires_keyfile = False
-                    preview = (
-                        "Encrypted repository (encryption detected but mode unclear)"
-                    )
-                else:
-                    # Likely unencrypted (very rare for Borg)
-                    encryption_mode = "none"
-                    requires_keyfile = False
-                    preview = "Unencrypted repository (no encryption detected)"
-
             return BorgRepositoryConfig(
-                mode=encryption_mode,
-                requires_keyfile=requires_keyfile,
-                preview=preview,
+                mode="unknown",
+                requires_keyfile=False,
+                preview="Borg repository detected",
             )
 
         except Exception as e:
@@ -182,46 +104,42 @@ class BorgService:
         logger.info(f"Initializing Borg repository at {repository.path}")
 
         try:
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg init",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--encryption=repokey"],
-            )
-        except Exception as e:
-            logger.error(f"Failed to build secure command: {e}")
-            return RepositoryInitializationResult.failure_result(
-                f"Security validation failed: {str(e)}"
-            )
+            ) as (command, env, _):
+                result = await self.command_runner.run_command(command, env, timeout=60)
 
-        try:
-            result = await self.command_runner.run_command(command, env, timeout=60)
-
-            if result.success:
-                return RepositoryInitializationResult.success_result(
-                    "Repository initialized successfully",
-                    repository_path=repository.path,
-                )
-            else:
-                # Check if it's just because repo already exists
-                if "already exists" in result.stderr.lower():
-                    logger.info("Repository already exists, which is fine")
+                if result.success:
                     return RepositoryInitializationResult.success_result(
-                        "Repository already exists", repository_path=repository.path
+                        "Repository initialized successfully",
+                        repository_path=repository.path,
                     )
+                else:
+                    # Check if it's just because repo already exists
+                    if "already exists" in result.stderr.lower():
+                        logger.info("Repository already exists, which is fine")
+                        return RepositoryInitializationResult.success_result(
+                            "Repository already exists", repository_path=repository.path
+                        )
 
-                # Return the actual error from borg
-                error_msg = (
-                    result.stderr.strip() or result.stdout.strip() or "Unknown error"
-                )
-                decoded_error = (
-                    error_msg.decode("utf-8", errors="replace")
-                    if isinstance(error_msg, bytes)
-                    else error_msg
-                )
-                return RepositoryInitializationResult.failure_result(
-                    f"Initialization failed: {decoded_error}"
-                )
+                    # Return the actual error from borg
+                    error_msg = (
+                        result.stderr.strip()
+                        or result.stdout.strip()
+                        or "Unknown error"
+                    )
+                    decoded_error = (
+                        error_msg.decode("utf-8", errors="replace")
+                        if isinstance(error_msg, bytes)
+                        else error_msg
+                    )
+                    return RepositoryInitializationResult.failure_result(
+                        f"Initialization failed: {decoded_error}"
+                    )
 
         except Exception as e:
             logger.error(f"Failed to initialize repository: {e}")
@@ -266,16 +184,15 @@ class BorgService:
         )
 
         try:
+            # For backup jobs, we can't use the context manager because the job runs asynchronously
+            # The JobManager will need to handle keyfile content separately
             command, env = build_secure_borg_command(
                 base_command="borg create",
                 repository_path="",  # Path is included in additional_args
                 passphrase=repository.get_passphrase(),
                 additional_args=additional_args,
             )
-        except Exception as e:
-            raise Exception(f"Security validation failed: {str(e)}")
 
-        try:
             job_id = await self._get_job_manager().start_borg_command(
                 command, env=env, is_backup=True
             )
@@ -304,31 +221,27 @@ class BorgService:
     async def list_archives(self, repository: Repository) -> BorgArchiveListResponse:
         """List all archives in a repository"""
         try:
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg list",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json"],
-            )
-        except Exception as e:
-            raise Exception(f"Security validation failed: {str(e)}")
+            ) as (command, env, _):
+                result = await self.command_runner.run_command(command, env, timeout=30)
 
-        try:
-            result = await self.command_runner.run_command(command, env, timeout=30)
-
-            if result.success and result.return_code == 0:
-                try:
-                    data = json.loads(result.stdout)
-                    return BorgArchiveListResponse.from_borg_json(data)
-                except json.JSONDecodeError as je:
-                    logger.error(f"JSON decode error: {je}")
-                    logger.error(f"Raw output: {result.stdout[:500]}...")
-
-                    return BorgArchiveListResponse(archives=[])
-            else:
-                raise Exception(
-                    f"Borg list failed with code {result.return_code}: {result.stderr}"
-                )
+                if result.success and result.return_code == 0:
+                    try:
+                        data = json.loads(result.stdout)
+                        return BorgArchiveListResponse.from_borg_json(data)
+                    except json.JSONDecodeError as je:
+                        logger.error(f"JSON decode error: {je}")
+                        logger.error(f"Raw output: {result.stdout[:500]}...")
+                        return BorgArchiveListResponse(archives=[])
+                else:
+                    raise Exception(
+                        f"Borg list failed with code {result.return_code}: {result.stderr}"
+                    )
 
         except Exception as e:
             raise Exception(f"Failed to list archives: {str(e)}")
@@ -347,6 +260,7 @@ class BorgService:
         self, repository: Repository, archive_name: str, file_path: str
     ) -> StreamingResponse:
         """Extract a single file from an archive and stream it to the client"""
+        temp_keyfile_path = None
         try:
             validate_archive_name(archive_name)
 
@@ -357,10 +271,12 @@ class BorgService:
             # Build borg extract command with --stdout
             borg_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
 
-            command, env = build_secure_borg_command(
+            # Use manual keyfile management for streaming operations
+            command, env, temp_keyfile_path = build_secure_borg_command_with_keyfile(
                 base_command="borg extract",
                 repository_path="",
                 passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
                 additional_args=borg_args,
             )
 
@@ -405,6 +321,9 @@ class BorgService:
                         logger.error(f"Borg extract process failed: {error_msg}")
                         raise Exception(f"Borg extract failed: {error_msg}")
 
+                    # Clean up keyfile after streaming completes
+                    cleanup_temp_keyfile(temp_keyfile_path)
+
             filename = os.path.basename(file_path)
 
             return StreamingResponse(
@@ -414,54 +333,61 @@ class BorgService:
             )
 
         except Exception as e:
+            # Clean up keyfile if error occurs before streaming starts
+            cleanup_temp_keyfile(temp_keyfile_path)
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
             raise Exception(f"Failed to extract file: {str(e)}")
 
     async def verify_repository_access(
-        self, repo_path: str, passphrase: str, keyfile_path: str = ""
+        self,
+        repo_path: str,
+        passphrase: str,
+        keyfile_path: str = "",
+        keyfile_content: str = "",
     ) -> bool:
         """Verify we can access a repository with given credentials"""
         try:
-            # Build environment overrides for keyfile if needed
+            # Handle keyfile path override if provided
             env_overrides = {}
-            if keyfile_path != "":
+            if keyfile_path:
                 env_overrides["BORG_KEY_FILE"] = keyfile_path
 
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg info",
                 repository_path=repo_path,
                 passphrase=passphrase,
+                keyfile_content=keyfile_content,
                 additional_args=["--json"],
                 environment_overrides=env_overrides,
-            )
-        except Exception as e:
-            logger.error(f"Security validation failed: {e}")
-            return False
+                cleanup_keyfile=False,  # Don't cleanup yet - job will handle it
+            ) as (command, env, temp_keyfile_path):
+                job_manager = self._get_job_manager()
+                job_id = await job_manager.start_borg_command(command, env=env)
 
-        try:
-            job_manager = self._get_job_manager()
-            job_id = await job_manager.start_borg_command(command, env=env)
+                # Wait for completion
+                max_wait = 30
+                wait_time = 0.0
 
-            # Wait for completion
-            max_wait = 30
-            wait_time = 0.0
+                while wait_time < max_wait:
+                    status = job_manager.get_job_status(job_id)
 
-            while wait_time < max_wait:
-                status = job_manager.get_job_status(job_id)
+                    if not status:
+                        return False
 
-                if not status:
-                    return False
+                    if status["completed"] or status["status"] == "failed":
+                        success = status["return_code"] == 0
+                        # Clean up job
+                        self._get_job_manager().cleanup_job(job_id)
+                        # Clean up temporary keyfile if created
+                        cleanup_temp_keyfile(temp_keyfile_path)
+                        return bool(success)
 
-                if status["completed"] or status["status"] == "failed":
-                    success = status["return_code"] == 0
-                    # Clean up job
-                    self._get_job_manager().cleanup_job(job_id)
-                    return bool(success)
+                    await asyncio.sleep(0.5)
+                    wait_time += 0.5
 
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            return False
+                # Cleanup keyfile on timeout
+                cleanup_temp_keyfile(temp_keyfile_path)
+                return False
 
         except Exception as e:
             logger.error(f"Failed to verify repository access: {e}")

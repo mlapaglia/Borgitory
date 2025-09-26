@@ -44,6 +44,7 @@ class TestArchiveMountManager:
         self.mock_repository.name = "test-repo"
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
+        self.mock_repository.get_keyfile_content.return_value = None
 
     def teardown_method(self) -> None:
         """Clean up test fixtures."""
@@ -584,6 +585,7 @@ class TestArchiveMountManagerIntegration:
         mock_repository.name = "test-repo"
         mock_repository.path = "/path/to/repo"
         mock_repository.get_passphrase.return_value = "test_pass"
+        mock_repository.get_keyfile_content.return_value = None
 
         # Test that initially no mounts exist
         stats = manager.get_mount_stats()

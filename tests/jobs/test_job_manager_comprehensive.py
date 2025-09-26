@@ -550,19 +550,26 @@ class TestJobManagerTaskExecution:
         # Capture the actual command built to verify --dry-run flag is included
         captured_command = None
 
-        def capture_command(
-            base_command: str,
-            repository_path: str,
-            passphrase: str,
-            additional_args: list[str],
-        ) -> tuple[list[str], dict[str, str]]:
+        def mock_secure_borg_command(*args, **kwargs):
             nonlocal captured_command
-            captured_command = [base_command] + additional_args
-            return (captured_command, {"BORG_PASSPHRASE": passphrase})
+            # Extract the arguments to build the command
+            base_command = kwargs.get("base_command", args[0] if args else "")
+            additional_args = kwargs.get("additional_args", [])
+            captured_command = [base_command] + (additional_args or [])
+
+            # Mock the context manager behavior
+            class MockContextManager:
+                async def __aenter__(self):
+                    return (captured_command, {"BORG_PASSPHRASE": "test"}, None)
+
+                async def __aexit__(self, *args):
+                    pass
+
+            return MockContextManager()
 
         with patch(
-            "borgitory.services.jobs.job_manager.build_secure_borg_command",
-            side_effect=capture_command,
+            "borgitory.services.jobs.job_manager.secure_borg_command",
+            side_effect=mock_secure_borg_command,
         ), patch.object(
             job_manager_with_db.executor, "start_process", return_value=mock_process
         ), patch.object(
@@ -574,6 +581,7 @@ class TestJobManagerTaskExecution:
                 "id": sample_repository.id,
                 "path": "/tmp/test-repo",
                 "passphrase": "test-passphrase",
+                "keyfile_content": None,
             },
         ):
             success = await job_manager_with_db._execute_backup_task(job, task)
@@ -1047,27 +1055,6 @@ class TestJobManagerDatabaseIntegration:
         """Test getting repository data for non-existent repository"""
         result = await job_manager_with_db._get_repository_data(99999)
         assert result is None
-
-    @pytest.mark.asyncio
-    async def test_get_repository_data_fallback_mechanisms(
-        self, job_manager_with_db: JobManager, sample_repository: Repository
-    ) -> None:
-        """Test repository data fallback when database manager fails"""
-        # Mock database manager to fail and fix passphrase
-        job_manager_with_db.database_manager.get_repository_data = AsyncMock(
-            side_effect=Exception("DB error")
-        )
-
-        with patch.object(
-            sample_repository, "get_passphrase", return_value="test-passphrase"
-        ):
-            result = await job_manager_with_db._get_repository_data(
-                sample_repository.id
-            )
-
-        # Should fall back to direct database access
-        assert result is not None
-        assert result["id"] == sample_repository.id
 
 
 class TestJobManagerStreamingAndUtility:

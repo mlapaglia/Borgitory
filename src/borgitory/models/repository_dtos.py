@@ -27,6 +27,8 @@ class ImportRepositoryRequest:
     path: str
     passphrase: str
     keyfile: Optional[UploadFile] = None
+    encryption_type: Optional[str] = None  # Manual encryption type override
+    keyfile_content: Optional[str] = None  # Keyfile content as text
     user_id: Optional[int] = None
 
 

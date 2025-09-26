@@ -9,7 +9,7 @@ import logging
 
 from borgitory.models.database import Repository
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.security import build_secure_borg_command
+from borgitory.utils.security import secure_borg_command
 from borgitory.utils.db_session import get_db_session
 import asyncio
 
@@ -121,43 +121,42 @@ class RecoveryService:
         try:
             logger.info(f"Attempting to release lock on repository: {repository.name}")
 
-            # Build borg break-lock command
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg break-lock",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
-            )
-
-            # Execute the break-lock command with a timeout
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-            )
-
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(), timeout=30
+            ) as (command, env, _):
+                # Execute the break-lock command with a timeout
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env,
                 )
 
-                if process.returncode == 0:
-                    logger.info(
-                        f"Successfully released lock on repository: {repository.name}"
+                try:
+                    stdout, stderr = await asyncio.wait_for(
+                        process.communicate(), timeout=30
                     )
-                else:
-                    # Log the error but don't fail - lock might not exist
-                    stderr_text = stderr.decode() if stderr else "No error details"
+
+                    if process.returncode == 0:
+                        logger.info(
+                            f"Successfully released lock on repository: {repository.name}"
+                        )
+                    else:
+                        # Log the error but don't fail - lock might not exist
+                        stderr_text = stderr.decode() if stderr else "No error details"
+                        logger.warning(
+                            f"Break-lock returned {process.returncode} for {repository.name}: {stderr_text}"
+                        )
+
+                except asyncio.TimeoutError:
                     logger.warning(
-                        f"Break-lock returned {process.returncode} for {repository.name}: {stderr_text}"
+                        f"Break-lock timed out for repository: {repository.name}"
                     )
-
-            except asyncio.TimeoutError:
-                logger.warning(
-                    f"Break-lock timed out for repository: {repository.name}"
-                )
-                process.kill()
+                    process.kill()
 
         except Exception as e:
             logger.error(f"Error releasing lock for repository {repository.name}: {e}")

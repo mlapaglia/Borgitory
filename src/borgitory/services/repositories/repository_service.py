@@ -175,6 +175,14 @@ class RepositoryService:
             db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
 
+            # Set encryption type if provided
+            if request.encryption_type:
+                db_repo.encryption_type = request.encryption_type
+
+            # Set keyfile content if provided
+            if request.keyfile_content:
+                db_repo.set_keyfile_content(request.keyfile_content)
+
             db.add(db_repo)
             db.commit()
             db.refresh(db_repo)
@@ -183,6 +191,7 @@ class RepositoryService:
                 repo_path=request.path,
                 passphrase=request.passphrase,
                 keyfile_path=str(keyfile_path) if keyfile_path else "",
+                keyfile_content=request.keyfile_content or "",
             )
 
             if not verification_successful:

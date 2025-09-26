@@ -61,7 +61,6 @@ from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.services.startup.package_restoration_service import (
     PackageRestorationService,
 )
-from borgitory.services.borg_command_builder import BorgCommandBuilder
 from borgitory.services.repositories.repository_service import RepositoryService
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
@@ -411,16 +410,6 @@ def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinition
     Note: This is not cached because it needs a database session per request.
     """
     return TaskDefinitionBuilder(db)
-
-
-def get_borg_command_builder() -> BorgCommandBuilder:
-    """
-    Provide a BorgCommandBuilder instance with proper FastAPI dependency injection.
-
-    Returns:
-        BorgCommandBuilder: New BorgCommandBuilder instance for each request
-    """
-    return BorgCommandBuilder()
 
 
 def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
@@ -982,7 +971,6 @@ VolumeServiceDep = Annotated[VolumeService, Depends(get_volume_service)]
 TaskDefinitionBuilderDep = Annotated[
     TaskDefinitionBuilder, Depends(get_task_definition_builder)
 ]
-BorgCommandBuilderDep = Annotated[BorgCommandBuilder, Depends(get_borg_command_builder)]
 JobEventBroadcasterDep = Annotated[
     JobEventBroadcaster, Depends(get_job_event_broadcaster_dep)
 ]
@@ -1076,7 +1064,6 @@ ArchiveMountManagerDep = Annotated[
 
 def get_archive_manager(
     job_executor: JobExecutor = Depends(get_job_executor),
-    command_builder: BorgCommandBuilder = Depends(get_borg_command_builder),
     mount_manager: "ArchiveMountManager" = Depends(
         get_archive_mount_manager_dependency
     ),
@@ -1088,7 +1075,6 @@ def get_archive_manager(
     """
     return ArchiveManager(
         job_executor=job_executor,
-        command_builder=command_builder,
         mount_manager=mount_manager,
     )
 

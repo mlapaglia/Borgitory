@@ -96,6 +96,7 @@ class ProcessExecutorProtocol(Protocol):
         self,
         repository_path: str,
         passphrase: str,
+        keyfile_content: Optional[str] = None,
         keep_within: Optional[str] = None,
         keep_secondly: Optional[int] = None,
         keep_minutely: Optional[int] = None,

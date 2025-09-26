@@ -305,20 +305,23 @@ async def update_import_form(
                 {
                     "path": path,
                     "show_encryption_info": True,
-                    "show_passphrase": True,
-                    "show_keyfile": True,
+                    "show_passphrase": False,  # Will be shown based on encryption type selection
+                    "show_keyfile": False,  # Will be shown based on encryption type selection
                     "enable_submit": True,
                     "preview": "Repository details not found - please re-scan",
                 },
             )
 
+        # Always use the dynamic form since we can't auto-detect encryption
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_simple.html",
+            "partials/repositories/import_form_dynamic.html",
             {
                 "path": path,
-                "show_passphrase": selected_repo.encryption_mode != "none",
-                "show_keyfile": selected_repo.requires_keyfile,
+                "show_encryption_info": True,
+                "show_passphrase": False,  # Will be shown based on encryption type selection
+                "show_keyfile": False,  # Will be shown based on encryption type selection
+                "enable_submit": True,
                 "preview": selected_repo.config_preview,
             },
         )
@@ -381,6 +384,8 @@ async def import_repository(
     path: str = Form(...),
     passphrase: str = Form(...),
     keyfile: UploadFile = File(None),
+    encryption_type: str = Form(None),
+    keyfile_content: str = Form(None),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
@@ -389,6 +394,8 @@ async def import_repository(
         path=path,
         passphrase=passphrase,
         keyfile=keyfile,
+        encryption_type=encryption_type,
+        keyfile_content=keyfile_content,
         user_id=None,  # Import doesn't require user ID currently
     )
 
