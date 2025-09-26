@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+import uuid
 from borgitory.utils.datetime_utils import now_utc
 import traceback
 from typing import Dict, List, Optional, Union, Callable, cast
@@ -316,9 +317,7 @@ class SchedulerService:
         if not self._running:
             raise RuntimeError("Scheduler is not running")
 
-        # Create a unique job ID for the one-time run (include microseconds for uniqueness)
-        timestamp = now_utc()
-        job_id = f"manual_run_{schedule_id}_{int(timestamp.timestamp())}_{timestamp.microsecond}"
+        job_id = str(uuid.uuid4())
 
         try:
             # Schedule the job to run immediately using DateTrigger

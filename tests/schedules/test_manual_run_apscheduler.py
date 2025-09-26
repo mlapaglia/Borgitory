@@ -3,6 +3,7 @@ Tests for manual schedule run functionality using APScheduler one-time jobs.
 """
 
 import pytest
+import uuid
 from unittest.mock import Mock, AsyncMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -21,23 +22,25 @@ class TestManualRunAPScheduler:
     """Test manual schedule run functionality using APScheduler one-time jobs"""
 
     @pytest.fixture
-    def mock_job_manager(self):
+    def mock_job_manager(self) -> Mock:
         """Mock job manager"""
         mock = Mock(spec=JobManagerProtocol)
         return mock
 
     @pytest.fixture
-    def mock_job_service_factory(self):
+    def mock_job_service_factory(self) -> Mock:
         """Mock job service factory"""
         return Mock()
 
     @pytest.fixture
-    def scheduler_service(self, mock_job_manager, mock_job_service_factory):
+    def scheduler_service(
+        self, mock_job_manager: Mock, mock_job_service_factory: Mock
+    ) -> SchedulerService:
         """Create scheduler service with mocked dependencies"""
         return SchedulerService(mock_job_manager, mock_job_service_factory)
 
     @pytest.fixture
-    def mock_scheduler_service(self):
+    def mock_scheduler_service(self) -> AsyncMock:
         """Mock scheduler service for schedule service tests"""
         mock = AsyncMock()
         mock.add_schedule = AsyncMock()
@@ -47,12 +50,14 @@ class TestManualRunAPScheduler:
         return mock
 
     @pytest.fixture
-    def schedule_service(self, test_db: Session, mock_scheduler_service):
+    def schedule_service(
+        self, test_db: Session, mock_scheduler_service: AsyncMock
+    ) -> ScheduleService:
         """Create schedule service with mocked scheduler service"""
         return ScheduleService(test_db, mock_scheduler_service)
 
     @pytest.fixture
-    def test_repository(self, test_db: Session):
+    def test_repository(self, test_db: Session) -> Repository:
         """Create test repository"""
         repo = Repository()
         repo.name = "test_repo"
@@ -64,7 +69,7 @@ class TestManualRunAPScheduler:
         return repo
 
     @pytest.fixture
-    def test_schedule(self, test_db: Session, test_repository):
+    def test_schedule(self, test_db: Session, test_repository: Repository) -> Schedule:
         """Create test schedule"""
         schedule = Schedule()
         schedule.name = "Test Schedule"
@@ -80,7 +85,7 @@ class TestManualRunAPScheduler:
     @pytest.mark.asyncio
     async def test_scheduler_service_run_schedule_once_success(
         self, scheduler_service: SchedulerService
-    ):
+    ) -> None:
         """Test SchedulerService.run_schedule_once creates one-time job successfully"""
         # Start the scheduler
         await scheduler_service.start()
@@ -93,12 +98,6 @@ class TestManualRunAPScheduler:
             job_id = await scheduler_service.run_schedule_once(
                 schedule_id, schedule_name
             )
-
-            # Verify job_id format
-            assert job_id.startswith(f"manual_run_{schedule_id}_")
-            assert (
-                len(job_id.split("_")) == 5
-            )  # manual_run_{id}_{timestamp}_{microseconds}
 
             # Verify job was added to scheduler
             job = scheduler_service.scheduler.get_job(job_id)
@@ -113,7 +112,7 @@ class TestManualRunAPScheduler:
     @pytest.mark.asyncio
     async def test_scheduler_service_run_schedule_once_scheduler_not_running(
         self, scheduler_service: SchedulerService
-    ):
+    ) -> None:
         """Test SchedulerService.run_schedule_once fails when scheduler not running"""
         schedule_id = 123
         schedule_name = "Test Schedule"
@@ -125,7 +124,7 @@ class TestManualRunAPScheduler:
     @pytest.mark.asyncio
     async def test_scheduler_service_run_schedule_once_unique_job_ids(
         self, scheduler_service: SchedulerService
-    ):
+    ) -> None:
         """Test that multiple manual runs create unique job IDs"""
         await scheduler_service.start()
 
@@ -145,8 +144,6 @@ class TestManualRunAPScheduler:
 
             # Verify they're different (microseconds should make them unique)
             assert job_id_1 != job_id_2
-            assert job_id_1.startswith(f"manual_run_{schedule_id}_")
-            assert job_id_2.startswith(f"manual_run_{schedule_id}_")
 
             # Verify both jobs exist in scheduler
             job_1 = scheduler_service.scheduler.get_job(job_id_1)
@@ -163,9 +160,9 @@ class TestManualRunAPScheduler:
         schedule_service: ScheduleService,
         test_schedule: Schedule,
         mock_scheduler_service: AsyncMock,
-    ):
+    ) -> None:
         """Test ScheduleService.run_schedule_manually calls scheduler service correctly"""
-        expected_job_id = f"manual_run_{test_schedule.id}_1234567890"
+        expected_job_id = str(uuid.uuid4())
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
         success, job_id, error_msg = await schedule_service.run_schedule_manually(
@@ -184,7 +181,7 @@ class TestManualRunAPScheduler:
     @pytest.mark.asyncio
     async def test_schedule_service_run_schedule_manually_not_found(
         self, schedule_service: ScheduleService, mock_scheduler_service: AsyncMock
-    ):
+    ) -> None:
         """Test ScheduleService.run_schedule_manually with non-existent schedule"""
         success, job_id, error_msg = await schedule_service.run_schedule_manually(999)
 
@@ -201,7 +198,7 @@ class TestManualRunAPScheduler:
         schedule_service: ScheduleService,
         test_schedule: Schedule,
         mock_scheduler_service: AsyncMock,
-    ):
+    ) -> None:
         """Test ScheduleService.run_schedule_manually with scheduler service error"""
         mock_scheduler_service.run_schedule_once.side_effect = RuntimeError(
             "Scheduler not running"
@@ -222,11 +219,11 @@ class TestManualRunAPScheduler:
 
     def test_manual_run_api_endpoint_success(
         self, test_db: Session, test_schedule: Schedule
-    ):
+    ) -> None:
         """Test the API endpoint for manual run with APScheduler approach"""
         # Setup dependency override
         mock_scheduler_service = AsyncMock()
-        expected_job_id = f"manual_run_{test_schedule.id}_1234567890"
+        expected_job_id = str(uuid.uuid4())
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
         schedule_service = ScheduleService(test_db, mock_scheduler_service)
@@ -247,7 +244,7 @@ class TestManualRunAPScheduler:
 
     def test_manual_run_api_endpoint_scheduler_error(
         self, test_db: Session, test_schedule: Schedule
-    ):
+    ) -> None:
         """Test the API endpoint with scheduler service error"""
         # Setup dependency override
         mock_scheduler_service = AsyncMock()
@@ -272,7 +269,7 @@ class TestManualRunAPScheduler:
     @pytest.mark.asyncio
     async def test_scheduler_service_job_execution_flow(
         self, scheduler_service: SchedulerService
-    ):
+    ) -> None:
         """Test that one-time jobs are properly configured for immediate execution"""
         await scheduler_service.start()
 
@@ -312,7 +309,7 @@ class TestManualRunAPScheduler:
     @pytest.mark.asyncio
     async def test_scheduler_service_job_cleanup(
         self, scheduler_service: SchedulerService
-    ):
+    ) -> None:
         """Test that one-time jobs are cleaned up after execution"""
         await scheduler_service.start()
 
