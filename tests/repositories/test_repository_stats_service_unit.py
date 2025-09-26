@@ -5,8 +5,9 @@ These tests focus on testing the service logic by injecting mock dependencies
 rather than mocking the entire service, providing better code coverage.
 """
 
+from contextlib import asynccontextmanager
 import pytest
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 from typing import List, Dict
 from sqlalchemy.orm import Session
 
@@ -704,11 +705,7 @@ class TestRepositoryStatsServiceIntegration:
         """Test _get_file_type_stats method with mocked command execution"""
         archives = ["backup-2024-01-01", "backup-2024-01-02"]
 
-        # We need to test this at the service level since it uses secure_borg_command directly
-        # Let's create a more comprehensive test that patches the secure_borg_command
-        from unittest.mock import patch, AsyncMock
-
-        # Mock the secure_borg_command context manager
+        # Mock the secure_borg_command context manager properly
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.communicate.return_value = (
@@ -716,15 +713,9 @@ class TestRepositoryStatsServiceIntegration:
             b"",
         )
 
-        async def mock_secure_borg_command(*args, **kwargs):
-            class MockContextManager:
-                async def __aenter__(self):
-                    return (["borg", "list"], {}, None)
-
-                async def __aexit__(self, *args):
-                    pass
-
-            return MockContextManager()
+        @asynccontextmanager
+        async def mock_secure_borg_command(*args, **kwargs) -> None:
+            yield (["borg", "list"], {}, None)
 
         with patch(
             "borgitory.services.repositories.repository_stats_service.secure_borg_command",
@@ -737,7 +728,6 @@ class TestRepositoryStatsServiceIntegration:
             assert "count_chart" in result
             assert "size_chart" in result
 
-            # Should have processed the file extensions
             count_chart = result["count_chart"]
             assert len(count_chart["labels"]) > 0
             assert len(count_chart["datasets"]) > 0
