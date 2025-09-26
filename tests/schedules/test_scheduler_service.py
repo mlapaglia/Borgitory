@@ -10,7 +10,8 @@ class TestSchedulerService:
 
     def setup_method(self) -> None:
         """Set up test fixtures"""
-        self.scheduler_service = SchedulerService()
+        mock_job_manager = Mock()
+        self.scheduler_service = SchedulerService(job_manager=mock_job_manager)
 
     @pytest.mark.asyncio
     async def test_start_scheduler(self) -> None:

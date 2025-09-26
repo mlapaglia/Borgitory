@@ -115,7 +115,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
 class SchedulerService:
     def __init__(
         self,
-        job_manager: Optional[JobManagerProtocol] = None,
+        job_manager: JobManagerProtocol,
         job_service_factory: Optional[JobService] = None,
     ) -> None:
         """
@@ -134,15 +134,11 @@ class SchedulerService:
         )
         self._running = False
 
-        self.job_manager = job_manager or JobManager()
+        self.job_manager = job_manager
         self.job_service_factory = job_service_factory or JobService
 
         # Cast to JobManager for the global function that expects concrete type
-        job_manager_concrete = (
-            self.job_manager
-            if isinstance(self.job_manager, JobManager)
-            else JobManager()
-        )
+        job_manager_concrete = cast(JobManager, job_manager)
         set_scheduler_dependencies(job_manager_concrete, self.job_service_factory)
 
     async def start(self) -> None:
