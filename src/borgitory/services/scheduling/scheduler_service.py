@@ -1,11 +1,13 @@
 import logging
 from datetime import datetime
+import uuid
 from borgitory.utils.datetime_utils import now_utc
 import traceback
 from typing import Dict, List, Optional, Union, Callable, cast
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
@@ -309,6 +311,34 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"Failed to update schedule {schedule_id}: {str(e)}")
             raise
+
+    async def run_schedule_once(self, schedule_id: int, schedule_name: str) -> str:
+        """Run a schedule immediately as a one-time job"""
+        if not self._running:
+            raise RuntimeError("Scheduler is not running")
+
+        job_id = str(uuid.uuid4())
+
+        try:
+            # Schedule the job to run immediately using DateTrigger
+            self.scheduler.add_job(
+                execute_scheduled_backup,
+                DateTrigger(run_date=now_utc()),
+                args=[schedule_id],
+                id=job_id,
+                name=f"Manual run: {schedule_name}",
+                max_instances=1,
+                misfire_grace_time=60,  # Shorter grace time for one-time jobs
+            )
+
+            logger.info(f"Added one-time job {job_id} for schedule {schedule_id}")
+            return job_id
+
+        except Exception as e:
+            logger.error(
+                f"Failed to add one-time job for schedule {schedule_id}: {str(e)}"
+            )
+            raise Exception(f"Failed to schedule manual run: {str(e)}")
 
     async def get_scheduled_jobs(self) -> List[Dict[str, Union[str, datetime, None]]]:
         """Get all scheduled jobs with their next run times"""
