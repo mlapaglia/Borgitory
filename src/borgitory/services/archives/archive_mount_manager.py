@@ -103,7 +103,7 @@ class ArchiveMountManager:
                     str(mount_point),
                     "-f",  # foreground mode
                 ],
-                cleanup_keyfile=False,  # Don't cleanup yet - process will need it
+                cleanup_keyfile=False,
             ) as (command, env, temp_keyfile_path):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -219,7 +219,6 @@ class ArchiveMountManager:
                     if mount_info.job_executor_process.returncode is None:
                         mount_info.job_executor_process.kill()
 
-            # Cleanup temporary keyfile if it exists
             cleanup_temp_keyfile(mount_info.temp_keyfile_path)
 
             del self.active_mounts[mount_key]
@@ -337,7 +336,6 @@ class ArchiveMountManager:
                 except (ProcessLookupError, asyncio.TimeoutError):
                     pass
 
-            # Cleanup temporary keyfile if it exists
             cleanup_temp_keyfile(mount_info.temp_keyfile_path)
 
         self.active_mounts.clear()

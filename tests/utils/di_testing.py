@@ -92,7 +92,6 @@ class MockServiceFactory:
         mock = Mock(spec=BorgService)
 
         # Setup common return values
-        mock.create_backup.return_value = {"job_id": "test-job-123"}
         mock.list_archives.return_value = []
         mock.verify_repository_access.return_value = True
         mock.scan_for_repositories.return_value = []

@@ -421,21 +421,6 @@ class TestSecurityIntegrationExtended:
         self.mock_repository.get_keyfile_content.return_value = None
 
     @pytest.mark.asyncio
-    async def test_create_backup_security_validation_prevents_injection(self) -> None:
-        """Test that security validation prevents injection attacks in backup creation."""
-        with patch(
-            "borgitory.utils.security.validate_compression",
-            side_effect=ValueError("Invalid compression"),
-        ), patch("borgitory.utils.security.validate_archive_name"):
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.create_backup(
-                    self.mock_repository, "/source/path", compression="lz4; rm -rf /"
-                )
-
-            assert "Validation failed" in str(exc_info.value)
-            assert "Invalid compression" in str(exc_info.value)
-
-    @pytest.mark.asyncio
     async def test_list_archives_security_validation(self) -> None:
         """Test that archive listing handles command runner errors properly."""
         # Mock the command runner to return an error result

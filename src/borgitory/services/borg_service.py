@@ -5,12 +5,11 @@ import logging
 import re
 import os
 from borgitory.services.archives.archive_manager import ArchiveEntry
-from borgitory.utils.datetime_utils import now_utc
-from typing import AsyncGenerator, List, Optional
+from typing import AsyncGenerator, List
 
 from starlette.responses import StreamingResponse
 
-from borgitory.models.database import Repository, Job
+from borgitory.models.database import Repository
 from borgitory.models.borg_info import (
     BorgArchiveListResponse,
     BorgRepositoryConfig,
@@ -25,12 +24,10 @@ from borgitory.protocols import (
 )
 from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
 from borgitory.utils.security import (
-    build_secure_borg_command,
     build_secure_borg_command_with_keyfile,
     secure_borg_command,
     cleanup_temp_keyfile,
     validate_archive_name,
-    validate_compression,
     sanitize_path,
 )
 
@@ -144,79 +141,6 @@ class BorgService:
         except Exception as e:
             logger.error(f"Failed to initialize repository: {e}")
             return RepositoryInitializationResult.failure_result(str(e))
-
-    async def create_backup(
-        self,
-        repository: Repository,
-        source_path: str,
-        compression: str = "zstd",
-        dry_run: bool = False,
-        cloud_sync_config_id: Optional[int] = None,
-    ) -> str:
-        """Create a backup and return job_id for tracking"""
-        logger.info(
-            f"Creating backup for repository: {repository.name} at {repository.path}"
-        )
-
-        try:
-            validate_compression(compression)
-            archive_name = f"backup-{now_utc().strftime('%Y-%m-%d_%H-%M-%S')}"
-            validate_archive_name(archive_name)
-        except Exception as e:
-            raise Exception(f"Validation failed: {str(e)}")
-
-        # Build additional arguments
-        additional_args = []
-
-        if dry_run:
-            additional_args.append("--dry-run")
-
-        additional_args.extend(
-            [
-                "--compression",
-                compression,
-                "--stats",
-                "--progress",
-                "--json",  # Enable JSON output for progress parsing
-                f"{repository.path}::{archive_name}",
-                source_path,
-            ]
-        )
-
-        try:
-            # For backup jobs, we can't use the context manager because the job runs asynchronously
-            # The JobManager will need to handle keyfile content separately
-            command, env = build_secure_borg_command(
-                base_command="borg create",
-                repository_path="",  # Path is included in additional_args
-                passphrase=repository.get_passphrase(),
-                additional_args=additional_args,
-            )
-
-            job_id = await self._get_job_manager().start_borg_command(
-                command, env=env, is_backup=True
-            )
-
-            # Create job record in database
-            from borgitory.utils.db_session import get_db_session
-
-            with get_db_session() as db:
-                job = Job()
-                job.id = job_id  # Store the JobManager UUID as the primary key
-                job.repository_id = repository.id
-                job.type = "backup"
-                job.status = "queued"  # Will be updated to 'running' when started
-                job.started_at = now_utc()
-                job.cloud_sync_config_id = cloud_sync_config_id
-                db.add(job)
-                db.refresh(job)
-                logger.info(f"Created job record {job.id} for backup job {job_id}")
-
-            return job_id
-
-        except Exception as e:
-            logger.error(f"Failed to start backup: {e}")
-            raise Exception(f"Failed to start backup: {str(e)}")
 
     async def list_archives(self, repository: Repository) -> BorgArchiveListResponse:
         """List all archives in a repository"""

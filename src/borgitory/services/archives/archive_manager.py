@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, AsyncGenerator, TypedDict, TYPE_CHECKIN
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
 from borgitory.utils.security import (
+    cleanup_temp_keyfile,
     validate_archive_name,
     sanitize_path,
     secure_borg_command,
@@ -214,9 +215,6 @@ class ArchiveManager:
         keyfile_content = repository.get_keyfile_content()
         passphrase = repository.get_passphrase() or ""
 
-        # Use secure_borg_command context manager with manual cleanup for streaming
-        from borgitory.utils.security import cleanup_temp_keyfile
-
         async with secure_borg_command(
             base_command=base_command,
             repository_path="",  # Already included in additional_args
@@ -286,7 +284,6 @@ class ArchiveManager:
                 keyfile_content=keyfile_content,
                 additional_args=additional_args,
             ) as (final_command, env, temp_keyfile_path):
-                # Use JobExecutor for consistent execution
                 process = await self.job_executor.start_process(final_command, env)
                 result = await self.job_executor.monitor_process_output(process)
 

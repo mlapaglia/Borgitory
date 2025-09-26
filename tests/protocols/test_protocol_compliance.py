@@ -166,7 +166,6 @@ class TestProtocolCompliance:
 
         # Check for key methods
         key_methods = [
-            "create_backup",
             "list_archives",
             "scan_for_repositories",
             "initialize_repository",
@@ -294,7 +293,6 @@ class TestProtocolInstantiation:
         # Verify mocks have protocol methods
         assert hasattr(mock_runner, "run_command")
         assert hasattr(mock_volume, "get_mounted_volumes")
-        assert hasattr(mock_backup, "create_backup")
 
         # Test that we can call protocol methods on mocks
         from unittest.mock import AsyncMock
