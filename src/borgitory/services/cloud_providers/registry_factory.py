@@ -103,15 +103,3 @@ class RegistryFactory:
 
         clear_registry()
         return get_registry()
-
-    @staticmethod
-    def get_default_registry() -> ProviderRegistry:
-        """
-        Get the default registry (production registry).
-
-        This is the fallback for backward compatibility when no registry is injected.
-
-        Returns:
-            ProviderRegistry: The default global registry
-        """
-        return get_registry()
