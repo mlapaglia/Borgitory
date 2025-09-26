@@ -13,7 +13,7 @@
 
 <img alt="borgitory logo" src="./assets/logo.png" width="400">
 
-Borgitory is a comprehensive web-based management interface for BorgBackup repositories that provides real-time monitoring, automated scheduling, and cloud synchronization capabilities. It offers complete backup lifecycle management including on-demand backups, automated pruning policies, interactive archive browsing with file downloads, and cloud sync to S3-compatible storage via Rclone. The system features a modern responsive web interface built with HTMX, Alpine.js, and Tailwind CSS, along with secure authentication, push notifications, and detailed job tracking with expandable task views.
+Borgitory is a comprehensive web-based management interface for BorgBackup repositories that provides real-time monitoring, automated scheduling, and cloud synchronization capabilities. It offers complete backup lifecycle management including on-demand backups, automated pruning policies, interactive archive browsing with file downloads, and cloud sync to S3-compatible storage via Rclone. The FastAPI powered system features a modern responsive web interface built with HTMX, and Tailwind CSS.
 
 ## Quick Start
 
