@@ -372,8 +372,3 @@ class JobService:
     def get_queue_stats(self) -> Dict[str, int]:
         """Get backup queue statistics"""
         return self.job_manager.get_queue_stats()
-
-    def run_database_migration(self) -> Dict[str, str]:
-        """Run database migration for jobs table"""
-        # Migration function not implemented
-        return {"message": "Database migration not implemented"}
