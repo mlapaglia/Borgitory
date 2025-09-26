@@ -764,3 +764,281 @@ class TestTelegramProvider:
         assert result.provider == "telegram"
         assert result.message == "API returned error"
         assert result.error == "Unknown error"  # Default when description is missing
+
+    # ===== TEST_CONNECTION TESTS =====
+
+    @pytest.mark.asyncio
+    async def test_test_connection_success(self, telegram_config, mock_http_client):
+        """Test successful connection test"""
+        # Setup mock responses for both getMe and test notification
+        getme_response = Mock()
+        getme_response.status = 200
+        getme_response.json = AsyncMock(
+            return_value={
+                "ok": True,
+                "result": {"id": 123456789, "is_bot": True, "first_name": "TestBot"},
+            }
+        )
+
+        test_notification_response = Mock()
+        test_notification_response.status = 200
+        test_notification_response.text = AsyncMock(
+            return_value='{"ok": true, "result": {"message_id": 456}}'
+        )
+        test_notification_response.json = AsyncMock(
+            return_value={"ok": True, "result": {"message_id": 456}}
+        )
+
+        # Mock HTTP client to return different responses for different calls
+        mock_http_client.post.side_effect = [getme_response, test_notification_response]
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.test_connection()
+
+        # Verify result
+        assert result is True
+
+        # Verify both API calls were made
+        assert mock_http_client.post.call_count == 2
+
+        # Verify getMe call
+        getme_call = mock_http_client.post.call_args_list[0]
+        expected_getme_url = (
+            f"https://api.telegram.org/bot{telegram_config.bot_token}/getMe"
+        )
+        assert getme_call[0][0] == expected_getme_url
+
+        # Verify test message call
+        test_call = mock_http_client.post.call_args_list[1]
+        expected_send_url = (
+            f"https://api.telegram.org/bot{telegram_config.bot_token}/sendMessage"
+        )
+        assert test_call[0][0] == expected_send_url
+
+        # Verify test message payload
+        test_payload = test_call[1]["json"]
+        assert test_payload["chat_id"] == telegram_config.chat_id
+        assert "Borgitory Test" in test_payload["text"]
+        assert "test notification" in test_payload["text"]
+
+    @pytest.mark.asyncio
+    async def test_test_connection_getme_http_error(
+        self, telegram_config, mock_http_client
+    ):
+        """Test connection test when getMe API returns HTTP error"""
+        # Setup mock response for getMe with HTTP error
+        getme_response = Mock()
+        getme_response.status = 401
+        mock_http_client.post.return_value = getme_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.test_connection()
+
+        # Verify result
+        assert result is False
+
+        # Verify only getMe was called (test notification should not be attempted)
+        assert mock_http_client.post.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_test_connection_getme_api_error(
+        self, telegram_config, mock_http_client
+    ):
+        """Test connection test when getMe API returns ok=false"""
+        # Setup mock response for getMe with API error
+        getme_response = Mock()
+        getme_response.status = 200
+        getme_response.json = AsyncMock(
+            return_value={"ok": False, "description": "Unauthorized"}
+        )
+        mock_http_client.post.return_value = getme_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.test_connection()
+
+        # Verify result
+        assert result is False
+
+        # Verify only getMe was called
+        assert mock_http_client.post.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_test_connection_getme_success_but_notification_fails(
+        self, telegram_config, mock_http_client
+    ):
+        """Test connection test when getMe succeeds but test notification fails"""
+        # Setup mock responses
+        getme_response = Mock()
+        getme_response.status = 200
+        getme_response.json = AsyncMock(
+            return_value={"ok": True, "result": {"id": 123456789, "is_bot": True}}
+        )
+
+        # Test notification fails
+        test_notification_response = Mock()
+        test_notification_response.status = 200
+        test_notification_response.text = AsyncMock(
+            return_value='{"ok": false, "description": "Chat not found"}'
+        )
+        test_notification_response.json = AsyncMock(
+            return_value={"ok": False, "description": "Chat not found"}
+        )
+
+        mock_http_client.post.side_effect = [getme_response, test_notification_response]
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.test_connection()
+
+        # Verify result - should be False because test notification failed
+        assert result is False
+
+        # Verify both calls were made
+        assert mock_http_client.post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_test_connection_network_exception_on_getme(
+        self, telegram_config, mock_http_client
+    ):
+        """Test connection test when getMe raises network exception"""
+        # Setup mock to raise exception on getMe
+        mock_http_client.post.side_effect = Exception("Network timeout")
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.test_connection()
+
+        # Verify result
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_test_connection_network_exception_on_test_notification(
+        self, telegram_config, mock_http_client
+    ):
+        """Test connection test when getMe succeeds but test notification raises exception"""
+        # Setup successful getMe response
+        getme_response = Mock()
+        getme_response.status = 200
+        getme_response.json = AsyncMock(
+            return_value={"ok": True, "result": {"id": 123456789, "is_bot": True}}
+        )
+
+        # First call (getMe) succeeds, second call (test notification) raises exception
+        mock_http_client.post.side_effect = [getme_response, Exception("Network error")]
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.test_connection()
+
+        # Verify result - should be False because test notification failed
+        assert result is False
+
+        # Verify both calls were attempted
+        assert mock_http_client.post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_test_connection_getme_json_parse_error(
+        self, telegram_config, mock_http_client
+    ):
+        """Test connection test when getMe returns invalid JSON"""
+        # Setup mock response with invalid JSON
+        getme_response = Mock()
+        getme_response.status = 200
+        getme_response.json = AsyncMock(side_effect=ValueError("Invalid JSON"))
+        mock_http_client.post.return_value = getme_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.test_connection()
+
+        # Verify result
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_test_connection_uses_correct_test_message(
+        self, telegram_config, mock_http_client
+    ):
+        """Test that connection test uses the correct test message format"""
+        # Setup successful responses
+        getme_response = Mock()
+        getme_response.status = 200
+        getme_response.json = AsyncMock(
+            return_value={"ok": True, "result": {"id": 123456789, "is_bot": True}}
+        )
+
+        test_notification_response = Mock()
+        test_notification_response.status = 200
+        test_notification_response.text = AsyncMock(return_value='{"ok": true}')
+        test_notification_response.json = AsyncMock(return_value={"ok": True})
+
+        mock_http_client.post.side_effect = [getme_response, test_notification_response]
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        await provider.test_connection()
+
+        # Verify test message payload
+        test_call = mock_http_client.post.call_args_list[1]
+        test_payload = test_call[1]["json"]
+
+        # Verify test message content
+        assert "Borgitory Test" in test_payload["text"]
+        assert (
+            "This is a test notification from Borgitory backup system."
+            in test_payload["text"]
+        )
+        assert test_payload["chat_id"] == telegram_config.chat_id
+        assert (
+            test_payload["disable_notification"] == telegram_config.disable_notification
+        )
+
+        # Should include parse_mode if configured
+        if telegram_config.parse_mode and telegram_config.parse_mode != "None":
+            assert test_payload["parse_mode"] == telegram_config.parse_mode
+
+    @pytest.mark.asyncio
+    async def test_test_connection_with_different_configs(self, mock_http_client):
+        """Test connection test works with different configuration options"""
+        configs_to_test = [
+            # Different parse modes
+            TelegramConfig(
+                bot_token="123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk",
+                chat_id="@test",
+                parse_mode="Markdown",
+                disable_notification=True,
+            ),
+            TelegramConfig(
+                bot_token="987654321:ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvuts",
+                chat_id="-123456789",
+                parse_mode="",
+                disable_notification=False,
+            ),
+        ]
+
+        for config in configs_to_test:
+            # Reset mock for each config
+            mock_http_client.post.reset_mock()
+
+            # Setup successful responses
+            getme_response = Mock()
+            getme_response.status = 200
+            getme_response.json = AsyncMock(
+                return_value={"ok": True, "result": {"id": 123456789, "is_bot": True}}
+            )
+
+            test_notification_response = Mock()
+            test_notification_response.status = 200
+            test_notification_response.text = AsyncMock(return_value='{"ok": true}')
+            test_notification_response.json = AsyncMock(return_value={"ok": True})
+
+            mock_http_client.post.side_effect = [
+                getme_response,
+                test_notification_response,
+            ]
+
+            provider = TelegramProvider(config, mock_http_client)
+            result = await provider.test_connection()
+
+            # Should succeed for all valid configs
+            assert result is True
+
+            # Verify correct configuration was used
+            test_call = mock_http_client.post.call_args_list[1]
+            test_payload = test_call[1]["json"]
+            assert test_payload["chat_id"] == config.chat_id
+            assert test_payload["disable_notification"] == config.disable_notification
