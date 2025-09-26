@@ -59,6 +59,12 @@ class Repository(Base):
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
     encrypted_passphrase: Mapped[str] = mapped_column(String, nullable=False)
+    encryption_type: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # "repokey", "keyfile", "none", etc.
+    encrypted_keyfile_content: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # Encrypted keyfile content
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
 
     jobs: Mapped[List["Job"]] = relationship(
@@ -75,6 +81,25 @@ class Repository(Base):
 
     def get_passphrase(self) -> str:
         return get_cipher_suite().decrypt(self.encrypted_passphrase.encode()).decode()
+
+    def set_keyfile_content(self, keyfile_content: str) -> None:
+        """Encrypt and store keyfile content."""
+        if keyfile_content:
+            self.encrypted_keyfile_content = (
+                get_cipher_suite().encrypt(keyfile_content.encode()).decode()
+            )
+        else:
+            self.encrypted_keyfile_content = None
+
+    def get_keyfile_content(self) -> str | None:
+        """Decrypt and return keyfile content."""
+        if self.encrypted_keyfile_content:
+            return (
+                get_cipher_suite()
+                .decrypt(self.encrypted_keyfile_content.encode())
+                .decode()
+            )
+        return None
 
 
 class Job(Base):

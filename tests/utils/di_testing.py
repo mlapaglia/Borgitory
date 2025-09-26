@@ -92,7 +92,6 @@ class MockServiceFactory:
         mock = Mock(spec=BorgService)
 
         # Setup common return values
-        mock.create_backup.return_value = {"job_id": "test-job-123"}
         mock.list_archives.return_value = []
         mock.verify_repository_access.return_value = True
         mock.scan_for_repositories.return_value = []
@@ -337,21 +336,6 @@ class MockServiceFactory:
         mock.start_process.return_value = {"success": True, "output": "Mock output"}
         mock.execute_prune_task.return_value = {"success": True}
         mock.execute_cloud_sync_task.return_value = {"success": True}
-
-        return mock
-
-    @staticmethod
-    def create_mock_borg_command_builder() -> Mock:
-        """Create a mock BorgCommandBuilder with common method signatures."""
-        from borgitory.services.borg_command_builder import BorgCommandBuilder
-
-        mock = Mock(spec=BorgCommandBuilder)
-
-        # Setup common return values
-        mock.build_list_archives_command.return_value = ["borg", "list"]
-        mock.build_backup_command.return_value = ["borg", "create"]
-        mock.build_check_command.return_value = ["borg", "check"]
-        mock.generate_archive_name.return_value = "test-archive-2025-01-19"
 
         return mock
 

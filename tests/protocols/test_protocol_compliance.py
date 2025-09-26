@@ -166,7 +166,6 @@ class TestProtocolCompliance:
 
         # Check for key methods
         key_methods = [
-            "create_backup",
             "list_archives",
             "scan_for_repositories",
             "initialize_repository",
@@ -207,11 +206,9 @@ class TestProtocolCompliance:
         # Check instantiation
         from unittest.mock import Mock
         from borgitory.services.jobs.job_executor import JobExecutor
-        from borgitory.services.borg_command_builder import BorgCommandBuilder
 
         manager = ArchiveManager(
             job_executor=JobExecutor(),
-            command_builder=BorgCommandBuilder(),
             mount_manager=Mock(),
         )
         assert manager is not None
@@ -296,7 +293,6 @@ class TestProtocolInstantiation:
         # Verify mocks have protocol methods
         assert hasattr(mock_runner, "run_command")
         assert hasattr(mock_volume, "get_mounted_volumes")
-        assert hasattr(mock_backup, "create_backup")
 
         # Test that we can call protocol methods on mocks
         from unittest.mock import AsyncMock

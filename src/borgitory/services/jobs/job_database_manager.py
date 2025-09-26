@@ -210,6 +210,7 @@ class JobDatabaseManager:
                     "name": repo.name,
                     "path": repo.path,
                     "passphrase": repo.get_passphrase(),
+                    "keyfile_content": repo.get_keyfile_content(),
                 }
 
         except Exception as e:

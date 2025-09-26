@@ -45,7 +45,10 @@ from borgitory.services.rclone_service import RcloneService
 from borgitory.utils.db_session import get_db_session
 from contextlib import _GeneratorContextManager
 
-from borgitory.utils.security import build_secure_borg_command
+from borgitory.utils.security import (
+    secure_borg_command,
+    cleanup_temp_keyfile,
+)
 
 if TYPE_CHECKING:
     from asyncio.subprocess import Process
@@ -235,10 +238,6 @@ class JobManagerFactory:
                 keepalive_timeout=config.sse_keepalive_timeout,
             )
 
-        # Cloud Provider Services - no longer using fallback logic
-        # All dependencies should be provided explicitly via DI
-
-        # Job Database Manager
         if custom_dependencies.database_manager:
             deps.database_manager = custom_dependencies.database_manager
         else:
@@ -976,6 +975,9 @@ class JobManager:
             passphrase = str(
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
+            keyfile_content = repo_data.get("keyfile_content")
+            if keyfile_content is not None and not isinstance(keyfile_content, str):
+                keyfile_content = None  # Ensure it's str or None
 
             def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
@@ -1034,29 +1036,34 @@ class JobManager:
                 logger.info(f"Running borg break-lock on repository: {repository_path}")
                 try:
                     await self._execute_break_lock(
-                        str(repository_path), passphrase, task_output_callback
+                        str(repository_path),
+                        passphrase,
+                        task_output_callback,
+                        keyfile_content,
                     )
                 except Exception as e:
                     logger.warning(f"Break-lock failed, continuing with backup: {e}")
                     task_output_callback(f"Warning: Break-lock failed: {e}")
 
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg create",
                 repository_path="",  # Already in additional_args
                 passphrase=passphrase,
+                keyfile_content=keyfile_content,
                 additional_args=additional_args,
-            )
+                cleanup_keyfile=False,
+            ) as (command, env, temp_keyfile_path):
+                process = await self.safe_executor.start_process(command, env)
+                self._processes[job.id] = process
 
-            # Start the backup process
-            process = await self.safe_executor.start_process(command, env)
-            self._processes[job.id] = process
+                if temp_keyfile_path:
+                    setattr(task, "_temp_keyfile_path", temp_keyfile_path)
 
-            # Monitor the process
+            # Monitor the process (outside context manager since it's long-running)
             result = await self.safe_executor.monitor_process_output(
                 process, output_callback=task_output_callback
             )
 
-            # Log the result for debugging
             logger.info(
                 f"Backup process completed with return code: {result.return_code}"
             )
@@ -1067,24 +1074,23 @@ class JobManager:
             if result.error:
                 logger.error(f"Backup process error: {result.error}")
 
-            # Clean up process tracking
             if job.id in self._processes:
                 del self._processes[job.id]
 
-            # Set task status based on result
             task.return_code = result.return_code
             task.status = "completed" if result.return_code == 0 else "failed"
             task.completed_at = now_utc()
 
-            # Always add the full process output to task output_lines for debugging
+            if hasattr(task, "_temp_keyfile_path"):
+                cleanup_temp_keyfile(getattr(task, "_temp_keyfile_path"))
+                delattr(task, "_temp_keyfile_path")
+
             if result.stdout:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()
                 if full_output and result.return_code != 0:
-                    # Add the captured output to the task output lines for visibility
                     for line in full_output.split("\n"):
                         if line.strip():
                             task.output_lines.append(line)
-                            # Also add to output manager for real-time display
                             asyncio.create_task(
                                 self.safe_output_manager.add_output_line(
                                     job.id, line, "stdout", {}
@@ -1094,8 +1100,6 @@ class JobManager:
             if result.error:
                 task.error = result.error
             elif result.return_code != 0:
-                # Set a default error message if none provided by result
-                # Since stderr is redirected to stdout, check stdout for error messages
                 if result.stdout:
                     output_text = result.stdout.decode(
                         "utf-8", errors="replace"
@@ -1117,6 +1121,11 @@ class JobManager:
             task.return_code = 1
             task.error = f"Backup task failed: {str(e)}"
             task.completed_at = now_utc()
+
+            if hasattr(task, "_temp_keyfile_path"):
+                cleanup_temp_keyfile(getattr(task, "_temp_keyfile_path"))
+                delattr(task, "_temp_keyfile_path")
+
             return False
 
     async def _execute_break_lock(
@@ -1124,6 +1133,7 @@ class JobManager:
         repository_path: str,
         passphrase: str,
         output_callback: Optional[Callable[[str], None]] = None,
+        keyfile_content: Optional[str] = None,
     ) -> None:
         """Execute borg break-lock command to release stale repository locks"""
         try:
@@ -1132,47 +1142,49 @@ class JobManager:
                     "Running 'borg break-lock' to remove stale repository locks..."
                 )
 
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg break-lock",
                 repository_path=repository_path,
                 passphrase=passphrase,
+                keyfile_content=keyfile_content,
                 additional_args=[],
-            )
+            ) as (command, env, _):
+                process = await self.safe_executor.start_process(command, env)
 
-            process = await self.safe_executor.start_process(command, env)
+                try:
+                    result = await asyncio.wait_for(
+                        self.safe_executor.monitor_process_output(
+                            process, output_callback=output_callback
+                        ),
+                        timeout=30,
+                    )
+                except asyncio.TimeoutError:
+                    if output_callback:
+                        output_callback("Break-lock timed out, terminating process")
+                    process.kill()
+                    await process.wait()
+                    raise Exception("Break-lock operation timed out")
 
-            try:
-                result = await asyncio.wait_for(
-                    self.safe_executor.monitor_process_output(
-                        process, output_callback=output_callback
-                    ),
-                    timeout=30,
-                )
-            except asyncio.TimeoutError:
-                if output_callback:
-                    output_callback("Break-lock timed out, terminating process")
-                process.kill()
-                await process.wait()
-                raise Exception("Break-lock operation timed out")
+                if result.return_code == 0:
+                    if output_callback:
+                        output_callback("Successfully released repository lock")
+                    logger.info(
+                        f"Successfully released lock on repository: {repository_path}"
+                    )
+                else:
+                    error_msg = f"Break-lock returned {result.return_code}"
+                    if result.stdout:
+                        stdout_text = result.stdout.decode(
+                            "utf-8", errors="replace"
+                        ).strip()
+                        if stdout_text:
+                            error_msg += f": {stdout_text}"
 
-            if result.return_code == 0:
-                if output_callback:
-                    output_callback("Successfully released repository lock")
-                logger.info(
-                    f"Successfully released lock on repository: {repository_path}"
-                )
-            else:
-                error_msg = f"Break-lock returned {result.return_code}"
-                if result.stdout:
-                    stdout_text = result.stdout.decode(
-                        "utf-8", errors="replace"
-                    ).strip()
-                    if stdout_text:
-                        error_msg += f": {stdout_text}"
-
-                if output_callback:
-                    output_callback(f"Warning: {error_msg}")
-                logger.warning(f"Break-lock warning for {repository_path}: {error_msg}")
+                    if output_callback:
+                        output_callback(f"Warning: {error_msg}")
+                    logger.warning(
+                        f"Break-lock warning for {repository_path}: {error_msg}"
+                    )
 
         except Exception as e:
             error_msg = f"Error executing break-lock: {str(e)}"
@@ -1290,6 +1302,9 @@ class JobManager:
             passphrase = str(
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
+            keyfile_content = repo_data.get("keyfile_content")
+            if keyfile_content is not None and not isinstance(keyfile_content, str):
+                keyfile_content = None  # Ensure it's str or None
 
             def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
@@ -1315,26 +1330,26 @@ class JobManager:
             if repository_path:
                 additional_args.append(str(repository_path))
 
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg check",
                 repository_path="",  # Already in additional_args
                 passphrase=passphrase,
+                keyfile_content=keyfile_content,
                 additional_args=additional_args,
-            )
+            ) as (command, env, _):
+                process = await self.safe_executor.start_process(command, env)
+                self._processes[job.id] = process
 
-            process = await self.safe_executor.start_process(command, env)
-            self._processes[job.id] = process
+                result = await self.safe_executor.monitor_process_output(
+                    process, output_callback=task_output_callback
+                )
 
-            result = await self.safe_executor.monitor_process_output(
-                process, output_callback=task_output_callback
-            )
+                if job.id in self._processes:
+                    del self._processes[job.id]
 
-            if job.id in self._processes:
-                del self._processes[job.id]
-
-            task.return_code = result.return_code
-            task.status = "completed" if result.return_code == 0 else "failed"
-            task.completed_at = now_utc()
+                task.return_code = result.return_code
+                task.status = "completed" if result.return_code == 0 else "failed"
+                task.completed_at = now_utc()
 
             if result.stdout:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()
@@ -2062,7 +2077,6 @@ class JobManager:
         self, repository_id: int
     ) -> Optional[Dict[str, object]]:
         """Get repository data by ID"""
-        # First try using database manager if available
         if hasattr(self, "database_manager") and self.database_manager:
             try:
                 return await self.database_manager.get_repository_data(repository_id)
@@ -2070,49 +2084,6 @@ class JobManager:
                 logger.error(
                     f"Error getting repository data from database manager: {e}"
                 )
-
-        # Fallback to direct database access
-        if self.dependencies.db_session_factory:
-            try:
-                with self.dependencies.db_session_factory() as db:
-                    from borgitory.models.database import Repository
-
-                    repo = (
-                        db.query(Repository)
-                        .filter(Repository.id == repository_id)
-                        .first()
-                    )
-                    if repo:
-                        return {
-                            "id": repo.id,
-                            "name": repo.name,
-                            "path": repo.path,
-                            "passphrase": repo.get_passphrase()
-                            if hasattr(repo, "get_passphrase")
-                            else None,
-                        }
-            except Exception as e:
-                logger.debug(f"Error getting repository data: {e}")
-
-        # Final fallback to get_db_session
-        try:
-            with get_db_session() as db:
-                from borgitory.models.database import Repository
-
-                repo = (
-                    db.query(Repository).filter(Repository.id == repository_id).first()
-                )
-                if repo:
-                    return {
-                        "id": repo.id,
-                        "name": repo.name,
-                        "path": repo.path,
-                        "passphrase": repo.get_passphrase()
-                        if hasattr(repo, "get_passphrase")
-                        else None,
-                    }
-        except Exception as e:
-            logger.debug(f"Error getting repository data from fallback: {e}")
 
         return None
 

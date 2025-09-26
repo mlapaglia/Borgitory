@@ -11,7 +11,7 @@ import inspect
 from typing import Dict, List, Optional, Callable, Coroutine, TYPE_CHECKING, cast
 
 from borgitory.constants.retention import RetentionFieldHandler
-from borgitory.utils.security import build_secure_borg_command
+from borgitory.utils.security import secure_borg_command
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -205,6 +205,7 @@ class JobExecutor:
         self,
         repository_path: str,
         passphrase: str,
+        keyfile_content: Optional[str] = None,
         keep_within: Optional[str] = None,
         keep_secondly: Optional[int] = None,
         keep_minutely: Optional[int] = None,
@@ -276,23 +277,25 @@ class JobExecutor:
                 f"Starting borg prune - Repository: {repository_path}, Dry run: {dry_run}"
             )
 
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg prune",
                 repository_path="",  # Path is in additional_args
                 passphrase=passphrase,
+                keyfile_content=keyfile_content,
                 additional_args=additional_args,
-            )
+            ) as (command, env, _):
+                process = await self.start_process(command, env)
 
-            process = await self.start_process(command, env)
+                result = await self.monitor_process_output(process, output_callback)
 
-            result = await self.monitor_process_output(process, output_callback)
+                if result.return_code == 0:
+                    logger.info("Prune task completed successfully")
+                else:
+                    logger.error(
+                        f"Prune task failed with return code {result.return_code}"
+                    )
 
-            if result.return_code == 0:
-                logger.info("Prune task completed successfully")
-            else:
-                logger.error(f"Prune task failed with return code {result.return_code}")
-
-            return result
+                return result
 
         except Exception as e:
             logger.error(f"Exception in prune task: {str(e)}")

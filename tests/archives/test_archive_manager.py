@@ -10,7 +10,6 @@ from types import SimpleNamespace
 from borgitory.services.archives.archive_manager import ArchiveManager, ArchiveEntry
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
-from borgitory.services.borg_command_builder import BorgCommandBuilder
 
 
 @pytest.fixture
@@ -23,24 +22,8 @@ def mock_job_executor() -> Mock:
 
 
 @pytest.fixture
-def mock_command_builder() -> Mock:
-    """Mock BorgCommandBuilder."""
-    mock = Mock(spec=BorgCommandBuilder)
-    mock.build_list_archive_contents_command = Mock(
-        return_value=(["borg", "list"], {"BORG_PASSPHRASE": "test"})
-    )
-    mock.build_extract_command = Mock(
-        return_value=(["borg", "extract"], {"BORG_PASSPHRASE": "test"})
-    )
-    mock.build_repo_info_command = Mock(
-        return_value=(["borg", "info"], {"BORG_PASSPHRASE": "test"})
-    )
-    return mock
-
-
-@pytest.fixture
 def archive_manager(
-    mock_job_executor: Mock, mock_command_builder: Mock
+    mock_job_executor: Mock,
 ) -> ArchiveManager:
     """ArchiveManager instance with mocked dependencies."""
     mock_mount_manager = Mock()
@@ -48,7 +31,6 @@ def archive_manager(
     mock_mount_manager.list_directory = Mock(return_value=[])
     return ArchiveManager(
         job_executor=mock_job_executor,
-        command_builder=mock_command_builder,
         mount_manager=mock_mount_manager,
     )
 
@@ -79,17 +61,14 @@ class TestArchiveManager:
     def test_init_with_dependencies(self) -> None:
         """Test ArchiveManager initialization with provided dependencies."""
         mock_executor = Mock(spec=JobExecutor)
-        mock_builder = Mock(spec=BorgCommandBuilder)
         mock_mount_manager = Mock()
 
         manager = ArchiveManager(
             job_executor=mock_executor,
-            command_builder=mock_builder,
             mount_manager=mock_mount_manager,
         )
 
         assert manager.job_executor is mock_executor
-        assert manager.command_builder is mock_builder
         assert manager.mount_manager is mock_mount_manager
 
     def test_init_with_defaults(self) -> None:
@@ -98,12 +77,10 @@ class TestArchiveManager:
         mock_mount_manager = Mock()
         manager = ArchiveManager(
             job_executor=JobExecutor(),
-            command_builder=BorgCommandBuilder(),
             mount_manager=mock_mount_manager,
         )
 
         assert isinstance(manager.job_executor, JobExecutor)
-        assert isinstance(manager.command_builder, BorgCommandBuilder)
         assert manager.mount_manager is mock_mount_manager
 
     @pytest.mark.asyncio

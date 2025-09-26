@@ -112,8 +112,6 @@ def test_borg_service_implements_protocol():
     # Check that required methods exist
     assert hasattr(service, "initialize_repository")
     assert callable(getattr(service, "initialize_repository"))
-    assert hasattr(service, "create_backup")
-    assert callable(getattr(service, "create_backup"))
     assert hasattr(service, "list_archives")
     assert callable(getattr(service, "list_archives"))
     assert hasattr(service, "scan_for_repositories")
@@ -147,7 +145,6 @@ def test_protocol_methods_match_implementations():
         archive_service=Mock(),
     )
     assert hasattr(borg_service, "initialize_repository")
-    assert hasattr(borg_service, "create_backup")
     assert hasattr(borg_service, "list_archives")
     assert hasattr(borg_service, "scan_for_repositories")
 

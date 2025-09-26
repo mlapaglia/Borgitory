@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.security import build_secure_borg_command
+from borgitory.utils.security import secure_borg_command
 
 logger = logging.getLogger(__name__)
 
@@ -182,29 +182,30 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
     async def execute_borg_list(self, repository: Repository) -> List[str]:
         """Execute borg list command to get archive names"""
         try:
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg list",
                 repository_path=str(repository.path),
                 passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--short"],
-            )
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-            )
-            stdout, stderr = await process.communicate()
-            if process.returncode == 0:
-                archives = [
-                    line.strip()
-                    for line in stdout.decode().strip().split("\n")
-                    if line.strip()
-                ]
-                return archives
-            else:
-                logger.error(f"Failed to list archives: {stderr.decode()}")
-                return []
+            ) as (command, env, _):
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env,
+                )
+                stdout, stderr = await process.communicate()
+                if process.returncode == 0:
+                    archives = [
+                        line.strip()
+                        for line in stdout.decode().strip().split("\n")
+                        if line.strip()
+                    ]
+                    return archives
+                else:
+                    logger.error(f"Failed to list archives: {stderr.decode()}")
+                    return []
         except Exception as e:
             logger.error(f"Exception while listing archives: {e}")
             return []
@@ -214,42 +215,43 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
     ) -> ArchiveInfo:
         """Execute borg info command to get archive details"""
         try:
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg info",
                 repository_path="",
                 passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json", f"{repository.path}::{archive_name}"],
-            )
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-            )
-            stdout, stderr = await process.communicate()
-            if process.returncode == 0:
-                info_data = json.loads(stdout.decode())
-                archive_info = info_data.get("archives", [{}])[0]
-                result: ArchiveInfo = {
-                    "name": archive_info.get("name", archive_name),
-                    "start": archive_info.get("start", ""),
-                    "end": archive_info.get("end", ""),
-                    "duration": archive_info.get("duration", 0),
-                    "original_size": archive_info.get("stats", {}).get(
-                        "original_size", 0
-                    ),
-                    "compressed_size": archive_info.get("stats", {}).get(
-                        "compressed_size", 0
-                    ),
-                    "deduplicated_size": archive_info.get("stats", {}).get(
-                        "deduplicated_size", 0
-                    ),
-                    "nfiles": archive_info.get("stats", {}).get("nfiles", 0),
-                }
-                return result
-            else:
-                logger.error(f"Failed to get archive info: {stderr.decode()}")
-                return {}
+            ) as (command, env, _):
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env,
+                )
+                stdout, stderr = await process.communicate()
+                if process.returncode == 0:
+                    info_data = json.loads(stdout.decode())
+                    archive_info = info_data.get("archives", [{}])[0]
+                    result: ArchiveInfo = {
+                        "name": archive_info.get("name", archive_name),
+                        "start": archive_info.get("start", ""),
+                        "end": archive_info.get("end", ""),
+                        "duration": archive_info.get("duration", 0),
+                        "original_size": archive_info.get("stats", {}).get(
+                            "original_size", 0
+                        ),
+                        "compressed_size": archive_info.get("stats", {}).get(
+                            "compressed_size", 0
+                        ),
+                        "deduplicated_size": archive_info.get("stats", {}).get(
+                            "deduplicated_size", 0
+                        ),
+                        "nfiles": archive_info.get("stats", {}).get("nfiles", 0),
+                    }
+                    return result
+                else:
+                    logger.error(f"Failed to get archive info: {stderr.decode()}")
+                    return {}
         except Exception as e:
             logger.error(f"Exception while getting archive info: {e}")
             return {}
@@ -259,32 +261,33 @@ class SubprocessCommandExecutor(CommandExecutorInterface):
     ) -> List[Dict[str, object]]:
         """Execute borg list command to get file details from an archive"""
         try:
-            command, env = build_secure_borg_command(
+            async with secure_borg_command(
                 base_command="borg list",
                 repository_path="",
                 passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json-lines", f"{repository.path}::{archive_name}"],
-            )
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-            )
-            stdout, stderr = await process.communicate()
-            if process.returncode == 0:
-                files = []
-                for line in stdout.decode().strip().split("\n"):
-                    if line.strip():
-                        try:
-                            file_info = json.loads(line)
-                            files.append(file_info)
-                        except json.JSONDecodeError:
-                            continue
-                return files
-            else:
-                logger.error(f"Failed to list files: {stderr.decode()}")
-                return []
+            ) as (command, env, _):
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env,
+                )
+                stdout, stderr = await process.communicate()
+                if process.returncode == 0:
+                    files = []
+                    for line in stdout.decode().strip().split("\n"):
+                        if line.strip():
+                            try:
+                                file_info = json.loads(line)
+                                files.append(file_info)
+                            except json.JSONDecodeError:
+                                continue
+                    return files
+                else:
+                    logger.error(f"Failed to list files: {stderr.decode()}")
+                    return []
         except Exception as e:
             logger.error(f"Exception while listing files: {e}")
             return []
@@ -408,92 +411,33 @@ class RepositoryStatsService:
 
     async def _get_archive_list(self, repository: Repository) -> List[str]:
         """Get list of all archives in repository"""
-        try:
-            command, env = build_secure_borg_command(
-                base_command="borg list",
-                repository_path=str(repository.path),
-                passphrase=repository.get_passphrase(),
-                additional_args=["--short"],
-            )
-
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-            )
-
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                archives = [
-                    line.strip()
-                    for line in stdout.decode().strip().split("\n")
-                    if line.strip()
-                ]
-                return archives
-            else:
-                logger.error(f"Borg list failed: {stderr.decode()}")
-                return []
-
-        except Exception as e:
-            logger.error(f"Error listing archives: {str(e)}")
-            return []
+        return await self.command_executor.execute_borg_list(repository)
 
     async def _get_archive_info(
         self, repository: Repository, archive_name: str
     ) -> Dict[str, object] | None:
         """Get detailed information for a specific archive"""
         try:
-            command, env = build_secure_borg_command(
-                base_command="borg info",
-                repository_path="",
-                passphrase=repository.get_passphrase(),
-                additional_args=["--json", f"{repository.path}::{archive_name}"],
+            archive_info = await self.command_executor.execute_borg_info(
+                repository, archive_name
             )
-
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-            )
-
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                info_data = json.loads(stdout.decode())
-
-                # Extract relevant statistics
-                archive_info = info_data.get("archives", [{}])[0]
-                cache_info = info_data.get("cache", {})
-
+            if archive_info:
+                # Convert ArchiveInfo to the dict format expected by this method
                 return {
-                    "name": archive_name,
+                    "name": archive_info.get("name", archive_name),
                     "start": archive_info.get("start", ""),
                     "end": archive_info.get("end", ""),
                     "duration": archive_info.get("duration", 0),
-                    "original_size": archive_info.get("stats", {}).get(
-                        "original_size", 0
-                    ),
-                    "compressed_size": archive_info.get("stats", {}).get(
-                        "compressed_size", 0
-                    ),
-                    "deduplicated_size": archive_info.get("stats", {}).get(
-                        "deduplicated_size", 0
-                    ),
-                    "nfiles": archive_info.get("stats", {}).get("nfiles", 0),
-                    "unique_chunks": cache_info.get("stats", {}).get(
-                        "unique_chunks", 0
-                    ),
-                    "total_chunks": cache_info.get("stats", {}).get("total_chunks", 0),
-                    "unique_size": cache_info.get("stats", {}).get("unique_size", 0),
-                    "total_size": cache_info.get("stats", {}).get("total_size", 0),
+                    "original_size": archive_info.get("original_size", 0),
+                    "compressed_size": archive_info.get("compressed_size", 0),
+                    "deduplicated_size": archive_info.get("deduplicated_size", 0),
+                    "nfiles": archive_info.get("nfiles", 0),
+                    "unique_chunks": archive_info.get("unique_chunks", 0),
+                    "total_chunks": archive_info.get("total_chunks", 0),
+                    "unique_size": archive_info.get("unique_size", 0),
+                    "total_size": archive_info.get("total_size", 0),
                 }
-            else:
-                logger.error(f"Borg info failed for {archive_name}: {stderr.decode()}")
-                return None
-
+            return None
         except Exception as e:
             logger.error(f"Error getting archive info for {archive_name}: {str(e)}")
             return None
@@ -625,75 +569,75 @@ class RepositoryStatsService:
                 )
             try:
                 # Get file listing with sizes
-                command, env = build_secure_borg_command(
+                async with secure_borg_command(
                     base_command="borg list",
                     repository_path="",
                     passphrase=repository.get_passphrase(),
+                    keyfile_content=repository.get_keyfile_content(),
                     additional_args=[
                         f"{repository.path}::{archive_name}",
                         "--format={size} {path}{NL}",
                     ],
-                )
-
-                process = await asyncio.create_subprocess_exec(
-                    *command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    env=env,
-                )
-
-                stdout, stderr = await process.communicate()
-
-                if process.returncode == 0:
-                    # Parse file types and sizes
-                    ext_count: Dict[str, int] = {}
-                    ext_size: Dict[str, int] = {}
-
-                    for line in stdout.decode().strip().split("\n"):
-                        if not line.strip():
-                            continue
-                        parts = line.strip().split(" ", 1)
-                        if len(parts) == 2:
-                            try:
-                                size = int(parts[0])
-                                path = parts[1]
-
-                                # Extract file extension
-                                if "." in path and not path.endswith("/"):
-                                    ext = path.split(".")[-1].lower()
-                                    if (
-                                        ext and len(ext) <= 10
-                                    ):  # Reasonable extension length
-                                        ext_count[ext] = ext_count.get(ext, 0) + 1
-                                        ext_size[ext] = ext_size.get(ext, 0) + size
-                            except (ValueError, IndexError):
-                                continue
-
-                    # Add to timeline
-                    archive_date = (
-                        archive_name.split("backup-")[-1][:10]
-                        if "backup-" in archive_name
-                        else archive_name[:10]
+                ) as (command, env, _):
+                    process = await asyncio.create_subprocess_exec(
+                        *command,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        env=env,
                     )
-                    file_type_timeline["labels"].append(archive_date)
 
-                    # Store data for each extension
-                    for ext in ext_count:
-                        if ext not in file_type_timeline["count_data"]:
-                            file_type_timeline["count_data"][ext] = []
-                            file_type_timeline["size_data"][ext] = []
-                        file_type_timeline["count_data"][ext].append(ext_count[ext])
-                        file_type_timeline["size_data"][ext].append(
-                            round(ext_size[ext] / (1024 * 1024), 2)
-                        )  # Convert to MB
+                    stdout, stderr = await process.communicate()
 
-                    # Fill missing data points for consistency
-                    for ext in file_type_timeline["count_data"]:
-                        while len(file_type_timeline["count_data"][ext]) < len(
-                            file_type_timeline["labels"]
-                        ):
-                            file_type_timeline["count_data"][ext].insert(-1, 0)
-                            file_type_timeline["size_data"][ext].insert(-1, 0)
+                    if process.returncode == 0:
+                        # Parse file types and sizes
+                        ext_count: Dict[str, int] = {}
+                        ext_size: Dict[str, int] = {}
+
+                        for line in stdout.decode().strip().split("\n"):
+                            if not line.strip():
+                                continue
+                            parts = line.strip().split(" ", 1)
+                            if len(parts) == 2:
+                                try:
+                                    size = int(parts[0])
+                                    path = parts[1]
+
+                                    # Extract file extension
+                                    if "." in path and not path.endswith("/"):
+                                        ext = path.split(".")[-1].lower()
+                                        if (
+                                            ext and len(ext) <= 10
+                                        ):  # Reasonable extension length
+                                            ext_count[ext] = ext_count.get(ext, 0) + 1
+                                            ext_size[ext] = ext_size.get(ext, 0) + size
+                                except (ValueError, IndexError):
+                                    continue
+
+                        # Add to timeline
+                        archive_date = (
+                            archive_name.split("backup-")[-1][:10]
+                            if "backup-" in archive_name
+                            else archive_name[:10]
+                        )
+                        file_type_timeline["labels"].append(archive_date)
+
+                        # Store data for each extension
+                        for ext in ext_count:
+                            if ext not in file_type_timeline["count_data"]:
+                                file_type_timeline["count_data"][ext] = []
+                                file_type_timeline["size_data"][ext] = []
+                            file_type_timeline["count_data"][ext].append(ext_count[ext])
+                            file_type_timeline["size_data"][ext].append(
+                                round(ext_size[ext] / (1024 * 1024), 2)
+                            )  # Convert to MB
+
+                        # Fill missing data points for consistency
+                        for ext in file_type_timeline["count_data"]:
+                            while len(file_type_timeline["count_data"][ext]) < len(
+                                file_type_timeline["labels"]
+                            ):
+                                file_type_timeline["count_data"][ext].insert(-1, 0)
+                                file_type_timeline["size_data"][ext].insert(-1, 0)
 
             except Exception as e:
                 logger.error(

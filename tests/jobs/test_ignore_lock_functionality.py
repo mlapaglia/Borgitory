@@ -323,17 +323,10 @@ class TestIgnoreLockFunctionality:
         output_callback.assert_any_call("Break-lock timed out, terminating process")
 
     @pytest.mark.asyncio
-    @patch("borgitory.services.jobs.job_manager.build_secure_borg_command")
     async def test_break_lock_uses_secure_command_builder(
-        self, mock_build_secure_command: MagicMock, job_manager: JobManager
+        self, job_manager: JobManager
     ) -> None:
-        """Test that break-lock uses the secure command builder"""
-
-        # Setup mock return value
-        mock_build_secure_command.return_value = (
-            ["borg", "break-lock", "/test/repo"],
-            {"BORG_PASSPHRASE": "test-pass"},
-        )
+        """Test that break-lock executes the correct command through the executor"""
 
         # Mock the executor methods
         mock_process = MagicMock()
@@ -347,10 +340,13 @@ class TestIgnoreLockFunctionality:
         # Execute break-lock
         await job_manager._execute_break_lock("/test/repo", "test-pass", MagicMock())
 
-        # Verify secure command builder was called correctly
-        mock_build_secure_command.assert_called_once_with(
-            base_command="borg break-lock",
-            repository_path="/test/repo",
-            passphrase="test-pass",
-            additional_args=[],
-        )
+        # Verify executor was called with a borg break-lock command
+        job_manager.executor.start_process.assert_called_once()
+        call_args = job_manager.executor.start_process.call_args
+        command = call_args[0][0]  # First positional argument
+        env = call_args[0][1]  # Second positional argument
+
+        # Verify it's a borg break-lock command
+        assert "borg" in command[0]
+        assert "break-lock" in command
+        assert "BORG_PASSPHRASE" in env

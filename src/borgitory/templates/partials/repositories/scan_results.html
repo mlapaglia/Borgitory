@@ -12,7 +12,7 @@
         <option value="">Select a repository...</option>
         {% for repo in repositories %}
         <option value="{{ repo.path }}">
-            {{ repo.path }} ({{ repo.encryption_mode }})
+            {{ repo.path }}
         </option>
         {% endfor %}
     </select>

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.models.database import Repository
-from borgitory.utils.security import build_secure_borg_command
+from borgitory.utils.security import secure_borg_command, cleanup_temp_keyfile
 from borgitory.services.archives.archive_manager import ArchiveEntry
 
 if TYPE_CHECKING:
@@ -46,6 +46,7 @@ class MountInfo:
     mounted_at: datetime
     last_accessed: datetime
     job_executor_process: Optional[asyncio.subprocess.Process] = None
+    temp_keyfile_path: Optional[str] = None
 
 
 class ArchiveMountManager:
@@ -90,66 +91,68 @@ class ArchiveMountManager:
         try:
             mount_point.mkdir(parents=True, exist_ok=True)
 
-            command, env = build_secure_borg_command(
+            logger.info(f"Mounting archive {archive_name} at {mount_point}")
+
+            async with secure_borg_command(
                 base_command="borg mount",
                 repository_path="",
                 passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
                 additional_args=[
                     f"{repository.path}::{archive_name}",
                     str(mount_point),
                     "-f",  # foreground mode
                 ],
-            )
+                cleanup_keyfile=False,
+            ) as (command, env, temp_keyfile_path):
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    env=env,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
 
-            logger.info(f"Mounting archive {archive_name} at {mount_point}")
+                mount_ready = await self._wait_for_mount_ready(
+                    mount_point, process, self.mounting_timeout.seconds
+                )
 
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                env=env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            mount_ready = await self._wait_for_mount_ready(
-                mount_point, process, self.mounting_timeout.seconds
-            )
-
-            if not mount_ready:
-                try:
-                    # Check if process has already exited with error
-                    if process.returncode is not None:
-                        stderr_data = (
-                            await process.stderr.read() if process.stderr else b""
+                if not mount_ready:
+                    try:
+                        # Check if process has already exited with error
+                        if process.returncode is not None:
+                            stderr_data = (
+                                await process.stderr.read() if process.stderr else b""
+                            )
+                            error_msg = stderr_data.decode("utf-8", errors="replace")
+                            raise Exception(f"Mount failed: {error_msg}")
+                        else:
+                            # Process is still running but mount not ready - terminate it
+                            process.terminate()
+                            await asyncio.wait_for(process.wait(), timeout=5)
+                            stderr_data = (
+                                await process.stderr.read() if process.stderr else b""
+                            )
+                            error_msg = stderr_data.decode("utf-8", errors="replace")
+                            raise Exception(f"Mount timed out: {error_msg}")
+                    except asyncio.TimeoutError:
+                        process.kill()
+                        raise Exception(
+                            "Archive contents not available after 5 seconds - mount failed"
                         )
-                        error_msg = stderr_data.decode("utf-8", errors="replace")
-                        raise Exception(f"Mount failed: {error_msg}")
-                    else:
-                        # Process is still running but mount not ready - terminate it
-                        process.terminate()
-                        await asyncio.wait_for(process.wait(), timeout=5)
-                        stderr_data = (
-                            await process.stderr.read() if process.stderr else b""
-                        )
-                        error_msg = stderr_data.decode("utf-8", errors="replace")
-                        raise Exception(f"Mount timed out: {error_msg}")
-                except asyncio.TimeoutError:
-                    process.kill()
-                    raise Exception(
-                        "Archive contents not available after 5 seconds - mount failed"
-                    )
 
-            mount_info = MountInfo(
-                repository_path=repository.path,
-                archive_name=archive_name,
-                mount_point=mount_point,
-                mounted_at=now_utc(),
-                last_accessed=now_utc(),
-                job_executor_process=process,
-            )
-            self.active_mounts[mount_key] = mount_info
+                mount_info = MountInfo(
+                    repository_path=repository.path,
+                    archive_name=archive_name,
+                    mount_point=mount_point,
+                    mounted_at=now_utc(),
+                    last_accessed=now_utc(),
+                    job_executor_process=process,
+                    temp_keyfile_path=temp_keyfile_path,
+                )
+                self.active_mounts[mount_key] = mount_info
 
-            logger.info(f"Successfully mounted archive at {mount_point}")
-            return mount_point
+                logger.info(f"Successfully mounted archive at {mount_point}")
+                return mount_point
 
         except Exception as e:
             logger.error(f"Failed to mount archive {archive_name}: {e}")
@@ -215,6 +218,8 @@ class ArchiveMountManager:
                     # Process already dead or taking too long
                     if mount_info.job_executor_process.returncode is None:
                         mount_info.job_executor_process.kill()
+
+            cleanup_temp_keyfile(mount_info.temp_keyfile_path)
 
             del self.active_mounts[mount_key]
             logger.info(f"Unmounted archive {archive_name}")
@@ -330,6 +335,8 @@ class ArchiveMountManager:
                     )
                 except (ProcessLookupError, asyncio.TimeoutError):
                     pass
+
+            cleanup_temp_keyfile(mount_info.temp_keyfile_path)
 
         self.active_mounts.clear()
 

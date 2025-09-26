@@ -10,8 +10,12 @@ from typing import Dict, List, Optional, AsyncGenerator, TypedDict, TYPE_CHECKIN
 
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_executor import JobExecutor
-from borgitory.services.borg_command_builder import BorgCommandBuilder
-from borgitory.utils.security import validate_archive_name, sanitize_path
+from borgitory.utils.security import (
+    cleanup_temp_keyfile,
+    validate_archive_name,
+    sanitize_path,
+    secure_borg_command,
+)
 
 if TYPE_CHECKING:
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
@@ -88,11 +92,9 @@ class ArchiveManager:
     def __init__(
         self,
         job_executor: JobExecutor,
-        command_builder: BorgCommandBuilder,
         mount_manager: "ArchiveMountManager",
     ) -> None:
         self.job_executor = job_executor
-        self.command_builder = command_builder
         self.mount_manager = mount_manager
 
     async def list_archive_directory_contents(
@@ -204,109 +206,134 @@ class ArchiveManager:
         self, repository: Repository, archive_name: str, file_path: str
     ) -> AsyncGenerator[bytes, None]:
         """Extract a single file from an archive and stream it as an async generator"""
-        try:
-            command, env = self.command_builder.build_extract_command(
-                repository, archive_name, file_path, extract_to_stdout=True
-            )
-        except Exception as e:
-            raise Exception(f"Command building failed: {str(e)}")
-
         logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        # Build the Borg extract command
+        base_command = "borg extract"
+        additional_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
 
-        try:
-            while True:
-                if not process.stdout:
-                    break
-                chunk = await process.stdout.read(65536)  # 64KB chunks for efficiency
-                if not chunk:
-                    break
+        keyfile_content = repository.get_keyfile_content()
+        passphrase = repository.get_passphrase() or ""
 
-                yield chunk
-
-            return_code = await process.wait()
-            if return_code != 0:
-                stderr_data = await process.stderr.read() if process.stderr else b""
-                error_msg = stderr_data.decode("utf-8", errors="replace")
-                raise Exception(
-                    f"Borg extract failed with code {return_code}: {error_msg}"
+        async with secure_borg_command(
+            base_command=base_command,
+            repository_path="",  # Already included in additional_args
+            passphrase=passphrase,
+            keyfile_content=keyfile_content,
+            additional_args=additional_args,
+            cleanup_keyfile=False,
+        ) as (final_command, env, temp_keyfile_path):
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *final_command,
+                    env=env,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
 
-        except Exception as e:
-            if process.returncode is None:
-                process.terminate()
                 try:
-                    await asyncio.wait_for(process.wait(), timeout=5.0)
-                except asyncio.TimeoutError:
-                    process.kill()
-                    await process.wait()
-            raise Exception(f"File extraction failed: {str(e)}")
+                    while True:
+                        if not process.stdout:
+                            break
+                        chunk = await process.stdout.read(
+                            65536
+                        )  # 64KB chunks for efficiency
+                        if not chunk:
+                            break
+
+                        yield chunk
+
+                    return_code = await process.wait()
+                    if return_code != 0:
+                        stderr_data = (
+                            await process.stderr.read() if process.stderr else b""
+                        )
+                        error_msg = stderr_data.decode("utf-8", errors="replace")
+                        raise Exception(
+                            f"Borg extract failed with code {return_code}: {error_msg}"
+                        )
+
+                except Exception as e:
+                    if process.returncode is None:
+                        process.terminate()
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=5.0)
+                        except asyncio.TimeoutError:
+                            process.kill()
+                            await process.wait()
+                    raise Exception(f"File extraction failed: {str(e)}")
+            finally:
+                # Always cleanup the temporary keyfile
+                if temp_keyfile_path:
+                    cleanup_temp_keyfile(temp_keyfile_path)
 
     async def get_archive_metadata(
         self, repository: Repository, archive_name: str
     ) -> Optional[ArchiveMetadata]:
         """Get metadata for a specific archive"""
         try:
-            # Get repository info which includes archive information
-            command, env = self.command_builder.build_repo_info_command(repository)
+            base_command = "borg info"
+            additional_args = ["--json", repository.path]
+            keyfile_content = repository.get_keyfile_content()
+            passphrase = repository.get_passphrase() or ""
 
-            # Use JobExecutor for consistent execution
-            process = await self.job_executor.start_process(command, env)
-            result = await self.job_executor.monitor_process_output(process)
+            async with secure_borg_command(
+                base_command=base_command,
+                repository_path="",  # Already included in additional_args
+                passphrase=passphrase,
+                keyfile_content=keyfile_content,
+                additional_args=additional_args,
+            ) as (final_command, env, temp_keyfile_path):
+                process = await self.job_executor.start_process(final_command, env)
+                result = await self.job_executor.monitor_process_output(process)
 
-            if result.return_code == 0:
-                output_text = result.stdout.decode("utf-8", errors="replace")
-                try:
-                    repo_info = json.loads(output_text)
-                    archives = repo_info.get("archives", [])
+                if result.return_code == 0:
+                    output_text = result.stdout.decode("utf-8", errors="replace")
+                    try:
+                        repo_info = json.loads(output_text)
+                        archives = repo_info.get("archives", [])
 
-                    # Find the specific archive
-                    for archive in archives:
-                        if archive.get("name") == archive_name:
-                            # Convert to ArchiveMetadata TypedDict
-                            metadata: ArchiveMetadata = {}
-                            if archive.get("name"):
-                                metadata["name"] = archive["name"]
-                            if archive.get("id"):
-                                metadata["id"] = archive["id"]
-                            if archive.get("start"):
-                                metadata["start"] = archive["start"]
-                            if archive.get("end"):
-                                metadata["end"] = archive["end"]
-                            if archive.get("duration"):
-                                metadata["duration"] = archive["duration"]
-                            if archive.get("stats"):
-                                metadata["stats"] = archive["stats"]
-                            if archive.get("size"):
-                                metadata["size"] = archive["size"]
-                            if archive.get("command_line"):
-                                metadata["command_line"] = archive["command_line"]
-                            if archive.get("hostname"):
-                                metadata["hostname"] = archive["hostname"]
-                            if archive.get("username"):
-                                metadata["username"] = archive["username"]
-                            if archive.get("comment"):
-                                metadata["comment"] = archive["comment"]
-                            return metadata
+                        # Find the specific archive
+                        for archive in archives:
+                            if archive.get("name") == archive_name:
+                                # Convert to ArchiveMetadata TypedDict
+                                metadata: ArchiveMetadata = {}
+                                if archive.get("name"):
+                                    metadata["name"] = archive["name"]
+                                if archive.get("id"):
+                                    metadata["id"] = archive["id"]
+                                if archive.get("start"):
+                                    metadata["start"] = archive["start"]
+                                if archive.get("end"):
+                                    metadata["end"] = archive["end"]
+                                if archive.get("duration"):
+                                    metadata["duration"] = archive["duration"]
+                                if archive.get("stats"):
+                                    metadata["stats"] = archive["stats"]
+                                if archive.get("size"):
+                                    metadata["size"] = archive["size"]
+                                if archive.get("command_line"):
+                                    metadata["command_line"] = archive["command_line"]
+                                if archive.get("hostname"):
+                                    metadata["hostname"] = archive["hostname"]
+                                if archive.get("username"):
+                                    metadata["username"] = archive["username"]
+                                if archive.get("comment"):
+                                    metadata["comment"] = archive["comment"]
+                                return metadata
 
-                    return None  # Archive not found
-                except json.JSONDecodeError:
-                    logger.warning("Could not parse repository info JSON")
+                        return None  # Archive not found
+                    except json.JSONDecodeError:
+                        logger.warning("Could not parse repository info JSON")
+                        return None
+                else:
+                    error_text = (
+                        result.stderr.decode("utf-8", errors="replace")
+                        if result.stderr
+                        else "Unknown error"
+                    )
+                    logger.error(f"Failed to get repository info: {error_text}")
                     return None
-            else:
-                error_text = (
-                    result.stderr.decode("utf-8", errors="replace")
-                    if result.stderr
-                    else "Unknown error"
-                )
-                logger.error(f"Failed to get repository info: {error_text}")
-                return None
 
         except Exception as e:
             logger.error(f"Error getting archive metadata: {e}")

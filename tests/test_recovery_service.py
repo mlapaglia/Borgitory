@@ -23,6 +23,7 @@ def mock_repository():
     repo.name = "test-repo"
     repo.path = "/repo/path"
     repo.get_passphrase.return_value = "test_passphrase"
+    repo.get_keyfile_content.return_value = None
     return repo
 
 
