@@ -714,7 +714,7 @@ class TestRepositoryStatsServiceIntegration:
         )
 
         @asynccontextmanager
-        async def mock_secure_borg_command(*args, **kwargs) -> None:
+        async def mock_secure_borg_command(*args, **kwargs):
             yield (["borg", "list"], {}, None)
 
         with patch(
