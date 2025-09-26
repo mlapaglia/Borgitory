@@ -3,13 +3,7 @@
     <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Prune Old Archives</h3>
     
     <!-- Error Message -->
-    <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4"
-         x-data="{ show: true }" 
-         x-show="show" 
-         x-init="setTimeout(() => show = false, 8000)"
-         x-transition:leave="transition ease-in duration-300"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0">
+    <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4" data-auto-hide="8000">
         <div class="flex items-center justify-between">
             <div class="flex items-center">
                 <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -17,7 +11,7 @@
                 </svg>
                 <span class="text-red-700">{{ error_message }}</span>
             </div>
-            <button @click="show = false" class="text-red-400 hover:text-red-600">
+            <button data-close class="text-red-400 hover:text-red-600">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>

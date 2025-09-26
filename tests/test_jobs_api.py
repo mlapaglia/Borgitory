@@ -74,7 +74,6 @@ class TestJobsAPI:
         mock.get_job_status = AsyncMock()
         mock.get_job_output = AsyncMock()
         mock.cancel_job = AsyncMock()
-        mock.run_database_migration = Mock()
         return mock
 
     @pytest.fixture

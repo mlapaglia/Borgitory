@@ -2089,12 +2089,8 @@ class JobManager:
 
     async def stream_all_job_updates(self) -> AsyncGenerator[JobEvent, None]:
         """Stream all job updates via event broadcaster"""
-        if self.event_broadcaster:
-            async for event in self.safe_event_broadcaster.stream_all_events():
-                yield event
-        else:
-            # Fallback: empty stream
-            return
+        async for event in self.safe_event_broadcaster.stream_all_events():
+            yield event
 
     async def shutdown(self) -> None:
         """Shutdown the job manager"""
