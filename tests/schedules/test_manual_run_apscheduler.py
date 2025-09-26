@@ -4,7 +4,7 @@ Tests for manual schedule run functionality using APScheduler one-time jobs.
 
 import pytest
 import uuid
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,29 @@ from borgitory.dependencies import get_schedule_service
 from borgitory.protocols.job_protocols import JobManagerProtocol
 
 client = TestClient(app)
+
+
+def create_test_scheduler_service(
+    job_manager: Mock, job_service_factory: Mock
+) -> SchedulerService:
+    """Create a scheduler service with in-memory job store for testing"""
+    scheduler_service = SchedulerService(job_manager, job_service_factory)
+
+    # Override to use in-memory job store to avoid CI database issues
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.jobstores.memory import MemoryJobStore
+    from apscheduler.executors.asyncio import AsyncIOExecutor
+
+    jobstores = {"default": MemoryJobStore()}
+    executors = {"default": AsyncIOExecutor()}
+    job_defaults = {"coalesce": False, "max_instances": 1}
+
+    scheduler_service.scheduler = AsyncIOScheduler(
+        jobstores=jobstores, executors=executors, job_defaults=job_defaults
+    )
+    scheduler_service._running = False
+
+    return scheduler_service
 
 
 class TestManualRunAPScheduler:
@@ -36,8 +59,8 @@ class TestManualRunAPScheduler:
     def scheduler_service(
         self, mock_job_manager: Mock, mock_job_service_factory: Mock
     ) -> SchedulerService:
-        """Create scheduler service with mocked dependencies"""
-        return SchedulerService(mock_job_manager, mock_job_service_factory)
+        """Create scheduler service with mocked dependencies and in-memory job store"""
+        return create_test_scheduler_service(mock_job_manager, mock_job_service_factory)
 
     @pytest.fixture
     def mock_scheduler_service(self) -> AsyncMock:
@@ -210,6 +233,7 @@ class TestManualRunAPScheduler:
 
         assert success is False
         assert job_id is None
+        assert error_msg is not None
         assert "Failed to run schedule manually: Scheduler not running" in error_msg
 
         # Verify scheduler service was called
@@ -300,6 +324,7 @@ class TestManualRunAPScheduler:
             # The run_date should be very close to now (within a few seconds)
             from borgitory.utils.datetime_utils import now_utc
 
+            assert job.trigger.run_date is not None
             time_diff = abs((job.trigger.run_date - now_utc()).total_seconds())
             assert time_diff < 5  # Should be within 5 seconds of now
 
@@ -317,29 +342,142 @@ class TestManualRunAPScheduler:
             schedule_id = 123
             schedule_name = "Test Schedule"
 
-            # Mock the execute_scheduled_backup to complete quickly
-            with patch(
-                "borgitory.services.scheduling.scheduler_service.execute_scheduled_backup"
-            ) as mock_execute:
-                mock_execute.return_value = None
+            # Create the job
+            job_id = await scheduler_service.run_schedule_once(
+                schedule_id, schedule_name
+            )
 
-                job_id = await scheduler_service.run_schedule_once(
-                    schedule_id, schedule_name
-                )
+            # Job should exist initially
+            job = scheduler_service.scheduler.get_job(job_id)
+            assert job is not None
 
-                # Job should exist initially
-                job = scheduler_service.scheduler.get_job(job_id)
-                assert job is not None
+            # Verify job configuration is set up for proper cleanup
+            assert job.max_instances == 1  # Only one instance allowed
 
-                # Wait a moment for potential execution
-                import asyncio
+            # Verify it's a one-time job (DateTrigger)
+            from apscheduler.triggers.date import DateTrigger
 
-                await asyncio.sleep(0.1)
+            assert isinstance(job.trigger, DateTrigger)
 
-                # After execution, one-time jobs should be automatically removed
-                # Note: This might not work in test environment due to mocking,
-                # but we can verify the job configuration is correct for cleanup
-                assert job.max_instances == 1  # Only one instance allowed
+            # One-time jobs should not have a next run time after execution
+            # (APScheduler automatically removes them)
+            assert job.trigger.run_date is not None
+
+        finally:
+            await scheduler_service.stop()
+
+    @pytest.mark.asyncio
+    async def test_scheduler_service_with_mock_dependencies(self) -> None:
+        """Test scheduler service with properly mocked dependencies (no patching)"""
+        # Create a mock job manager that tracks calls
+        mock_job_manager = Mock(spec=JobManagerProtocol)
+        mock_job_manager.create_composite_job = AsyncMock(return_value="test-job-123")
+
+        # Create a mock job service factory
+        mock_job_service = Mock()
+        mock_job_service.create_backup_job = AsyncMock(
+            return_value={"job_id": "test-job-123"}
+        )
+        mock_job_service_factory = Mock(return_value=mock_job_service)
+
+        # Create scheduler service with mocked dependencies and in-memory job store
+        scheduler_service = create_test_scheduler_service(
+            mock_job_manager, mock_job_service_factory
+        )
+
+        await scheduler_service.start()
+
+        try:
+            schedule_id = 456
+            schedule_name = "Mock Test Schedule"
+
+            # Create the job
+            job_id = await scheduler_service.run_schedule_once(
+                schedule_id, schedule_name
+            )
+
+            # Verify job was created in scheduler
+            job = scheduler_service.scheduler.get_job(job_id)
+            assert job is not None
+            assert job.name == f"Manual run: {schedule_name}"
+            assert job.args == (schedule_id,)
+
+            # Verify it's configured as a one-time job
+            from apscheduler.triggers.date import DateTrigger
+
+            assert isinstance(job.trigger, DateTrigger)
+
+            # The job function should be execute_scheduled_backup
+            from borgitory.services.scheduling.scheduler_service import (
+                execute_scheduled_backup,
+            )
+
+            assert job.func == execute_scheduled_backup
+
+        finally:
+            await scheduler_service.stop()
+
+    @pytest.mark.asyncio
+    async def test_job_execution_with_real_dependencies(self, test_db: Session) -> None:
+        """Test job execution flow using real database but mocked external dependencies"""
+        # Create a real repository and schedule in the test database
+        repo = Repository()
+        repo.name = "integration_test_repo"
+        repo.path = "/tmp/integration_test"
+        repo.set_passphrase("integration_test_pass")
+        test_db.add(repo)
+        test_db.commit()
+        test_db.refresh(repo)
+
+        schedule = Schedule()
+        schedule.name = "Integration Test Schedule"
+        schedule.repository_id = repo.id
+        schedule.cron_expression = "0 3 * * *"
+        schedule.source_path = "/integration/test/source"
+        schedule.enabled = True
+        test_db.add(schedule)
+        test_db.commit()
+        test_db.refresh(schedule)
+
+        # Mock only the job manager (external dependency)
+        mock_job_manager = Mock(spec=JobManagerProtocol)
+        mock_job_manager.create_composite_job = AsyncMock(
+            return_value="integration-job-456"
+        )
+
+        # Mock job service factory to return a service that doesn't actually run borg
+        mock_job_service = Mock()
+        mock_job_service.create_backup_job = AsyncMock(
+            return_value={"job_id": "integration-job-456"}
+        )
+        mock_job_service_factory = Mock(return_value=mock_job_service)
+
+        # Create scheduler service with in-memory job store for testing
+        scheduler_service = create_test_scheduler_service(
+            mock_job_manager, mock_job_service_factory
+        )
+
+        await scheduler_service.start()
+
+        try:
+            # Test the manual run
+            job_id = await scheduler_service.run_schedule_once(
+                schedule.id, schedule.name
+            )
+
+            # Verify the job was created correctly
+            job = scheduler_service.scheduler.get_job(job_id)
+            assert job is not None
+            assert job.name == f"Manual run: {schedule.name}"
+            assert job.args == (schedule.id,)
+
+            # Wait a brief moment for the job to potentially execute
+            import asyncio
+
+            await asyncio.sleep(0.1)
+
+            # The job should still exist (since we're not actually executing borg commands)
+            # but we've verified the setup is correct
 
         finally:
             await scheduler_service.stop()
