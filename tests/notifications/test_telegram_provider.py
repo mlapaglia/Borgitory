@@ -14,7 +14,6 @@ from borgitory.services.notifications.providers.telegram_provider import (
 from borgitory.services.notifications.providers.discord_provider import HttpClient
 from borgitory.services.notifications.types import (
     NotificationMessage,
-    NotificationResult,
     NotificationType,
     NotificationPriority,
     ConnectionInfo,
@@ -105,7 +104,10 @@ class TestTelegramProvider:
     def test_config_validation_invalid_bot_token_non_numeric_id(self) -> None:
         """Test invalid bot token (non-numeric bot ID) raises validation error"""
         with pytest.raises(Exception):  # Pydantic validation error
-            TelegramConfig(bot_token="abc:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk", chat_id="12345678")
+            TelegramConfig(
+                bot_token="abc:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk",
+                chat_id="12345678",
+            )
 
     def test_config_validation_various_chat_id_formats(self) -> None:
         """Test various valid chat ID formats"""
@@ -195,9 +197,9 @@ class TestTelegramProvider:
             "parse_mode": "HTML",
             "disable_notification": False,
         }
-        
+
         details = telegram_provider.get_display_details(config_dict)
-        
+
         assert details["provider_name"] == "Telegram"
         assert "123456789" in details["provider_details"]  # Bot ID shown
         assert "@test_channel" in details["provider_details"]  # Chat ID shown
@@ -227,11 +229,11 @@ class TestTelegramProvider:
             title="Test Alert",
             message="This is a test message",
             notification_type=NotificationType.WARNING,
-            metadata={"backup_id": "test-123", "duration": "5 minutes"}
+            metadata={"backup_id": "test-123", "duration": "5 minutes"},
         )
 
         formatted = provider._format_message(message)
-        
+
         assert "⚠️" in formatted  # Warning emoji
         assert "<b>Test Alert</b>" in formatted  # Bold title
         assert "This is a test message" in formatted
@@ -255,7 +257,7 @@ class TestTelegramProvider:
         )
 
         formatted = provider._format_message(message)
-        
+
         assert "✅" in formatted  # Success emoji
         assert "*Success*" in formatted  # Bold title
         assert "Backup completed successfully" in formatted
@@ -276,7 +278,7 @@ class TestTelegramProvider:
         )
 
         formatted = provider._format_message(message)
-        
+
         assert "❌" in formatted  # Failure emoji
         assert "*Error: Backup Failed\\!*" in formatted  # Escaped title
         assert "\\(permission denied\\)" in formatted  # Escaped parentheses
@@ -297,7 +299,7 @@ class TestTelegramProvider:
         )
 
         formatted = provider._format_message(message)
-        
+
         assert "ℹ️" in formatted  # Info emoji
         assert "Info" in formatted  # Plain title
         assert "Just some information" in formatted
@@ -321,9 +323,11 @@ class TestTelegramProvider:
         # Test that the provider constructs correct API URLs
         assert hasattr(telegram_provider, "TELEGRAM_API_BASE")
         assert telegram_provider.TELEGRAM_API_BASE == "https://api.telegram.org"
-        
+
         # Test URL construction in send_notification would use bot token
-        expected_base = f"https://api.telegram.org/bot{telegram_provider.config.bot_token}"
+        expected_base = (
+            f"https://api.telegram.org/bot{telegram_provider.config.bot_token}"
+        )
         assert telegram_provider.config.bot_token in expected_base
 
     def test_provider_constants(self, telegram_provider) -> None:
@@ -428,7 +432,7 @@ class TestTelegramProvider:
         )
 
         formatted = provider._format_message(message)
-        
+
         # Check that special characters are properly escaped
         assert "Test\\_with\\*special\\[chars\\]\\(and\\)more\\!" in formatted
         assert "Message with\\. special\\+ chars\\= here\\| too\\{\\}" in formatted
@@ -444,15 +448,15 @@ class TestTelegramProvider:
                 "response": "internal response data",  # Should be filtered
                 "status_code": 200,  # Should be filtered
                 "duration": "5 minutes",
-            }
+            },
         )
 
         formatted = telegram_provider._format_message(message)
-        
+
         # Should include user-visible metadata
         assert "backup_id" in formatted or "Backup Id" in formatted
         assert "duration" in formatted or "Duration" in formatted
-        
+
         # Should NOT include internal metadata
         assert "response" not in formatted
         assert "status_code" not in formatted

@@ -5,7 +5,7 @@ Handles all repository-related business operations independent of HTTP concerns.
 
 import logging
 import os
-from typing import List, Dict, Protocol, TypedDict, Union
+from typing import List, Protocol, TypedDict, Union
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job, Schedule
@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 class KeyfileProtocol(Protocol):
     """Protocol for keyfile objects (e.g., FastAPI UploadFile)."""
+
     filename: str | None
 
     async def read(self) -> bytes:
@@ -58,12 +59,14 @@ class KeyfileProtocol(Protocol):
 
 class KeyfileSuccessResult(TypedDict):
     """Result when keyfile save succeeds."""
+
     success: bool
     path: str
 
 
 class KeyfileErrorResult(TypedDict):
     """Result when keyfile save fails."""
+
     success: bool
     error: str
 
@@ -158,7 +161,10 @@ class RepositoryService:
                     # Type narrowing: if success is False, it's a KeyfileErrorResult
                     error_msg = keyfile_result.get("error")
                     return RepositoryOperationResult(
-                        success=False, error_message=str(error_msg) if error_msg else "Unknown keyfile error"
+                        success=False,
+                        error_message=str(error_msg)
+                        if error_msg
+                        else "Unknown keyfile error",
                     )
                 # Type narrowing: if success is True, it's a KeyfileSuccessResult
                 path_value = keyfile_result.get("path")
@@ -569,7 +575,9 @@ class RepositoryService:
         else:
             return f"Failed to initialize repository: {borg_error}"
 
-    async def _save_keyfile(self, repository_name: str, keyfile: KeyfileProtocol) -> KeyfileSaveResult:
+    async def _save_keyfile(
+        self, repository_name: str, keyfile: KeyfileProtocol
+    ) -> KeyfileSaveResult:
         """Save uploaded keyfile securely."""
         try:
             keyfiles_dir = "/app/data/keyfiles"

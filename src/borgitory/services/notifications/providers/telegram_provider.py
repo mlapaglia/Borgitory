@@ -6,7 +6,6 @@ import logging
 from typing import Dict, List, Optional
 from pydantic import Field, field_validator
 
-# Import HttpClient protocol from discord_provider for consistency
 from .discord_provider import HttpClient, AiohttpClient
 
 from .base import NotificationProvider, NotificationProviderConfig
@@ -24,14 +23,14 @@ logger = logging.getLogger(__name__)
 class TelegramConfig(NotificationProviderConfig):
     """Configuration for Telegram bot notifications"""
 
-    bot_token: str = Field(
-        ..., min_length=10, description="Telegram bot token"
-    )
+    bot_token: str = Field(..., min_length=10, description="Telegram bot token")
     chat_id: str = Field(
-        ..., description="Telegram chat ID (can be user ID, group ID, or channel username)"
+        ...,
+        description="Telegram chat ID (can be user ID, group ID, or channel username)",
     )
     parse_mode: str = Field(
-        default="HTML", description="Message parse mode (HTML, Markdown, MarkdownV2, or None for plain text)"
+        default="HTML",
+        description="Message parse mode (HTML, Markdown, MarkdownV2, or None for plain text)",
     )
     disable_notification: bool = Field(
         default=False, description="Send message silently (no notification sound)"
@@ -54,7 +53,9 @@ class TelegramConfig(NotificationProviderConfig):
         """Validate parse mode"""
         valid_modes = ["HTML", "Markdown", "MarkdownV2", "None", ""]
         if v not in valid_modes:
-            raise ValueError(f"Parse mode must be one of: HTML, Markdown, MarkdownV2, None, or empty string for plain text")
+            raise ValueError(
+                "Parse mode must be one of: HTML, Markdown, MarkdownV2, None, or empty string for plain text"
+            )
         return v
 
 
@@ -78,18 +79,16 @@ class TelegramProvider(NotificationProvider):
     ) -> NotificationResult:
         """Send a notification via Telegram bot API"""
         try:
-            # Format message based on notification type
             formatted_message = self._format_message(message)
-            
-            # Build API URL
+
             api_url = f"{self.TELEGRAM_API_BASE}/bot{self.config.bot_token}/sendMessage"
-            
+
             payload = {
                 "chat_id": self.config.chat_id,
                 "text": formatted_message,
                 "disable_notification": self.config.disable_notification,
             }
-            
+
             # Only include parse_mode if it's not empty or "None"
             if self.config.parse_mode and self.config.parse_mode != "None":
                 payload["parse_mode"] = self.config.parse_mode
@@ -154,14 +153,16 @@ class TelegramProvider(NotificationProvider):
             # First, test if the bot token is valid by calling getMe
             api_url = f"{self.TELEGRAM_API_BASE}/bot{self.config.bot_token}/getMe"
             response = await self.http_client.post(api_url)
-            
+
             if response.status != 200:
                 logger.error("Telegram bot token validation failed")
                 return False
-                
-            result = await response.json()
-            if not result.get("ok"):
-                logger.error(f"Telegram getMe failed: {result.get('description')}")
+
+            getme_result = await response.json()
+            if not getme_result.get("ok"):
+                logger.error(
+                    f"Telegram getMe failed: {getme_result.get('description')}"
+                )
                 return False
 
             # Then send a test message
@@ -171,8 +172,8 @@ class TelegramProvider(NotificationProvider):
                 notification_type=NotificationType.INFO,
             )
 
-            result = await self.send_notification(test_message)
-            return result.success
+            notification_result = await self.send_notification(test_message)
+            return notification_result.success
 
         except Exception as e:
             logger.error(f"Telegram connection test failed: {e}")
@@ -180,7 +181,11 @@ class TelegramProvider(NotificationProvider):
 
     def get_connection_info(self) -> ConnectionInfo:
         """Get connection info for display"""
-        bot_id = self.config.bot_token.split(":")[0] if ":" in self.config.bot_token else "unknown"
+        bot_id = (
+            self.config.bot_token.split(":")[0]
+            if ":" in self.config.bot_token
+            else "unknown"
+        )
         return ConnectionInfo(
             provider="telegram",
             endpoint=f"Bot: {bot_id}, Chat: {self.config.chat_id}",
@@ -195,7 +200,7 @@ class TelegramProvider(NotificationProvider):
         """Get provider-specific display details for the UI"""
         bot_token = str(config_dict.get("bot_token", ""))
         bot_id = bot_token.split(":")[0] if ":" in bot_token else "unknown"
-        
+
         details = f"""
         <div class="space-y-2">
             <div><span class="font-medium">Bot ID:</span> {bot_id}</div>
@@ -211,10 +216,10 @@ class TelegramProvider(NotificationProvider):
         """Format message for Telegram with appropriate styling"""
         # Get emoji for notification type
         emoji = self._get_emoji_for_type(message.notification_type)
-        
+
         if self.config.parse_mode == "HTML":
             formatted = f"{emoji} <b>{message.title}</b>\n\n{message.message}"
-            
+
             # Add metadata if present
             if message.metadata:
                 formatted += "\n\n<b>Details:</b>"
@@ -222,17 +227,55 @@ class TelegramProvider(NotificationProvider):
                     if key not in ["response", "status_code"]:  # Skip internal fields
                         clean_key = key.replace("_", " ").title()
                         formatted += f"\n• <i>{clean_key}:</i> {value}"
-                        
+
         elif self.config.parse_mode in ["Markdown", "MarkdownV2"]:
             # Use Markdown formatting
             if self.config.parse_mode == "MarkdownV2":
                 # MarkdownV2 requires escaping special characters
-                title = message.title.replace("_", "\\_").replace("*", "\\*").replace("[", "\\[").replace("]", "\\]").replace("(", "\\(").replace(")", "\\)").replace("~", "\\~").replace("`", "\\`").replace(">", "\\>").replace("#", "\\#").replace("+", "\\+").replace("-", "\\-").replace("=", "\\=").replace("|", "\\|").replace("{", "\\{").replace("}", "\\}").replace(".", "\\.").replace("!", "\\!")
-                msg_text = message.message.replace("_", "\\_").replace("*", "\\*").replace("[", "\\[").replace("]", "\\]").replace("(", "\\(").replace(")", "\\)").replace("~", "\\~").replace("`", "\\`").replace(">", "\\>").replace("#", "\\#").replace("+", "\\+").replace("-", "\\-").replace("=", "\\=").replace("|", "\\|").replace("{", "\\{").replace("}", "\\}").replace(".", "\\.").replace("!", "\\!")
+                title = (
+                    message.title.replace("_", "\\_")
+                    .replace("*", "\\*")
+                    .replace("[", "\\[")
+                    .replace("]", "\\]")
+                    .replace("(", "\\(")
+                    .replace(")", "\\)")
+                    .replace("~", "\\~")
+                    .replace("`", "\\`")
+                    .replace(">", "\\>")
+                    .replace("#", "\\#")
+                    .replace("+", "\\+")
+                    .replace("-", "\\-")
+                    .replace("=", "\\=")
+                    .replace("|", "\\|")
+                    .replace("{", "\\{")
+                    .replace("}", "\\}")
+                    .replace(".", "\\.")
+                    .replace("!", "\\!")
+                )
+                msg_text = (
+                    message.message.replace("_", "\\_")
+                    .replace("*", "\\*")
+                    .replace("[", "\\[")
+                    .replace("]", "\\]")
+                    .replace("(", "\\(")
+                    .replace(")", "\\)")
+                    .replace("~", "\\~")
+                    .replace("`", "\\`")
+                    .replace(">", "\\>")
+                    .replace("#", "\\#")
+                    .replace("+", "\\+")
+                    .replace("-", "\\-")
+                    .replace("=", "\\=")
+                    .replace("|", "\\|")
+                    .replace("{", "\\{")
+                    .replace("}", "\\}")
+                    .replace(".", "\\.")
+                    .replace("!", "\\!")
+                )
                 formatted = f"{emoji} *{title}*\n\n{msg_text}"
             else:
                 formatted = f"{emoji} *{message.title}*\n\n{message.message}"
-                
+
             # Add metadata if present
             if message.metadata:
                 formatted += "\n\n*Details:*"
@@ -243,7 +286,7 @@ class TelegramProvider(NotificationProvider):
         else:
             # Plain text mode (empty string, "None", or other)
             formatted = f"{emoji} {message.title}\n\n{message.message}"
-            
+
             # Add metadata if present
             if message.metadata:
                 formatted += "\n\nDetails:"
