@@ -1045,23 +1045,18 @@ class JobManager:
                     logger.warning(f"Break-lock failed, continuing with backup: {e}")
                     task_output_callback(f"Warning: Break-lock failed: {e}")
 
-            # Use context manager to handle keyfile creation without cleanup
-            # (cleanup will happen when job completes or fails)
             async with secure_borg_command(
                 base_command="borg create",
                 repository_path="",  # Already in additional_args
                 passphrase=passphrase,
                 keyfile_content=keyfile_content,
                 additional_args=additional_args,
-                cleanup_keyfile=False,  # Don't cleanup yet - job will handle it
+                cleanup_keyfile=False,
             ) as (command, env, temp_keyfile_path):
-                # Start the backup process
                 process = await self.safe_executor.start_process(command, env)
                 self._processes[job.id] = process
 
-                # Store keyfile path for later cleanup
                 if temp_keyfile_path:
-                    # Store in job context for cleanup when job finishes
                     setattr(task, "_temp_keyfile_path", temp_keyfile_path)
 
             # Monitor the process (outside context manager since it's long-running)
@@ -1069,7 +1064,6 @@ class JobManager:
                 process, output_callback=task_output_callback
             )
 
-            # Log the result for debugging
             logger.info(
                 f"Backup process completed with return code: {result.return_code}"
             )
@@ -1080,29 +1074,23 @@ class JobManager:
             if result.error:
                 logger.error(f"Backup process error: {result.error}")
 
-            # Clean up process tracking
             if job.id in self._processes:
                 del self._processes[job.id]
 
-            # Set task status based on result
             task.return_code = result.return_code
             task.status = "completed" if result.return_code == 0 else "failed"
             task.completed_at = now_utc()
 
-            # Clean up temporary keyfile if one was created
             if hasattr(task, "_temp_keyfile_path"):
                 cleanup_temp_keyfile(getattr(task, "_temp_keyfile_path"))
                 delattr(task, "_temp_keyfile_path")
 
-            # Always add the full process output to task output_lines for debugging
             if result.stdout:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()
                 if full_output and result.return_code != 0:
-                    # Add the captured output to the task output lines for visibility
                     for line in full_output.split("\n"):
                         if line.strip():
                             task.output_lines.append(line)
-                            # Also add to output manager for real-time display
                             asyncio.create_task(
                                 self.safe_output_manager.add_output_line(
                                     job.id, line, "stdout", {}
@@ -1112,8 +1100,6 @@ class JobManager:
             if result.error:
                 task.error = result.error
             elif result.return_code != 0:
-                # Set a default error message if none provided by result
-                # Since stderr is redirected to stdout, check stdout for error messages
                 if result.stdout:
                     output_text = result.stdout.decode(
                         "utf-8", errors="replace"
@@ -1136,7 +1122,6 @@ class JobManager:
             task.error = f"Backup task failed: {str(e)}"
             task.completed_at = now_utc()
 
-            # Clean up temporary keyfile if one was created
             if hasattr(task, "_temp_keyfile_path"):
                 cleanup_temp_keyfile(getattr(task, "_temp_keyfile_path"))
                 delattr(task, "_temp_keyfile_path")

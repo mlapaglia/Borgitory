@@ -393,7 +393,7 @@ class TestExtractFileStream:
     async def test_extract_file_stream_security_error(self) -> None:
         """Test file extraction with security validation error."""
         with patch("borgitory.utils.security.validate_archive_name"), patch(
-            "borgitory.services.borg_service.build_secure_borg_command",
+            "borgitory.utils.security.build_secure_borg_command_with_keyfile",
             side_effect=Exception("Security error"),
         ):
             with pytest.raises(Exception) as exc_info:
