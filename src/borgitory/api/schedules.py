@@ -394,6 +394,37 @@ async def delete_schedule(
     return response
 
 
+@router.post("/{schedule_id}/run", response_class=HTMLResponse)
+async def run_schedule_manually(
+    schedule_id: int,
+    request: Request,
+    templates: TemplatesDep,
+    schedule_service: ScheduleServiceDep,
+) -> HTMLResponse:
+    """Run a schedule manually"""
+    success, job_id, error_msg = await schedule_service.run_schedule_manually(
+        schedule_id
+    )
+
+    if not success:
+        return templates.TemplateResponse(
+            request,
+            "partials/common/error_message.html",
+            {"error_message": error_msg},
+            status_code=404 if error_msg and "not found" in error_msg else 500,
+        )
+
+    # Get the schedule name for the success message
+    schedule = schedule_service.get_schedule_by_id(schedule_id)
+    schedule_name = schedule.name if schedule else "Unknown"
+
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/run_success.html",
+        {"schedule_name": schedule_name, "job_id": job_id},
+    )
+
+
 @router.get("/jobs/active", response_class=HTMLResponse)
 async def get_active_scheduled_jobs(
     templates: TemplatesDep,

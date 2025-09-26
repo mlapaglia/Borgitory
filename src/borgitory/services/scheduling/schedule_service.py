@@ -225,6 +225,34 @@ class ScheduleService:
             self.db.rollback()
             return False, None, f"Failed to delete schedule: {str(e)}"
 
+    async def run_schedule_manually(
+        self, schedule_id: int
+    ) -> tuple[bool, Optional[str], Optional[str]]:
+        """
+        Manually run a schedule immediately by injecting a one-time job into APScheduler.
+
+        Returns:
+            tuple: (success, job_id_or_none, error_message_or_none)
+        """
+        try:
+            schedule = self.get_schedule_by_id(schedule_id)
+            if not schedule:
+                return False, None, "Schedule not found"
+
+            # Use the scheduler service to inject a one-time job
+            job_id = await self.scheduler_service.run_schedule_once(
+                schedule_id, schedule.name
+            )
+
+            logger.info(
+                f"Successfully scheduled manual run for schedule {schedule_id} with job_id {job_id}"
+            )
+            return True, job_id, None
+
+        except Exception as e:
+            logger.error(f"Failed to run schedule manually: {str(e)}")
+            return False, None, f"Failed to run schedule manually: {str(e)}"
+
     def validate_schedule_creation_data(
         self, json_data: Dict[str, Any]
     ) -> tuple[bool, Dict[str, Any], Optional[str]]:
