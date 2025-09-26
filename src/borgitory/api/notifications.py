@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]:
-    """Get the appropriate template path for a provider and mode"""
+    """Get the appropriate template path for a provider (now unified for create/edit)"""
     if not provider:
         return None
 
@@ -30,9 +30,8 @@ def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]
     if not re.fullmatch(r"^[\w-]+$", provider):
         return None
 
-    # Automatically discover templates by checking if they exist on filesystem
-    suffix = "_edit" if mode == "edit" else ""
-    template_path = f"partials/notifications/providers/{provider}_fields{suffix}.html"
+    # Use unified template (no more separate _edit templates)
+    template_path = f"partials/notifications/providers/{provider}_fields.html"
     full_path = f"src/borgitory/templates/{template_path}"
 
     # Ensure fully resolved full_path remains inside the intended provider templates dir
@@ -320,6 +319,7 @@ async def get_notification_config_edit_form(
             "decrypted_config": decrypted_config,
             "provider_template": _get_provider_template(config.provider, "edit"),
             "is_edit_mode": True,
+            "mode": "edit",  # Pass mode for unified template
         }
 
         # Add decrypted config values to context for template rendering

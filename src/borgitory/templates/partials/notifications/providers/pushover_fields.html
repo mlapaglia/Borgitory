@@ -1,25 +1,35 @@
-<!-- Pushover Provider Fields -->
+<!-- Pushover Provider Fields - Unified Template -->
 <div class="space-y-4">
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Pushover User Key</label>
-        <input type="text" name="user_key" required placeholder="u1a2b3c4d5e6f7g8h9i0j1k2l3m4n5" class="input-modern mt-1">
+        <input type="text" 
+               name="user_key" 
+               required 
+               value="{{ user_key or '' }}" 
+               placeholder="u1a2b3c4d5e6f7g8h9i0j1k2l3m4n5" 
+               class="input-modern mt-1">
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Found in your Pushover dashboard</p>
     </div>
     
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">App Token</label>
-        <input type="text" name="app_token" required placeholder="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8" class="input-modern mt-1">
+        <input type="text" 
+               name="app_token" 
+               required 
+               value="{{ app_token or '' }}" 
+               placeholder="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8" 
+               class="input-modern mt-1">
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Create an application in Pushover to get this token</p>
     </div>
     
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Default Priority</label>
         <select name="priority" class="select-modern w-full">
-            <option value="-2">Lowest Priority</option>
-            <option value="-1">Low Priority</option>
-            <option value="0" selected>Normal Priority</option>
-            <option value="1">High Priority</option>
-            <option value="2">Emergency Priority</option>
+            <option value="-2" {% if priority == -2 %}selected{% endif %}>Lowest Priority</option>
+            <option value="-1" {% if priority == -1 %}selected{% endif %}>Low Priority</option>
+            <option value="0" {% if priority == 0 or not priority %}selected{% endif %}>Normal Priority</option>
+            <option value="1" {% if priority == 1 %}selected{% endif %}>High Priority</option>
+            <option value="2" {% if priority == 2 %}selected{% endif %}>Emergency Priority</option>
         </select>
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Default priority for notifications (can be overridden per notification)</p>
     </div>
@@ -27,32 +37,34 @@
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Default Sound</label>
         <select name="sound" class="select-modern w-full">
-            <option value="default" selected>Default</option>
-            <option value="bike">Bike</option>
-            <option value="bugle">Bugle</option>
-            <option value="cashregister">Cash Register</option>
-            <option value="classical">Classical</option>
-            <option value="cosmic">Cosmic</option>
-            <option value="falling">Falling</option>
-            <option value="gamelan">Gamelan</option>
-            <option value="incoming">Incoming</option>
-            <option value="intermission">Intermission</option>
-            <option value="magic">Magic</option>
-            <option value="mechanical">Mechanical</option>
-            <option value="pianobar">Piano Bar</option>
-            <option value="siren">Siren</option>
-            <option value="spacealarm">Space Alarm</option>
-            <option value="tugboat">Tugboat</option>
-            <option value="alien">Alien Alarm (long)</option>
-            <option value="climb">Climb (long)</option>
-            <option value="persistent">Persistent (long)</option>
-            <option value="echo">Pushover Echo (long)</option>
-            <option value="updown">Up Down (long)</option>
-            <option value="none">Silent</option>
+            <option value="default" {% if sound == 'default' or not sound %}selected{% endif %}>Default</option>
+            <option value="bike" {% if sound == 'bike' %}selected{% endif %}>Bike</option>
+            <option value="bugle" {% if sound == 'bugle' %}selected{% endif %}>Bugle</option>
+            <option value="cashregister" {% if sound == 'cashregister' %}selected{% endif %}>Cash Register</option>
+            <option value="classical" {% if sound == 'classical' %}selected{% endif %}>Classical</option>
+            <option value="cosmic" {% if sound == 'cosmic' %}selected{% endif %}>Cosmic</option>
+            <option value="falling" {% if sound == 'falling' %}selected{% endif %}>Falling</option>
+            <option value="gamelan" {% if sound == 'gamelan' %}selected{% endif %}>Gamelan</option>
+            <option value="incoming" {% if sound == 'incoming' %}selected{% endif %}>Incoming</option>
+            <option value="intermission" {% if sound == 'intermission' %}selected{% endif %}>Intermission</option>
+            <option value="magic" {% if sound == 'magic' %}selected{% endif %}>Magic</option>
+            <option value="mechanical" {% if sound == 'mechanical' %}selected{% endif %}>Mechanical</option>
+            <option value="pianobar" {% if sound == 'pianobar' %}selected{% endif %}>Piano Bar</option>
+            <option value="siren" {% if sound == 'siren' %}selected{% endif %}>Siren</option>
+            <option value="spacealarm" {% if sound == 'spacealarm' %}selected{% endif %}>Space Alarm</option>
+            <option value="tugboat" {% if sound == 'tugboat' %}selected{% endif %}>Tugboat</option>
+            <option value="alien" {% if sound == 'alien' %}selected{% endif %}>Alien Alarm (long)</option>
+            <option value="climb" {% if sound == 'climb' %}selected{% endif %}>Climb (long)</option>
+            <option value="persistent" {% if sound == 'persistent' %}selected{% endif %}>Persistent (long)</option>
+            <option value="echo" {% if sound == 'echo' %}selected{% endif %}>Pushover Echo (long)</option>
+            <option value="updown" {% if sound == 'updown' %}selected{% endif %}>Up Down (long)</option>
+            <option value="none" {% if sound == 'none' %}selected{% endif %}>Silent</option>
         </select>
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Default sound for notifications</p>
     </div>
 
+    <!-- Only show buttons in create mode -->
+    {% if mode == 'create' %}
     <div class="flex space-x-2">
         <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
             {{ submit_button_text or "Add Pushover Notification" }}
@@ -67,4 +79,5 @@
     </div>
     
     <div id="notification-test-status" class="mt-2"></div>
+    {% endif %}
 </div>

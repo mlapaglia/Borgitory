@@ -370,34 +370,40 @@ class TestNotificationEditIntegration:
             "checked" in html_content
         )  # disable_notification checkbox should be checked
 
-    def test_edit_template_discovery(self) -> None:
-        """Test that edit templates are properly discovered for all providers"""
+    def test_unified_template_discovery(self) -> None:
+        """Test that unified templates are properly discovered for all providers"""
         from borgitory.api.notifications import _get_provider_template
 
-        # Test that all edit templates exist
-        providers = ["telegram", "discord", "pushover"]
-        for provider in providers:
-            template_path = _get_provider_template(provider, "edit")
-            assert template_path is not None
-            assert template_path.endswith(f"{provider}_fields_edit.html")
-            assert "partials/notifications/providers/" in template_path
-
-        # Test that non-existent provider returns None
-        assert _get_provider_template("nonexistent", "edit") is None
-
-    def test_edit_vs_create_template_differences(self) -> None:
-        """Test that edit and create templates are different files"""
-        from borgitory.api.notifications import _get_provider_template
-
+        # Test that all unified templates exist for both create and edit modes
         providers = ["telegram", "discord", "pushover"]
         for provider in providers:
             create_template = _get_provider_template(provider, "create")
             edit_template = _get_provider_template(provider, "edit")
 
-            assert create_template != edit_template
+            # Both should return the same unified template
+            assert create_template is not None
+            assert edit_template is not None
+            assert create_template == edit_template  # Unified template
+            assert create_template.endswith(f"{provider}_fields.html")
+            assert "partials/notifications/providers/" in create_template
+
+        # Test that non-existent provider returns None
+        assert _get_provider_template("nonexistent", "edit") is None
+
+    def test_unified_template_mode_handling(self) -> None:
+        """Test that unified templates handle create/edit modes correctly via context"""
+        from borgitory.api.notifications import _get_provider_template
+
+        providers = ["telegram", "discord", "pushover"]
+        for provider in providers:
+            # Both modes should use the same template file
+            create_template = _get_provider_template(provider, "create")
+            edit_template = _get_provider_template(provider, "edit")
+
+            assert create_template == edit_template  # Same unified template
             assert create_template is not None and create_template.endswith(
                 f"{provider}_fields.html"
             )
-            assert edit_template is not None and edit_template.endswith(
-                f"{provider}_fields_edit.html"
-            )
+
+            # The difference is in the context passed to the template (mode parameter)
+            # This test verifies the template discovery works for the unified approach
