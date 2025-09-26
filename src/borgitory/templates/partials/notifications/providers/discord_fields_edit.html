@@ -1,0 +1,23 @@
+<!-- Discord Provider Fields - Edit Mode -->
+<div class="space-y-4">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Discord Webhook URL</label>
+        <input type="text" name="webhook_url" required value="{{ webhook_url or '' }}" placeholder="https://discord.com/api/webhooks/..." class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Create a webhook in your Discord server: Server Settings → Integrations → Webhooks → New Webhook
+        </p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bot Username</label>
+        <input type="text" name="username" value="{{ username or 'Borgitory' }}" placeholder="Borgitory" class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Name that will appear as the sender of messages</p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Bot Avatar URL (Optional)</label>
+        <input type="url" name="avatar_url" value="{{ avatar_url or '' }}" placeholder="https://example.com/avatar.png" class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">URL to an image to use as the bot's avatar</p>
+    </div>
+
+</div>

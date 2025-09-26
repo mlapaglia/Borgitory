@@ -78,6 +78,13 @@ async def get_provider_fields(
             "submit_button_text": submit_button_text,
         }
 
+        # For edit mode, include any configuration values passed via query params or form data
+        if mode == "edit":
+            # Get configuration data from query parameters (for HTMX requests)
+            for key, value in request.query_params.items():
+                if key not in ["provider", "mode"]:
+                    context[key] = value
+
         return HTMLResponse(
             templates.get_template(template_path).render(request=request, **context)
         )
@@ -311,8 +318,12 @@ async def get_notification_config_edit_form(
         context = {
             "config": config,
             "decrypted_config": decrypted_config,
+            "provider_template": _get_provider_template(config.provider, "edit"),
             "is_edit_mode": True,
         }
+
+        # Add decrypted config values to context for template rendering
+        context.update(decrypted_config)
 
         return templates.TemplateResponse(
             request, "partials/notifications/edit_form.html", context
