@@ -1,0 +1,69 @@
+<!-- Telegram Provider Fields - Unified Template -->
+<div class="space-y-4">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Telegram Bot Token</label>
+        <input type="text" 
+               name="bot_token" 
+               required 
+               value="{{ bot_token or '' }}" 
+               placeholder="123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk" 
+               class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Create a bot with @BotFather on Telegram and copy the token here
+        </p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Chat ID</label>
+        <input type="text" 
+               name="chat_id" 
+               required 
+               value="{{ chat_id or '' }}" 
+               placeholder="@channel_name or 123456789 or -987654321" 
+               class="input-modern mt-1">
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Channel username (@channel), user ID (numbers), or group ID (negative numbers)
+        </p>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Message Format</label>
+        <select name="parse_mode" class="select-modern w-full">
+            <option value="HTML" {% if parse_mode == 'HTML' or not parse_mode %}selected{% endif %}>HTML</option>
+            <option value="Markdown" {% if parse_mode == 'Markdown' %}selected{% endif %}>Markdown</option>
+            <option value="MarkdownV2" {% if parse_mode == 'MarkdownV2' %}selected{% endif %}>MarkdownV2</option>
+            <option value="" {% if parse_mode == '' %}selected{% endif %}>Plain Text</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Format for notification messages (HTML recommended)</p>
+    </div>
+    
+    <div class="flex items-center space-x-3">
+        <input type="checkbox" 
+               name="disable_notification" 
+               id="disable_notification" 
+               class="checkbox-modern"
+               {% if disable_notification %}checked{% endif %}>
+        <label for="disable_notification" class="text-sm text-gray-900 dark:text-gray-100">
+            Send Silent Notifications
+        </label>
+        <p class="text-xs text-gray-600 dark:text-gray-400">Messages won't trigger notification sounds</p>
+    </div>
+
+    <!-- Only show buttons in create mode -->
+    {% if mode == 'create' %}
+    <div class="flex space-x-2">
+        <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+            {{ submit_button_text or "Add Telegram Notification" }}
+        </button>
+        <button type="button" 
+                hx-post="/api/notifications/test-config"
+                hx-include="closest form"
+                hx-target="#notification-test-status"
+                class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+            Test Bot
+        </button>
+    </div>
+    
+    <div id="notification-test-status" class="mt-2"></div>
+    {% endif %}
+</div>

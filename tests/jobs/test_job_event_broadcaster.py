@@ -114,7 +114,7 @@ class TestJobEventBroadcaster:
         # Create queue at max capacity
         queue = self.broadcaster.subscribe_client()
         for i in range(5):  # Fill to max_queue_size
-            queue.put_nowait({"test": i})
+            queue.put_nowait(JobEvent(event_type=EventType.KEEPALIVE, data={"test": i}))
 
         initial_client_count = len(self.broadcaster._client_queues)
 

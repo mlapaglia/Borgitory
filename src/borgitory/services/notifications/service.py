@@ -391,6 +391,7 @@ class NotificationService:
             sensitive_fields = [
                 "user_key",
                 "app_token",
+                "bot_token",
                 "token",
                 "password",
                 "secret",

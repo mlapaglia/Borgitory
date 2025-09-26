@@ -5,7 +5,7 @@ Handles all repository-related business operations independent of HTTP concerns.
 
 import logging
 import os
-from typing import List, Dict, Any
+from typing import List, Protocol, TypedDict, Union
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job, Schedule
@@ -45,6 +45,33 @@ from borgitory.utils.secure_path import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class KeyfileProtocol(Protocol):
+    """Protocol for keyfile objects (e.g., FastAPI UploadFile)."""
+
+    filename: str | None
+
+    async def read(self) -> bytes:
+        """Read the file content."""
+        ...
+
+
+class KeyfileSuccessResult(TypedDict):
+    """Result when keyfile save succeeds."""
+
+    success: bool
+    path: str
+
+
+class KeyfileErrorResult(TypedDict):
+    """Result when keyfile save fails."""
+
+    success: bool
+    error: str
+
+
+KeyfileSaveResult = Union[KeyfileSuccessResult, KeyfileErrorResult]
 
 
 class RepositoryService:
@@ -127,14 +154,21 @@ class RepositoryService:
                 )
 
             # Handle keyfile if provided
-            keyfile_path = None
+            keyfile_path: str | None = None
             if request.keyfile and request.keyfile.filename:
                 keyfile_result = await self._save_keyfile(request.name, request.keyfile)
                 if not keyfile_result["success"]:
+                    # Type narrowing: if success is False, it's a KeyfileErrorResult
+                    error_msg = keyfile_result.get("error")
                     return RepositoryOperationResult(
-                        success=False, error_message=keyfile_result["error"]
+                        success=False,
+                        error_message=str(error_msg)
+                        if error_msg
+                        else "Unknown keyfile error",
                     )
-                keyfile_path = keyfile_result["path"]
+                # Type narrowing: if success is True, it's a KeyfileSuccessResult
+                path_value = keyfile_result.get("path")
+                keyfile_path = str(path_value) if path_value else None
 
             db_repo = Repository()
             db_repo.name = request.name
@@ -541,14 +575,16 @@ class RepositoryService:
         else:
             return f"Failed to initialize repository: {borg_error}"
 
-    async def _save_keyfile(self, repository_name: str, keyfile: Any) -> Dict[str, Any]:
+    async def _save_keyfile(
+        self, repository_name: str, keyfile: KeyfileProtocol
+    ) -> KeyfileSaveResult:
         """Save uploaded keyfile securely."""
         try:
             keyfiles_dir = "/app/data/keyfiles"
             os.makedirs(keyfiles_dir, exist_ok=True)
 
             safe_filename = create_secure_filename(
-                repository_name, keyfile.filename, add_uuid=True
+                repository_name, keyfile.filename or "keyfile", add_uuid=True
             )
             keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
 
