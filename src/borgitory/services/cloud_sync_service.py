@@ -53,8 +53,7 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
                     logger.warning(
                         f"Failed to create temp storage instance for {provider}: {e}"
                     )
-                    # If we can't create an instance, try to inspect the method
-                    # or return empty list - no hardcoded fallbacks
+
                     return []
 
         logger.warning(

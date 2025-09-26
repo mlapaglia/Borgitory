@@ -89,7 +89,6 @@ class TelegramProvider(NotificationProvider):
                 "disable_notification": self.config.disable_notification,
             }
 
-            # Only include parse_mode if it's not empty or "None"
             if self.config.parse_mode and self.config.parse_mode != "None":
                 payload["parse_mode"] = self.config.parse_mode
 
@@ -150,7 +149,6 @@ class TelegramProvider(NotificationProvider):
     async def test_connection(self) -> bool:
         """Test Telegram bot connection and validate credentials"""
         try:
-            # First, test if the bot token is valid by calling getMe
             api_url = f"{self.TELEGRAM_API_BASE}/bot{self.config.bot_token}/getMe"
             response = await self.http_client.post(api_url)
 
@@ -165,7 +163,6 @@ class TelegramProvider(NotificationProvider):
                 )
                 return False
 
-            # Then send a test message
             test_message = NotificationMessage(
                 title="Borgitory Test",
                 message="This is a test notification from Borgitory backup system.",

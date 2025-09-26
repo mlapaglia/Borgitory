@@ -460,3 +460,307 @@ class TestTelegramProvider:
         # Should NOT include internal metadata
         assert "response" not in formatted
         assert "status_code" not in formatted
+
+    # ===== SEND_NOTIFICATION TESTS =====
+
+    @pytest.mark.asyncio
+    async def test_send_notification_success(
+        self, telegram_config, mock_http_client, sample_message
+    ):
+        """Test successful notification sending"""
+        # Setup mock response
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(
+            return_value='{"ok": true, "result": {"message_id": 123}}'
+        )
+        mock_response.json = AsyncMock(
+            return_value={"ok": True, "result": {"message_id": 123}}
+        )
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.send_notification(sample_message)
+
+        # Verify result
+        assert result.success is True
+        assert result.provider == "telegram"
+        assert result.message == "Notification sent successfully"
+        assert result.error is None
+        assert "response" in result.metadata
+
+        # Verify HTTP call
+        mock_http_client.post.assert_called_once()
+        call_args = mock_http_client.post.call_args
+        assert (
+            call_args[0][0]
+            == f"https://api.telegram.org/bot{telegram_config.bot_token}/sendMessage"
+        )
+
+        # Verify payload
+        payload = call_args[1]["json"]
+        assert payload["chat_id"] == telegram_config.chat_id
+        assert payload["disable_notification"] == telegram_config.disable_notification
+        assert "text" in payload
+        assert payload["parse_mode"] == telegram_config.parse_mode
+
+    @pytest.mark.asyncio
+    async def test_send_notification_api_error(
+        self, telegram_config, mock_http_client, sample_message
+    ):
+        """Test handling of Telegram API errors (200 status but ok=false)"""
+        # Setup mock response with API error
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(
+            return_value='{"ok": false, "description": "Bad Request: chat not found"}'
+        )
+        mock_response.json = AsyncMock(
+            return_value={"ok": False, "description": "Bad Request: chat not found"}
+        )
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.send_notification(sample_message)
+
+        # Verify result
+        assert result.success is False
+        assert result.provider == "telegram"
+        assert result.message == "API returned error"
+        assert result.error == "Bad Request: chat not found"
+        assert "response" in result.metadata
+
+    @pytest.mark.asyncio
+    async def test_send_notification_http_error(
+        self, telegram_config, mock_http_client, sample_message
+    ):
+        """Test handling of HTTP errors (non-200 status)"""
+        # Setup mock response with HTTP error
+        mock_response = Mock()
+        mock_response.status = 401
+        mock_response.text = AsyncMock(return_value="Unauthorized")
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.send_notification(sample_message)
+
+        # Verify result
+        assert result.success is False
+        assert result.provider == "telegram"
+        assert result.message == "HTTP error 401"
+        assert result.error == "Unauthorized"
+        assert result.metadata["status_code"] == 401
+
+    @pytest.mark.asyncio
+    async def test_send_notification_json_parse_error_but_200(
+        self, telegram_config, mock_http_client, sample_message
+    ):
+        """Test handling when JSON parsing fails but HTTP status is 200 (consider success)"""
+        # Setup mock response that returns 200 but invalid JSON
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value="Invalid JSON response")
+        mock_response.json = AsyncMock(side_effect=ValueError("Invalid JSON"))
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.send_notification(sample_message)
+
+        # Should still consider it success since status is 200
+        assert result.success is True
+        assert result.provider == "telegram"
+        assert result.message == "Notification sent successfully"
+        assert result.error is None
+        assert "response" in result.metadata
+
+    @pytest.mark.asyncio
+    async def test_send_notification_network_exception(
+        self, telegram_config, mock_http_client, sample_message
+    ):
+        """Test handling of network exceptions"""
+        # Setup mock to raise exception
+        mock_http_client.post.side_effect = Exception("Network error")
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.send_notification(sample_message)
+
+        # Verify result
+        assert result.success is False
+        assert result.provider == "telegram"
+        assert result.message == "Exception occurred"
+        assert result.error == "Network error"
+        assert result.metadata == {}
+
+    @pytest.mark.asyncio
+    async def test_send_notification_payload_construction(
+        self, mock_http_client, sample_message
+    ):
+        """Test that notification payload is constructed correctly for different configurations"""
+        # Test with parse_mode = None (should not include parse_mode in payload)
+        config_no_parse = TelegramConfig(
+            bot_token="123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk",
+            chat_id="@test",
+            parse_mode="None",
+            disable_notification=True,
+        )
+
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value='{"ok": true}')
+        mock_response.json = AsyncMock(return_value={"ok": True})
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(config_no_parse, mock_http_client)
+        await provider.send_notification(sample_message)
+
+        # Check that parse_mode is not in payload when set to "None"
+        call_args = mock_http_client.post.call_args
+        payload = call_args[1]["json"]
+        assert "parse_mode" not in payload
+        assert payload["disable_notification"] is True
+
+    @pytest.mark.asyncio
+    async def test_send_notification_empty_parse_mode(
+        self, mock_http_client, sample_message
+    ):
+        """Test notification with empty parse_mode (plain text)"""
+        config_empty_parse = TelegramConfig(
+            bot_token="123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk",
+            chat_id="@test",
+            parse_mode="",
+            disable_notification=False,
+        )
+
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value='{"ok": true}')
+        mock_response.json = AsyncMock(return_value={"ok": True})
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(config_empty_parse, mock_http_client)
+        await provider.send_notification(sample_message)
+
+        # Check that parse_mode is not in payload when empty string
+        call_args = mock_http_client.post.call_args
+        payload = call_args[1]["json"]
+        assert "parse_mode" not in payload
+
+    @pytest.mark.asyncio
+    async def test_send_notification_with_metadata(
+        self, telegram_config, mock_http_client
+    ):
+        """Test notification sending with metadata in message"""
+        message_with_metadata = NotificationMessage(
+            title="Backup Complete",
+            message="Daily backup finished successfully",
+            notification_type=NotificationType.SUCCESS,
+            metadata={
+                "backup_size": "2.5 GB",
+                "duration": "45 minutes",
+                "files_backed_up": 1250,
+            },
+        )
+
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value='{"ok": true}')
+        mock_response.json = AsyncMock(return_value={"ok": True})
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.send_notification(message_with_metadata)
+
+        assert result.success is True
+
+        # Verify the formatted message includes metadata
+        call_args = mock_http_client.post.call_args
+        payload = call_args[1]["json"]
+        message_text = payload["text"]
+
+        # Should contain title, message, and metadata
+        assert "Backup Complete" in message_text
+        assert "Daily backup finished successfully" in message_text
+        assert "Details:" in message_text
+        assert "Backup Size" in message_text  # metadata keys are formatted
+        assert "2.5 GB" in message_text
+
+    @pytest.mark.asyncio
+    async def test_send_notification_different_notification_types(
+        self, telegram_config, mock_http_client
+    ):
+        """Test that different notification types get appropriate emoji formatting"""
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value='{"ok": true}')
+        mock_response.json = AsyncMock(return_value={"ok": True})
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+
+        # Test different notification types
+        notification_types = [
+            (NotificationType.SUCCESS, "✅"),
+            (NotificationType.FAILURE, "❌"),
+            (NotificationType.WARNING, "⚠️"),
+            (NotificationType.INFO, "ℹ️"),
+        ]
+
+        for notification_type, expected_emoji in notification_types:
+            mock_http_client.post.reset_mock()
+
+            message = NotificationMessage(
+                title="Test",
+                message="Test message",
+                notification_type=notification_type,
+            )
+
+            await provider.send_notification(message)
+
+            # Check that the correct emoji is used
+            call_args = mock_http_client.post.call_args
+            payload = call_args[1]["json"]
+            message_text = payload["text"]
+            assert expected_emoji in message_text
+
+    @pytest.mark.asyncio
+    async def test_send_notification_api_url_construction(
+        self, telegram_config, mock_http_client, sample_message
+    ):
+        """Test that the correct API URL is constructed"""
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value='{"ok": true}')
+        mock_response.json = AsyncMock(return_value={"ok": True})
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        await provider.send_notification(sample_message)
+
+        # Verify the correct URL was called
+        expected_url = (
+            f"https://api.telegram.org/bot{telegram_config.bot_token}/sendMessage"
+        )
+        mock_http_client.post.assert_called_once()
+        call_args = mock_http_client.post.call_args
+        assert call_args[0][0] == expected_url
+
+    @pytest.mark.asyncio
+    async def test_send_notification_unknown_api_error(
+        self, telegram_config, mock_http_client, sample_message
+    ):
+        """Test handling of API errors without description"""
+        # Setup mock response with API error but no description
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value='{"ok": false}')
+        mock_response.json = AsyncMock(return_value={"ok": False})
+        mock_http_client.post.return_value = mock_response
+
+        provider = TelegramProvider(telegram_config, mock_http_client)
+        result = await provider.send_notification(sample_message)
+
+        # Verify result handles missing description gracefully
+        assert result.success is False
+        assert result.provider == "telegram"
+        assert result.message == "API returned error"
+        assert result.error == "Unknown error"  # Default when description is missing
