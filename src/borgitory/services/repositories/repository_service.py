@@ -986,8 +986,10 @@ class RepositoryService:
         if bytes_value == 0:
             return "0 B"
 
+        # Convert to float for division
+        value = float(bytes_value)
         for unit in ["B", "KB", "MB", "GB", "TB"]:
-            if bytes_value < 1024.0:
-                return f"{bytes_value:.1f} {unit}"
-            bytes_value /= 1024.0
-        return f"{bytes_value:.1f} PB"
+            if value < 1024.0:
+                return f"{value:.1f} {unit}"
+            value /= 1024.0
+        return f"{value:.1f} PB"
