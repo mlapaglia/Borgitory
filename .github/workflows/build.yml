@@ -19,7 +19,7 @@ env:
   IMAGE_NAME: mlapaglia/borgitory
 
 jobs:
-  build-docker-test-image:
+  prepare-test-images:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -62,9 +62,9 @@ jobs:
         path: /tmp/borgitory-test-${{ matrix.arch }}.tar
         retention-days: 1
 
-  lint:
+  code-quality-lint:
     runs-on: ubuntu-latest
-    needs: build-docker-test-image
+    needs: prepare-test-images
     
     steps:
     - name: Checkout repository
@@ -85,9 +85,9 @@ jobs:
       run: |
         docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test-x86_64 python lint.py check
 
-  mypy:
+  code-quality-types:
     runs-on: ubuntu-latest
-    needs: build-docker-test-image
+    needs: prepare-test-images
     
     steps:
     - name: Checkout repository
@@ -108,9 +108,9 @@ jobs:
       run: |
         docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test-x86_64 python lint.py mypy
 
-  unit-tests:
+  test-unit:
     runs-on: ${{ matrix.os }}
-    needs: build-docker-test-image
+    needs: prepare-test-images
     strategy:
       matrix:
         include:
@@ -165,9 +165,9 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
-  integration-tests:
+  test-integration:
     runs-on: ${{ matrix.os }}
-    needs: build-docker-test-image
+    needs: prepare-test-images
     strategy:
       matrix:
         include:
@@ -215,9 +215,9 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
 
-  build-python-production-package:
+  build-python-package:
     runs-on: ubuntu-latest
-    needs: [lint, mypy, unit-tests, integration-tests]
+    needs: [code-quality-lint, code-quality-types, test-unit, test-integration]
     
     steps:
     - name: Checkout repository
@@ -262,9 +262,9 @@ jobs:
         borgitory --version
         borgitory --help
 
-  build-docker-production-image:
+  build-docker-images:
     runs-on: ${{ matrix.os }}
-    needs: [lint, mypy, unit-tests, integration-tests]
+    needs: [code-quality-lint, code-quality-types, test-unit, test-integration]
     strategy:
       matrix:
         include:

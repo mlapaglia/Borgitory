@@ -13,7 +13,7 @@ env:
   IMAGE_NAME: mlapaglia/borgitory
 
 jobs:
-  prepare-release:
+  extract-version:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
@@ -28,9 +28,9 @@ jobs:
         echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
         echo "Extracted version: ${VERSION}"
 
-  pypi-release:
+  publish-python:
     runs-on: ubuntu-latest
-    needs: prepare-release
+    needs: extract-version
 
     steps:
     - name: Checkout repository
@@ -47,7 +47,7 @@ jobs:
       uses: jacobtomlinson/gha-find-replace@v3
       with:
         find: 'version = ".*"'
-        replace: 'version = "${{ needs.prepare-release.outputs.version }}"'
+        replace: 'version = "${{ needs.extract-version.outputs.version }}"'
         regex: true
         include: "pyproject.toml"
 
@@ -72,9 +72,9 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         print-hash: true
 
-  docker-build:
+  build-docker-images:
     runs-on: ${{ matrix.os }}
-    needs: prepare-release
+    needs: extract-version
     strategy:
       matrix:
         include:
@@ -105,7 +105,7 @@ jobs:
       uses: jacobtomlinson/gha-find-replace@v3
       with:
         find: 'version = ".*"'
-        replace: 'version = "${{ needs.prepare-release.outputs.version }}"'
+        replace: 'version = "${{ needs.extract-version.outputs.version }}"'
         regex: true
         include: "pyproject.toml"
 
@@ -119,7 +119,7 @@ jobs:
         labels: |
           org.opencontainers.image.title=Borgitory
           org.opencontainers.image.description=A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities
-          org.opencontainers.image.version=${{ needs.prepare-release.outputs.version }}
+          org.opencontainers.image.version=${{ needs.extract-version.outputs.version }}
           org.opencontainers.image.url=https://github.com/mlapaglia/borgitory
           org.opencontainers.image.source=https://github.com/mlapaglia/borgitory
           org.opencontainers.image.vendor=mlapaglia
@@ -127,8 +127,8 @@ jobs:
         cache-from: type=gha,scope=${{ matrix.arch }}
         cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
         build-args: |
-          VERSION=${{ needs.prepare-release.outputs.version }}
-          BORGITORY_VERSION=${{ needs.prepare-release.outputs.version }}
+          VERSION=${{ needs.extract-version.outputs.version }}
+          BORGITORY_VERSION=${{ needs.extract-version.outputs.version }}
         outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
     - name: Export digest
@@ -145,14 +145,16 @@ jobs:
         if-no-files-found: error
         retention-days: 1
 
-  docker-merge:
+  publish-docker:
     runs-on: ubuntu-latest
     needs: 
-      - prepare-release
-      - docker-build
+      - extract-version
+      - build-docker-images
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
 
       - name: Download digests
         uses: actions/download-artifact@v4
@@ -178,10 +180,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             # For stable releases: tag with version and latest
-            type=raw,value=${{ needs.prepare-release.outputs.version }},enable=${{ github.event.release.prerelease == false }}
+            type=raw,value=${{ needs.extract-version.outputs.version }},enable=${{ github.event.release.prerelease == false }}
             type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
             # For prereleases: tag with exact version and alpha
-            type=raw,value=${{ needs.prepare-release.outputs.version }},enable=${{ github.event.release.prerelease == true }}
+            type=raw,value=${{ needs.extract-version.outputs.version }},enable=${{ github.event.release.prerelease == true }}
             type=raw,value=alpha,enable=${{ github.event.release.prerelease == true }}
 
       - name: Create manifest list and push
@@ -192,7 +194,7 @@ jobs:
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.extract-version.outputs.version }}
 
       - name: Update Docker Hub description
         if: always()
