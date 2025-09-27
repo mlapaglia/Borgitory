@@ -359,10 +359,6 @@ class BorgService:
         # Add find parameters
         command_parts.extend(
             [
-                "-mindepth",
-                "2",  # Start looking 2 levels deep (scan_path/repo_name/config)
-                "-maxdepth",
-                "2",  # Don't go deeper than 2 levels
                 "-name",
                 "config",
                 "-type",

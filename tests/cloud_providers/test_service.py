@@ -10,20 +10,21 @@ import pytest
 import json
 from unittest.mock import Mock, AsyncMock, patch
 
+from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.cloud_providers.service import (
     ConfigValidator,
     StorageFactory,
-    EncryptionService,
     CloudSyncService,
 )
 from borgitory.services.cloud_providers.types import CloudSyncConfig, SyncResult
+from borgitory.services.encryption_service import EncryptionService
 
 
 class TestConfigValidator:
     """Test ConfigValidator with all supported providers and edge cases"""
 
     @pytest.fixture
-    def validator(self, production_registry) -> ConfigValidator:
+    def validator(self, production_registry: ProviderRegistry) -> ConfigValidator:
         """Create validator with injected registry for proper test isolation"""
         return ConfigValidator(registry=production_registry)
 
@@ -182,7 +183,9 @@ class TestStorageFactory:
         return Mock()
 
     @pytest.fixture
-    def factory(self, mock_rclone_service: Mock, production_registry) -> StorageFactory:
+    def factory(
+        self, mock_rclone_service: Mock, production_registry: ProviderRegistry
+    ) -> StorageFactory:
         """Create factory with injected registry for proper test isolation"""
         return StorageFactory(mock_rclone_service, registry=production_registry)
 
@@ -235,7 +238,7 @@ class TestStorageFactory:
             factory.create_storage("unknown", config)
 
     def test_factory_uses_injected_rclone_service(
-        self, mock_rclone_service: Mock, production_registry
+        self, mock_rclone_service: Mock, production_registry: ProviderRegistry
     ) -> None:
         """Test that factory uses the injected rclone service"""
         factory = StorageFactory(mock_rclone_service, registry=production_registry)
