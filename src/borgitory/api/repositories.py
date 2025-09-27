@@ -9,7 +9,7 @@ from fastapi import (
     UploadFile,
     Request,
 )
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -268,7 +268,7 @@ async def update_import_form(
     if not path:
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_dynamic.html",
+            "partials/repositories/import/import_form_dynamic.html",
             {
                 "path": "",
                 "show_encryption_info": False,
@@ -282,7 +282,7 @@ async def update_import_form(
     if loading == "true":
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_loading.html",
+            "partials/repositories/import/import_form_loading.html",
             {
                 "path": path,
             },
@@ -301,7 +301,7 @@ async def update_import_form(
             logger.warning(f"Repository not found for path: {path}")
             return templates.TemplateResponse(
                 request,
-                "partials/repositories/import_form_dynamic.html",
+                "partials/repositories/import/import_form_dynamic.html",
                 {
                     "path": path,
                     "show_encryption_info": True,
@@ -315,7 +315,7 @@ async def update_import_form(
         # Always use the dynamic form since we can't auto-detect encryption
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_dynamic.html",
+            "partials/repositories/import/import_form_dynamic.html",
             {
                 "path": path,
                 "show_encryption_info": True,
@@ -330,7 +330,7 @@ async def update_import_form(
         logger.error(f"Error updating import form: {e}")
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_simple.html",
+            "partials/repositories/import/import_form_simple.html",
             {
                 "path": path,
                 "show_passphrase": True,
@@ -345,7 +345,9 @@ async def get_import_form(
     request: Request, templates: TemplatesDep
 ) -> _TemplateResponse:
     """Get the import repository form"""
-    return templates.TemplateResponse(request, "partials/repositories/form_import.html")
+    return templates.TemplateResponse(
+        request, "partials/repositories/import/form_import.html"
+    )
 
 
 @router.get("/import-form-inner", response_class=HTMLResponse)
@@ -354,7 +356,7 @@ async def get_import_form_inner(
 ) -> _TemplateResponse:
     """Get the import repository form inner content (preserves tab state)"""
     return templates.TemplateResponse(
-        request, "partials/repositories/form_import_inner.html"
+        request, "partials/repositories/import/form_import_inner.html"
     )
 
 
@@ -364,7 +366,7 @@ async def get_import_form_clear(
 ) -> _TemplateResponse:
     """Clear the selected repository form after successful import"""
     return templates.TemplateResponse(
-        request, "partials/repositories/import_form_clear.html"
+        request, "partials/repositories/import/import_form_clear.html"
     )
 
 
@@ -373,7 +375,9 @@ async def get_create_form(
     request: Request, templates: TemplatesDep
 ) -> _TemplateResponse:
     """Get the create repository form"""
-    return templates.TemplateResponse(request, "partials/repositories/form_create.html")
+    return templates.TemplateResponse(
+        request, "partials/repositories/create/form_create.html"
+    )
 
 
 @router.post("/import")
@@ -433,6 +437,214 @@ def update_repository(
     db.commit()
     db.refresh(repository)
     return repository
+
+
+@router.get("/{repo_id}/lock-status", response_class=HTMLResponse)
+async def check_repository_lock_status(
+    repo_id: int,
+    request: Request,
+    repo_svc: RepositoryServiceDep,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Check if a repository is currently locked."""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    lock_status = await repo_svc.check_repository_lock_status(repository)
+
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/modal/lock_status.html",
+        {
+            "repo_id": repo_id,
+            "locked": lock_status.get("locked", False),
+            "accessible": lock_status.get("accessible", False),
+            "message": lock_status.get("message", "Unknown status"),
+        },
+    )
+
+
+@router.get("/{repo_id}/details-modal", response_class=HTMLResponse)
+async def get_repository_details_modal(
+    repo_id: int,
+    request: Request,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Get the repository details modal."""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/modal/details_modal.html",
+        {
+            "repository": repository,
+        },
+    )
+
+
+@router.get("/modal/close", response_class=HTMLResponse)
+async def close_repository_modal() -> HTMLResponse:
+    """Close the repository details modal."""
+    return HTMLResponse(content="")
+
+
+@router.get("/{repo_id}/break-lock-button", response_class=HTMLResponse)
+async def get_break_lock_button(
+    repo_id: int,
+    request: Request,
+    repo_svc: RepositoryServiceDep,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Get the break lock button if repository is locked."""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    lock_status = await repo_svc.check_repository_lock_status(repository)
+
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/modal/break_lock_button.html",
+        {
+            "repo_id": repo_id,
+            "repo_name": repository.name,
+            "show_break_lock_button": lock_status.get("locked", False),
+        },
+    )
+
+
+@router.get("/{repo_id}/break-lock-button-modal", response_class=HTMLResponse)
+async def get_break_lock_button_modal(
+    repo_id: int,
+    request: Request,
+    repo_svc: RepositoryServiceDep,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Get the break lock button for modal if repository is locked."""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    lock_status = await repo_svc.check_repository_lock_status(repository)
+
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/modal/break_lock_button_modal.html",
+        {
+            "repo_id": repo_id,
+            "repo_name": repository.name,
+            "show_break_lock_button": lock_status.get("locked", False),
+        },
+    )
+
+
+@router.post("/{repo_id}/break-lock", response_class=HTMLResponse)
+async def break_repository_lock(
+    repo_id: int,
+    request: Request,
+    repo_svc: RepositoryServiceDep,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Break a repository lock and return updated repository list."""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    await repo_svc.break_repository_lock(repository)
+
+    # Return the updated repository list
+    repositories = db.query(Repository).all()
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/list_content.html",
+        {
+            "repositories": repositories,
+        },
+    )
+
+
+@router.post("/{repo_id}/break-lock-modal", response_class=HTMLResponse)
+async def break_repository_lock_modal(
+    repo_id: int,
+    request: Request,
+    repo_svc: RepositoryServiceDep,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Break a repository lock from modal and return updated lock status."""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    await repo_svc.break_repository_lock(repository)
+
+    # Return updated lock status for the modal
+    lock_status = await repo_svc.check_repository_lock_status(repository)
+
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/modal/lock_status.html",
+        {
+            "repo_id": repo_id,
+            "locked": lock_status.get("locked", False),
+            "accessible": lock_status.get("accessible", False),
+            "message": lock_status.get("message", "Unknown status"),
+        },
+    )
+
+
+@router.get("/{repo_id}/borg-info", response_class=HTMLResponse)
+async def get_repository_borg_info(
+    repo_id: int,
+    request: Request,
+    repo_svc: RepositoryServiceDep,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Get detailed repository information from borg info command."""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    info_result = await repo_svc.get_repository_info(repository)
+
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/modal/borg_info.html",
+        info_result,
+    )
+
+
+@router.get("/{repo_id}/export-key")
+async def export_repository_key(
+    repo_id: int,
+    repo_svc: RepositoryServiceDep,
+    db: Session = Depends(get_db),
+) -> Response:
+    """Export repository key as a downloadable file."""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    result = await repo_svc.export_repository_key(repository)
+
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error_message"])
+
+    # Return the key as a downloadable text file
+    return Response(
+        content=result["key_data"],
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{result["filename"]}"'},
+    )
 
 
 @router.delete("/{repo_id}", response_class=HTMLResponse)

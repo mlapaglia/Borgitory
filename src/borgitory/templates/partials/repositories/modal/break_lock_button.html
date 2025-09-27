@@ -1,0 +1,10 @@
+<!-- Break Lock Button Template -->
+{% if show_break_lock_button %}
+<button hx-post="/api/repositories/{{ repo_id }}/break-lock"
+        hx-confirm="Are you sure you want to break the lock on repository '{{ repo_name }}'? Only do this if you're certain no other Borg processes are running."
+        hx-target="#repository-list"
+        hx-swap="innerHTML"
+        class="px-3 py-1 text-sm bg-yellow-100 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-200 rounded hover:bg-yellow-200 dark:hover:bg-yellow-700">
+    Break Lock
+</button>
+{% endif %}

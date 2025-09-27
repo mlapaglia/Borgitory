@@ -1,0 +1,14 @@
+<!-- Lock Status Indicator Template -->
+{% if locked %}
+    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200" title="{{ message }}">
+        Locked
+    </span>
+{% elif accessible %}
+    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200" title="{{ message }}">
+        Available
+    </span>
+{% else %}
+    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 dark:bg-orange-800 text-orange-700 dark:text-orange-200" title="{{ message }}">
+        Error
+    </span>
+{% endif %}

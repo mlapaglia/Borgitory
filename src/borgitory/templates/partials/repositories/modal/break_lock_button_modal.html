@@ -1,0 +1,11 @@
+<!-- Break Lock Button Template for Modal -->
+{% if show_break_lock_button %}
+<button hx-post="/api/repositories/{{ repo_id }}/break-lock-modal"
+        hx-confirm="Are you sure you want to break the lock on repository '{{ repo_name }}'? Only do this if you're certain no other Borg processes are running."
+        hx-target="#modal-lock-status-{{ repo_id }}, #modal-break-lock-container-{{ repo_id }}"
+        hx-swap="innerHTML"
+        hx-on="htmx:afterRequest: htmx.trigger(document.body, 'lockStatusUpdate')"
+        class="px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600">
+    Break Lock
+</button>
+{% endif %}

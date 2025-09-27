@@ -57,7 +57,7 @@ class RepositoryResponseHandler:
         if result.success:
             response = get_templates_instance().TemplateResponse(
                 request,
-                "partials/repositories/form_create_success.html",
+                "partials/repositories/create/form_create_success.html",
                 {"repository_name": result.repository_name},
             )
             response.headers["HX-Trigger"] = "repositoryUpdate"
@@ -69,7 +69,7 @@ class RepositoryResponseHandler:
 
             return get_templates_instance().TemplateResponse(
                 request,
-                "partials/repositories/form_create_error.html",
+                "partials/repositories/create/form_create_error.html",
                 {"error_message": error_message},
                 status_code=200,
             )
@@ -82,7 +82,7 @@ class RepositoryResponseHandler:
         if result.success:
             response = get_templates_instance().TemplateResponse(
                 request,
-                "partials/repositories/form_import_success.html",
+                "partials/repositories/import/form_import_success.html",
                 {"repository_name": result.repository_name},
             )
             response.headers["HX-Trigger"] = "repositoryUpdate"
@@ -94,7 +94,7 @@ class RepositoryResponseHandler:
 
             return get_templates_instance().TemplateResponse(
                 request,
-                "partials/repositories/form_import_error.html",
+                "partials/repositories/import/form_import_error.html",
                 {"error_message": error_message},
                 status_code=200,
             )
@@ -107,7 +107,7 @@ class RepositoryResponseHandler:
         if result.success:
             return get_templates_instance().TemplateResponse(
                 request,
-                "partials/repositories/scan_results.html",
+                "partials/repositories/import/scan_results.html",
                 {"repositories": [repo.__dict__ for repo in result.repositories]},
             )
         else:

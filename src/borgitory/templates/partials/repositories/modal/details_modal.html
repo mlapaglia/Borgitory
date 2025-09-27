@@ -1,0 +1,124 @@
+<!-- Repository Details Modal -->
+<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="modal-container">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <!-- Modal Header -->
+        <div class="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Repository Details: {{ repository.name }}
+                </h3>
+                <button type="button" 
+                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        hx-get="/api/repositories/modal/close" 
+                        hx-target="#modal-container"
+                        hx-swap="outerHTML">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Modal Content -->
+        <div class="overflow-y-auto max-h-[calc(90vh-8rem)]">
+            <div class="p-6">
+                <!-- Repository Info Section -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-6">
+                    <h4 class="text-md font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                        Repository Information
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="font-medium text-gray-700 dark:text-gray-300">Name:</span>
+                            <span class="text-gray-900 dark:text-gray-100 ml-2">{{ repository.name }}</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700 dark:text-gray-300">Path:</span>
+                            <span class="text-gray-900 dark:text-gray-100 ml-2 font-mono text-xs">{{ repository.path }}</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700 dark:text-gray-300">Created:</span>
+                            <span class="text-gray-900 dark:text-gray-100 ml-2">
+                                {{ repository.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) if repository.created_at else "Unknown" }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700 dark:text-gray-300">Encryption:</span>
+                            <span class="text-gray-900 dark:text-gray-100 ml-2">{{ repository.encryption_type or "Unknown" }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lock Status Section -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-6">
+                    <h4 class="text-md font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                        Lock Status
+                    </h4>
+                    <div class="flex items-center justify-between">
+                        <div id="modal-lock-status-{{ repository.id }}" 
+                             hx-get="/api/repositories/{{ repository.id }}/lock-status"
+                             hx-trigger="load, lockStatusUpdate from:body"
+                             hx-swap="innerHTML">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300">
+                                Checking...
+                            </span>
+                        </div>
+                        <div id="modal-break-lock-container-{{ repository.id }}" 
+                             hx-get="/api/repositories/{{ repository.id }}/break-lock-button-modal"
+                             hx-trigger="load, lockStatusUpdate from:body"
+                             hx-swap="innerHTML">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Repository Details Section -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-6">
+                    <h4 class="text-md font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                        Repository Details
+                    </h4>
+                    <div id="modal-repo-details-{{ repository.id }}" 
+                         hx-get="/api/repositories/{{ repository.id }}/borg-info"
+                         hx-trigger="load"
+                         hx-swap="innerHTML">
+                        <div class="flex items-center justify-center py-4">
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 dark:border-gray-100"></div>
+                            <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading repository details...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Repository Management Actions -->
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-6">
+                    <h4 class="text-md font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                        Repository Management
+                    </h4>
+                    <div class="grid grid-cols-1 gap-4">
+                        <!-- Key Export -->
+                        <div class="space-y-2">
+                            <h5 class="font-medium text-gray-700 dark:text-gray-300">Key Export</h5>
+                            <a href="/api/repositories/{{ repository.id }}/export-key"
+                               download="{{ repository.name }}_key.txt"
+                               class="block w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-center">
+                                Export Repository Key
+                            </a>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Download the repository encryption key for backup</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-gray-50 dark:bg-gray-900">
+            <div class="flex justify-end space-x-3">
+                <button type="button" 
+                        class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500"
+                        hx-get="/api/repositories/modal/close" 
+                        hx-target="#modal-container"
+                        hx-swap="outerHTML">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
