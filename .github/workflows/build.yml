@@ -52,6 +52,16 @@ jobs:
         cache-from: type=gha,scope=${{ matrix.arch }}
         cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
+    - name: Save Docker image
+      run: docker save borgitory-test-${{ matrix.arch }} > /tmp/borgitory-test-${{ matrix.arch }}.tar
+
+    - name: Upload Docker image
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-test-${{ matrix.arch }}
+        path: /tmp/borgitory-test-${{ matrix.arch }}.tar
+        retention-days: 1
+
   lint:
     runs-on: ubuntu-latest
     needs: build-docker-test-image
@@ -62,21 +72,18 @@ jobs:
       with:
         fetch-depth: 2
     
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Load test image from cache
-      uses: docker/build-push-action@v6
+    - name: Download test image
+      uses: actions/download-artifact@v4
       with:
-        context: .
-        target: test
-        load: true
-        tags: borgitory-test
-        cache-from: type=gha,scope=x86_64
+        name: docker-test-x86_64
+        path: /tmp
+    
+    - name: Load Docker image
+      run: docker load < /tmp/borgitory-test-x86_64.tar
     
     - name: Run linting
       run: |
-        docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test python lint.py check
+        docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test-x86_64 python lint.py check
 
   mypy:
     runs-on: ubuntu-latest
@@ -88,21 +95,18 @@ jobs:
       with:
         fetch-depth: 2
     
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Load test image from cache
-      uses: docker/build-push-action@v6
+    - name: Download test image
+      uses: actions/download-artifact@v4
       with:
-        context: .
-        target: test
-        load: true
-        tags: borgitory-test
-        cache-from: type=gha,scope=x86_64
+        name: docker-test-x86_64
+        path: /tmp
+    
+    - name: Load Docker image
+      run: docker load < /tmp/borgitory-test-x86_64.tar
     
     - name: Run type checking
       run: |
-        docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test python lint.py mypy
+        docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test-x86_64 python lint.py mypy
 
   unit-tests:
     runs-on: ${{ matrix.os }}
@@ -121,17 +125,14 @@ jobs:
       with:
         fetch-depth: 2
     
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Load test image from cache
-      uses: docker/build-push-action@v6
+    - name: Download test image
+      uses: actions/download-artifact@v4
       with:
-        context: .
-        target: test
-        load: true
-        tags: borgitory-test
-        cache-from: type=gha,scope=${{ matrix.arch }}
+        name: docker-test-${{ matrix.arch }}
+        path: /tmp
+    
+    - name: Load Docker image
+      run: docker load < /tmp/borgitory-test-${{ matrix.arch }}.tar
     
     - name: Run unit tests
       run: |
@@ -140,7 +141,7 @@ jobs:
           --device /dev/fuse:/dev/fuse:rwm \
           -v $(pwd):/app \
           -w /app \
-          borgitory-test \
+          borgitory-test-${{ matrix.arch }} \
           sh -c "pip install -e .[dev] && pytest tests/ --ignore=tests/integration \
             --cov=src/borgitory \
             --cov-report=xml:coverage.xml \
@@ -181,17 +182,14 @@ jobs:
       with:
         fetch-depth: 2
     
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Load test image from cache
-      uses: docker/build-push-action@v6
+    - name: Download test image
+      uses: actions/download-artifact@v4
       with:
-        context: .
-        target: test
-        load: true
-        tags: borgitory-test
-        cache-from: type=gha,scope=${{ matrix.arch }}
+        name: docker-test-${{ matrix.arch }}
+        path: /tmp
+    
+    - name: Load Docker image
+      run: docker load < /tmp/borgitory-test-${{ matrix.arch }}.tar
     
     - name: Run integration tests with coverage
       run: |
@@ -200,7 +198,7 @@ jobs:
           --device /dev/fuse:/dev/fuse:rwm \
           -v $(pwd):/app \
           -w /app \
-          borgitory-test \
+          borgitory-test-${{ matrix.arch }} \
           pytest tests/integration/ -v --tb=short \
             --cov=src/borgitory \
             --cov-report=xml:integration-coverage.xml \
@@ -220,13 +218,6 @@ jobs:
   build-python-production-package:
     runs-on: ubuntu-latest
     needs: [lint, mypy, unit-tests, integration-tests]
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            arch: x86_64
-          - os: ubuntu-24.04-arm
-            arch: aarch64
     
     steps:
     - name: Checkout repository
