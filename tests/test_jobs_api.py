@@ -13,6 +13,14 @@ from sqlalchemy.orm import Session
 
 from borgitory.main import app
 from borgitory.models.database import Repository, Job
+from borgitory.models.job_results import (
+    JobCreationResult,
+    JobCreationError,
+    JobStatus,
+    JobStatusError,
+    JobStatusEnum,
+    JobTypeEnum,
+)
 from borgitory.dependencies import (
     get_job_service,
     get_job_stream_service,
@@ -157,10 +165,11 @@ class TestJobsAPI:
         sample_repository: Repository,
     ) -> None:
         """Test successful backup job creation."""
-        setup_dependencies["job_service"].create_backup_job.return_value = {
-            "job_id": "test-job-123",
-            "status": "started",
-        }
+        setup_dependencies[
+            "job_service"
+        ].create_backup_job.return_value = JobCreationResult(
+            job_id="test-job-123", status="started"
+        )
 
         backup_request = {
             "repository_id": sample_repository.id,
@@ -180,8 +189,10 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test backup job creation with non-existent repository."""
-        setup_dependencies["job_service"].create_backup_job.side_effect = ValueError(
-            "Repository not found"
+        setup_dependencies[
+            "job_service"
+        ].create_backup_job.return_value = JobCreationError(
+            error="Repository not found", error_code="REPOSITORY_NOT_FOUND"
         )
 
         backup_request = {
@@ -205,8 +216,10 @@ class TestJobsAPI:
         sample_repository: Repository,
     ) -> None:
         """Test backup job creation with general error."""
-        setup_dependencies["job_service"].create_backup_job.side_effect = Exception(
-            "General error"
+        setup_dependencies[
+            "job_service"
+        ].create_backup_job.return_value = JobCreationError(
+            error="General error", error_code="GENERAL_ERROR"
         )
 
         backup_request = {
@@ -230,9 +243,11 @@ class TestJobsAPI:
         sample_repository: Repository,
     ) -> None:
         """Test successful prune job creation."""
-        setup_dependencies["job_service"].create_prune_job.return_value = {
-            "job_id": "prune-job-123"
-        }
+        setup_dependencies[
+            "job_service"
+        ].create_prune_job.return_value = JobCreationResult(
+            job_id="prune-job-123", status="started"
+        )
 
         prune_request = {
             "repository_id": sample_repository.id,
@@ -252,8 +267,10 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test prune job creation with error."""
-        setup_dependencies["job_service"].create_prune_job.side_effect = ValueError(
-            "Invalid prune configuration"
+        setup_dependencies[
+            "job_service"
+        ].create_prune_job.return_value = JobCreationError(
+            error="Invalid prune configuration", error_code="INVALID_CONFIG"
         )
 
         prune_request = {
@@ -277,9 +294,11 @@ class TestJobsAPI:
         sample_repository: Repository,
     ) -> None:
         """Test successful check job creation."""
-        setup_dependencies["job_service"].create_check_job.return_value = {
-            "job_id": "check-job-123"
-        }
+        setup_dependencies[
+            "job_service"
+        ].create_check_job.return_value = JobCreationResult(
+            job_id="check-job-123", status="started"
+        )
 
         check_request = {
             "repository_id": sample_repository.id,
@@ -298,8 +317,10 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test check job creation with error."""
-        setup_dependencies["job_service"].create_check_job.side_effect = Exception(
-            "Check job failed"
+        setup_dependencies[
+            "job_service"
+        ].create_check_job.return_value = JobCreationError(
+            error="Check job failed", error_code="CHECK_FAILED"
         )
 
         check_request = {
@@ -362,14 +383,19 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting job status."""
-        status_data = {
-            "id": "test-job-123",
-            "status": "running",
-            "running": True,
-            "completed": False,
-            "failed": False,
-            "job_type": "backup",
-        }
+        from datetime import datetime
+
+        status_data = JobStatus(
+            id="test-job-123",
+            status=JobStatusEnum.RUNNING,
+            job_type=JobTypeEnum.BACKUP,
+            started_at=datetime.fromisoformat("2023-01-01T00:00:00"),
+            completed_at=None,
+            return_code=None,
+            error=None,
+            current_task_index=0,
+            total_tasks=1,
+        )
         setup_dependencies["job_service"].get_job_status.return_value = status_data
 
         response = await async_client.get("/api/jobs/test-job-123/status")
@@ -394,9 +420,9 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting job status with error."""
-        setup_dependencies["job_service"].get_job_status.return_value = {
-            "error": "Job not found"
-        }
+        setup_dependencies["job_service"].get_job_status.return_value = JobStatusError(
+            error="Job not found", job_id="non-existent-job"
+        )
 
         response = await async_client.get("/api/jobs/non-existent-job/status")
 

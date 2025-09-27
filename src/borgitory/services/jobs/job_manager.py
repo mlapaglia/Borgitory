@@ -1994,6 +1994,85 @@ class JobManager:
 
         return True
 
+    async def stop_job(self, job_id: str) -> Dict[str, object]:
+        """Stop a running job, killing current task and skipping remaining tasks"""
+        job = self.jobs.get(job_id)
+        if not job:
+            return {
+                "success": False,
+                "error": "Job not found",
+                "error_code": "JOB_NOT_FOUND",
+            }
+
+        if job.status not in ["running", "queued"]:
+            return {
+                "success": False,
+                "error": f"Cannot stop job in status: {job.status}",
+                "error_code": "INVALID_STATUS",
+            }
+
+        current_task_killed = False
+        tasks_skipped = 0
+
+        # Kill current running process if exists
+        if job_id in self._processes:
+            process = self._processes[job_id]
+            success = await self.safe_executor.terminate_process(process)
+            if success:
+                del self._processes[job_id]
+                current_task_killed = True
+
+        # For composite jobs, mark remaining tasks as skipped
+        if job.job_type == "composite" and job.tasks:
+            current_index = job.current_task_index
+
+            # Mark current task as stopped if it was running
+            if current_index < len(job.tasks):
+                current_task = job.tasks[current_index]
+                if current_task.status == "running":
+                    current_task.status = "stopped"
+                    current_task.completed_at = now_utc()
+                    current_task.error = "Manually stopped by user"
+
+            # Skip all remaining tasks (even critical/always_run ones since this is manual)
+            for i in range(current_index + 1, len(job.tasks)):
+                task = job.tasks[i]
+                if task.status in ["pending", "queued"]:
+                    task.status = "skipped"
+                    task.completed_at = now_utc()
+                    task.error = "Skipped due to manual job stop"
+                    tasks_skipped += 1
+
+        # Mark job as stopped
+        job.status = "stopped"
+        job.completed_at = now_utc()
+        job.error = "Manually stopped by user"
+
+        # Update database
+        if self.database_manager:
+            await self.database_manager.update_job_status(
+                job_id, "stopped", job.completed_at
+            )
+
+        # Broadcast stop event
+        self.safe_event_broadcaster.broadcast_event(
+            EventType.JOB_CANCELLED,  # Reuse existing event type
+            job_id=job_id,
+            data={
+                "stopped_at": job.completed_at.isoformat(),
+                "reason": "manual_stop",
+                "tasks_skipped": tasks_skipped,
+                "current_task_killed": current_task_killed,
+            },
+        )
+
+        return {
+            "success": True,
+            "message": f"Job stopped successfully. {tasks_skipped} tasks skipped.",
+            "tasks_skipped": tasks_skipped,
+            "current_task_killed": current_task_killed,
+        }
+
     def cleanup_job(self, job_id: str) -> bool:
         """Clean up job resources"""
         if job_id in self.jobs:

@@ -6,6 +6,11 @@ from starlette.responses import StreamingResponse
 from pydantic import BaseModel
 from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
 from borgitory.models.enums import JobType
+from borgitory.models.job_results import (
+    JobCreationResult,
+    JobStatusError,
+    JobStopResult,
+)
 from borgitory.dependencies import JobServiceDep
 from borgitory.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from borgitory.dependencies import TemplatesDep
@@ -103,32 +108,20 @@ async def create_backup(
 ) -> HTMLResponse:
     """Start a backup job using JobService"""
 
-    try:
-        result = await job_svc.create_backup_job(backup_request, JobType.MANUAL_BACKUP)
-        job_id = result["job_id"]
+    result = await job_svc.create_backup_job(backup_request, JobType.MANUAL_BACKUP)
 
+    if isinstance(result, JobCreationResult):
         return templates.TemplateResponse(
             request,
             "partials/jobs/backup_success.html",
-            {"job_id": job_id},
+            {"job_id": result.job_id},
         )
-
-    except ValueError as e:
-        error_msg = f"Repository not found: {str(e)}"
+    else:  # JobCreationError
         return templates.TemplateResponse(
             request,
             "partials/jobs/backup_error.html",
-            {"error_message": error_msg},
+            {"error_message": result.error},
             status_code=400,
-        )
-    except Exception as e:
-        logger.error(f"Failed to start backup: {e}")
-        error_msg = f"Failed to start backup: {str(e)}"
-        return templates.TemplateResponse(
-            request,
-            "partials/jobs/backup_error.html",
-            {"error_message": error_msg},
-            status_code=500,
         )
 
 
@@ -141,31 +134,20 @@ async def create_prune_job(
 ) -> HTMLResponse:
     """Start an archive pruning job using JobService"""
 
-    try:
-        result = await job_svc.create_prune_job(prune_request)
-        job_id = result["job_id"]
+    result = await job_svc.create_prune_job(prune_request)
 
+    if isinstance(result, JobCreationResult):
         return templates.TemplateResponse(
             request,
             "partials/prune/prune_success.html",
-            {"job_id": job_id},
+            {"job_id": result.job_id},
         )
-    except ValueError as e:
-        error_msg = str(e)
+    else:  # JobCreationError
         return templates.TemplateResponse(
             request,
             "partials/prune/prune_error.html",
-            {"error_message": error_msg},
+            {"error_message": result.error},
             status_code=400,
-        )
-    except Exception as e:
-        logger.error(f"Failed to start prune job: {e}")
-        error_msg = f"Failed to start prune job: {str(e)}"
-        return templates.TemplateResponse(
-            request,
-            "partials/prune/prune_error.html",
-            {"error_message": error_msg},
-            status_code=500,
         )
 
 
@@ -178,31 +160,20 @@ async def create_check_job(
 ) -> HTMLResponse:
     """Start a repository check job and return job_id for tracking"""
 
-    try:
-        result = await job_svc.create_check_job(check_request)
+    result = await job_svc.create_check_job(check_request)
 
+    if isinstance(result, JobCreationResult):
         return templates.TemplateResponse(
             request,
             "partials/repository_check/check_success.html",
-            {"job_id": result.get("job_id", "unknown")},
+            {"job_id": result.job_id},
         )
-
-    except ValueError as e:
-        error_msg = str(e)
+    else:  # JobCreationError
         return templates.TemplateResponse(
             request,
             "partials/repository_check/check_error.html",
-            {"error_message": error_msg},
+            {"error_message": result.error},
             status_code=400,
-        )
-    except Exception as e:
-        logger.error(f"Failed to start check job: {e}")
-        error_msg = f"Failed to start check job: {str(e)}"
-        return templates.TemplateResponse(
-            request,
-            "partials/repository_check/check_error.html",
-            {"error_message": error_msg},
-            status_code=500,
         )
 
 
@@ -252,44 +223,26 @@ async def stream_current_jobs_html(
 @router.get("/{job_id}/status", response_model=JobStatusResponse)
 async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusResponse:
     """Get current job status and progress"""
-    try:
-        output = await job_svc.get_job_status(job_id)
-        if "error" in output:
-            raise HTTPException(status_code=404, detail=str(output["error"]))
+    result = await job_svc.get_job_status(job_id)
 
-        # Create JobStatusResponse with proper type casting
-        def safe_int(value: object) -> Optional[int]:
-            """Safely convert value to int or None"""
-            if value is None:
-                return None
-            if isinstance(value, (int, float, str)):
-                try:
-                    return int(value)
-                except (ValueError, TypeError):
-                    return None
-            return None
+    if isinstance(result, JobStatusError):
+        raise HTTPException(status_code=404, detail=result.error)
 
-        return JobStatusResponse(
-            id=str(output["id"]),
-            status=str(output["status"]),
-            running=bool(output["running"]),
-            completed=bool(output["completed"]),
-            failed=bool(output["failed"]),
-            started_at=str(output["started_at"]) if output.get("started_at") else None,
-            completed_at=str(output["completed_at"])
-            if output.get("completed_at")
-            else None,
-            return_code=safe_int(output.get("return_code")),
-            error=str(output["error"]) if output.get("error") else None,
-            job_type=str(output["job_type"]) if output.get("job_type") else None,
-            current_task_index=safe_int(output.get("current_task_index")),
-            tasks=safe_int(output.get("tasks")),
-        )
-    except HTTPException:
-        raise  # Re-raise HTTPExceptions without modification
-    except Exception as e:
-        logger.error(f"Error getting job status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # Convert JobStatus to Pydantic JobStatusResponse
+    return JobStatusResponse(
+        id=result.id,
+        status=result.status.value,
+        running=result.running,
+        completed=result.completed,
+        failed=result.failed,
+        started_at=result.started_at.isoformat() if result.started_at else None,
+        completed_at=result.completed_at.isoformat() if result.completed_at else None,
+        return_code=result.return_code,
+        error=result.error,
+        job_type=result.job_type.value,
+        current_task_index=result.current_task_index,
+        tasks=result.total_tasks,
+    )
 
 
 @router.get("/{job_id}/stream")
@@ -299,6 +252,40 @@ async def stream_job_output(
 ) -> StreamingResponse:
     """Stream real-time job output via Server-Sent Events"""
     return await stream_svc.stream_job_output(job_id)
+
+
+@router.post("/{job_id}/stop", response_class=HTMLResponse)
+async def stop_job(
+    job_id: str,
+    request: Request,
+    job_svc: JobServiceDep,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Stop a running job, killing current task and skipping remaining tasks"""
+    result = await job_svc.stop_job(job_id)
+
+    if isinstance(result, JobStopResult):
+        return templates.TemplateResponse(
+            request,
+            "partials/jobs/job_stop_success.html",
+            {
+                "job_id": job_id,
+                "message": result.message,
+                "tasks_skipped": result.tasks_skipped,
+                "current_task_killed": result.current_task_killed,
+            },
+        )
+    else:  # JobStopError
+        return templates.TemplateResponse(
+            request,
+            "partials/jobs/job_stop_error.html",
+            {
+                "job_id": job_id,
+                "error_message": result.error,
+                "error_code": result.error_code,
+            },
+            status_code=400,
+        )
 
 
 @router.get("/{job_id}/toggle-details", response_class=HTMLResponse)

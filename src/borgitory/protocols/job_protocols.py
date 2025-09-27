@@ -69,6 +69,10 @@ class JobManagerProtocol(Protocol):
         """Cancel a running job."""
         ...
 
+    async def stop_job(self, job_id: str) -> Dict[str, object]:
+        """Stop a running job, killing current task and skipping remaining tasks."""
+        ...
+
     # Event and streaming methods
     def subscribe_to_events(self) -> Optional[asyncio.Queue["JobEvent"]]:
         """Subscribe to job events."""
