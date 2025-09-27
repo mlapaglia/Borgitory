@@ -20,7 +20,16 @@ env:
 
 jobs:
   build-docker-test-image:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: aarch64
     
     steps:
     - name: Checkout repository
@@ -36,12 +45,12 @@ jobs:
       with:
         context: .
         target: test
-        platforms: linux/amd64,linux/arm64
-        load: false
+        platforms: ${{ matrix.platform }}
+        load: true
         push: false
-        tags: borgitory-test
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        tags: borgitory-test-${{ matrix.arch }}
+        cache-from: type=gha,scope=${{ matrix.arch }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
   lint:
     runs-on: ubuntu-latest
@@ -63,7 +72,7 @@ jobs:
         target: test
         load: true
         tags: borgitory-test
-        cache-from: type=gha
+        cache-from: type=gha,scope=x86_64
     
     - name: Run linting
       run: |
@@ -89,15 +98,22 @@ jobs:
         target: test
         load: true
         tags: borgitory-test
-        cache-from: type=gha
+        cache-from: type=gha,scope=x86_64
     
     - name: Run type checking
       run: |
         docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test python lint.py mypy
 
   unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: build-docker-test-image
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
     
     steps:
     - name: Checkout repository
@@ -115,7 +131,7 @@ jobs:
         target: test
         load: true
         tags: borgitory-test
-        cache-from: type=gha
+        cache-from: type=gha,scope=${{ matrix.arch }}
     
     - name: Run unit tests
       run: |
@@ -133,7 +149,7 @@ jobs:
             -o junit_family=legacy"
 
     - name: Upload unit test coverage to Codecov
-      if: always()
+      if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@v5
       with:
         files: ./coverage.xml
@@ -143,14 +159,21 @@ jobs:
         fail_ci_if_error: false
 
     - name: Upload test results to Codecov
-      if: always()
+      if: always() && matrix.arch == 'x86_64'
       uses: codecov/test-results-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   integration-tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: build-docker-test-image
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
     
     steps:
     - name: Checkout repository
@@ -168,7 +191,7 @@ jobs:
         target: test
         load: true
         tags: borgitory-test
-        cache-from: type=gha
+        cache-from: type=gha,scope=${{ matrix.arch }}
     
     - name: Run integration tests with coverage
       run: |
@@ -185,7 +208,7 @@ jobs:
             --cov-append
 
     - name: Upload integration test coverage to Codecov
-      if: always()
+      if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@v5
       with:
         files: ./integration-coverage.xml
@@ -202,7 +225,7 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: x86_64
-          - os: ubuntu-22.04-arm64
+          - os: ubuntu-24.04-arm
             arch: aarch64
     
     steps:
@@ -249,8 +272,17 @@ jobs:
         borgitory --help
 
   build-docker-production-image:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: [lint, mypy, unit-tests, integration-tests]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: aarch64
     
     steps:
     - name: Checkout repository
@@ -265,9 +297,9 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
+        platforms: ${{ matrix.platform }}
         push: false
         load: false
-        tags: borgitory-production
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        tags: borgitory-production-${{ matrix.arch }}
+        cache-from: type=gha,scope=${{ matrix.arch }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
