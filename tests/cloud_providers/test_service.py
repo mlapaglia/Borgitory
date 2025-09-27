@@ -23,8 +23,9 @@ class TestConfigValidator:
     """Test ConfigValidator with all supported providers and edge cases"""
 
     @pytest.fixture
-    def validator(self) -> ConfigValidator:
-        return ConfigValidator()
+    def validator(self, production_registry) -> ConfigValidator:
+        """Create validator with injected registry for proper test isolation"""
+        return ConfigValidator(registry=production_registry)
 
     def test_validate_s3_config_success(self, validator: ConfigValidator) -> None:
         """Test successful S3 configuration validation"""
@@ -181,8 +182,9 @@ class TestStorageFactory:
         return Mock()
 
     @pytest.fixture
-    def factory(self, mock_rclone_service: Mock) -> StorageFactory:
-        return StorageFactory(mock_rclone_service)
+    def factory(self, mock_rclone_service: Mock, production_registry) -> StorageFactory:
+        """Create factory with injected registry for proper test isolation"""
+        return StorageFactory(mock_rclone_service, registry=production_registry)
 
     def test_create_s3_storage_success(
         self, factory: StorageFactory, mock_rclone_service: Mock
@@ -233,10 +235,10 @@ class TestStorageFactory:
             factory.create_storage("unknown", config)
 
     def test_factory_uses_injected_rclone_service(
-        self, mock_rclone_service: Mock
+        self, mock_rclone_service: Mock, production_registry
     ) -> None:
         """Test that factory uses the injected rclone service"""
-        factory = StorageFactory(mock_rclone_service)
+        factory = StorageFactory(mock_rclone_service, registry=production_registry)
 
         config = {
             "bucket_name": "test-bucket",

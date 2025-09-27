@@ -10,6 +10,7 @@ import json
 import logging
 from typing import (
     Dict,
+    List,
     Callable,
     Optional,
     cast,
@@ -23,7 +24,7 @@ from borgitory.services.rclone_service import RcloneService
 
 from .types import CloudSyncConfig, SyncResult
 from .storage import CloudStorage
-from .registry import get_config_class, get_storage_class, get_supported_providers
+from .registry import ProviderRegistry
 from .orchestration import CloudSyncer, LoggingSyncEventHandler
 from borgitory.services.encryption_service import EncryptionService
 from borgitory.custom_types import ConfigDict
@@ -33,6 +34,21 @@ logger = logging.getLogger(__name__)
 
 class ConfigValidator:
     """Validates cloud storage configurations"""
+
+    def __init__(self, registry: Optional["ProviderRegistry"] = None) -> None:
+        """
+        Initialize validator with optional registry injection.
+
+        Args:
+            registry: Provider registry instance. If None, uses global registry.
+        """
+        if registry is not None:
+            self._registry = registry
+        else:
+            # Fallback to global registry for backward compatibility
+            from .registry import get_registry
+
+            self._registry = get_registry()
 
     def validate_config(self, provider: str, config: ConfigDict) -> object:
         """
@@ -48,9 +64,9 @@ class ConfigValidator:
         Raises:
             ValueError: If configuration is invalid or provider is unknown
         """
-        config_class = get_config_class(provider)
+        config_class = self._registry.get_config_class(provider)
         if config_class is None:
-            supported = get_supported_providers()
+            supported = self._registry.get_supported_providers()
             raise ValueError(
                 f"Unknown provider: {provider}. "
                 f"Supported providers: {', '.join(sorted(supported))}"
@@ -64,14 +80,27 @@ class ConfigValidator:
 class StorageFactory:
     """Factory for creating cloud storage instances with automatic dependency injection"""
 
-    def __init__(self, rclone_service: Optional[RcloneService] = None) -> None:
+    def __init__(
+        self,
+        rclone_service: Optional[RcloneService] = None,
+        registry: Optional["ProviderRegistry"] = None,
+    ) -> None:
         """
         Initialize storage factory with available dependencies.
 
         Args:
             rclone_service: Rclone service for I/O operations (optional for DI)
+            registry: Provider registry instance (optional for DI)
         """
-        self._validator = ConfigValidator()
+        if registry is not None:
+            self._registry = registry
+        else:
+            # Fallback to global registry for backward compatibility
+            from .registry import get_registry
+
+            self._registry = get_registry()
+
+        self._validator = ConfigValidator(registry=self._registry)
         self._dependencies = {
             "rclone_service": rclone_service,
             # Add more injectable dependencies here as needed
@@ -93,9 +122,9 @@ class StorageFactory:
         """
         validated_config = self._validator.validate_config(provider, config)
 
-        storage_class = get_storage_class(provider)
+        storage_class = self._registry.get_storage_class(provider)
         if storage_class is None:
-            supported = get_supported_providers()
+            supported = self._registry.get_supported_providers()
             raise ValueError(
                 f"Unknown provider: {provider}. "
                 f"Supported providers: {', '.join(sorted(supported))}"
@@ -196,9 +225,9 @@ class StorageFactory:
                 f"Could not create storage {storage_class.__name__}: {e}"
             ) from e
 
-    def get_supported_providers(self) -> list[str]:
+    def get_supported_providers(self) -> List[str]:
         """Get list of supported provider names."""
-        return get_supported_providers()
+        return self._registry.get_supported_providers()
 
 
 class CloudSyncService:
