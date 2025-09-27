@@ -80,9 +80,16 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         print-hash: true
 
-  docker-release:
-    runs-on: ubuntu-latest
+  docker-build:
+    runs-on: ${{ matrix.runner }}
     needs: prepare-release
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-latest-arm64
 
     steps:
     - name: Checkout repository
@@ -113,6 +120,8 @@ jobs:
       uses: docker/metadata-action@v5
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        flavor: |
+          latest=false
         tags: |
           # For stable releases: tag with version and latest
           type=raw,value=${{ needs.prepare-release.outputs.version }},enable=${{ github.event.release.prerelease == false }}
@@ -129,11 +138,12 @@ jobs:
           org.opencontainers.image.vendor=mlapaglia
           org.opencontainers.image.licenses=MIT
 
-    - name: Build and push Docker image
+    - name: Build and push by digest
+      id: build
       uses: docker/build-push-action@v6
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
+        platforms: ${{ matrix.platform }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
@@ -142,9 +152,79 @@ jobs:
         build-args: |
           VERSION=${{ needs.prepare-release.outputs.version }}
           BORGITORY_VERSION=${{ needs.prepare-release.outputs.version }}
+        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+
+    - name: Export digest
+      run: |
+        mkdir -p /tmp/digests
+        digest="${{ steps.build.outputs.digest }}"
+        touch "/tmp/digests/${digest#sha256:}"
+
+    - name: Upload digest
+      uses: actions/upload-artifact@v4
+      with:
+        name: digests-${{ matrix.platform }}
+        path: /tmp/digests/*
+        if-no-files-found: error
+        retention-days: 1
+
+  docker-manifest:
+    runs-on: ubuntu-latest
+    needs: 
+      - prepare-release
+      - docker-build
+
+    steps:
+    - name: Download digests
+      uses: actions/download-artifact@v4
+      with:
+        path: /tmp/digests
+        pattern: digests-*
+        merge-multiple: true
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          # For stable releases: tag with version and latest
+          type=raw,value=${{ needs.prepare-release.outputs.version }},enable=${{ github.event.release.prerelease == false }}
+          type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+          # For prereleases: tag with exact version and alpha
+          type=raw,value=${{ needs.prepare-release.outputs.version }},enable=${{ github.event.release.prerelease == true }}
+          type=raw,value=alpha,enable=${{ github.event.release.prerelease == true }}
+
+    - name: Create manifest list and push
+      working-directory: /tmp/digests
+      run: |
+        docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+    - name: Inspect image
+      run: |
+        docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+
+  docker-description:
+    runs-on: ubuntu-latest
+    needs: docker-manifest
+    if: always()
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
 
     - name: Update Docker Hub description
-      if: always()
       uses: peter-evans/dockerhub-description@v4
       with:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
