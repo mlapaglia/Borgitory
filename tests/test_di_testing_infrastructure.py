@@ -6,6 +6,7 @@ for the hybrid service migration.
 """
 
 import pytest
+from typing import Callable, Any
 from unittest.mock import Mock
 
 from tests.utils.di_testing import (
@@ -43,7 +44,7 @@ class TestDependencyOverrideInfrastructure:
 
     def test_multiple_dependency_overrides(self) -> None:
         """Test that multiple dependency overrides work."""
-        overrides = {
+        overrides: dict[Callable[..., Any], Callable[..., Any]] = {
             get_debug_service: lambda: MockServiceFactory.create_mock_debug_service(),
             get_borg_service: lambda: MockServiceFactory.create_mock_borg_service(),
         }
@@ -175,7 +176,7 @@ class TestDependencyTestHelper:
     def test_verify_service_creation_failure(self) -> None:
         """Test service creation verification with failing factory."""
 
-        def failing_factory():
+        def failing_factory() -> Any:
             raise RuntimeError("Service creation failed")
 
         with pytest.raises(AssertionError, match="Service creation failed"):

@@ -12,8 +12,8 @@ class MockFileSystem(FileSystemInterface):
     """Mock filesystem for testing"""
 
     def __init__(self) -> None:
-        self.directories = set()
-        self.files = set()
+        self.directories: set[str] = set()
+        self.files: set[str] = set()
 
     def add_directory(self, path: str) -> None:
         """Add a directory to the mock filesystem"""
@@ -48,12 +48,12 @@ class MockFileSystem(FileSystemInterface):
 
 
 @pytest.fixture
-def mock_filesystem():
+def mock_filesystem() -> MockFileSystem:
     return MockFileSystem()
 
 
 @pytest.fixture
-def volume_service(mock_filesystem):
+def volume_service(mock_filesystem: MockFileSystem) -> VolumeService:
     return VolumeService(filesystem=mock_filesystem)
 
 
@@ -62,7 +62,7 @@ class TestVolumeService:
 
     @pytest.mark.asyncio
     async def test_get_mounted_volumes_success(
-        self, volume_service, mock_filesystem
+        self, volume_service: VolumeService, mock_filesystem: MockFileSystem
     ) -> None:
         """Test successful discovery of volumes under /mnt"""
         # Set up mock filesystem
@@ -80,7 +80,7 @@ class TestVolumeService:
 
     @pytest.mark.asyncio
     async def test_get_mounted_volumes_no_mnt_directory(
-        self, volume_service, mock_filesystem
+        self, volume_service: VolumeService, mock_filesystem: MockFileSystem
     ) -> None:
         """Test behavior when /mnt directory doesn't exist"""
         # Don't add /mnt to mock filesystem (it doesn't exist)
@@ -89,7 +89,7 @@ class TestVolumeService:
 
     @pytest.mark.asyncio
     async def test_get_mounted_volumes_empty_mnt_directory(
-        self, volume_service, mock_filesystem
+        self, volume_service: VolumeService, mock_filesystem: MockFileSystem
     ) -> None:
         """Test behavior when /mnt directory is empty"""
         # Add /mnt directory but no subdirectories
@@ -100,7 +100,7 @@ class TestVolumeService:
 
     @pytest.mark.asyncio
     async def test_get_mounted_volumes_filters_files(
-        self, volume_service, mock_filesystem
+        self, volume_service: VolumeService, mock_filesystem: MockFileSystem
     ) -> None:
         """Test that only directories are included, not files"""
         # Set up mock filesystem with directories and files
@@ -118,7 +118,7 @@ class TestVolumeService:
 
     @pytest.mark.asyncio
     async def test_get_mounted_volumes_exception_handling(
-        self, mock_filesystem
+        self, mock_filesystem: MockFileSystem
     ) -> None:
         """Test handling of exceptions during directory listing"""
 
@@ -134,7 +134,7 @@ class TestVolumeService:
         assert volumes == []
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_success(self, volume_service) -> None:
+    async def test_get_volume_info_success(self, volume_service: VolumeService) -> None:
         """Test successful volume info retrieval"""
         with patch.object(
             volume_service,
@@ -148,7 +148,9 @@ class TestVolumeService:
             assert info["accessible"] is True
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_exception(self, volume_service) -> None:
+    async def test_get_volume_info_exception(
+        self, volume_service: VolumeService
+    ) -> None:
         """Test volume info retrieval with exception"""
         with patch.object(
             volume_service, "get_mounted_volumes", side_effect=Exception("Test error")
@@ -163,7 +165,7 @@ class TestVolumeService:
 
     @pytest.mark.asyncio
     async def test_volumes_sorted_consistently(
-        self, volume_service, mock_filesystem
+        self, volume_service: VolumeService, mock_filesystem: MockFileSystem
     ) -> None:
         """Test that volumes are returned in sorted order"""
         # Set up mock filesystem with unsorted directories

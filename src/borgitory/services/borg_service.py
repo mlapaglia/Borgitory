@@ -184,25 +184,29 @@ class BorgService:
         self, repository: Repository, archive_name: str, file_path: str
     ) -> StreamingResponse:
         """Extract a single file from an archive and stream it to the client"""
-        temp_keyfile_path = None
+        result = None
         try:
-            validate_archive_name(archive_name)
+            # Validate inputs
+            if not archive_name or not archive_name.strip():
+                raise ValueError("Archive name must be a non-empty string")
 
-            # Sanitize the file path
-            if not file_path or not isinstance(file_path, str):
-                raise Exception("File path is required")
+            if not file_path:
+                raise ValueError("File path is required")
+
+            validate_archive_name(archive_name)
 
             # Build borg extract command with --stdout
             borg_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
 
             # Use manual keyfile management for streaming operations
-            command, env, temp_keyfile_path = build_secure_borg_command_with_keyfile(
+            result = build_secure_borg_command_with_keyfile(
                 base_command="borg extract",
                 repository_path="",
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=borg_args,
             )
+            command, env = result.command, result.environment
 
             logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
@@ -246,7 +250,7 @@ class BorgService:
                         raise Exception(f"Borg extract failed: {error_msg}")
 
                     # Clean up keyfile after streaming completes
-                    cleanup_temp_keyfile(temp_keyfile_path)
+                    result.cleanup_temp_files()
 
             filename = os.path.basename(file_path)
 
@@ -258,7 +262,8 @@ class BorgService:
 
         except Exception as e:
             # Clean up keyfile if error occurs before streaming starts
-            cleanup_temp_keyfile(temp_keyfile_path)
+            if result:
+                result.cleanup_temp_files()
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
             raise Exception(f"Failed to extract file: {str(e)}")
 

@@ -365,46 +365,6 @@ class DebugService:
         except Exception as e:
             tools["fuse3"] = {"error": str(e), "accessible": False}
 
-        try:
-            process = await asyncio.create_subprocess_exec(
-                "dpkg",
-                "-l",
-                "python3-pyfuse3",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                output = stdout.decode().strip()
-                # Parse dpkg output to get version
-                lines = output.split("\n")
-                for line in lines:
-                    if line.startswith("ii") and "python3-pyfuse3" in line:
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            version = parts[2]
-                            tools["python3-pyfuse3"] = {
-                                "version": f"python3-pyfuse3 {version}",
-                                "accessible": True,
-                            }
-                            break
-                else:
-                    tools["python3-pyfuse3"] = {
-                        "error": "Package info not found",
-                        "accessible": False,
-                    }
-            else:
-                tools["python3-pyfuse3"] = {
-                    "error": stderr.decode().strip()
-                    if stderr
-                    else "Package not installed",
-                    "accessible": False,
-                }
-        except Exception as e:
-            tools["python3-pyfuse3"] = {"error": str(e), "accessible": False}
-
         return tools
 
     def _get_environment_info(self) -> Dict[str, str]:

@@ -3,6 +3,7 @@ Tests for FastAPI dependency providers
 """
 
 import inspect
+from typing import Callable, Any
 from unittest.mock import Mock, AsyncMock
 
 from borgitory.dependencies import (
@@ -233,7 +234,7 @@ class TestDependencies:
         )
 
         # Override dependencies
-        overrides = {
+        overrides: dict[Callable[..., Any], Callable[..., Any]] = {
             get_simple_command_runner: lambda: mock_command_runner,
             get_volume_service: lambda: mock_volume_service,
             get_job_manager_dependency: lambda: mock_job_manager,
@@ -260,7 +261,7 @@ class TestDependencies:
         )
 
         # Override dependencies
-        overrides = {
+        overrides: dict[Callable[..., Any], Callable[..., Any]] = {
             get_simple_command_runner: lambda: mock_command_runner,
             get_volume_service: lambda: mock_volume_service,
             get_job_manager_dependency: lambda: mock_job_manager,
@@ -434,7 +435,7 @@ class TestDependencies:
         )
 
         # Override dependencies
-        overrides = {
+        overrides: dict[Callable[..., Any], Callable[..., Any]] = {
             get_volume_service: lambda: mock_volume_service,
             get_job_manager_dependency: lambda: mock_job_manager,
         }

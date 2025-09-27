@@ -107,7 +107,7 @@ class TestBuildSecureBorgCommandWithKeyfile:
 
     def test_build_command_without_keyfile(self) -> None:
         """Test building command without keyfile content"""
-        command, env, temp_keyfile_path = build_secure_borg_command_with_keyfile(
+        result = build_secure_borg_command_with_keyfile(
             base_command="borg list",
             repository_path="/test/repo",
             passphrase="test_pass",
@@ -118,16 +118,16 @@ class TestBuildSecureBorgCommandWithKeyfile:
         # Should behave like regular build_secure_borg_command
         # Use sanitize_path to get the expected platform-specific path
         expected_path = sanitize_path("/test/repo")
-        assert command == ["borg", "list", "--json", expected_path]
-        assert env["BORG_PASSPHRASE"] == "test_pass"
-        assert "BORG_KEY_FILE" not in env
-        assert temp_keyfile_path is None
+        assert result.command == ["borg", "list", "--json", expected_path]
+        assert result.environment["BORG_PASSPHRASE"] == "test_pass"
+        assert "BORG_KEY_FILE" not in result.environment
+        assert result.temp_keyfile_path is None
 
     def test_build_command_with_keyfile(self) -> None:
         """Test building command with keyfile content"""
         keyfile_content = "test keyfile content"
 
-        command, env, temp_keyfile_path = build_secure_borg_command_with_keyfile(
+        result = build_secure_borg_command_with_keyfile(
             base_command="borg list",
             repository_path="/test/repo",
             passphrase="test_pass",
@@ -138,22 +138,22 @@ class TestBuildSecureBorgCommandWithKeyfile:
         try:
             # Verify command structure
             expected_path = sanitize_path("/test/repo")
-            assert command == ["borg", "list", "--json", expected_path]
-            assert env["BORG_PASSPHRASE"] == "test_pass"
-            assert "BORG_KEY_FILE" in env
-            assert temp_keyfile_path is not None
-            assert env["BORG_KEY_FILE"] == temp_keyfile_path
+            assert result.command == ["borg", "list", "--json", expected_path]
+            assert result.environment["BORG_PASSPHRASE"] == "test_pass"
+            assert "BORG_KEY_FILE" in result.environment
+            assert result.temp_keyfile_path is not None
+            assert result.environment["BORG_KEY_FILE"] == result.temp_keyfile_path
 
             # Verify keyfile was created correctly
-            assert os.path.exists(temp_keyfile_path)
-            with open(temp_keyfile_path, "r", encoding="utf-8") as f:
+            assert os.path.exists(result.temp_keyfile_path)
+            with open(result.temp_keyfile_path, "r", encoding="utf-8") as f:
                 content = f.read()
             assert content == keyfile_content
 
         finally:
             # Clean up
-            if temp_keyfile_path and os.path.exists(temp_keyfile_path):
-                os.unlink(temp_keyfile_path)
+            if result.temp_keyfile_path and os.path.exists(result.temp_keyfile_path):
+                os.unlink(result.temp_keyfile_path)
 
     def test_build_command_with_keyfile_and_env_overrides(self) -> None:
         """Test building command with keyfile and existing environment overrides"""
@@ -163,7 +163,7 @@ class TestBuildSecureBorgCommandWithKeyfile:
             "CUSTOM_VAR": "value",
         }
 
-        command, env, temp_keyfile_path = build_secure_borg_command_with_keyfile(
+        result = build_secure_borg_command_with_keyfile(
             base_command="borg info",
             repository_path="/test/repo",
             passphrase="test_pass",
@@ -173,22 +173,22 @@ class TestBuildSecureBorgCommandWithKeyfile:
 
         try:
             # Verify environment variables
-            assert env["BORG_PASSPHRASE"] == "test_pass"
-            assert env["BORG_KEY_FILE"] == temp_keyfile_path
+            assert result.environment["BORG_PASSPHRASE"] == "test_pass"
+            assert result.environment["BORG_KEY_FILE"] == result.temp_keyfile_path
             assert (
-                env["BORG_RELOCATED_REPO_ACCESS_IS_OK"] == "no"
+                result.environment["BORG_RELOCATED_REPO_ACCESS_IS_OK"] == "no"
             )  # Override should work
-            assert env["CUSTOM_VAR"] == "value"
+            assert result.environment["CUSTOM_VAR"] == "value"
 
         finally:
-            if temp_keyfile_path and os.path.exists(temp_keyfile_path):
-                os.unlink(temp_keyfile_path)
+            if result.temp_keyfile_path and os.path.exists(result.temp_keyfile_path):
+                os.unlink(result.temp_keyfile_path)
 
     def test_build_command_empty_repository_path(self) -> None:
         """Test building command with empty repository path (path in additional_args)"""
         keyfile_content = "test keyfile content"
 
-        command, env, temp_keyfile_path = build_secure_borg_command_with_keyfile(
+        result = build_secure_borg_command_with_keyfile(
             base_command="borg create",
             repository_path="",  # Empty - path will be in additional_args
             passphrase="test_pass",
@@ -198,18 +198,18 @@ class TestBuildSecureBorgCommandWithKeyfile:
 
         try:
             # Repository path should not be appended when empty
-            assert command == [
+            assert result.command == [
                 "borg",
                 "create",
                 "--stats",
                 "/test/repo::archive",
                 "/source",
             ]
-            assert env["BORG_KEY_FILE"] == temp_keyfile_path
+            assert result.environment["BORG_KEY_FILE"] == result.temp_keyfile_path
 
         finally:
-            if temp_keyfile_path and os.path.exists(temp_keyfile_path):
-                os.unlink(temp_keyfile_path)
+            if result.temp_keyfile_path and os.path.exists(result.temp_keyfile_path):
+                os.unlink(result.temp_keyfile_path)
 
 
 class TestCleanupTempKeyfile:
@@ -431,7 +431,7 @@ class TestSecurityFunctionsIntegration:
 
         try:
             # Use it in command building
-            command, env, returned_path = build_secure_borg_command_with_keyfile(
+            result = build_secure_borg_command_with_keyfile(
                 base_command="borg list",
                 repository_path="/test/repo",
                 passphrase="test_pass",
@@ -440,16 +440,16 @@ class TestSecurityFunctionsIntegration:
 
             # Verify both keyfiles exist (one from _create_temp_keyfile, one from build_secure_borg_command_with_keyfile)
             assert os.path.exists(temp_path)
-            assert returned_path is not None
-            assert os.path.exists(returned_path)
-            assert temp_path != returned_path  # Should be different files
+            assert result.temp_keyfile_path is not None
+            assert os.path.exists(result.temp_keyfile_path)
+            assert temp_path != result.temp_keyfile_path  # Should be different files
 
             # Verify environment
-            assert env["BORG_KEY_FILE"] == returned_path
+            assert result.environment["BORG_KEY_FILE"] == result.temp_keyfile_path
 
             # Clean up the returned path
-            cleanup_temp_keyfile(returned_path)
-            assert not os.path.exists(returned_path)
+            cleanup_temp_keyfile(result.temp_keyfile_path)
+            assert not os.path.exists(result.temp_keyfile_path)
 
         finally:
             # Clean up our manual keyfile

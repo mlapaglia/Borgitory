@@ -130,7 +130,7 @@ async def create_schedule(
             {"error_message": f"Invalid form data: {str(e)}"},
         )
 
-    success, created_schedule, error_msg = await schedule_service.create_schedule(
+    result = await schedule_service.create_schedule(
         name=schedule.name,
         repository_id=schedule.repository_id,
         cron_expression=schedule.cron_expression,
@@ -142,17 +142,17 @@ async def create_schedule(
         post_job_hooks=schedule.post_job_hooks,
     )
 
-    if not success or not created_schedule:
+    if result.is_error or not result.schedule:
         return templates.TemplateResponse(
             request,
             "partials/schedules/create_error.html",
-            {"error_message": error_msg},
+            {"error_message": result.error_message},
         )
 
     response = templates.TemplateResponse(
         request,
         "partials/schedules/create_success.html",
-        {"schedule_name": created_schedule.name},
+        {"schedule_name": result.schedule.name},
     )
     response.headers["HX-Trigger"] = "scheduleUpdate"
     return response
@@ -318,22 +318,22 @@ async def update_schedule(
             {"error_message": f"Invalid form data: {str(e)}"},
         )
 
-    success, updated_schedule, error_msg = await schedule_service.update_schedule(
-        schedule_id, update_data
-    )
+    result = await schedule_service.update_schedule(schedule_id, update_data)
 
-    if not success or not updated_schedule:
+    if result.is_error or not result.schedule:
         return templates.TemplateResponse(
             request,
             "partials/schedules/update_error.html",
-            {"error_message": error_msg},
-            status_code=404 if error_msg and "not found" in error_msg else 500,
+            {"error_message": result.error_message},
+            status_code=404
+            if result.error_message and "not found" in result.error_message
+            else 500,
         )
 
     response = templates.TemplateResponse(
         request,
         "partials/schedules/update_success.html",
-        {"schedule_name": updated_schedule.name},
+        {"schedule_name": result.schedule.name},
     )
     response.headers["HX-Trigger"] = "scheduleUpdate"
     return response
@@ -346,16 +346,16 @@ async def toggle_schedule(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
 ) -> HTMLResponse:
-    success, updated_schedule, error_msg = await schedule_service.toggle_schedule(
-        schedule_id
-    )
+    result = await schedule_service.toggle_schedule(schedule_id)
 
-    if not success:
+    if result.is_error:
         return templates.TemplateResponse(
             request,
             "partials/common/error_message.html",
-            {"error_message": error_msg},
-            status_code=404 if error_msg and "not found" in error_msg else 500,
+            {"error_message": result.error_message},
+            status_code=404
+            if result.error_message and "not found" in result.error_message
+            else 500,
         )
 
     schedules = schedule_service.get_all_schedules()
@@ -373,22 +373,22 @@ async def delete_schedule(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
 ) -> HTMLResponse:
-    success, schedule_name, error_msg = await schedule_service.delete_schedule(
-        schedule_id
-    )
+    result = await schedule_service.delete_schedule(schedule_id)
 
-    if not success:
+    if not result.success:
         return templates.TemplateResponse(
             request,
             "partials/schedules/delete_error.html",
-            {"error_message": error_msg},
-            status_code=404 if error_msg and "not found" in error_msg else 500,
+            {"error_message": result.error_message},
+            status_code=404
+            if result.error_message and "not found" in result.error_message
+            else 500,
         )
 
     response = templates.TemplateResponse(
         request,
         "partials/schedules/delete_success.html",
-        {"schedule_name": schedule_name},
+        {"schedule_name": result.schedule_name},
     )
     response.headers["HX-Trigger"] = "scheduleUpdate"
     return response
@@ -402,16 +402,16 @@ async def run_schedule_manually(
     schedule_service: ScheduleServiceDep,
 ) -> HTMLResponse:
     """Run a schedule manually"""
-    success, job_id, error_msg = await schedule_service.run_schedule_manually(
-        schedule_id
-    )
+    result = await schedule_service.run_schedule_manually(schedule_id)
 
-    if not success:
+    if result.is_error:
         return templates.TemplateResponse(
             request,
             "partials/common/error_message.html",
-            {"error_message": error_msg},
-            status_code=404 if error_msg and "not found" in error_msg else 500,
+            {"error_message": result.error_message},
+            status_code=404
+            if result.error_message and "not found" in result.error_message
+            else 500,
         )
 
     # Get the schedule name for the success message
@@ -421,7 +421,10 @@ async def run_schedule_manually(
     return templates.TemplateResponse(
         request,
         "partials/schedules/run_success.html",
-        {"schedule_name": schedule_name, "job_id": job_id},
+        {
+            "schedule_name": schedule_name,
+            "job_id": result.job_details.get("job_id") if result.job_details else None,
+        },
     )
 
 

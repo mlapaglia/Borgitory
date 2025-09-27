@@ -1,3 +1,4 @@
+from typing import Any, Generator
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
@@ -29,7 +30,9 @@ class TestSchedulesAPI:
     """Test the Schedules API endpoints - HTMX/HTTP behavior"""
 
     @pytest.fixture(scope="function")
-    def setup_test_dependencies(self, test_db: Session):
+    def setup_test_dependencies(
+        self, test_db: Session
+    ) -> Generator[dict[str, Any], None, None]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -73,7 +76,10 @@ class TestSchedulesAPI:
         return repository
 
     def test_get_schedules_form(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test getting schedules form returns HTML template."""
         # Create some test configurations with required fields
@@ -120,7 +126,10 @@ class TestSchedulesAPI:
         assert "schedule" in response.text.lower() or "form" in response.text.lower()
 
     def test_create_schedule_success(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test successful schedule creation returns success template."""
         schedule_data = {
@@ -146,7 +155,7 @@ class TestSchedulesAPI:
         assert created_schedule.repository_id == sample_repository.id
 
     def test_create_schedule_repository_not_found(
-        self, setup_test_dependencies, test_db
+        self, setup_test_dependencies: dict[str, Any], test_db: Session
     ) -> None:
         """Test schedule creation with non-existent repository returns error template."""
         schedule_data = {
@@ -164,7 +173,10 @@ class TestSchedulesAPI:
         assert "repository" in response.text.lower() or "error" in response.text.lower()
 
     def test_create_schedule_invalid_cron(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test schedule creation with invalid cron expression returns error template."""
         schedule_data = {
@@ -182,7 +194,10 @@ class TestSchedulesAPI:
         assert "cron" in response.text.lower() or "error" in response.text.lower()
 
     def test_get_schedules_html(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test getting schedules as HTML."""
         # Create test schedules
@@ -209,7 +224,10 @@ class TestSchedulesAPI:
         assert "schedule-1" in response_text or "schedule-2" in response_text
 
     def test_get_schedules_html_pagination(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test getting schedules with pagination parameters."""
         # Create multiple schedules
@@ -227,7 +245,9 @@ class TestSchedulesAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_upcoming_backups_html(self, setup_test_dependencies) -> None:
+    def test_get_upcoming_backups_html(
+        self, setup_test_dependencies: dict[str, Any]
+    ) -> None:
         """Test getting upcoming backups as HTML."""
         # Setup mock jobs with different datetime formats
         mock_jobs = [
@@ -251,7 +271,9 @@ class TestSchedulesAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_upcoming_backups_html_error(self, setup_test_dependencies) -> None:
+    def test_get_upcoming_backups_html_error(
+        self, setup_test_dependencies: dict[str, Any]
+    ) -> None:
         """Test getting upcoming backups HTML with scheduler error."""
         setup_test_dependencies[
             "scheduler_service"
@@ -264,7 +286,9 @@ class TestSchedulesAPI:
         # Should contain error message
         assert "error" in response.text.lower()
 
-    def test_get_cron_expression_form(self, setup_test_dependencies) -> None:
+    def test_get_cron_expression_form(
+        self, setup_test_dependencies: dict[str, Any]
+    ) -> None:
         """Test getting cron expression form."""
         response = client.get(
             "/api/schedules/cron-expression-form?preset=0%202%20*%20*%20*"
@@ -274,7 +298,10 @@ class TestSchedulesAPI:
         assert "text/html" in response.headers.get("content-type", "")
 
     def test_list_schedules(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test listing schedules."""
         # Create test schedules
@@ -295,12 +322,17 @@ class TestSchedulesAPI:
         reason="Template path issues in test environment - service layer is tested separately"
     )
     def test_get_schedule_success(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test getting specific schedule successfully."""
         pass
 
-    def test_get_schedule_not_found(self, setup_test_dependencies) -> None:
+    def test_get_schedule_not_found(
+        self, setup_test_dependencies: dict[str, Any]
+    ) -> None:
         """Test getting non-existent schedule."""
         response = client.get("/api/schedules/999")
 
@@ -309,7 +341,10 @@ class TestSchedulesAPI:
         assert "error" in response.text.lower() or "not found" in response.text.lower()
 
     def test_get_schedule_edit_form(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test getting schedule edit form."""
         schedule = Schedule()
@@ -329,7 +364,10 @@ class TestSchedulesAPI:
         assert "form" in response.text.lower() or "edit" in response.text.lower()
 
     def test_update_schedule_success(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test successful schedule update."""
         schedule = Schedule()
@@ -353,11 +391,15 @@ class TestSchedulesAPI:
         updated_schedule = (
             test_db.query(Schedule).filter(Schedule.id == schedule.id).first()
         )
+        assert updated_schedule is not None
         assert updated_schedule.name == "updated-schedule"
         assert updated_schedule.cron_expression == "0 3 * * *"
 
     def test_toggle_schedule_success(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test successfully toggling schedule."""
         schedule = Schedule()
@@ -379,9 +421,12 @@ class TestSchedulesAPI:
         toggled_schedule = (
             test_db.query(Schedule).filter(Schedule.id == schedule.id).first()
         )
+        assert toggled_schedule is not None
         assert toggled_schedule.enabled is True
 
-    def test_toggle_schedule_not_found(self, setup_test_dependencies) -> None:
+    def test_toggle_schedule_not_found(
+        self, setup_test_dependencies: dict[str, Any]
+    ) -> None:
         """Test toggling non-existent schedule."""
         response = client.put("/api/schedules/999/toggle")
 
@@ -390,7 +435,10 @@ class TestSchedulesAPI:
         assert "error" in response.text.lower() or "not found" in response.text.lower()
 
     def test_delete_schedule_success(
-        self, setup_test_dependencies, test_db, sample_repository
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: Session,
+        sample_repository: Repository,
     ) -> None:
         """Test successfully deleting schedule."""
         schedule = Schedule()
@@ -415,7 +463,9 @@ class TestSchedulesAPI:
         )
         assert deleted_schedule is None
 
-    def test_delete_schedule_not_found(self, setup_test_dependencies) -> None:
+    def test_delete_schedule_not_found(
+        self, setup_test_dependencies: dict[str, Any]
+    ) -> None:
         """Test deleting non-existent schedule."""
         response = client.delete("/api/schedules/999")
 
@@ -426,7 +476,9 @@ class TestSchedulesAPI:
     @pytest.mark.skip(
         reason="Template missing in test environment - functionality tested in service layer"
     )
-    def test_get_active_scheduled_jobs(self, setup_test_dependencies) -> None:
+    def test_get_active_scheduled_jobs(
+        self, setup_test_dependencies: dict[str, Any]
+    ) -> None:
         """Test getting active scheduled jobs."""
         pass
 
@@ -439,25 +491,33 @@ class TestScheduleUtilityFunctions:
         """Provide CronDescriptionService instance for tests"""
         return CronDescriptionService()
 
-    def test_format_cron_trigger_daily(self, cron_description_service) -> None:
+    def test_format_cron_trigger_daily(
+        self, cron_description_service: CronDescriptionService
+    ) -> None:
         """Test formatting daily cron trigger"""
         trigger_str = "cron[minute='0', hour='14', day='*', month='*', day_of_week='*']"
         result = cron_description_service.format_cron_trigger(trigger_str)
         assert result == "At 14:00"
 
-    def test_format_cron_trigger_weekly(self, cron_description_service) -> None:
+    def test_format_cron_trigger_weekly(
+        self, cron_description_service: CronDescriptionService
+    ) -> None:
         """Test formatting weekly cron trigger"""
         trigger_str = "cron[minute='0', hour='9', day='*', month='*', day_of_week='1']"
         result = cron_description_service.format_cron_trigger(trigger_str)
         assert result == "At 09:00, only on Monday"
 
-    def test_format_cron_trigger_monthly(self, cron_description_service) -> None:
+    def test_format_cron_trigger_monthly(
+        self, cron_description_service: CronDescriptionService
+    ) -> None:
         """Test formatting monthly cron trigger"""
         trigger_str = "cron[minute='0', hour='2', day='15', month='*', day_of_week='*']"
         result = cron_description_service.format_cron_trigger(trigger_str)
         assert result == "At 02:00, on day 15 of the month"
 
-    def test_format_cron_trigger_twice_monthly(self, cron_description_service) -> None:
+    def test_format_cron_trigger_twice_monthly(
+        self, cron_description_service: CronDescriptionService
+    ) -> None:
         """Test formatting twice monthly cron trigger"""
         trigger_str = (
             "cron[minute='0', hour='2', day='1,15', month='*', day_of_week='*']"
@@ -465,7 +525,9 @@ class TestScheduleUtilityFunctions:
         result = cron_description_service.format_cron_trigger(trigger_str)
         assert result == "At 02:00, on day 1 and 15 of the month"
 
-    def test_format_cron_trigger_every_n_days(self, cron_description_service) -> None:
+    def test_format_cron_trigger_every_n_days(
+        self, cron_description_service: CronDescriptionService
+    ) -> None:
         """Test formatting every N days cron trigger"""
         trigger_str = (
             "cron[minute='0', hour='2', day='*/3', month='*', day_of_week='*']"
@@ -473,7 +535,9 @@ class TestScheduleUtilityFunctions:
         result = cron_description_service.format_cron_trigger(trigger_str)
         assert result == "At 02:00, every 3 days"
 
-    def test_format_cron_trigger_invalid(self, cron_description_service) -> None:
+    def test_format_cron_trigger_invalid(
+        self, cron_description_service: CronDescriptionService
+    ) -> None:
         """Test formatting invalid cron trigger"""
         trigger_str = "invalid trigger format"
         result = cron_description_service.format_cron_trigger(trigger_str)

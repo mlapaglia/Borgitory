@@ -188,13 +188,11 @@ class TestManualRunAPScheduler:
         expected_job_id = str(uuid.uuid4())
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
-        success, job_id, error_msg = await schedule_service.run_schedule_manually(
-            test_schedule.id
-        )
+        result = await schedule_service.run_schedule_manually(test_schedule.id)
 
-        assert success is True
-        assert job_id == expected_job_id
-        assert error_msg is None
+        assert result.success is True
+        assert result.job_details.get("job_id") == expected_job_id
+        assert result.error_message is None
 
         # Verify scheduler service was called correctly
         mock_scheduler_service.run_schedule_once.assert_called_once_with(
@@ -206,11 +204,11 @@ class TestManualRunAPScheduler:
         self, schedule_service: ScheduleService, mock_scheduler_service: AsyncMock
     ) -> None:
         """Test ScheduleService.run_schedule_manually with non-existent schedule"""
-        success, job_id, error_msg = await schedule_service.run_schedule_manually(999)
+        result = await schedule_service.run_schedule_manually(999)
 
-        assert success is False
-        assert job_id is None
-        assert error_msg == "Schedule not found"
+        assert result.success is False
+        assert result.job_details.get("job_id") is None
+        assert result.error_message == "Schedule not found"
 
         # Verify scheduler service was not called
         mock_scheduler_service.run_schedule_once.assert_not_called()
@@ -227,14 +225,15 @@ class TestManualRunAPScheduler:
             "Scheduler not running"
         )
 
-        success, job_id, error_msg = await schedule_service.run_schedule_manually(
-            test_schedule.id
-        )
+        result = await schedule_service.run_schedule_manually(test_schedule.id)
 
-        assert success is False
-        assert job_id is None
-        assert error_msg is not None
-        assert "Failed to run schedule manually: Scheduler not running" in error_msg
+        assert result.success is False
+        assert result.job_details.get("job_id") is None
+        assert result.error_message is not None
+        assert (
+            "Failed to run schedule manually: Scheduler not running"
+            in result.error_message
+        )
 
         # Verify scheduler service was called
         mock_scheduler_service.run_schedule_once.assert_called_once_with(

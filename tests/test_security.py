@@ -5,7 +5,7 @@ Tests for security utilities - CRITICAL for preventing command injection and pat
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from borgitory.utils.security import (
     sanitize_path,
@@ -451,7 +451,7 @@ class TestGetOrGenerateSecretKey:
             assert retrieved_key == original_key
 
     @patch("pathlib.Path.mkdir")
-    def test_directory_creation_failure(self, mock_mkdir) -> None:
+    def test_directory_creation_failure(self, mock_mkdir: Mock) -> None:
         """Test handling of directory creation failure."""
         mock_mkdir.side_effect = OSError("Permission denied")
 
@@ -459,7 +459,7 @@ class TestGetOrGenerateSecretKey:
             get_or_generate_secret_key("/nonexistent/path")
 
     @patch("pathlib.Path.read_text")
-    def test_read_secret_key_failure(self, mock_read) -> None:
+    def test_read_secret_key_failure(self, mock_read: Mock) -> None:
         """Test handling of secret key read failure."""
         mock_read.side_effect = OSError("Permission denied")
 
@@ -472,7 +472,7 @@ class TestGetOrGenerateSecretKey:
                 get_or_generate_secret_key(temp_dir)
 
     @patch("pathlib.Path.write_text")
-    def test_write_secret_key_failure(self, mock_write) -> None:
+    def test_write_secret_key_failure(self, mock_write: Mock) -> None:
         """Test handling of secret key write failure."""
         mock_write.side_effect = OSError("Disk full")
 

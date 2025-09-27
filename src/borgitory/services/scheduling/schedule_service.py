@@ -4,6 +4,7 @@ Handles all schedule-related business operations independent of HTTP concerns.
 """
 
 import logging
+from dataclasses import dataclass
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
@@ -16,6 +17,70 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ScheduleOperationResult:
+    """Result of a schedule operation (create, update, toggle, delete)."""
+
+    success: bool
+    schedule: Optional[Schedule] = None
+    error_message: Optional[str] = None
+
+    @property
+    def is_error(self) -> bool:
+        """Check if the operation resulted in an error."""
+        return not self.success or self.error_message is not None
+
+    def raise_if_error(self) -> None:
+        """Raise an exception if the operation failed."""
+        if self.is_error:
+            raise ValueError(self.error_message or "Schedule operation failed")
+
+
+@dataclass
+class ScheduleValidationResult:
+    """Result of schedule validation operations."""
+
+    success: bool
+    error_message: Optional[str] = None
+
+    @property
+    def is_error(self) -> bool:
+        """Check if the validation resulted in an error."""
+        return not self.success or self.error_message is not None
+
+
+@dataclass
+class ScheduleDeleteResult:
+    """Result of schedule deletion operations."""
+
+    success: bool
+    schedule_name: Optional[str] = None
+    error_message: Optional[str] = None
+
+    @property
+    def is_error(self) -> bool:
+        """Check if the deletion resulted in an error."""
+        return not self.success or self.error_message is not None
+
+
+@dataclass
+class ScheduleRunResult:
+    """Result of manual schedule run operations."""
+
+    success: bool
+    job_details: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.job_details is None:
+            self.job_details = {}
+
+    @property
+    def is_error(self) -> bool:
+        """Check if the run resulted in an error."""
+        return not self.success or self.error_message is not None
+
+
 class ScheduleService:
     """Service for schedule business logic operations."""
 
@@ -25,18 +90,20 @@ class ScheduleService:
 
     def validate_cron_expression(
         self, cron_expression: str
-    ) -> tuple[bool, Optional[str]]:
+    ) -> ScheduleValidationResult:
         """
         Validate a cron expression using APScheduler.
 
         Returns:
-            tuple: (is_valid, error_message)
+            ScheduleValidationResult with success status and optional error message
         """
         try:
             CronTrigger.from_crontab(cron_expression)
-            return True, None
+            return ScheduleValidationResult(success=True)
         except ValueError as e:
-            return False, f"Invalid cron expression: {str(e)}"
+            return ScheduleValidationResult(
+                success=False, error_message=f"Invalid cron expression: {str(e)}"
+            )
 
     def get_schedule_by_id(self, schedule_id: int) -> Optional[Schedule]:
         """Get a schedule by ID."""
@@ -61,12 +128,12 @@ class ScheduleService:
         notification_config_id: Optional[int] = None,
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
-    ) -> tuple[bool, Optional[Schedule], Optional[str]]:
+    ) -> ScheduleOperationResult:
         """
         Create a new schedule.
 
         Returns:
-            tuple: (success, schedule_or_none, error_message_or_none)
+            ScheduleOperationResult with success status, schedule, and optional error message
         """
         try:
             # Validate repository exists
@@ -74,12 +141,16 @@ class ScheduleService:
                 self.db.query(Repository).filter(Repository.id == repository_id).first()
             )
             if not repository:
-                return False, None, "Repository not found"
+                return ScheduleOperationResult(
+                    success=False, error_message="Repository not found"
+                )
 
             # Validate cron expression
-            is_valid, error_msg = self.validate_cron_expression(cron_expression)
-            if not is_valid:
-                return False, None, error_msg
+            validation_result = self.validate_cron_expression(cron_expression)
+            if validation_result.is_error:
+                return ScheduleOperationResult(
+                    success=False, error_message=validation_result.error_message
+                )
 
             # Create schedule
             db_schedule = Schedule()
@@ -103,32 +174,38 @@ class ScheduleService:
                 await self.scheduler_service.add_schedule(
                     db_schedule.id, db_schedule.name, db_schedule.cron_expression
                 )
-                return True, db_schedule, None
+                return ScheduleOperationResult(success=True, schedule=db_schedule)
             except Exception as e:
                 # Rollback database changes if scheduler fails
                 self.db.delete(db_schedule)
                 self.db.commit()
-                return False, None, f"Failed to schedule job: {str(e)}"
+                return ScheduleOperationResult(
+                    success=False, error_message=f"Failed to schedule job: {str(e)}"
+                )
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to create schedule: {str(e)}"
+            return ScheduleOperationResult(
+                success=False, error_message=f"Failed to create schedule: {str(e)}"
+            )
 
     async def update_schedule(
         self,
         schedule_id: int,
         update_data: Dict[str, Any],
-    ) -> tuple[bool, Optional[Schedule], Optional[str]]:
+    ) -> ScheduleOperationResult:
         """
         Update an existing schedule.
 
         Returns:
-            tuple: (success, schedule_or_none, error_message_or_none)
+            ScheduleOperationResult with success status, schedule, and optional error message
         """
         try:
             schedule = self.get_schedule_by_id(schedule_id)
             if not schedule:
-                return False, None, "Schedule not found"
+                return ScheduleOperationResult(
+                    success=False, error_message="Schedule not found"
+                )
 
             # Update fields
             for field, value in update_data.items():
@@ -150,25 +227,27 @@ class ScheduleService:
                     # If scheduler update fails, we still want to return the updated schedule
                     pass
 
-            return True, schedule, None
+            return ScheduleOperationResult(success=True, schedule=schedule)
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to update schedule: {str(e)}"
+            return ScheduleOperationResult(
+                success=False, error_message=f"Failed to update schedule: {str(e)}"
+            )
 
-    async def toggle_schedule(
-        self, schedule_id: int
-    ) -> tuple[bool, Optional[Schedule], Optional[str]]:
+    async def toggle_schedule(self, schedule_id: int) -> ScheduleOperationResult:
         """
         Toggle a schedule's enabled state.
 
         Returns:
-            tuple: (success, schedule_or_none, error_message_or_none)
+            ScheduleOperationResult with success status, schedule, and optional error message
         """
         try:
             schedule = self.get_schedule_by_id(schedule_id)
             if not schedule:
-                return False, None, "Schedule not found"
+                return ScheduleOperationResult(
+                    success=False, error_message="Schedule not found"
+                )
 
             schedule.enabled = not schedule.enabled
             self.db.commit()
@@ -181,27 +260,31 @@ class ScheduleService:
                     schedule.cron_expression,
                     schedule.enabled,
                 )
-                return True, schedule, None
+                return ScheduleOperationResult(success=True, schedule=schedule)
             except Exception as e:
-                return False, None, f"Failed to update schedule: {str(e)}"
+                return ScheduleOperationResult(
+                    success=False, error_message=f"Failed to update schedule: {str(e)}"
+                )
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to toggle schedule: {str(e)}"
+            return ScheduleOperationResult(
+                success=False, error_message=f"Failed to toggle schedule: {str(e)}"
+            )
 
-    async def delete_schedule(
-        self, schedule_id: int
-    ) -> tuple[bool, Optional[str], Optional[str]]:
+    async def delete_schedule(self, schedule_id: int) -> ScheduleDeleteResult:
         """
         Delete a schedule.
 
         Returns:
-            tuple: (success, schedule_name_or_none, error_message_or_none)
+            ScheduleDeleteResult with success status, schedule name, and optional error message
         """
         try:
             schedule = self.get_schedule_by_id(schedule_id)
             if not schedule:
-                return False, None, "Schedule not found"
+                return ScheduleDeleteResult(
+                    success=False, error_message="Schedule not found"
+                )
 
             schedule_name = schedule.name
 
@@ -209,35 +292,36 @@ class ScheduleService:
             try:
                 await self.scheduler_service.remove_schedule(schedule_id)
             except Exception as e:
-                return (
-                    False,
-                    None,
-                    f"Failed to remove schedule from scheduler: {str(e)}",
+                return ScheduleDeleteResult(
+                    success=False,
+                    error_message=f"Failed to remove schedule from scheduler: {str(e)}",
                 )
 
             # Delete from database
             self.db.delete(schedule)
             self.db.commit()
 
-            return True, schedule_name, None
+            return ScheduleDeleteResult(success=True, schedule_name=schedule_name)
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to delete schedule: {str(e)}"
+            return ScheduleDeleteResult(
+                success=False, error_message=f"Failed to delete schedule: {str(e)}"
+            )
 
-    async def run_schedule_manually(
-        self, schedule_id: int
-    ) -> tuple[bool, Optional[str], Optional[str]]:
+    async def run_schedule_manually(self, schedule_id: int) -> ScheduleRunResult:
         """
         Manually run a schedule immediately by injecting a one-time job into APScheduler.
 
         Returns:
-            tuple: (success, job_id_or_none, error_message_or_none)
+            ScheduleRunResult with success status, job details, and optional error message
         """
         try:
             schedule = self.get_schedule_by_id(schedule_id)
             if not schedule:
-                return False, None, "Schedule not found"
+                return ScheduleRunResult(
+                    success=False, error_message="Schedule not found"
+                )
 
             # Use the scheduler service to inject a one-time job
             job_id = await self.scheduler_service.run_schedule_once(
@@ -247,11 +331,14 @@ class ScheduleService:
             logger.info(
                 f"Successfully scheduled manual run for schedule {schedule_id} with job_id {job_id}"
             )
-            return True, job_id, None
+            return ScheduleRunResult(success=True, job_details={"job_id": job_id})
 
         except Exception as e:
             logger.error(f"Failed to run schedule manually: {str(e)}")
-            return False, None, f"Failed to run schedule manually: {str(e)}"
+            return ScheduleRunResult(
+                success=False,
+                error_message=f"Failed to run schedule manually: {str(e)}",
+            )
 
     def validate_schedule_creation_data(
         self, json_data: Dict[str, Any]

@@ -71,13 +71,13 @@ async def create_prune_config(
     service: PruneServiceDep,
 ) -> HTMLResponse:
     """Create a new prune configuration"""
-    success, config, error_message = service.create_prune_config(prune_config)
+    result = service.create_prune_config(prune_config)
 
-    if success and config:
+    if result.success and result.config:
         response = templates.TemplateResponse(
             request,
             "partials/prune/create_success.html",
-            {"config_name": config.name},
+            {"config_name": result.config.name},
         )
         response.headers["HX-Trigger"] = "pruneConfigUpdate"
         return response
@@ -85,7 +85,7 @@ async def create_prune_config(
         return templates.TemplateResponse(
             request,
             "partials/prune/create_error.html",
-            {"error_message": error_message},
+            {"error_message": result.error_message},
             status_code=400,
         )
 
@@ -118,13 +118,13 @@ async def enable_prune_config(
     service: PruneServiceDep,
 ) -> _TemplateResponse:
     """Enable a prune configuration"""
-    success, config, error_message = service.enable_prune_config(config_id)
+    result = service.enable_prune_config(config_id)
 
-    if success and config:
+    if result.success and result.config:
         response = templates.TemplateResponse(
             request,
             "partials/prune/action_success.html",
-            {"message": f"Prune policy '{config.name}' enabled successfully!"},
+            {"message": f"Prune policy '{result.config.name}' enabled successfully!"},
         )
         response.headers["HX-Trigger"] = "pruneConfigUpdate"
         return response
@@ -132,7 +132,7 @@ async def enable_prune_config(
         return templates.TemplateResponse(
             request,
             "partials/prune/action_error.html",
-            {"error_message": error_message},
+            {"error_message": result.error_message},
             status_code=404,
         )
 
@@ -145,13 +145,13 @@ async def disable_prune_config(
     service: PruneServiceDep,
 ) -> HTMLResponse:
     """Disable a prune configuration"""
-    success, config, error_message = service.disable_prune_config(config_id)
+    result = service.disable_prune_config(config_id)
 
-    if success and config:
+    if result.success and result.config:
         response = templates.TemplateResponse(
             request,
             "partials/prune/action_success.html",
-            {"message": f"Prune policy '{config.name}' disabled successfully!"},
+            {"message": f"Prune policy '{result.config.name}' disabled successfully!"},
         )
         response.headers["HX-Trigger"] = "pruneConfigUpdate"
         return response
@@ -159,7 +159,7 @@ async def disable_prune_config(
         return templates.TemplateResponse(
             request,
             "partials/prune/action_error.html",
-            {"error_message": error_message},
+            {"error_message": result.error_message},
             status_code=404,
         )
 
@@ -196,15 +196,13 @@ async def update_prune_config(
     service: PruneServiceDep,
 ) -> HTMLResponse:
     """Update a prune configuration"""
-    success, updated_config, error_message = service.update_prune_config(
-        config_id, config_update
-    )
+    result = service.update_prune_config(config_id, config_update)
 
-    if success and updated_config:
+    if result.success and result.config:
         response = templates.TemplateResponse(
             request,
             "partials/prune/update_success.html",
-            {"config_name": updated_config.name},
+            {"config_name": result.config.name},
         )
         response.headers["HX-Trigger"] = "pruneConfigUpdate"
         return response
@@ -212,7 +210,7 @@ async def update_prune_config(
         return templates.TemplateResponse(
             request,
             "partials/prune/update_error.html",
-            {"error_message": error_message},
+            {"error_message": result.error_message},
             status_code=404,
         )
 
@@ -225,13 +223,15 @@ async def delete_prune_config(
     service: PruneServiceDep,
 ) -> HTMLResponse:
     """Delete a prune configuration"""
-    success, config_name, error_message = service.delete_prune_config(config_id)
+    result = service.delete_prune_config(config_id)
 
-    if success:
+    if result.success:
         response = templates.TemplateResponse(
             request,
             "partials/prune/action_success.html",
-            {"message": f"Prune configuration '{config_name}' deleted successfully!"},
+            {
+                "message": f"Prune configuration '{result.config_name}' deleted successfully!"
+            },
         )
         response.headers["HX-Trigger"] = "pruneConfigUpdate"
         return response
@@ -239,6 +239,6 @@ async def delete_prune_config(
         return templates.TemplateResponse(
             request,
             "partials/prune/action_error.html",
-            {"error_message": error_message},
+            {"error_message": result.error_message},
             status_code=404,
         )

@@ -289,9 +289,9 @@ class TestScheduleValidationService:
         ]
 
         for expr in valid_expressions:
-            is_valid, error_msg = schedule_service.validate_cron_expression(expr)
-            assert is_valid is True, f"Expected '{expr}' to be valid"
-            assert error_msg is None
+            result = schedule_service.validate_cron_expression(expr)
+            assert result.success is True, f"Expected '{expr}' to be valid"
+            assert result.error_message is None
 
     def test_validate_cron_expression_invalid(
         self, schedule_service: ScheduleService
@@ -306,7 +306,7 @@ class TestScheduleValidationService:
         ]
 
         for expr in invalid_expressions:
-            is_valid, error_msg = schedule_service.validate_cron_expression(expr)
-            assert is_valid is False, f"Expected '{expr}' to be invalid"
-            assert error_msg is not None
-            assert "Invalid cron expression:" in error_msg
+            result = schedule_service.validate_cron_expression(expr)
+            assert result.success is False, f"Expected '{expr}' to be invalid"
+            assert result.error_message is not None
+            assert "Invalid cron expression:" in result.error_message

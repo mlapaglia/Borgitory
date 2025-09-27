@@ -76,12 +76,14 @@ class TestJobManagerProperDI:
         dependency_doc = get_job_manager_dependency.__doc__
 
         # Singleton function should document direct usage
+        assert singleton_doc is not None
         assert "direct instantiation" in singleton_doc
         assert "tests" in singleton_doc
         assert "background tasks" in singleton_doc
         assert "Don't use for: FastAPI endpoints" in singleton_doc
 
         # Dependency function should document FastAPI DI usage
+        assert dependency_doc is not None
         assert "FastAPI endpoints" in dependency_doc
         assert "Depends(get_job_manager_dependency)" in dependency_doc
         assert "Don't use for: Direct calls" in dependency_doc

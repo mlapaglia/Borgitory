@@ -23,7 +23,7 @@ class TestStreamingErrorHandling:
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager) -> JobStreamService:
+    def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
     @pytest.mark.asyncio
@@ -178,7 +178,7 @@ class TestStreamingPerformance:
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager) -> JobStreamService:
+    def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
     def test_streaming_output_size_efficiency(self) -> None:
@@ -234,7 +234,7 @@ class TestEventFiltering:
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager) -> JobStreamService:
+    def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
     @pytest.mark.asyncio
