@@ -218,7 +218,7 @@ jobs:
         fail_ci_if_error: false
 
   build-python-production-package:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     needs: [lint, mypy, unit-tests, integration-tests]
     strategy:
       matrix:
