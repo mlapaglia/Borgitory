@@ -268,7 +268,7 @@ async def update_import_form(
     if not path:
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_dynamic.html",
+            "partials/repositories/import/import_form_dynamic.html",
             {
                 "path": "",
                 "show_encryption_info": False,
@@ -282,7 +282,7 @@ async def update_import_form(
     if loading == "true":
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_loading.html",
+            "partials/repositories/import/import_form_loading.html",
             {
                 "path": path,
             },
@@ -301,7 +301,7 @@ async def update_import_form(
             logger.warning(f"Repository not found for path: {path}")
             return templates.TemplateResponse(
                 request,
-                "partials/repositories/import_form_dynamic.html",
+                "partials/repositories/import/import_form_dynamic.html",
                 {
                     "path": path,
                     "show_encryption_info": True,
@@ -315,7 +315,7 @@ async def update_import_form(
         # Always use the dynamic form since we can't auto-detect encryption
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_dynamic.html",
+            "partials/repositories/import/import_form_dynamic.html",
             {
                 "path": path,
                 "show_encryption_info": True,
@@ -330,7 +330,7 @@ async def update_import_form(
         logger.error(f"Error updating import form: {e}")
         return templates.TemplateResponse(
             request,
-            "partials/repositories/import_form_simple.html",
+            "partials/repositories/import/import_form_simple.html",
             {
                 "path": path,
                 "show_passphrase": True,
@@ -345,7 +345,9 @@ async def get_import_form(
     request: Request, templates: TemplatesDep
 ) -> _TemplateResponse:
     """Get the import repository form"""
-    return templates.TemplateResponse(request, "partials/repositories/form_import.html")
+    return templates.TemplateResponse(
+        request, "partials/repositories/import/form_import.html"
+    )
 
 
 @router.get("/import-form-inner", response_class=HTMLResponse)
@@ -354,7 +356,7 @@ async def get_import_form_inner(
 ) -> _TemplateResponse:
     """Get the import repository form inner content (preserves tab state)"""
     return templates.TemplateResponse(
-        request, "partials/repositories/form_import_inner.html"
+        request, "partials/repositories/import/form_import_inner.html"
     )
 
 
@@ -364,7 +366,7 @@ async def get_import_form_clear(
 ) -> _TemplateResponse:
     """Clear the selected repository form after successful import"""
     return templates.TemplateResponse(
-        request, "partials/repositories/import_form_clear.html"
+        request, "partials/repositories/import/import_form_clear.html"
     )
 
 
@@ -373,7 +375,9 @@ async def get_create_form(
     request: Request, templates: TemplatesDep
 ) -> _TemplateResponse:
     """Get the create repository form"""
-    return templates.TemplateResponse(request, "partials/repositories/form_create.html")
+    return templates.TemplateResponse(
+        request, "partials/repositories/create/form_create.html"
+    )
 
 
 @router.post("/import")
@@ -452,7 +456,7 @@ async def check_repository_lock_status(
 
     return templates.TemplateResponse(
         request,
-        "partials/repositories/lock_status.html",
+        "partials/repositories/modal/lock_status.html",
         {
             "repo_id": repo_id,
             "locked": lock_status.get("locked", False),
@@ -476,7 +480,7 @@ async def get_repository_details_modal(
 
     return templates.TemplateResponse(
         request,
-        "partials/repositories/details_modal.html",
+        "partials/repositories/modal/details_modal.html",
         {
             "repository": repository,
         },
@@ -506,7 +510,7 @@ async def get_break_lock_button(
 
     return templates.TemplateResponse(
         request,
-        "partials/repositories/break_lock_button.html",
+        "partials/repositories/modal/break_lock_button.html",
         {
             "repo_id": repo_id,
             "repo_name": repository.name,
@@ -532,7 +536,7 @@ async def get_break_lock_button_modal(
 
     return templates.TemplateResponse(
         request,
-        "partials/repositories/break_lock_button_modal.html",
+        "partials/repositories/modal/break_lock_button_modal.html",
         {
             "repo_id": repo_id,
             "repo_name": repository.name,
@@ -587,7 +591,7 @@ async def break_repository_lock_modal(
 
     return templates.TemplateResponse(
         request,
-        "partials/repositories/lock_status.html",
+        "partials/repositories/modal/lock_status.html",
         {
             "repo_id": repo_id,
             "locked": lock_status.get("locked", False),
@@ -614,7 +618,7 @@ async def get_repository_borg_info(
 
     return templates.TemplateResponse(
         request,
-        "partials/repositories/borg_info.html",
+        "partials/repositories/modal/borg_info.html",
         info_result,
     )
 
