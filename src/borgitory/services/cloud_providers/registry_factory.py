@@ -34,9 +34,9 @@ class RegistryFactory:
                 ".base"
             ):  # Skip base module and packages
                 try:
-                    module = importlib.import_module(modname)
-                    # Force reload to ensure registration happens
-                    importlib.reload(module)
+                    # Import module only if not already imported
+                    # The @register_provider decorators will run on first import
+                    importlib.import_module(modname)
                 except Exception as e:
                     import logging
 
@@ -79,6 +79,8 @@ class RegistryFactory:
 
                 if provider_name in providers:
                     try:
+                        # For test registries, we need to reload modules after clearing
+                        # to ensure the @register_provider decorators run again
                         module = importlib.import_module(modname)
                         importlib.reload(module)
                     except Exception as e:
@@ -101,5 +103,6 @@ class RegistryFactory:
         """
         from .registry import clear_registry
 
+        # Clear the registry to ensure it's empty for testing
         clear_registry()
         return get_registry()
