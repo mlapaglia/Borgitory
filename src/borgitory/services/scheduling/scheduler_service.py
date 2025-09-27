@@ -16,6 +16,7 @@ from borgitory.config_module import DATABASE_URL
 from borgitory.models.database import Schedule
 from borgitory.models.schemas import BackupRequest, CompressionType
 from borgitory.models.enums import JobType
+from borgitory.models.job_results import JobCreationResult
 from borgitory.utils.db_session import get_db_session
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.jobs.job_manager import JobManager
@@ -99,11 +100,15 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             result = await job_service.create_backup_job(  # type: ignore[attr-defined]
                 backup_request, JobType.SCHEDULED_BACKUP
             )
-            job_id = result["job_id"]
 
-            logger.info(
-                f"SCHEDULER: Created scheduled backup job {job_id} via JobService"
-            )
+            if isinstance(result, JobCreationResult):
+                job_id = result.job_id
+                logger.info(
+                    f"SCHEDULER: Created scheduled backup job {job_id} via JobService"
+                )
+            else:  # JobCreationError
+                logger.error(f"SCHEDULER: Failed to create backup job: {result.error}")
+                return
 
         except Exception as e:
             logger.error(

@@ -9,6 +9,13 @@ from borgitory.utils.datetime_utils import now_utc
 from sqlalchemy.orm import Session
 
 from borgitory.services.jobs.job_service import JobService
+from borgitory.models.job_results import (
+    JobCreationResult,
+    JobCreationError,
+    JobStatus,
+    ManagerStats,
+    QueueStats,
+)
 from borgitory.models.database import (
     Repository,
     Job,
@@ -70,8 +77,9 @@ class TestJobService:
             backup_request, JobType.MANUAL_BACKUP
         )
 
-        assert result["job_id"] == "job-123"
-        assert result["status"] == "started"
+        assert isinstance(result, JobCreationResult)
+        assert result.job_id == "job-123"
+        assert result.status == "started"
 
         # Verify job manager was called with correct parameters
         self.mock_job_manager.create_composite_job.assert_called_once()
@@ -118,7 +126,8 @@ class TestJobService:
             backup_request, JobType.MANUAL_BACKUP
         )
 
-        assert result["job_id"] == "job-123"
+        assert isinstance(result, JobCreationResult)
+        assert result.job_id == "job-123"
 
         # Verify task definitions include prune task
         call_args = self.mock_job_manager.create_composite_job.call_args
@@ -144,12 +153,14 @@ class TestJobService:
             notification_config_id=None,
         )
 
-        with pytest.raises(ValueError, match="Repository not found"):
-            # Override mock db with real test_db for this test
-            self.job_service.db = test_db
-            await self.job_service.create_backup_job(
-                backup_request, JobType.MANUAL_BACKUP
-            )
+        # Override mock db with real test_db for this test
+        self.job_service.db = test_db
+        result = await self.job_service.create_backup_job(
+            backup_request, JobType.MANUAL_BACKUP
+        )
+
+        assert isinstance(result, JobCreationError)
+        assert "Repository not found" in result.error
 
     @pytest.mark.asyncio
     async def test_create_prune_job_simple_strategy(self, test_db: Session) -> None:
@@ -186,8 +197,9 @@ class TestJobService:
         self.job_service.db = test_db
         result = await self.job_service.create_prune_job(prune_request)
 
-        assert result["job_id"] == "prune-job-123"
-        assert result["status"] == "started"
+        assert isinstance(result, JobCreationResult)
+        assert result.job_id == "prune-job-123"
+        assert result.status == "started"
 
         # Verify task definition
         call_args = self.mock_job_manager.create_composite_job.call_args
@@ -230,7 +242,8 @@ class TestJobService:
         self.job_service.db = test_db
         result = await self.job_service.create_prune_job(prune_request)
 
-        assert result["job_id"] == "prune-job-123"
+        assert isinstance(result, JobCreationResult)
+        assert result.job_id == "prune-job-123"
 
         # Verify task definition includes all retention parameters
         call_args = self.mock_job_manager.create_composite_job.call_args
@@ -275,8 +288,9 @@ class TestJobService:
         self.job_service.db = test_db
         result = await self.job_service.create_check_job(check_request)
 
-        assert result["job_id"] == "check-job-123"
-        assert result["status"] == "started"
+        assert isinstance(result, JobCreationResult)
+        assert result.job_id == "check-job-123"
+        assert result.status == "started"
 
         # Verify task definition uses config parameters
         call_args = self.mock_job_manager.create_composite_job.call_args
@@ -317,7 +331,8 @@ class TestJobService:
         self.job_service.db = test_db
         result = await self.job_service.create_check_job(check_request)
 
-        assert result["job_id"] == "check-job-123"
+        assert isinstance(result, JobCreationResult)
+        assert result.job_id == "check-job-123"
 
         # Verify task definition uses custom parameters
         call_args = self.mock_job_manager.create_composite_job.call_args
@@ -439,12 +454,24 @@ class TestJobService:
     @pytest.mark.asyncio
     async def test_get_job_status(self) -> None:
         """Test getting job status."""
-        expected_output = {"status": "running", "progress": 50}
+        expected_output = {
+            "id": "job-123",
+            "status": "running",
+            "job_type": "backup",
+            "started_at": "2023-01-01T00:00:00",
+            "completed_at": None,
+            "return_code": None,
+            "error": None,
+            "current_task_index": 0,
+            "tasks": 1,
+        }
         self.mock_job_manager.get_job_status.return_value = expected_output
 
         result = await self.job_service.get_job_status("job-123")
 
-        assert result == expected_output
+        assert isinstance(result, JobStatus)
+        assert result.id == "job-123"
+        assert result.status.value == "running"
         self.mock_job_manager.get_job_status.assert_called_once_with("job-123")
 
     @pytest.mark.asyncio
@@ -507,11 +534,12 @@ class TestJobService:
 
         stats = self.job_service.get_manager_stats()
 
-        assert stats["total_jobs"] == 3
-        assert stats["running_jobs"] == 1
-        assert stats["completed_jobs"] == 1
-        assert stats["failed_jobs"] == 1
-        assert stats["active_processes"] == 2
+        assert isinstance(stats, ManagerStats)
+        assert stats.total_jobs == 3
+        assert stats.running_jobs == 1
+        assert stats.completed_jobs == 1
+        assert stats.failed_jobs == 1
+        assert stats.active_processes == 2
 
     def test_cleanup_completed_jobs(self) -> None:
         """Test cleaning up completed jobs."""
@@ -536,9 +564,11 @@ class TestJobService:
 
     def test_get_queue_stats(self) -> None:
         """Test getting queue statistics."""
-        expected_stats = {"queued": 3, "processing": 1}
+        expected_stats = {"queued_backups": 3, "running_backups": 1}
         self.mock_job_manager.get_queue_stats.return_value = expected_stats
 
         stats = self.job_service.get_queue_stats()
 
-        assert stats == expected_stats
+        assert isinstance(stats, QueueStats)
+        assert stats.pending == 3
+        assert stats.running == 1
