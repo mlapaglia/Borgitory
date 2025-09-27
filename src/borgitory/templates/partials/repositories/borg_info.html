@@ -1,0 +1,111 @@
+<!-- Borg Info Details Template -->
+{% if error %}
+    <div class="text-center py-4">
+        <div class="text-red-600 dark:text-red-400 mb-2">
+            <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+        <p class="text-sm text-red-600 dark:text-red-400 font-medium">Failed to load repository details</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ error_message }}</p>
+    </div>
+{% else %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        {% if repository_id %}
+        <div class="col-span-1 md:col-span-2">
+            <span class="font-medium text-gray-700 dark:text-gray-300">Repository ID:</span>
+            <div class="text-gray-900 dark:text-gray-100 mt-1 font-mono text-xs break-all">{{ repository_id }}</div>
+        </div>
+        {% endif %}
+        
+        {% if location %}
+        <div class="col-span-1 md:col-span-2">
+            <span class="font-medium text-gray-700 dark:text-gray-300">Location:</span>
+            <div class="text-gray-900 dark:text-gray-100 mt-1 font-mono text-xs break-all">{{ location }}</div>
+        </div>
+        {% endif %}
+        
+        {% if encryption %}
+        <div>
+            <span class="font-medium text-gray-700 dark:text-gray-300">Encryption:</span>
+            <span class="text-gray-900 dark:text-gray-100 ml-2">{{ encryption.mode }}</span>
+        </div>
+        {% endif %}
+        
+        {% if cache %}
+        <div class="col-span-1 md:col-span-2">
+            <span class="font-medium text-gray-700 dark:text-gray-300">Cache Path:</span>
+            <div class="text-gray-900 dark:text-gray-100 mt-1 font-mono text-xs break-all">{{ cache.path }}</div>
+        </div>
+        {% endif %}
+        
+        {% if security_dir %}
+        <div class="col-span-1 md:col-span-2">
+            <span class="font-medium text-gray-700 dark:text-gray-300">Security Dir:</span>
+            <div class="text-gray-900 dark:text-gray-100 mt-1 font-mono text-xs break-all">{{ security_dir }}</div>
+        </div>
+        {% endif %}
+        
+        {% if archives_count is defined %}
+        <div>
+            <span class="font-medium text-gray-700 dark:text-gray-300">Archives:</span>
+            <span class="text-gray-900 dark:text-gray-100 ml-2">{{ archives_count }}</span>
+        </div>
+        {% endif %}
+        
+        {% if last_modified %}
+        <div>
+            <span class="font-medium text-gray-700 dark:text-gray-300">Last Modified:</span>
+            <span class="text-gray-900 dark:text-gray-100 ml-2">{{ last_modified }}</span>
+        </div>
+        {% endif %}
+        
+        {% if original_size %}
+        <div>
+            <span class="font-medium text-gray-700 dark:text-gray-300">Original Size:</span>
+            <span class="text-gray-900 dark:text-gray-100 ml-2">{{ original_size }}</span>
+        </div>
+        {% endif %}
+        
+        {% if compressed_size %}
+        <div>
+            <span class="font-medium text-gray-700 dark:text-gray-300">Compressed Size:</span>
+            <span class="text-gray-900 dark:text-gray-100 ml-2">{{ compressed_size }}</span>
+        </div>
+        {% endif %}
+        
+        {% if deduplicated_size %}
+        <div>
+            <span class="font-medium text-gray-700 dark:text-gray-300">Deduplicated Size:</span>
+            <span class="text-gray-900 dark:text-gray-100 ml-2">{{ deduplicated_size }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Repository Configuration Section -->
+    {% if config or config_error %}
+    <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+        <h5 class="text-md font-semibold text-gray-900 dark:text-gray-100 mb-3">Repository Configuration</h5>
+        
+        {% if config_error %}
+            <div class="text-center py-2">
+                <p class="text-sm text-orange-600 dark:text-orange-400">Could not load configuration</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ config_error }}</p>
+            </div>
+        {% elif config %}
+            <div class="grid grid-cols-1 gap-3 text-sm">
+                {% for key, value in config.items() %}
+                <div>
+                    <span class="font-medium text-gray-700 dark:text-gray-300">{{ key }}:</span>
+                    <div class="text-gray-900 dark:text-gray-100 mt-1 font-mono text-xs break-all">{{ value }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-2">
+                <p class="text-sm text-gray-500 dark:text-gray-400">No configuration settings found</p>
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+{% endif %}
