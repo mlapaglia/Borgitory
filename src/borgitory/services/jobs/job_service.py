@@ -407,19 +407,26 @@ class JobService:
             result = await self.job_manager.stop_job(job_id)
 
             if result["success"]:
+                # Safely extract values with type casting
+                tasks_skipped_val = result.get("tasks_skipped", 0)
+                current_task_killed_val = result.get("current_task_killed", False)
+
                 return JobStopResult(
                     job_id=job_id,
                     success=True,
                     message=str(result["message"]),
-                    tasks_skipped=int(result["tasks_skipped"]),
-                    current_task_killed=bool(result["current_task_killed"]),
+                    tasks_skipped=int(tasks_skipped_val)
+                    if isinstance(tasks_skipped_val, (int, str))
+                    else 0,
+                    current_task_killed=bool(current_task_killed_val),
                 )
             else:
+                error_code_val = result.get("error_code")
                 return JobStopError(
                     job_id=job_id,
                     error=str(result["error"]),
-                    error_code=str(result.get("error_code"))
-                    if result.get("error_code")
+                    error_code=str(error_code_val)
+                    if error_code_val is not None
                     else None,
                 )
 
