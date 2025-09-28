@@ -5,7 +5,7 @@ Tests for JobExecutor - subprocess execution and process management
 import pytest
 import asyncio
 from typing import Dict
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from borgitory.services.jobs.job_executor import JobExecutor
 
@@ -21,7 +21,6 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_start_process_success(self) -> None:
         """Test successful process start"""
-        from unittest.mock import Mock
 
         mock_process = Mock()
         mock_process.pid = 12345
@@ -53,7 +52,6 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_monitor_process_output_success(self) -> None:
         """Test successful process output monitoring"""
-        from unittest.mock import Mock
 
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=0)
@@ -87,7 +85,6 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_monitor_process_output_with_error(self) -> None:
         """Test process output monitoring with error"""
-        from unittest.mock import Mock
 
         mock_process = Mock()
         mock_process.wait = AsyncMock(return_value=1)
@@ -141,7 +138,6 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_graceful(self) -> None:
         """Test graceful process termination"""
-        from unittest.mock import Mock
 
         mock_process = Mock()
         mock_process.returncode = None
@@ -158,7 +154,6 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_force_kill(self) -> None:
         """Test force killing process after timeout"""
-        from unittest.mock import Mock
 
         mock_process = Mock()
         mock_process.returncode = None
@@ -177,7 +172,6 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_already_terminated(self) -> None:
         """Test terminating already finished process"""
-        from unittest.mock import Mock
 
         mock_process = Mock()
         mock_process.returncode = 0  # Already finished
@@ -194,7 +188,6 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_error(self) -> None:
         """Test error during process termination"""
-        from unittest.mock import Mock
 
         mock_process = Mock()
         mock_process.returncode = None

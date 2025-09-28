@@ -526,7 +526,6 @@ class TestJobStreamService:
         from borgitory.dependencies import get_job_stream_service
         from borgitory.main import app
         from tests.utils.di_testing import override_dependency
-        from unittest.mock import Mock
         import inspect
 
         # Test that JobStreamService works in FastAPI context

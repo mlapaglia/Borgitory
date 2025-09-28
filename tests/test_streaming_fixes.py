@@ -265,7 +265,6 @@ class TestJobRenderServiceUUIDIntegration:
     ) -> None:
         """Test that JobRenderService properly handles UUID-based job identification"""
         from tests.utils.di_testing import MockServiceFactory
-        from unittest.mock import Mock
         from borgitory.services.jobs.job_render_service import JobDisplayData, JobStatus
 
         # Create service with mocked dependencies

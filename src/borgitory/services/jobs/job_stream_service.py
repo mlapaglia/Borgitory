@@ -345,9 +345,17 @@ class JobStreamService:
 
             try:
                 # Send current task output if any (for existing lines when connection starts)
+                # Only send the latest 100 lines to avoid overwhelming the UI
                 if hasattr(task, "output_lines") and task.output_lines:
+                    # Get only the latest 100 lines
+                    latest_lines = (
+                        task.output_lines[-100:]
+                        if len(task.output_lines) > 100
+                        else task.output_lines
+                    )
+
                     # Send each existing line as individual output events
-                    for line in task.output_lines:
+                    for line in latest_lines:
                         # Handle both dict format {"text": "content"} and plain string format
                         if isinstance(line, dict):
                             line_text = line.get("text", "")

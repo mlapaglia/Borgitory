@@ -203,8 +203,6 @@ class TestProtocolCompliance:
                 f"ArchiveManager should have {method} method"
             )
 
-        # Check instantiation
-        from unittest.mock import Mock
         from borgitory.services.jobs.job_executor import JobExecutor
 
         manager = ArchiveManager(

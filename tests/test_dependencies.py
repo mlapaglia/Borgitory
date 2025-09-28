@@ -500,7 +500,6 @@ class TestDependencies:
         from borgitory.services.repositories.repository_stats_service import (
             CommandExecutorInterface,
         )
-        from unittest.mock import Mock
 
         mock_executor = Mock(spec=CommandExecutorInterface)
         service = get_repository_stats_service(mock_executor)
@@ -534,7 +533,6 @@ class TestDependencies:
         """Test JobExecutor with mock subprocess executor for testing."""
         from borgitory.dependencies import get_job_executor
         from borgitory.services.jobs.job_executor import JobExecutor
-        from unittest.mock import Mock
 
         mock_subprocess_executor = Mock()
         job_executor = get_job_executor(mock_subprocess_executor)
