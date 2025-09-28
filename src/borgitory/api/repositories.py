@@ -82,7 +82,7 @@ async def create_repository(
     create_request = CreateRepositoryRequest(
         name=repo.name,
         path=repo.path,
-        passphrase=repo.passphrase,
+        passphrase=repo.passphrase or "",
         user_id=current_user.id,
         cache_dir=repo.cache_dir,
     )

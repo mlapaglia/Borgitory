@@ -1047,8 +1047,8 @@ class JobManager:
                     task_output_callback(f"Warning: Break-lock failed: {e}")
 
             # Prepare environment overrides for cache directory
-            env_overrides = {}
-            if cache_dir:
+            env_overrides: dict[str, str] = {}
+            if cache_dir and isinstance(cache_dir, str):
                 env_overrides["BORG_CACHE_DIR"] = cache_dir
 
             async with secure_borg_command(
