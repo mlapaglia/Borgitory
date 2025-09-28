@@ -60,10 +60,24 @@ class RepositoryBase(BaseModel):
         pattern=r"^/.*",
         description="Absolute path to repository (must start with /)",
     )
+    cache_dir: Optional[str] = Field(
+        None,
+        pattern=r"^/.*",
+        description="Custom cache directory path (optional, must start with /)",
+    )
 
     @field_validator("path", mode="before")
     @classmethod
     def validate_path(cls, v: str) -> str:
+        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
+
+        return normalize_path_with_mnt_prefix(v)
+
+    @field_validator("cache_dir", mode="before")
+    @classmethod
+    def validate_cache_dir(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v.strip() == "":
+            return None
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
 
         return normalize_path_with_mnt_prefix(v)
@@ -81,12 +95,22 @@ class RepositoryUpdate(BaseModel):
     )
     path: Optional[str] = Field(None, min_length=1, pattern=r"^/.*")
     passphrase: Optional[str] = Field(None, min_length=8)
+    cache_dir: Optional[str] = Field(None, pattern=r"^/.*")
 
     @field_validator("path", mode="before")
     @classmethod
     def validate_path(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
+        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
+
+        return normalize_path_with_mnt_prefix(v)
+
+    @field_validator("cache_dir", mode="before")
+    @classmethod
+    def validate_cache_dir(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
         from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
 
         return normalize_path_with_mnt_prefix(v)

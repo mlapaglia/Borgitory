@@ -34,6 +34,14 @@ from borgitory.utils.security import (
 logger = logging.getLogger(__name__)
 
 
+def _build_repository_env_overrides(repository: Repository) -> dict[str, str]:
+    """Build environment overrides for a repository, including cache directory."""
+    env_overrides = {}
+    if repository.cache_dir:
+        env_overrides["BORG_CACHE_DIR"] = repository.cache_dir
+    return env_overrides
+
+
 class BorgService:
     def __init__(
         self,
@@ -107,6 +115,7 @@ class BorgService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--encryption=repokey"],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 result = await self.command_runner.run_command(command, env, timeout=60)
 
@@ -151,6 +160,7 @@ class BorgService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json"],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 result = await self.command_runner.run_command(command, env, timeout=30)
 

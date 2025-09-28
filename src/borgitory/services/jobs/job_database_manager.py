@@ -211,6 +211,7 @@ class JobDatabaseManager:
                     "path": repo.path,
                     "passphrase": repo.get_passphrase(),
                     "keyfile_content": repo.get_keyfile_content(),
+                    "cache_dir": repo.cache_dir,
                 }
 
         except Exception as e:

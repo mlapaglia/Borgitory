@@ -84,6 +84,7 @@ async def create_repository(
         path=repo.path,
         passphrase=repo.passphrase,
         user_id=current_user.id,
+        cache_dir=repo.cache_dir,
     )
 
     # Call business service
@@ -190,6 +191,9 @@ async def list_directories_autocomplete(
             "import-path",
             "backup-source-path",
             "schedule-source-path",
+            "cache_dir",
+            "create-cache-dir",
+            "import-cache-dir",
         ]:
             input_value = str(form_data.get(param_name, ""))
             break
@@ -390,9 +394,17 @@ async def import_repository(
     keyfile: UploadFile = File(None),
     encryption_type: str = Form(None),
     keyfile_content: str = Form(None),
+    cache_dir: str = Form(None),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
+    # Normalize cache_dir the same way as path normalization in schemas
+    normalized_cache_dir = None
+    if cache_dir and cache_dir.strip():
+        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
+
+        normalized_cache_dir = normalize_path_with_mnt_prefix(cache_dir.strip())
+
     import_request = ImportRepositoryRequest(
         name=name,
         path=path,
@@ -401,6 +413,7 @@ async def import_repository(
         encryption_type=encryption_type,
         keyfile_content=keyfile_content,
         user_id=None,  # Import doesn't require user ID currently
+        cache_dir=normalized_cache_dir,
     )
 
     # Call business service

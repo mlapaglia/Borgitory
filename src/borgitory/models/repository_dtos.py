@@ -17,6 +17,7 @@ class CreateRepositoryRequest:
     path: str
     passphrase: str
     user_id: int
+    cache_dir: Optional[str] = None
 
 
 @dataclass
@@ -30,6 +31,7 @@ class ImportRepositoryRequest:
     encryption_type: Optional[str] = None  # Manual encryption type override
     keyfile_content: Optional[str] = None  # Keyfile content as text
     user_id: Optional[int] = None
+    cache_dir: Optional[str] = None
 
 
 @dataclass

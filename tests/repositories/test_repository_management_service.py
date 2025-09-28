@@ -61,6 +61,7 @@ class TestRepositoryManagementService:
         repo.path = "/test/repo/path"
         repo.get_passphrase.return_value = "test_passphrase"
         repo.get_keyfile_content.return_value = None
+        repo.cache_dir = "/mnt/test/cache/dir"
         return repo
 
     def test_format_bytes_helper(self, repository_service: RepositoryService) -> None:
@@ -171,6 +172,7 @@ class TestRepositoryManagementBusinessLogic:
         repo.path = "/test/repo/path"
         repo.get_passphrase.return_value = "test_passphrase"
         repo.get_keyfile_content.return_value = None
+        repo.cache_dir = "/mnt/test/cache/dir"
         return repo
 
     @pytest.mark.asyncio
@@ -217,6 +219,7 @@ class TestRepositoryManagementBusinessLogic:
                 passphrase=mock_repository.get_passphrase(),
                 keyfile_content=mock_repository.get_keyfile_content(),
                 additional_args=["--short"],
+                environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
     @pytest.mark.asyncio
@@ -339,6 +342,7 @@ class TestRepositoryManagementBusinessLogic:
                 passphrase=mock_repository.get_passphrase(),
                 keyfile_content=mock_repository.get_keyfile_content(),
                 additional_args=[],
+                environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
     @pytest.mark.asyncio
@@ -498,6 +502,7 @@ class TestRepositoryManagementBusinessLogic:
                 passphrase=mock_repository.get_passphrase(),
                 keyfile_content=mock_repository.get_keyfile_content(),
                 additional_args=[],
+                environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
     @pytest.mark.asyncio

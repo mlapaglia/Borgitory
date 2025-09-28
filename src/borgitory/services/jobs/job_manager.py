@@ -978,6 +978,7 @@ class JobManager:
             keyfile_content = repo_data.get("keyfile_content")
             if keyfile_content is not None and not isinstance(keyfile_content, str):
                 keyfile_content = None  # Ensure it's str or None
+            cache_dir = repo_data.get("cache_dir")
 
             def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
@@ -1045,12 +1046,18 @@ class JobManager:
                     logger.warning(f"Break-lock failed, continuing with backup: {e}")
                     task_output_callback(f"Warning: Break-lock failed: {e}")
 
+            # Prepare environment overrides for cache directory
+            env_overrides = {}
+            if cache_dir:
+                env_overrides["BORG_CACHE_DIR"] = cache_dir
+
             async with secure_borg_command(
                 base_command="borg create",
                 repository_path="",  # Already in additional_args
                 passphrase=passphrase,
                 keyfile_content=keyfile_content,
                 additional_args=additional_args,
+                environment_overrides=env_overrides,
                 cleanup_keyfile=False,
             ) as (command, env, temp_keyfile_path):
                 process = await self.safe_executor.start_process(command, env)

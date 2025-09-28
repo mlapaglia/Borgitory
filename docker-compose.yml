@@ -10,6 +10,8 @@ services:
     volumes:
       # Persistent data storage
       - ./local-data:/app/data
+      # Borg cache storage
+      - ./local-cache:/mnt/cache:rw
       # Mount your backup sources (adjust as needed)
       - ./backup-sources:/mnt/backup-sources:ro
       # Borg repository storage (where backups are stored)

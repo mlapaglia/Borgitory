@@ -64,15 +64,7 @@
                     <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto" 
                          id="task-output-container-{{ job.id }}-{{ task.task_order }}"
                          sse-swap="output"
-                         hx-swap="beforeend show:bottom"
-                         hx-on:htmx:afterSwap="
-                           const children = this.children;
-                           if (children.length > 100) {
-                             for (let i = 0; i < children.length - 100; i++) {
-                               children[0].remove();
-                             }
-                           }
-                         ">
+                         hx-swap="afterbegin">
                         <div class="text-gray-500 dark:text-gray-400">Connecting to task output...</div>
                     </div>
                     

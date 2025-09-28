@@ -31,6 +31,16 @@
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Passphrase</label>
                     <input type="password" name="passphrase" required class="input-modern mt-1">
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Cache Directory (Optional)</label>
+                    {% set input_id = "create-cache-dir" %}
+                    {% set input_name = "cache_dir" %}
+                    {% set input_value = "" %}
+                    {% set placeholder = "Leave empty for default" %}
+                    {% set required = false %}
+                    {% include "partials/shared/path_autocomplete.html" %}
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Custom cache directory for Borg operations. Leave empty to use default.</p>
+                </div>
                 <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
                     Create Repository
                 </button>

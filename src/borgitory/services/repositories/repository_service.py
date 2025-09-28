@@ -49,6 +49,14 @@ from borgitory.utils.security import secure_borg_command
 logger = logging.getLogger(__name__)
 
 
+def _build_repository_env_overrides(repository: Repository) -> dict[str, str]:
+    """Build environment overrides for a repository, including cache directory."""
+    env_overrides = {}
+    if repository.cache_dir:
+        env_overrides["BORG_CACHE_DIR"] = repository.cache_dir
+    return env_overrides
+
+
 class KeyfileProtocol(Protocol):
     """Protocol for keyfile objects (e.g., FastAPI UploadFile)."""
 
@@ -105,6 +113,7 @@ class RepositoryService:
             db_repo.name = request.name
             db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
+            db_repo.cache_dir = request.cache_dir
 
             # Initialize repository with Borg
             init_result = await self.borg_service.initialize_repository(db_repo)
@@ -176,6 +185,7 @@ class RepositoryService:
             db_repo.name = request.name
             db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
+            db_repo.cache_dir = request.cache_dir
 
             # Set encryption type if provided
             if request.encryption_type:
@@ -625,6 +635,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--short"],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -693,6 +704,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -783,6 +795,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json"],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -883,6 +896,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--list"],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -939,6 +953,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
