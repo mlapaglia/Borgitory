@@ -24,7 +24,7 @@ class TestJobStreamingFixes:
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager) -> JobStreamService:
+    def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         """Create JobStreamService with mocked dependencies"""
         return JobStreamService(job_manager=mock_job_manager)
 

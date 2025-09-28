@@ -11,12 +11,12 @@ from borgitory.models.database import Repository, Job, JobTask
 
 
 @pytest.fixture
-def recovery_service():
+def recovery_service() -> RecoveryService:
     return RecoveryService()
 
 
 @pytest.fixture
-def mock_repository():
+def mock_repository() -> MagicMock:
     """Mock repository object"""
     repo = MagicMock(spec=Repository)
     repo.id = 1
@@ -28,7 +28,7 @@ def mock_repository():
 
 
 @pytest.fixture
-def mock_job():
+def mock_job() -> MagicMock:
     """Mock job object"""
     job = MagicMock(spec=Job)
     job.id = 123
@@ -40,7 +40,7 @@ def mock_job():
 
 
 @pytest.fixture
-def mock_task():
+def mock_task() -> MagicMock:
     """Mock job task object"""
     task = MagicMock(spec=JobTask)
     task.id = 456
@@ -54,7 +54,7 @@ class TestRecoveryService:
     """Test the RecoveryService class"""
 
     @pytest.mark.asyncio
-    async def test_recover_stale_jobs(self, recovery_service) -> None:
+    async def test_recover_stale_jobs(self, recovery_service: RecoveryService) -> None:
         """Test the main recovery method"""
         with patch.object(
             recovery_service, "recover_database_job_records"
@@ -65,7 +65,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_no_interrupted_jobs(
-        self, recovery_service
+        self, recovery_service: RecoveryService
     ) -> None:
         """Test recovery when no interrupted jobs exist"""
         mock_db = MagicMock()
@@ -86,7 +86,11 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_with_interrupted_jobs(
-        self, recovery_service, mock_job, mock_task, mock_repository
+        self,
+        recovery_service: RecoveryService,
+        mock_job: MagicMock,
+        mock_task: MagicMock,
+        mock_repository: MagicMock,
     ) -> None:
         """Test recovery with interrupted jobs"""
         mock_db = MagicMock()
@@ -125,7 +129,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_non_backup_job(
-        self, recovery_service
+        self, recovery_service: RecoveryService
     ) -> None:
         """Test recovery with non-backup job (no lock release needed)"""
         mock_db = MagicMock()
@@ -159,7 +163,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_backup_job_no_repository(
-        self, recovery_service
+        self, recovery_service: RecoveryService
     ) -> None:
         """Test recovery with backup job but no repository found"""
         mock_db = MagicMock()
@@ -195,7 +199,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_multiple_job_types(
-        self, recovery_service
+        self, recovery_service: RecoveryService
     ) -> None:
         """Test recovery with different backup job types"""
         mock_db = MagicMock()
@@ -244,7 +248,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_exception_handling(
-        self, recovery_service
+        self, recovery_service: RecoveryService
     ) -> None:
         """Test exception handling in database job recovery"""
         with patch(
@@ -256,7 +260,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_success(
-        self, recovery_service, mock_repository
+        self, recovery_service: RecoveryService, mock_repository: MagicMock
     ) -> None:
         """Test successful repository lock release"""
         mock_process = MagicMock()
@@ -277,7 +281,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_command_failure(
-        self, recovery_service, mock_repository
+        self, recovery_service: RecoveryService, mock_repository: MagicMock
     ) -> None:
         """Test repository lock release with command failure"""
         mock_process = MagicMock()
@@ -296,7 +300,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_timeout(
-        self, recovery_service, mock_repository
+        self, recovery_service: RecoveryService, mock_repository: MagicMock
     ) -> None:
         """Test repository lock release with timeout"""
         mock_process = MagicMock()
@@ -319,7 +323,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_exception(
-        self, recovery_service, mock_repository
+        self, recovery_service: RecoveryService, mock_repository: MagicMock
     ) -> None:
         """Test repository lock release with exception"""
         with patch(
@@ -331,7 +335,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_no_stderr(
-        self, recovery_service, mock_repository
+        self, recovery_service: RecoveryService, mock_repository: MagicMock
     ) -> None:
         """Test repository lock release with no stderr output"""
         mock_process = MagicMock()
@@ -349,7 +353,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_job_without_repository_id(
-        self, recovery_service
+        self, recovery_service: RecoveryService
     ) -> None:
         """Test recovery with backup job but no repository_id"""
         mock_db = MagicMock()
@@ -382,7 +386,7 @@ class TestRecoveryService:
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_multiple_task_statuses(
-        self, recovery_service
+        self, recovery_service: RecoveryService
     ) -> None:
         """Test recovery with tasks in different statuses"""
         mock_db = MagicMock()

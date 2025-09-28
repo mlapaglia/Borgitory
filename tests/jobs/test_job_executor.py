@@ -21,7 +21,9 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_start_process_success(self) -> None:
         """Test successful process start"""
-        mock_process = AsyncMock()
+        from unittest.mock import Mock
+
+        mock_process = Mock()
         mock_process.pid = 12345
         self.mock_subprocess.return_value = mock_process
 
@@ -38,7 +40,7 @@ class TestJobExecutor:
         """Test process start failure"""
 
         # Use AsyncMock side_effect properly to avoid unawaited coroutine warnings
-        async def mock_failure(*args, **kwargs):
+        async def mock_failure(*args, **kwargs) -> None:
             raise Exception("Process start failed")
 
         self.mock_subprocess.side_effect = mock_failure
@@ -51,8 +53,10 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_monitor_process_output_success(self) -> None:
         """Test successful process output monitoring"""
-        mock_process = AsyncMock()
-        mock_process.wait.return_value = 0
+        from unittest.mock import Mock
+
+        mock_process = Mock()
+        mock_process.wait = AsyncMock(return_value=0)
 
         # Mock stdout lines
         async def mock_stdout():
@@ -83,8 +87,10 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_monitor_process_output_with_error(self) -> None:
         """Test process output monitoring with error"""
-        mock_process = AsyncMock()
-        mock_process.wait.return_value = 1
+        from unittest.mock import Mock
+
+        mock_process = Mock()
+        mock_process.wait = AsyncMock(return_value=1)
         mock_process.stdout = AsyncMock()
         mock_process.stdout.__aiter__.side_effect = Exception("Read error")
 
@@ -135,9 +141,13 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_graceful(self) -> None:
         """Test graceful process termination"""
-        mock_process = AsyncMock()
+        from unittest.mock import Mock
+
+        mock_process = Mock()
         mock_process.returncode = None
-        mock_process.wait.return_value = 0
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.terminate = Mock()
+        mock_process.kill = Mock()
 
         result = await self.executor.terminate_process(mock_process, timeout=1.0)
 
@@ -148,8 +158,13 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_force_kill(self) -> None:
         """Test force killing process after timeout"""
-        mock_process = AsyncMock()
+        from unittest.mock import Mock
+
+        mock_process = Mock()
         mock_process.returncode = None
+        mock_process.terminate = Mock()
+        mock_process.kill = Mock()
+        mock_process.wait = AsyncMock()
 
         # Mock wait_for to timeout first time (graceful termination), succeed second time (after kill)
         with patch("asyncio.wait_for", side_effect=[asyncio.TimeoutError(), None]):
@@ -162,8 +177,13 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_already_terminated(self) -> None:
         """Test terminating already finished process"""
-        mock_process = AsyncMock()
+        from unittest.mock import Mock
+
+        mock_process = Mock()
         mock_process.returncode = 0  # Already finished
+        # Set these as regular Mock objects to avoid async mock creation
+        mock_process.terminate = Mock()
+        mock_process.kill = Mock()
 
         result = await self.executor.terminate_process(mock_process)
 
@@ -174,7 +194,9 @@ class TestJobExecutor:
     @pytest.mark.asyncio
     async def test_terminate_process_error(self) -> None:
         """Test error during process termination"""
-        mock_process = AsyncMock()
+        from unittest.mock import Mock
+
+        mock_process = Mock()
         mock_process.returncode = None
 
         # Use a regular function that raises an exception, not an async mock
@@ -182,6 +204,10 @@ class TestJobExecutor:
             raise Exception("Termination error")
 
         mock_process.terminate = terminate_error
+        # Set kill as regular Mock to avoid async mock creation
+        mock_process.kill = Mock()
+        # Set wait as AsyncMock since it's awaited in the terminate_process method
+        mock_process.wait = AsyncMock()
 
         result = await self.executor.terminate_process(mock_process)
 

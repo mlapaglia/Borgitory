@@ -5,12 +5,12 @@ Handles all prune configuration-related business operations independent of HTTP 
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict, Union, cast
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import PruneConfig, Repository
 from borgitory.models.schemas import PruneConfigCreate, PruneConfigUpdate
-from borgitory.constants.retention import RetentionFieldHandler
+from borgitory.constants.retention import RetentionFieldHandler, RetentionConfigProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,10 @@ class PruneService:
             db_config.name = prune_config.name
             db_config.strategy = prune_config.strategy
             db_config.keep_within_days = prune_config.keep_within_days
-            RetentionFieldHandler.copy_fields(prune_config, db_config)
+            RetentionFieldHandler.copy_fields(
+                cast(RetentionConfigProtocol, prune_config),
+                cast(RetentionConfigProtocol, db_config),
+            )
             db_config.show_list = prune_config.show_list
             db_config.show_stats = prune_config.show_stats
             db_config.save_space = prune_config.save_space

@@ -78,11 +78,15 @@ class TestRepositoryModel:
         with patch(
             "borgitory.models.database.get_cipher_suite", return_value=self.mock_cipher
         ):
-            self.repository = Repository(name="test-repo", path="/path/to/repo")
+            self.repository = Repository()
+            self.repository.name = "test-repo"
+            self.repository.path = "/path/to/repo"
 
     def test_repository_creation(self) -> None:
         """Test basic repository creation."""
-        repo = Repository(name="test", path="/test/path")
+        repo = Repository()
+        repo.name = "test"
+        repo.path = "/test/path"
         assert repo.name == "test"
         assert repo.path == "/test/path"
         assert repo.created_at is None  # Not set until added to session
@@ -127,7 +131,9 @@ class TestRepositoryModel:
             # Clear cached cipher
             borgitory.models.database._cipher_suite = None
 
-            repo = Repository(name="test", path="/test")
+            repo = Repository()
+            repo.name = "test"
+            repo.path = "/test"
             repo.set_passphrase(original_passphrase)
 
             # Verify passphrase was encrypted (not stored in plain text)
@@ -148,7 +154,9 @@ class TestRepositoryModel:
         ):
             borgitory.models.database._cipher_suite = None
 
-            repo = Repository(name="test", path="/test")
+            repo = Repository()
+            repo.name = "test"
+            repo.path = "/test"
             repo.set_passphrase(unicode_passphrase)
             decrypted = repo.get_passphrase()
 
@@ -162,7 +170,9 @@ class TestRepositoryModel:
         ):
             borgitory.models.database._cipher_suite = None
 
-            repo = Repository(name="test", path="/test")
+            repo = Repository()
+            repo.name = "test"
+            repo.path = "/test"
             repo.set_passphrase("")
             decrypted = repo.get_passphrase()
 
@@ -170,7 +180,9 @@ class TestRepositoryModel:
 
     def test_passphrase_decryption_invalid_data(self) -> None:
         """Test handling of invalid encrypted data."""
-        repo = Repository(name="test", path="/test")
+        repo = Repository()
+        repo.name = "test"
+        repo.path = "/test"
         repo.encrypted_passphrase = "invalid_encrypted_data"
 
         mock_cipher = Mock()
@@ -192,7 +204,9 @@ class TestRepositoryModel:
         ):
             borgitory.models.database._cipher_suite = None
 
-            repo = Repository(name="test", path="/test")
+            repo = Repository()
+            repo.name = "test"
+            repo.path = "/test"
             repo.set_passphrase(long_passphrase)
             decrypted = repo.get_passphrase()
 
@@ -204,13 +218,15 @@ class TestUserModel:
 
     def test_user_creation(self) -> None:
         """Test basic user creation."""
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         assert user.username == "testuser"
         assert user.password_hash is None
 
     def test_set_password_hashing(self) -> None:
         """Test that password is properly hashed."""
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         password = "my_secure_password_123!"
 
         user.set_password(password)
@@ -223,7 +239,8 @@ class TestUserModel:
 
     def test_verify_password_correct(self) -> None:
         """Test password verification with correct password."""
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         password = "my_secure_password_123!"
 
         user.set_password(password)
@@ -231,7 +248,8 @@ class TestUserModel:
 
     def test_verify_password_incorrect(self) -> None:
         """Test password verification with incorrect password."""
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         password = "my_secure_password_123!"
         wrong_password = "wrong_password"
 
@@ -240,8 +258,10 @@ class TestUserModel:
 
     def test_password_hashing_consistency(self) -> None:
         """Test that same password produces different hashes (due to salt)."""
-        user1 = User(username="user1")
-        user2 = User(username="user2")
+        user1 = User()
+        user1.username = "user1"
+        user2 = User()
+        user2.username = "user2"
         same_password = "identical_password"
 
         user1.set_password(same_password)
@@ -256,7 +276,8 @@ class TestUserModel:
 
     def test_password_with_unicode_characters(self) -> None:
         """Test password hashing with unicode characters."""
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         unicode_password = "pässwörd_ünicöde_日本語"
 
         user.set_password(unicode_password)
@@ -265,7 +286,8 @@ class TestUserModel:
 
     def test_empty_password_handling(self) -> None:
         """Test handling of empty password."""
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
 
         user.set_password("")
         assert user.password_hash != ""
@@ -274,7 +296,8 @@ class TestUserModel:
 
     def test_very_long_password(self) -> None:
         """Test password hashing with very long password."""
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         long_password = "a" * 1000  # 1000 character password
 
         user.set_password(long_password)
@@ -282,7 +305,8 @@ class TestUserModel:
 
     def test_password_with_special_characters(self) -> None:
         """Test password with various special characters."""
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         special_password = "!@#$%^&*()_+-=[]{}|;:'\",.<>?/`~"
 
         user.set_password(special_password)
@@ -306,7 +330,9 @@ class TestEncryptionSecurity:
         ):
             borgitory.models.database._cipher_suite = None
 
-            repo1 = Repository(name="test1", path="/test1")
+            repo1 = Repository()
+            repo1.name = "test1"
+            repo1.path = "/test1"
             repo1.set_passphrase(test_data)
             encrypted1 = repo1.encrypted_passphrase
 
@@ -316,7 +342,9 @@ class TestEncryptionSecurity:
         ):
             borgitory.models.database._cipher_suite = None
 
-            repo2 = Repository(name="test2", path="/test2")
+            repo2 = Repository()
+            repo2.name = "test2"
+            repo2.path = "/test2"
             repo2.set_passphrase(test_data)
             encrypted2 = repo2.encrypted_passphrase
 
@@ -333,10 +361,14 @@ class TestEncryptionSecurity:
         ):
             borgitory.models.database._cipher_suite = None
 
-            repo1 = Repository(name="test1", path="/test1")
+            repo1 = Repository()
+            repo1.name = "test1"
+            repo1.path = "/test1"
             repo1.set_passphrase(test_data)
 
-            repo2 = Repository(name="test2", path="/test2")
+            repo2 = Repository()
+            repo2.name = "test2"
+            repo2.path = "/test2"
             repo2.set_passphrase(test_data)
 
             # Fernet includes random IV, so encrypted data should be different
@@ -348,7 +380,9 @@ class TestEncryptionSecurity:
 
     def test_encryption_invalid_token_handling(self) -> None:
         """Test handling of corrupted encrypted data."""
-        repo = Repository(name="test", path="/test")
+        repo = Repository()
+        repo.name = "test"
+        repo.path = "/test"
 
         with patch(
             "borgitory.config.get_secret_key",
@@ -376,7 +410,9 @@ class TestEncryptionSecurity:
         ):
             borgitory.models.database._cipher_suite = None
 
-            repo = Repository(name="test", path="/test")
+            repo = Repository()
+            repo.name = "test"
+            repo.path = "/test"
             repo.set_passphrase(binary_like_data)
             decrypted = repo.get_passphrase()
 
@@ -388,7 +424,9 @@ class TestModelRelationships:
 
     def test_repository_model_fields(self) -> None:
         """Test Repository model has all required fields."""
-        repo = Repository(name="test", path="/test")
+        repo = Repository()
+        repo.name = "test"
+        repo.path = "/test"
 
         # Test required fields exist
         assert hasattr(repo, "id")
@@ -403,7 +441,8 @@ class TestModelRelationships:
 
     def test_user_model_fields(self) -> None:
         """Test User model has all required fields."""
-        user = User(username="test")
+        user = User()
+        user.username = "test"
 
         # Test required fields exist
         assert hasattr(user, "id")
@@ -419,16 +458,15 @@ class TestModelRelationships:
         """Test CloudSyncConfig model has all required fields."""
         import json
 
-        config = CloudSyncConfig(
-            name="test",
-            provider="s3",
-            provider_config=json.dumps(
-                {
-                    "bucket_name": "test-bucket",
-                    "access_key": "test-key",
-                    "secret_key": "test-secret",
-                }
-            ),
+        config = CloudSyncConfig()
+        config.name = "test"
+        config.provider = "s3"
+        config.provider_config = json.dumps(
+            {
+                "bucket_name": "test-bucket",
+                "access_key": "test-key",
+                "secret_key": "test-secret",
+            }
         )
 
         # Test required fields exist
