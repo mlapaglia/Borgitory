@@ -129,10 +129,6 @@ class MockServiceFactory:
                 "database_size_bytes": 1048576,
                 "database_accessible": True,
             },
-            "volumes": {
-                "mounted_volumes": ["/data", "/backup"],
-                "total_mounted_volumes": 2,
-            },
             "tools": {
                 "borg": {"version": "borg 1.2.0", "accessible": True},
                 "rclone": {"version": "rclone v1.58.0", "accessible": True},

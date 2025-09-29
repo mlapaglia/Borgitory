@@ -107,7 +107,6 @@ class TestMockServiceFactory:
         assert "system" in debug_info
         assert "application" in debug_info
         assert "database" in debug_info
-        assert "volumes" in debug_info
         assert "tools" in debug_info
         assert "environment" in debug_info
         assert "job_manager" in debug_info

@@ -1,5 +1,5 @@
 """
-Protocol interfaces for storage and volume services.
+Protocol interfaces for storage service.
 """
 
 from typing import Protocol, Dict
