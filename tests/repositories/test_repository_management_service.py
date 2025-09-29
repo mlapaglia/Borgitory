@@ -34,15 +34,26 @@ class TestRepositoryManagementService:
         return mock
 
     @pytest.fixture
+    def mock_path_service(self) -> Any:
+        """Create mock path service."""
+        mock = Mock()
+        mock.get_keyfiles_dir.return_value = "/test/keyfiles"
+        mock.ensure_directory.return_value = True
+        mock.secure_join.return_value = "/test/keyfiles/test_file"
+        return mock
+
+    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
+        mock_path_service: Any,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
             scheduler_service=mock_scheduler_service,
+            path_service=mock_path_service,
         )
 
     @pytest.fixture
@@ -136,15 +147,26 @@ class TestRepositoryManagementBusinessLogic:
         return Mock()
 
     @pytest.fixture
+    def mock_path_service(self) -> Any:
+        """Create mock path service."""
+        mock = Mock()
+        mock.get_keyfiles_dir.return_value = "/test/keyfiles"
+        mock.ensure_directory.return_value = True
+        mock.secure_join.return_value = "/test/keyfiles/test_file"
+        return mock
+
+    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
+        mock_path_service: Any,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
             scheduler_service=mock_scheduler_service,
+            path_service=mock_path_service,
         )
 
     @pytest.fixture

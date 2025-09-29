@@ -23,6 +23,7 @@ from borgitory.dependencies import (
     BorgServiceDep,
     TemplatesDep,
     RepositoryServiceDep,
+    PathServiceDep,
 )
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
@@ -145,6 +146,8 @@ async def list_directories(path: str = "/") -> DirectoryListResponse:
 async def list_directories_autocomplete(
     request: Request,
     templates: TemplatesDep,
+    repo_svc: RepositoryServiceDep,
+    path_service: PathServiceDep,
     current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """List directories as HTML for autocomplete functionality."""
@@ -172,24 +175,17 @@ async def list_directories_autocomplete(
             break
 
     if not input_value:
+        # Always use Unix root for WSL-first approach
         input_value = "/"
 
     # Parse the normalized path to get directory and search term
-    dir_path, search_term = parse_path_for_autocomplete(input_value)
+    dir_path, search_term = parse_path_for_autocomplete(input_value, path_service)
 
     try:
-        if not secure_exists(dir_path):
-            directories: List[DirectoryInfo] = []
-        elif not secure_isdir(dir_path):
-            directories = []
-        else:
-            directories = get_directory_listing(dir_path, include_files=False)
-
-        # Filter directories based on search term
-        if search_term:
-            directories = [
-                d for d in directories if search_term.lower() in d.name.lower()
-            ]
+        # Use repository service to handle directory listing across platforms
+        directories = await repo_svc.list_directories_for_autocomplete(
+            dir_path, search_term, include_files=False
+        )
 
         # Get the target input ID from headers
         target_input = request.headers.get("hx-target-input", "")

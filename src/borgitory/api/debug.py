@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -7,17 +8,16 @@ from sqlalchemy.orm import Session
 
 from borgitory.models.database import get_db
 from borgitory.dependencies import DebugServiceDep, get_templates
-from borgitory.services.debug_service import DebugInfo
 
 router = APIRouter(prefix="/api/debug", tags=["debug"])
 templates = get_templates()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/info")
+@router.get("/info", response_model=None)
 async def get_debug_info(
     debug_svc: DebugServiceDep, db: Session = Depends(get_db)
-) -> DebugInfo:
+) -> Any:
     """Get comprehensive debug information"""
     try:
         debug_info = await debug_svc.get_debug_info(db)

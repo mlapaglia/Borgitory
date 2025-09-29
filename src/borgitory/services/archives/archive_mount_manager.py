@@ -60,7 +60,7 @@ class ArchiveMountManager:
         mounting_timeout: timedelta = timedelta(seconds=30),
     ) -> None:
         self.base_mount_dir = Path(base_mount_dir)
-        self.base_mount_dir.mkdir(parents=True, exist_ok=True)
+        # Directory creation is deferred to first use to avoid sync filesystem operations
         self.active_mounts: Dict[str, MountInfo] = {}  # key: repo_path::archive_name
         self.mount_timeout = mount_timeout
         self.mounting_timeout = mounting_timeout
@@ -78,6 +78,9 @@ class ArchiveMountManager:
 
     async def mount_archive(self, repository: Repository, archive_name: str) -> Path:
         """Mount an archive and return the mount point"""
+        # Ensure base mount directory exists
+        self.base_mount_dir.mkdir(parents=True, exist_ok=True)
+
         mount_key = self._get_mount_key(repository, archive_name)
 
         if mount_key in self.active_mounts:

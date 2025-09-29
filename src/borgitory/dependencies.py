@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from borgitory.services.cloud_providers.registry_factory import RegistryFactory
     from borgitory.services.volumes.file_system_interface import FileSystemInterface
     from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
+    from borgitory.protocols.path_protocols import PathServiceInterface
     from sqlalchemy.orm import Session
 from functools import lru_cache
 from fastapi import Depends
@@ -390,6 +391,18 @@ def get_file_system() -> "FileSystemInterface":
     from borgitory.services.volumes.os_file_system import OsFileSystem
 
     return OsFileSystem()
+
+
+def get_path_service() -> "PathServiceInterface":
+    """
+    Provide PathServiceInterface implementation for cross-platform path operations.
+
+    Returns:
+        PathServiceInterface: Platform-appropriate path service implementation
+    """
+    from borgitory.services.path import get_path_service as create_path_service
+
+    return create_path_service()
 
 
 def get_hook_execution_service() -> HookExecutionService:
@@ -991,6 +1004,7 @@ HookExecutionServiceDep = Annotated[
     HookExecutionService, Depends(get_hook_execution_service)
 ]
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
+PathServiceDep = Annotated["PathServiceInterface", Depends(get_path_service)]
 
 
 @lru_cache()
@@ -1015,9 +1029,18 @@ def get_archive_mount_manager_singleton() -> "ArchiveMountManager":
     subprocess_executor = get_subprocess_executor()
     job_executor = get_job_executor(subprocess_executor)
 
+    # Use path configuration service directly for sync access to get base temp dir
+    from borgitory.services.path.path_configuration_service import (
+        PathConfigurationService,
+    )
+
+    config = PathConfigurationService()
+    temp_base = config.get_base_temp_dir()
+    mount_dir = f"{temp_base}/borgitory-mounts"
+
     return ArchiveMountManager(
         job_executor=job_executor,
-        base_mount_dir="/tmp/borgitory-mounts",  # More appropriate mount directory
+        base_mount_dir=mount_dir,
         mount_timeout=timedelta(seconds=1800),
         mounting_timeout=timedelta(seconds=30),
     )
@@ -1109,6 +1132,7 @@ def get_borg_service(
 def get_repository_service(
     borg_service: BorgService = Depends(get_borg_service),
     scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
+    path_service: "PathServiceInterface" = Depends(get_path_service),
 ) -> RepositoryService:
     """
     Provide a RepositoryService instance with proper dependency injection.
@@ -1118,6 +1142,7 @@ def get_repository_service(
     return RepositoryService(
         borg_service=borg_service,
         scheduler_service=scheduler_service,
+        path_service=path_service,
     )
 
 

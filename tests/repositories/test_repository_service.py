@@ -29,14 +29,14 @@ class TestRepositoryService:
         return mock
 
     @pytest.fixture
-    def mock_scheduler_service(self):
+    def mock_scheduler_service(self) -> Mock:
         """Mock scheduler service."""
         mock = Mock()
         mock.remove_schedule = AsyncMock()
         return mock
 
     @pytest.fixture
-    def mock_db_session(self):
+    def mock_db_session(self) -> Mock:
         """Mock database session."""
         mock = Mock(spec=Session)
         mock.query.return_value.filter.return_value.first.return_value = None
@@ -49,11 +49,26 @@ class TestRepositoryService:
         return mock
 
     @pytest.fixture
-    def repository_service(self, mock_borg_service, mock_scheduler_service: Mock):
+    def mock_path_service(self) -> Mock:
+        """Create mock path service."""
+        mock = Mock()
+        mock.get_keyfiles_dir.return_value = "/test/keyfiles"
+        mock.ensure_directory.return_value = True
+        mock.secure_join.return_value = "/test/keyfiles/test_file"
+        return mock
+
+    @pytest.fixture
+    def repository_service(
+        self,
+        mock_borg_service: Mock,
+        mock_scheduler_service: Mock,
+        mock_path_service: Mock,
+    ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
             scheduler_service=mock_scheduler_service,
+            path_service=mock_path_service,
         )
 
     @pytest.mark.asyncio
@@ -109,7 +124,7 @@ class TestRepositoryService:
 
     @pytest.mark.asyncio
     async def test_create_repository_name_already_exists(
-        self, repository_service, mock_db_session
+        self, repository_service: RepositoryService, mock_db_session: Mock
     ) -> None:
         """Test repository creation fails when name already exists."""
         # Arrange
@@ -137,6 +152,7 @@ class TestRepositoryService:
         # Assert
         assert result.success is False
         assert result.is_validation_error is True
+        assert result.validation_errors is not None
         assert len(result.validation_errors) == 1
         assert result.validation_errors[0].field == "name"
         assert "already exists" in result.validation_errors[0].message

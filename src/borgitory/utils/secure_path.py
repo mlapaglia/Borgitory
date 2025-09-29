@@ -25,6 +25,19 @@ class DirectoryInfo:
     is_borg_repo: bool = False
     is_borg_cache: bool = False
 
+    @property
+    def path_with_separator(self) -> str:
+        """Get path with Unix-style trailing separator (WSL-first approach)."""
+        if not self.path:
+            return self.path
+
+        # Check if path already ends with Unix separator
+        if self.path.endswith("/"):
+            return self.path
+
+        # Always add Unix-style separator for WSL-first approach
+        return self.path + "/"
+
 
 def _is_borg_repository(directory_path: str) -> bool:
     """Check if a directory is a Borg repository by looking for a config file."""
@@ -160,9 +173,9 @@ def secure_path_join(base_dir: str, *path_parts: str) -> str:
     safe_parts = []
     for part in path_parts:
         if part:
-            # Remove dangerous path traversal sequences
-            safe_part = re.sub(r"\.\.+[/\\]?", "", str(part))
-            safe_part = safe_part.strip("/\\")
+            # Remove dangerous path traversal sequences (Unix-style only)
+            safe_part = re.sub(r"\.\.+/?", "", str(part))
+            safe_part = safe_part.strip("/")
             if safe_part:
                 safe_parts.append(safe_part)
 

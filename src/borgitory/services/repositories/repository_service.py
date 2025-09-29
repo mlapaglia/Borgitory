@@ -5,7 +5,6 @@ Handles all repository-related business operations independent of HTTP concerns.
 
 import asyncio
 import logging
-import os
 from typing import Dict, List, Protocol, TypedDict, Union, Any
 from sqlalchemy.orm import Session
 
@@ -27,6 +26,7 @@ from borgitory.models.repository_dtos import (
 )
 from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
+from borgitory.protocols.path_protocols import PathServiceInterface
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
     parse_datetime_string,
@@ -36,8 +36,8 @@ from borgitory.utils.secure_path import (
     get_directory_listing,
     secure_exists,
     secure_isdir,
-    secure_path_join,
     secure_remove_file,
+    DirectoryInfo,
 )
 from borgitory.utils.security import secure_borg_command
 
@@ -86,9 +86,11 @@ class RepositoryService:
         self,
         borg_service: BorgService,
         scheduler_service: SchedulerService,
+        path_service: PathServiceInterface,
     ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service
+        self.path_service = path_service
 
     async def create_repository(
         self, request: CreateRepositoryRequest, db: Session
@@ -556,13 +558,13 @@ class RepositoryService:
         self, repository_name: str, keyfile: KeyfileProtocol
     ) -> KeyfileSaveResult:
         """Save uploaded keyfile securely."""
-        keyfiles_dir = "/app/data/keyfiles"
-        os.makedirs(keyfiles_dir, exist_ok=True)
+        keyfiles_dir = await self.path_service.get_keyfiles_dir()
+        await self.path_service.ensure_directory(keyfiles_dir)
 
         safe_filename = create_secure_filename(
             repository_name, keyfile.filename or "keyfile", add_uuid=True
         )
-        keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
+        keyfile_path = self.path_service.secure_join(keyfiles_dir, safe_filename)
 
         with open(keyfile_path, "wb") as f:
             content = await keyfile.read()
@@ -958,3 +960,60 @@ class RepositoryService:
                 return f"{value:.1f} {unit}"
             value /= 1024.0
         return f"{value:.1f} PB"
+
+    async def list_directories_for_autocomplete(
+        self, path: str, search_term: str = "", include_files: bool = False
+    ) -> List[DirectoryInfo]:
+        """
+        List directories for autocomplete functionality, handling both WSL and non-WSL environments.
+
+        Args:
+            path: The directory path to list
+            search_term: Optional search term to filter results
+            include_files: Whether to include files in the results
+
+        Returns:
+            List of DirectoryInfo objects matching the criteria
+        """
+        try:
+            directories = []
+
+            # Use WSL path service for directory operations if available
+            if self.path_service.get_platform_name() == "wsl":
+                from borgitory.services.path.wsl_path_service import WSLPathService
+
+                if isinstance(self.path_service, WSLPathService):
+                    # Special handling for root directory - show /mnt directory where Windows drives are mounted
+                    if path == "/" or path == "":
+                        # Instead of showing Unix root, show /mnt where Windows drives are mounted
+                        directories = await self.path_service.list_directory(
+                            "/mnt", include_files=include_files
+                        )
+                    else:
+                        directories = await self.path_service.list_directory(
+                            path, include_files=include_files
+                        )
+                else:
+                    directories = []
+            else:
+                # Fallback to legacy functions for non-WSL
+                if not secure_exists(path):
+                    directories = []
+                elif not secure_isdir(path):
+                    directories = []
+                else:
+                    directories = get_directory_listing(
+                        path, include_files=include_files
+                    )
+
+            # Filter directories based on search term
+            if search_term:
+                directories = [
+                    d for d in directories if search_term.lower() in d.name.lower()
+                ]
+
+            return directories
+
+        except Exception as e:
+            logger.error(f"Error listing directories at {path}: {e}")
+            return []

@@ -1,99 +1,122 @@
 import asyncio
 import platform
+import subprocess
 import sys
 import os
 import logging
-from typing import Dict, Optional, TypedDict
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Optional
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job
 from borgitory.protocols import JobManagerProtocol
 from borgitory.protocols.environment_protocol import EnvironmentProtocol
+from borgitory.services.wsl import get_wsl_command_executor
 
 logger = logging.getLogger(__name__)
 
 
-class SystemInfo(TypedDict, total=False):
+class SystemInfo:
     """System information structure"""
 
-    # Success fields
-    platform: str
-    system: str
-    release: str
-    version: str
-    architecture: str
-    processor: str
-    hostname: str
-    python_version: str
-    python_executable: str
-    # Error field
-    error: str
+    def __init__(self) -> None:
+        # Success fields
+        self.platform: str = ""
+        self.system: str = ""
+        self.release: str = ""
+        self.version: str = ""
+        self.architecture: str = ""
+        self.processor: str = ""
+        self.hostname: str = ""
+        self.python_version: str = ""
+        self.python_executable: str = ""
+        # Error field
+        self.error: str = ""
 
 
-class ApplicationInfo(TypedDict, total=False):
+class ApplicationInfo:
     """Application information structure"""
 
-    # Success fields
-    borgitory_version: Optional[str]
-    debug_mode: bool
-    startup_time: str
-    working_directory: str
-    # Error field
-    error: str
+    def __init__(self) -> None:
+        # Success fields
+        self.borgitory_version: Optional[str] = None
+        self.debug_mode: bool = False
+        self.startup_time: str = ""
+        self.working_directory: str = ""
+        # Error field
+        self.error: str = ""
 
 
-class DatabaseInfo(TypedDict, total=False):
+class DatabaseInfo:
     """Database information structure"""
 
-    # Success fields
-    repository_count: int
-    total_jobs: int
-    jobs_today: int
-    database_type: str
-    database_url: str
-    database_size: str
-    database_size_bytes: int
-    # Common fields
-    database_accessible: bool
-    # Error field
-    error: str
+    def __init__(self) -> None:
+        # Success fields
+        self.repository_count: int = 0
+        self.total_jobs: int = 0
+        self.jobs_today: int = 0
+        self.database_type: str = ""
+        self.database_url: str = ""
+        self.database_size: str = ""
+        self.database_size_bytes: int = 0
+        # Common fields
+        self.database_accessible: bool = False
+        # Error field
+        self.error: str = ""
 
 
-class ToolInfo(TypedDict, total=False):
+class ToolInfo:
     """Tool version information structure"""
 
-    # Success fields
-    version: str
-    accessible: bool
-    # Error field
-    error: str
+    def __init__(self) -> None:
+        # Success fields
+        self.version: str = ""
+        self.accessible: bool = False
+        # Error field
+        self.error: str = ""
 
 
-class JobManagerInfo(TypedDict, total=False):
+class JobManagerInfo:
     """Job manager information structure"""
 
-    # Success fields
-    active_jobs: int
-    total_jobs: int
-    job_manager_running: bool
-    # Error/unavailable fields
-    error: str
-    status: str
+    def __init__(self) -> None:
+        # Success fields
+        self.active_jobs: int = 0
+        self.total_jobs: int = 0
+        self.job_manager_running: bool = False
+        # Error/unavailable fields
+        self.error: str = ""
+        self.status: str = ""
 
 
-class DebugInfo(TypedDict):
-    """Comprehensive debug information structure
+class WSLInfo:
+    """WSL (Windows Subsystem for Linux) information structure"""
 
-    Each field contains the specific TypedDict for that section.
-    All TypedDicts use total=False to handle error cases with {"error": str}.
-    """
+    def __init__(self) -> None:
+        # Success fields
+        self.wsl_available: bool = False
+        self.wsl_version: str = ""
+        self.default_distribution: str = ""
+        self.installed_distributions: list[str] = []
+        self.wsl_kernel_version: str = ""
+        self.windows_version: str = ""
+        self.wsl_path_accessible: bool = False
+        self.mount_points: list[str] = []
+        # Error field
+        self.error: str = ""
 
-    system: SystemInfo
-    application: ApplicationInfo
-    database: DatabaseInfo
-    tools: Dict[str, ToolInfo]
-    environment: Dict[str, str]
-    job_manager: JobManagerInfo
+
+class DebugInfo:
+    """Comprehensive debug information structure"""
+
+    def __init__(self) -> None:
+        self.system: SystemInfo = SystemInfo()
+        self.application: ApplicationInfo = ApplicationInfo()
+        self.database: DatabaseInfo = DatabaseInfo()
+        self.tools: Dict[str, ToolInfo] = {}
+        self.environment: Dict[str, str] = {}
+        self.job_manager: JobManagerInfo = JobManagerInfo()
+        self.wsl: WSLInfo = WSLInfo()
 
 
 class DebugService:
@@ -106,56 +129,114 @@ class DebugService:
     ) -> None:
         self.job_manager = job_manager
         self.environment = environment
+        self.wsl_executor = (
+            get_wsl_command_executor() if platform.system() == "Windows" else None
+        )
+
+    async def _run_command(
+        self, command: list[str], timeout: float = 30.0, use_wsl_for_tools: bool = True
+    ) -> tuple[int, str, str]:
+        """
+        Run command using WSL executor on Windows or direct subprocess on other platforms.
+
+        Args:
+            command: Command to run
+            timeout: Command timeout
+            use_wsl_for_tools: If True, use WSL for tool commands on Windows
+
+        Returns:
+            Tuple of (return_code, stdout, stderr)
+        """
+        # Determine if we should use WSL
+        should_use_wsl = (
+            use_wsl_for_tools
+            and self.wsl_executor is not None
+            and command[0]
+            not in [
+                "wsl",
+                "dpkg",
+            ]  # Don't use WSL for WSL commands or Windows-specific commands
+        )
+
+        if should_use_wsl and self.wsl_executor:
+            # Use WSL command executor
+            result = await self.wsl_executor.execute_command(command, timeout=timeout)
+            return result.return_code, result.stdout, result.stderr
+        else:
+            # Use direct subprocess with thread pool
+            loop = asyncio.get_event_loop()
+
+            def run_command() -> tuple[int, bytes, bytes]:
+                try:
+                    result = subprocess.run(
+                        command,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=timeout,
+                        text=False,  # Keep as bytes for consistent decoding
+                    )
+                    return result.returncode, result.stdout, result.stderr
+                except subprocess.TimeoutExpired:
+                    return -1, b"", b"Command timed out"
+                except Exception as e:
+                    return -1, b"", str(e).encode()
+
+            with ThreadPoolExecutor() as executor:
+                return_code, stdout, stderr = await loop.run_in_executor(
+                    executor, run_command
+                )
+                return (
+                    return_code,
+                    stdout.decode("utf-8", errors="replace"),
+                    stderr.decode("utf-8", errors="replace"),
+                )
 
     async def get_debug_info(self, db: Session) -> DebugInfo:
         """Gather comprehensive debug information"""
-        # Each method now handles its own exceptions and returns the appropriate TypedDict
-        debug_info: DebugInfo = {
-            "system": await self._get_system_info(),
-            "application": await self._get_application_info(),
-            "database": self._get_database_info(db),
-            "tools": await self._get_tool_versions(),
-            "environment": self._get_environment_info(),
-            "job_manager": self._get_job_manager_info(),
-        }
+        debug_info = DebugInfo()
+        debug_info.system = await self._get_system_info()
+        debug_info.application = await self._get_application_info()
+        debug_info.database = self._get_database_info(db)
+        debug_info.tools = await self._get_tool_versions()
+        debug_info.environment = self._get_environment_info()
+        debug_info.job_manager = self._get_job_manager_info()
+        debug_info.wsl = await self._get_wsl_info()
 
         return debug_info
 
     async def _get_system_info(self) -> SystemInfo:
         """Get system information"""
+        system_info = SystemInfo()
         try:
-            system_info: SystemInfo = {
-                "platform": platform.platform(),
-                "system": platform.system(),
-                "release": platform.release(),
-                "version": platform.version(),
-                "architecture": platform.architecture()[0],
-                "processor": platform.processor(),
-                "hostname": platform.node(),
-                "python_version": sys.version,
-                "python_executable": sys.executable,
-            }
+            system_info.platform = platform.platform()
+            system_info.system = platform.system()
+            system_info.release = platform.release()
+            system_info.version = platform.version()
+            system_info.architecture = platform.architecture()[0]
+            system_info.processor = platform.processor()
+            system_info.hostname = platform.node()
+            system_info.python_version = sys.version
+            system_info.python_executable = sys.executable
             return system_info
         except Exception as e:
             logger.error(f"Error getting system info: {str(e)}")
-            return {"error": str(e)}
+            system_info.error = str(e)
+            return system_info
 
     async def _get_application_info(self) -> ApplicationInfo:
         """Get application information"""
+        app_info = ApplicationInfo()
         try:
-            app_info: ApplicationInfo = {
-                "borgitory_version": self.environment.get_env("BORGITORY_VERSION"),
-                "debug_mode": (
-                    self.environment.get_env("DEBUG", "false") or "false"
-                ).lower()
-                == "true",
-                "startup_time": self.environment.now_utc().isoformat(),
-                "working_directory": self.environment.get_cwd(),
-            }
+            app_info.borgitory_version = self.environment.get_env("BORGITORY_VERSION")
+            debug_env = self.environment.get_env("DEBUG", "false") or "false"
+            app_info.debug_mode = debug_env.lower() == "true"
+            app_info.startup_time = self.environment.now_utc().isoformat()
+            app_info.working_directory = self.environment.get_cwd()
             return app_info
         except Exception as e:
             logger.error(f"Error getting application info: {str(e)}")
-            return {"error": str(e)}
+            app_info.error = str(e)
+            return app_info
 
     def _get_database_info(self, db: Session) -> DatabaseInfo:
         """Get database information"""
@@ -227,81 +308,76 @@ class DebugService:
             else:
                 db_type = "Unknown"
 
-            return {
-                "repository_count": repository_count,
-                "total_jobs": total_jobs,
-                "jobs_today": recent_jobs,
-                "database_type": db_type,
-                "database_url": database_url,
-                "database_size": database_size,
-                "database_size_bytes": database_size_bytes,
-                "database_accessible": True,
-            }
+            db_info = DatabaseInfo()
+            db_info.repository_count = repository_count
+            db_info.total_jobs = total_jobs
+            db_info.jobs_today = recent_jobs
+            db_info.database_type = db_type
+            db_info.database_url = database_url
+            db_info.database_size = database_size
+            db_info.database_size_bytes = database_size_bytes
+            db_info.database_accessible = True
+            return db_info
         except Exception as e:
-            return {"error": str(e), "database_accessible": False}
+            db_info = DatabaseInfo()
+            db_info.error = str(e)
+            db_info.database_accessible = False
+            return db_info
 
     async def _get_tool_versions(self) -> Dict[str, ToolInfo]:
         """Get versions of external tools"""
         tools: Dict[str, ToolInfo] = {}
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                "borg",
-                "--version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            return_code, stdout, stderr = await self._run_command(["borg", "--version"])
 
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                tools["borg"] = {"version": stdout.decode().strip(), "accessible": True}
+            if return_code == 0:
+                borg_info = ToolInfo()
+                borg_info.version = stdout.strip()
+                borg_info.accessible = True
+                tools["borg"] = borg_info
             else:
-                tools["borg"] = {
-                    "error": stderr.decode().strip() if stderr else "Command failed",
-                    "accessible": False,
-                }
+                borg_info = ToolInfo()
+                borg_info.error = stderr.strip() if stderr else "Command failed"
+                borg_info.accessible = False
+                tools["borg"] = borg_info
         except Exception as e:
-            tools["borg"] = {"error": str(e), "accessible": False}
+            borg_info = ToolInfo()
+            borg_info.error = str(e)
+            borg_info.accessible = False
+            tools["borg"] = borg_info
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                "rclone",
-                "version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            return_code, stdout, stderr = await self._run_command(["rclone", "version"])
 
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                version_output = stdout.decode().strip()
+            if return_code == 0:
+                version_output = stdout.strip()
                 # Extract just the version line
                 version_line = (
                     version_output.split("\n")[0] if version_output else "Unknown"
                 )
-                tools["rclone"] = {"version": version_line, "accessible": True}
+                rclone_info = ToolInfo()
+                rclone_info.version = version_line
+                rclone_info.accessible = True
+                tools["rclone"] = rclone_info
             else:
-                tools["rclone"] = {
-                    "error": stderr.decode().strip() if stderr else "Not installed",
-                    "accessible": False,
-                }
+                rclone_info = ToolInfo()
+                rclone_info.error = stderr.strip() if stderr else "Not installed"
+                rclone_info.accessible = False
+                tools["rclone"] = rclone_info
         except Exception as e:
-            tools["rclone"] = {"error": str(e), "accessible": False}
+            rclone_info = ToolInfo()
+            rclone_info.error = str(e)
+            rclone_info.accessible = False
+            tools["rclone"] = rclone_info
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                "dpkg",
-                "-l",
-                "fuse3",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            return_code, stdout, stderr = await self._run_command(
+                ["dpkg", "-l", "fuse3"], use_wsl_for_tools=False
             )
 
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                output = stdout.decode().strip()
+            if return_code == 0:
+                output = stdout.strip()
                 # Parse dpkg output to get version
                 lines = output.split("\n")
                 for line in lines:
@@ -309,25 +385,26 @@ class DebugService:
                         parts = line.split()
                         if len(parts) >= 3:
                             version = parts[2]
-                            tools["fuse3"] = {
-                                "version": f"fuse3 {version}",
-                                "accessible": True,
-                            }
+                            fuse3_info = ToolInfo()
+                            fuse3_info.version = f"fuse3 {version}"
+                            fuse3_info.accessible = True
+                            tools["fuse3"] = fuse3_info
                             break
                 else:
-                    tools["fuse3"] = {
-                        "error": "Package info not found",
-                        "accessible": False,
-                    }
+                    fuse3_info = ToolInfo()
+                    fuse3_info.error = "Package info not found"
+                    fuse3_info.accessible = False
+                    tools["fuse3"] = fuse3_info
             else:
-                tools["fuse3"] = {
-                    "error": stderr.decode().strip()
-                    if stderr
-                    else "Package not installed",
-                    "accessible": False,
-                }
+                fuse3_info = ToolInfo()
+                fuse3_info.error = stderr.strip() if stderr else "Package not installed"
+                fuse3_info.accessible = False
+                tools["fuse3"] = fuse3_info
         except Exception as e:
-            tools["fuse3"] = {"error": str(e), "accessible": False}
+            fuse3_info = ToolInfo()
+            fuse3_info.error = str(e)
+            fuse3_info.accessible = False
+            tools["fuse3"] = fuse3_info
 
         return tools
 
@@ -386,10 +463,155 @@ class DebugService:
                     if hasattr(job, "status") and job.status == "running":
                         active_jobs_count += 1
 
-            return {
-                "active_jobs": active_jobs_count,
-                "total_jobs": total_jobs,
-                "job_manager_running": True,
-            }
+            job_info = JobManagerInfo()
+            job_info.active_jobs = active_jobs_count
+            job_info.total_jobs = total_jobs
+            job_info.job_manager_running = True
+            return job_info
         except Exception as e:
-            return {"error": str(e), "job_manager_running": False}
+            job_info = JobManagerInfo()
+            job_info.error = str(e)
+            job_info.job_manager_running = False
+            return job_info
+
+    async def _get_wsl_info(self) -> WSLInfo:
+        """Get comprehensive WSL (Windows Subsystem for Linux) information"""
+        wsl_info = WSLInfo()
+
+        try:
+            # Check if we're on Windows first
+            os_env = self.environment.get_env("OS", "") or ""
+            if not os_env.startswith("Windows") and platform.system() != "Windows":
+                wsl_info.error = "Not running on Windows - WSL not applicable"
+                return wsl_info
+
+            # Check if WSL is available
+            try:
+                # Test basic WSL availability
+                return_code, stdout, stderr = await self._run_command(
+                    ["wsl", "--status"], use_wsl_for_tools=False
+                )
+
+                if return_code == 0:
+                    wsl_info.wsl_available = True
+                    status_output = stdout.strip()
+
+                    # Parse WSL status output
+                    for line in status_output.split("\n"):
+                        clean_line = line.replace("\x00", "").strip()
+                        if "Default Distribution:" in clean_line:
+                            wsl_info.default_distribution = clean_line.split(":", 1)[
+                                1
+                            ].strip()
+                        elif "Default Version:" in clean_line:
+                            wsl_info.wsl_version = (
+                                f"WSL {clean_line.split(':', 1)[1].strip()}"
+                            )
+                else:
+                    wsl_info.error = f"WSL not available: {stderr.strip()}"
+                    return wsl_info
+
+            except FileNotFoundError:
+                wsl_info.error = "WSL command not found - WSL not installed"
+                return wsl_info
+            except Exception as e:
+                wsl_info.error = f"Error checking WSL status: {str(e)}"
+                return wsl_info
+
+            # Get list of installed distributions
+            try:
+                return_code, stdout, stderr = await self._run_command(
+                    ["wsl", "-l", "-v"], use_wsl_for_tools=False
+                )
+
+                if return_code == 0:
+                    distro_output = stdout.strip()
+                    distributions = []
+                    lines = distro_output.split("\n")
+                    for line in lines[1:]:  # Skip header line
+                        if line.strip():
+                            # Parse WSL list output (format: NAME STATE VERSION)
+                            # Remove null characters and extra whitespace
+                            clean_line = line.replace("\x00", "").strip()
+                            if clean_line:
+                                parts = clean_line.split()
+                                if parts:
+                                    distro_name = (
+                                        parts[0].replace("*", "").strip()
+                                    )  # Remove default marker
+                                    if distro_name and distro_name not in [
+                                        "NAME",
+                                        "Windows",
+                                        "Subsystem",
+                                    ]:
+                                        distributions.append(distro_name)
+                    wsl_info.installed_distributions = distributions
+
+            except Exception as e:
+                logger.warning(f"Could not get WSL distributions: {e}")
+
+            # Get WSL kernel version
+            try:
+                return_code, stdout, stderr = await self._run_command(
+                    ["wsl", "--version"], use_wsl_for_tools=False
+                )
+
+                if return_code == 0:
+                    version_output = stdout.strip()
+                    for line in version_output.split("\n"):
+                        if "WSL version:" in line:
+                            wsl_info.wsl_version = line.split(":", 1)[1].strip()
+                        elif "Kernel version:" in line:
+                            wsl_info.wsl_kernel_version = line.split(":", 1)[1].strip()
+
+            except Exception as e:
+                logger.warning(f"Could not get WSL version details: {e}")
+
+            # Get Windows version for compatibility info
+            try:
+                import winreg
+
+                key = winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+                )
+                build_number = winreg.QueryValueEx(key, "CurrentBuildNumber")[0]
+                release_id = winreg.QueryValueEx(key, "ReleaseId")[0]
+                wsl_info.windows_version = (
+                    f"Build {build_number} (Release {release_id})"
+                )
+                winreg.CloseKey(key)
+            except Exception as e:
+                logger.warning(f"Could not get Windows version: {e}")
+                wsl_info.windows_version = "Unknown"
+
+            # Test WSL path accessibility
+            try:
+                # Try to access /mnt directory which should contain Windows drives
+                return_code, stdout, stderr = await self._run_command(
+                    ["wsl", "ls", "/mnt"], use_wsl_for_tools=False
+                )
+
+                if return_code == 0:
+                    wsl_info.wsl_path_accessible = True
+                    # Parse mount points
+                    mount_output = stdout.strip()
+                    mount_points = []
+                    for line in mount_output.split("\n"):
+                        if line.strip():
+                            mount_points.append(f"/mnt/{line.strip()}")
+                    wsl_info.mount_points = mount_points
+                else:
+                    wsl_info.wsl_path_accessible = False
+                    logger.warning(f"WSL path access failed: {stderr.strip()}")
+
+            except Exception as e:
+                wsl_info.wsl_path_accessible = False
+                logger.warning(f"Could not test WSL path accessibility: {e}")
+
+            return wsl_info
+
+        except Exception as e:
+            wsl_info.error = f"Unexpected error gathering WSL info: {str(e)}"
+            logger.error(f"Error in _get_wsl_info: {e}")
+            return wsl_info

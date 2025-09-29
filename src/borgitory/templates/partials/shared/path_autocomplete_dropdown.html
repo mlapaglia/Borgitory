@@ -5,7 +5,7 @@
 {% elif directories %}
 {% for dir in directories %}
 <div class="autocomplete-item px-3 py-2 cursor-pointer {% if dir.is_borg_repo %}bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-200 dark:border-blue-700{% elif dir.is_borg_cache %}bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 border-green-200 dark:border-green-700{% else %}hover:bg-gray-100 dark:hover:bg-gray-600{% endif %} border-b border-gray-100 dark:border-gray-600 last:border-b-0" 
-     data-path="{{ dir.path }}/"
+     data-path="{{ dir.path_with_separator }}"
      hx-on:click="
         event.preventDefault();
         event.stopPropagation();
