@@ -1053,7 +1053,7 @@ class JobManager:
 
             async with secure_borg_command(
                 base_command="borg create",
-                repository_path="",  # Already in additional_args
+                repository_path="",  # Already in additional_argsborgi
                 passphrase=passphrase,
                 keyfile_content=keyfile_content,
                 additional_args=additional_args,

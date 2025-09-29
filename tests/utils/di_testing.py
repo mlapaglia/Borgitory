@@ -94,7 +94,6 @@ class MockServiceFactory:
         # Setup common return values
         mock.list_archives.return_value = []
         mock.verify_repository_access.return_value = True
-        mock.scan_for_repositories.return_value = []
 
         return mock
 
@@ -265,7 +264,6 @@ class MockServiceFactory:
         mock = Mock(spec=RepositoryService)
 
         # Setup common return values
-        mock.scan_repositories.return_value = []
         mock.create_repository.return_value = {"id": 1, "name": "test-repo"}
         mock.delete_repository.return_value = True
 

@@ -1,5 +1,4 @@
 import asyncio
-import configparser
 import json
 import logging
 import re
@@ -12,9 +11,7 @@ from starlette.responses import StreamingResponse
 from borgitory.models.database import Repository
 from borgitory.models.borg_info import (
     BorgArchiveListResponse,
-    BorgRepositoryConfig,
     RepositoryInitializationResult,
-    RepositoryScanResponse,
 )
 from borgitory.protocols import (
     CommandRunnerProtocol,
@@ -28,7 +25,6 @@ from borgitory.utils.security import (
     secure_borg_command,
     cleanup_temp_keyfile,
     validate_archive_name,
-    sanitize_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,33 +70,6 @@ class BorgService:
     def _get_job_manager(self) -> JobManagerProtocol:
         """Get job manager instance - guaranteed to be available via DI"""
         return self.job_manager
-
-    def _parse_borg_config(self, repo_path: str) -> "BorgRepositoryConfig":
-        """Parse a Borg repository config file to verify it's a valid Borg repository"""
-        config_path = os.path.join(repo_path, "config")
-
-        try:
-            if not os.path.exists(config_path):
-                return BorgRepositoryConfig.unknown_config()
-
-            with open(config_path, "r", encoding="utf-8") as f:
-                config_content = f.read()
-
-            config = configparser.ConfigParser()
-            config.read_string(config_content)
-
-            if not config.has_section("repository"):
-                return BorgRepositoryConfig.invalid_config()
-
-            return BorgRepositoryConfig(
-                mode="unknown",
-                requires_keyfile=False,
-                preview="Borg repository detected",
-            )
-
-        except Exception as e:
-            logger.error(f"Error parsing Borg config at {config_path}: {e}")
-            return BorgRepositoryConfig.error_config(str(e))
 
     async def initialize_repository(
         self, repository: Repository
@@ -331,101 +300,3 @@ class BorgService:
         except Exception as e:
             logger.error(f"Failed to verify repository access: {e}")
             return False
-
-    def _validate_scan_path(self, path: str) -> bool:
-        """Validate if a scan path exists and is a directory (abstracted for testing)"""
-        try:
-            safe_scan_path = sanitize_path(path)
-            return os.path.exists(safe_scan_path) and os.path.isdir(safe_scan_path)
-        except Exception:
-            return False
-
-    def _is_valid_repository_path(self, path: str) -> bool:
-        """Check if a path is a valid repository path (abstracted for testing)"""
-        return bool(
-            path
-            and path.startswith("/")  # Must be an absolute path
-            and os.path.isdir(path)  # Must be a valid directory
-        )
-
-    async def scan_for_repositories(self) -> RepositoryScanResponse:
-        """Scan for Borg repositories using SimpleCommandRunner"""
-        logger.info("Starting repository scan")
-
-        mounted_volumes = await self.volume_service.get_mounted_volumes()
-
-        if not mounted_volumes:
-            logger.warning("No mounted volumes found")
-
-        logger.info(
-            f"Scanning across {len(mounted_volumes)} mounted volumes: {mounted_volumes}"
-        )
-
-        # Build command to scan multiple paths
-        command_parts = ["find"]
-
-        # Add all valid scan paths
-        for path in mounted_volumes:
-            if self._validate_scan_path(path):
-                command_parts.append(sanitize_path(path))
-            else:
-                logger.warning(f"Skipping invalid scan path {path}")
-
-        # Add find parameters
-        command_parts.extend(
-            [
-                "-name",
-                "config",
-                "-type",
-                "f",
-                "-exec",
-                "sh",
-                "-c",
-                'if head -20 "$1" 2>/dev/null | grep -q "\\[repository\\]"; then echo "$(dirname "$1")"; fi',
-                "_",
-                "{}",
-                ";",
-            ]
-        )
-
-        try:
-            logger.info(f"Executing scan command: {' '.join(command_parts)}")
-
-            # Execute the command directly and wait for result
-            result = await self.command_runner.run_command(command_parts, timeout=300)
-
-            if not result.success:
-                logger.error(f"Scan failed: {result.error}")
-                return RepositoryScanResponse(
-                    repositories=[], scan_paths=mounted_volumes
-                )
-
-            # Process the output to find repositories
-            repo_data = []
-            for line in result.stdout.splitlines():
-                line_text = (
-                    line.decode("utf-8", errors="replace").strip()
-                    if isinstance(line, bytes)
-                    else line.strip()
-                )
-                if self._is_valid_repository_path(line_text):
-                    # Parse the Borg config file to get encryption info
-                    encryption_info = self._parse_borg_config(line_text)
-
-                    repo_data.append(
-                        {
-                            "path": line_text,
-                            "id": f"repo_{hash(line_text)}",
-                            "encryption_mode": encryption_info.mode,
-                            "requires_keyfile": encryption_info.requires_keyfile,
-                            "detected": True,
-                            "config_preview": encryption_info.preview,
-                        }
-                    )
-
-            logger.info(f"Scan completed, found {len(repo_data)} repositories")
-            return RepositoryScanResponse.from_scan_results(repo_data, mounted_volumes)
-
-        except Exception as e:
-            logger.error(f"Failed to scan for repositories: {e}")
-            return RepositoryScanResponse(repositories=[], scan_paths=mounted_volumes)

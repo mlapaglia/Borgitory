@@ -10,10 +10,72 @@ import logging
 import os
 import re
 import uuid
+import configparser
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class DirectoryInfo:
+    """Information about a directory entry."""
+
+    name: str
+    path: str
+    is_borg_repo: bool = False
+    is_borg_cache: bool = False
+
+
+def _is_borg_repository(directory_path: str) -> bool:
+    """Check if a directory is a Borg repository by looking for a config file."""
+    try:
+        config_path = os.path.join(directory_path, "config")
+
+        if not os.path.exists(config_path) or not os.path.isfile(config_path):
+            return False
+
+        # Try to read the config file and check for [repository] section
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config_content = f.read()
+
+            config = configparser.ConfigParser()
+            config.read_string(config_content)
+
+            return config.has_section("repository")
+
+        except (configparser.Error, UnicodeDecodeError, PermissionError):
+            return False
+
+    except Exception:
+        return False
+
+
+def _is_borg_cache(directory_path: str) -> bool:
+    """Check if a directory is a Borg cache by looking for a config file with [cache] section."""
+    try:
+        config_path = os.path.join(directory_path, "config")
+
+        if not os.path.exists(config_path) or not os.path.isfile(config_path):
+            return False
+
+        # Try to read the config file and check for [cache] section
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config_content = f.read()
+
+            config = configparser.ConfigParser()
+            config.read_string(config_content)
+
+            return config.has_section("cache")
+
+        except (configparser.Error, UnicodeDecodeError, PermissionError):
+            return False
+
+    except Exception:
+        return False
 
 
 def _pre_validate_user_input(user_path: str, allowed_prefixes: List[str]) -> bool:
@@ -339,7 +401,7 @@ def secure_remove_file(file_path: str) -> bool:
 def get_directory_listing(
     path: str,
     include_files: bool = False,
-) -> List[Dict[str, str]]:
+) -> List[DirectoryInfo]:
     """
     Get a secure directory listing with additional metadata.
 
@@ -348,7 +410,7 @@ def get_directory_listing(
         include_files: Whether to include files (default: directories only)
 
     Returns:
-        List of dictionaries with 'name' and 'path' keys
+        List of DirectoryInfo objects
     """
     validated_path = validate_secure_path(path, allow_app_data=True)
     if validated_path is None:
@@ -362,12 +424,28 @@ def get_directory_listing(
     try:
         for item in validated_path.iterdir():
             if item.is_dir():
-                items.append({"name": item.name, "path": str(item)})
+                is_borg_repo = _is_borg_repository(str(item))
+                is_borg_cache = _is_borg_cache(str(item))
+                items.append(
+                    DirectoryInfo(
+                        name=item.name,
+                        path=str(item),
+                        is_borg_repo=is_borg_repo,
+                        is_borg_cache=is_borg_cache,
+                    )
+                )
             elif include_files and item.is_file():
-                items.append({"name": item.name, "path": str(item)})
+                items.append(
+                    DirectoryInfo(
+                        name=item.name,
+                        path=str(item),
+                        is_borg_repo=False,
+                        is_borg_cache=False,
+                    )
+                )
 
         # Sort alphabetically
-        items.sort(key=lambda x: x["name"].lower())
+        items.sort(key=lambda x: x.name.lower())
 
     except (PermissionError, OSError) as e:
         logger.warning(f"Cannot access directory '{path}': {e}")
@@ -406,7 +484,7 @@ def user_secure_isdir(path: str) -> bool:
 
 def user_get_directory_listing(
     path: str, include_files: bool = False
-) -> List[Dict[str, str]]:
+) -> List[DirectoryInfo]:
     """Get directory listing - /mnt only (for user repos/backup sources)."""
     validated_path = validate_mnt_path(path)
     if validated_path is None:
@@ -420,12 +498,28 @@ def user_get_directory_listing(
     try:
         for item in validated_path.iterdir():
             if item.is_dir():
-                items.append({"name": item.name, "path": str(item)})
+                is_borg_repo = _is_borg_repository(str(item))
+                is_borg_cache = _is_borg_cache(str(item))
+                items.append(
+                    DirectoryInfo(
+                        name=item.name,
+                        path=str(item),
+                        is_borg_repo=is_borg_repo,
+                        is_borg_cache=is_borg_cache,
+                    )
+                )
             elif include_files and item.is_file():
-                items.append({"name": item.name, "path": str(item)})
+                items.append(
+                    DirectoryInfo(
+                        name=item.name,
+                        path=str(item),
+                        is_borg_repo=False,
+                        is_borg_cache=False,
+                    )
+                )
 
         # Sort alphabetically
-        items.sort(key=lambda x: x["name"].lower())
+        items.sort(key=lambda x: x.name.lower())
 
     except (PermissionError, OSError) as e:
         logger.warning(f"Cannot access directory '{path}': {e}")

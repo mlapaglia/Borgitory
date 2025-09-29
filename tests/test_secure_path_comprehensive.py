@@ -378,8 +378,8 @@ class TestGetDirectoryListing:
 
                 # Should only include directories by default
                 assert len(result) == 1
-                assert result[0]["name"] == "subdir"
-                assert "subdir" in result[0]["path"]
+                assert result[0].name == "subdir"
+                assert "subdir" in result[0].path
 
     def test_get_directory_listing_with_files(self) -> None:
         """Test listing contents including files."""
@@ -397,7 +397,7 @@ class TestGetDirectoryListing:
                 result = get_directory_listing(temp_dir, include_files=True)
 
                 assert len(result) == 2
-                names = [item["name"] for item in result]
+                names = [item.name for item in result]
                 assert "subdir" in names
                 assert "test.txt" in names
 
@@ -444,7 +444,7 @@ class TestGetDirectoryListing:
                 mock_validate.return_value = Path(temp_dir)
 
                 result = get_directory_listing(temp_dir)
-                names = [item["name"] for item in result]
+                names = [item.name for item in result]
                 assert names == ["apple", "banana", "zebra"]
 
 
@@ -528,7 +528,7 @@ class TestUserFacingFunctions:
 
                 result = user_get_directory_listing("/mnt/test")
                 assert len(result) == 1
-                assert result[0]["name"] == "subdir"
+                assert result[0].name == "subdir"
 
     def test_user_get_directory_listing_invalid_path(self) -> None:
         """Test user directory listing for invalid paths."""
@@ -548,7 +548,7 @@ class TestUserFacingFunctions:
 
                 result = user_get_directory_listing("/mnt/test", include_files=True)
                 assert len(result) == 1
-                assert result[0]["name"] == "test.txt"
+                assert result[0].name == "test.txt"
 
     def test_user_get_directory_listing_permission_error(self) -> None:
         """Test handling permission errors in user directory listing."""

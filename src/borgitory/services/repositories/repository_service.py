@@ -22,9 +22,6 @@ from borgitory.models.repository_dtos import (
     ArchiveContentsRequest,
     ArchiveContentsResult,
     DirectoryItem,
-    RepositoryScanRequest,
-    RepositoryScanResult,
-    ScannedRepository,
     DeleteRepositoryRequest,
     DeleteRepositoryResult,
 )
@@ -240,38 +237,6 @@ class RepositoryService:
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
 
-    async def scan_repositories(
-        self, request: RepositoryScanRequest
-    ) -> RepositoryScanResult:
-        """Scan for existing repositories."""
-        try:
-            scan_response = await self.borg_service.scan_for_repositories()
-
-            scanned_repos = []
-            for borg_repo in scan_response.repositories:
-                scanned_repo = ScannedRepository(
-                    name="",  # Borg doesn't provide name, will be set by user
-                    path=borg_repo.path,
-                    encryption_mode=borg_repo.encryption_mode,
-                    requires_keyfile=borg_repo.requires_keyfile,
-                    preview=borg_repo.config_preview,
-                    is_existing=False,  # These are newly discovered repos
-                )
-                scanned_repos.append(scanned_repo)
-
-            return RepositoryScanResult(
-                success=True,
-                repositories=scanned_repos,
-            )
-
-        except Exception as e:
-            logger.error(f"Error scanning for repositories: {e}")
-            return RepositoryScanResult(
-                success=False,
-                repositories=[],
-                error_message=f"Failed to scan repositories: {str(e)}",
-            )
-
     async def list_archives(
         self, repository_id: int, db: Session
     ) -> ArchiveListingResult:
@@ -370,7 +335,7 @@ class RepositoryService:
                 directory_data = directory_data[: request.max_items]
 
             # Extract just the names for the result
-            directories = [item["name"] for item in directory_data]
+            directories = [item.name for item in directory_data]
 
             return DirectoryListingResult(
                 success=True, path=request.path, directories=directories

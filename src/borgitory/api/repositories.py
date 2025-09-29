@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import List
 from fastapi import (
     APIRouter,
     Depends,
@@ -27,7 +27,6 @@ from borgitory.dependencies import (
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
     ImportRepositoryRequest,
-    RepositoryScanRequest,
     DeleteRepositoryRequest,
 )
 from borgitory.utils.datetime_utils import (
@@ -41,6 +40,7 @@ from borgitory.utils.template_responses import (
 from borgitory.api.auth import get_current_user
 from borgitory.utils.secure_path import (
     PathSecurityError,
+    DirectoryInfo,
     # User-facing functions for repos/backup sources (only /mnt)
     user_secure_exists,
     user_secure_isdir,
@@ -56,17 +56,13 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-class DirectoryInfo(BaseModel):
-    """Directory information model"""
-
-    name: str
-    path: str
-
-
 class DirectoryListResponse(BaseModel):
     """Response model for directory listing"""
 
     directories: List[DirectoryInfo]
+
+    class Config:
+        from_attributes = True
 
 
 @router.post("/")
@@ -100,21 +96,6 @@ def list_repositories(
 ) -> List[Repository]:
     repositories = db.query(Repository).offset(skip).limit(limit).all()
     return repositories
-
-
-@router.get("/scan")
-async def scan_repositories(
-    request: Request, repo_svc: RepositoryServiceDep
-) -> HTMLResponse:
-    """Scan for existing repositories - thin controller using business logic service."""
-    # Create scan request
-    scan_request = RepositoryScanRequest()
-
-    # Call business service
-    result = await repo_svc.scan_repositories(scan_request)
-
-    # Handle response formatting
-    return RepositoryResponseHandler.handle_scan_response(request, result)
 
 
 @router.get("/html", response_class=HTMLResponse)
@@ -153,9 +134,8 @@ async def list_directories(path: str = "/mnt") -> DirectoryListResponse:
             return DirectoryListResponse(directories=[])
 
         directories = user_get_directory_listing(path, include_files=False)
-        directory_infos = [DirectoryInfo(**dir_info) for dir_info in directories]
 
-        return DirectoryListResponse(directories=directory_infos)
+        return DirectoryListResponse(directories=directories)
 
     except PathSecurityError as e:
         logger.warning(f"Path security violation: {e}")
@@ -206,7 +186,7 @@ async def list_directories_autocomplete(
 
     try:
         if not user_secure_exists(dir_path):
-            directories: List[Dict[str, str]] = []
+            directories: List[DirectoryInfo] = []
         elif not user_secure_isdir(dir_path):
             directories = []
         else:
@@ -215,7 +195,7 @@ async def list_directories_autocomplete(
         # Filter directories based on search term
         if search_term:
             directories = [
-                d for d in directories if search_term.lower() in d["name"].lower()
+                d for d in directories if search_term.lower() in d.name.lower()
             ]
 
         # Get the target input ID from headers
@@ -255,91 +235,6 @@ async def list_directories_autocomplete(
                 "search_term": search_term,
                 "target_input": "",
                 "error": str(e),
-            },
-        )
-
-
-@router.get("/import-form-update", response_class=HTMLResponse)
-async def update_import_form(
-    request: Request,
-    templates: TemplatesDep,
-    borg_svc: BorgServiceDep,
-    path: str,
-    loading: str = "",
-) -> _TemplateResponse:
-    """Update import form fields based on selected repository path"""
-
-    if not path:
-        return templates.TemplateResponse(
-            request,
-            "partials/repositories/import/import_form_dynamic.html",
-            {
-                "path": "",
-                "show_encryption_info": False,
-                "show_passphrase": False,
-                "show_keyfile": False,
-                "enable_submit": False,
-                "preview": "",
-            },
-        )
-
-    if loading == "true":
-        return templates.TemplateResponse(
-            request,
-            "partials/repositories/import/import_form_loading.html",
-            {
-                "path": path,
-            },
-        )
-
-    try:
-        repository_scan_response = await borg_svc.scan_for_repositories()
-        selected_repo = None
-
-        for repo in repository_scan_response.repositories:
-            if repo.path == path:
-                selected_repo = repo
-                break
-
-        if not selected_repo:
-            logger.warning(f"Repository not found for path: {path}")
-            return templates.TemplateResponse(
-                request,
-                "partials/repositories/import/import_form_dynamic.html",
-                {
-                    "path": path,
-                    "show_encryption_info": True,
-                    "show_passphrase": False,  # Will be shown based on encryption type selection
-                    "show_keyfile": False,  # Will be shown based on encryption type selection
-                    "enable_submit": True,
-                    "preview": "Repository details not found - please re-scan",
-                },
-            )
-
-        # Always use the dynamic form since we can't auto-detect encryption
-        return templates.TemplateResponse(
-            request,
-            "partials/repositories/import/import_form_dynamic.html",
-            {
-                "path": path,
-                "show_encryption_info": True,
-                "show_passphrase": False,  # Will be shown based on encryption type selection
-                "show_keyfile": False,  # Will be shown based on encryption type selection
-                "enable_submit": True,
-                "preview": selected_repo.config_preview,
-            },
-        )
-
-    except Exception as e:
-        logger.error(f"Error updating import form: {e}")
-        return templates.TemplateResponse(
-            request,
-            "partials/repositories/import/import_form_simple.html",
-            {
-                "path": path,
-                "show_passphrase": True,
-                "show_keyfile": True,
-                "preview": "Error loading repository details",
             },
         )
 

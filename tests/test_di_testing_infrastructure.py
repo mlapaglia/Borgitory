@@ -155,12 +155,10 @@ class TestMockServiceFactory:
         mock = MockServiceFactory.create_mock_repository_service()
 
         assert isinstance(mock, Mock)
-        assert hasattr(mock, "scan_repositories")
         assert hasattr(mock, "create_repository")
         assert hasattr(mock, "delete_repository")
 
         # Verify return values
-        assert mock.scan_repositories.return_value == []
         assert mock.delete_repository.return_value is True
 
 

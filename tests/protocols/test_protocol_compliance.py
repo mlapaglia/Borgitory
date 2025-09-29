@@ -167,7 +167,6 @@ class TestProtocolCompliance:
         # Check for key methods
         key_methods = [
             "list_archives",
-            "scan_for_repositories",
             "initialize_repository",
             "verify_repository_access",
         ]
