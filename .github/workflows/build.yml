@@ -73,7 +73,7 @@ jobs:
         fetch-depth: 2
     
     - name: Download test image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: docker-test-x86_64
         path: /tmp
@@ -96,7 +96,7 @@ jobs:
         fetch-depth: 2
     
     - name: Download test image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: docker-test-x86_64
         path: /tmp
@@ -126,7 +126,7 @@ jobs:
         fetch-depth: 2
     
     - name: Download test image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: docker-test-${{ matrix.arch }}
         path: /tmp
@@ -183,7 +183,7 @@ jobs:
         fetch-depth: 2
     
     - name: Download test image
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: docker-test-${{ matrix.arch }}
         path: /tmp
