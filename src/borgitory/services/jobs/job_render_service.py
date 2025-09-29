@@ -100,18 +100,6 @@ class JobDisplayData:
     progress: JobProgress
     error: Optional[str] = None
 
-    @property
-    def started_at_formatted(self) -> str:
-        """Format start time for display"""
-        return self.started_at.strftime("%Y-%m-%d %H:%M") if self.started_at else "N/A"
-
-    @property
-    def finished_at_formatted(self) -> str:
-        """Format finish time for display"""
-        return (
-            self.finished_at.strftime("%Y-%m-%d %H:%M") if self.finished_at else "N/A"
-        )
-
 
 @dataclass
 class TemplateTaskData:
@@ -126,15 +114,6 @@ class TemplateTaskData:
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     return_code: Optional[int]
-
-    # Computed properties for templates
-    @property
-    def started_at_formatted(self) -> str:
-        return self.started_at.strftime("%H:%M:%S") if self.started_at else "N/A"
-
-    @property
-    def completed_at_formatted(self) -> str:
-        return self.completed_at.strftime("%H:%M:%S") if self.completed_at else "N/A"
 
 
 class TemplateJobStatus:
@@ -221,10 +200,8 @@ def convert_to_template_data(
         job_title=job_data.title,
         status_class=job_data.status.css_class,
         status_icon=job_data.status.icon,
-        started_at=job_data.started_at_formatted,  # Keep for backward compatibility
-        finished_at=job_data.finished_at_formatted,  # Keep for backward compatibility
-        started_at_raw=job_data.started_at,  # Add raw datetime for timezone-aware formatting
-        finished_at_raw=job_data.finished_at,  # Add raw datetime for timezone-aware formatting
+        started_at=job_data.started_at,  # Raw datetime for timezone-aware formatting
+        finished_at=job_data.finished_at,  # Raw datetime for timezone-aware formatting
         repository_name=job_data.repository_name,
         sorted_tasks=template_tasks,
         expand_details=expand_details,
