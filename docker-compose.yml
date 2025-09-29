@@ -3,16 +3,22 @@ services:
     build: .
     cap_add:
       - SYS_ADMIN
+    environment:
+      - BORGITORY_DEV_MODE=false
+      - BORGITORY_DEBUG=false
     devices:
       - /dev/fuse:/dev/fuse:rwm
     ports:
       - "8000:8000"   # HTTP port
+      - "5678:5678"   # Debug port
     volumes:
       # Persistent data storage
       - ./local-data:/app/data
       # Borg cache storage
-      - ./local-cache:/mnt/cache:rw
+      - ./local-cache:/cache:rw
       # Mount your backup sources (adjust as needed)
-      - ./backup-sources:/mnt/backup-sources:ro
+      - ./backup-sources:/backup-sources:ro
       # Borg repository storage (where backups are stored)
-      - ./borg-repos:/mnt/my-repos:rw
+      - ./borg-repos:/my-repos:rw
+      # Development: Live reload source code (comment out for production)
+      - ./src:/app/src:ro

@@ -16,12 +16,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml LICENSE README.md MANIFEST.in ./
-COPY src/ ./src/
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir .[dev]
+    pip install --no-cache-dir -e .[dev]
+
+COPY src/ ./src/
 
 FROM python:3.13.7-slim-trixie AS test
 

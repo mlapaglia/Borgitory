@@ -34,12 +34,11 @@ from borgitory.utils.datetime_utils import (
 )
 from borgitory.utils.secure_path import (
     create_secure_filename,
+    get_directory_listing,
+    secure_exists,
+    secure_isdir,
     secure_path_join,
     secure_remove_file,
-    PathSecurityError,
-    user_secure_exists,
-    user_secure_isdir,
-    user_get_directory_listing,
 )
 from borgitory.utils.security import secure_borg_command
 
@@ -317,17 +316,17 @@ class RepositoryService:
     ) -> DirectoryListingResult:
         """List directories at the given path."""
         try:
-            if not user_secure_exists(request.path):
+            if not secure_exists(request.path):
                 return DirectoryListingResult(
                     success=True, path=request.path, directories=[]
                 )
 
-            if not user_secure_isdir(request.path):
+            if not secure_isdir(request.path):
                 return DirectoryListingResult(
                     success=True, path=request.path, directories=[]
                 )
 
-            directory_data = user_get_directory_listing(
+            directory_data = get_directory_listing(
                 request.path, include_files=request.include_files
             )
 
@@ -341,11 +340,6 @@ class RepositoryService:
                 success=True, path=request.path, directories=directories
             )
 
-        except PathSecurityError as e:
-            logger.warning(f"Path security violation: {e}")
-            return DirectoryListingResult(
-                success=True, path=request.path, directories=[]
-            )
         except Exception as e:
             logger.error(f"Error listing directories at {request.path}: {e}")
             return DirectoryListingResult(
@@ -565,29 +559,23 @@ class RepositoryService:
         self, repository_name: str, keyfile: KeyfileProtocol
     ) -> KeyfileSaveResult:
         """Save uploaded keyfile securely."""
-        try:
-            keyfiles_dir = "/app/data/keyfiles"
-            os.makedirs(keyfiles_dir, exist_ok=True)
+        keyfiles_dir = "/app/data/keyfiles"
+        os.makedirs(keyfiles_dir, exist_ok=True)
 
-            safe_filename = create_secure_filename(
-                repository_name, keyfile.filename or "keyfile", add_uuid=True
-            )
-            keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
+        safe_filename = create_secure_filename(
+            repository_name, keyfile.filename or "keyfile", add_uuid=True
+        )
+        keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
 
-            with open(keyfile_path, "wb") as f:
-                content = await keyfile.read()
-                f.write(content)
+        with open(keyfile_path, "wb") as f:
+            content = await keyfile.read()
+            f.write(content)
 
-            logger.info(
-                f"Saved keyfile for repository '{repository_name}' at {keyfile_path}"
-            )
+        logger.info(
+            f"Saved keyfile for repository '{repository_name}' at {keyfile_path}"
+        )
 
-            return {"success": True, "path": keyfile_path}
-
-        except (PathSecurityError, OSError) as e:
-            error_message = f"Failed to save keyfile: {str(e)}"
-            logger.error(error_message)
-            return {"success": False, "error": error_message}
+        return {"success": True, "path": keyfile_path}
 
     async def check_repository_lock_status(
         self, repository: Repository

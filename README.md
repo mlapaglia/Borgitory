@@ -35,8 +35,8 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
    docker run -d \
      -p 8000:8000 \
      -v ./data:/app/data \
-     -v /path/to/backup/sources:/mnt/backup/sources:ro \
-     -v /path/to/borg/repos:/mnt/repos \
+     -v /path/to/backup/sources:/backup/sources:ro \
+     -v /path/to/borg/repos:/repos \
      --cap-add SYS_ADMIN \
      --device /dev/fuse \
      --name borgitory \
@@ -54,16 +54,14 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
          - "8000:8000"
        volumes:
          - ./data:/app/data # database and encryption key location
-         - /path/to/backup/sources:/mnt/sources:ro
-         - /path/to/any/backup/repos:/mnt/repos:ro
+         - /path/to/backup/sources:/sources:ro
+         - /path/to/any/backup/repos:/repos:ro
        cap_add:
          - SYS_ADMIN # optional, needed to mount borg archives and browse them
        devices:
          - /dev/fuse # borg uses FUSE to mount archives
        restart: unless-stopped
    ```
-
-   **Important**: All volumes must be mounted under `/mnt/` to be visible in the application
 
    ```bash
    docker-compose up -d

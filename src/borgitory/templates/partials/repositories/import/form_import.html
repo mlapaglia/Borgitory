@@ -24,7 +24,7 @@
                     {% set input_id = "import-path" %}
                     {% set input_name = "path" %}
                     {% set input_value = "" %}
-                    {% set placeholder = "/mnt/repos/my-repo" %}
+                    {% set placeholder = "/repos/my-repo" %}
                     {% set required = true %}
                     {% include "partials/shared/path_autocomplete.html" %}
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Enter the full path to your existing Borg repository</p>
@@ -35,7 +35,7 @@
                     {% set input_id = "import-cache-dir" %}
                     {% set input_name = "cache_dir" %}
                     {% set input_value = "" %}
-                    {% set placeholder = "/mnt/cache/borg" %}
+                    {% set placeholder = "/cache/borg" %}
                     {% set required = false %}
                     {% include "partials/shared/path_autocomplete.html" %}
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Custom cache directory for this repository (optional)</p>

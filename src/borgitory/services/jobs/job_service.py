@@ -64,7 +64,6 @@ class JobService:
                 error="Repository not found", error_code="REPOSITORY_NOT_FOUND"
             )
 
-        # Use TaskDefinitionBuilder to create all task definitions
         builder = TaskDefinitionBuilder(self.db)
 
         backup_params: ConfigDict = {

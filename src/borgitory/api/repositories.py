@@ -39,15 +39,12 @@ from borgitory.utils.template_responses import (
 )
 from borgitory.api.auth import get_current_user
 from borgitory.utils.secure_path import (
-    PathSecurityError,
     DirectoryInfo,
-    # User-facing functions for repos/backup sources (only /mnt)
-    user_secure_exists,
-    user_secure_isdir,
-    user_get_directory_listing,
+    secure_exists,
+    secure_isdir,
+    get_directory_listing,
 )
 from borgitory.utils.path_prefix import (
-    normalize_path_with_mnt_prefix,
     parse_path_for_autocomplete,
 )
 from starlette.templating import _TemplateResponse
@@ -123,23 +120,19 @@ def get_repositories_html(
 
 
 @router.get("/directories", response_model=DirectoryListResponse)
-async def list_directories(path: str = "/mnt") -> DirectoryListResponse:
-    """List directories at the given path for autocomplete functionality. All paths must be under /mnt."""
+async def list_directories(path: str = "/") -> DirectoryListResponse:
+    """List directories at the given path for autocomplete functionality."""
 
     try:
-        if not user_secure_exists(path):
+        if not secure_exists(path):
             return DirectoryListResponse(directories=[])
 
-        if not user_secure_isdir(path):
+        if not secure_isdir(path):
             return DirectoryListResponse(directories=[])
 
-        directories = user_get_directory_listing(path, include_files=False)
+        directories = get_directory_listing(path, include_files=False)
 
         return DirectoryListResponse(directories=directories)
-
-    except PathSecurityError as e:
-        logger.warning(f"Path security violation: {e}")
-        return DirectoryListResponse(directories=[])
 
     except Exception as e:
         logger.error(f"Error listing directories at {path}: {e}")
@@ -178,19 +171,19 @@ async def list_directories_autocomplete(
             input_value = str(form_data.get(param_name, ""))
             break
 
-    # Normalize the path with /mnt/ prefix
-    normalized_path = normalize_path_with_mnt_prefix(str(input_value))
+    if not input_value:
+        input_value = "/"
 
     # Parse the normalized path to get directory and search term
-    dir_path, search_term = parse_path_for_autocomplete(normalized_path)
+    dir_path, search_term = parse_path_for_autocomplete(input_value)
 
     try:
-        if not user_secure_exists(dir_path):
+        if not secure_exists(dir_path):
             directories: List[DirectoryInfo] = []
-        elif not user_secure_isdir(dir_path):
+        elif not secure_isdir(dir_path):
             directories = []
         else:
-            directories = user_get_directory_listing(dir_path, include_files=False)
+            directories = get_directory_listing(dir_path, include_files=False)
 
         # Filter directories based on search term
         if search_term:
@@ -208,20 +201,7 @@ async def list_directories_autocomplete(
                 "directories": directories,
                 "search_term": search_term,
                 "target_input": target_input,
-                "input_value": normalized_path,
-            },
-        )
-
-    except PathSecurityError as e:
-        logger.warning(f"Path security violation: {e}")
-        return templates.TemplateResponse(
-            request,
-            "partials/shared/path_autocomplete_dropdown.html",
-            {
-                "directories": [],
-                "search_term": search_term,
-                "target_input": "",
-                "error": str(e),
+                "input_value": input_value,
             },
         )
 
@@ -287,30 +267,19 @@ async def import_repository(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
-    from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
-
-    # Normalize both path and cache_dir the same way as path normalization in schemas
-    normalized_path = normalize_path_with_mnt_prefix(path.strip())
-
-    normalized_cache_dir = None
-    if cache_dir and cache_dir.strip():
-        normalized_cache_dir = normalize_path_with_mnt_prefix(cache_dir.strip())
-
     import_request = ImportRepositoryRequest(
         name=name,
-        path=normalized_path,
+        path=path.strip(),
         passphrase=passphrase,
         keyfile=keyfile,
         encryption_type=encryption_type,
         keyfile_content=keyfile_content,
         user_id=None,  # Import doesn't require user ID currently
-        cache_dir=normalized_cache_dir,
+        cache_dir=cache_dir.strip(),
     )
 
-    # Call business service
     result = await repo_svc.import_repository(import_request, db)
 
-    # Handle response formatting
     return RepositoryResponseHandler.handle_import_response(request, result)
 
 

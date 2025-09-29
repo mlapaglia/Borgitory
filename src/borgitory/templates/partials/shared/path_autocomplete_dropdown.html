@@ -11,12 +11,7 @@
         event.stopPropagation();
         const targetInput = document.getElementById('{{ target_input }}');
         if (targetInput) {
-            let path = this.dataset.path;
-            // Remove /mnt/ prefix if present
-            if (path.startsWith('/mnt/')) {
-                path = path.substring(5);
-            }
-            targetInput.value = path;
+            targetInput.value = this.dataset.path;
             // Trigger the autocomplete request manually with the new value
             htmx.trigger(targetInput, 'input');
         }
@@ -51,7 +46,7 @@
             </span>
         {% endif %}
     </div>
-    <div class="text-xs {% if dir.is_borg_repo %}text-blue-600 dark:text-blue-300{% elif dir.is_borg_cache %}text-green-600 dark:text-green-300{% else %}text-gray-500 dark:text-gray-400{% endif %} ml-6 break-words overflow-hidden">{{ dir.path[5:] if dir.path.startswith('/mnt/') else dir.path }}</div>
+    <div class="text-xs {% if dir.is_borg_repo %}text-blue-600 dark:text-blue-300{% elif dir.is_borg_cache %}text-green-600 dark:text-green-300{% else %}text-gray-500 dark:text-gray-400{% endif %} ml-6 break-words overflow-hidden">{{ dir.path }}</div>
 </div>
 {% endfor %}
 {% else %}

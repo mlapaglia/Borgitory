@@ -94,14 +94,6 @@ class BorgService:
                         repository_path=repository.path,
                     )
                 else:
-                    # Check if it's just because repo already exists
-                    if "already exists" in result.stderr.lower():
-                        logger.info("Repository already exists, which is fine")
-                        return RepositoryInitializationResult.success_result(
-                            "Repository already exists", repository_path=repository.path
-                        )
-
-                    # Return the actual error from borg
                     error_msg = (
                         result.stderr.strip()
                         or result.stdout.strip()

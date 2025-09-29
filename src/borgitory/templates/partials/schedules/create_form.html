@@ -24,8 +24,7 @@
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Source Path</label>
                 {% set input_id = "schedule-source-path" %}
                 {% set input_name = "source_path" %}
-                {% set input_value = "/mnt/" %}
-                {% set placeholder = "Enter path for scheduled backups" %}
+                {% set placeholder = "/path/to/data" %}
                 {% set required = false %}
                 {% include "partials/shared/path_autocomplete.html" %}
             </div>

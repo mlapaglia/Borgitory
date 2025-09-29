@@ -34,7 +34,9 @@ class UpcomingBackupsService:
     def __init__(self, cron_description_service: CronDescriptionService) -> None:
         self.cron_description_service = cron_description_service
 
-    def process_jobs(self, jobs_raw: List[Dict[str, object]]) -> List[Dict[str, str | datetime]]:
+    def process_jobs(
+        self, jobs_raw: List[Dict[str, object]]
+    ) -> List[Dict[str, str | datetime]]:
         """Process raw job data into formatted upcoming backup information."""
         processed_jobs = []
 
@@ -45,7 +47,9 @@ class UpcomingBackupsService:
 
         return processed_jobs
 
-    def _process_single_job(self, job: Dict[str, object]) -> Dict[str, str | datetime] | None:
+    def _process_single_job(
+        self, job: Dict[str, object]
+    ) -> Dict[str, str | datetime] | None:
         """Process a single job into formatted data."""
         try:
             next_run_val = job.get("next_run")

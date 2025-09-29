@@ -19,37 +19,31 @@ class VolumeInfo(TypedDict, total=False):
 
 
 class VolumeService:
-    """Service to discover mounted volumes under /mnt"""
+    """Service to discover mounted volumes under /"""
 
     def __init__(self, filesystem: Optional[FileSystemInterface] = None) -> None:
         self.filesystem = filesystem or OsFileSystem()
 
     async def get_mounted_volumes(self) -> List[str]:
-        """Get list of directories under /mnt (user-mounted volumes)"""
+        """Get list of directories under / (user-mounted volumes)"""
         try:
-            mnt_path = "/mnt"
+            root_dir = "/"
             mounted_volumes = []
 
-            if not self.filesystem.exists(mnt_path) or not self.filesystem.is_dir(
-                mnt_path
-            ):
-                logger.info("No /mnt directory found")
-                return []
-
-            for item in self.filesystem.listdir(mnt_path):
-                item_path = self.filesystem.join(mnt_path, item)
+            for item in self.filesystem.listdir(root_dir):
+                item_path = self.filesystem.join(root_dir, item)
                 if self.filesystem.is_dir(item_path):
                     mounted_volumes.append(item_path)
 
             mounted_volumes.sort()
 
             logger.info(
-                f"Found {len(mounted_volumes)} mounted volumes under /mnt: {mounted_volumes}"
+                f"Found {len(mounted_volumes)} mounted volumes under /: {mounted_volumes}"
             )
             return mounted_volumes
 
         except Exception as e:
-            logger.error(f"Error discovering mounted volumes under /mnt: {e}")
+            logger.error(f"Error discovering mounted volumes under /: {e}")
             return []
 
     async def get_volume_info(self) -> VolumeInfo:
