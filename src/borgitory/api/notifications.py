@@ -84,9 +84,7 @@ async def get_provider_fields(
                 if key not in ["provider", "mode"]:
                     context[key] = value
 
-        return HTMLResponse(
-            templates.get_template(template_path).render(request=request, **context)
-        )
+        return templates.TemplateResponse(request, template_path, context)
     except Exception as e:
         logger.error(f"Error rendering provider template {template_path}: {e}")
         return HTMLResponse(

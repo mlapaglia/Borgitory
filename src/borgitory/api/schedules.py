@@ -178,6 +178,7 @@ def get_schedules_html(
 
 @router.get("/upcoming/html", response_class=HTMLResponse)
 async def get_upcoming_backups_html(
+    request: Request,
     templates: TemplatesDep,
     scheduler_service: SchedulerServiceDep,
     upcoming_backups_service: UpcomingBackupsServiceDep,
@@ -189,10 +190,10 @@ async def get_upcoming_backups_html(
             cast(List[Dict[str, object]], jobs_raw)
         )
 
-        return HTMLResponse(
-            templates.get_template(
-                "partials/schedules/upcoming_backups_content.html"
-            ).render(jobs=processed_jobs)
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/upcoming_backups_content.html",
+            {"jobs": processed_jobs},
         )
 
     except Exception as e:
@@ -430,13 +431,14 @@ async def run_schedule_manually(
 
 @router.get("/jobs/active", response_class=HTMLResponse)
 async def get_active_scheduled_jobs(
+    request: Request,
     templates: TemplatesDep,
     scheduler_service: SchedulerServiceDep,
 ) -> HTMLResponse:
     """Get all active scheduled jobs"""
     jobs = await scheduler_service.get_scheduled_jobs()
-    return HTMLResponse(
-        templates.get_template("partials/schedules/active_jobs.html").render(jobs=jobs)
+    return templates.TemplateResponse(
+        request, "partials/schedules/active_jobs.html", {"jobs": jobs}
     )
 
 

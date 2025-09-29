@@ -8,6 +8,8 @@ and does not include the spinner animation.
 import pytest
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
+from datetime import datetime
+from borgitory.dependencies import datetime_browser_filter
 
 
 class TestCurrentJobsTemplate:
@@ -19,7 +21,10 @@ class TestCurrentJobsTemplate:
         template_dir = (
             Path(__file__).parent.parent.parent / "src" / "borgitory" / "templates"
         )
-        return Environment(loader=FileSystemLoader(str(template_dir)))
+        env = Environment(loader=FileSystemLoader(str(template_dir)))
+        # Register the custom datetime filter
+        env.filters["format_datetime_browser"] = datetime_browser_filter
+        return env
 
     @pytest.fixture
     def sample_job_data(self) -> list[dict]:
@@ -29,14 +34,14 @@ class TestCurrentJobsTemplate:
                 "id": "test-job-123",
                 "type": "Backup",
                 "status": "running",
-                "started_at": "10:30:45",
+                "started_at": datetime(2025, 9, 29, 10, 30, 45),
                 "progress_info": "Task 1/3",
             },
             {
                 "id": "test-job-456",
                 "type": "Cleanup",
                 "status": "running",
-                "started_at": "10:32:12",
+                "started_at": datetime(2025, 9, 29, 10, 32, 12),
                 "progress_info": "Pruning archives",
             },
         ]
@@ -51,6 +56,7 @@ class TestCurrentJobsTemplate:
             current_jobs=sample_job_data,
             message="No operations currently running.",
             padding="4",
+            browser_tz_offset=0,  # Add browser timezone offset for the filter
         )
 
         # Verify spinner classes are NOT present
@@ -66,7 +72,7 @@ class TestCurrentJobsTemplate:
         assert "test-job-456" in rendered, "Should render second job ID"
         assert "Backup" in rendered, "Should render job types"
         assert "Cleanup" in rendered, "Should render job types"
-        assert "10:30:45" in rendered, "Should render start times"
+        assert "2025-09-29 10:30:45" in rendered, "Should render formatted start times"
         assert "Task 1/3" in rendered, "Should render progress info"
 
     def test_current_jobs_template_with_no_jobs(self, jinja_env: Environment) -> None:
@@ -74,7 +80,10 @@ class TestCurrentJobsTemplate:
         template = jinja_env.get_template("partials/jobs/current_jobs_list.html")
 
         rendered = template.render(
-            current_jobs=[], message="No operations currently running.", padding="4"
+            current_jobs=[],
+            message="No operations currently running.",
+            padding="4",
+            browser_tz_offset=0,
         )
 
         # Should include empty state
@@ -95,6 +104,7 @@ class TestCurrentJobsTemplate:
             current_jobs=sample_job_data,
             message="No operations currently running.",
             padding="4",
+            browser_tz_offset=0,
         )
 
         # Verify expected HTML structure
@@ -118,7 +128,7 @@ class TestCurrentJobsTemplate:
                 "id": "test-job-789",
                 "type": "Check",
                 "status": "running",
-                "started_at": "11:00:00",
+                "started_at": datetime(2025, 9, 29, 11, 0, 0),
                 "progress_info": None,  # No progress info
             }
         ]
@@ -129,12 +139,13 @@ class TestCurrentJobsTemplate:
             current_jobs=job_data,
             message="No operations currently running.",
             padding="4",
+            browser_tz_offset=0,
         )
 
         # Should render without error
         assert "test-job-789" in rendered, "Should render job ID"
         assert "Check" in rendered, "Should render job type"
-        assert "11:00:00" in rendered, "Should render start time"
+        assert "2025-09-29 11:00:00" in rendered, "Should render formatted start time"
 
         # Should not contain spinner
         assert "animate-spin" not in rendered, "Should not contain spinner"
@@ -155,7 +166,10 @@ class TestCurrentJobsTemplate:
         # Now test that main template includes it properly
         main_template = jinja_env.get_template("partials/jobs/current_jobs_list.html")
         main_rendered = main_template.render(
-            current_jobs=[], message="No operations currently running.", padding="4"
+            current_jobs=[],
+            message="No operations currently running.",
+            padding="4",
+            browser_tz_offset=0,
         )
 
         # Should contain the empty state content

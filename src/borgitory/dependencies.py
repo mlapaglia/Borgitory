@@ -75,14 +75,36 @@ from borgitory.services.repositories.repository_check_config_service import (
 from borgitory.services.prune_service import PruneService
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
+from borgitory.services.jobs.job_executor import JobExecutor
+from borgitory.services.jobs.job_output_manager import JobOutputManager
+from borgitory.services.jobs.job_queue_manager import JobQueueManager
+from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 from fastapi.templating import Jinja2Templates
 from starlette.templating import _TemplateResponse
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
     get_server_timezone,
 )
+
+
 from fastapi import Request
 from datetime import datetime, timedelta
+
+
+def datetime_browser_filter(
+    dt: datetime,
+    format_str: str = "%Y-%m-%d %H:%M:%S",
+    tz_offset: Optional[int] = None,
+) -> str:
+    """Jinja2 filter for datetime formatting with browser timezone conversion"""
+    if tz_offset is not None:
+        return format_datetime_for_display(
+            dt, format_str, browser_tz_offset_minutes=tz_offset
+        )
+    else:
+        # Fallback to server timezone when no browser offset available
+        return format_datetime_for_display(dt, format_str, get_server_timezone())
+
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncConfigService
@@ -100,11 +122,6 @@ if TYPE_CHECKING:
     from borgitory.services.repositories.repository_stats_service import (
         CommandExecutorInterface,
     )
-    from borgitory.services.jobs.job_manager import JobManagerConfig
-from borgitory.services.jobs.job_executor import JobExecutor
-from borgitory.services.jobs.job_output_manager import JobOutputManager
-from borgitory.services.jobs.job_queue_manager import JobQueueManager
-from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
 
 def get_subprocess_executor() -> Callable[
@@ -487,15 +504,7 @@ def get_templates() -> TimezoneAwareJinja2Templates:
         """Jinja2 filter for datetime formatting with timezone conversion"""
         return format_datetime_for_display(dt, format_str, get_server_timezone())
 
-    def datetime_browser_filter(
-        dt: datetime,
-        format_str: str = "%Y-%m-%d %H:%M:%S",
-        tz_offset: Optional[int] = None,
-    ) -> str:
-        """Jinja2 filter for datetime formatting with browser timezone conversion"""
-        return format_datetime_for_display(
-            dt, format_str, browser_tz_offset_minutes=tz_offset
-        )
+    # Use the standalone datetime_browser_filter function
 
     def from_json_filter(json_str: str) -> List[Any]:
         """Jinja2 filter for parsing JSON strings"""

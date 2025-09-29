@@ -10,7 +10,7 @@
                         <span class="text-blue-700 text-sm">#{{ job.id }}</span>
                     </div>
                     <div class="text-xs text-blue-600 mt-1">
-                        Started: {{ job.started_at }}{% if job.progress_info %} | {{ job.progress_info }}{% endif %}
+                        Started: {{ job.started_at | format_datetime_browser("%Y-%m-%d %H:%M:%S", browser_tz_offset) if job.started_at else "N/A" }}{% if job.progress_info %} | {{ job.progress_info }}{% endif %}
                     </div>
                 </div>
             </div>

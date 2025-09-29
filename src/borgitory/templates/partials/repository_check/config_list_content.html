@@ -26,7 +26,7 @@
                     {% if config.save_space %}<span class="text-green-600 ml-2">💾 Save Space</span>{% endif %}
                     {% if not config.verify_data and not config.repair_mode and not config.save_space %}<span class="text-gray-500">None</span>{% endif %}
                 </div>
-                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ config.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ config.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) }}</div>
             </div>
         </div>
         <div class="flex flex-col space-y-2 ml-4">

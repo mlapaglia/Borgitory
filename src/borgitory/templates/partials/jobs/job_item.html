@@ -15,9 +15,9 @@
                     </span>
                 </div>
                 <div class="mt-2 text-xs text-gray-500 dark:text-gray-400 space-x-4">
-                    <span>Started: {{ started_at }}</span>
+                    <span>Started: {{ job.started_at | format_datetime_browser("%Y-%m-%d %H:%M:%S", browser_tz_offset) if job.started_at else "N/A" }}</span>
                     {% if job.finished_at %}
-                        <span>Finished: {{ finished_at }}</span>
+                        <span>Finished: {{ job.finished_at | format_datetime_browser("%Y-%m-%d %H:%M:%S", browser_tz_offset) }}</span>
                     {% endif %}
                     {% if job.error %}
                         <span class="text-red-600">Error: {{ job.error }}</span>
