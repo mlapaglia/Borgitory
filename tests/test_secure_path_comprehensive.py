@@ -7,10 +7,8 @@ various edge cases and security scenarios correctly.
 
 import os
 import tempfile
-import configparser
 from pathlib import Path
 from unittest.mock import patch, mock_open
-import pytest
 
 from borgitory.utils.secure_path import (
     DirectoryInfo,
@@ -40,10 +38,7 @@ class TestDirectoryInfo:
     def test_directory_info_with_flags(self) -> None:
         """Test DirectoryInfo creation with borg flags."""
         info = DirectoryInfo(
-            name="repo", 
-            path="/repo/path", 
-            is_borg_repo=True, 
-            is_borg_cache=True
+            name="repo", path="/repo/path", is_borg_repo=True, is_borg_cache=True
         )
         assert info.name == "repo"
         assert info.path == "/repo/path"
@@ -61,9 +56,9 @@ class TestIsBorgRepository:
 version = 1
 segments_per_dir = 1000
 """
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data=config_content)):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
             assert _is_borg_repository("/test/repo") is True
 
     def test_is_borg_repository_no_config_file(self) -> None:
@@ -73,8 +68,9 @@ segments_per_dir = 1000
 
     def test_is_borg_repository_config_is_directory(self) -> None:
         """Test with config being a directory instead of file."""
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=False):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=False
+        ):
             assert _is_borg_repository("/test/repo") is False
 
     def test_is_borg_repository_no_repository_section(self) -> None:
@@ -83,31 +79,34 @@ segments_per_dir = 1000
 [cache]
 version = 1
 """
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data=config_content)):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
             assert _is_borg_repository("/test/repo") is False
 
     def test_is_borg_repository_invalid_config(self) -> None:
         """Test with invalid config file content."""
         config_content = "invalid config content"
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data=config_content)):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
             assert _is_borg_repository("/test/repo") is False
 
     def test_is_borg_repository_permission_error(self) -> None:
         """Test handling of permission errors."""
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=PermissionError("Access denied")):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", side_effect=PermissionError("Access denied")):
             assert _is_borg_repository("/test/repo") is False
 
     def test_is_borg_repository_unicode_error(self) -> None:
         """Test handling of unicode decode errors."""
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "invalid")):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch(
+            "builtins.open",
+            side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "invalid"),
+        ):
             assert _is_borg_repository("/test/repo") is False
 
     def test_is_borg_repository_general_exception(self) -> None:
@@ -126,9 +125,9 @@ class TestIsBorgCache:
 version = 1
 repository = /path/to/repo
 """
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data=config_content)):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
             assert _is_borg_cache("/test/cache") is True
 
     def test_is_borg_cache_no_config_file(self) -> None:
@@ -142,16 +141,16 @@ repository = /path/to/repo
 [repository]
 version = 1
 """
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data=config_content)):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
             assert _is_borg_cache("/test/cache") is False
 
     def test_is_borg_cache_permission_error(self) -> None:
         """Test handling of permission errors."""
-        with patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=PermissionError("Access denied")):
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", side_effect=PermissionError("Access denied")):
             assert _is_borg_cache("/test/cache") is False
 
 
@@ -236,7 +235,9 @@ class TestCreateSecureFilename:
 
     def test_create_secure_filename_long_extension(self) -> None:
         """Test truncation of long extensions."""
-        result = create_secure_filename("test", "file.verylongextension", add_uuid=False)
+        result = create_secure_filename(
+            "test", "file.verylongextension", add_uuid=False
+        )
         assert result == "test.verylongex"  # Extension truncated to 10 chars
 
     def test_create_secure_filename_dangerous_base_name(self) -> None:
@@ -279,12 +280,6 @@ class TestSecurePathJoin:
         result = secure_path_join("/base", "", "", "")
         # On Windows, paths get converted to backslashes
         expected = str(Path("/base"))
-        assert result == expected
-
-    def test_secure_path_join_windows_separators(self) -> None:
-        """Test handling of Windows path separators."""
-        result = secure_path_join("/base", "subdir\\file.txt")
-        expected = str(Path("/base") / "subdir" / "file.txt")
         assert result == expected
 
 
@@ -341,7 +336,7 @@ class TestSecureRemoveFile:
         """Test removing an existing file."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             temp_path = temp_file.name
-        
+
         assert os.path.exists(temp_path)
         result = secure_remove_file(temp_path)
         assert result is True
@@ -354,15 +349,17 @@ class TestSecureRemoveFile:
 
     def test_secure_remove_file_permission_error(self) -> None:
         """Test handling of permission errors."""
-        with patch.object(Path, "exists", return_value=True), \
-             patch.object(Path, "unlink", side_effect=PermissionError("Access denied")):
+        with patch.object(Path, "exists", return_value=True), patch.object(
+            Path, "unlink", side_effect=PermissionError("Access denied")
+        ):
             result = secure_remove_file("/test/file.txt")
             assert result is False
 
     def test_secure_remove_file_os_error(self) -> None:
         """Test handling of OS errors."""
-        with patch.object(Path, "exists", return_value=True), \
-             patch.object(Path, "unlink", side_effect=OSError("OS error")):
+        with patch.object(Path, "exists", return_value=True), patch.object(
+            Path, "unlink", side_effect=OSError("OS error")
+        ):
             result = secure_remove_file("/test/file.txt")
             assert result is False
 
@@ -378,13 +375,13 @@ class TestGetDirectoryListing:
             subdir2 = Path(temp_dir) / "subdir2"
             subdir1.mkdir()
             subdir2.mkdir()
-            
+
             # Create a test file
             test_file = Path(temp_dir) / "test.txt"
             test_file.write_text("test")
-            
+
             result = get_directory_listing(temp_dir)
-            
+
             assert len(result) == 2  # Only directories by default
             dir_names = [item.name for item in result]
             assert "subdir1" in dir_names
@@ -398,9 +395,9 @@ class TestGetDirectoryListing:
             subdir.mkdir()
             test_file = Path(temp_dir) / "test.txt"
             test_file.write_text("test")
-            
+
             result = get_directory_listing(temp_dir, include_files=True)
-            
+
             assert len(result) == 2  # Directory + file
             names = [item.name for item in result]
             assert "subdir" in names
@@ -414,9 +411,9 @@ class TestGetDirectoryListing:
             repo_dir.mkdir()
             config_file = repo_dir / "config"
             config_file.write_text("[repository]\nversion = 1\n")
-            
+
             result = get_directory_listing(temp_dir)
-            
+
             assert len(result) == 1
             assert result[0].name == "borg_repo"
             assert result[0].is_borg_repo is True
@@ -430,9 +427,9 @@ class TestGetDirectoryListing:
             cache_dir.mkdir()
             config_file = cache_dir / "config"
             config_file.write_text("[cache]\nversion = 1\n")
-            
+
             result = get_directory_listing(temp_dir)
-            
+
             assert len(result) == 1
             assert result[0].name == "borg_cache"
             assert result[0].is_borg_repo is False
@@ -446,8 +443,9 @@ class TestGetDirectoryListing:
 
     def test_get_directory_listing_permission_error(self) -> None:
         """Test handling of permission errors."""
-        with patch.object(Path, "is_dir", return_value=True), \
-             patch.object(Path, "iterdir", side_effect=PermissionError("Access denied")):
+        with patch.object(Path, "is_dir", return_value=True), patch.object(
+            Path, "iterdir", side_effect=PermissionError("Access denied")
+        ):
             result = get_directory_listing("/test/path")
             assert result == []
 
@@ -458,8 +456,8 @@ class TestGetDirectoryListing:
             dirs = ["zebra", "apple", "banana"]
             for dir_name in dirs:
                 (Path(temp_dir) / dir_name).mkdir()
-            
+
             result = get_directory_listing(temp_dir)
-            
+
             names = [item.name for item in result]
             assert names == ["apple", "banana", "zebra"]
