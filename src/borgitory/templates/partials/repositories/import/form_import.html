@@ -43,7 +43,12 @@
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Encryption Type</label>
-                    <select name="encryption_type" class="input-modern mt-1" onchange="toggleImportFields(this.value)">
+                    <select name="encryption_type" 
+                            class="input-modern mt-1"
+                            hx-get="/api/repositories/import-encryption-fields"
+                            hx-target="#encryption-fields-container"
+                            hx-trigger="change"
+                            hx-include="this">
                         <option value="">Select encryption type...</option>
                         <option value="repokey">Repository Key (repokey)</option>
                         <option value="keyfile">External Keyfile (keyfile)</option>
@@ -52,15 +57,9 @@
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Choose the encryption method used by your repository</p>
                 </div>
                 
-                <div id="passphrase-field" class="hidden">
-                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Passphrase</label>
-                    <input type="password" name="passphrase" class="input-modern mt-1" placeholder="Enter repository passphrase">
-                </div>
-                
-                <div id="keyfile-field" class="hidden">
-                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Keyfile</label>
-                    <input type="file" name="keyfile" accept=".key" class="input-modern mt-1">
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Upload the Borg keyfile (usually has .key extension)</p>
+                <!-- Container for dynamic encryption fields -->
+                <div id="encryption-fields-container">
+                    <!-- Fields will be loaded here via HTMX -->
                 </div>
                 
                 <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
@@ -76,23 +75,3 @@
         </form>
     </div>
 </div>
-
-<script>
-function toggleImportFields(encryptionType) {
-    const passphraseField = document.getElementById('passphrase-field');
-    const keyfileField = document.getElementById('keyfile-field');
-    
-    // Hide both fields initially
-    passphraseField.classList.add('hidden');
-    keyfileField.classList.add('hidden');
-    
-    // Show appropriate fields based on encryption type
-    if (encryptionType === 'repokey') {
-        passphraseField.classList.remove('hidden');
-    } else if (encryptionType === 'keyfile') {
-        passphraseField.classList.remove('hidden');
-        keyfileField.classList.remove('hidden');
-    }
-    // For 'none' encryption, no additional fields needed
-}
-</script>

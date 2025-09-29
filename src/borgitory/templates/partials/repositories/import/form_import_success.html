@@ -5,16 +5,9 @@
      hx-trigger="load">
 </div>
 
-<!-- Clear the selected form and reset scan results -->
-<div hx-get="/api/repositories/import-form-clear"
-     hx-target="#selected-repo-form"
+<!-- Clear the import form -->
+<div hx-get="/api/repositories/import-form"
+     hx-target="#import-form-container"
      hx-swap="innerHTML"
      hx-trigger="load delay:100ms">
-</div>
-
-<!-- Reset scan results dropdown -->
-<div hx-get="/api/repositories/scan"
-     hx-target="#scan-results"
-     hx-swap="innerHTML"
-     hx-trigger="load delay:200ms">
 </div>

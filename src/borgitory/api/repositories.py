@@ -249,23 +249,17 @@ async def get_import_form(
     )
 
 
-@router.get("/import-form-inner", response_class=HTMLResponse)
-async def get_import_form_inner(
-    request: Request, templates: TemplatesDep
+@router.get("/import-encryption-fields", response_class=HTMLResponse)
+async def get_import_encryption_fields(
+    request: Request,
+    templates: TemplatesDep,
+    encryption_type: str = "",
 ) -> _TemplateResponse:
-    """Get the import repository form inner content (preserves tab state)"""
+    """Get the appropriate encryption fields based on encryption type selection."""
     return templates.TemplateResponse(
-        request, "partials/repositories/import/form_import_inner.html"
-    )
-
-
-@router.get("/import-form-clear", response_class=HTMLResponse)
-async def get_import_form_clear(
-    request: Request, templates: TemplatesDep
-) -> _TemplateResponse:
-    """Clear the selected repository form after successful import"""
-    return templates.TemplateResponse(
-        request, "partials/repositories/import/import_form_clear.html"
+        request,
+        "partials/repositories/import/encryption_fields.html",
+        {"encryption_type": encryption_type},
     )
 
 
@@ -293,16 +287,18 @@ async def import_repository(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
-    # Normalize cache_dir the same way as path normalization in schemas
+    from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
+
+    # Normalize both path and cache_dir the same way as path normalization in schemas
+    normalized_path = normalize_path_with_mnt_prefix(path.strip())
+
     normalized_cache_dir = None
     if cache_dir and cache_dir.strip():
-        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
-
         normalized_cache_dir = normalize_path_with_mnt_prefix(cache_dir.strip())
 
     import_request = ImportRepositoryRequest(
         name=name,
-        path=path,
+        path=normalized_path,
         passphrase=passphrase,
         keyfile=keyfile,
         encryption_type=encryption_type,

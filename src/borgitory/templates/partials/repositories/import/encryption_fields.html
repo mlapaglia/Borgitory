@@ -1,0 +1,19 @@
+<!-- Dynamic encryption fields based on encryption type -->
+{% if encryption_type == "repokey" %}
+<div id="passphrase-field">
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Passphrase</label>
+    <input type="password" name="passphrase" class="input-modern mt-1" placeholder="Enter repository passphrase" required>
+</div>
+{% elif encryption_type == "keyfile" %}
+<div id="passphrase-field">
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Passphrase</label>
+    <input type="password" name="passphrase" class="input-modern mt-1" placeholder="Enter repository passphrase" required>
+</div>
+
+<div id="keyfile-field">
+    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Keyfile</label>
+    <input type="file" name="keyfile" accept=".key" class="input-modern mt-1" required>
+    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Upload the Borg keyfile (usually has .key extension)</p>
+</div>
+{% endif %}
+<!-- For 'none' encryption or empty selection, no additional fields are shown -->
