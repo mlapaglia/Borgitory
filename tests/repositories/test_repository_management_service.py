@@ -34,22 +34,15 @@ class TestRepositoryManagementService:
         return mock
 
     @pytest.fixture
-    def mock_volume_service(self) -> Any:
-        """Mock volume service."""
-        return Mock()
-
-    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
-        mock_volume_service: Any,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
             scheduler_service=mock_scheduler_service,
-            volume_service=mock_volume_service,
         )
 
     @pytest.fixture
@@ -101,12 +94,10 @@ class TestRepositoryManagementService:
         repository_service: RepositoryService,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
-        mock_volume_service: Any,
     ) -> None:
         """Test that dependencies are properly injected."""
         assert repository_service.borg_service is mock_borg_service
         assert repository_service.scheduler_service is mock_scheduler_service
-        assert repository_service.volume_service is mock_volume_service
 
     def test_format_bytes_edge_cases(
         self, repository_service: RepositoryService
@@ -145,22 +136,15 @@ class TestRepositoryManagementBusinessLogic:
         return Mock()
 
     @pytest.fixture
-    def mock_volume_service(self) -> Any:
-        """Mock volume service."""
-        return Mock()
-
-    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
-        mock_volume_service: Any,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
             scheduler_service=mock_scheduler_service,
-            volume_service=mock_volume_service,
         )
 
     @pytest.fixture

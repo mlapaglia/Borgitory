@@ -27,7 +27,6 @@ from borgitory.models.repository_dtos import (
 )
 from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
-from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
     parse_datetime_string,
@@ -87,11 +86,9 @@ class RepositoryService:
         self,
         borg_service: BorgService,
         scheduler_service: SchedulerService,
-        volume_service: VolumeService,
     ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service
-        self.volume_service = volume_service
 
     async def create_repository(
         self, request: CreateRepositoryRequest, db: Session

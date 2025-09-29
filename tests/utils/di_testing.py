@@ -22,7 +22,6 @@ from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.repositories.repository_service import RepositoryService
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.simple_command_runner import SimpleCommandRunner
-from borgitory.services.volumes.volume_service import VolumeService
 
 T = TypeVar("T")
 
@@ -70,7 +69,6 @@ def override_multiple_dependencies(
     Example:
         overrides = {
             get_borg_service: lambda: mock_borg_service,
-            get_volume_service: lambda: mock_volume_service,
         }
         with override_multiple_dependencies(overrides) as client:
             response = client.get("/api/repositories")
@@ -302,25 +300,6 @@ class MockServiceFactory:
             )
 
         mock.run_command = mock_run_command
-        return mock
-
-    @staticmethod
-    def create_mock_volume_service() -> Mock:
-        """Create a mock VolumeService with common method signatures."""
-        mock = Mock(spec=VolumeService)
-
-        # Setup common return values that match our VolumeInfo TypedDict structure
-        from unittest.mock import AsyncMock
-
-        mock.get_mounted_volumes = AsyncMock(return_value=["/mnt/test-volume"])
-        mock.get_volume_info = AsyncMock(
-            return_value={
-                "mounted_volumes": ["/mnt/test-volume"],
-                "total_mounted_volumes": 1,
-                "accessible": True,
-            }
-        )
-
         return mock
 
     @staticmethod

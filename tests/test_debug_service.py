@@ -38,19 +38,6 @@ def mock_environment() -> MockEnvironment:
 
 
 @pytest.fixture
-def mock_volume_service() -> AsyncMock:
-    """Mock volume service for testing"""
-    from unittest.mock import AsyncMock
-
-    mock_service = AsyncMock()
-    mock_service.get_volume_info.return_value = {
-        "mounted_volumes": ["/data", "/backup"],
-        "total_mounted_volumes": 2,
-    }
-    return mock_service
-
-
-@pytest.fixture
 def mock_job_manager() -> Mock:
     """Mock job manager for testing"""
     from unittest.mock import Mock
@@ -67,12 +54,10 @@ def mock_job_manager() -> Mock:
 @pytest.fixture
 def debug_service(
     mock_environment: MockEnvironment,
-    mock_volume_service: AsyncMock,
     mock_job_manager: Mock,
 ) -> DebugService:
     """Debug service with all required dependencies injected"""
     return DebugService(
-        volume_service=mock_volume_service,
         job_manager=mock_job_manager,
         environment=mock_environment,
     )
@@ -124,11 +109,6 @@ class TestDebugService:
             "database_accessible": True,
         }
 
-        volume_info = {
-            "mounted_volumes": ["/data", "/backup"],
-            "total_mounted_volumes": 2,
-        }
-
         tools_info = {
             "borg": {"version": "borg 1.2.0", "accessible": True},
             "rclone": {"version": "rclone v1.58.0", "accessible": True},
@@ -149,8 +129,6 @@ class TestDebugService:
         ), patch.object(
             debug_service, "_get_database_info", return_value=db_info
         ), patch.object(
-            debug_service, "_get_volume_info", return_value=volume_info
-        ), patch.object(
             debug_service, "_get_tool_versions", return_value=tools_info
         ), patch.object(
             debug_service, "_get_environment_info", return_value=env_info
@@ -162,7 +140,6 @@ class TestDebugService:
             assert result["system"] == system_info
             assert result["application"] == app_info
             assert result["database"] == db_info
-            assert result["volumes"] == volume_info
             assert result["tools"] == tools_info
             assert result["environment"] == env_info
             assert result["job_manager"] == job_manager_info
@@ -179,8 +156,6 @@ class TestDebugService:
             "startup_time": "2023-01-01T12:00:00",
             "working_directory": "/test/dir",
         }
-
-        volume_info = {"mounted_volumes": ["/data"], "total_mounted_volumes": 1}
 
         tools_info = {"borg": {"version": "borg 1.2.0", "accessible": True}}
 
@@ -201,8 +176,6 @@ class TestDebugService:
             "_get_database_info",
             return_value={"error": "DB error", "database_accessible": False},
         ), patch.object(
-            debug_service, "_get_volume_info", return_value=volume_info
-        ), patch.object(
             debug_service, "_get_tool_versions", return_value=tools_info
         ), patch.object(
             debug_service, "_get_environment_info", return_value=env_info
@@ -217,7 +190,6 @@ class TestDebugService:
                 "error": "DB error",
                 "database_accessible": False,
             }
-            assert result["volumes"] == volume_info
             assert result["tools"] == tools_info
             assert result["environment"] == env_info
             assert result["job_manager"] == job_manager_info
@@ -353,54 +325,6 @@ class TestDebugService:
 
         assert "error" in result
         assert result["database_accessible"] is False
-
-    @pytest.mark.asyncio
-    async def test_get_volume_info_success(
-        self, debug_service: DebugService, mock_volume_service: AsyncMock
-    ) -> None:
-        """Test volume info collection success"""
-        # Configure the mock volume service
-        mock_volume_service.get_volume_info.return_value = {
-            "mounted_volumes": ["/data", "/backup"],
-            "total_mounted_volumes": 2,
-        }
-
-        result = await debug_service._get_volume_info()
-
-        assert result["mounted_volumes"] == ["/data", "/backup"]
-        assert result["total_mounted_volumes"] == 2
-
-    @pytest.mark.asyncio
-    async def test_get_volume_info_with_volumes(
-        self, debug_service: DebugService, mock_volume_service: AsyncMock
-    ) -> None:
-        """Test volume info when volumes are present"""
-        # Configure the mock volume service for this specific test
-        mock_volume_service.get_volume_info.return_value = {
-            "mounted_volumes": ["/data"],
-            "total_mounted_volumes": 1,
-        }
-
-        result = await debug_service._get_volume_info()
-
-        assert result["mounted_volumes"] == ["/data"]
-        assert result["total_mounted_volumes"] == 1
-
-    @pytest.mark.asyncio
-    async def test_get_volume_info_service_failure(
-        self, debug_service: DebugService, mock_volume_service: AsyncMock
-    ) -> None:
-        """Test volume info when volume service fails"""
-        # Configure the mock volume service to raise an exception
-        mock_volume_service.get_volume_info.side_effect = Exception(
-            "Volume service error"
-        )
-
-        result = await debug_service._get_volume_info()
-
-        assert "error" in result
-        assert result["mounted_volumes"] == []
-        assert result["total_mounted_volumes"] == 0
 
     @pytest.mark.asyncio
     async def test_get_tool_versions_success(self, debug_service: DebugService) -> None:

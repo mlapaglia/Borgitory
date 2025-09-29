@@ -36,12 +36,6 @@ class TestRepositoryService:
         return mock
 
     @pytest.fixture
-    def mock_volume_service(self):
-        """Mock volume service."""
-        mock = Mock()
-        return mock
-
-    @pytest.fixture
     def mock_db_session(self):
         """Mock database session."""
         mock = Mock(spec=Session)
@@ -55,14 +49,11 @@ class TestRepositoryService:
         return mock
 
     @pytest.fixture
-    def repository_service(
-        self, mock_borg_service, mock_scheduler_service, mock_volume_service
-    ):
+    def repository_service(self, mock_borg_service, mock_scheduler_service: Mock):
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
             scheduler_service=mock_scheduler_service,
-            volume_service=mock_volume_service,
         )
 
     @pytest.mark.asyncio

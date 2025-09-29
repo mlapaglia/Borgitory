@@ -48,16 +48,6 @@ class ProtocolMockFactory:
         return mock
 
     @staticmethod
-    def create_volume_service_mock() -> Mock:
-        """Create a mock VolumeServiceProtocol."""
-        from borgitory.protocols import VolumeServiceProtocol
-
-        mock = Mock(spec=VolumeServiceProtocol)
-        mock.get_mounted_volumes = AsyncMock(return_value=["/mock/volume"])
-        mock.get_volume_info = Mock(return_value={"mock": "info"})
-        return mock
-
-    @staticmethod
     def create_backup_service_mock() -> Mock:
         """Create a mock BackupServiceProtocol."""
         from borgitory.protocols import BackupServiceProtocol
@@ -239,7 +229,6 @@ def get_all_protocol_mocks() -> Dict[str, Mock]:
     """Get mocks for all major protocols."""
     return {
         "command_runner": ProtocolMockFactory.create_command_runner_mock(),
-        "volume_service": ProtocolMockFactory.create_volume_service_mock(),
         "backup_service": ProtocolMockFactory.create_backup_service_mock(),
         "job_manager": ProtocolMockFactory.create_job_manager_mock(),
         "notification_service": ProtocolMockFactory.create_notification_service_mock(),

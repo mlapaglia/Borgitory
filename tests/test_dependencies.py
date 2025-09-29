@@ -13,7 +13,6 @@ from borgitory.dependencies import (
     get_registry_factory,
     get_provider_registry,
     get_file_system,
-    get_volume_service,
 )
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.config.command_runner_config import CommandRunnerConfig
@@ -24,7 +23,6 @@ from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.volumes.file_system_interface import FileSystemInterface
 from borgitory.services.volumes.os_file_system import OsFileSystem
-from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.protocols.command_protocols import CommandRunnerProtocol
 
 
@@ -153,21 +151,3 @@ class TestDependencies:
 
         assert isinstance(filesystem, FileSystemInterface)
         assert isinstance(filesystem, OsFileSystem)
-
-    def test_get_volume_service(self) -> None:
-        """Test VolumeService dependency provider."""
-        filesystem = get_file_system()
-        volume_service = get_volume_service(filesystem)
-
-        assert isinstance(volume_service, VolumeService)
-
-    def test_get_volume_service_with_mock_filesystem(self) -> None:
-        """Test VolumeService with mock filesystem for testing."""
-        # Create a mock filesystem
-        mock_filesystem = Mock(spec=FileSystemInterface)
-
-        # Test the dependency function
-        volume_service = get_volume_service(mock_filesystem)
-
-        assert isinstance(volume_service, VolumeService)
-        assert volume_service.filesystem is mock_filesystem

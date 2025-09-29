@@ -16,7 +16,6 @@ from borgitory.models.borg_info import (
 from borgitory.protocols import (
     CommandRunnerProtocol,
     ProcessExecutorProtocol,
-    VolumeServiceProtocol,
     JobManagerProtocol,
 )
 from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
@@ -44,7 +43,6 @@ class BorgService:
         job_executor: ProcessExecutorProtocol,
         command_runner: CommandRunnerProtocol,
         job_manager: JobManagerProtocol,
-        volume_service: VolumeServiceProtocol,
         archive_service: ArchiveServiceProtocol,
     ) -> None:
         """
@@ -54,13 +52,11 @@ class BorgService:
             job_executor: Job executor for running Borg processes
             command_runner: Command runner for executing system commands
             job_manager: Job manager for handling job lifecycle
-            volume_service: Volume service for discovering mounted volumes
             archive_service: Archive service for managing archive operations
         """
         self.job_executor = job_executor
         self.command_runner = command_runner
         self.job_manager = job_manager
-        self.volume_service = volume_service
         self.archive_service = archive_service
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"

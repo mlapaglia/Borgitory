@@ -14,7 +14,6 @@ from unittest.mock import Mock
 from borgitory.protocols import (
     CommandRunnerProtocol,
     ProcessExecutorProtocol,
-    VolumeServiceProtocol,
     BackupServiceProtocol,
     ArchiveServiceProtocol,
     NotificationServiceProtocol,
@@ -23,7 +22,6 @@ from borgitory.protocols import (
 # Import concrete services
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.jobs.job_executor import JobExecutor
-from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.borg_service import BorgService
 from borgitory.services.archives.archive_manager import ArchiveManager
@@ -142,23 +140,6 @@ class TestProtocolCompliance:
         executor = JobExecutor()
         assert executor is not None
 
-    def test_volume_service_compliance(self) -> None:
-        """Test that VolumeService satisfies VolumeServiceProtocol."""
-        checker = ProtocolComplianceChecker()
-        checker.check_protocol_compliance(VolumeService, VolumeServiceProtocol)
-
-        # Check for key methods
-        assert hasattr(VolumeService, "get_mounted_volumes"), (
-            "VolumeService should have get_mounted_volumes method"
-        )
-        assert hasattr(VolumeService, "get_volume_info"), (
-            "VolumeService should have get_volume_info method"
-        )
-
-        # Check instantiation
-        service = VolumeService()
-        assert service is not None
-
     def test_borg_service_compliance(self) -> None:
         """Test that BorgService satisfies BackupServiceProtocol."""
         checker = ProtocolComplianceChecker()
@@ -181,7 +162,6 @@ class TestProtocolCompliance:
             job_executor=Mock(),
             command_runner=Mock(),
             job_manager=Mock(),
-            volume_service=Mock(),
             archive_service=Mock(),
         )
         assert service is not None
@@ -262,49 +242,32 @@ class TestProtocolInstantiation:
             """Function that accepts any CommandRunnerProtocol implementation."""
             assert runner is not None
 
-        def use_volume_service(service: VolumeServiceProtocol) -> None:
-            """Function that accepts any VolumeServiceProtocol implementation."""
-            assert service is not None
-
         # Test with real implementations
         from borgitory.config.command_runner_config import CommandRunnerConfig
 
         use_command_runner(SimpleCommandRunner(config=CommandRunnerConfig()))
-        use_volume_service(VolumeService())
 
         # Test with mocks
         mock_runner = Mock(spec=CommandRunnerProtocol)
-        mock_volume = Mock(spec=VolumeServiceProtocol)
 
         use_command_runner(mock_runner)
-        use_volume_service(mock_volume)
 
     def test_protocol_mocking(self) -> None:
         """Test that protocols can be easily mocked."""
 
         # Create protocol mocks
         mock_runner = Mock(spec=CommandRunnerProtocol)
-        mock_volume = Mock(spec=VolumeServiceProtocol)
         mock_backup = Mock(spec=BackupServiceProtocol)
 
         # Verify mocks have protocol methods
         assert hasattr(mock_runner, "run_command")
-        assert hasattr(mock_volume, "get_mounted_volumes")
 
         # Test that we can call protocol methods on mocks
         from unittest.mock import AsyncMock
 
         # For async methods, use AsyncMock
         mock_runner.run_command = AsyncMock(return_value=Mock(success=True))
-        mock_volume.get_mounted_volumes = AsyncMock(return_value=["/test"])
         mock_backup.create_backup = AsyncMock(return_value="job-123")
-
-        # For async methods, use AsyncMock
-        mock_volume.get_volume_info = AsyncMock(return_value={"info": "test"})
-
-        # Note: For async methods in real usage, you'd await them:
-        # volumes = await mock_volume.get_mounted_volumes()
-        # job_id = await mock_backup.create_backup(Mock(), '/source')
 
 
 if __name__ == "__main__":
