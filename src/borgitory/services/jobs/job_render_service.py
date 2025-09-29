@@ -151,16 +151,10 @@ class TemplateJobData:
     job_title: str
     status_class: str
     status_icon: str
-    started_at: str  # Pre-formatted (for backward compatibility)
-    finished_at: str  # Pre-formatted (for backward compatibility)
+    started_at: Optional[datetime]  # Raw datetime for timezone-aware formatting
+    finished_at: Optional[datetime]  # Raw datetime for timezone-aware formatting
     repository_name: str
     sorted_tasks: List[TemplateTaskData]
-    started_at_raw: Optional[datetime] = (
-        None  # Raw datetime for timezone-aware formatting
-    )
-    finished_at_raw: Optional[datetime] = (
-        None  # Raw datetime for timezone-aware formatting
-    )
     expand_details: bool = False  # For API state management
 
 
