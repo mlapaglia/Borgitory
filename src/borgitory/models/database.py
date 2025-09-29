@@ -65,6 +65,9 @@ class Repository(Base):
     encrypted_keyfile_content: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # Encrypted keyfile content
+    cache_dir: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # Custom BORG_CACHE_DIR path
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
 
     jobs: Mapped[List["Job"]] = relationship(

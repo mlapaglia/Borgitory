@@ -1,23 +1,8 @@
 """
-Protocol interfaces for storage and volume services.
+Protocol interfaces for storage service.
 """
 
-from typing import Protocol, List, Dict, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from borgitory.services.volumes.volume_service import VolumeInfo
-
-
-class VolumeServiceProtocol(Protocol):
-    """Protocol for volume management services."""
-
-    async def get_mounted_volumes(self) -> List[str]:
-        """Get list of mounted volume paths."""
-        ...
-
-    async def get_volume_info(self) -> "VolumeInfo":
-        """Get detailed volume information."""
-        ...
+from typing import Protocol, Dict
 
 
 class CloudStorageProtocol(Protocol):

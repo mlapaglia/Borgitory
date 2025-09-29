@@ -2,6 +2,7 @@
 Tests for prune API endpoints - HTMX and response validation focused
 """
 
+from typing import Any
 import pytest
 from unittest.mock import MagicMock
 from fastapi import Request
@@ -12,7 +13,7 @@ from borgitory.models.schemas import PruneStrategy, PruneConfigCreate, PruneConf
 
 
 @pytest.fixture
-def mock_request():
+def mock_request() -> MagicMock:
     """Mock FastAPI request"""
     request = MagicMock(spec=Request)
     request.headers = {}
@@ -20,7 +21,7 @@ def mock_request():
 
 
 @pytest.fixture
-def mock_templates():
+def mock_templates() -> MagicMock:
     """Mock templates dependency"""
     templates = MagicMock()
     mock_response = MagicMock(spec=HTMLResponse)
@@ -31,14 +32,14 @@ def mock_templates():
 
 
 @pytest.fixture
-def mock_service():
+def mock_service() -> MagicMock:
     """Mock PruneService"""
     service = MagicMock()
     return service
 
 
 @pytest.fixture
-def sample_config_create():
+def sample_config_create() -> PruneConfigCreate:
     """Sample config creation data"""
     return PruneConfigCreate(
         name="test-config",
@@ -55,7 +56,7 @@ def sample_config_create():
 
 
 @pytest.fixture
-def sample_config_update():
+def sample_config_update() -> PruneConfigUpdate:
     """Sample config update data"""
     return PruneConfigUpdate(
         name="updated-config",
@@ -75,12 +76,15 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_get_prune_form_success(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test getting prune form returns correct template response."""
         from borgitory.api.prune import get_prune_form
 
-        mock_form_data = {"repositories": []}
+        mock_form_data: dict[str, Any] = {"repositories": []}
         mock_service.get_form_data.return_value = mock_form_data
 
         await get_prune_form(mock_request, mock_templates, mock_service)
@@ -96,7 +100,9 @@ class TestPruneAPI:
         )
 
     @pytest.mark.asyncio
-    async def test_get_policy_form_success(self, mock_request, mock_templates) -> None:
+    async def test_get_policy_form_success(
+        self, mock_request: MagicMock, mock_templates: MagicMock
+    ) -> None:
         """Test getting policy form returns correct template response."""
         from borgitory.api.prune import get_policy_form
 
@@ -111,7 +117,7 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_get_strategy_fields_success(
-        self, mock_request, mock_templates
+        self, mock_request: MagicMock, mock_templates: MagicMock
     ) -> None:
         """Test getting strategy fields returns correct template response."""
         from borgitory.api.prune import get_strategy_fields
@@ -127,7 +133,11 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_create_prune_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service, sample_config_create
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
+        sample_config_create: PruneConfigCreate,
     ) -> None:
         """Test successful config creation returns correct HTMX response."""
         from borgitory.api.prune import create_prune_config
@@ -135,7 +145,11 @@ class TestPruneAPI:
         # Mock successful service response
         mock_config = MagicMock()
         mock_config.name = "test-config"
-        mock_service.create_prune_config.return_value = (True, mock_config, None)
+        from borgitory.services.prune_service import PruneConfigOperationResult
+
+        mock_service.create_prune_config.return_value = PruneConfigOperationResult(
+            success=True, config=mock_config, error_message=None
+        )
 
         result = await create_prune_config(
             mock_request, sample_config_create, mock_templates, mock_service
@@ -156,16 +170,21 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_create_prune_config_failure_htmx_response(
-        self, mock_request, mock_templates, mock_service, sample_config_create
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
+        sample_config_create: PruneConfigCreate,
     ) -> None:
         """Test failed config creation returns correct HTMX error response."""
         from borgitory.api.prune import create_prune_config
+        from borgitory.services.prune_service import PruneConfigOperationResult
 
         # Mock service failure
-        mock_service.create_prune_config.return_value = (
-            False,
-            None,
-            "Failed to create prune configuration",
+        mock_service.create_prune_config.return_value = PruneConfigOperationResult(
+            success=False,
+            config=None,
+            error_message="Failed to create prune configuration",
         )
 
         await create_prune_config(
@@ -181,11 +200,14 @@ class TestPruneAPI:
         )
 
     def test_get_prune_configs_success(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test getting configs HTML returns correct template response."""
 
-        mock_configs_data = [
+        mock_configs_data: list[dict[str, Any]] = [
             {"name": "config1", "description": "Keep archives within 30 days"},
             {"name": "config2", "description": "7 daily, 4 weekly"},
         ]
@@ -202,7 +224,10 @@ class TestPruneAPI:
         )
 
     def test_get_prune_configs_exception(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test getting configs HTML with exception returns error template."""
         from borgitory.api.prune import get_prune_configs
@@ -218,14 +243,20 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_enable_prune_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test successful config enable returns correct HTMX response."""
         from borgitory.api.prune import enable_prune_config
+        from borgitory.services.prune_service import PruneConfigOperationResult
 
         mock_config = MagicMock()
         mock_config.name = "test-config"
-        mock_service.enable_prune_config.return_value = (True, mock_config, None)
+        mock_service.enable_prune_config.return_value = PruneConfigOperationResult(
+            success=True, config=mock_config, error_message=None
+        )
 
         result = await enable_prune_config(
             mock_request, 1, mock_templates, mock_service
@@ -246,15 +277,19 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_enable_prune_config_not_found_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test enabling non-existent config returns correct HTMX error response."""
         from borgitory.api.prune import enable_prune_config
+        from borgitory.services.prune_service import PruneConfigOperationResult
 
-        mock_service.enable_prune_config.return_value = (
-            False,
-            None,
-            "Prune configuration not found",
+        mock_service.enable_prune_config.return_value = PruneConfigOperationResult(
+            success=False,
+            config=None,
+            error_message="Prune configuration not found",
         )
 
         await enable_prune_config(mock_request, 999, mock_templates, mock_service)
@@ -269,14 +304,20 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_disable_prune_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test successful config disable returns correct HTMX response."""
         from borgitory.api.prune import disable_prune_config
+        from borgitory.services.prune_service import PruneConfigOperationResult
 
         mock_config = MagicMock()
         mock_config.name = "test-config"
-        mock_service.disable_prune_config.return_value = (True, mock_config, None)
+        mock_service.disable_prune_config.return_value = PruneConfigOperationResult(
+            success=True, config=mock_config, error_message=None
+        )
 
         result = await disable_prune_config(
             mock_request, 1, mock_templates, mock_service
@@ -297,15 +338,19 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_disable_prune_config_not_found_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test disabling non-existent config returns correct HTMX error response."""
         from borgitory.api.prune import disable_prune_config
+        from borgitory.services.prune_service import PruneConfigOperationResult
 
-        mock_service.disable_prune_config.return_value = (
-            False,
-            None,
-            "Prune configuration not found",
+        mock_service.disable_prune_config.return_value = PruneConfigOperationResult(
+            success=False,
+            config=None,
+            error_message="Prune configuration not found",
         )
 
         await disable_prune_config(mock_request, 999, mock_templates, mock_service)
@@ -320,7 +365,10 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_get_prune_config_edit_form_success(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test getting edit form returns correct template response."""
         from borgitory.api.prune import get_prune_config_edit_form
@@ -345,7 +393,10 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_get_prune_config_edit_form_not_found(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test getting edit form for non-existent config raises HTTPException."""
         from borgitory.api.prune import get_prune_config_edit_form
@@ -363,14 +414,21 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_update_prune_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service, sample_config_update
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
+        sample_config_update: PruneConfigUpdate,
     ) -> None:
         """Test successful config update returns correct HTMX response."""
         from borgitory.api.prune import update_prune_config
+        from borgitory.services.prune_service import PruneConfigOperationResult
 
         mock_config = MagicMock()
         mock_config.name = "updated-config"
-        mock_service.update_prune_config.return_value = (True, mock_config, None)
+        mock_service.update_prune_config.return_value = PruneConfigOperationResult(
+            success=True, config=mock_config, error_message=None
+        )
 
         result = await update_prune_config(
             mock_request, 1, sample_config_update, mock_templates, mock_service
@@ -393,15 +451,20 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_update_prune_config_failure_htmx_response(
-        self, mock_request, mock_templates, mock_service, sample_config_update
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
+        sample_config_update: PruneConfigUpdate,
     ) -> None:
         """Test failed config update returns correct HTMX error response."""
         from borgitory.api.prune import update_prune_config
+        from borgitory.services.prune_service import PruneConfigOperationResult
 
-        mock_service.update_prune_config.return_value = (
-            False,
-            None,
-            "Prune configuration not found",
+        mock_service.update_prune_config.return_value = PruneConfigOperationResult(
+            success=False,
+            config=None,
+            error_message="Prune configuration not found",
         )
 
         await update_prune_config(
@@ -418,12 +481,19 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_delete_prune_config_success_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test successful config deletion returns correct HTMX response."""
         from borgitory.api.prune import delete_prune_config
 
-        mock_service.delete_prune_config.return_value = (True, "test-config", None)
+        from borgitory.services.prune_service import PruneConfigDeleteResult
+
+        mock_service.delete_prune_config.return_value = PruneConfigDeleteResult(
+            success=True, config_name="test-config", error_message=None
+        )
 
         result = await delete_prune_config(
             mock_request, 1, mock_templates, mock_service
@@ -444,15 +514,19 @@ class TestPruneAPI:
 
     @pytest.mark.asyncio
     async def test_delete_prune_config_failure_htmx_response(
-        self, mock_request, mock_templates, mock_service
+        self,
+        mock_request: MagicMock,
+        mock_templates: MagicMock,
+        mock_service: MagicMock,
     ) -> None:
         """Test failed config deletion returns correct HTMX error response."""
         from borgitory.api.prune import delete_prune_config
+        from borgitory.services.prune_service import PruneConfigDeleteResult
 
-        mock_service.delete_prune_config.return_value = (
-            False,
-            None,
-            "Prune configuration not found",
+        mock_service.delete_prune_config.return_value = PruneConfigDeleteResult(
+            success=False,
+            config_name=None,
+            error_message="Prune configuration not found",
         )
 
         await delete_prune_config(mock_request, 999, mock_templates, mock_service)

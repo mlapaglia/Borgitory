@@ -1,16 +1,19 @@
 """
-Comprehensive tests for secure_path.py utilities.
-Tests functions not covered in test_security.py to achieve full coverage.
+Comprehensive tests for secure_path utilities.
+
+Tests all functions in the secure_path module to ensure they handle
+various edge cases and security scenarios correctly.
 """
 
-import pytest
-import tempfile
 import os
+import tempfile
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import patch, mock_open
 
 from borgitory.utils.secure_path import (
-    PathSecurityError,
+    DirectoryInfo,
+    _is_borg_repository,
+    _is_borg_cache,
     sanitize_filename,
     create_secure_filename,
     secure_path_join,
@@ -18,659 +21,443 @@ from borgitory.utils.secure_path import (
     secure_isdir,
     secure_remove_file,
     get_directory_listing,
-    user_secure_exists,
-    user_secure_isdir,
-    user_get_directory_listing,
-    validate_user_repository_path,
 )
 
 
+class TestDirectoryInfo:
+    """Test the DirectoryInfo dataclass."""
+
+    def test_directory_info_creation(self) -> None:
+        """Test basic DirectoryInfo creation."""
+        info = DirectoryInfo(name="test", path="/test/path")
+        assert info.name == "test"
+        assert info.path == "/test/path"
+        assert info.is_borg_repo is False
+        assert info.is_borg_cache is False
+
+    def test_directory_info_with_flags(self) -> None:
+        """Test DirectoryInfo creation with borg flags."""
+        info = DirectoryInfo(
+            name="repo", path="/repo/path", is_borg_repo=True, is_borg_cache=True
+        )
+        assert info.name == "repo"
+        assert info.path == "/repo/path"
+        assert info.is_borg_repo is True
+        assert info.is_borg_cache is True
+
+
+class TestIsBorgRepository:
+    """Test the _is_borg_repository function."""
+
+    def test_is_borg_repository_with_valid_config(self) -> None:
+        """Test detection of valid borg repository."""
+        config_content = """
+[repository]
+version = 1
+segments_per_dir = 1000
+"""
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
+            assert _is_borg_repository("/test/repo") is True
+
+    def test_is_borg_repository_no_config_file(self) -> None:
+        """Test with missing config file."""
+        with patch("os.path.exists", return_value=False):
+            assert _is_borg_repository("/test/repo") is False
+
+    def test_is_borg_repository_config_is_directory(self) -> None:
+        """Test with config being a directory instead of file."""
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=False
+        ):
+            assert _is_borg_repository("/test/repo") is False
+
+    def test_is_borg_repository_no_repository_section(self) -> None:
+        """Test with config file missing [repository] section."""
+        config_content = """
+[cache]
+version = 1
+"""
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
+            assert _is_borg_repository("/test/repo") is False
+
+    def test_is_borg_repository_invalid_config(self) -> None:
+        """Test with invalid config file content."""
+        config_content = "invalid config content"
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
+            assert _is_borg_repository("/test/repo") is False
+
+    def test_is_borg_repository_permission_error(self) -> None:
+        """Test handling of permission errors."""
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", side_effect=PermissionError("Access denied")):
+            assert _is_borg_repository("/test/repo") is False
+
+    def test_is_borg_repository_unicode_error(self) -> None:
+        """Test handling of unicode decode errors."""
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch(
+            "builtins.open",
+            side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "invalid"),
+        ):
+            assert _is_borg_repository("/test/repo") is False
+
+    def test_is_borg_repository_general_exception(self) -> None:
+        """Test handling of general exceptions."""
+        with patch("os.path.exists", side_effect=Exception("General error")):
+            assert _is_borg_repository("/test/repo") is False
+
+
+class TestIsBorgCache:
+    """Test the _is_borg_cache function."""
+
+    def test_is_borg_cache_with_valid_config(self) -> None:
+        """Test detection of valid borg cache."""
+        config_content = """
+[cache]
+version = 1
+repository = /path/to/repo
+"""
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
+            assert _is_borg_cache("/test/cache") is True
+
+    def test_is_borg_cache_no_config_file(self) -> None:
+        """Test with missing config file."""
+        with patch("os.path.exists", return_value=False):
+            assert _is_borg_cache("/test/cache") is False
+
+    def test_is_borg_cache_no_cache_section(self) -> None:
+        """Test with config file missing [cache] section."""
+        config_content = """
+[repository]
+version = 1
+"""
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", mock_open(read_data=config_content)):
+            assert _is_borg_cache("/test/cache") is False
+
+    def test_is_borg_cache_permission_error(self) -> None:
+        """Test handling of permission errors."""
+        with patch("os.path.exists", return_value=True), patch(
+            "os.path.isfile", return_value=True
+        ), patch("builtins.open", side_effect=PermissionError("Access denied")):
+            assert _is_borg_cache("/test/cache") is False
+
+
 class TestSanitizeFilename:
-    """Test filename sanitization functionality."""
+    """Test the sanitize_filename function."""
 
-    def test_sanitize_valid_filename(self) -> None:
-        """Test sanitization of valid filenames."""
-        valid_names = [
-            "backup.tar.gz",
-            "file123.txt",
-            "my-backup_2023.zip",
-            "test.log",
-            "simple",
-            "file.with.dots",
-        ]
+    def test_sanitize_filename_basic(self) -> None:
+        """Test basic filename sanitization."""
+        result = sanitize_filename("test_file.txt")
+        assert result == "test_file.txt"
 
-        for name in valid_names:
-            result = sanitize_filename(name)
-            assert result == name
-            assert len(result) <= 100
+    def test_sanitize_filename_dangerous_chars(self) -> None:
+        """Test sanitization of dangerous characters."""
+        result = sanitize_filename("test/../file.txt")
+        assert result == "test_._file.txt"
 
-    def test_sanitize_empty_filename(self) -> None:
-        """Test that empty filenames get default name."""
-        assert sanitize_filename("") == "unnamed"
-        assert sanitize_filename(None) == "unnamed"
+    def test_sanitize_filename_special_chars(self) -> None:
+        """Test sanitization of various special characters."""
+        result = sanitize_filename("test@#$%^&*()file.txt")
+        assert result == "test_________file.txt"
 
-    def test_sanitize_dangerous_characters(self) -> None:
-        """Test that dangerous characters are replaced."""
-        dangerous_names = [
-            ("file/with/slashes", "file_with_slashes"),
-            ("file\\with\\backslashes", "file_with_backslashes"),
-            ("file:with:colons", "file_with_colons"),
-            ("file*with*asterisks", "file_with_asterisks"),
-            ("file?with?questions", "file_with_questions"),
-            ("file|with|pipes", "file_with_pipes"),
-            ("file<with<less", "file_with_less"),
-            ("file>with>greater", "file_with_greater"),
-            ('file"with"quotes', "file_with_quotes"),
-            ("file with spaces", "file_with_spaces"),
-        ]
+    def test_sanitize_filename_multiple_dots(self) -> None:
+        """Test handling of multiple consecutive dots."""
+        result = sanitize_filename("test...file.txt")
+        assert result == "test.file.txt"
 
-        for dangerous, expected in dangerous_names:
-            result = sanitize_filename(dangerous)
-            assert result == expected
+    def test_sanitize_filename_leading_trailing_dots_spaces(self) -> None:
+        """Test removal of leading/trailing dots and spaces."""
+        result = sanitize_filename("  .test_file.  ")
+        # Spaces become underscores, dots and spaces are stripped but underscores remain
+        assert result == "__.test_file.__"
 
-    def test_sanitize_multiple_dots(self) -> None:
-        """Test that multiple consecutive dots are normalized."""
-        assert sanitize_filename("file...txt") == "file.txt"
-        assert sanitize_filename("file....backup") == "file.backup"
-        assert sanitize_filename("...hidden") == "hidden"  # Leading dots are stripped
-
-    def test_sanitize_leading_trailing_dots_spaces(self) -> None:
-        """Test that leading/trailing dots and spaces are handled."""
-        assert (
-            sanitize_filename(" file.txt ") == "_file.txt_"
-        )  # Spaces become underscores
-        assert (
-            sanitize_filename(".file.txt.") == "file.txt"
-        )  # Leading/trailing dots stripped
-        assert (
-            sanitize_filename("  ..file..  ") == "__.file.__"
-        )  # Spaces become underscores, only consecutive dots normalized
-
-    def test_sanitize_only_dangerous_chars(self) -> None:
-        """Test filenames with only dangerous characters."""
-        assert sanitize_filename("///") == "___"  # Slashes become underscores
-        assert sanitize_filename("***") == "___"  # Asterisks become underscores
-        assert sanitize_filename("   ") == "___"  # Spaces also become underscores
-        # Test that only completely empty after processing becomes unnamed
+    def test_sanitize_filename_empty_string(self) -> None:
+        """Test handling of empty string."""
         result = sanitize_filename("")
         assert result == "unnamed"
 
-    def test_sanitize_long_filename(self) -> None:
-        """Test filename truncation."""
+    def test_sanitize_filename_only_special_chars(self) -> None:
+        """Test filename with only special characters."""
+        result = sanitize_filename("@#$%^&*()")
+        # Special chars become underscores, but underscores are not stripped
+        assert result == "_________"
+
+    def test_sanitize_filename_max_length(self) -> None:
+        """Test filename length truncation."""
         long_name = "a" * 150 + ".txt"
         result = sanitize_filename(long_name, max_length=100)
-        assert len(result) <= 100
+        assert len(result) == 100
         assert result.endswith(".txt")
-        assert result.startswith("a")
 
-    def test_sanitize_custom_max_length(self) -> None:
-        """Test custom maximum length."""
-        name = "verylongfilename.txt"
-        result = sanitize_filename(name, max_length=10)
-        assert len(result) <= 10
-        assert result.endswith(".txt")
+    def test_sanitize_filename_max_length_no_extension(self) -> None:
+        """Test filename length truncation without extension."""
+        long_name = "a" * 150
+        result = sanitize_filename(long_name, max_length=50)
+        assert len(result) == 50
 
 
 class TestCreateSecureFilename:
-    """Test secure filename creation."""
+    """Test the create_secure_filename function."""
 
-    def test_create_basic_filename(self) -> None:
+    def test_create_secure_filename_basic(self) -> None:
         """Test basic secure filename creation."""
-        result = create_secure_filename("backup")
-        assert result.startswith("backup_")
-        assert len(result.split("_")[1]) == 8  # UUID part
-        assert not result.endswith(".")
-
-    def test_create_filename_with_extension(self) -> None:
-        """Test filename creation with extension extraction."""
-        result = create_secure_filename("backup", "file.tar.gz")
-        assert result.startswith("backup_")
-        assert result.endswith(".gz")
-
-    def test_create_filename_without_uuid(self) -> None:
-        """Test filename creation without UUID."""
-        result = create_secure_filename("backup", add_uuid=False)
-        assert result == "backup"
-
-    def test_create_filename_with_dangerous_extension(self) -> None:
-        """Test that dangerous extensions are sanitized."""
-        result = create_secure_filename("backup", "file.exe!@#")
-        assert result.startswith("backup_")
-        assert result.endswith(".exe")
-
-    def test_create_filename_no_extension(self) -> None:
-        """Test filename creation when original has no extension."""
-        result = create_secure_filename("backup", "noextension")
-        assert result.startswith("backup_")
-        assert "." not in result.split("_")[1]  # No extension added
-
-    def test_create_filename_dangerous_base(self) -> None:
-        """Test that dangerous base names are sanitized."""
-        result = create_secure_filename("../../../dangerous", "file.txt")
-        assert not result.startswith("../")
+        result = create_secure_filename("test", "original.txt")
+        assert result.startswith("test_")
         assert result.endswith(".txt")
+        assert len(result.split("_")[1].split(".")[0]) == 8  # UUID length
+
+    def test_create_secure_filename_no_uuid(self) -> None:
+        """Test secure filename creation without UUID."""
+        result = create_secure_filename("test", "original.txt", add_uuid=False)
+        assert result == "test.txt"
+
+    def test_create_secure_filename_no_extension(self) -> None:
+        """Test secure filename creation without extension."""
+        result = create_secure_filename("test", "", add_uuid=False)
+        assert result == "test"
+
+    def test_create_secure_filename_invalid_extension(self) -> None:
+        """Test handling of invalid extension characters."""
+        result = create_secure_filename("test", "file.@#$", add_uuid=False)
+        assert result == "test"
+
+    def test_create_secure_filename_long_extension(self) -> None:
+        """Test truncation of long extensions."""
+        result = create_secure_filename(
+            "test", "file.verylongextension", add_uuid=False
+        )
+        assert result == "test.verylongex"  # Extension truncated to 10 chars
+
+    def test_create_secure_filename_dangerous_base_name(self) -> None:
+        """Test sanitization of dangerous base name."""
+        result = create_secure_filename("../test", "file.txt", add_uuid=False)
+        assert result == "_test.txt"
 
 
 class TestSecurePathJoin:
-    """Test secure path joining functionality."""
+    """Test the secure_path_join function."""
 
-    def test_secure_join_valid_paths(self) -> None:
-        """Test joining valid path components."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create a test directory structure
-            mnt_dir = os.path.join(temp_dir, "mnt")
-            os.makedirs(mnt_dir, exist_ok=True)
+    def test_secure_path_join_basic(self) -> None:
+        """Test basic path joining."""
+        result = secure_path_join("/base", "subdir", "file.txt")
+        expected = str(Path("/base") / "subdir" / "file.txt")
+        assert result == expected
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                # Mock both calls - first for base validation, second for final validation
-                expected_final = Path(mnt_dir) / "subdir" / "file.txt"
-                mock_validate.side_effect = [Path(mnt_dir), expected_final]
+    def test_secure_path_join_traversal_attack(self) -> None:
+        """Test prevention of directory traversal attacks."""
+        result = secure_path_join("/base", "../../../etc", "passwd")
+        # Should remove the traversal sequences
+        expected = str(Path("/base") / "etc" / "passwd")
+        assert result == expected
 
-                result = secure_path_join(mnt_dir, "subdir", "file.txt")
-                assert "subdir" in result
-                assert "file.txt" in result
+    def test_secure_path_join_empty_parts(self) -> None:
+        """Test handling of empty path parts."""
+        result = secure_path_join("/base", "", "subdir", "", "file.txt")
+        expected = str(Path("/base") / "subdir" / "file.txt")
+        assert result == expected
 
-    def test_secure_join_dangerous_components(self) -> None:
-        """Test that dangerous path components are cleaned."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            mnt_dir = os.path.join(temp_dir, "mnt")
-            os.makedirs(mnt_dir, exist_ok=True)
+    def test_secure_path_join_no_parts(self) -> None:
+        """Test with no additional path parts."""
+        result = secure_path_join("/base")
+        # On Windows, paths get converted to backslashes
+        expected = str(Path("/base"))
+        assert result == expected
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.side_effect = (
-                    lambda x, **kwargs: Path(mnt_dir) if "mnt" in str(x) else None
-                )
-
-                result = secure_path_join(mnt_dir, "../../../etc", "passwd")
-                # Should clean the dangerous component
-                assert "etc" not in result or "passwd" not in result
-
-    def test_secure_join_invalid_base(self) -> None:
-        """Test that invalid base directories raise errors."""
-        with pytest.raises(PathSecurityError):
-            secure_path_join("/etc/passwd", "file.txt")
-
-    def test_secure_join_empty_components(self) -> None:
-        """Test joining with empty components."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            mnt_dir = os.path.join(temp_dir, "mnt")
-            os.makedirs(mnt_dir, exist_ok=True)
-
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                expected_final = Path(mnt_dir) / "file.txt"
-                mock_validate.side_effect = [Path(mnt_dir), expected_final]
-
-                result = secure_path_join(mnt_dir, "", "file.txt", "")
-                assert result == str(expected_final)
-
-    def test_secure_join_final_validation_failure(self) -> None:
-        """Test that final path validation failures raise errors."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            mnt_dir = os.path.join(temp_dir, "mnt")
-            os.makedirs(mnt_dir, exist_ok=True)
-
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                # First call succeeds (base validation), second fails (final validation)
-                mock_validate.side_effect = [Path(mnt_dir), None]
-
-                with pytest.raises(PathSecurityError):
-                    secure_path_join(mnt_dir, "legitimate", "path")
+    def test_secure_path_join_all_empty_parts(self) -> None:
+        """Test with all empty path parts."""
+        result = secure_path_join("/base", "", "", "")
+        # On Windows, paths get converted to backslashes
+        expected = str(Path("/base"))
+        assert result == expected
 
 
 class TestSecureExists:
-    """Test secure file existence checking."""
+    """Test the secure_exists function."""
 
-    def test_secure_exists_valid_path(self) -> None:
-        """Test existence check for valid paths."""
+    def test_secure_exists_existing_path(self) -> None:
+        """Test with existing path."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
+            assert secure_exists(temp_dir) is True
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(test_file)
-
-                assert secure_exists(test_file) is True
-
-    def test_secure_exists_nonexistent_path(self) -> None:
-        """Test existence check for nonexistent paths."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            nonexistent = os.path.join(temp_dir, "nonexistent.txt")
-
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(nonexistent)
-
-                assert secure_exists(nonexistent) is False
-
-    def test_secure_exists_invalid_path(self) -> None:
-        """Test existence check for invalid paths."""
-        assert secure_exists("../../../etc/passwd") is False
+    def test_secure_exists_non_existing_path(self) -> None:
+        """Test with non-existing path."""
+        assert secure_exists("/non/existing/path") is False
 
     def test_secure_exists_permission_error(self) -> None:
         """Test handling of permission errors."""
-        with patch("borgitory.utils.secure_path.validate_secure_path") as mock_validate:
-            mock_path = Mock()
-            mock_path.exists.side_effect = PermissionError("Access denied")
-            mock_validate.return_value = mock_path
+        with patch.object(Path, "exists", side_effect=PermissionError("Access denied")):
+            assert secure_exists("/test/path") is False
 
-            assert secure_exists("/mnt/test") is False
+    def test_secure_exists_os_error(self) -> None:
+        """Test handling of OS errors."""
+        with patch.object(Path, "exists", side_effect=OSError("OS error")):
+            assert secure_exists("/test/path") is False
 
 
 class TestSecureIsdir:
-    """Test secure directory checking."""
+    """Test the secure_isdir function."""
 
-    def test_secure_isdir_valid_directory(self) -> None:
-        """Test directory check for valid directories."""
+    def test_secure_isdir_existing_directory(self) -> None:
+        """Test with existing directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(temp_dir)
+            assert secure_isdir(temp_dir) is True
 
-                assert secure_isdir(temp_dir) is True
+    def test_secure_isdir_existing_file(self) -> None:
+        """Test with existing file (not directory)."""
+        with tempfile.NamedTemporaryFile() as temp_file:
+            assert secure_isdir(temp_file.name) is False
 
-    def test_secure_isdir_file_not_directory(self) -> None:
-        """Test directory check for files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
-
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(test_file)
-
-                assert secure_isdir(test_file) is False
-
-    def test_secure_isdir_invalid_path(self) -> None:
-        """Test directory check for invalid paths."""
-        assert secure_isdir("../../../etc") is False
+    def test_secure_isdir_non_existing_path(self) -> None:
+        """Test with non-existing path."""
+        assert secure_isdir("/non/existing/path") is False
 
     def test_secure_isdir_permission_error(self) -> None:
         """Test handling of permission errors."""
-        with patch("borgitory.utils.secure_path.validate_secure_path") as mock_validate:
-            mock_path = Mock()
-            mock_path.is_dir.side_effect = PermissionError("Access denied")
-            mock_validate.return_value = mock_path
-
-            assert secure_isdir("/mnt/test") is False
+        with patch.object(Path, "is_dir", side_effect=PermissionError("Access denied")):
+            assert secure_isdir("/test/path") is False
 
 
 class TestSecureRemoveFile:
-    """Test secure file removal."""
+    """Test the secure_remove_file function."""
 
-    def test_secure_remove_existing_file(self) -> None:
+    def test_secure_remove_file_existing_file(self) -> None:
         """Test removing an existing file."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_path = temp_file.name
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(test_file)
+        assert os.path.exists(temp_path)
+        result = secure_remove_file(temp_path)
+        assert result is True
+        assert not os.path.exists(temp_path)
 
-                assert secure_remove_file(test_file) is True
-                assert not Path(test_file).exists()
+    def test_secure_remove_file_non_existing_file(self) -> None:
+        """Test removing a non-existing file."""
+        result = secure_remove_file("/non/existing/file.txt")
+        assert result is True  # Should return True even if file doesn't exist
 
-    def test_secure_remove_nonexistent_file(self) -> None:
-        """Test removing a nonexistent file."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            nonexistent = os.path.join(temp_dir, "nonexistent.txt")
+    def test_secure_remove_file_permission_error(self) -> None:
+        """Test handling of permission errors."""
+        with patch.object(Path, "exists", return_value=True), patch.object(
+            Path, "unlink", side_effect=PermissionError("Access denied")
+        ):
+            result = secure_remove_file("/test/file.txt")
+            assert result is False
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(nonexistent)
-
-                assert secure_remove_file(nonexistent) is True
-
-    def test_secure_remove_invalid_path(self) -> None:
-        """Test removing file with invalid path."""
-        assert secure_remove_file("../../../etc/passwd") is False
-
-    def test_secure_remove_permission_error(self) -> None:
-        """Test handling of permission errors during removal."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
-
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_path = Mock()
-                mock_path.exists.return_value = True
-                mock_path.unlink.side_effect = PermissionError("Access denied")
-                mock_validate.return_value = mock_path
-
-                assert secure_remove_file(test_file) is False
+    def test_secure_remove_file_os_error(self) -> None:
+        """Test handling of OS errors."""
+        with patch.object(Path, "exists", return_value=True), patch.object(
+            Path, "unlink", side_effect=OSError("OS error")
+        ):
+            result = secure_remove_file("/test/file.txt")
+            assert result is False
 
 
 class TestGetDirectoryListing:
-    """Test secure directory listing."""
+    """Test the get_directory_listing function."""
 
-    def test_get_directory_listing_valid_directory(self) -> None:
-        """Test listing contents of valid directory."""
+    def test_get_directory_listing_basic(self) -> None:
+        """Test basic directory listing."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Create test structure
-            subdir = os.path.join(temp_dir, "subdir")
-            os.makedirs(subdir)
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
+            # Create test directories
+            subdir1 = Path(temp_dir) / "subdir1"
+            subdir2 = Path(temp_dir) / "subdir2"
+            subdir1.mkdir()
+            subdir2.mkdir()
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(temp_dir)
+            # Create a test file
+            test_file = Path(temp_dir) / "test.txt"
+            test_file.write_text("test")
 
-                result = get_directory_listing(temp_dir)
+            result = get_directory_listing(temp_dir)
 
-                # Should only include directories by default
-                assert len(result) == 1
-                assert result[0]["name"] == "subdir"
-                assert "subdir" in result[0]["path"]
+            assert len(result) == 2  # Only directories by default
+            dir_names = [item.name for item in result]
+            assert "subdir1" in dir_names
+            assert "subdir2" in dir_names
 
-    def test_get_directory_listing_with_files(self) -> None:
-        """Test listing contents including files."""
+    def test_get_directory_listing_include_files(self) -> None:
+        """Test directory listing including files."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            subdir = os.path.join(temp_dir, "subdir")
-            os.makedirs(subdir)
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
+            # Create test directory and file
+            subdir = Path(temp_dir) / "subdir"
+            subdir.mkdir()
+            test_file = Path(temp_dir) / "test.txt"
+            test_file.write_text("test")
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(temp_dir)
+            result = get_directory_listing(temp_dir, include_files=True)
 
-                result = get_directory_listing(temp_dir, include_files=True)
+            assert len(result) == 2  # Directory + file
+            names = [item.name for item in result]
+            assert "subdir" in names
+            assert "test.txt" in names
 
-                assert len(result) == 2
-                names = [item["name"] for item in result]
-                assert "subdir" in names
-                assert "test.txt" in names
-
-    def test_get_directory_listing_invalid_path(self) -> None:
-        """Test listing invalid directory."""
-        result = get_directory_listing("../../../etc")
-        assert result == []
-
-    def test_get_directory_listing_not_directory(self) -> None:
-        """Test listing a file instead of directory."""
+    def test_get_directory_listing_borg_repo(self) -> None:
+        """Test detection of borg repositories."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
+            # Create a mock borg repository
+            repo_dir = Path(temp_dir) / "borg_repo"
+            repo_dir.mkdir()
+            config_file = repo_dir / "config"
+            config_file.write_text("[repository]\nversion = 1\n")
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(test_file)
+            result = get_directory_listing(temp_dir)
 
-                result = get_directory_listing(test_file)
-                assert result == []
+            assert len(result) == 1
+            assert result[0].name == "borg_repo"
+            assert result[0].is_borg_repo is True
+            assert result[0].is_borg_cache is False
+
+    def test_get_directory_listing_borg_cache(self) -> None:
+        """Test detection of borg caches."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a mock borg cache
+            cache_dir = Path(temp_dir) / "borg_cache"
+            cache_dir.mkdir()
+            config_file = cache_dir / "config"
+            config_file.write_text("[cache]\nversion = 1\n")
+
+            result = get_directory_listing(temp_dir)
+
+            assert len(result) == 1
+            assert result[0].name == "borg_cache"
+            assert result[0].is_borg_repo is False
+            assert result[0].is_borg_cache is True
+
+    def test_get_directory_listing_non_directory(self) -> None:
+        """Test with non-directory path."""
+        with tempfile.NamedTemporaryFile() as temp_file:
+            result = get_directory_listing(temp_file.name)
+            assert result == []
 
     def test_get_directory_listing_permission_error(self) -> None:
-        """Test handling permission errors during listing."""
-        with patch("borgitory.utils.secure_path.validate_secure_path") as mock_validate:
-            mock_path = Mock()
-            mock_path.is_dir.return_value = True
-            mock_path.iterdir.side_effect = PermissionError("Access denied")
-            mock_validate.return_value = mock_path
-
-            result = get_directory_listing("/mnt/test")
+        """Test handling of permission errors."""
+        with patch.object(Path, "is_dir", return_value=True), patch.object(
+            Path, "iterdir", side_effect=PermissionError("Access denied")
+        ):
+            result = get_directory_listing("/test/path")
             assert result == []
 
     def test_get_directory_listing_sorted(self) -> None:
-        """Test that directory listing is sorted alphabetically."""
+        """Test that results are sorted alphabetically."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create directories in non-alphabetical order
-            for name in ["zebra", "apple", "banana"]:
-                os.makedirs(os.path.join(temp_dir, name))
+            dirs = ["zebra", "apple", "banana"]
+            for dir_name in dirs:
+                (Path(temp_dir) / dir_name).mkdir()
 
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(temp_dir)
+            result = get_directory_listing(temp_dir)
 
-                result = get_directory_listing(temp_dir)
-                names = [item["name"] for item in result]
-                assert names == ["apple", "banana", "zebra"]
-
-
-class TestUserFacingFunctions:
-    """Test user-facing functions that only allow /mnt paths."""
-
-    def test_user_secure_exists_mnt_path(self) -> None:
-        """Test user existence check for /mnt paths."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
-
-            with patch(
-                "borgitory.utils.secure_path.validate_mnt_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(test_file)
-
-                assert user_secure_exists("/mnt/test.txt") is True
-
-    def test_user_secure_exists_invalid_path(self) -> None:
-        """Test user existence check for invalid paths."""
-        assert user_secure_exists("../../../etc/passwd") is False
-
-    def test_user_secure_exists_permission_error(self) -> None:
-        """Test handling permission errors in user existence check."""
-        with patch("borgitory.utils.secure_path.validate_mnt_path") as mock_validate:
-            mock_path = Mock()
-            mock_path.exists.side_effect = PermissionError("Access denied")
-            mock_validate.return_value = mock_path
-
-            assert user_secure_exists("/mnt/test") is False
-
-    def test_user_secure_isdir_valid_directory(self) -> None:
-        """Test user directory check for valid directories."""
-        with tempfile.TemporaryDirectory():
-            with patch(
-                "borgitory.utils.secure_path.validate_mnt_path"
-            ) as mock_validate, patch("os.path.realpath") as mock_realpath:
-                # Create a mock path that behaves like it's under /mnt
-                mock_path = Mock(spec=Path)
-                mock_path.is_dir.return_value = True
-                mock_path.__str__ = Mock(return_value="/mnt/test")
-                mock_validate.return_value = mock_path
-                mock_realpath.return_value = "/mnt"
-
-                assert user_secure_isdir("/mnt/test") is True
-
-    def test_user_secure_isdir_path_outside_mnt(self) -> None:
-        """Test user directory check blocks paths outside /mnt."""
-        with patch(
-            "borgitory.utils.secure_path.validate_mnt_path"
-        ) as mock_validate, patch("os.path.realpath") as mock_realpath:
-            mock_validate.return_value = Path("/app/data/test")
-            mock_realpath.return_value = "/mnt"
-
-            assert user_secure_isdir("/app/data/test") is False
-
-    def test_user_secure_isdir_permission_error(self) -> None:
-        """Test handling permission errors in user directory check."""
-        with patch(
-            "borgitory.utils.secure_path.validate_mnt_path"
-        ) as mock_validate, patch("os.path.realpath") as mock_realpath:
-            mock_path = Mock()
-            mock_path.is_dir.side_effect = PermissionError("Access denied")
-            mock_validate.return_value = mock_path
-            mock_realpath.return_value = "/mnt"
-
-            with patch.object(Path, "__str__", return_value="/mnt/test"):
-                assert user_secure_isdir("/mnt/test") is False
-
-    def test_user_get_directory_listing_valid(self) -> None:
-        """Test user directory listing for valid /mnt paths."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            subdir = os.path.join(temp_dir, "subdir")
-            os.makedirs(subdir)
-
-            with patch(
-                "borgitory.utils.secure_path.validate_mnt_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(temp_dir)
-
-                result = user_get_directory_listing("/mnt/test")
-                assert len(result) == 1
-                assert result[0]["name"] == "subdir"
-
-    def test_user_get_directory_listing_invalid_path(self) -> None:
-        """Test user directory listing for invalid paths."""
-        result = user_get_directory_listing("../../../etc")
-        assert result == []
-
-    def test_user_get_directory_listing_with_files(self) -> None:
-        """Test user directory listing including files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            Path(test_file).touch()
-
-            with patch(
-                "borgitory.utils.secure_path.validate_mnt_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(temp_dir)
-
-                result = user_get_directory_listing("/mnt/test", include_files=True)
-                assert len(result) == 1
-                assert result[0]["name"] == "test.txt"
-
-    def test_user_get_directory_listing_permission_error(self) -> None:
-        """Test handling permission errors in user directory listing."""
-        with patch("borgitory.utils.secure_path.validate_mnt_path") as mock_validate:
-            mock_path = Mock()
-            mock_path.is_dir.return_value = True
-            mock_path.iterdir.side_effect = PermissionError("Access denied")
-            mock_validate.return_value = mock_path
-
-            result = user_get_directory_listing("/mnt/test")
-            assert result == []
-
-
-class TestValidateUserRepositoryPath:
-    """Test user repository path validation."""
-
-    def test_validate_user_repository_path_valid(self) -> None:
-        """Test validation of valid user repository paths."""
-        with patch("borgitory.utils.secure_path.validate_mnt_path") as mock_validate:
-            mock_validate.return_value = Path("/mnt/repo")
-
-            result = validate_user_repository_path("/mnt/repo")
-            assert result is not None
-
-    def test_validate_user_repository_path_invalid(self) -> None:
-        """Test validation rejects invalid paths."""
-        with patch("borgitory.utils.secure_path.validate_mnt_path") as mock_validate:
-            mock_validate.return_value = None
-
-            result = validate_user_repository_path("/etc/passwd")
-            assert result is None
-
-
-class TestPathSecurityError:
-    """Test PathSecurityError exception."""
-
-    def test_path_security_error_creation(self):
-        """Test that PathSecurityError can be created and raised."""
-        with pytest.raises(PathSecurityError):
-            raise PathSecurityError("Test error message")
-
-    def test_path_security_error_inheritance(self) -> None:
-        """Test that PathSecurityError inherits from Exception."""
-        error = PathSecurityError("Test")
-        assert isinstance(error, Exception)
-
-
-class TestEdgeCasesAndErrorHandling:
-    """Test edge cases and error handling scenarios."""
-
-    def test_validate_secure_path_os_error(self) -> None:
-        """Test handling of OS errors during path validation."""
-        with patch("os.path.realpath") as mock_realpath:
-            mock_realpath.side_effect = OSError("Filesystem error")
-
-            from borgitory.utils.secure_path import validate_secure_path
-
-            result = validate_secure_path("/mnt/test")
-            assert result is None
-
-    def test_secure_path_join_no_safe_parts(self) -> None:
-        """Test secure path join with no safe parts after cleaning."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            mnt_dir = os.path.join(temp_dir, "mnt")
-            os.makedirs(mnt_dir, exist_ok=True)
-
-            with patch(
-                "borgitory.utils.secure_path.validate_secure_path"
-            ) as mock_validate:
-                mock_validate.return_value = Path(mnt_dir)
-
-                # All parts should be cleaned away
-                result = secure_path_join(mnt_dir, "../..", "../../..", "")
-                assert result == str(Path(mnt_dir))
-
-    def test_filename_edge_cases(self) -> None:
-        """Test filename sanitization edge cases."""
-        # Test filename that becomes empty after sanitization
-        result = sanitize_filename("...")
-        assert result == "unnamed"
-
-        # Test filename with only extension (leading dot stripped)
-        result = sanitize_filename(".txt")
-        assert result == "txt"
-
-        # Test very short max_length - function preserves extension
-        result = sanitize_filename("test.txt", max_length=3)
-        # With max_length=3, it should truncate but keep extension
-        assert (
-            result == "t.txt" or len(result) <= 8
-        )  # Allow for extension preservation logic
-
-    def test_create_secure_filename_edge_cases(self) -> None:
-        """Test secure filename creation edge cases."""
-        # Test with empty base name
-        result = create_secure_filename("")
-        assert result.startswith("unnamed_")
-
-        # Test with extension that becomes empty after sanitization
-        result = create_secure_filename("test", "file.!@#$%")
-        assert not result.endswith(".")
-
-        # Test with very long extension
-        long_ext = "a" * 20
-        result = create_secure_filename("test", f"file.{long_ext}")
-        # Extension should be truncated to 10 chars
-        assert len(result.split(".")[-1]) <= 10
-
-    def test_windows_path_handling(self) -> None:
-        """Test Windows-specific path handling in pre-validation."""
-        from borgitory.utils.secure_path import _pre_validate_user_input
-
-        allowed_prefixes = ["/mnt", "/app/data"]
-
-        with patch("os.name", "nt"), patch("os.path.isabs") as mock_isabs:
-            mock_isabs.return_value = True
-
-            # Test Windows path that should be allowed
-            assert _pre_validate_user_input("C:\\mnt\\test", allowed_prefixes) is True
-
-            # Test Windows path that should be rejected
-            assert (
-                _pre_validate_user_input("C:\\Windows\\System32", allowed_prefixes)
-                is False
-            )
+            names = [item.name for item in result]
+            assert names == ["apple", "banana", "zebra"]

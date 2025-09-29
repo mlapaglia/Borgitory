@@ -12,11 +12,6 @@ from .command_protocols import (
     ProcessExecutorProtocol,
 )
 
-# Storage and volume protocols
-from .storage_protocols import (
-    VolumeServiceProtocol,
-)
-
 # Job management protocols
 from .job_protocols import (
     JobStatusProtocol,
@@ -52,8 +47,6 @@ __all__ = [
     "CommandResult",
     "CommandRunnerProtocol",
     "ProcessExecutorProtocol",
-    # Storage protocols
-    "VolumeServiceProtocol",
     # Job protocols
     "JobStatusProtocol",
     "JobManagerProtocol",

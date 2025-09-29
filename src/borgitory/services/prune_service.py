@@ -4,14 +4,48 @@ Handles all prune configuration-related business operations independent of HTTP 
 """
 
 import logging
-from typing import List, Optional, Dict, Tuple, Union
+from dataclasses import dataclass
+from typing import List, Optional, Dict, Union, cast
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import PruneConfig, Repository
 from borgitory.models.schemas import PruneConfigCreate, PruneConfigUpdate
-from borgitory.constants.retention import RetentionFieldHandler
+from borgitory.constants.retention import RetentionFieldHandler, RetentionConfigProtocol
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PruneConfigOperationResult:
+    """Result of a prune configuration operation (create, update, enable, disable)."""
+
+    success: bool
+    config: Optional[PruneConfig] = None
+    error_message: Optional[str] = None
+
+    @property
+    def is_error(self) -> bool:
+        """Check if the operation resulted in an error."""
+        return not self.success or self.error_message is not None
+
+    def raise_if_error(self) -> None:
+        """Raise an exception if the operation failed."""
+        if self.is_error:
+            raise ValueError(self.error_message or "Prune config operation failed")
+
+
+@dataclass
+class PruneConfigDeleteResult:
+    """Result of prune configuration deletion operations."""
+
+    success: bool
+    config_name: Optional[str] = None
+    error_message: Optional[str] = None
+
+    @property
+    def is_error(self) -> bool:
+        """Check if the deletion resulted in an error."""
+        return not self.success or self.error_message is not None
 
 
 class PruneService:
@@ -33,7 +67,7 @@ class PruneService:
 
     def create_prune_config(
         self, prune_config: PruneConfigCreate
-    ) -> Tuple[bool, Optional[PruneConfig], Optional[str]]:
+    ) -> PruneConfigOperationResult:
         """
         Create a new prune configuration.
 
@@ -47,13 +81,19 @@ class PruneService:
                 .first()
             )
             if existing:
-                return False, None, "A prune policy with this name already exists"
+                return PruneConfigOperationResult(
+                    success=False,
+                    error_message="A prune policy with this name already exists",
+                )
 
             db_config = PruneConfig()
             db_config.name = prune_config.name
             db_config.strategy = prune_config.strategy
             db_config.keep_within_days = prune_config.keep_within_days
-            RetentionFieldHandler.copy_fields(prune_config, db_config)
+            RetentionFieldHandler.copy_fields(
+                cast(RetentionConfigProtocol, prune_config),
+                cast(RetentionConfigProtocol, db_config),
+            )
             db_config.show_list = prune_config.show_list
             db_config.show_stats = prune_config.show_stats
             db_config.save_space = prune_config.save_space
@@ -63,15 +103,18 @@ class PruneService:
             self.db.commit()
             self.db.refresh(db_config)
 
-            return True, db_config, None
+            return PruneConfigOperationResult(success=True, config=db_config)
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to create prune configuration: {str(e)}"
+            return PruneConfigOperationResult(
+                success=False,
+                error_message=f"Failed to create prune configuration: {str(e)}",
+            )
 
     def update_prune_config(
         self, config_id: int, prune_config_update: PruneConfigUpdate
-    ) -> Tuple[bool, Optional[PruneConfig], Optional[str]]:
+    ) -> PruneConfigOperationResult:
         """
         Update an existing prune configuration.
 
@@ -83,7 +126,9 @@ class PruneService:
                 self.db.query(PruneConfig).filter(PruneConfig.id == config_id).first()
             )
             if not config:
-                return False, None, "Prune configuration not found"
+                return PruneConfigOperationResult(
+                    success=False, error_message="Prune configuration not found"
+                )
 
             update_dict = prune_config_update.model_dump(exclude_unset=True)
             if "name" in update_dict and update_dict["name"] != config.name:
@@ -96,7 +141,10 @@ class PruneService:
                     .first()
                 )
                 if existing:
-                    return False, None, "A prune policy with this name already exists"
+                    return PruneConfigOperationResult(
+                        success=False,
+                        error_message="A prune policy with this name already exists",
+                    )
 
             for field, value in update_dict.items():
                 if hasattr(config, field):
@@ -105,15 +153,16 @@ class PruneService:
             self.db.commit()
             self.db.refresh(config)
 
-            return True, config, None
+            return PruneConfigOperationResult(success=True, config=config)
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to update prune configuration: {str(e)}"
+            return PruneConfigOperationResult(
+                success=False,
+                error_message=f"Failed to update prune configuration: {str(e)}",
+            )
 
-    def enable_prune_config(
-        self, prune_config_id: int
-    ) -> Tuple[bool, Optional[PruneConfig], Optional[str]]:
+    def enable_prune_config(self, prune_config_id: int) -> PruneConfigOperationResult:
         """
         Enable a prune configuration.
 
@@ -127,21 +176,24 @@ class PruneService:
                 .first()
             )
             if not config:
-                return False, None, "Prune configuration not found"
+                return PruneConfigOperationResult(
+                    success=False, error_message="Prune configuration not found"
+                )
 
             config.enabled = True
             self.db.commit()
             self.db.refresh(config)
 
-            return True, config, None
+            return PruneConfigOperationResult(success=True, config=config)
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to enable prune configuration: {str(e)}"
+            return PruneConfigOperationResult(
+                success=False,
+                error_message=f"Failed to enable prune configuration: {str(e)}",
+            )
 
-    def disable_prune_config(
-        self, prune_config_id: int
-    ) -> Tuple[bool, Optional[PruneConfig], Optional[str]]:
+    def disable_prune_config(self, prune_config_id: int) -> PruneConfigOperationResult:
         """
         Disable a prune configuration.
 
@@ -155,21 +207,24 @@ class PruneService:
                 .first()
             )
             if not config:
-                return False, None, "Prune configuration not found"
+                return PruneConfigOperationResult(
+                    success=False, error_message="Prune configuration not found"
+                )
 
             config.enabled = False
             self.db.commit()
             self.db.refresh(config)
 
-            return True, config, None
+            return PruneConfigOperationResult(success=True, config=config)
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to disable prune configuration: {str(e)}"
+            return PruneConfigOperationResult(
+                success=False,
+                error_message=f"Failed to disable prune configuration: {str(e)}",
+            )
 
-    def delete_prune_config(
-        self, prune_config_id: int
-    ) -> Tuple[bool, Optional[str], Optional[str]]:
+    def delete_prune_config(self, prune_config_id: int) -> PruneConfigDeleteResult:
         """
         Delete a prune configuration.
 
@@ -183,17 +238,22 @@ class PruneService:
                 .first()
             )
             if not config:
-                return False, None, "Prune configuration not found"
+                return PruneConfigDeleteResult(
+                    success=False, error_message="Prune configuration not found"
+                )
 
             config_name = config.name
             self.db.delete(config)
             self.db.commit()
 
-            return True, config_name, None
+            return PruneConfigDeleteResult(success=True, config_name=config_name)
 
         except Exception as e:
             self.db.rollback()
-            return False, None, f"Failed to delete prune configuration: {str(e)}"
+            return PruneConfigDeleteResult(
+                success=False,
+                error_message=f"Failed to delete prune configuration: {str(e)}",
+            )
 
     def get_configs_with_descriptions(
         self,

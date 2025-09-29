@@ -3,11 +3,11 @@ import platform
 import sys
 import os
 import logging
-from typing import Dict, Optional, TypedDict, List
+from typing import Dict, Optional, TypedDict
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job
-from borgitory.protocols import VolumeServiceProtocol, JobManagerProtocol
+from borgitory.protocols import JobManagerProtocol
 from borgitory.protocols.environment_protocol import EnvironmentProtocol
 
 logger = logging.getLogger(__name__)
@@ -69,16 +69,6 @@ class ToolInfo(TypedDict, total=False):
     error: str
 
 
-class VolumeDebugInfo(TypedDict, total=False):
-    """Volume debug information structure"""
-
-    # Success fields
-    mounted_volumes: List[str]
-    total_mounted_volumes: int
-    # Error field
-    error: str
-
-
 class JobManagerInfo(TypedDict, total=False):
     """Job manager information structure"""
 
@@ -101,7 +91,6 @@ class DebugInfo(TypedDict):
     system: SystemInfo
     application: ApplicationInfo
     database: DatabaseInfo
-    volumes: VolumeDebugInfo
     tools: Dict[str, ToolInfo]
     environment: Dict[str, str]
     job_manager: JobManagerInfo
@@ -112,11 +101,9 @@ class DebugService:
 
     def __init__(
         self,
-        volume_service: VolumeServiceProtocol,
         job_manager: JobManagerProtocol,
         environment: EnvironmentProtocol,
     ) -> None:
-        self.volume_service = volume_service
         self.job_manager = job_manager
         self.environment = environment
 
@@ -127,7 +114,6 @@ class DebugService:
             "system": await self._get_system_info(),
             "application": await self._get_application_info(),
             "database": self._get_database_info(db),
-            "volumes": await self._get_volume_info(),
             "tools": await self._get_tool_versions(),
             "environment": self._get_environment_info(),
             "job_manager": self._get_job_manager_info(),
@@ -254,28 +240,6 @@ class DebugService:
         except Exception as e:
             return {"error": str(e), "database_accessible": False}
 
-    async def _get_volume_info(self) -> VolumeDebugInfo:
-        """Get volume mount information"""
-        try:
-            volume_info = await self.volume_service.get_volume_info()
-            mounted_volumes = volume_info.get("mounted_volumes", [])
-            if not isinstance(mounted_volumes, list):
-                mounted_volumes = []
-
-            volume_debug_info: VolumeDebugInfo = {
-                "mounted_volumes": mounted_volumes,
-                "total_mounted_volumes": len(mounted_volumes),
-            }
-            return volume_debug_info
-
-        except Exception as e:
-            error_info: VolumeDebugInfo = {
-                "error": str(e),
-                "mounted_volumes": [],
-                "total_mounted_volumes": 0,
-            }
-            return error_info
-
     async def _get_tool_versions(self) -> Dict[str, ToolInfo]:
         """Get versions of external tools"""
         tools: Dict[str, ToolInfo] = {}
@@ -364,46 +328,6 @@ class DebugService:
                 }
         except Exception as e:
             tools["fuse3"] = {"error": str(e), "accessible": False}
-
-        try:
-            process = await asyncio.create_subprocess_exec(
-                "dpkg",
-                "-l",
-                "python3-pyfuse3",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                output = stdout.decode().strip()
-                # Parse dpkg output to get version
-                lines = output.split("\n")
-                for line in lines:
-                    if line.startswith("ii") and "python3-pyfuse3" in line:
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            version = parts[2]
-                            tools["python3-pyfuse3"] = {
-                                "version": f"python3-pyfuse3 {version}",
-                                "accessible": True,
-                            }
-                            break
-                else:
-                    tools["python3-pyfuse3"] = {
-                        "error": "Package info not found",
-                        "accessible": False,
-                    }
-            else:
-                tools["python3-pyfuse3"] = {
-                    "error": stderr.decode().strip()
-                    if stderr
-                    else "Package not installed",
-                    "accessible": False,
-                }
-        except Exception as e:
-            tools["python3-pyfuse3"] = {"error": str(e), "accessible": False}
 
         return tools
 

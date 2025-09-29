@@ -5,7 +5,7 @@ import subprocess
 import time
 import requests
 import os
-from typing import Optional
+from typing import Generator, Optional
 
 
 class AppRunner:
@@ -32,7 +32,7 @@ class AppRunner:
             db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"
         self.db_filename = db_filename
 
-        self.process: Optional[subprocess.Popen] = None
+        self.process: Optional[subprocess.Popen[bytes]] = None
         self.base_url = f"http://localhost:{port}"
 
     def start(self, timeout: int = 30) -> bool:
@@ -100,7 +100,7 @@ class AppRunner:
         except (requests.ConnectionError, requests.Timeout):
             return False
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the application process."""
         if self.process:
             try:
@@ -141,7 +141,7 @@ class AppRunner:
 
 
 @pytest.fixture
-def app_runner_module(temp_data_dir):
+def app_runner_module(temp_data_dir: str) -> Generator[AppRunner, None, None]:
     """Create a single AppRunner instance for all tests in this module."""
     # Changed from module scope to function scope to ensure test isolation
     runner = AppRunner(temp_data_dir)
@@ -162,14 +162,14 @@ def app_runner_module(temp_data_dir):
 
 
 @pytest.fixture
-def app_runner(temp_data_dir):
+def app_runner(temp_data_dir: str) -> Generator[AppRunner, None, None]:
     """Create an AppRunner instance for individual tests that need their own instance."""
     runner = AppRunner(temp_data_dir)
     yield runner
     runner.stop()
 
 
-def test_app_starts_successfully(app_runner):
+def test_app_starts_successfully(app_runner: AppRunner) -> None:
     """Test that the application starts without crashing."""
     success = app_runner.start(timeout=30)
 
@@ -193,7 +193,7 @@ def test_app_starts_successfully(app_runner):
     assert app_runner.process.poll() is None, "Application process died after startup"
 
 
-def test_app_responds_to_health_check(app_runner_module):
+def test_app_responds_to_health_check(app_runner_module: AppRunner) -> None:
     """Test that the application responds to basic health check requests."""
     # App is already started by the module fixture
 
@@ -210,7 +210,7 @@ def test_app_responds_to_health_check(app_runner_module):
     assert len(response.text) > 0, "Response body is empty"
 
 
-def test_app_serves_main_page(app_runner_module):
+def test_app_serves_main_page(app_runner_module: AppRunner) -> None:
     """Test that the application serves the main page."""
     # App is already started by the module fixture
 
@@ -227,7 +227,7 @@ def test_app_serves_main_page(app_runner_module):
         assert "html" in response.text.lower() or "<!DOCTYPE" in response.text
 
 
-def test_app_handles_auth_check_endpoint(app_runner_module):
+def test_app_handles_auth_check_endpoint(app_runner_module: AppRunner) -> None:
     """Test that the auth check endpoint works."""
     # App is already started by the module fixture
 
@@ -250,7 +250,7 @@ def test_app_handles_auth_check_endpoint(app_runner_module):
     ), "Response doesn't appear to contain a form"
 
 
-def test_app_startup_with_fresh_database(app_runner):
+def test_app_startup_with_fresh_database(app_runner: AppRunner) -> None:
     """Test that the application can start with a completely fresh database."""
     # App should start and create database automatically (migration handles this)
     assert app_runner.start(timeout=30), (
@@ -264,12 +264,14 @@ def test_app_startup_with_fresh_database(app_runner):
     )
 
 
-def test_app_shutdown_gracefully(app_runner):
+def test_app_shutdown_gracefully(app_runner: AppRunner) -> None:
     """Test that the application shuts down gracefully."""
     assert app_runner.start(timeout=30), "Application failed to start"
 
     # Verify app is running
-    assert app_runner.process.poll() is None, "Process not running"
+    assert app_runner.process is not None and app_runner.process.poll() is None, (
+        "Process not running"
+    )
 
     # Stop the app
     app_runner.stop()

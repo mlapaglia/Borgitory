@@ -24,7 +24,7 @@ class TestJobStreamingFixes:
         return manager
 
     @pytest.fixture
-    def job_stream_service(self, mock_job_manager) -> JobStreamService:
+    def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         """Create JobStreamService with mocked dependencies"""
         return JobStreamService(job_manager=mock_job_manager)
 
@@ -265,7 +265,6 @@ class TestJobRenderServiceUUIDIntegration:
     ) -> None:
         """Test that JobRenderService properly handles UUID-based job identification"""
         from tests.utils.di_testing import MockServiceFactory
-        from unittest.mock import Mock
         from borgitory.services.jobs.job_render_service import JobDisplayData, JobStatus
 
         # Create service with mocked dependencies

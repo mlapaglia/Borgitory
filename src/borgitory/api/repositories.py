@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import List
 from fastapi import (
     APIRouter,
     Depends,
@@ -27,7 +27,6 @@ from borgitory.dependencies import (
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
     ImportRepositoryRequest,
-    RepositoryScanRequest,
     DeleteRepositoryRequest,
 )
 from borgitory.utils.datetime_utils import (
@@ -40,14 +39,12 @@ from borgitory.utils.template_responses import (
 )
 from borgitory.api.auth import get_current_user
 from borgitory.utils.secure_path import (
-    PathSecurityError,
-    # User-facing functions for repos/backup sources (only /mnt)
-    user_secure_exists,
-    user_secure_isdir,
-    user_get_directory_listing,
+    DirectoryInfo,
+    secure_exists,
+    secure_isdir,
+    get_directory_listing,
 )
 from borgitory.utils.path_prefix import (
-    normalize_path_with_mnt_prefix,
     parse_path_for_autocomplete,
 )
 from starlette.templating import _TemplateResponse
@@ -56,17 +53,13 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-class DirectoryInfo(BaseModel):
-    """Directory information model"""
-
-    name: str
-    path: str
-
-
 class DirectoryListResponse(BaseModel):
     """Response model for directory listing"""
 
     directories: List[DirectoryInfo]
+
+    class Config:
+        from_attributes = True
 
 
 @router.post("/")
@@ -82,8 +75,9 @@ async def create_repository(
     create_request = CreateRepositoryRequest(
         name=repo.name,
         path=repo.path,
-        passphrase=repo.passphrase,
+        passphrase=repo.passphrase or "",
         user_id=current_user.id,
+        cache_dir=repo.cache_dir,
     )
 
     # Call business service
@@ -99,21 +93,6 @@ def list_repositories(
 ) -> List[Repository]:
     repositories = db.query(Repository).offset(skip).limit(limit).all()
     return repositories
-
-
-@router.get("/scan")
-async def scan_repositories(
-    request: Request, repo_svc: RepositoryServiceDep
-) -> HTMLResponse:
-    """Scan for existing repositories - thin controller using business logic service."""
-    # Create scan request
-    scan_request = RepositoryScanRequest()
-
-    # Call business service
-    result = await repo_svc.scan_repositories(scan_request)
-
-    # Handle response formatting
-    return RepositoryResponseHandler.handle_scan_response(request, result)
 
 
 @router.get("/html", response_class=HTMLResponse)
@@ -141,24 +120,19 @@ def get_repositories_html(
 
 
 @router.get("/directories", response_model=DirectoryListResponse)
-async def list_directories(path: str = "/mnt") -> DirectoryListResponse:
-    """List directories at the given path for autocomplete functionality. All paths must be under /mnt."""
+async def list_directories(path: str = "/") -> DirectoryListResponse:
+    """List directories at the given path for autocomplete functionality."""
 
     try:
-        if not user_secure_exists(path):
+        if not secure_exists(path):
             return DirectoryListResponse(directories=[])
 
-        if not user_secure_isdir(path):
+        if not secure_isdir(path):
             return DirectoryListResponse(directories=[])
 
-        directories = user_get_directory_listing(path, include_files=False)
-        directory_infos = [DirectoryInfo(**dir_info) for dir_info in directories]
+        directories = get_directory_listing(path, include_files=False)
 
-        return DirectoryListResponse(directories=directory_infos)
-
-    except PathSecurityError as e:
-        logger.warning(f"Path security violation: {e}")
-        return DirectoryListResponse(directories=[])
+        return DirectoryListResponse(directories=directories)
 
     except Exception as e:
         logger.error(f"Error listing directories at {path}: {e}")
@@ -190,28 +164,31 @@ async def list_directories_autocomplete(
             "import-path",
             "backup-source-path",
             "schedule-source-path",
+            "cache_dir",
+            "create-cache-dir",
+            "import-cache-dir",
         ]:
             input_value = str(form_data.get(param_name, ""))
             break
 
-    # Normalize the path with /mnt/ prefix
-    normalized_path = normalize_path_with_mnt_prefix(str(input_value))
+    if not input_value:
+        input_value = "/"
 
     # Parse the normalized path to get directory and search term
-    dir_path, search_term = parse_path_for_autocomplete(normalized_path)
+    dir_path, search_term = parse_path_for_autocomplete(input_value)
 
     try:
-        if not user_secure_exists(dir_path):
-            directories: List[Dict[str, str]] = []
-        elif not user_secure_isdir(dir_path):
+        if not secure_exists(dir_path):
+            directories: List[DirectoryInfo] = []
+        elif not secure_isdir(dir_path):
             directories = []
         else:
-            directories = user_get_directory_listing(dir_path, include_files=False)
+            directories = get_directory_listing(dir_path, include_files=False)
 
         # Filter directories based on search term
         if search_term:
             directories = [
-                d for d in directories if search_term.lower() in d["name"].lower()
+                d for d in directories if search_term.lower() in d.name.lower()
             ]
 
         # Get the target input ID from headers
@@ -224,20 +201,7 @@ async def list_directories_autocomplete(
                 "directories": directories,
                 "search_term": search_term,
                 "target_input": target_input,
-                "input_value": normalized_path,
-            },
-        )
-
-    except PathSecurityError as e:
-        logger.warning(f"Path security violation: {e}")
-        return templates.TemplateResponse(
-            request,
-            "partials/shared/path_autocomplete_dropdown.html",
-            {
-                "directories": [],
-                "search_term": search_term,
-                "target_input": "",
-                "error": str(e),
+                "input_value": input_value,
             },
         )
 
@@ -255,91 +219,6 @@ async def list_directories_autocomplete(
         )
 
 
-@router.get("/import-form-update", response_class=HTMLResponse)
-async def update_import_form(
-    request: Request,
-    templates: TemplatesDep,
-    borg_svc: BorgServiceDep,
-    path: str,
-    loading: str = "",
-) -> _TemplateResponse:
-    """Update import form fields based on selected repository path"""
-
-    if not path:
-        return templates.TemplateResponse(
-            request,
-            "partials/repositories/import/import_form_dynamic.html",
-            {
-                "path": "",
-                "show_encryption_info": False,
-                "show_passphrase": False,
-                "show_keyfile": False,
-                "enable_submit": False,
-                "preview": "",
-            },
-        )
-
-    if loading == "true":
-        return templates.TemplateResponse(
-            request,
-            "partials/repositories/import/import_form_loading.html",
-            {
-                "path": path,
-            },
-        )
-
-    try:
-        repository_scan_response = await borg_svc.scan_for_repositories()
-        selected_repo = None
-
-        for repo in repository_scan_response.repositories:
-            if repo.path == path:
-                selected_repo = repo
-                break
-
-        if not selected_repo:
-            logger.warning(f"Repository not found for path: {path}")
-            return templates.TemplateResponse(
-                request,
-                "partials/repositories/import/import_form_dynamic.html",
-                {
-                    "path": path,
-                    "show_encryption_info": True,
-                    "show_passphrase": False,  # Will be shown based on encryption type selection
-                    "show_keyfile": False,  # Will be shown based on encryption type selection
-                    "enable_submit": True,
-                    "preview": "Repository details not found - please re-scan",
-                },
-            )
-
-        # Always use the dynamic form since we can't auto-detect encryption
-        return templates.TemplateResponse(
-            request,
-            "partials/repositories/import/import_form_dynamic.html",
-            {
-                "path": path,
-                "show_encryption_info": True,
-                "show_passphrase": False,  # Will be shown based on encryption type selection
-                "show_keyfile": False,  # Will be shown based on encryption type selection
-                "enable_submit": True,
-                "preview": selected_repo.config_preview,
-            },
-        )
-
-    except Exception as e:
-        logger.error(f"Error updating import form: {e}")
-        return templates.TemplateResponse(
-            request,
-            "partials/repositories/import/import_form_simple.html",
-            {
-                "path": path,
-                "show_passphrase": True,
-                "show_keyfile": True,
-                "preview": "Error loading repository details",
-            },
-        )
-
-
 @router.get("/import-form", response_class=HTMLResponse)
 async def get_import_form(
     request: Request, templates: TemplatesDep
@@ -350,23 +229,17 @@ async def get_import_form(
     )
 
 
-@router.get("/import-form-inner", response_class=HTMLResponse)
-async def get_import_form_inner(
-    request: Request, templates: TemplatesDep
+@router.get("/import-encryption-fields", response_class=HTMLResponse)
+async def get_import_encryption_fields(
+    request: Request,
+    templates: TemplatesDep,
+    encryption_type: str = "",
 ) -> _TemplateResponse:
-    """Get the import repository form inner content (preserves tab state)"""
+    """Get the appropriate encryption fields based on encryption type selection."""
     return templates.TemplateResponse(
-        request, "partials/repositories/import/form_import_inner.html"
-    )
-
-
-@router.get("/import-form-clear", response_class=HTMLResponse)
-async def get_import_form_clear(
-    request: Request, templates: TemplatesDep
-) -> _TemplateResponse:
-    """Clear the selected repository form after successful import"""
-    return templates.TemplateResponse(
-        request, "partials/repositories/import/import_form_clear.html"
+        request,
+        "partials/repositories/import/encryption_fields.html",
+        {"encryption_type": encryption_type},
     )
 
 
@@ -390,23 +263,23 @@ async def import_repository(
     keyfile: UploadFile = File(None),
     encryption_type: str = Form(None),
     keyfile_content: str = Form(None),
+    cache_dir: str = Form(None),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
     import_request = ImportRepositoryRequest(
         name=name,
-        path=path,
+        path=path.strip(),
         passphrase=passphrase,
         keyfile=keyfile,
         encryption_type=encryption_type,
         keyfile_content=keyfile_content,
         user_id=None,  # Import doesn't require user ID currently
+        cache_dir=cache_dir.strip(),
     )
 
-    # Call business service
     result = await repo_svc.import_repository(import_request, db)
 
-    # Handle response formatting
     return RepositoryResponseHandler.handle_import_response(request, result)
 
 

@@ -3,6 +3,7 @@ Tests for DebugService - Service to gather system and application debug informat
 """
 
 import pytest
+from typing import Any
 from unittest.mock import patch, MagicMock, AsyncMock, Mock
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -12,13 +13,13 @@ from borgitory.services.debug_service import DebugService
 class MockEnvironment:
     """Mock environment for testing"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.env_vars = {}
         self.cwd = "/test/dir"
         self.current_time = datetime(2023, 1, 1, 12, 0, 0)
         self.database_url = "sqlite:///test.db"
 
-    def get_env(self, key: str, default: str = None) -> str:
+    def get_env(self, key: str, default: str = "") -> str:
         return self.env_vars.get(key, default)
 
     def get_cwd(self) -> str:
@@ -32,25 +33,12 @@ class MockEnvironment:
 
 
 @pytest.fixture
-def mock_environment():
+def mock_environment() -> MockEnvironment:
     return MockEnvironment()
 
 
 @pytest.fixture
-def mock_volume_service():
-    """Mock volume service for testing"""
-    from unittest.mock import AsyncMock
-
-    mock_service = AsyncMock()
-    mock_service.get_volume_info.return_value = {
-        "mounted_volumes": ["/data", "/backup"],
-        "total_mounted_volumes": 2,
-    }
-    return mock_service
-
-
-@pytest.fixture
-def mock_job_manager():
+def mock_job_manager() -> Mock:
     """Mock job manager for testing"""
     from unittest.mock import Mock
 
@@ -64,17 +52,19 @@ def mock_job_manager():
 
 
 @pytest.fixture
-def debug_service(mock_environment, mock_volume_service, mock_job_manager):
+def debug_service(
+    mock_environment: MockEnvironment,
+    mock_job_manager: Mock,
+) -> DebugService:
     """Debug service with all required dependencies injected"""
     return DebugService(
-        volume_service=mock_volume_service,
         job_manager=mock_job_manager,
         environment=mock_environment,
     )
 
 
 @pytest.fixture
-def mock_db_session():
+def mock_db_session() -> MagicMock:
     """Mock database session"""
     session = MagicMock(spec=Session)
     return session
@@ -85,7 +75,7 @@ class TestDebugService:
 
     @pytest.mark.asyncio
     async def test_get_debug_info_all_sections_success(
-        self, debug_service, mock_db_session
+        self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
         """Test successful retrieval of all debug info sections"""
         # Mock data that matches our TypedDict structures
@@ -119,11 +109,6 @@ class TestDebugService:
             "database_accessible": True,
         }
 
-        volume_info = {
-            "mounted_volumes": ["/data", "/backup"],
-            "total_mounted_volumes": 2,
-        }
-
         tools_info = {
             "borg": {"version": "borg 1.2.0", "accessible": True},
             "rclone": {"version": "rclone v1.58.0", "accessible": True},
@@ -144,8 +129,6 @@ class TestDebugService:
         ), patch.object(
             debug_service, "_get_database_info", return_value=db_info
         ), patch.object(
-            debug_service, "_get_volume_info", return_value=volume_info
-        ), patch.object(
             debug_service, "_get_tool_versions", return_value=tools_info
         ), patch.object(
             debug_service, "_get_environment_info", return_value=env_info
@@ -157,14 +140,13 @@ class TestDebugService:
             assert result["system"] == system_info
             assert result["application"] == app_info
             assert result["database"] == db_info
-            assert result["volumes"] == volume_info
             assert result["tools"] == tools_info
             assert result["environment"] == env_info
             assert result["job_manager"] == job_manager_info
 
     @pytest.mark.asyncio
     async def test_get_debug_info_handles_section_failures(
-        self, debug_service, mock_db_session
+        self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
         """Test that individual section failures are handled internally by each method"""
         # In the new architecture, methods handle their own exceptions and return error dicts
@@ -174,8 +156,6 @@ class TestDebugService:
             "startup_time": "2023-01-01T12:00:00",
             "working_directory": "/test/dir",
         }
-
-        volume_info = {"mounted_volumes": ["/data"], "total_mounted_volumes": 1}
 
         tools_info = {"borg": {"version": "borg 1.2.0", "accessible": True}}
 
@@ -196,8 +176,6 @@ class TestDebugService:
             "_get_database_info",
             return_value={"error": "DB error", "database_accessible": False},
         ), patch.object(
-            debug_service, "_get_volume_info", return_value=volume_info
-        ), patch.object(
             debug_service, "_get_tool_versions", return_value=tools_info
         ), patch.object(
             debug_service, "_get_environment_info", return_value=env_info
@@ -212,13 +190,12 @@ class TestDebugService:
                 "error": "DB error",
                 "database_accessible": False,
             }
-            assert result["volumes"] == volume_info
             assert result["tools"] == tools_info
             assert result["environment"] == env_info
             assert result["job_manager"] == job_manager_info
 
     @pytest.mark.asyncio
-    async def test_get_system_info(self, debug_service) -> None:
+    async def test_get_system_info(self, debug_service: DebugService) -> None:
         """Test system info collection"""
         with patch("platform.platform", return_value="Test Platform"), patch(
             "platform.system", return_value="TestOS"
@@ -242,7 +219,9 @@ class TestDebugService:
             assert result["python_executable"] == "/usr/bin/python"
 
     @pytest.mark.asyncio
-    async def test_get_application_info(self, debug_service, mock_environment) -> None:
+    async def test_get_application_info(
+        self, debug_service: DebugService, mock_environment: MockEnvironment
+    ) -> None:
         """Test application info collection"""
         # Configure mock environment
         mock_environment.env_vars = {"BORGITORY_VERSION": "1.0.0", "DEBUG": "false"}
@@ -258,7 +237,7 @@ class TestDebugService:
 
     @pytest.mark.asyncio
     async def test_get_application_info_debug_mode_true(
-        self, debug_service, mock_environment
+        self, debug_service: DebugService, mock_environment: MockEnvironment
     ) -> None:
         """Test application info with debug mode enabled"""
         # Configure mock environment for debug mode
@@ -268,7 +247,9 @@ class TestDebugService:
 
         assert result["debug_mode"] is True
 
-    def test_get_database_info_success(self, debug_service, mock_db_session) -> None:
+    def test_get_database_info_success(
+        self, debug_service: DebugService, mock_db_session: MagicMock
+    ) -> None:
         """Test successful database info collection"""
         # Mock query results with different chains for different calls
         repo_query_mock = MagicMock()
@@ -308,7 +289,7 @@ class TestDebugService:
             assert result["database_accessible"] is True
 
     def test_get_database_info_size_formatting(
-        self, debug_service, mock_db_session
+        self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
         """Test database size formatting for different sizes"""
         mock_db_session.query.return_value.count.return_value = 1
@@ -335,7 +316,7 @@ class TestDebugService:
             assert result["database_size"] == "2.0 GB"
 
     def test_get_database_info_exception_handling(
-        self, debug_service, mock_db_session
+        self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
         """Test database info exception handling"""
         mock_db_session.query.side_effect = Exception("Database error")
@@ -346,55 +327,7 @@ class TestDebugService:
         assert result["database_accessible"] is False
 
     @pytest.mark.asyncio
-    async def test_get_volume_info_success(
-        self, debug_service, mock_volume_service
-    ) -> None:
-        """Test volume info collection success"""
-        # Configure the mock volume service
-        mock_volume_service.get_volume_info.return_value = {
-            "mounted_volumes": ["/data", "/backup"],
-            "total_mounted_volumes": 2,
-        }
-
-        result = await debug_service._get_volume_info()
-
-        assert result["mounted_volumes"] == ["/data", "/backup"]
-        assert result["total_mounted_volumes"] == 2
-
-    @pytest.mark.asyncio
-    async def test_get_volume_info_with_volumes(
-        self, debug_service, mock_volume_service
-    ) -> None:
-        """Test volume info when volumes are present"""
-        # Configure the mock volume service for this specific test
-        mock_volume_service.get_volume_info.return_value = {
-            "mounted_volumes": ["/data"],
-            "total_mounted_volumes": 1,
-        }
-
-        result = await debug_service._get_volume_info()
-
-        assert result["mounted_volumes"] == ["/data"]
-        assert result["total_mounted_volumes"] == 1
-
-    @pytest.mark.asyncio
-    async def test_get_volume_info_service_failure(
-        self, debug_service, mock_volume_service
-    ) -> None:
-        """Test volume info when volume service fails"""
-        # Configure the mock volume service to raise an exception
-        mock_volume_service.get_volume_info.side_effect = Exception(
-            "Volume service error"
-        )
-
-        result = await debug_service._get_volume_info()
-
-        assert "error" in result
-        assert result["mounted_volumes"] == []
-        assert result["total_mounted_volumes"] == 0
-
-    @pytest.mark.asyncio
-    async def test_get_tool_versions_success(self, debug_service) -> None:
+    async def test_get_tool_versions_success(self, debug_service: DebugService) -> None:
         """Test successful tool version detection"""
         # Mock borg process
         mock_borg_process = MagicMock()
@@ -408,7 +341,7 @@ class TestDebugService:
             return_value=(b"rclone v1.58.0\n", b"")
         )
 
-        async def create_subprocess_side_effect(*args, **kwargs):
+        async def create_subprocess_side_effect(*args: Any, **kwargs: Any) -> Mock:
             if "borg" in args:
                 return mock_borg_process
             elif "rclone" in args:
@@ -425,7 +358,9 @@ class TestDebugService:
             assert result["rclone"]["accessible"] is True
 
     @pytest.mark.asyncio
-    async def test_get_tool_versions_command_failures(self, debug_service) -> None:
+    async def test_get_tool_versions_command_failures(
+        self, debug_service: DebugService
+    ) -> None:
         """Test tool version detection when commands fail"""
         # Mock borg process failure
         mock_borg_process = MagicMock()
@@ -435,7 +370,7 @@ class TestDebugService:
         )
 
         # Mock rclone exception
-        async def create_subprocess_side_effect(*args, **kwargs):
+        async def create_subprocess_side_effect(*args: Any, **kwargs: Any) -> Mock:
             if "borg" in args:
                 return mock_borg_process
             elif "rclone" in args:
@@ -451,7 +386,9 @@ class TestDebugService:
             assert result["rclone"]["accessible"] is False
             assert "error" in result["rclone"]
 
-    def test_get_environment_info(self, debug_service, mock_environment) -> None:
+    def test_get_environment_info(
+        self, debug_service: DebugService, mock_environment: MockEnvironment
+    ) -> None:
         """Test environment info collection"""
         # Configure mock environment
         mock_environment.env_vars = {

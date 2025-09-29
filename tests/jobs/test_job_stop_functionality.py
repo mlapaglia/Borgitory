@@ -11,14 +11,14 @@ from borgitory.models.job_results import JobStopResult, JobStopError
 class TestJobStopFunctionality:
     """Test job stopping functionality"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures"""
         self.mock_db = Mock()
         self.mock_job_manager = Mock()
         self.job_service = JobService(self.mock_db, self.mock_job_manager)
 
     @pytest.mark.asyncio
-    async def test_stop_job_success(self):
+    async def test_stop_job_success(self) -> None:
         """Test successful job stopping"""
         # Mock job manager stop_job response
         self.mock_job_manager.stop_job = AsyncMock(
@@ -40,7 +40,7 @@ class TestJobStopFunctionality:
         assert result.current_task_killed is True
 
     @pytest.mark.asyncio
-    async def test_stop_job_not_found(self):
+    async def test_stop_job_not_found(self) -> None:
         """Test stopping non-existent job"""
         # Mock job manager stop_job response for not found
         self.mock_job_manager.stop_job = AsyncMock(
@@ -59,7 +59,7 @@ class TestJobStopFunctionality:
         assert result.error_code == "JOB_NOT_FOUND"
 
     @pytest.mark.asyncio
-    async def test_stop_job_invalid_status(self):
+    async def test_stop_job_invalid_status(self) -> None:
         """Test stopping job in invalid status"""
         # Mock job manager stop_job response for invalid status
         self.mock_job_manager.stop_job = AsyncMock(
@@ -78,7 +78,7 @@ class TestJobStopFunctionality:
         assert result.error_code == "INVALID_STATUS"
 
     @pytest.mark.asyncio
-    async def test_stop_job_no_tasks_skipped(self):
+    async def test_stop_job_no_tasks_skipped(self) -> None:
         """Test stopping job with no remaining tasks"""
         # Mock job manager stop_job response with no tasks skipped
         self.mock_job_manager.stop_job = AsyncMock(

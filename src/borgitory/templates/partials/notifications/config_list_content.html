@@ -17,7 +17,7 @@
             <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
                 <div><strong>Provider:</strong> {{ config.provider.title() }}</div>
                 <div><strong>Notifications:</strong> {{ config.notification_desc }}</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ config.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ config.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) }}</div>
             </div>
         </div>
         <div class="flex flex-col space-y-2 ml-4">

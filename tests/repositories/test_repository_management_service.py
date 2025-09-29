@@ -34,22 +34,15 @@ class TestRepositoryManagementService:
         return mock
 
     @pytest.fixture
-    def mock_volume_service(self) -> Any:
-        """Mock volume service."""
-        return Mock()
-
-    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
-        mock_volume_service: Any,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
             scheduler_service=mock_scheduler_service,
-            volume_service=mock_volume_service,
         )
 
     @pytest.fixture
@@ -61,6 +54,7 @@ class TestRepositoryManagementService:
         repo.path = "/test/repo/path"
         repo.get_passphrase.return_value = "test_passphrase"
         repo.get_keyfile_content.return_value = None
+        repo.cache_dir = "/mnt/test/cache/dir"
         return repo
 
     def test_format_bytes_helper(self, repository_service: RepositoryService) -> None:
@@ -100,12 +94,10 @@ class TestRepositoryManagementService:
         repository_service: RepositoryService,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
-        mock_volume_service: Any,
     ) -> None:
         """Test that dependencies are properly injected."""
         assert repository_service.borg_service is mock_borg_service
         assert repository_service.scheduler_service is mock_scheduler_service
-        assert repository_service.volume_service is mock_volume_service
 
     def test_format_bytes_edge_cases(
         self, repository_service: RepositoryService
@@ -144,22 +136,15 @@ class TestRepositoryManagementBusinessLogic:
         return Mock()
 
     @pytest.fixture
-    def mock_volume_service(self) -> Any:
-        """Mock volume service."""
-        return Mock()
-
-    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
-        mock_volume_service: Any,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         return RepositoryService(
             borg_service=mock_borg_service,
             scheduler_service=mock_scheduler_service,
-            volume_service=mock_volume_service,
         )
 
     @pytest.fixture
@@ -171,6 +156,7 @@ class TestRepositoryManagementBusinessLogic:
         repo.path = "/test/repo/path"
         repo.get_passphrase.return_value = "test_passphrase"
         repo.get_keyfile_content.return_value = None
+        repo.cache_dir = "/mnt/test/cache/dir"
         return repo
 
     @pytest.mark.asyncio
@@ -217,6 +203,7 @@ class TestRepositoryManagementBusinessLogic:
                 passphrase=mock_repository.get_passphrase(),
                 keyfile_content=mock_repository.get_keyfile_content(),
                 additional_args=["--short"],
+                environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
     @pytest.mark.asyncio
@@ -339,6 +326,7 @@ class TestRepositoryManagementBusinessLogic:
                 passphrase=mock_repository.get_passphrase(),
                 keyfile_content=mock_repository.get_keyfile_content(),
                 additional_args=[],
+                environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
     @pytest.mark.asyncio
@@ -498,6 +486,7 @@ class TestRepositoryManagementBusinessLogic:
                 passphrase=mock_repository.get_passphrase(),
                 keyfile_content=mock_repository.get_keyfile_content(),
                 additional_args=[],
+                environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
     @pytest.mark.asyncio

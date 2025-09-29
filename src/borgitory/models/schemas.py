@@ -60,13 +60,11 @@ class RepositoryBase(BaseModel):
         pattern=r"^/.*",
         description="Absolute path to repository (must start with /)",
     )
-
-    @field_validator("path", mode="before")
-    @classmethod
-    def validate_path(cls, v: str) -> str:
-        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
-
-        return normalize_path_with_mnt_prefix(v)
+    cache_dir: Optional[str] = Field(
+        None,
+        pattern=r"^/.*",
+        description="Custom cache directory path (optional, must start with /)",
+    )
 
 
 class RepositoryCreate(RepositoryBase):
@@ -81,15 +79,7 @@ class RepositoryUpdate(BaseModel):
     )
     path: Optional[str] = Field(None, min_length=1, pattern=r"^/.*")
     passphrase: Optional[str] = Field(None, min_length=8)
-
-    @field_validator("path", mode="before")
-    @classmethod
-    def validate_path(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
-
-        return normalize_path_with_mnt_prefix(v)
+    cache_dir: Optional[str] = Field(None, pattern=r"^/.*")
 
 
 class Repository(RepositoryBase):
@@ -165,13 +155,6 @@ class ScheduleCreate(ScheduleBase):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
 
-    @field_validator("source_path", mode="before")
-    @classmethod
-    def validate_source_path(cls, v: Union[str, int, float, bool, None]) -> str:
-        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
-
-        return normalize_path_with_mnt_prefix(str(v))
-
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
     def validate_cloud_sync_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
@@ -243,15 +226,6 @@ class ScheduleUpdate(BaseModel):
     enabled: Optional[bool] = None
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
-
-    @field_validator("source_path", mode="before")
-    @classmethod
-    def validate_source_path(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
-
-        return normalize_path_with_mnt_prefix(v)
 
     @field_validator("pre_job_hooks", mode="before")
     @classmethod
@@ -330,7 +304,7 @@ class ScheduleUpdate(BaseModel):
 class Schedule(ScheduleBase):
     id: int = Field(gt=0)
     repository_id: int = Field(gt=0)
-    source_path: str = Field(default="/data", pattern=r"^/.*")
+    source_path: str = Field(default="/", pattern=r"^/.*")
     enabled: bool
     last_run: Optional[datetime] = None
     next_run: Optional[datetime] = None
@@ -460,13 +434,6 @@ class BackupRequest(BaseModel):
     notification_config_id: Optional[int] = Field(None, gt=0)
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
-
-    @field_validator("source_path", mode="before")
-    @classmethod
-    def validate_source_path(cls, v: Union[str, int, float, bool, None]) -> str:
-        from borgitory.utils.path_prefix import normalize_path_with_mnt_prefix
-
-        return normalize_path_with_mnt_prefix(str(v))
 
     @field_validator("dry_run", mode="before")
     @classmethod

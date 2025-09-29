@@ -22,7 +22,6 @@ from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.repositories.repository_service import RepositoryService
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.simple_command_runner import SimpleCommandRunner
-from borgitory.services.volumes.volume_service import VolumeService
 
 T = TypeVar("T")
 
@@ -70,7 +69,6 @@ def override_multiple_dependencies(
     Example:
         overrides = {
             get_borg_service: lambda: mock_borg_service,
-            get_volume_service: lambda: mock_volume_service,
         }
         with override_multiple_dependencies(overrides) as client:
             response = client.get("/api/repositories")
@@ -94,7 +92,6 @@ class MockServiceFactory:
         # Setup common return values
         mock.list_archives.return_value = []
         mock.verify_repository_access.return_value = True
-        mock.scan_for_repositories.return_value = []
 
         return mock
 
@@ -131,10 +128,6 @@ class MockServiceFactory:
                 "database_size": "1.0 MB",
                 "database_size_bytes": 1048576,
                 "database_accessible": True,
-            },
-            "volumes": {
-                "mounted_volumes": ["/data", "/backup"],
-                "total_mounted_volumes": 2,
             },
             "tools": {
                 "borg": {"version": "borg 1.2.0", "accessible": True},
@@ -265,7 +258,6 @@ class MockServiceFactory:
         mock = Mock(spec=RepositoryService)
 
         # Setup common return values
-        mock.scan_repositories.return_value = []
         mock.create_repository.return_value = {"id": 1, "name": "test-repo"}
         mock.delete_repository.return_value = True
 
@@ -304,25 +296,6 @@ class MockServiceFactory:
             )
 
         mock.run_command = mock_run_command
-        return mock
-
-    @staticmethod
-    def create_mock_volume_service() -> Mock:
-        """Create a mock VolumeService with common method signatures."""
-        mock = Mock(spec=VolumeService)
-
-        # Setup common return values that match our VolumeInfo TypedDict structure
-        from unittest.mock import AsyncMock
-
-        mock.get_mounted_volumes = AsyncMock(return_value=["/mnt/test-volume"])
-        mock.get_volume_info = AsyncMock(
-            return_value={
-                "mounted_volumes": ["/mnt/test-volume"],
-                "total_mounted_volumes": 1,
-                "accessible": True,
-            }
-        )
-
         return mock
 
     @staticmethod

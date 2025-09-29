@@ -56,7 +56,6 @@ from borgitory.services.repositories.repository_stats_service import (
 )
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
-from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.services.startup.package_restoration_service import (
     PackageRestorationService,
@@ -75,14 +74,36 @@ from borgitory.services.repositories.repository_check_config_service import (
 from borgitory.services.prune_service import PruneService
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.services.upcoming_backups_service import UpcomingBackupsService
+from borgitory.services.jobs.job_executor import JobExecutor
+from borgitory.services.jobs.job_output_manager import JobOutputManager
+from borgitory.services.jobs.job_queue_manager import JobQueueManager
+from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 from fastapi.templating import Jinja2Templates
 from starlette.templating import _TemplateResponse
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
     get_server_timezone,
 )
+
+
 from fastapi import Request
 from datetime import datetime, timedelta
+
+
+def datetime_browser_filter(
+    dt: datetime,
+    format_str: str = "%Y-%m-%d %H:%M:%S",
+    tz_offset: Optional[int] = None,
+) -> str:
+    """Jinja2 filter for datetime formatting with browser timezone conversion"""
+    if tz_offset is not None:
+        return format_datetime_for_display(
+            dt, format_str, browser_tz_offset_minutes=tz_offset
+        )
+    else:
+        # Fallback to server timezone when no browser offset available
+        return format_datetime_for_display(dt, format_str, get_server_timezone())
+
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncConfigService
@@ -91,7 +112,6 @@ if TYPE_CHECKING:
         CommandRunnerProtocol,
         ProcessExecutorProtocol,
     )
-    from borgitory.protocols.storage_protocols import VolumeServiceProtocol
     from borgitory.protocols.job_protocols import (
         JobManagerProtocol,
     )
@@ -100,11 +120,6 @@ if TYPE_CHECKING:
     from borgitory.services.repositories.repository_stats_service import (
         CommandExecutorInterface,
     )
-    from borgitory.services.jobs.job_manager import JobManagerConfig
-from borgitory.services.jobs.job_executor import JobExecutor
-from borgitory.services.jobs.job_output_manager import JobOutputManager
-from borgitory.services.jobs.job_queue_manager import JobQueueManager
-from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
 
 def get_subprocess_executor() -> Callable[
@@ -377,21 +392,6 @@ def get_file_system() -> "FileSystemInterface":
     return OsFileSystem()
 
 
-def get_volume_service(
-    filesystem: "FileSystemInterface" = Depends(get_file_system),
-) -> "VolumeServiceProtocol":
-    """
-    Provide VolumeServiceProtocol with injected filesystem dependency.
-
-    Args:
-        filesystem: Injected filesystem interface for volume operations
-
-    Returns:
-        VolumeServiceProtocol: Volume service with injected filesystem
-    """
-    return VolumeService(filesystem=filesystem)
-
-
 def get_hook_execution_service() -> HookExecutionService:
     """
     Provide a HookExecutionService instance with proper dependency injection.
@@ -487,15 +487,7 @@ def get_templates() -> TimezoneAwareJinja2Templates:
         """Jinja2 filter for datetime formatting with timezone conversion"""
         return format_datetime_for_display(dt, format_str, get_server_timezone())
 
-    def datetime_browser_filter(
-        dt: datetime,
-        format_str: str = "%Y-%m-%d %H:%M:%S",
-        tz_offset: Optional[int] = None,
-    ) -> str:
-        """Jinja2 filter for datetime formatting with browser timezone conversion"""
-        return format_datetime_for_display(
-            dt, format_str, browser_tz_offset_minutes=tz_offset
-        )
+    # Use the standalone datetime_browser_filter function
 
     def from_json_filter(json_str: str) -> List[Any]:
         """Jinja2 filter for parsing JSON strings"""
@@ -824,7 +816,6 @@ def get_job_render_service(
 
 
 def get_debug_service(
-    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> DebugService:
     """
@@ -832,7 +823,6 @@ def get_debug_service(
     Uses FastAPI DI with automatic dependency resolution.
     """
     return DebugService(
-        volume_service=volume_service,
         job_manager=job_manager,
         environment=DefaultEnvironment(),
     )
@@ -967,7 +957,6 @@ RepositoryStatsServiceDep = Annotated[
 SchedulerServiceDep = Annotated[
     SchedulerService, Depends(get_scheduler_service_dependency)
 ]
-VolumeServiceDep = Annotated[VolumeService, Depends(get_volume_service)]
 TaskDefinitionBuilderDep = Annotated[
     TaskDefinitionBuilder, Depends(get_task_definition_builder)
 ]
@@ -1095,7 +1084,6 @@ def get_borg_service(
     job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
     command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-    volume_service: "VolumeServiceProtocol" = Depends(get_volume_service),
     archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
 ) -> BorgService:
     """
@@ -1105,7 +1093,6 @@ def get_borg_service(
         job_executor: Injected job executor for running Borg processes
         command_runner: Injected command runner for system commands
         job_manager: Injected job manager for job lifecycle
-        volume_service: Injected volume service for mounted volumes
         archive_service: Injected archive service for archive operations
 
     Returns:
@@ -1115,7 +1102,6 @@ def get_borg_service(
         job_executor=job_executor,
         command_runner=command_runner,
         job_manager=job_manager,
-        volume_service=volume_service,
         archive_service=archive_service,
     )
 
@@ -1123,7 +1109,6 @@ def get_borg_service(
 def get_repository_service(
     borg_service: BorgService = Depends(get_borg_service),
     scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
-    volume_service: VolumeService = Depends(get_volume_service),
 ) -> RepositoryService:
     """
     Provide a RepositoryService instance with proper dependency injection.
@@ -1133,7 +1118,6 @@ def get_repository_service(
     return RepositoryService(
         borg_service=borg_service,
         scheduler_service=scheduler_service,
-        volume_service=volume_service,
     )
 
 

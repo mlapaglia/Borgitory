@@ -116,10 +116,6 @@ class RepositoryServiceProtocol(Protocol):
         """Delete a repository."""
         ...
 
-    async def scan_repositories(self) -> List[Dict[str, object]]:
-        """Scan for repositories on mounted volumes."""
-        ...
-
     def get_repository_stats(
         self,
         repository_id: int,

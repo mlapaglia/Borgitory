@@ -11,7 +11,7 @@ from borgitory.models.job_results import (
     JobStatusError,
     JobStopResult,
 )
-from borgitory.dependencies import JobServiceDep
+from borgitory.dependencies import JobServiceDep, get_browser_timezone_offset
 from borgitory.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from borgitory.dependencies import TemplatesDep
 
@@ -187,18 +187,25 @@ async def stream_all_jobs(
 
 @router.get("/html", response_class=HTMLResponse)
 def get_jobs_html(
+    request: Request,
     render_svc: JobRenderServiceDep,
     job_svc: JobServiceDep,
     expand: str = "",
 ) -> str:
     """Get job history as HTML"""
-    return render_svc.render_jobs_html(job_svc.db, expand)
+
+    browser_tz_offset = get_browser_timezone_offset(request)
+    return render_svc.render_jobs_html(job_svc.db, expand, browser_tz_offset)
 
 
 @router.get("/current/html", response_class=HTMLResponse)
-def get_current_jobs_html(render_svc: JobRenderServiceDep) -> HTMLResponse:
+def get_current_jobs_html(
+    request: Request, render_svc: JobRenderServiceDep
+) -> HTMLResponse:
     """Get current running jobs as HTML"""
-    html_content = render_svc.render_current_jobs_html()
+
+    browser_tz_offset = get_browser_timezone_offset(request)
+    html_content = render_svc.render_current_jobs_html(browser_tz_offset)
     return HTMLResponse(content=html_content)
 
 

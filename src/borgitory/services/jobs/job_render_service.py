@@ -100,18 +100,6 @@ class JobDisplayData:
     progress: JobProgress
     error: Optional[str] = None
 
-    @property
-    def started_at_formatted(self) -> str:
-        """Format start time for display"""
-        return self.started_at.strftime("%Y-%m-%d %H:%M") if self.started_at else "N/A"
-
-    @property
-    def finished_at_formatted(self) -> str:
-        """Format finish time for display"""
-        return (
-            self.finished_at.strftime("%Y-%m-%d %H:%M") if self.finished_at else "N/A"
-        )
-
 
 @dataclass
 class TemplateTaskData:
@@ -126,15 +114,6 @@ class TemplateTaskData:
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     return_code: Optional[int]
-
-    # Computed properties for templates
-    @property
-    def started_at_formatted(self) -> str:
-        return self.started_at.strftime("%H:%M:%S") if self.started_at else "N/A"
-
-    @property
-    def completed_at_formatted(self) -> str:
-        return self.completed_at.strftime("%H:%M:%S") if self.completed_at else "N/A"
 
 
 class TemplateJobStatus:
@@ -156,6 +135,7 @@ class TemplateJobContext:
 
     id: str
     status: TemplateJobStatus
+    started_at: Optional[datetime]
     finished_at: Optional[datetime]
     error: Optional[str]
 
@@ -171,8 +151,8 @@ class TemplateJobData:
     job_title: str
     status_class: str
     status_icon: str
-    started_at: str  # Pre-formatted
-    finished_at: str  # Pre-formatted (not finished_at_formatted)
+    started_at: Optional[datetime]  # Raw datetime for timezone-aware formatting
+    finished_at: Optional[datetime]  # Raw datetime for timezone-aware formatting
     repository_name: str
     sorted_tasks: List[TemplateTaskData]
     expand_details: bool = False  # For API state management
@@ -204,6 +184,7 @@ def convert_to_template_data(
         status=TemplateJobStatus(
             job_data.status.type.value
         ),  # Wrapper for .title() method
+        started_at=job_data.started_at,
         finished_at=job_data.finished_at,
         error=job_data.error,
     )
@@ -213,8 +194,8 @@ def convert_to_template_data(
         job_title=job_data.title,
         status_class=job_data.status.css_class,
         status_icon=job_data.status.icon,
-        started_at=job_data.started_at_formatted,
-        finished_at=job_data.finished_at_formatted,
+        started_at=job_data.started_at,  # Raw datetime for timezone-aware formatting
+        finished_at=job_data.finished_at,  # Raw datetime for timezone-aware formatting
         repository_name=job_data.repository_name,
         sorted_tasks=template_tasks,
         expand_details=expand_details,
@@ -441,7 +422,9 @@ class JobRenderService:
             logger.error(f"Error getting job display data for {job_id}: {e}")
             return None
 
-    def render_jobs_html(self, db: Session, expand: str = "") -> str:
+    def render_jobs_html(
+        self, db: Session, expand: str = "", browser_tz_offset: Optional[int] = None
+    ) -> str:
         """Render job history as HTML"""
         try:
             # Get recent jobs (last 20) with their tasks
@@ -465,7 +448,9 @@ class JobRenderService:
                 job_data = self.converter.fix_failed_job_tasks(job_data)
                 should_expand = bool(expand and job_data.id == expand)
                 html_content += self._render_job_html(
-                    job_data, expand_details=should_expand
+                    job_data,
+                    expand_details=should_expand,
+                    browser_tz_offset=browser_tz_offset,
                 )
 
             html_content += "</div>"
@@ -477,7 +462,7 @@ class JobRenderService:
                 message=f"Error loading jobs: {str(e)}", padding="4"
             )
 
-    def render_current_jobs_html(self) -> str:
+    def render_current_jobs_html(self, browser_tz_offset: Optional[int] = None) -> str:
         """Render current running jobs as HTML"""
         try:
             current_jobs_data = []
@@ -493,9 +478,7 @@ class JobRenderService:
                                 0
                             ],  # Extract job type from title
                             "status": job_data.status.type.value,
-                            "started_at": job_data.started_at.strftime("%H:%M:%S")
-                            if job_data.started_at
-                            else "N/A",
+                            "started_at": job_data.started_at,  # Pass raw datetime for timezone conversion in template
                             "progress_info": job_data.progress.current_task_name
                             or f"{job_data.progress.display_text}",
                         }
@@ -508,6 +491,7 @@ class JobRenderService:
                 current_jobs=current_jobs_data,
                 message="No operations currently running.",
                 padding="4",
+                browser_tz_offset=browser_tz_offset,
             )
 
         except Exception as e:
@@ -517,13 +501,18 @@ class JobRenderService:
             )
 
     def _render_job_html(
-        self, job_data: JobDisplayData, expand_details: bool = False
+        self,
+        job_data: JobDisplayData,
+        expand_details: bool = False,
+        browser_tz_offset: Optional[int] = None,
     ) -> str:
         """Render HTML for a single job using JobDisplayData"""
         try:
             template_data = convert_to_template_data(job_data, expand_details)
+            context = template_data.__dict__.copy()
+            context["browser_tz_offset"] = browser_tz_offset
             return self.templates.get_template("partials/jobs/job_item.html").render(
-                template_data.__dict__
+                context
             )
         except Exception as e:
             logger.error(f"Error rendering job HTML for {job_data.id}: {e}")

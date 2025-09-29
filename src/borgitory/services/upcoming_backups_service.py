@@ -34,7 +34,9 @@ class UpcomingBackupsService:
     def __init__(self, cron_description_service: CronDescriptionService) -> None:
         self.cron_description_service = cron_description_service
 
-    def process_jobs(self, jobs_raw: List[Dict[str, object]]) -> List[Dict[str, str]]:
+    def process_jobs(
+        self, jobs_raw: List[Dict[str, object]]
+    ) -> List[Dict[str, str | datetime]]:
         """Process raw job data into formatted upcoming backup information."""
         processed_jobs = []
 
@@ -45,7 +47,9 @@ class UpcomingBackupsService:
 
         return processed_jobs
 
-    def _process_single_job(self, job: Dict[str, object]) -> Dict[str, str] | None:
+    def _process_single_job(
+        self, job: Dict[str, object]
+    ) -> Dict[str, str | datetime] | None:
         """Process a single job into formatted data."""
         try:
             next_run_val = job.get("next_run")
@@ -61,12 +65,13 @@ class UpcomingBackupsService:
             cron_description = self.cron_description_service.format_cron_trigger(
                 str(trigger_val)
             )
-            next_run_display = next_run.strftime("%m/%d/%Y, %I:%M:%S %p")
-
             name_val = job.get("name", "Unknown")
             return {
                 "name": str(name_val),
-                "next_run_display": next_run_display,
+                "next_run": next_run,  # Pass raw datetime for template formatting
+                "next_run_display": next_run.strftime(
+                    "%m/%d/%Y, %I:%M:%S %p"
+                ),  # Keep for backward compatibility
                 "time_until": time_until,
                 "cron_description": cron_description,
             }

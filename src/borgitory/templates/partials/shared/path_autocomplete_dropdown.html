@@ -4,30 +4,49 @@
 </div>
 {% elif directories %}
 {% for dir in directories %}
-<div class="autocomplete-item px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-100 dark:border-gray-600 last:border-b-0" 
+<div class="autocomplete-item px-3 py-2 cursor-pointer {% if dir.is_borg_repo %}bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-200 dark:border-blue-700{% elif dir.is_borg_cache %}bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 border-green-200 dark:border-green-700{% else %}hover:bg-gray-100 dark:hover:bg-gray-600{% endif %} border-b border-gray-100 dark:border-gray-600 last:border-b-0" 
      data-path="{{ dir.path }}/"
      hx-on:click="
         event.preventDefault();
         event.stopPropagation();
         const targetInput = document.getElementById('{{ target_input }}');
         if (targetInput) {
-            let path = this.dataset.path;
-            // Remove /mnt/ prefix if present
-            if (path.startsWith('/mnt/')) {
-                path = path.substring(5);
-            }
-            targetInput.value = path;
+            targetInput.value = this.dataset.path;
             // Trigger the autocomplete request manually with the new value
             htmx.trigger(targetInput, 'input');
         }
      ">
-    <div class="flex items-center space-x-2">
-        <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-        </svg>
-        <span class="text-sm text-gray-900 dark:text-gray-100">{{ dir.name }}</span>
+    <div class="flex items-center justify-between min-w-0">
+        <div class="flex items-center space-x-2 min-w-0 flex-1">
+            {% if dir.is_borg_repo %}
+                <!-- Borg repository icon -->
+                <svg class="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+                </svg>
+            {% elif dir.is_borg_cache %}
+                <!-- Borg cache icon -->
+                <svg class="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" clip-rule="evenodd"></path>
+                </svg>
+            {% else %}
+                <!-- Regular folder icon -->
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                </svg>
+            {% endif %}
+            <span class="text-sm {% if dir.is_borg_repo %}text-blue-900 dark:text-blue-100 font-medium{% elif dir.is_borg_cache %}text-green-900 dark:text-green-100 font-medium{% else %}text-gray-900 dark:text-gray-100{% endif %} break-words overflow-hidden min-w-0">{{ dir.name }}</span>
+        </div>
+        {% if dir.is_borg_repo %}
+            <span class="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium flex-shrink-0 ml-2">
+                Borg Repository
+            </span>
+        {% elif dir.is_borg_cache %}
+            <span class="text-xs bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-2 py-1 rounded-full font-medium flex-shrink-0 ml-2">
+                Borg Cache
+            </span>
+        {% endif %}
     </div>
-    <div class="text-xs text-gray-500 dark:text-gray-400 ml-6">{{ dir.path[5:] if dir.path.startswith('/mnt/') else dir.path }}</div>
+    <div class="text-xs {% if dir.is_borg_repo %}text-blue-600 dark:text-blue-300{% elif dir.is_borg_cache %}text-green-600 dark:text-green-300{% else %}text-gray-500 dark:text-gray-400{% endif %} ml-6 break-words overflow-hidden">{{ dir.path }}</div>
 </div>
 {% endfor %}
 {% else %}

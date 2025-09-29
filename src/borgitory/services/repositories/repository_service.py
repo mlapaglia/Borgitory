@@ -22,31 +22,34 @@ from borgitory.models.repository_dtos import (
     ArchiveContentsRequest,
     ArchiveContentsResult,
     DirectoryItem,
-    RepositoryScanRequest,
-    RepositoryScanResult,
-    ScannedRepository,
     DeleteRepositoryRequest,
     DeleteRepositoryResult,
 )
 from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
-from borgitory.services.volumes.volume_service import VolumeService
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
     parse_datetime_string,
 )
 from borgitory.utils.secure_path import (
     create_secure_filename,
+    get_directory_listing,
+    secure_exists,
+    secure_isdir,
     secure_path_join,
     secure_remove_file,
-    PathSecurityError,
-    user_secure_exists,
-    user_secure_isdir,
-    user_get_directory_listing,
 )
 from borgitory.utils.security import secure_borg_command
 
 logger = logging.getLogger(__name__)
+
+
+def _build_repository_env_overrides(repository: Repository) -> dict[str, str]:
+    """Build environment overrides for a repository, including cache directory."""
+    env_overrides = {}
+    if repository.cache_dir:
+        env_overrides["BORG_CACHE_DIR"] = repository.cache_dir
+    return env_overrides
 
 
 class KeyfileProtocol(Protocol):
@@ -83,11 +86,9 @@ class RepositoryService:
         self,
         borg_service: BorgService,
         scheduler_service: SchedulerService,
-        volume_service: VolumeService,
     ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service
-        self.volume_service = volume_service
 
     async def create_repository(
         self, request: CreateRepositoryRequest, db: Session
@@ -105,6 +106,7 @@ class RepositoryService:
             db_repo.name = request.name
             db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
+            db_repo.cache_dir = request.cache_dir
 
             # Initialize repository with Borg
             init_result = await self.borg_service.initialize_repository(db_repo)
@@ -176,6 +178,7 @@ class RepositoryService:
             db_repo.name = request.name
             db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
+            db_repo.cache_dir = request.cache_dir
 
             # Set encryption type if provided
             if request.encryption_type:
@@ -229,38 +232,6 @@ class RepositoryService:
             error_message = f"Failed to import repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
-
-    async def scan_repositories(
-        self, request: RepositoryScanRequest
-    ) -> RepositoryScanResult:
-        """Scan for existing repositories."""
-        try:
-            scan_response = await self.borg_service.scan_for_repositories()
-
-            scanned_repos = []
-            for borg_repo in scan_response.repositories:
-                scanned_repo = ScannedRepository(
-                    name="",  # Borg doesn't provide name, will be set by user
-                    path=borg_repo.path,
-                    encryption_mode=borg_repo.encryption_mode,
-                    requires_keyfile=borg_repo.requires_keyfile,
-                    preview=borg_repo.config_preview,
-                    is_existing=False,  # These are newly discovered repos
-                )
-                scanned_repos.append(scanned_repo)
-
-            return RepositoryScanResult(
-                success=True,
-                repositories=scanned_repos,
-            )
-
-        except Exception as e:
-            logger.error(f"Error scanning for repositories: {e}")
-            return RepositoryScanResult(
-                success=False,
-                repositories=[],
-                error_message=f"Failed to scan repositories: {str(e)}",
-            )
 
     async def list_archives(
         self, repository_id: int, db: Session
@@ -342,17 +313,17 @@ class RepositoryService:
     ) -> DirectoryListingResult:
         """List directories at the given path."""
         try:
-            if not user_secure_exists(request.path):
+            if not secure_exists(request.path):
                 return DirectoryListingResult(
                     success=True, path=request.path, directories=[]
                 )
 
-            if not user_secure_isdir(request.path):
+            if not secure_isdir(request.path):
                 return DirectoryListingResult(
                     success=True, path=request.path, directories=[]
                 )
 
-            directory_data = user_get_directory_listing(
+            directory_data = get_directory_listing(
                 request.path, include_files=request.include_files
             )
 
@@ -360,17 +331,12 @@ class RepositoryService:
                 directory_data = directory_data[: request.max_items]
 
             # Extract just the names for the result
-            directories = [item["name"] for item in directory_data]
+            directories = [item.name for item in directory_data]
 
             return DirectoryListingResult(
                 success=True, path=request.path, directories=directories
             )
 
-        except PathSecurityError as e:
-            logger.warning(f"Path security violation: {e}")
-            return DirectoryListingResult(
-                success=True, path=request.path, directories=[]
-            )
         except Exception as e:
             logger.error(f"Error listing directories at {request.path}: {e}")
             return DirectoryListingResult(
@@ -590,29 +556,23 @@ class RepositoryService:
         self, repository_name: str, keyfile: KeyfileProtocol
     ) -> KeyfileSaveResult:
         """Save uploaded keyfile securely."""
-        try:
-            keyfiles_dir = "/app/data/keyfiles"
-            os.makedirs(keyfiles_dir, exist_ok=True)
+        keyfiles_dir = "/app/data/keyfiles"
+        os.makedirs(keyfiles_dir, exist_ok=True)
 
-            safe_filename = create_secure_filename(
-                repository_name, keyfile.filename or "keyfile", add_uuid=True
-            )
-            keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
+        safe_filename = create_secure_filename(
+            repository_name, keyfile.filename or "keyfile", add_uuid=True
+        )
+        keyfile_path = secure_path_join(keyfiles_dir, safe_filename)
 
-            with open(keyfile_path, "wb") as f:
-                content = await keyfile.read()
-                f.write(content)
+        with open(keyfile_path, "wb") as f:
+            content = await keyfile.read()
+            f.write(content)
 
-            logger.info(
-                f"Saved keyfile for repository '{repository_name}' at {keyfile_path}"
-            )
+        logger.info(
+            f"Saved keyfile for repository '{repository_name}' at {keyfile_path}"
+        )
 
-            return {"success": True, "path": keyfile_path}
-
-        except (PathSecurityError, OSError) as e:
-            error_message = f"Failed to save keyfile: {str(e)}"
-            logger.error(error_message)
-            return {"success": False, "error": error_message}
+        return {"success": True, "path": keyfile_path}
 
     async def check_repository_lock_status(
         self, repository: Repository
@@ -625,6 +585,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--short"],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -693,6 +654,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -783,6 +745,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json"],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -883,6 +846,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--list"],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,
@@ -939,6 +903,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
+                environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 process = await asyncio.create_subprocess_exec(
                     *command,

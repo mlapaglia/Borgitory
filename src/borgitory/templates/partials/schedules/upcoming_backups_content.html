@@ -6,7 +6,7 @@
     <div>
         <div class="font-medium text-gray-900 dark:text-gray-100">{{ job.name or 'Unknown' }}</div>
         <div class="text-sm text-gray-600 dark:text-gray-300">
-            <span class="font-medium">Next run:</span> {{ job.next_run_display }}
+            <span class="font-medium">Next run:</span> {{ job.next_run | format_datetime_browser("%m/%d/%Y, %I:%M:%S %p", browser_tz_offset) if job.next_run else job.next_run_display }}
         </div>
         <div class="text-sm text-gray-500 dark:text-gray-400">
             <span class="font-medium">Time until:</span> {{ job.time_until }}

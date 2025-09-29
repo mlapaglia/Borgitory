@@ -10,6 +10,7 @@ This test module specifically ensures that:
 
 import pytest
 import json
+from typing import AsyncGenerator, Callable
 from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.orm import Session
 
@@ -21,12 +22,12 @@ from borgitory.models.database import CloudSyncConfig
 
 
 @pytest.fixture
-def mock_rclone_service():
+def mock_rclone_service() -> MagicMock:
     """Mock RcloneService with the generic dispatcher methods"""
     service = MagicMock(spec=RcloneService)
 
     # Mock the generic dispatcher methods
-    async def mock_sync_generator():
+    async def mock_sync_generator() -> AsyncGenerator[dict[str, str], None]:
         yield {"type": "started", "command": "rclone sync", "pid": 12345}
         yield {
             "type": "progress",
@@ -48,30 +49,31 @@ def mock_rclone_service():
         }
         yield {"type": "completed", "return_code": 0, "status": "success"}
 
-    # Mock should return the generator directly, not a coroutine
-    service.sync_repository_to_provider = MagicMock(return_value=mock_sync_generator())
+    # Mock should return the async generator directly
+    service.sync_repository_to_provider = MagicMock(
+        side_effect=lambda *args, **kwargs: mock_sync_generator()
+    )
     service.test_provider_connection = AsyncMock(return_value={"status": "success"})
 
     return service
 
 
 @pytest.fixture
-def s3_cloud_sync_config(test_db: Session):
+def s3_cloud_sync_config(test_db: Session) -> CloudSyncConfig:
     """Create an S3 cloud sync configuration"""
-    config = CloudSyncConfig(
-        name="Test S3 Config",
-        provider="s3",
-        provider_config=json.dumps(
-            {
-                "access_key": "AKIAIOSFODNN7EXAMPLE",  # 20 chars, starts with AKIA
-                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # 40 chars
-                "bucket_name": "test-bucket",
-                "region": "us-east-1",
-            }
-        ),
-        enabled=True,
-        path_prefix="backups/",
+    config = CloudSyncConfig()
+    config.name = "Test S3 Config"
+    config.provider = "s3"
+    config.provider_config = json.dumps(
+        {
+            "access_key": "AKIAIOSFODNN7EXAMPLE",  # 20 chars, starts with AKIA
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # 40 chars
+            "bucket_name": "test-bucket",
+            "region": "us-east-1",
+        }
     )
+    config.enabled = True
+    config.path_prefix = "backups/"
     test_db.add(config)
     test_db.commit()
     test_db.refresh(config)
@@ -79,23 +81,22 @@ def s3_cloud_sync_config(test_db: Session):
 
 
 @pytest.fixture
-def sftp_cloud_sync_config(test_db: Session):
+def sftp_cloud_sync_config(test_db: Session) -> CloudSyncConfig:
     """Create an SFTP cloud sync configuration"""
-    config = CloudSyncConfig(
-        name="Test SFTP Config",
-        provider="sftp",
-        provider_config=json.dumps(
-            {
-                "host": "sftp.example.com",
-                "username": "testuser",
-                "password": "testpass",
-                "remote_path": "/backup",
-                "port": 22,
-            }
-        ),
-        enabled=True,
-        path_prefix="repos/",
+    config = CloudSyncConfig()
+    config.name = "Test SFTP Config"
+    config.provider = "sftp"
+    config.provider_config = json.dumps(
+        {
+            "host": "sftp.example.com",
+            "username": "testuser",
+            "password": "testpass",
+            "remote_path": "/backup",
+            "port": 22,
+        }
     )
+    config.enabled = True
+    config.path_prefix = "repos/"
     test_db.add(config)
     test_db.commit()
     test_db.refresh(config)
@@ -103,7 +104,7 @@ def sftp_cloud_sync_config(test_db: Session):
 
 
 @pytest.fixture
-def invalid_s3_config(test_db: Session):
+def invalid_s3_config(test_db: Session) -> CloudSyncConfig:
     """Create an invalid S3 configuration (empty provider_config to test error handling)"""
     config = CloudSyncConfig(
         name="Invalid S3 Config",
@@ -118,7 +119,7 @@ def invalid_s3_config(test_db: Session):
 
 
 @pytest.fixture
-def missing_config_s3_config(test_db: Session):
+def missing_config_s3_config(test_db: Session) -> CloudSyncConfig:
     """Create an S3 configuration with no provider_config (null)"""
     config = CloudSyncConfig(
         name="Missing Config S3",
@@ -133,7 +134,7 @@ def missing_config_s3_config(test_db: Session):
 
 
 @pytest.fixture
-def mock_encryption_service():
+def mock_encryption_service() -> MagicMock:
     """Create mock encryption service for DI"""
     from unittest.mock import MagicMock
 
@@ -149,7 +150,7 @@ def mock_encryption_service():
 
 
 @pytest.fixture
-def mock_storage_factory():
+def mock_storage_factory() -> MagicMock:
     """Create mock storage factory for DI"""
     from unittest.mock import MagicMock
 
@@ -157,7 +158,7 @@ def mock_storage_factory():
 
 
 @pytest.fixture
-def job_executor():
+def job_executor() -> JobExecutor:
     """Create JobExecutor instance"""
     return JobExecutor()
 
@@ -167,15 +168,15 @@ class TestCloudSyncDependencyInjection:
 
     async def _execute_cloud_sync_with_di(
         self,
-        job_executor,
-        config_id,
-        test_db,
-        mock_rclone_service,
-        mock_encryption_service,
-        mock_storage_factory,
-        mock_provider_registry=None,
-        output_callback=None,
-    ):
+        job_executor: JobExecutor,
+        config_id: int,
+        test_db: Session,
+        mock_rclone_service: MagicMock,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
+        mock_provider_registry: MagicMock | None = None,
+        output_callback: Callable[[str], None] = None,
+    ) -> None:
         """Helper method to execute cloud sync with all DI parameters"""
         # Create a mock registry if not provided
         if mock_provider_registry is None:
@@ -201,12 +202,12 @@ class TestCloudSyncDependencyInjection:
     @pytest.mark.asyncio
     async def test_cloud_sync_uses_injected_rclone_service(
         self,
-        job_executor,
-        mock_rclone_service,
-        s3_cloud_sync_config,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
+        job_executor: JobExecutor,
+        mock_rclone_service: MagicMock,
+        s3_cloud_sync_config: CloudSyncConfig,
+        test_db: Session,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
     ) -> None:
         """Test that cloud sync uses the injected RcloneService, not hardcoded imports"""
 
@@ -257,12 +258,12 @@ class TestCloudSyncDependencyInjection:
     @pytest.mark.asyncio
     async def test_cloud_sync_works_with_sftp_provider(
         self,
-        job_executor,
-        mock_rclone_service,
-        sftp_cloud_sync_config,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
+        job_executor: JobExecutor,
+        mock_rclone_service: MagicMock,
+        sftp_cloud_sync_config: CloudSyncConfig,
+        test_db: Session,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
     ) -> None:
         """Test cloud sync works with SFTP provider using generic dispatcher"""
 
@@ -299,12 +300,12 @@ class TestCloudSyncDependencyInjection:
     @pytest.mark.asyncio
     async def test_cloud_sync_handles_invalid_provider_config(
         self,
-        job_executor,
-        mock_rclone_service,
-        invalid_s3_config,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
+        job_executor: JobExecutor,
+        mock_rclone_service: MagicMock,
+        invalid_s3_config: CloudSyncConfig,
+        test_db: Session,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
     ) -> None:
         """Test that configurations with invalid provider_config are handled with clear error messages"""
 
@@ -325,12 +326,12 @@ class TestCloudSyncDependencyInjection:
     @pytest.mark.asyncio
     async def test_cloud_sync_handles_missing_provider_config(
         self,
-        job_executor,
-        mock_rclone_service,
-        missing_config_s3_config,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
+        job_executor: JobExecutor,
+        mock_rclone_service: MagicMock,
+        missing_config_s3_config: CloudSyncConfig,
+        test_db: Session,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
     ) -> None:
         """Test that configurations with missing provider_config are handled with clear error messages"""
 
@@ -351,11 +352,11 @@ class TestCloudSyncDependencyInjection:
     @pytest.mark.asyncio
     async def test_cloud_sync_handles_rclone_service_exception(
         self,
-        job_executor,
-        s3_cloud_sync_config,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
+        job_executor: JobExecutor,
+        s3_cloud_sync_config: CloudSyncConfig,
+        test_db: Session,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
     ) -> None:
         """Test proper error handling when rclone service throws exception"""
 
@@ -385,12 +386,12 @@ class TestCloudSyncDependencyInjection:
     @pytest.mark.asyncio
     async def test_cloud_sync_skips_when_config_disabled(
         self,
-        job_executor,
-        mock_rclone_service,
-        s3_cloud_sync_config,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
+        job_executor: JobExecutor,
+        mock_rclone_service: MagicMock,
+        s3_cloud_sync_config: CloudSyncConfig,
+        test_db: Session,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
     ) -> None:
         """Test that cloud sync is skipped when config is disabled"""
 
@@ -446,7 +447,9 @@ class TestNoDeprecatedImports:
         )
 
     @pytest.mark.asyncio
-    async def test_registry_integration_works(self, production_registry) -> None:
+    async def test_registry_integration_works(
+        self, production_registry: MagicMock
+    ) -> None:
         """Test that the registry system is properly integrated"""
         # Use isolated registry fixture instead of global registry
         providers = production_registry.get_supported_providers()
@@ -479,15 +482,15 @@ class TestCloudSyncProgressHandling:
 
     async def _execute_cloud_sync_with_di(
         self,
-        job_executor,
-        config_id,
-        test_db,
-        mock_rclone_service,
-        mock_encryption_service,
-        mock_storage_factory,
-        mock_provider_registry=None,
-        output_callback=None,
-    ):
+        job_executor: JobExecutor,
+        config_id: int,
+        test_db: Session,
+        mock_rclone_service: MagicMock,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
+        mock_provider_registry: MagicMock | None = None,
+        output_callback: Callable[[str], None] = None,
+    ) -> None:
         """Helper method to execute cloud sync with all DI parameters"""
         # Create a mock registry if not provided
         if mock_provider_registry is None:
@@ -513,18 +516,18 @@ class TestCloudSyncProgressHandling:
     @pytest.mark.asyncio
     async def test_progress_streaming_works(
         self,
-        job_executor,
-        s3_cloud_sync_config,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
+        job_executor: JobExecutor,
+        s3_cloud_sync_config: CloudSyncConfig,
+        test_db: Session,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
     ) -> None:
         """Test that progress is properly streamed from rclone service"""
 
         # Create a mock rclone service with detailed progress
         mock_rclone_service = MagicMock(spec=RcloneService)
 
-        async def detailed_progress_generator():
+        async def detailed_progress_generator() -> AsyncGenerator[dict[str, str], None]:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {"type": "progress", "percentage": 10, "transferred": "50MB"}
             yield {"type": "progress", "percentage": 25, "transferred": "125MB"}
@@ -533,8 +536,9 @@ class TestCloudSyncProgressHandling:
             yield {"type": "progress", "percentage": 100, "transferred": "500MB"}
             yield {"type": "completed", "return_code": 0, "status": "success"}
 
+        # Mock should return the async generator directly
         mock_rclone_service.sync_repository_to_provider = MagicMock(
-            return_value=detailed_progress_generator()
+            side_effect=lambda *args, **kwargs: detailed_progress_generator()
         )
 
         progress_events = []
@@ -566,17 +570,17 @@ class TestCloudSyncProgressHandling:
     @pytest.mark.asyncio
     async def test_handles_rclone_failure_gracefully(
         self,
-        job_executor,
-        s3_cloud_sync_config,
-        test_db,
-        mock_encryption_service,
-        mock_storage_factory,
+        job_executor: JobExecutor,
+        s3_cloud_sync_config: CloudSyncConfig,
+        test_db: Session,
+        mock_encryption_service: MagicMock,
+        mock_storage_factory: MagicMock,
     ) -> None:
         """Test handling when rclone process fails"""
 
         mock_rclone_service = MagicMock(spec=RcloneService)
 
-        async def failing_generator():
+        async def failing_generator() -> AsyncGenerator[dict[str, str], None]:
             yield {"type": "started", "command": "rclone sync", "pid": 12345}
             yield {"type": "progress", "percentage": 25, "transferred": "100MB"}
             yield {"type": "error", "message": "Network connection failed"}

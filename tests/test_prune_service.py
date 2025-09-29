@@ -13,13 +13,13 @@ from borgitory.models.schemas import PruneConfigCreate, PruneConfigUpdate, Prune
 
 
 @pytest.fixture
-def service(test_db: Session):
+def service(test_db: Session) -> PruneService:
     """PruneService instance with real database session."""
     return PruneService(test_db)
 
 
 @pytest.fixture
-def sample_repository(test_db: Session):
+def sample_repository(test_db: Session) -> Repository:
     """Create a sample repository for testing."""
     repository = Repository(
         name="test-repo",
@@ -35,12 +35,14 @@ def sample_repository(test_db: Session):
 class TestPruneService:
     """Test class for PruneService business logic."""
 
-    def test_get_prune_configs_empty(self, service) -> None:
+    def test_get_prune_configs_empty(self, service: PruneService) -> None:
         """Test getting prune configs when none exist."""
         result = service.get_prune_configs()
         assert result == []
 
-    def test_get_prune_configs_with_data(self, service, test_db: Session) -> None:
+    def test_get_prune_configs_with_data(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test getting prune configs with data."""
         config1 = PruneConfig(
             name="config-1",
@@ -76,7 +78,9 @@ class TestPruneService:
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_prune_configs_with_pagination(self, service, test_db: Session) -> None:
+    def test_get_prune_configs_with_pagination(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test getting prune configs with pagination."""
         for i in range(5):
             config = PruneConfig(
@@ -98,7 +102,9 @@ class TestPruneService:
         result = service.get_prune_configs(skip=2, limit=2)
         assert len(result) == 2
 
-    def test_get_prune_config_by_id_success(self, service, test_db: Session) -> None:
+    def test_get_prune_config_by_id_success(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test getting prune config by ID successfully."""
         config = PruneConfig(
             name="test-config",
@@ -122,14 +128,16 @@ class TestPruneService:
         assert result.name == "test-config"
         assert result.id == config.id
 
-    def test_get_prune_config_by_id_not_found(self, service) -> None:
+    def test_get_prune_config_by_id_not_found(self, service: PruneService) -> None:
         """Test getting non-existent prune config raises exception."""
         with pytest.raises(
             Exception, match="Prune configuration with id 999 not found"
         ):
             service.get_prune_config_by_id(999)
 
-    def test_create_prune_config_success(self, service, test_db: Session) -> None:
+    def test_create_prune_config_success(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test successful prune config creation."""
         config_data = PruneConfigCreate(
             name="new-config",
@@ -144,7 +152,8 @@ class TestPruneService:
             keep_yearly=0,
         )
 
-        success, config, error = service.create_prune_config(config_data)
+        result = service.create_prune_config(config_data)
+        success, config, error = result.success, result.config, result.error_message
 
         assert success is True
         assert error is None
@@ -161,7 +170,7 @@ class TestPruneService:
         assert saved_config.strategy == PruneStrategy.SIMPLE
 
     def test_create_prune_config_duplicate_name(
-        self, service, test_db: Session
+        self, service: PruneService, test_db: Session
     ) -> None:
         """Test prune config creation with duplicate name."""
         existing_config = PruneConfig(
@@ -192,14 +201,16 @@ class TestPruneService:
             keep_yearly=0,
         )
 
-        success, config, error = service.create_prune_config(config_data)
+        result = service.create_prune_config(config_data)
+        success, config, error = result.success, result.config, result.error_message
 
         assert success is False
         assert config is None
+        assert error is not None
         assert "A prune policy with this name already exists" in error
 
     def test_create_prune_config_database_error(
-        self, service, test_db: Session
+        self, service: PruneService, test_db: Session
     ) -> None:
         """Test prune config creation with database error."""
         config_data = PruneConfigCreate(
@@ -216,13 +227,17 @@ class TestPruneService:
         )
 
         with patch.object(test_db, "commit", side_effect=Exception("Database error")):
-            success, config, error = service.create_prune_config(config_data)
+            result = service.create_prune_config(config_data)
+            success, config, error = result.success, result.config, result.error_message
 
             assert success is False
             assert config is None
+            assert error is not None
             assert "Failed to create prune configuration" in error
 
-    def test_update_prune_config_success(self, service, test_db: Session) -> None:
+    def test_update_prune_config_success(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test successful prune config update."""
         config = PruneConfig(
             name="original-config",
@@ -243,8 +258,12 @@ class TestPruneService:
 
         config_update = PruneConfigUpdate(name="updated-config", keep_within_days=60)
 
-        success, updated_config, error = service.update_prune_config(
-            config.id, config_update
+        result = service.update_prune_config(config.id, config_update)
+
+        success, updated_config, error = (
+            result.success,
+            result.config,
+            result.error_message,
         )
 
         assert success is True
@@ -252,18 +271,20 @@ class TestPruneService:
         assert updated_config.name == "updated-config"
         assert updated_config.keep_within_days == 60
 
-    def test_update_prune_config_not_found(self, service) -> None:
+    def test_update_prune_config_not_found(self, service: PruneService) -> None:
         """Test updating non-existent prune config."""
         config_update = PruneConfigUpdate(name="new-name")
 
-        success, config, error = service.update_prune_config(999, config_update)
+        result = service.update_prune_config(999, config_update)
+        success, config, error = result.success, result.config, result.error_message
 
         assert success is False
         assert config is None
+        assert error is not None
         assert "Prune configuration not found" in error
 
     def test_update_prune_config_duplicate_name(
-        self, service, test_db: Session
+        self, service: PruneService, test_db: Session
     ) -> None:
         """Test updating prune config with duplicate name."""
         config1 = PruneConfig(
@@ -296,13 +317,17 @@ class TestPruneService:
 
         config_update = PruneConfigUpdate(name="config-2")
 
-        success, config, error = service.update_prune_config(config1.id, config_update)
+        result = service.update_prune_config(config1.id, config_update)
+        success, config, error = result.success, result.config, result.error_message
 
         assert success is False
         assert config is None
+        assert error is not None
         assert "A prune policy with this name already exists" in error
 
-    def test_enable_prune_config_success(self, service, test_db: Session) -> None:
+    def test_enable_prune_config_success(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test successfully enabling prune config."""
         config = PruneConfig(
             name="test-config",
@@ -321,21 +346,29 @@ class TestPruneService:
         test_db.commit()
         test_db.refresh(config)
 
-        success, updated_config, error = service.enable_prune_config(config.id)
+        result = service.enable_prune_config(config.id)
+        success, updated_config, error = (
+            result.success,
+            result.config,
+            result.error_message,
+        )
 
         assert success is True
         assert error is None
         assert updated_config.enabled is True
 
-    def test_enable_prune_config_not_found(self, service) -> None:
+    def test_enable_prune_config_not_found(self, service: PruneService) -> None:
         """Test enabling non-existent prune config."""
-        success, config, error = service.enable_prune_config(999)
+        result = service.enable_prune_config(999)
 
-        assert success is False
-        assert config is None
-        assert "Prune configuration not found" in error
+        assert result.success is False
+        assert result.config is None
+        assert result.error_message is not None
+        assert "Prune configuration not found" in result.error_message
 
-    def test_disable_prune_config_success(self, service, test_db: Session) -> None:
+    def test_disable_prune_config_success(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test successfully disabling prune config."""
         config = PruneConfig(
             name="test-config",
@@ -354,21 +387,30 @@ class TestPruneService:
         test_db.commit()
         test_db.refresh(config)
 
-        success, updated_config, error = service.disable_prune_config(config.id)
+        result = service.disable_prune_config(config.id)
+        success, updated_config, error = (
+            result.success,
+            result.config,
+            result.error_message,
+        )
 
         assert success is True
         assert error is None
         assert updated_config.enabled is False
 
-    def test_disable_prune_config_not_found(self, service) -> None:
+    def test_disable_prune_config_not_found(self, service: PruneService) -> None:
         """Test disabling non-existent prune config."""
-        success, config, error = service.disable_prune_config(999)
+        result = service.disable_prune_config(999)
+        success, config, error = result.success, result.config, result.error_message
 
         assert success is False
         assert config is None
+        assert error is not None
         assert "Prune configuration not found" in error
 
-    def test_delete_prune_config_success(self, service, test_db: Session) -> None:
+    def test_delete_prune_config_success(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test successful prune config deletion."""
         config = PruneConfig(
             name="test-config",
@@ -388,7 +430,12 @@ class TestPruneService:
         test_db.refresh(config)
         config_id = config.id
 
-        success, config_name, error = service.delete_prune_config(config_id)
+        result = service.delete_prune_config(config_id)
+        success, config_name, error = (
+            result.success,
+            result.config_name,
+            result.error_message,
+        )
 
         assert success is True
         assert config_name == "test-config"
@@ -400,16 +447,22 @@ class TestPruneService:
         )
         assert deleted_config is None
 
-    def test_delete_prune_config_not_found(self, service) -> None:
+    def test_delete_prune_config_not_found(self, service: PruneService) -> None:
         """Test deleting non-existent prune config."""
-        success, config_name, error = service.delete_prune_config(999)
+        result = service.delete_prune_config(999)
+        success, config_name, error = (
+            result.success,
+            result.config_name,
+            result.error_message,
+        )
 
         assert success is False
         assert config_name is None
+        assert error is not None
         assert "Prune configuration not found" in error
 
     def test_get_configs_with_descriptions_simple_strategy(
-        self, service, test_db: Session
+        self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting configs with descriptions for simple strategy."""
         config = PruneConfig(
@@ -434,7 +487,7 @@ class TestPruneService:
         assert result[0]["description"] == "Keep archives within 30 days"
 
     def test_get_configs_with_descriptions_advanced_strategy(
-        self, service, test_db: Session
+        self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting configs with descriptions for advanced strategy."""
         config = PruneConfig(
@@ -456,7 +509,7 @@ class TestPruneService:
         assert result[0]["description"] == expected_desc
 
     def test_get_configs_with_descriptions_partial_advanced(
-        self, service, test_db: Session
+        self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting configs with descriptions for partial advanced strategy."""
         config = PruneConfig(
@@ -476,7 +529,7 @@ class TestPruneService:
         assert result[0]["description"] == expected_desc
 
     def test_get_configs_with_descriptions_no_rules(
-        self, service, test_db: Session
+        self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting configs with descriptions for no retention rules."""
         config = PruneConfig(
@@ -499,7 +552,9 @@ class TestPruneService:
         assert len(result) == 1
         assert result[0]["description"] == "No retention rules"
 
-    def test_get_configs_with_descriptions_error_handling(self, service) -> None:
+    def test_get_configs_with_descriptions_error_handling(
+        self, service: PruneService
+    ) -> None:
         """Test error handling in get_configs_with_descriptions."""
         with patch.object(
             service, "get_prune_configs", side_effect=Exception("Database error")
@@ -507,7 +562,9 @@ class TestPruneService:
             result = service.get_configs_with_descriptions()
             assert result == []
 
-    def test_get_form_data_success(self, service, test_db, sample_repository) -> None:
+    def test_get_form_data_success(
+        self, service: PruneService, test_db: Session, sample_repository: Repository
+    ) -> None:
         """Test successful form data retrieval."""
         result = service.get_form_data()
 
@@ -515,13 +572,17 @@ class TestPruneService:
         assert len(result["repositories"]) == 1
         assert result["repositories"][0].name == "test-repo"
 
-    def test_get_form_data_error_handling(self, service, test_db: Session) -> None:
+    def test_get_form_data_error_handling(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test error handling in get_form_data."""
         with patch.object(test_db, "query", side_effect=Exception("Database error")):
             result = service.get_form_data()
             assert result == {"repositories": []}
 
-    def test_prune_config_lifecycle(self, service, test_db: Session) -> None:
+    def test_prune_config_lifecycle(
+        self, service: PruneService, test_db: Session
+    ) -> None:
         """Test complete prune config lifecycle: create, update, enable/disable, delete."""
         # Create
         config_data = PruneConfigCreate(
@@ -536,32 +597,51 @@ class TestPruneService:
             keep_monthly=0,
             keep_yearly=0,
         )
-        success, created_config, error = service.create_prune_config(config_data)
+        result = service.create_prune_config(config_data)
+        success, created_config, _error = (
+            result.success,
+            result.config,
+            result.error_message,
+        )
         assert success is True
+        assert created_config is not None
         config_id = created_config.id
 
         # Update
         config_update = PruneConfigUpdate(keep_within_days=60)
-        success, updated_config, error = service.update_prune_config(
-            config_id, config_update
+        result = service.update_prune_config(config_id, config_update)
+        success, updated_config, _error = (
+            result.success,
+            result.config,
+            result.error_message,
         )
         assert success is True
+        assert updated_config is not None
         assert updated_config.keep_within_days == 60
 
         # Disable
-        success, disabled_config, error = service.disable_prune_config(config_id)
+        result = service.disable_prune_config(config_id)
+        success, disabled_config, _error = (
+            result.success,
+            result.config,
+            result.error_message,
+        )
         assert success is True
+        assert disabled_config is not None
         assert disabled_config.enabled is False
 
         # Enable
-        success, enabled_config, error = service.enable_prune_config(config_id)
-        assert success is True
-        assert enabled_config.enabled is True
+        result = service.enable_prune_config(config_id)
+        assert result.success is True
+        assert result.config is not None
+        assert result.config.enabled is True
 
         # Delete
-        success, config_name, error = service.delete_prune_config(config_id)
-        assert success is True
-        assert config_name == "lifecycle-test"
+        result = service.delete_prune_config(config_id)
+        assert result is not None
+        assert result.success is True
+        assert result.config_name is not None
+        assert result.config_name == "lifecycle-test"
 
         # Verify completely removed
         deleted_config = (

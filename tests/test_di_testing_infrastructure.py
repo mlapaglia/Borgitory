@@ -6,6 +6,7 @@ for the hybrid service migration.
 """
 
 import pytest
+from typing import Callable, Any
 from unittest.mock import Mock
 
 from tests.utils.di_testing import (
@@ -43,7 +44,7 @@ class TestDependencyOverrideInfrastructure:
 
     def test_multiple_dependency_overrides(self) -> None:
         """Test that multiple dependency overrides work."""
-        overrides = {
+        overrides: dict[Callable[..., Any], Callable[..., Any]] = {
             get_debug_service: lambda: MockServiceFactory.create_mock_debug_service(),
             get_borg_service: lambda: MockServiceFactory.create_mock_borg_service(),
         }
@@ -106,7 +107,6 @@ class TestMockServiceFactory:
         assert "system" in debug_info
         assert "application" in debug_info
         assert "database" in debug_info
-        assert "volumes" in debug_info
         assert "tools" in debug_info
         assert "environment" in debug_info
         assert "job_manager" in debug_info
@@ -154,12 +154,10 @@ class TestMockServiceFactory:
         mock = MockServiceFactory.create_mock_repository_service()
 
         assert isinstance(mock, Mock)
-        assert hasattr(mock, "scan_repositories")
         assert hasattr(mock, "create_repository")
         assert hasattr(mock, "delete_repository")
 
         # Verify return values
-        assert mock.scan_repositories.return_value == []
         assert mock.delete_repository.return_value is True
 
 
@@ -175,7 +173,7 @@ class TestDependencyTestHelper:
     def test_verify_service_creation_failure(self) -> None:
         """Test service creation verification with failing factory."""
 
-        def failing_factory():
+        def failing_factory() -> Any:
             raise RuntimeError("Service creation failed")
 
         with pytest.raises(AssertionError, match="Service creation failed"):

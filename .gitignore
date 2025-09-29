@@ -212,6 +212,7 @@ borg-repos/
 .claude/
 data/
 local-data/**
+local-cache/**
 *.db
 *.sqlite
 *.sqlite3

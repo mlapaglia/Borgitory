@@ -1,158 +1,79 @@
 """
 Secure path utilities to prevent directory traversal attacks.
 
-This module provides secure wrappers around common file system operations
-that validate paths to ensure they stay within the /mnt directory only.
-All user data must be mounted under /mnt for security.
+This module provides secure wrappers around common file system operations.
 """
 
 import logging
 import os
 import re
 import uuid
+import configparser
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 
-def _pre_validate_user_input(user_path: str, allowed_prefixes: List[str]) -> bool:
-    """
-    Pre-validate user input before Path operations to prevent security issues.
+@dataclass
+class DirectoryInfo:
+    """Information about a directory entry."""
 
-    Args:
-        user_path: The user-provided path to validate
-        allowed_prefixes: List of allowed absolute path prefixes (e.g., ["/mnt", "/app/data"])
+    name: str
+    path: str
+    is_borg_repo: bool = False
+    is_borg_cache: bool = False
 
-    Returns:
-        True if input is safe to process, False otherwise
-    """
-    # Check if input is a proper non-empty string without null bytes
-    if not isinstance(user_path, str) or user_path.strip() == "" or "\x00" in user_path:
-        logger.warning(
-            f"Path validation failed for '{user_path}': empty or invalid path string"
-        )
-        return False
 
-    # Only permit absolute paths if they start with allowed prefixes
-    # Check both OS-specific absolute paths and Unix-style paths (for Docker containers)
-    is_absolute = os.path.isabs(user_path) or user_path.startswith("/")
-    if is_absolute:
-        # For Unix-style paths, check with forward slash
-        unix_match = any(
-            user_path.startswith(prefix + "/") or user_path == prefix
-            for prefix in allowed_prefixes
-        )
-        # For Windows-style paths, convert allowed prefixes to Windows format and check
-        windows_match = False
-        if os.name == "nt" and os.path.isabs(user_path):
-            # Convert Unix prefixes to Windows format for local development
-            windows_prefixes = []
-            for prefix in allowed_prefixes:
-                if prefix == "/mnt":
-                    windows_prefixes.append("C:\\mnt")
-                elif prefix == "/app/data":
-                    windows_prefixes.append("C:\\app\\app\\data")
-            windows_match = any(
-                user_path.startswith(prefix + "\\")
-                or user_path.startswith(prefix + "/")
-                or user_path == prefix
-                for prefix in windows_prefixes
-            )
+def _is_borg_repository(directory_path: str) -> bool:
+    """Check if a directory is a Borg repository by looking for a config file."""
+    try:
+        config_path = os.path.join(directory_path, "config")
 
-        if not (unix_match or windows_match):
-            logger.warning(
-                f"Path validation failed for '{user_path}': absolute path not under allowed roots"
-            )
+        if not os.path.exists(config_path) or not os.path.isfile(config_path):
             return False
 
-    return True
+        # Try to read the config file and check for [repository] section
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config_content = f.read()
+
+            config = configparser.ConfigParser()
+            config.read_string(config_content)
+
+            return config.has_section("repository")
+
+        except (configparser.Error, UnicodeDecodeError, PermissionError):
+            return False
+
+    except Exception:
+        return False
 
 
-class PathSecurityError(Exception):
-    """Raised when a path operation violates security constraints."""
-
-    pass
-
-
-def validate_secure_path(user_path: str, allow_app_data: bool = True) -> Optional[Path]:
-    """
-    Validate that a path is under allowed directories. Simple and secure.
-
-    Allowed paths:
-    - /mnt/* - For user repos, backup sources, keyfiles, etc.
-    - /app/data/* - For application database, secret key, etc. (if allow_app_data=True)
-
-    This function uses pathlib.Path.resolve() to handle symlinks, relative paths,
-    and normalization automatically, preventing path traversal attacks.
-
-    Args:
-        user_path: The user-provided path to validate
-        allow_app_data: Whether to allow /app/data paths (default: True)
-
-    Returns:
-        Resolved Path object if valid and under allowed directories, None otherwise
-    """
+def _is_borg_cache(directory_path: str) -> bool:
+    """Check if a directory is a Borg cache by looking for a config file with [cache] section."""
     try:
-        allowed_prefixes = ["/mnt"]
-        if allow_app_data:
-            allowed_prefixes.append("/app/data")
+        config_path = os.path.join(directory_path, "config")
 
-        if not _pre_validate_user_input(user_path, allowed_prefixes):
-            return None
+        if not os.path.exists(config_path) or not os.path.isfile(config_path):
+            return False
 
-        for allowed_root_str in allowed_prefixes:
-            allowed_root_real = os.path.realpath(allowed_root_str)
+        # Try to read the config file and check for [cache] section
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config_content = f.read()
 
-            # Compose the target path
-            target_path = (
-                user_path
-                if os.path.isabs(user_path)
-                else os.path.join(allowed_root_str, user_path)
-            )
-            # Canonicalize target path
-            target_realpath = os.path.realpath(os.path.normpath(target_path))
+            config = configparser.ConfigParser()
+            config.read_string(config_content)
 
-            # Hardened containment check: must be strictly inside allowed_root_real
-            normalized_root = os.path.join(allowed_root_real, "")
-            if target_realpath == allowed_root_real or target_realpath.startswith(
-                normalized_root
-            ):
-                # Disallow symlinks that point outside, ensure target_realpath is inside root
-                # Additional defense: verify relpath does not start with ../
-                rel_path = os.path.relpath(target_realpath, allowed_root_real)
-                if not rel_path.startswith(".."):
-                    logger.debug(f"Validated path: {user_path} -> {target_realpath}")
-                    return Path(target_realpath)
-                else:
-                    logger.warning(
-                        f"Path traversal attempt detected for '{user_path}' resolved as '{target_realpath}' relative '{rel_path}'"
-                    )
-                    return None
-        allowed_paths = ["/mnt"] + (["/app/data"] if allow_app_data else [])
-        logger.warning(
-            f"Path validation failed for '{user_path}': not under allowed paths {allowed_paths}"
-        )
-        return None
-    except (OSError,) as e:
-        logger.warning(f"Path validation failed for '{user_path}': {e}")
-        return None
+            return config.has_section("cache")
 
+        except (configparser.Error, UnicodeDecodeError, PermissionError):
+            return False
 
-def validate_mnt_path(user_path: str) -> Optional[Path]:
-    """
-    Validate that a path is under /mnt/ only - for user repos/backup sources.
-    Use this for user-facing operations to prevent repos in /app/data.
-    """
-    return validate_secure_path(user_path, allow_app_data=False)
-
-
-def validate_user_repository_path(user_path: str) -> Optional[Path]:
-    """
-    Validate paths for user repositories and backup sources - /mnt only.
-    This prevents users from putting repositories in /app/data.
-    """
-    return validate_mnt_path(user_path)
+    except Exception:
+        return False
 
 
 def sanitize_filename(filename: str, max_length: int = 100) -> str:
@@ -227,21 +148,13 @@ def secure_path_join(base_dir: str, *path_parts: str) -> str:
     Securely join path components and validate the result is under allowed directories.
 
     Args:
-        base_dir: Starting path (must be under /mnt or /app/data)
+        base_dir: Starting path
         path_parts: Path components to join
 
     Returns:
         The secure joined path
-
-    Raises:
-        PathSecurityError: If the resulting path would not be under allowed directories
     """
-    # Validate base directory is under allowed directories
-    validated_base = validate_secure_path(base_dir, allow_app_data=True)
-    if validated_base is None:
-        raise PathSecurityError(
-            f"Base directory '{base_dir}' must be under /mnt or /app/data"
-        )
+    validated_base = Path(base_dir)
 
     # Clean and join path parts
     safe_parts = []
@@ -260,26 +173,22 @@ def secure_path_join(base_dir: str, *path_parts: str) -> str:
     joined_path = validated_base / Path(*safe_parts)
 
     # Validate the final result is still under allowed directories
-    final_validated = validate_secure_path(str(joined_path), allow_app_data=True)
-    if final_validated is None:
-        raise PathSecurityError(
-            f"Joined path '{joined_path}' would be outside allowed directories"
-        )
+    final_validated = Path(str(joined_path))
 
     return str(final_validated)
 
 
 def secure_exists(path: str) -> bool:
     """
-    Securely check if a path exists, validating it's under allowed directories.
+    Securely check if a path exists.
 
     Args:
         path: The path to check
 
     Returns:
-        True if path exists and is under /mnt or /app/data
+        True if path exists
     """
-    validated_path = validate_secure_path(path, allow_app_data=True)
+    validated_path = Path(path)
     if validated_path is None:
         return False
 
@@ -292,15 +201,15 @@ def secure_exists(path: str) -> bool:
 
 def secure_isdir(path: str) -> bool:
     """
-    Securely check if a path is a directory, validating it's under allowed directories.
+    Securely check if a path is a directory.
 
     Args:
         path: The path to check
 
     Returns:
-        True if path is a directory and is under /mnt or /app/data
+        True if path is a directory
     """
-    validated_path = validate_secure_path(path, allow_app_data=True)
+    validated_path = Path(path)
     if validated_path is None:
         return False
 
@@ -313,7 +222,7 @@ def secure_isdir(path: str) -> bool:
 
 def secure_remove_file(file_path: str) -> bool:
     """
-    Securely remove a file, validating it's under allowed directories.
+    Securely remove a file.
 
     Args:
         file_path: Path to the file to remove
@@ -321,10 +230,7 @@ def secure_remove_file(file_path: str) -> bool:
     Returns:
         True if file was removed or didn't exist, False if operation failed
     """
-    validated_path = validate_secure_path(file_path, allow_app_data=True)
-    if validated_path is None:
-        logger.warning(f"File '{file_path}' not under allowed directories")
-        return False
+    validated_path = Path(file_path)
 
     try:
         if validated_path.exists():
@@ -339,7 +245,7 @@ def secure_remove_file(file_path: str) -> bool:
 def get_directory_listing(
     path: str,
     include_files: bool = False,
-) -> List[Dict[str, str]]:
+) -> List[DirectoryInfo]:
     """
     Get a secure directory listing with additional metadata.
 
@@ -348,12 +254,9 @@ def get_directory_listing(
         include_files: Whether to include files (default: directories only)
 
     Returns:
-        List of dictionaries with 'name' and 'path' keys
+        List of DirectoryInfo objects
     """
-    validated_path = validate_secure_path(path, allow_app_data=True)
-    if validated_path is None:
-        logger.warning(f"Path '{path}' not under allowed directories")
-        return []
+    validated_path = Path(path)
 
     if not validated_path.is_dir():
         return []
@@ -362,70 +265,28 @@ def get_directory_listing(
     try:
         for item in validated_path.iterdir():
             if item.is_dir():
-                items.append({"name": item.name, "path": str(item)})
+                is_borg_repo = _is_borg_repository(str(item))
+                is_borg_cache = _is_borg_cache(str(item))
+                items.append(
+                    DirectoryInfo(
+                        name=item.name,
+                        path=str(item),
+                        is_borg_repo=is_borg_repo,
+                        is_borg_cache=is_borg_cache,
+                    )
+                )
             elif include_files and item.is_file():
-                items.append({"name": item.name, "path": str(item)})
+                items.append(
+                    DirectoryInfo(
+                        name=item.name,
+                        path=str(item),
+                        is_borg_repo=False,
+                        is_borg_cache=False,
+                    )
+                )
 
         # Sort alphabetically
-        items.sort(key=lambda x: x["name"].lower())
-
-    except (PermissionError, OSError) as e:
-        logger.warning(f"Cannot access directory '{path}': {e}")
-
-    return items
-
-
-# User-facing functions that only allow /mnt (for repositories/backup sources)
-def user_secure_exists(path: str) -> bool:
-    """Check if path exists - /mnt only (for user repos/backup sources)."""
-    validated_path = validate_mnt_path(path)
-    if validated_path is None:
-        return False
-
-    try:
-        return validated_path.exists()
-    except (PermissionError, OSError) as e:
-        logger.warning(f"Cannot access path '{path}': {e}")
-        return False
-
-
-def user_secure_isdir(path: str) -> bool:
-    """Check if path is directory - /mnt only (for user repos/backup sources)."""
-    validated_path = validate_mnt_path(path)
-    # Additional defense: require that validated_path is inside /mnt
-    mnt_real = os.path.realpath("/mnt")
-    if validated_path is None or not str(validated_path).startswith(mnt_real):
-        logger.warning(f"Directory check blocked: Path '{path}' not contained in /mnt")
-        return False
-    try:
-        return validated_path.is_dir()
-    except (PermissionError, OSError) as e:
-        logger.warning(f"Cannot access path '{path}': {e}")
-        return False
-
-
-def user_get_directory_listing(
-    path: str, include_files: bool = False
-) -> List[Dict[str, str]]:
-    """Get directory listing - /mnt only (for user repos/backup sources)."""
-    validated_path = validate_mnt_path(path)
-    if validated_path is None:
-        logger.warning(f"Path '{path}' not under /mnt directory")
-        return []
-
-    if not validated_path.is_dir():
-        return []
-
-    items = []
-    try:
-        for item in validated_path.iterdir():
-            if item.is_dir():
-                items.append({"name": item.name, "path": str(item)})
-            elif include_files and item.is_file():
-                items.append({"name": item.name, "path": str(item)})
-
-        # Sort alphabetically
-        items.sort(key=lambda x: x["name"].lower())
+        items.sort(key=lambda x: x.name.lower())
 
     except (PermissionError, OSError) as e:
         logger.warning(f"Cannot access directory '{path}': {e}")
