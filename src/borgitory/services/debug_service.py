@@ -16,10 +16,6 @@ if TYPE_CHECKING:
     from borgitory.services.command_execution.wsl_command_executor import (
         WSLCommandExecutor,
     )
-    try:
-        import winreg
-    except ImportError:
-        winreg = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -575,22 +571,7 @@ class DebugService:
                 logger.warning(f"Could not get WSL version details: {e}")
 
             # Get Windows version for compatibility info
-            try:
-                import winreg
-
-                key = winreg.OpenKey(
-                    winreg.HKEY_LOCAL_MACHINE,
-                    r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-                )
-                build_number = winreg.QueryValueEx(key, "CurrentBuildNumber")[0]
-                release_id = winreg.QueryValueEx(key, "ReleaseId")[0]
-                wsl_info.windows_version = (
-                    f"Build {build_number} (Release {release_id})"
-                )
-                winreg.CloseKey(key)
-            except (ImportError, Exception) as e:
-                logger.warning(f"Could not get Windows version: {e}")
-                wsl_info.windows_version = "Unknown"
+            wsl_info.windows_version = self._get_windows_version()
 
             # Test WSL path accessibility
             try:
@@ -622,3 +603,56 @@ class DebugService:
             wsl_info.error = f"Unexpected error gathering WSL info: {str(e)}"
             logger.error(f"Error in _get_wsl_info: {e}")
             return wsl_info
+
+    def _get_windows_version(self) -> str:
+        """Get Windows version information using cross-platform methods."""
+        try:
+            # Method 1: Use platform.platform() which works cross-platform
+            platform_info = platform.platform()
+            if "Windows" in platform_info:
+                return platform_info
+            
+            # Method 2: Try subprocess to get Windows version (if on Windows)
+            if platform.system() == "Windows":
+                try:
+                    result = subprocess.run(
+                        ["cmd", "/c", "ver"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result.returncode == 0 and result.stdout:
+                        # Extract version from output like "Microsoft Windows [Version 10.0.19045.5011]"
+                        version_line = result.stdout.strip()
+                        if "Version" in version_line:
+                            return version_line
+                except Exception:
+                    pass
+                
+                # Method 3: Try systeminfo command
+                try:
+                    result = subprocess.run(
+                        ["systeminfo", "/fo", "csv"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+                    if result.returncode == 0 and result.stdout:
+                        lines = result.stdout.split('\n')
+                        if len(lines) >= 2:
+                            # Parse CSV output to get OS Name and Version
+                            headers = lines[0].split(',')
+                            values = lines[1].split(',')
+                            for i, header in enumerate(headers):
+                                if 'OS Name' in header and i < len(values):
+                                    os_name = values[i].strip('"')
+                                    return os_name
+                except Exception:
+                    pass
+            
+            # Fallback to basic platform info
+            return f"{platform.system()} {platform.release()}"
+
+        except Exception as e:
+            logger.warning(f"Could not get Windows version: {e}")
+            return "Unknown"
