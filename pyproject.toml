@@ -236,6 +236,7 @@ module = [
     "pyfuse3.*",
     "sqlalchemy.*",
     "sse_starlette.*",
+    "winreg",
 ]
 ignore_missing_imports = true
 

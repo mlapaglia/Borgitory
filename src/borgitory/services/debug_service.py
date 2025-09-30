@@ -16,6 +16,10 @@ if TYPE_CHECKING:
     from borgitory.services.command_execution.wsl_command_executor import (
         WSLCommandExecutor,
     )
+    try:
+        import winreg
+    except ImportError:
+        winreg = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -584,7 +588,7 @@ class DebugService:
                     f"Build {build_number} (Release {release_id})"
                 )
                 winreg.CloseKey(key)
-            except Exception as e:
+            except (ImportError, Exception) as e:
                 logger.warning(f"Could not get Windows version: {e}")
                 wsl_info.windows_version = "Unknown"
 
