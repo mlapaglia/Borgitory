@@ -130,22 +130,12 @@ def main() -> None:
         help="Log level (default: info)",
     )
 
-    # Migration command
-    subparsers.add_parser("migrate", help="Run database migrations")
-
     args = parser.parse_args()
 
     setup_logging(args.verbose)
 
     if args.command == "serve":
         start_server(host=args.host, port=args.port, log_level=args.log_level)
-    elif args.command == "migrate":
-        if run_migrations():
-            print("Migrations completed successfully")
-            sys.exit(0)
-        else:
-            print("Migration failed")
-            sys.exit(1)
     else:
         # Default behavior - start server
         start_server()
