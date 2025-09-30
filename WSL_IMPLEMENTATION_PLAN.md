@@ -7,7 +7,7 @@ This document outlines the implementation plan for adding Windows Subsystem for 
 ## Current State
 
 ✅ **Completed:**
-- Simplified path service architecture with `UniversalPathService`
+- Simplified path service architecture with `LinuxPathService`
 - Removed Windows-specific path handling logic
 - Updated schemas to accept only Unix-style paths (`/mnt/c/...`)
 - Updated autocomplete to work with Unix paths
@@ -110,7 +110,7 @@ def create_path_service() -> PathServiceInterface:
     if config.is_windows() and wsl_available():
         return WSLPathService(config)
     else:
-        return UniversalPathService(config)
+        return LinuxPathService(config)
 ```
 
 #### 5.2 Configuration Options

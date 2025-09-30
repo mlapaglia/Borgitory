@@ -24,6 +24,7 @@ class DirectoryInfo:
     path: str
     is_borg_repo: bool = False
     is_borg_cache: bool = False
+    has_permission_error: bool = False
 
     @property
     def path_with_separator(self) -> str:
@@ -286,6 +287,7 @@ def get_directory_listing(
                         path=str(item),
                         is_borg_repo=is_borg_repo,
                         is_borg_cache=is_borg_cache,
+                        has_permission_error=False,  # Local filesystem access doesn't have WSL permission issues
                     )
                 )
             elif include_files and item.is_file():
@@ -295,6 +297,7 @@ def get_directory_listing(
                         path=str(item),
                         is_borg_repo=False,
                         is_borg_cache=False,
+                        has_permission_error=False,
                     )
                 )
 

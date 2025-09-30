@@ -6,6 +6,7 @@ for Unix and container environments. Windows is only supported via WSL.
 """
 
 import os
+import platform
 import logging
 from typing import Optional
 
@@ -26,7 +27,7 @@ class PathConfigurationService(PathConfigurationInterface):
     def __init__(self) -> None:
         """Initialize the path configuration service."""
         self._platform_name: Optional[str] = None
-        self._is_container: Optional[bool] = None
+        self._is_docker: Optional[bool] = None
 
     def get_base_data_dir(self) -> str:
         """
@@ -41,7 +42,7 @@ class PathConfigurationService(PathConfigurationInterface):
             return env_data_dir
 
         # Use environment-specific defaults
-        if self.is_container_environment():
+        if self.is_docker():
             return "/app/data"
         else:  # Unix-like systems (including WSL)
             # Check for XDG_DATA_HOME (Linux standard)
@@ -66,7 +67,7 @@ class PathConfigurationService(PathConfigurationInterface):
         if env_temp_dir:
             return env_temp_dir
 
-        if self._is_container:
+        if self._is_docker:
             return "/tmp/borgitory"
         else:  # Unix-like (including WSL)
             return "/tmp/borgitory"
@@ -80,7 +81,7 @@ class PathConfigurationService(PathConfigurationInterface):
         if env_cache_dir:
             return env_cache_dir
 
-        if self._is_container:
+        if self._is_docker:
             return "/cache/borgitory"  # Matches Docker volume mount
         else:  # Unix-like (including WSL)
             # Check for XDG_CACHE_HOME (Linux standard)
@@ -90,56 +91,29 @@ class PathConfigurationService(PathConfigurationInterface):
             home = os.path.expanduser("~")
             return os.path.join(home, ".cache", "borgitory")
 
-    def is_container_environment(self) -> bool:
-        """
-        Check if running in a container environment.
-
-        Returns:
-            True if running in a container
-        """
-        if self._is_container is not None:
-            return self._is_container
-
-        # Check multiple container indicators
-        container_indicators = [
-            # Docker
-            os.path.exists("/.dockerenv"),
-            # Kubernetes
-            os.getenv("KUBERNETES_SERVICE_HOST") is not None,
-            # Generic container indicators
-            os.getenv("CONTAINER") == "true",
-            os.getenv("DOCKER_CONTAINER") == "true",
-            # Check if we're running in /app (common container pattern)
-            os.getcwd().startswith("/app"),
-        ]
-
-        self._is_container = any(container_indicators)
-
-        if self._is_container:
-            logger.debug("Container environment detected")
-        else:
-            logger.debug(f"Native environment detected: {os.name}")
-
-        return self._is_container
+    def is_docker(self) -> bool:
+        if os.path.exists("/proc/self/cgroup"):
+            with open("/proc/self/cgroup", "r") as procfile:
+                for line in procfile:
+                    fields = line.strip().split("/")
+                    if fields[1] == "docker":
+                        return True
+        return False
 
     def get_platform_name(self) -> str:
         """
         Get the platform name for logging and debugging.
 
         Returns:
-            Platform name: 'container' or 'unix' (Windows only supported via WSL)
+            Platform name: 'windows', 'linux', 'docker', 'darwin'
         """
         if self._platform_name is not None:
             return self._platform_name
 
-        if self.is_container_environment():
-            self._platform_name = "container"
-        else:
-            # All non-container environments are treated as Unix
-            # Windows is only supported via WSL which appears as Unix
-            self._platform_name = "unix"
+        if self.is_docker():
+            return "docker"
 
-        return self._platform_name
+        return platform.system().lower()
 
     def is_windows(self) -> bool:
         """
@@ -148,4 +122,13 @@ class PathConfigurationService(PathConfigurationInterface):
         Returns:
             True if running on Windows
         """
-        return os.name == "nt"
+        return self.get_platform_name() == "windows"
+
+    def is_linux(self) -> bool:
+        """
+        Check if running on Linux.
+
+        Returns:
+            True if running on Linux
+        """
+        return self.get_platform_name() == "linux"

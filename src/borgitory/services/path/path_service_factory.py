@@ -1,8 +1,9 @@
 """
 Path service factory for creating filesystem path services.
 
-This module provides the factory function for creating path service
-implementations for different environments.
+This module provides factory functions for creating path service
+implementations. Note: The main path service creation is now handled
+via dependency injection in dependencies.py for better testability.
 """
 
 import logging
@@ -11,7 +12,10 @@ import subprocess
 
 from borgitory.protocols.path_protocols import PathServiceInterface
 from borgitory.services.path.path_configuration_service import PathConfigurationService
-from borgitory.services.path.universal_path_service import UniversalPathService
+from borgitory.services.path.path_service import PathService
+from borgitory.services.command_execution.linux_command_executor import (
+    LinuxCommandExecutor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,27 +41,29 @@ def create_path_service() -> PathServiceInterface:
     """
     Create a path service for the current environment.
 
-    This factory function automatically detects the environment:
-    - Windows with WSL: Uses WSLPathService
-    - Unix/Container: Uses UniversalPathService
+    Note: This is a legacy factory function. For production use,
+    prefer the dependency injection approach in dependencies.py.
 
     Returns:
         PathServiceInterface: A path service implementation
     """
     config = PathConfigurationService()
 
-    # Note: WSL path service creation is now handled in dependencies.py with DI
-    # This factory now only creates UniversalPathService
+    # For factory usage, default to Linux command executor
+    # In production, the proper executor is injected via DI
+    command_executor = LinuxCommandExecutor()
+
     platform = config.get_platform_name()
-    logger.info(f"Creating universal path service for {platform} environment")
-    return UniversalPathService(config)
+    logger.info(f"Creating path service for {platform} environment (factory mode)")
+    return PathService(config, command_executor)
 
 
 def get_path_service() -> PathServiceInterface:
     """
     Get a path service instance.
 
-    This function is designed to be used with FastAPI's dependency injection system.
+    Note: This is a legacy function. For production use,
+    prefer the dependency injection approach in dependencies.py.
 
     Returns:
         PathServiceInterface: A path service instance

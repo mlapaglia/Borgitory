@@ -941,23 +941,18 @@ class RepositoryService:
         try:
             directories = []
 
-            # Use WSL path service for directory operations if available
-            if self.path_service.get_platform_name() == "wsl":
-                from borgitory.services.path.wsl_path_service import WSLPathService
-
-                if isinstance(self.path_service, WSLPathService):
-                    # Special handling for root directory - show /mnt directory where Windows drives are mounted
-                    if path == "/" or path == "":
-                        # Instead of showing Unix root, show /mnt where Windows drives are mounted
-                        directories = await self.path_service.list_directory(
-                            "/mnt", include_files=include_files
-                        )
-                    else:
-                        directories = await self.path_service.list_directory(
-                            path, include_files=include_files
-                        )
+            # Use special handling for Windows/WSL environments
+            if self.path_service.get_platform_name() == "windows":
+                # Special handling for root directory - show /mnt directory where Windows drives are mounted
+                if path == "/" or path == "":
+                    # Instead of showing Unix root, show /mnt where Windows drives are mounted
+                    directories = await self.path_service.list_directory(
+                        "/mnt", include_files=include_files
+                    )
                 else:
-                    directories = []
+                    directories = await self.path_service.list_directory(
+                        path, include_files=include_files
+                    )
             else:
                 # Fallback to legacy functions for non-WSL
                 if not secure_exists(path):

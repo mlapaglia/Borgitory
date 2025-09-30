@@ -7,9 +7,7 @@ all commands through WSL, enabling Unix-style command execution on Windows.
 
 import asyncio
 import logging
-import subprocess
 import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
 from borgitory.protocols.command_executor_protocol import (
@@ -70,49 +68,45 @@ class WSLCommandExecutor(CommandExecutorProtocol):
         )
 
         try:
-            # Use ThreadPoolExecutor to run synchronous subprocess in async context
-            # This avoids the NotImplementedError on Windows with asyncio.create_subprocess_exec
-            loop = asyncio.get_event_loop()
+            # Use asyncio.create_subprocess_exec directly
+            process = await asyncio.create_subprocess_exec(
+                *wsl_command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                stdin=asyncio.subprocess.PIPE if input_data else None,
+            )
 
-            def run_subprocess() -> subprocess.CompletedProcess[bytes]:
-                return subprocess.run(
-                    wsl_command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    stdin=subprocess.PIPE if input_data else None,
-                    input=input_data.encode() if input_data else None,
+            try:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    process.communicate(
+                        input=input_data.encode() if input_data else None
+                    ),
                     timeout=actual_timeout,
-                    text=False,  # Keep as bytes for consistent decoding
+                )
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                execution_time = time.time() - start_time
+                return CommandResult(
+                    command=cmd_list,
+                    return_code=-1,
+                    stdout="",
+                    stderr="",
+                    success=False,
+                    execution_time=execution_time,
+                    error=f"Command timed out after {actual_timeout} seconds",
                 )
 
-            # Execute in thread pool to avoid blocking the event loop
-            with ThreadPoolExecutor() as executor:
-                try:
-                    process_result = await loop.run_in_executor(
-                        executor, run_subprocess
-                    )
-                except subprocess.TimeoutExpired:
-                    execution_time = time.time() - start_time
-                    return CommandResult(
-                        command=cmd_list,
-                        return_code=-1,
-                        stdout="",
-                        stderr="",
-                        success=False,
-                        execution_time=execution_time,
-                        error=f"Command timed out after {actual_timeout} seconds",
-                    )
-
             # Decode output
-            stdout_str = process_result.stdout.decode("utf-8", errors="replace")
-            stderr_str = process_result.stderr.decode("utf-8", errors="replace")
+            stdout_str = stdout_bytes.decode("utf-8", errors="replace")
+            stderr_str = stderr_bytes.decode("utf-8", errors="replace")
 
             execution_time = time.time() - start_time
-            success = process_result.returncode == 0
+            success = process.returncode == 0
 
             result = CommandResult(
                 command=cmd_list,
-                return_code=process_result.returncode,
+                return_code=process.returncode or 0,
                 stdout=stdout_str,
                 stderr=stderr_str,
                 success=success,
@@ -125,9 +119,10 @@ class WSLCommandExecutor(CommandExecutorProtocol):
                     f"WSL command completed successfully in {execution_time:.2f}s"
                 )
             else:
-                logger.warning(
-                    f"WSL command failed (code {result.return_code}) in {execution_time:.2f}s: {stderr_str}"
-                )
+                if "No such file or directory" not in stderr_str:
+                    logger.warning(
+                        f"WSL command failed (code {result.return_code}) in {execution_time:.2f}s: {stderr_str}"
+                    )
 
             return result
 
@@ -236,12 +231,20 @@ class WSLCommandExecutor(CommandExecutorProtocol):
         # We need to construct a shell command that handles env vars and cwd
         shell_parts = []
 
-        # Set environment variables
+        # Set environment variables (only pass relevant ones to avoid bash syntax errors)
         if env:
+            # Filter to only pass variables that are relevant for our commands
+            relevant_prefixes = [
+                "BORG_",  # All Borg-related variables
+                "BORGITORY_",  # Our app-specific variables
+            ]
+
             for key, value in env.items():
-                # Escape the value to handle special characters
-                escaped_value = value.replace("'", "'\"'\"'")
-                shell_parts.append(f"export {key}='{escaped_value}'")
+                # Only pass environment variables that are relevant
+                if any(key.startswith(prefix) for prefix in relevant_prefixes):
+                    # Escape the value to handle special characters
+                    escaped_value = value.replace("'", "'\"'\"'")
+                    shell_parts.append(f"export {key}='{escaped_value}'")
 
         # Change directory if specified
         if cwd:
@@ -263,8 +266,8 @@ class WSLCommandExecutor(CommandExecutorProtocol):
         # Join all parts with && to ensure they execute in sequence
         shell_command = " && ".join(shell_parts)
 
-        # Add the shell command to WSL
-        wsl_cmd.extend(["/bin/bash", "-c", shell_command])
+        # Add the shell command to WSL using login shell (-l) to get full environment
+        wsl_cmd.extend(["/bin/bash", "-l", "-c", shell_command])
 
         return wsl_cmd
 

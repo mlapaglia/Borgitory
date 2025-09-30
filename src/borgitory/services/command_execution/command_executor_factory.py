@@ -12,10 +12,12 @@ from typing import TYPE_CHECKING
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.services.path.path_configuration_service import PathConfigurationService
-from .unix_command_executor import UnixCommandExecutor
+from .linux_command_executor import LinuxCommandExecutor
 
 if TYPE_CHECKING:
-    from borgitory.services.wsl.wsl_command_executor import WSLCommandExecutor
+    from borgitory.services.command_execution.wsl_command_executor import (
+        WSLCommandExecutor,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -43,27 +45,27 @@ def create_command_executor() -> CommandExecutorProtocol:
 
     This factory function automatically detects the environment:
     - Windows with WSL: Uses WSLCommandExecutor
-    - Linux/Container: Uses UnixCommandExecutor
+    - Linux/Container: Uses LinuxCommandExecutor
 
     Returns:
         CommandExecutorProtocol: A command executor implementation
     """
     config = PathConfigurationService()
 
-    if config.is_windows() and wsl_available():
-        try:
-            from borgitory.services.wsl.wsl_command_executor import WSLCommandExecutor
+    if config.is_windows():
+        if not wsl_available():
+            raise RuntimeError("Detected Windows environment, but WSL is not available")
 
-            logger.debug("Creating WSL command executor for Windows environment")
-            return WSLCommandExecutor()
-        except ImportError as e:
-            logger.warning(f"WSL command executor not available: {e}")
-            logger.warning("Falling back to Unix command executor")
-            return UnixCommandExecutor()
+        logger.debug("Creating WSL command executor")
+        return WSLCommandExecutor()
+    elif config.is_linux():
+        logger.debug("Creating Linux command executor")
+        return LinuxCommandExecutor()
     else:
-        platform = config.get_platform_name()
-        logger.debug(f"Creating Unix command executor for {platform} environment")
-        return UnixCommandExecutor()
+        logger.error("Unsupported environment detected")
+        raise RuntimeError(
+            f"Unsupported environment detected {config.get_platform_name()}"
+        )
 
 
 def create_command_executor_with_injection(
@@ -89,4 +91,4 @@ def create_command_executor_with_injection(
     else:
         platform = config.get_platform_name()
         logger.debug(f"Creating Unix command executor for {platform} environment")
-        return UnixCommandExecutor()
+        return LinuxCommandExecutor()

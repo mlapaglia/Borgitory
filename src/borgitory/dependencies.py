@@ -31,7 +31,9 @@ if TYPE_CHECKING:
     from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
     from borgitory.protocols.path_protocols import PathServiceInterface
     from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
-    from borgitory.services.wsl.wsl_command_executor import WSLCommandExecutor
+    from borgitory.services.command_execution.wsl_command_executor import (
+        WSLCommandExecutor,
+    )
     from sqlalchemy.orm import Session
 from functools import lru_cache
 from fastapi import Depends
@@ -129,7 +131,9 @@ def get_wsl_command_executor() -> "WSLCommandExecutor":
     Returns:
         WSLCommandExecutor: WSL command executor instance for Windows WSL operations
     """
-    from borgitory.services.wsl.wsl_command_executor import WSLCommandExecutor
+    from borgitory.services.command_execution.wsl_command_executor import (
+        WSLCommandExecutor,
+    )
 
     return WSLCommandExecutor()
 
@@ -142,7 +146,7 @@ def get_command_executor(
 
     This factory creates the appropriate command executor based on the environment:
     - Windows + WSL: WSLCommandExecutor (injected)
-    - Linux/Docker: UnixCommandExecutor
+    - Linux/Docker: LinuxCommandExecutor
 
     Args:
         wsl_executor: Injected WSL command executor for Windows
@@ -427,43 +431,30 @@ def get_file_system() -> "FileSystemInterface":
 
 
 def get_path_service(
-    wsl_executor: "WSLCommandExecutor" = Depends(get_wsl_command_executor),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> "PathServiceInterface":
     """
     Provide PathServiceInterface implementation for cross-platform path operations.
 
-    Args:
-        wsl_executor: Injected WSL command executor for Windows WSL operations
+    This function creates a unified path service that uses the appropriate
+    CommandExecutorProtocol based on the current platform.
 
     Returns:
-        PathServiceInterface: Platform-appropriate path service implementation
+        PathServiceInterface: Unified path service implementation
     """
     import logging
     from borgitory.services.path.path_configuration_service import (
         PathConfigurationService,
     )
-    from borgitory.services.path.universal_path_service import UniversalPathService
-    from borgitory.services.path.path_service_factory import wsl_available
+    from borgitory.services.path.path_service import PathService
 
     logger = logging.getLogger(__name__)
     config = PathConfigurationService()
 
-    if config.is_windows() and wsl_available():
-        try:
-            from borgitory.services.path.wsl_path_service import WSLPathService
-
-            logger.debug("Creating WSL path service for Windows environment with DI")
-            return WSLPathService(config, wsl_executor)
-        except ImportError as e:
-            logger.warning(f"WSL path service not available: {e}")
-            logger.warning("Falling back to universal path service")
-            return UniversalPathService(config)
-    else:
-        platform = config.get_platform_name()
-        logger.debug(
-            f"Creating universal path service for {platform} environment with DI"
-        )
-        return UniversalPathService(config)
+    logger.debug(
+        f"Creating unified path service for {config.get_platform_name()} with {type(command_executor).__name__}"
+    )
+    return PathService(config, command_executor)
 
 
 def get_hook_execution_service() -> HookExecutionService:

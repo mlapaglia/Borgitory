@@ -4,8 +4,9 @@
 </div>
 {% elif directories %}
 {% for dir in directories %}
-<div class="autocomplete-item px-3 py-2 cursor-pointer {% if dir.is_borg_repo %}bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-200 dark:border-blue-700{% elif dir.is_borg_cache %}bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 border-green-200 dark:border-green-700{% else %}hover:bg-gray-100 dark:hover:bg-gray-600{% endif %} border-b border-gray-100 dark:border-gray-600 last:border-b-0" 
+<div class="autocomplete-item px-3 py-2 {% if dir.has_permission_error %}cursor-not-allowed opacity-60 bg-red-50 dark:bg-red-900/20{% else %}cursor-pointer{% endif %} {% if not dir.has_permission_error %}{% if dir.is_borg_repo %}bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-200 dark:border-blue-700{% elif dir.is_borg_cache %}bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 border-green-200 dark:border-green-700{% else %}hover:bg-gray-100 dark:hover:bg-gray-600{% endif %}{% endif %} border-b border-gray-100 dark:border-gray-600 last:border-b-0" 
      data-path="{{ dir.path_with_separator }}"
+     {% if not dir.has_permission_error %}
      hx-on:click="
         event.preventDefault();
         event.stopPropagation();
@@ -15,10 +16,16 @@
             // Trigger the autocomplete request manually with the new value
             htmx.trigger(targetInput, 'input');
         }
-     ">
+     "
+     {% endif %}>
     <div class="flex items-center justify-between min-w-0">
         <div class="flex items-center space-x-2 min-w-0 flex-1">
-            {% if dir.is_borg_repo %}
+            {% if dir.has_permission_error %}
+                <!-- Permission denied icon -->
+                <svg class="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clip-rule="evenodd"></path>
+                </svg>
+            {% elif dir.is_borg_repo %}
                 <!-- Borg repository icon -->
                 <svg class="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
@@ -34,9 +41,13 @@
                     <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
                 </svg>
             {% endif %}
-            <span class="text-sm {% if dir.is_borg_repo %}text-blue-900 dark:text-blue-100 font-medium{% elif dir.is_borg_cache %}text-green-900 dark:text-green-100 font-medium{% else %}text-gray-900 dark:text-gray-100{% endif %} break-words overflow-hidden min-w-0">{{ dir.name }}</span>
+            <span class="text-sm {% if dir.has_permission_error %}text-red-900 dark:text-red-100 font-medium{% elif dir.is_borg_repo %}text-blue-900 dark:text-blue-100 font-medium{% elif dir.is_borg_cache %}text-green-900 dark:text-green-100 font-medium{% else %}text-gray-900 dark:text-gray-100{% endif %} break-words overflow-hidden min-w-0">{{ dir.name }}</span>
         </div>
-        {% if dir.is_borg_repo %}
+        {% if dir.has_permission_error %}
+            <span class="text-xs bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 px-2 py-1 rounded-full font-medium flex-shrink-0 ml-2">
+                Permission Denied
+            </span>
+        {% elif dir.is_borg_repo %}
             <span class="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium flex-shrink-0 ml-2">
                 Borg Repository
             </span>
@@ -46,7 +57,7 @@
             </span>
         {% endif %}
     </div>
-    <div class="text-xs {% if dir.is_borg_repo %}text-blue-600 dark:text-blue-300{% elif dir.is_borg_cache %}text-green-600 dark:text-green-300{% else %}text-gray-500 dark:text-gray-400{% endif %} ml-6 break-words overflow-hidden">{{ dir.path }}</div>
+    <div class="text-xs {% if dir.has_permission_error %}text-red-600 dark:text-red-300{% elif dir.is_borg_repo %}text-blue-600 dark:text-blue-300{% elif dir.is_borg_cache %}text-green-600 dark:text-green-300{% else %}text-gray-500 dark:text-gray-400{% endif %} ml-6 break-words overflow-hidden">{{ dir.path }}</div>
 </div>
 {% endfor %}
 {% else %}

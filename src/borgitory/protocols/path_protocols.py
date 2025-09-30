@@ -6,7 +6,9 @@ filesystem operations for different environments (native, WSL, container).
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import List, Optional
+
+from borgitory.utils.secure_path import DirectoryInfo
 
 
 class PathServiceInterface(ABC):
@@ -74,6 +76,48 @@ class PathServiceInterface(ABC):
         """Get the platform name (native, wsl, container)."""
         pass
 
+    @abstractmethod
+    async def path_exists(self, path: str) -> bool:
+        """
+        Check if a path exists.
+
+        Args:
+            path: Path to check
+
+        Returns:
+            True if path exists
+        """
+        pass
+
+    @abstractmethod
+    async def is_directory(self, path: str) -> bool:
+        """
+        Check if a path is a directory.
+
+        Args:
+            path: Path to check
+
+        Returns:
+            True if path is a directory
+        """
+        pass
+
+    @abstractmethod
+    async def list_directory(
+        self, path: str, include_files: bool = False
+    ) -> List[DirectoryInfo]:
+        """
+        List directory contents.
+
+        Args:
+            path: Directory path to list
+            include_files: Whether to include files in results
+
+        Returns:
+            List of DirectoryInfo objects
+        """
+        pass
+
 
 class PathConfigurationInterface(ABC):
     """
@@ -99,8 +143,8 @@ class PathConfigurationInterface(ABC):
         pass
 
     @abstractmethod
-    def is_container_environment(self) -> bool:
-        """Check if running in a container environment."""
+    def is_docker(self) -> bool:
+        """Check if running in a idocker environment."""
         pass
 
     @abstractmethod

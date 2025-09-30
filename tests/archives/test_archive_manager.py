@@ -75,12 +75,12 @@ class TestArchiveManager:
         """Test ArchiveManager initialization with default dependencies."""
 
         mock_mount_manager = Mock()
-        from borgitory.services.command_execution.unix_command_executor import (
-            UnixCommandExecutor,
+        from borgitory.services.command_execution.linux_command_executor import (
+            LinuxCommandExecutor,
         )
 
         manager = ArchiveManager(
-            job_executor=JobExecutor(UnixCommandExecutor()),
+            job_executor=JobExecutor(LinuxCommandExecutor()),
             mount_manager=mock_mount_manager,
         )
 

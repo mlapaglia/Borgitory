@@ -145,11 +145,11 @@ class TestProtocolCompliance:
         )
 
         # Check instantiation
-        from borgitory.services.command_execution.unix_command_executor import (
-            UnixCommandExecutor,
+        from borgitory.services.command_execution.linux_command_executor import (
+            LinuxCommandExecutor,
         )
 
-        executor = JobExecutor(UnixCommandExecutor())
+        executor = JobExecutor(LinuxCommandExecutor())
         assert executor is not None
 
     def test_borg_service_compliance(self) -> None:
@@ -202,12 +202,12 @@ class TestProtocolCompliance:
             )
 
         from borgitory.services.jobs.job_executor import JobExecutor
-        from borgitory.services.command_execution.unix_command_executor import (
-            UnixCommandExecutor,
+        from borgitory.services.command_execution.linux_command_executor import (
+            LinuxCommandExecutor,
         )
 
         manager = ArchiveManager(
-            job_executor=JobExecutor(UnixCommandExecutor()),
+            job_executor=JobExecutor(LinuxCommandExecutor()),
             mount_manager=Mock(),
         )
         assert manager is not None

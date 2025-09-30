@@ -5,10 +5,12 @@ This package provides command executors for different environments
 and a factory for creating the appropriate executor.
 """
 
-from .unix_command_executor import UnixCommandExecutor
+from .linux_command_executor import LinuxCommandExecutor
 from .command_executor_factory import create_command_executor
+from .wsl_command_executor import WSLCommandExecutor
 
 __all__ = [
-    "UnixCommandExecutor",
+    "LinuxCommandExecutor",
     "create_command_executor",
+    "WSLCommandExecutor",
 ]

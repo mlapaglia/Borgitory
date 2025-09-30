@@ -18,7 +18,7 @@ The original Borgitory application had hardcoded Linux-specific paths that would
 ### Core Components
 
 1. **PathServiceInterface** - Abstract interface defining filesystem operations
-2. **UniversalPathService** - Single implementation that works across platforms
+2. **LinuxPathService** - Single implementation that works across platforms
 3. **PathConfigurationService** - Environment detection and base path determination
 4. **Factory Pattern** - Clean dependency injection integration
 
@@ -46,7 +46,7 @@ src/borgitory/
     ├── __init__.py
     ├── path_service_factory.py     # Factory function
     ├── path_configuration_service.py  # Environment detection
-    └── universal_path_service.py   # Single implementation
+    └── linux_path_service.py   # Single implementation
 ```
 
 ### Key Features
@@ -58,7 +58,7 @@ class PathConfigurationService:
         # Detects Docker/Kubernetes environments
         
     def _determine_platform_name(self) -> str:
-        # Returns: "container", "windows", or "unix"
+        # Returns: "container", "windows", or "linux"
         
     def get_base_data_dir(self) -> str:
         # Platform-specific data directories:
@@ -69,7 +69,7 @@ class PathConfigurationService:
 
 #### Universal Path Service
 ```python
-class UniversalPathService(PathServiceInterface):
+class LinuxPathService(PathServiceInterface):
     def secure_join(self, base_path: str, *path_parts: str) -> str:
         # Prevents directory traversal attacks
         
@@ -84,7 +84,7 @@ class UniversalPathService(PathServiceInterface):
 ```python
 def create_path_service() -> PathServiceInterface:
     config = PathConfigurationService()
-    return UniversalPathService(config)
+    return LinuxPathService(config)
 ```
 
 ### Dependency Injection Integration
@@ -139,7 +139,7 @@ def create_path_service() -> PathServiceInterface:
     if config.is_windows() and wsl_available():
         return WSLPathService(config)  # Future WSL implementation
     else:
-        return UniversalPathService(config)  # Current implementation
+        return LinuxPathService(config)  # Current implementation
 ```
 
 ## Testing

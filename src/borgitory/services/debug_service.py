@@ -13,7 +13,9 @@ from borgitory.protocols import JobManagerProtocol
 from borgitory.protocols.environment_protocol import EnvironmentProtocol
 
 if TYPE_CHECKING:
-    from borgitory.services.wsl.wsl_command_executor import WSLCommandExecutor
+    from borgitory.services.command_execution.wsl_command_executor import (
+        WSLCommandExecutor,
+    )
 
 logger = logging.getLogger(__name__)
 

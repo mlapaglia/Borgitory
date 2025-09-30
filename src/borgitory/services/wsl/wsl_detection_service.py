@@ -7,7 +7,7 @@ and validates the WSL environment for Borgitory operations.
 
 import asyncio
 import logging
-import os
+import platform
 import re
 from typing import List, Optional
 from dataclasses import dataclass
@@ -62,8 +62,7 @@ class WSLDetectionService:
         logger.info("Detecting WSL environment...")
 
         try:
-            # Check if we're on Windows
-            if os.name != "nt":
+            if platform.system().lower() != "windows":
                 info = WSLEnvironmentInfo(
                     wsl_available=False,
                     wsl_version=None,
@@ -78,7 +77,6 @@ class WSLDetectionService:
                 self._cache_valid = True
                 return info
 
-            # Check WSL availability and version
             wsl_available, wsl_version, error_msg = await self._check_wsl_availability()
 
             if not wsl_available:

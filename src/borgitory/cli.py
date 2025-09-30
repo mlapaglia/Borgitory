@@ -143,9 +143,7 @@ def main() -> None:
     setup_logging(args.verbose)
 
     if args.command == "serve":
-        start_server(
-            host=args.host, port=args.port, reload=args.reload, log_level=args.log_level
-        )
+        start_server(host=args.host, port=args.port, log_level=args.log_level)
     elif args.command == "migrate":
         if run_migrations():
             print("Migrations completed successfully")

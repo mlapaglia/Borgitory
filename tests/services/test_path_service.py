@@ -12,7 +12,7 @@ from unittest.mock import patch, Mock
 from pathlib import Path
 
 from borgitory.services.path.path_configuration_service import PathConfigurationService
-from borgitory.services.path.universal_path_service import UniversalPathService
+from borgitory.services.path.linux_path_service import LinuxPathService
 from borgitory.services.path.path_service_factory import create_path_service
 
 
@@ -24,7 +24,7 @@ class TestPathConfigurationService:
         with patch("os.path.exists") as mock_exists:
             mock_exists.return_value = True
             config = PathConfigurationService()
-            assert config.is_container_environment() is True
+            assert config.is_docker() is True
 
     def test_container_detection_kubernetes(self) -> None:
         """Test container detection using Kubernetes environment."""
@@ -32,7 +32,7 @@ class TestPathConfigurationService:
             "os.path.exists", return_value=False
         ):
             config = PathConfigurationService()
-            assert config.is_container_environment() is True
+            assert config.is_docker() is True
 
     def test_container_detection_docker_env(self) -> None:
         """Test container detection using Docker environment variable."""
@@ -40,7 +40,7 @@ class TestPathConfigurationService:
             "os.path.exists", return_value=False
         ):
             config = PathConfigurationService()
-            assert config.is_container_environment() is True
+            assert config.is_docker() is True
 
     def test_native_environment_detection(self) -> None:
         """Test native environment detection."""
@@ -48,15 +48,15 @@ class TestPathConfigurationService:
             os.environ, {}, clear=True
         ):
             config = PathConfigurationService()
-            assert config.is_container_environment() is False
+            assert config.is_docker() is False
 
-    def test_unix_platform_name(self) -> None:
+    def test_linux_platform_name(self) -> None:
         """Test Unix platform name detection."""
         with patch("os.path.exists", return_value=False), patch(
             "os.name", "posix"
         ), patch.dict(os.environ, {}, clear=True):
             config = PathConfigurationService()
-            assert config.get_platform_name() == "unix"
+            assert config.get_platform_name() == "linux"
 
     def test_container_platform_name(self) -> None:
         """Test container platform name detection."""
@@ -83,7 +83,7 @@ class TestPathConfigurationService:
             assert config.get_base_cache_dir() == "/custom/cache"
 
 
-class TestUniversalPathService:
+class TestLinuxPathService:
     """Test universal path service."""
 
     @pytest.fixture
@@ -99,7 +99,7 @@ class TestUniversalPathService:
     @pytest.mark.asyncio
     async def test_directory_methods(self, mock_config: Mock) -> None:
         """Test basic directory methods."""
-        service = UniversalPathService(mock_config)
+        service = LinuxPathService(mock_config)
 
         with patch.object(service, "ensure_directory") as mock_ensure:
             # Test that directory methods call ensure_directory
@@ -121,7 +121,7 @@ class TestUniversalPathService:
 
     def test_secure_join_basic(self, mock_config: Mock) -> None:
         """Test basic secure path joining."""
-        service = UniversalPathService(mock_config)
+        service = LinuxPathService(mock_config)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             result = service.secure_join(temp_dir, "subdir", "file.txt")
@@ -137,7 +137,7 @@ class TestUniversalPathService:
 
     def test_secure_join_prevents_traversal(self, mock_config: Mock) -> None:
         """Test that secure_join prevents path traversal."""
-        service = UniversalPathService(mock_config)
+        service = LinuxPathService(mock_config)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # Should raise ValueError for path traversal attempts
@@ -146,7 +146,7 @@ class TestUniversalPathService:
 
     def test_secure_join_empty_parts(self, mock_config: Mock) -> None:
         """Test secure_join with empty parts."""
-        service = UniversalPathService(mock_config)
+        service = LinuxPathService(mock_config)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # Empty parts should be ignored
@@ -156,7 +156,7 @@ class TestUniversalPathService:
 
     def test_secure_join_empty_base_raises(self, mock_config: Mock) -> None:
         """Test that secure_join raises on empty base."""
-        service = UniversalPathService(mock_config)
+        service = LinuxPathService(mock_config)
 
         with pytest.raises(ValueError, match="Base path cannot be empty"):
             service.secure_join("", "subdir")
@@ -164,7 +164,7 @@ class TestUniversalPathService:
     @pytest.mark.asyncio
     async def test_ensure_directory_creates_path(self, mock_config: Mock) -> None:
         """Test directory creation."""
-        service = UniversalPathService(mock_config)
+        service = LinuxPathService(mock_config)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             test_path = os.path.join(temp_dir, "new", "nested", "directory")
@@ -177,14 +177,14 @@ class TestUniversalPathService:
     @pytest.mark.asyncio
     async def test_ensure_directory_empty_path(self, mock_config: Mock) -> None:
         """Test ensure_directory with empty path."""
-        service = UniversalPathService(mock_config)
+        service = LinuxPathService(mock_config)
 
         # Should not raise error for empty path
         await service.ensure_directory("")
 
     def test_get_platform_name(self, mock_config: Mock) -> None:
         """Test platform name retrieval."""
-        service = UniversalPathService(mock_config)
+        service = LinuxPathService(mock_config)
 
         # Call it once
         result = service.get_platform_name()
@@ -200,7 +200,7 @@ class TestPathServiceFactory:
     def test_factory_creates_universal_service(self) -> None:
         """Test factory creates universal service."""
         service = create_path_service()
-        assert isinstance(service, UniversalPathService)
+        assert isinstance(service, LinuxPathService)
 
     def test_factory_service_has_platform_name(self) -> None:
         """Test factory-created service has platform name."""
