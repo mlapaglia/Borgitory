@@ -25,7 +25,7 @@ class UniversalPathService(PathServiceInterface):
 
     def __init__(self, config: PathConfigurationService):
         self.config = config
-        logger.info(
+        logger.debug(
             f"Initialized universal path service for {config.get_platform_name()}"
         )
 

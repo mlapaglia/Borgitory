@@ -10,26 +10,17 @@ import logging
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Union
-from dataclasses import dataclass
+from typing import Dict, List, Optional
+
+from borgitory.protocols.command_executor_protocol import (
+    CommandExecutorProtocol,
+    CommandResult,
+)
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class WSLCommandResult:
-    """Result of a WSL command execution."""
-
-    command: List[str]
-    return_code: int
-    stdout: str
-    stderr: str
-    success: bool
-    execution_time: float
-    error: Optional[str] = None
-
-
-class WSLCommandExecutor:
+class WSLCommandExecutor(CommandExecutorProtocol):
     """Executor for running commands through WSL."""
 
     def __init__(self, distribution: Optional[str] = None, timeout: float = 300.0):
@@ -45,12 +36,12 @@ class WSLCommandExecutor:
 
     async def execute_command(
         self,
-        command: Union[str, List[str]],
+        command: List[str],
         env: Optional[Dict[str, str]] = None,
         cwd: Optional[str] = None,
         timeout: Optional[float] = None,
         input_data: Optional[str] = None,
-    ) -> WSLCommandResult:
+    ) -> CommandResult:
         """
         Execute a command through WSL.
 
@@ -62,15 +53,12 @@ class WSLCommandExecutor:
             input_data: Data to send to command stdin
 
         Returns:
-            WSLCommandResult with execution details
+            CommandResult with execution details
         """
         start_time = time.time()
 
-        # Convert command to list if it's a string
-        if isinstance(command, str):
-            cmd_list = command.split()
-        else:
-            cmd_list = list(command)
+        # Command is already a list from the protocol
+        cmd_list = list(command)
 
         # Build WSL command
         wsl_command = self._build_wsl_command(cmd_list, env, cwd)
@@ -105,7 +93,7 @@ class WSLCommandExecutor:
                     )
                 except subprocess.TimeoutExpired:
                     execution_time = time.time() - start_time
-                    return WSLCommandResult(
+                    return CommandResult(
                         command=cmd_list,
                         return_code=-1,
                         stdout="",
@@ -122,7 +110,7 @@ class WSLCommandExecutor:
             execution_time = time.time() - start_time
             success = process_result.returncode == 0
 
-            result = WSLCommandResult(
+            result = CommandResult(
                 command=cmd_list,
                 return_code=process_result.returncode,
                 stdout=stdout_str,
@@ -149,7 +137,7 @@ class WSLCommandExecutor:
             logger.error(f"{error_msg} (Command: {' '.join(wsl_command)})")
             logger.exception("Full exception details:")
 
-            return WSLCommandResult(
+            return CommandResult(
                 command=cmd_list,
                 return_code=-1,
                 stdout="",
@@ -165,7 +153,7 @@ class WSLCommandExecutor:
         env: Optional[Dict[str, str]] = None,
         cwd: Optional[str] = None,
         timeout: Optional[float] = None,
-    ) -> WSLCommandResult:
+    ) -> CommandResult:
         """
         Execute a borg command through WSL.
 
@@ -176,7 +164,7 @@ class WSLCommandExecutor:
             timeout: Command timeout
 
         Returns:
-            WSLCommandResult with execution details
+            CommandResult with execution details
         """
         command = ["borg"] + borg_args
         return await self.execute_command(command, env, cwd, timeout)
@@ -280,22 +268,28 @@ class WSLCommandExecutor:
 
         return wsl_cmd
 
-    async def start_interactive_process(
+    async def create_subprocess(
         self,
         command: List[str],
         env: Optional[Dict[str, str]] = None,
         cwd: Optional[str] = None,
+        stdout: Optional[int] = None,
+        stderr: Optional[int] = None,
+        stdin: Optional[int] = None,
     ) -> asyncio.subprocess.Process:
         """
-        Start an interactive WSL process (for streaming operations).
+        Create a subprocess for streaming operations.
 
         Args:
             command: Command to execute
             env: Environment variables
             cwd: Working directory
+            stdout: Stdout redirection (e.g., asyncio.subprocess.PIPE)
+            stderr: Stderr redirection (e.g., asyncio.subprocess.PIPE)
+            stdin: Stdin redirection (e.g., asyncio.subprocess.PIPE)
 
         Returns:
-            Subprocess.Process for interactive communication
+            Process object for streaming operations
         """
         wsl_command = self._build_wsl_command(command, env, cwd)
 
@@ -303,35 +297,15 @@ class WSLCommandExecutor:
 
         process = await asyncio.create_subprocess_exec(
             *wsl_command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            stdin=asyncio.subprocess.PIPE,
+            stdout=stdout or asyncio.subprocess.PIPE,
+            stderr=stderr or asyncio.subprocess.PIPE,
+            stdin=stdin,
+            env=env,
+            cwd=cwd,
         )
 
         return process
 
-
-# Global instance for easy access
-_wsl_command_executor: Optional[WSLCommandExecutor] = None
-
-
-def get_wsl_command_executor(
-    distribution: Optional[str] = None, timeout: float = 300.0
-) -> WSLCommandExecutor:
-    """
-    Get a WSL command executor instance.
-
-    Args:
-        distribution: WSL distribution to use
-        timeout: Default command timeout
-
-    Returns:
-        WSLCommandExecutor instance
-    """
-    global _wsl_command_executor
-    if (
-        _wsl_command_executor is None
-        or _wsl_command_executor.distribution != distribution
-    ):
-        _wsl_command_executor = WSLCommandExecutor(distribution, timeout)
-    return _wsl_command_executor
+    def get_platform_name(self) -> str:
+        """Get the platform name this executor handles."""
+        return "wsl"

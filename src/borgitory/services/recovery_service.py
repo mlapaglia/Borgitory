@@ -11,6 +11,7 @@ from borgitory.models.database import Repository
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.utils.security import secure_borg_command
 from borgitory.utils.db_session import get_db_session
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 class RecoveryService:
     """Service to recover from application crashes during backup operations"""
+
+    def __init__(self, command_executor: CommandExecutorProtocol) -> None:
+        """Initialize RecoveryService with command executor for cross-platform compatibility."""
+        self.command_executor = command_executor
 
     async def recover_stale_jobs(self) -> None:
         """
@@ -128,12 +133,12 @@ class RecoveryService:
                 keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
             ) as (command, env, _):
-                # Execute the break-lock command with a timeout
-                process = await asyncio.create_subprocess_exec(
-                    *command,
+                # Execute the break-lock command with a timeout using command executor
+                process = await self.command_executor.create_subprocess(
+                    command=command,
+                    env=env,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    env=env,
                 )
 
                 try:

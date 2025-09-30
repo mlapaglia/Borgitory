@@ -3,7 +3,6 @@ Repository Business Logic Service.
 Handles all repository-related business operations independent of HTTP concerns.
 """
 
-import asyncio
 import logging
 from typing import Dict, List, Protocol, TypedDict, Union, Any
 from sqlalchemy.orm import Session
@@ -27,6 +26,7 @@ from borgitory.models.repository_dtos import (
 from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.protocols.path_protocols import PathServiceInterface
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
     parse_datetime_string,
@@ -87,10 +87,12 @@ class RepositoryService:
         borg_service: BorgService,
         scheduler_service: SchedulerService,
         path_service: PathServiceInterface,
+        command_executor: CommandExecutorProtocol,
     ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service
         self.path_service = path_service
+        self.command_executor = command_executor
 
     async def create_repository(
         self, request: CreateRepositoryRequest, db: Session
@@ -589,52 +591,43 @@ class RepositoryService:
                 additional_args=["--short"],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
-                process = await asyncio.create_subprocess_exec(
-                    *command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                result = await self.command_executor.execute_command(
+                    command=command,
                     env=env,
+                    timeout=10.0,
                 )
 
-                try:
-                    stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=10
-                    )
-
-                    if process.returncode == 0:
+                if result.success:
+                    return {
+                        "locked": False,
+                        "accessible": True,
+                        "message": "Repository is accessible",
+                    }
+                else:
+                    stderr_text = result.stderr
+                    if (
+                        "Failed to create/acquire the lock" in stderr_text
+                        or "LockTimeout" in stderr_text
+                    ):
                         return {
-                            "locked": False,
-                            "accessible": True,
-                            "message": "Repository is accessible",
+                            "locked": True,
+                            "accessible": False,
+                            "message": "Repository is locked by another process",
+                            "error": stderr_text,
+                        }
+                    elif "Command timed out" in stderr_text:
+                        return {
+                            "locked": True,
+                            "accessible": False,
+                            "message": "Repository check timed out (possibly locked)",
                         }
                     else:
-                        stderr_text = stderr.decode() if stderr else ""
-                        if (
-                            "Failed to create/acquire the lock" in stderr_text
-                            or "LockTimeout" in stderr_text
-                        ):
-                            return {
-                                "locked": True,
-                                "accessible": False,
-                                "message": "Repository is locked by another process",
-                                "error": stderr_text,
-                            }
-                        else:
-                            return {
-                                "locked": False,
-                                "accessible": False,
-                                "message": f"Repository access failed: {stderr_text}",
-                                "error": stderr_text,
-                            }
-
-                except asyncio.TimeoutError:
-                    process.kill()
-                    await process.wait()
-                    return {
-                        "locked": True,
-                        "accessible": False,
-                        "message": "Repository check timed out (possibly locked)",
-                    }
+                        return {
+                            "locked": False,
+                            "accessible": False,
+                            "message": f"Repository access failed: {stderr_text}",
+                            "error": stderr_text,
+                        }
 
         except Exception as e:
             logger.error(f"Error checking repository lock status: {e}")
@@ -658,47 +651,39 @@ class RepositoryService:
                 additional_args=[],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
-                process = await asyncio.create_subprocess_exec(
-                    *command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                result = await self.command_executor.execute_command(
+                    command=command,
                     env=env,
+                    timeout=30.0,
                 )
 
-                try:
-                    stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=30
+                if result.success:
+                    logger.info(
+                        f"Successfully broke lock on repository: {repository.name}"
                     )
-
-                    if process.returncode == 0:
-                        logger.info(
-                            f"Successfully broke lock on repository: {repository.name}"
+                    return {
+                        "success": True,
+                        "message": "Repository lock successfully removed",
+                    }
+                else:
+                    stderr_text = result.stderr or "No error details"
+                    if "Command timed out" in stderr_text:
+                        logger.warning(
+                            f"Break-lock timed out for repository: {repository.name}"
                         )
                         return {
-                            "success": True,
-                            "message": "Repository lock successfully removed",
+                            "success": False,
+                            "message": "Break-lock operation timed out",
                         }
                     else:
-                        stderr_text = stderr.decode() if stderr else "No error details"
                         logger.warning(
-                            f"Break-lock returned {process.returncode} for {repository.name}: {stderr_text}"
+                            f"Break-lock returned {result.return_code} for {repository.name}: {stderr_text}"
                         )
                         return {
                             "success": False,
                             "message": f"Failed to break lock: {stderr_text}",
                             "error": stderr_text,
                         }
-
-                except asyncio.TimeoutError:
-                    logger.warning(
-                        f"Break-lock timed out for repository: {repository.name}"
-                    )
-                    process.kill()
-                    await process.wait()
-                    return {
-                        "success": False,
-                        "message": "Break-lock operation timed out",
-                    }
 
         except Exception as e:
             logger.error(f"Error breaking lock for repository {repository.name}: {e}")
@@ -749,87 +734,81 @@ class RepositoryService:
                 additional_args=["--json"],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
-                process = await asyncio.create_subprocess_exec(
-                    *command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                result = await self.command_executor.execute_command(
+                    command=command,
                     env=env,
+                    timeout=30.0,
                 )
 
-                try:
-                    stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=30
-                    )
+                if result.success:
+                    import json
 
-                    if process.returncode == 0:
-                        import json
+                    info_data = json.loads(result.stdout)
 
-                        info_data = json.loads(stdout.decode())
+                    # Extract relevant information
+                    info_result = {
+                        "success": True,
+                        "repository_id": info_data.get("repository", {}).get("id"),
+                        "location": info_data.get("repository", {}).get("location"),
+                        "encryption": info_data.get("encryption"),
+                        "cache": info_data.get("cache"),
+                        "security_dir": info_data.get("security_dir"),
+                    }
 
-                        # Extract relevant information
-                        result = {
-                            "success": True,
-                            "repository_id": info_data.get("repository", {}).get("id"),
-                            "location": info_data.get("repository", {}).get("location"),
-                            "encryption": info_data.get("encryption"),
-                            "cache": info_data.get("cache"),
-                            "security_dir": info_data.get("security_dir"),
-                        }
+                    # Add archive statistics if available
+                    archives = info_data.get("archives", [])
+                    if archives:
+                        info_result["archives_count"] = len(archives)
 
-                        # Add archive statistics if available
-                        archives = info_data.get("archives", [])
+                        # Calculate totals
+                        total_original = sum(
+                            archive.get("stats", {}).get("original_size", 0)
+                            for archive in archives
+                        )
+                        total_compressed = sum(
+                            archive.get("stats", {}).get("compressed_size", 0)
+                            for archive in archives
+                        )
+                        total_deduplicated = sum(
+                            archive.get("stats", {}).get("deduplicated_size", 0)
+                            for archive in archives
+                        )
+
+                        # Format sizes
+                        info_result["original_size"] = self._format_bytes(
+                            total_original
+                        )
+                        info_result["compressed_size"] = self._format_bytes(
+                            total_compressed
+                        )
+                        info_result["deduplicated_size"] = self._format_bytes(
+                            total_deduplicated
+                        )
+
+                        # Get last modified from most recent archive
                         if archives:
-                            result["archives_count"] = len(archives)
-
-                            # Calculate totals
-                            total_original = sum(
-                                archive.get("stats", {}).get("original_size", 0)
-                                for archive in archives
+                            latest_archive = max(
+                                archives, key=lambda a: a.get("start", "")
                             )
-                            total_compressed = sum(
-                                archive.get("stats", {}).get("compressed_size", 0)
-                                for archive in archives
-                            )
-                            total_deduplicated = sum(
-                                archive.get("stats", {}).get("deduplicated_size", 0)
-                                for archive in archives
+                            info_result["last_modified"] = latest_archive.get(
+                                "start", "Unknown"
                             )
 
-                            # Format sizes
-                            result["original_size"] = self._format_bytes(total_original)
-                            result["compressed_size"] = self._format_bytes(
-                                total_compressed
-                            )
-                            result["deduplicated_size"] = self._format_bytes(
-                                total_deduplicated
-                            )
-
-                            # Get last modified from most recent archive
-                            if archives:
-                                latest_archive = max(
-                                    archives, key=lambda a: a.get("start", "")
-                                )
-                                result["last_modified"] = latest_archive.get(
-                                    "start", "Unknown"
-                                )
-
-                        return result
+                    return info_result
+                else:
+                    stderr_text = result.stderr or "Unknown error"
+                    if "Command timed out" in stderr_text:
+                        return {
+                            "success": False,
+                            "error": True,
+                            "error_message": "Repository info command timed out",
+                        }
                     else:
-                        stderr_text = stderr.decode() if stderr else "Unknown error"
                         return {
                             "success": False,
                             "error": True,
                             "error_message": f"Failed to get repository info: {stderr_text}",
                         }
-
-                except asyncio.TimeoutError:
-                    process.kill()
-                    await process.wait()
-                    return {
-                        "success": False,
-                        "error": True,
-                        "error_message": "Repository info command timed out",
-                    }
 
         except Exception as e:
             logger.error(f"Error getting borg info for {repository.name}: {e}")
@@ -850,44 +829,36 @@ class RepositoryService:
                 additional_args=["--list"],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
-                process = await asyncio.create_subprocess_exec(
-                    *command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                result = await self.command_executor.execute_command(
+                    command=command,
                     env=env,
+                    timeout=30.0,
                 )
 
-                try:
-                    stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=30
-                    )
+                if result.success:
+                    config_output = result.stdout.strip()
+                    config_dict = {}
 
-                    if process.returncode == 0:
-                        config_output = stdout.decode().strip()
-                        config_dict = {}
+                    # Parse the config output (format: key = value)
+                    for line in config_output.split("\n"):
+                        line = line.strip()
+                        if line and "=" in line:
+                            key, value = line.split("=", 1)
+                            config_dict[key.strip()] = value.strip()
 
-                        # Parse the config output (format: key = value)
-                        for line in config_output.split("\n"):
-                            line = line.strip()
-                            if line and "=" in line:
-                                key, value = line.split("=", 1)
-                                config_dict[key.strip()] = value.strip()
-
-                        return {"success": True, "config": config_dict}
+                    return {"success": True, "config": config_dict}
+                else:
+                    stderr_text = result.stderr or "Unknown error"
+                    if "Command timed out" in stderr_text:
+                        return {
+                            "success": False,
+                            "error_message": "Repository config command timed out",
+                        }
                     else:
-                        stderr_text = stderr.decode() if stderr else "Unknown error"
                         return {
                             "success": False,
                             "error_message": f"Failed to get repository config: {stderr_text}",
                         }
-
-                except asyncio.TimeoutError:
-                    process.kill()
-                    await process.wait()
-                    return {
-                        "success": False,
-                        "error_message": "Repository config command timed out",
-                    }
 
         except Exception as e:
             logger.error(f"Error getting borg config for {repository.name}: {e}")
@@ -907,39 +878,31 @@ class RepositoryService:
                 additional_args=[],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
-                process = await asyncio.create_subprocess_exec(
-                    *command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                result = await self.command_executor.execute_command(
+                    command=command,
                     env=env,
+                    timeout=30.0,
                 )
 
-                try:
-                    stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=30
-                    )
-
-                    if process.returncode == 0:
-                        key_data = stdout.decode().strip()
+                if result.success:
+                    key_data = result.stdout.strip()
+                    return {
+                        "success": True,
+                        "key_data": key_data,
+                        "filename": f"{repository.name}_key.txt",
+                    }
+                else:
+                    stderr_text = result.stderr or "Unknown error"
+                    if "Command timed out" in stderr_text:
                         return {
-                            "success": True,
-                            "key_data": key_data,
-                            "filename": f"{repository.name}_key.txt",
+                            "success": False,
+                            "error_message": "Key export command timed out",
                         }
                     else:
-                        stderr_text = stderr.decode() if stderr else "Unknown error"
                         return {
                             "success": False,
                             "error_message": f"Failed to export repository key: {stderr_text}",
                         }
-
-                except asyncio.TimeoutError:
-                    process.kill()
-                    await process.wait()
-                    return {
-                        "success": False,
-                        "error_message": "Key export command timed out",
-                    }
 
         except Exception as e:
             logger.error(f"Error exporting key for repository {repository.name}: {e}")

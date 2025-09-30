@@ -116,9 +116,9 @@ class PathConfigurationService(PathConfigurationInterface):
         self._is_container = any(container_indicators)
 
         if self._is_container:
-            logger.info("Container environment detected")
+            logger.debug("Container environment detected")
         else:
-            logger.info(f"Native environment detected: {os.name}")
+            logger.debug(f"Native environment detected: {os.name}")
 
         return self._is_container
 

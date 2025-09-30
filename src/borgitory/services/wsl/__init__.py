@@ -12,11 +12,7 @@ from .wsl_detection_service import (
     WSLDistribution,
     get_wsl_detection_service,
 )
-from .wsl_command_executor import (
-    WSLCommandExecutor,
-    WSLCommandResult,
-    get_wsl_command_executor,
-)
+from .wsl_command_executor import WSLCommandExecutor
 
 __all__ = [
     "WSLDetectionService",
@@ -24,6 +20,4 @@ __all__ = [
     "WSLDistribution",
     "get_wsl_detection_service",
     "WSLCommandExecutor",
-    "WSLCommandResult",
-    "get_wsl_command_executor",
 ]

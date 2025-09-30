@@ -11,7 +11,7 @@ from typing import List
 from borgitory.utils.secure_path import DirectoryInfo
 from borgitory.services.path.path_configuration_service import PathConfigurationService
 from borgitory.services.path.universal_path_service import UniversalPathService
-from borgitory.services.wsl import get_wsl_command_executor
+from borgitory.services.wsl.wsl_command_executor import WSLCommandExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +24,12 @@ class WSLPathService(UniversalPathService):
     enabling Unix-style path handling on Windows systems.
     """
 
-    def __init__(self, config: PathConfigurationService):
+    def __init__(
+        self, config: PathConfigurationService, wsl_executor: WSLCommandExecutor
+    ):
         super().__init__(config)
-        self.wsl_executor = get_wsl_command_executor()
-        logger.info("Initialized WSL path service")
+        self.wsl_executor = wsl_executor
+        logger.debug("Initialized WSL path service")
 
     async def get_data_dir(self) -> str:
         """Get the application data directory (WSL-style path)."""

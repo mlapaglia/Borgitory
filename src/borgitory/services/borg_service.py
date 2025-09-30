@@ -18,6 +18,7 @@ from borgitory.protocols import (
     ProcessExecutorProtocol,
     JobManagerProtocol,
 )
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
 from borgitory.utils.security import (
     build_secure_borg_command_with_keyfile,
@@ -44,6 +45,7 @@ class BorgService:
         command_runner: CommandRunnerProtocol,
         job_manager: JobManagerProtocol,
         archive_service: ArchiveServiceProtocol,
+        command_executor: CommandExecutorProtocol,
     ) -> None:
         """
         Initialize BorgService with mandatory dependency injection.
@@ -53,11 +55,13 @@ class BorgService:
             command_runner: Command runner for executing system commands
             job_manager: Job manager for handling job lifecycle
             archive_service: Archive service for managing archive operations
+            command_executor: Command executor for cross-platform command execution
         """
         self.job_executor = job_executor
         self.command_runner = command_runner
         self.job_manager = job_manager
         self.archive_service = archive_service
+        self.command_executor = command_executor
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
@@ -177,9 +181,9 @@ class BorgService:
 
             logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
-            # Start the borg process
-            process = await asyncio.create_subprocess_exec(
-                *command,
+            # Start the borg process using command executor for cross-platform compatibility
+            process = await self.command_executor.create_subprocess(
+                command=command,
                 env=env,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

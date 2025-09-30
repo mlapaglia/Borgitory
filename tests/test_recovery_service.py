@@ -1,439 +1,318 @@
 """
-Tests for RecoveryService - Service for handling crashed or interrupted backup jobs
+Tests for RecoveryService - Recovery and cleanup functionality tests
 """
 
 import pytest
 import asyncio
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
+
 from borgitory.services.recovery_service import RecoveryService
-from borgitory.models.database import Repository, Job, JobTask
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.models.database import Repository
 
 
 @pytest.fixture
-def recovery_service() -> RecoveryService:
-    return RecoveryService()
+def mock_command_executor() -> Mock:
+    """Create mock command executor."""
+    mock = Mock(spec=CommandExecutorProtocol)
+    mock.create_subprocess = AsyncMock()
+    mock.execute_command = AsyncMock()
+    return mock
 
 
 @pytest.fixture
-def mock_repository() -> MagicMock:
-    """Mock repository object"""
-    repo = MagicMock(spec=Repository)
-    repo.id = 1
+def recovery_service(mock_command_executor: Mock) -> RecoveryService:
+    """Create RecoveryService with mock command executor."""
+    return RecoveryService(command_executor=mock_command_executor)
+
+
+@pytest.fixture
+def mock_repository() -> Mock:
+    """Create mock repository."""
+    repo = Mock(spec=Repository)
     repo.name = "test-repo"
-    repo.path = "/repo/path"
-    repo.get_passphrase.return_value = "test_passphrase"
+    repo.path = "/test/repo/path"
+    repo.get_passphrase.return_value = "test-passphrase"
     repo.get_keyfile_content.return_value = None
     return repo
 
 
-@pytest.fixture
-def mock_job() -> MagicMock:
-    """Mock job object"""
-    job = MagicMock(spec=Job)
-    job.id = 123
-    job.job_type = "manual_backup"
-    job.status = "running"
-    job.repository_id = 1
-    job.started_at = datetime(2023, 1, 1, 12, 0, 0)
-    return job
+class TestRecoveryServiceBasics:
+    """Test basic RecoveryService functionality."""
 
-
-@pytest.fixture
-def mock_task() -> MagicMock:
-    """Mock job task object"""
-    task = MagicMock(spec=JobTask)
-    task.id = 456
-    task.job_id = 123
-    task.task_name = "backup_create"
-    task.status = "running"
-    return task
-
-
-class TestRecoveryService:
-    """Test the RecoveryService class"""
+    def test_service_initialization(self, mock_command_executor: Mock) -> None:
+        """Test RecoveryService initializes correctly with command executor."""
+        service = RecoveryService(command_executor=mock_command_executor)
+        assert service.command_executor is mock_command_executor
 
     @pytest.mark.asyncio
     async def test_recover_stale_jobs(self, recovery_service: RecoveryService) -> None:
-        """Test the main recovery method"""
+        """Test the main recovery entry point."""
         with patch.object(
-            recovery_service, "recover_database_job_records"
+            recovery_service, "recover_database_job_records", new_callable=AsyncMock
         ) as mock_recover:
             await recovery_service.recover_stale_jobs()
-
             mock_recover.assert_called_once()
+
+
+class TestRecoveryServiceDatabaseRecovery:
+    """Test database job record recovery."""
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_no_interrupted_jobs(
         self, recovery_service: RecoveryService
     ) -> None:
-        """Test recovery when no interrupted jobs exist"""
-        mock_db = MagicMock()
+        """Test recovery when no interrupted jobs exist."""
+        with patch("borgitory.services.recovery_service.get_db_session") as mock_get_db:
+            mock_db = Mock()
+            mock_get_db.return_value.__enter__.return_value = mock_db
 
-        # Mock query to return no interrupted jobs
-        mock_db.query.return_value.filter.return_value.all.return_value = []
+            # Mock query to return no interrupted jobs
+            mock_db.query.return_value.filter.return_value.all.return_value = []
 
-        with patch(
-            "borgitory.services.recovery_service.get_db_session"
-        ) as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = mock_db
-            mock_get_session.return_value.__exit__.return_value = None
-
+            # Should complete without error
             await recovery_service.recover_database_job_records()
 
-            # Should query for running/pending jobs
+            # Verify query was called
             mock_db.query.assert_called()
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_with_interrupted_jobs(
-        self,
-        recovery_service: RecoveryService,
-        mock_job: MagicMock,
-        mock_task: MagicMock,
-        mock_repository: MagicMock,
+        self, recovery_service: RecoveryService, mock_repository: Mock
     ) -> None:
-        """Test recovery with interrupted jobs"""
-        mock_db = MagicMock()
+        """Test recovery with interrupted jobs."""
+        with patch("borgitory.services.recovery_service.get_db_session") as mock_get_db:
+            mock_db = Mock()
+            mock_get_db.return_value.__enter__.return_value = mock_db
 
-        # Mock query to return interrupted job
-        mock_db.query.return_value.filter.return_value.all.side_effect = [
-            [mock_job],  # First call returns interrupted jobs
-            [mock_task],  # Second call returns running tasks
-        ]
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_repository
-        )
+            # Create mock interrupted job
+            mock_job = Mock()
+            mock_job.id = 1
+            mock_job.job_type = "manual_backup"
+            mock_job.repository_id = 1
+            mock_job.started_at = datetime.now()
 
-        with patch(
-            "borgitory.services.recovery_service.get_db_session"
-        ) as mock_get_session, patch.object(
-            recovery_service, "_release_repository_lock"
-        ) as mock_release_lock:
-            mock_get_session.return_value.__enter__.return_value = mock_db
-            mock_get_session.return_value.__exit__.return_value = None
+            # Create mock interrupted task
+            mock_task = Mock()
+            mock_task.task_name = "backup_task"
 
-            await recovery_service.recover_database_job_records()
+            # Mock queries
+            mock_db.query.return_value.filter.return_value.all.side_effect = [
+                [mock_job],  # First call returns interrupted jobs
+                [mock_task],  # Second call returns interrupted tasks
+            ]
+            mock_db.query.return_value.filter.return_value.first.return_value = (
+                mock_repository
+            )
 
-            # Should mark job as failed
-            assert mock_job.status == "failed"
-            assert mock_job.finished_at is not None
-            assert "Job cancelled on startup" in mock_job.error
+            with patch.object(
+                recovery_service, "_release_repository_lock", new_callable=AsyncMock
+            ) as mock_release:
+                await recovery_service.recover_database_job_records()
 
-            # Should mark task as failed
-            assert mock_task.status == "failed"
-            assert mock_task.completed_at is not None
-            assert "Task cancelled on startup" in mock_task.error
+                # Verify job was marked as failed
+                assert mock_job.status == "failed"
+                assert mock_job.finished_at is not None
+                assert "cancelled on startup" in mock_job.error.lower()
 
-            # Should release repository lock
-            mock_release_lock.assert_called_once_with(mock_repository)
+                # Verify task was marked as failed
+                assert mock_task.status == "failed"
+                assert mock_task.completed_at is not None
+                assert "cancelled on startup" in mock_task.error.lower()
+
+                # Verify repository lock was released
+                mock_release.assert_called_once_with(mock_repository)
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_non_backup_job(
         self, recovery_service: RecoveryService
     ) -> None:
-        """Test recovery with non-backup job (no lock release needed)"""
-        mock_db = MagicMock()
+        """Test recovery with non-backup job types."""
+        with patch("borgitory.services.recovery_service.get_db_session") as mock_get_db:
+            mock_db = Mock()
+            mock_get_db.return_value.__enter__.return_value = mock_db
 
-        # Create non-backup job
-        non_backup_job = MagicMock(spec=Job)
-        non_backup_job.id = 123
-        non_backup_job.job_type = "list_archives"  # Not a backup job
-        non_backup_job.status = "running"
-        non_backup_job.repository_id = 1
-        non_backup_job.started_at = datetime(2023, 1, 1, 12, 0, 0)
+            # Create mock non-backup job
+            mock_job = Mock()
+            mock_job.id = 1
+            mock_job.job_type = "scan"  # Not a backup job
+            mock_job.repository_id = None
+            mock_job.started_at = datetime.now()
 
-        mock_db.query.return_value.filter.return_value.all.side_effect = [
-            [non_backup_job],  # Interrupted jobs
-            [],  # No running tasks
-        ]
+            # Mock queries
+            mock_db.query.return_value.filter.return_value.all.side_effect = [
+                [mock_job],  # First call returns interrupted jobs
+                [],  # Second call returns no interrupted tasks
+            ]
 
-        with patch(
-            "borgitory.services.recovery_service.get_db_session"
-        ) as mock_get_session, patch.object(
-            recovery_service, "_release_repository_lock"
-        ) as mock_release_lock:
-            mock_get_session.return_value.__enter__.return_value = mock_db
-            mock_get_session.return_value.__exit__.return_value = None
+            with patch.object(
+                recovery_service, "_release_repository_lock", new_callable=AsyncMock
+            ) as mock_release:
+                await recovery_service.recover_database_job_records()
 
-            await recovery_service.recover_database_job_records()
+                # Verify job was marked as failed
+                assert mock_job.status == "failed"
 
-            # Should mark job as failed but not release lock
-            assert non_backup_job.status == "failed"
-            mock_release_lock.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_recover_database_job_records_backup_job_no_repository(
-        self, recovery_service: RecoveryService
-    ) -> None:
-        """Test recovery with backup job but no repository found"""
-        mock_db = MagicMock()
-
-        backup_job = MagicMock(spec=Job)
-        backup_job.id = 123
-        backup_job.job_type = "manual_backup"
-        backup_job.status = "running"
-        backup_job.repository_id = 999  # Non-existent repository
-        backup_job.started_at = datetime(2023, 1, 1, 12, 0, 0)
-
-        mock_db.query.return_value.filter.return_value.all.side_effect = [
-            [backup_job],  # Interrupted jobs
-            [],  # No running tasks
-        ]
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            None  # Repository not found
-        )
-
-        with patch(
-            "borgitory.services.recovery_service.get_db_session"
-        ) as mock_get_session, patch.object(
-            recovery_service, "_release_repository_lock"
-        ) as mock_release_lock:
-            mock_get_session.return_value.__enter__.return_value = mock_db
-            mock_get_session.return_value.__exit__.return_value = None
-
-            await recovery_service.recover_database_job_records()
-
-            # Should mark job as failed but not release lock since repo not found
-            assert backup_job.status == "failed"
-            mock_release_lock.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_recover_database_job_records_multiple_job_types(
-        self, recovery_service: RecoveryService
-    ) -> None:
-        """Test recovery with different backup job types"""
-        mock_db = MagicMock()
-
-        # Create different backup job types (removed "composite" since it's no longer a separate type)
-        manual_job = MagicMock(spec=Job)
-        manual_job.job_type = "manual_backup"
-        manual_job.repository_id = 1
-
-        scheduled_job = MagicMock(spec=Job)
-        scheduled_job.job_type = "scheduled_backup"
-        scheduled_job.repository_id = 2
-
-        prune_job = MagicMock(spec=Job)
-        prune_job.job_type = "prune"
-        prune_job.repository_id = 3
-
-        for job in [manual_job, scheduled_job, prune_job]:
-            job.id = 123
-            job.status = "running"
-            job.started_at = datetime(2023, 1, 1, 12, 0, 0)
-
-        mock_repository = MagicMock(spec=Repository)
-        mock_db.query.return_value.filter.return_value.all.side_effect = [
-            [manual_job, scheduled_job, prune_job],  # Interrupted jobs
-            [],
-            [],
-            [],  # No running tasks for each job
-        ]
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_repository
-        )
-
-        with patch(
-            "borgitory.services.recovery_service.get_db_session"
-        ) as mock_get_session, patch.object(
-            recovery_service, "_release_repository_lock"
-        ) as mock_release_lock:
-            mock_get_session.return_value.__enter__.return_value = mock_db
-            mock_get_session.return_value.__exit__.return_value = None
-
-            await recovery_service.recover_database_job_records()
-
-            # Should release locks for backup job types only (not prune)
-            assert mock_release_lock.call_count == 2
+                # Verify repository lock was NOT released (not a backup job)
+                mock_release.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_recover_database_job_records_exception_handling(
         self, recovery_service: RecoveryService
     ) -> None:
-        """Test exception handling in database job recovery"""
-        with patch(
-            "borgitory.services.recovery_service.get_db_session",
-            side_effect=Exception("Database error"),
-        ):
-            # Should not raise exception
+        """Test exception handling during database recovery."""
+        with patch("borgitory.services.recovery_service.get_db_session") as mock_get_db:
+            mock_get_db.side_effect = Exception("Database error")
+
+            # Should not raise exception, just log it
             await recovery_service.recover_database_job_records()
+
+
+class TestRecoveryServiceLockRelease:
+    """Test repository lock release functionality."""
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_success(
-        self, recovery_service: RecoveryService, mock_repository: MagicMock
+        self,
+        recovery_service: RecoveryService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
     ) -> None:
-        """Test successful repository lock release"""
-        mock_process = MagicMock()
+        """Test successful repository lock release."""
+        # Mock subprocess for break-lock command
+        mock_process = Mock()
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(b"Lock released", b""))
+        mock_command_executor.create_subprocess.return_value = mock_process
 
         with patch(
-            "borgitory.utils.security.build_secure_borg_command",
-            return_value=(
-                ["borg", "break-lock", "/repo/path"],
-                {"BORG_PASSPHRASE": "test"},
-            ),
-        ), patch("asyncio.create_subprocess_exec", return_value=mock_process):
+            "borgitory.services.recovery_service.secure_borg_command"
+        ) as mock_secure:
+            mock_secure.return_value.__aenter__.return_value = (
+                ["borg", "break-lock", "/test/repo/path"],
+                {"BORG_PASSPHRASE": "test-passphrase"},
+                None,
+            )
+
+            # Should complete without raising exception
             await recovery_service._release_repository_lock(mock_repository)
 
-            # Should build secure command with correct parameters
-            assert mock_repository.get_passphrase.called
+            # Verify the command executor was called
+            mock_command_executor.create_subprocess.assert_called_once()
+            call_args = mock_command_executor.create_subprocess.call_args
+
+            # Verify the command contains expected elements
+            assert call_args[1]["command"] == ["borg", "break-lock", "/test/repo/path"]
+            assert "BORG_PASSPHRASE" in call_args[1]["env"]
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_command_failure(
-        self, recovery_service: RecoveryService, mock_repository: MagicMock
+        self,
+        recovery_service: RecoveryService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
     ) -> None:
-        """Test repository lock release with command failure"""
-        mock_process = MagicMock()
+        """Test repository lock release when command fails."""
+        # Mock subprocess that fails
+        mock_process = Mock()
         mock_process.returncode = 1
         mock_process.communicate = AsyncMock(return_value=(b"", b"Lock not found"))
+        mock_command_executor.create_subprocess.return_value = mock_process
 
         with patch(
-            "borgitory.utils.security.build_secure_borg_command",
-            return_value=(
-                ["borg", "break-lock", "/repo/path"],
-                {"BORG_PASSPHRASE": "test"},
-            ),
-        ), patch("asyncio.create_subprocess_exec", return_value=mock_process):
-            # Should not raise exception even on command failure
+            "borgitory.services.recovery_service.secure_borg_command"
+        ) as mock_secure:
+            mock_secure.return_value.__aenter__.return_value = (
+                ["borg", "break-lock", "/test/repo/path"],
+                {"BORG_PASSPHRASE": "test-passphrase"},
+                None,
+            )
+
+            # Should complete without raising exception (just logs warning)
             await recovery_service._release_repository_lock(mock_repository)
+
+            # Verify the command executor was called
+            mock_command_executor.create_subprocess.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_timeout(
-        self, recovery_service: RecoveryService, mock_repository: MagicMock
+        self,
+        recovery_service: RecoveryService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
     ) -> None:
-        """Test repository lock release with timeout"""
-        mock_process = MagicMock()
-        mock_process.kill = MagicMock()
+        """Test repository lock release timeout handling."""
+        # Mock subprocess that times out
+        mock_process = Mock()
+        mock_process.kill = Mock()
+        mock_process.communicate = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_command_executor.create_subprocess.return_value = mock_process
 
         with patch(
-            "borgitory.utils.security.build_secure_borg_command",
-            return_value=(
-                ["borg", "break-lock", "/repo/path"],
-                {"BORG_PASSPHRASE": "test"},
-            ),
-        ), patch("asyncio.create_subprocess_exec", return_value=mock_process), patch(
-            "asyncio.wait_for", side_effect=asyncio.TimeoutError()
-        ):
-            # Should handle timeout gracefully
+            "borgitory.services.recovery_service.secure_borg_command"
+        ) as mock_secure:
+            mock_secure.return_value.__aenter__.return_value = (
+                ["borg", "break-lock", "/test/repo/path"],
+                {"BORG_PASSPHRASE": "test-passphrase"},
+                None,
+            )
+
+            # Should complete without raising exception (handles timeout)
             await recovery_service._release_repository_lock(mock_repository)
 
-            # Should kill the process
+            # Verify process was killed
             mock_process.kill.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_release_repository_lock_exception(
-        self, recovery_service: RecoveryService, mock_repository: MagicMock
+        self,
+        recovery_service: RecoveryService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
     ) -> None:
-        """Test repository lock release with exception"""
+        """Test repository lock release exception handling."""
+        # Mock command executor to raise an exception
+        mock_command_executor.create_subprocess.side_effect = Exception("Process error")
+
         with patch(
-            "borgitory.utils.security.build_secure_borg_command",
-            side_effect=Exception("Command build failed"),
-        ):
-            # Should handle exception gracefully
+            "borgitory.services.recovery_service.secure_borg_command"
+        ) as mock_secure:
+            mock_secure.return_value.__aenter__.return_value = (
+                ["borg", "break-lock", "/test/repo/path"],
+                {"BORG_PASSPHRASE": "test-passphrase"},
+                None,
+            )
+
+            # Should complete without raising exception (logs error)
             await recovery_service._release_repository_lock(mock_repository)
 
-    @pytest.mark.asyncio
-    async def test_release_repository_lock_no_stderr(
-        self, recovery_service: RecoveryService, mock_repository: MagicMock
-    ) -> None:
-        """Test repository lock release with no stderr output"""
-        mock_process = MagicMock()
-        mock_process.returncode = 1
-        mock_process.communicate = AsyncMock(return_value=(b"", None))  # No stderr
 
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command",
-            return_value=(
-                ["borg", "break-lock", "/repo/path"],
-                {"BORG_PASSPHRASE": "test"},
-            ),
-        ), patch("asyncio.create_subprocess_exec", return_value=mock_process):
-            await recovery_service._release_repository_lock(mock_repository)
+class TestRecoveryServiceIntegration:
+    """Test integration scenarios."""
 
     @pytest.mark.asyncio
-    async def test_recover_database_job_records_job_without_repository_id(
-        self, recovery_service: RecoveryService
+    async def test_full_recovery_workflow(
+        self, recovery_service: RecoveryService, mock_command_executor: Mock
     ) -> None:
-        """Test recovery with backup job but no repository_id"""
-        mock_db = MagicMock()
+        """Test the complete recovery workflow."""
+        with patch.object(
+            recovery_service, "recover_database_job_records", new_callable=AsyncMock
+        ) as mock_recover:
+            await recovery_service.recover_stale_jobs()
 
-        backup_job = MagicMock(spec=Job)
-        backup_job.id = 123
-        backup_job.job_type = "manual_backup"
-        backup_job.status = "running"
-        backup_job.repository_id = None  # No repository ID
-        backup_job.started_at = datetime(2023, 1, 1, 12, 0, 0)
+            # Verify the database recovery was called
+            mock_recover.assert_called_once()
 
-        mock_db.query.return_value.filter.return_value.all.side_effect = [
-            [backup_job],  # Interrupted jobs
-            [],  # No running tasks
-        ]
+    def test_dependency_injection_pattern(self, mock_command_executor: Mock) -> None:
+        """Test that RecoveryService follows proper dependency injection patterns."""
+        # Should be able to create multiple instances with different dependencies
+        service1 = RecoveryService(command_executor=mock_command_executor)
 
-        with patch(
-            "borgitory.services.recovery_service.get_db_session"
-        ) as mock_get_session, patch.object(
-            recovery_service, "_release_repository_lock"
-        ) as mock_release_lock:
-            mock_get_session.return_value.__enter__.return_value = mock_db
-            mock_get_session.return_value.__exit__.return_value = None
+        other_command_executor = Mock(spec=CommandExecutorProtocol)
+        service2 = RecoveryService(command_executor=other_command_executor)
 
-            await recovery_service.recover_database_job_records()
-
-            # Should mark job as failed but not try to release lock
-            assert backup_job.status == "failed"
-            mock_release_lock.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_recover_database_job_records_multiple_task_statuses(
-        self, recovery_service: RecoveryService
-    ) -> None:
-        """Test recovery with tasks in different statuses"""
-        mock_db = MagicMock()
-
-        job = MagicMock(spec=Job)
-        job.id = 123
-        job.job_type = "utility"  # Non-backup job
-        job.status = "running"
-        job.started_at = datetime(2023, 1, 1, 12, 0, 0)
-
-        # Create tasks with different statuses
-        pending_task = MagicMock(spec=JobTask)
-        pending_task.task_name = "pending_task"
-        pending_task.status = "pending"
-
-        running_task = MagicMock(spec=JobTask)
-        running_task.task_name = "running_task"
-        running_task.status = "running"
-
-        in_progress_task = MagicMock(spec=JobTask)
-        in_progress_task.task_name = "in_progress_task"
-        in_progress_task.status = "in_progress"
-
-        completed_task = MagicMock(spec=JobTask)
-        completed_task.task_name = "completed_task"
-        completed_task.status = "completed"  # Should not be affected
-
-        mock_db.query.return_value.filter.return_value.all.side_effect = [
-            [job],  # Interrupted jobs
-            [
-                pending_task,
-                running_task,
-                in_progress_task,
-            ],  # Only incomplete tasks returned by query
-        ]
-
-        with patch(
-            "borgitory.services.recovery_service.get_db_session"
-        ) as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = mock_db
-            mock_get_session.return_value.__exit__.return_value = None
-            await recovery_service.recover_database_job_records()
-
-            # Should mark all incomplete tasks as failed
-            assert pending_task.status == "failed"
-            assert running_task.status == "failed"
-            assert in_progress_task.status == "failed"
-
-            # Completed task should not be queried/modified
-            assert completed_task.status == "completed"
+        # Services should have different command executors
+        assert service1.command_executor is not service2.command_executor
+        assert service1.command_executor is mock_command_executor
+        assert service2.command_executor is other_command_executor

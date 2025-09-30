@@ -46,20 +46,11 @@ def create_path_service() -> PathServiceInterface:
     """
     config = PathConfigurationService()
 
-    if config.is_windows() and wsl_available():
-        try:
-            from borgitory.services.path.wsl_path_service import WSLPathService
-
-            logger.info("Creating WSL path service for Windows environment")
-            return WSLPathService(config)  # WSL implementation
-        except ImportError as e:
-            logger.warning(f"WSL path service not available: {e}")
-            logger.info("Falling back to universal path service")
-            return UniversalPathService(config)
-    else:
-        platform = config.get_platform_name()
-        logger.info(f"Creating universal path service for {platform} environment")
-        return UniversalPathService(config)  # Current implementation
+    # Note: WSL path service creation is now handled in dependencies.py with DI
+    # This factory now only creates UniversalPathService
+    platform = config.get_platform_name()
+    logger.info(f"Creating universal path service for {platform} environment")
+    return UniversalPathService(config)
 
 
 def get_path_service() -> PathServiceInterface:

@@ -13,6 +13,7 @@ from borgitory.utils.datetime_utils import now_utc
 from borgitory.models.database import Repository
 from borgitory.utils.security import secure_borg_command, cleanup_temp_keyfile
 from borgitory.services.archives.archive_manager import ArchiveEntry
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 
 if TYPE_CHECKING:
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
@@ -55,6 +56,7 @@ class ArchiveMountManager:
     def __init__(
         self,
         job_executor: "ProcessExecutorProtocol",
+        command_executor: CommandExecutorProtocol,
         base_mount_dir: str,
         mount_timeout: timedelta = timedelta(seconds=1800),
         mounting_timeout: timedelta = timedelta(seconds=30),
@@ -64,6 +66,7 @@ class ArchiveMountManager:
         self.mount_timeout = mount_timeout
         self.mounting_timeout = mounting_timeout
         self.job_executor = job_executor
+        self.command_executor = command_executor
 
     def _get_mount_key(self, repository: Repository, archive_name: str) -> str:
         """Generate unique key for mount"""
@@ -106,8 +109,8 @@ class ArchiveMountManager:
                 ],
                 cleanup_keyfile=False,
             ) as (command, env, temp_keyfile_path):
-                process = await asyncio.create_subprocess_exec(
-                    *command,
+                process = await self.command_executor.create_subprocess(
+                    command=command,
                     env=env,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -231,10 +234,8 @@ class ArchiveMountManager:
         """Unmount a filesystem path"""
         try:
             # Use fusermount -u to unmount FUSE filesystems
-            process = await asyncio.create_subprocess_exec(
-                "fusermount",
-                "-u",
-                str(mount_point),
+            process = await self.command_executor.create_subprocess(
+                command=["fusermount", "-u", str(mount_point)],
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

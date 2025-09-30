@@ -129,9 +129,6 @@ def main() -> None:
         "--port", "-p", type=int, default=8000, help="Port to bind to (default: 8000)"
     )
     server_parser.add_argument(
-        "--reload", action="store_true", help="Enable auto-reload for development"
-    )
-    server_parser.add_argument(
         "--log-level",
         choices=["critical", "error", "warning", "info", "debug"],
         default="info",

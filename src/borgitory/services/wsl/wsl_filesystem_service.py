@@ -12,7 +12,7 @@ from typing import List, Optional
 from dataclasses import dataclass
 
 from borgitory.utils.secure_path import DirectoryInfo
-from .wsl_command_executor import WSLCommandExecutor, get_wsl_command_executor
+from .wsl_command_executor import WSLCommandExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +34,14 @@ class WSLDirectoryInfo:
 class WSLFilesystemService:
     """Service for filesystem operations via WSL commands."""
 
-    def __init__(self, executor: Optional[WSLCommandExecutor] = None):
+    def __init__(self, executor: WSLCommandExecutor):
         """
         Initialize WSL filesystem service.
 
         Args:
-            executor: WSL command executor (uses default if None)
+            executor: WSL command executor
         """
-        self.executor = executor or get_wsl_command_executor()
+        self.executor = executor
 
     async def list_directory(
         self, path: str, include_files: bool = False, include_hidden: bool = False
@@ -303,15 +303,3 @@ class WSLFilesystemService:
 
         name_lower = name.lower()
         return any(re.match(pattern, name_lower) for pattern in cache_patterns)
-
-
-# Global instance for easy access
-_wsl_filesystem_service: Optional[WSLFilesystemService] = None
-
-
-def get_wsl_filesystem_service() -> WSLFilesystemService:
-    """Get the global WSL filesystem service instance."""
-    global _wsl_filesystem_service
-    if _wsl_filesystem_service is None:
-        _wsl_filesystem_service = WSLFilesystemService()
-    return _wsl_filesystem_service

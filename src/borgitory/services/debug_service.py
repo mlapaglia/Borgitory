@@ -5,13 +5,15 @@ import sys
 import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Optional
+from typing import Dict, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job
 from borgitory.protocols import JobManagerProtocol
 from borgitory.protocols.environment_protocol import EnvironmentProtocol
-from borgitory.services.wsl import get_wsl_command_executor
+
+if TYPE_CHECKING:
+    from borgitory.services.wsl.wsl_command_executor import WSLCommandExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -126,12 +128,11 @@ class DebugService:
         self,
         job_manager: JobManagerProtocol,
         environment: EnvironmentProtocol,
+        wsl_executor: Optional["WSLCommandExecutor"] = None,
     ) -> None:
         self.job_manager = job_manager
         self.environment = environment
-        self.wsl_executor = (
-            get_wsl_command_executor() if platform.system() == "Windows" else None
-        )
+        self.wsl_executor = wsl_executor
 
     async def _run_command(
         self, command: list[str], timeout: float = 30.0, use_wsl_for_tools: bool = True
