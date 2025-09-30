@@ -58,7 +58,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("SECRET_KEY initialized")
 
         await init_db()
-        logger.info("Database initialized")
 
         try:
             restoration_service = get_package_restoration_service_for_startup()

@@ -8,6 +8,7 @@ for Unix and container environments. Windows is only supported via WSL.
 import os
 import platform
 import logging
+from os import path
 from typing import Optional
 
 from borgitory.protocols.path_protocols import PathConfigurationInterface
@@ -44,19 +45,13 @@ class PathConfigurationService(PathConfigurationInterface):
         # Use environment-specific defaults
         if self.is_docker():
             return "/app/data"
-        else:  # Unix-like systems (including WSL)
-            # Check for XDG_DATA_HOME (Linux standard)
-            xdg_data = os.getenv("XDG_DATA_HOME")
-            if xdg_data:
-                return os.path.join(xdg_data, "borgitory")
-
-            # Check if running as root (Unix only)
-            if hasattr(os, "geteuid") and os.geteuid() == 0:
-                return "/var/lib/borgitory"
-
-            # User installation - use ~/.local/share
+        elif self.is_windows():
+            return path.expandvars("%LOCALAPPDATA%\\Borgitory")
+        elif self.is_linux():
             home = os.path.expanduser("~")
             return os.path.join(home, ".local", "share", "borgitory")
+        else:
+            raise ValueError("Unknown platform")
 
     def get_base_temp_dir(self) -> str:
         """
@@ -92,13 +87,10 @@ class PathConfigurationService(PathConfigurationInterface):
             return os.path.join(home, ".cache", "borgitory")
 
     def is_docker(self) -> bool:
-        if os.path.exists("/proc/self/cgroup"):
-            with open("/proc/self/cgroup", "r") as procfile:
-                for line in procfile:
-                    fields = line.strip().split("/")
-                    if fields[1] == "docker":
-                        return True
-        return False
+        if os.environ.get("BORGITORY_RUNNING_IN_CONTAINER"):
+            return True
+        else:
+            return False
 
     def get_platform_name(self) -> str:
         """

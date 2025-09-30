@@ -8,16 +8,11 @@ appropriate command executor implementation.
 import logging
 import os
 import subprocess
-from typing import TYPE_CHECKING
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.services.path.path_configuration_service import PathConfigurationService
 from .linux_command_executor import LinuxCommandExecutor
-
-if TYPE_CHECKING:
-    from borgitory.services.command_execution.wsl_command_executor import (
-        WSLCommandExecutor,
-    )
+from .wsl_command_executor import WSLCommandExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +53,12 @@ def create_command_executor() -> CommandExecutorProtocol:
 
         logger.debug("Creating WSL command executor")
         return WSLCommandExecutor()
-    elif config.is_linux():
+    elif config.is_linux() or config.is_docker():
         logger.debug("Creating Linux command executor")
         return LinuxCommandExecutor()
     else:
-        logger.error("Unsupported environment detected")
         raise RuntimeError(
-            f"Unsupported environment detected {config.get_platform_name()}"
+            f"Unsupported environment detected: {config.get_platform_name()}"
         )
 
 

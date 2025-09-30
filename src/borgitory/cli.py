@@ -94,11 +94,6 @@ def start_server(
     """Start the Borgitory web server."""
     load_dotenv()
 
-    # Run migrations first
-    if not run_migrations():
-        print("Exiting due to migration failure")
-        sys.exit(1)
-
     print(f"Starting Borgitory server on {host}:{port}")
     uvicorn.run(
         "borgitory.main:app", host=host, port=port, reload=reload, log_level=log_level
