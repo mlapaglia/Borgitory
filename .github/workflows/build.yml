@@ -259,17 +259,28 @@ jobs:
     - name: Check package with twine
       run: twine check dist/*
     
-    - name: Test package installation
+    - name: Test package installation (Ubuntu)
+      if: startsWith(matrix.os, 'ubuntu')
       run: |
         # Create a virtual environment for testing
         python -m venv test_env
         
         # Install the built package
-        if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          test_env\Scripts\activate
-        else
-          source test_env/bin/activate
-        fi
+        source test_env/bin/activate
+        pip install dist/*.whl
+        
+        # Test that the CLI works
+        borgitory --version
+        borgitory --help
+    
+    - name: Test package installation (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Create a virtual environment for testing
+        python -m venv test_env
+        
+        # Install the built package
+        test_env\Scripts\activate.bat
         pip install dist/*.whl
         
         # Test that the CLI works
