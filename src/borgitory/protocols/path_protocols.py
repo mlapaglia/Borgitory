@@ -6,7 +6,7 @@ filesystem operations for different environments (native, WSL, container).
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List
 
 from borgitory.utils.secure_path import DirectoryInfo
 
@@ -133,13 +133,13 @@ class PathConfigurationInterface(ABC):
         pass
 
     @abstractmethod
-    def get_base_temp_dir(self) -> Optional[str]:
-        """Get the base temp directory from configuration, if specified."""
+    def get_base_temp_dir(self) -> str:
+        """Get the base temp directory from configuration."""
         pass
 
     @abstractmethod
-    def get_base_cache_dir(self) -> Optional[str]:
-        """Get the base cache directory from configuration, if specified."""
+    def get_base_cache_dir(self) -> str:
+        """Get the base cache directory from configuration."""
         pass
 
     @abstractmethod
@@ -150,4 +150,9 @@ class PathConfigurationInterface(ABC):
     @abstractmethod
     def get_platform_name(self) -> str:
         """Get the platform name (windows, unix, container)."""
+        pass
+
+    @abstractmethod
+    def is_windows(self) -> bool:
+        """Check if running on Windows platform."""
         pass

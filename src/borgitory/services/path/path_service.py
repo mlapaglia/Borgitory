@@ -9,10 +9,12 @@ import logging
 import posixpath
 from typing import List, Tuple
 
-from borgitory.protocols.path_protocols import PathServiceInterface
+from borgitory.protocols.path_protocols import (
+    PathServiceInterface,
+    PathConfigurationInterface,
+)
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.command_protocols import CommandResult
-from borgitory.services.path.path_configuration_service import PathConfigurationService
 from borgitory.utils.secure_path import DirectoryInfo
 
 logger = logging.getLogger(__name__)
@@ -29,7 +31,7 @@ class PathService(PathServiceInterface):
 
     def __init__(
         self,
-        config: PathConfigurationService,
+        config: PathConfigurationInterface,
         command_executor: CommandExecutorProtocol,
     ):
         self.config = config
@@ -314,6 +316,8 @@ class PathService(PathServiceInterface):
                 is_borg_cache=False,
                 has_permission_error=False,
             )
+            # Store directory flag for sorting
+            dir_info._is_directory = is_directory
             items.append(dir_info)
 
             # Collect directories for batch Borg checking
@@ -327,7 +331,7 @@ class PathService(PathServiceInterface):
         # Sort: directories first, then alphabetically
         items.sort(
             key=lambda x: (
-                not x.path.endswith("/") if hasattr(x, "path") else True,
+                not getattr(x, "_is_directory", False),
                 x.name.lower(),
             )
         )

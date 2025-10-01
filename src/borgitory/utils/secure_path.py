@@ -25,6 +25,7 @@ class DirectoryInfo:
     is_borg_repo: bool = False
     is_borg_cache: bool = False
     has_permission_error: bool = False
+    _is_directory: bool = False
 
     @property
     def path_with_separator(self) -> str:
