@@ -18,13 +18,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: System :: Archiving :: Backup",
     "Topic :: System :: Systems Administration",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "aiofiles>=24.1.0",
     "aiohttp>=3.9.0",
@@ -116,8 +114,8 @@ exclude = [
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.8+.
-target-version = "py38"
+# Assume Python 3.13+.
+target-version = "py313"
 
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
@@ -183,7 +181,7 @@ exclude_lines = [
 
 [tool.mypy]
 # Basic settings
-python_version = "3.11"
+python_version = "3.13"
 strict = true
 
 # Display options
@@ -242,5 +240,5 @@ ignore_missing_imports = true
 [tool.pyright]
 include = ["src", "tests"]
 extraPaths = ["src"]
-pythonVersion = "3.11"
+pythonVersion = "3.13"
 pythonPlatform = "All"

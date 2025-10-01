@@ -23,7 +23,9 @@ from sqlalchemy.orm import sessionmaker, relationship, Session
 from typing import Generator
 
 from borgitory.config_module import DATABASE_URL, get_secret_key, DATA_DIR
-from borgitory.utils.migrations import run_migrations
+from borgitory.services.migrations.migration_factory import (
+    create_migration_service_for_startup,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -415,7 +417,8 @@ async def init_db() -> None:
 
         os.makedirs(DATA_DIR, exist_ok=True)
 
-        if not run_migrations():
+        migration_service = create_migration_service_for_startup()
+        if not migration_service.run_migrations():
             raise RuntimeError("Database migration failed")
     except Exception as e:
         logger.error(f"Database initialization error: {e}")

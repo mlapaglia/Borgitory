@@ -356,7 +356,6 @@ class PackageManagerService:
         user_packages = self.get_user_installed_packages()
 
         if not user_packages:
-            logger.info("No user-installed packages to restore")
             return True, "No packages to restore"
 
         missing_packages = []
@@ -367,7 +366,6 @@ class PackageManagerService:
                 missing_packages.append(package_record.package_name)
 
         if not missing_packages:
-            logger.info(f"All {len(user_packages)} user packages are already installed")
             return True, f"All {len(user_packages)} packages already installed"
 
         logger.info(

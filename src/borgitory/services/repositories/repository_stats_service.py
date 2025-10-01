@@ -195,10 +195,10 @@ class RepositoryStatsService:
         try:
             async with secure_borg_command(
                 base_command="borg info",
-                repository_path=str(repository.path),
+                repository_path="",
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
-                additional_args=["--json", f"::{archive_name}"],
+                additional_args=["--json", f"{repository.path}::{archive_name}"],
             ) as (command, env, _):
                 result = await self.command_executor.execute_command(
                     command=command,

@@ -20,6 +20,17 @@ def mock_command_executor() -> Mock:
     """Create mock command executor."""
     mock = Mock(spec=CommandExecutorProtocol)
     mock.create_subprocess = AsyncMock()
+    mock.execute_command = AsyncMock()
+    mock.get_platform_name = Mock(return_value="linux")
+
+    # Configure default successful command execution
+    mock_result = Mock()
+    mock_result.success = True
+    mock_result.return_code = 0
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+    mock.execute_command.return_value = mock_result
+
     return mock
 
 
@@ -30,14 +41,27 @@ def mock_job_executor() -> Mock:
 
 
 @pytest.fixture
+def mock_path_config() -> Mock:
+    """Create mock path configuration service."""
+    mock = Mock()
+    mock.is_windows.return_value = False
+    mock.get_base_temp_dir.return_value = "/tmp"
+    return mock
+
+
+@pytest.fixture
 def archive_mount_manager(
-    mock_job_executor: Mock, mock_command_executor: Mock
+    mock_job_executor: Mock, mock_command_executor: Mock, mock_path_config: Mock
 ) -> ArchiveMountManager:
     """Create ArchiveMountManager with mock dependencies."""
+    # Configure mock path config for the fixture
+    mock_path_config.is_windows.return_value = False
+    mock_path_config.get_base_temp_dir.return_value = "/tmp"
+
     return ArchiveMountManager(
         job_executor=mock_job_executor,
         command_executor=mock_command_executor,
-        base_mount_dir="/tmp/test-mounts",
+        path_config=mock_path_config,
         mount_timeout=timedelta(seconds=30),
         mounting_timeout=timedelta(seconds=10),
     )
@@ -58,17 +82,24 @@ class TestArchiveMountManagerBasics:
     """Test basic ArchiveMountManager functionality."""
 
     def test_initialization(
-        self, mock_job_executor: Mock, mock_command_executor: Mock
+        self,
+        mock_job_executor: Mock,
+        mock_command_executor: Mock,
+        mock_path_config: Mock,
     ) -> None:
         """Test ArchiveMountManager initializes correctly."""
+        # Configure mock path config to return the expected base directory
+        mock_path_config.is_windows.return_value = False
+        mock_path_config.get_base_temp_dir.return_value = "/tmp"
+
         manager = ArchiveMountManager(
             job_executor=mock_job_executor,
             command_executor=mock_command_executor,
-            base_mount_dir="/tmp/test-mounts",
+            path_config=mock_path_config,
         )
         assert manager.command_executor is mock_command_executor
         assert manager.job_executor is mock_job_executor
-        assert str(manager.base_mount_dir).replace("\\", "/") == "/tmp/test-mounts"
+        assert str(manager.base_mount_dir).replace("\\", "/") == "/tmp/borgitory-mounts"
 
     def test_get_mount_key(
         self, archive_mount_manager: ArchiveMountManager, mock_repository: Mock
@@ -85,7 +116,7 @@ class TestArchiveMountManagerBasics:
             mock_repository, "test-archive"
         )
         # The actual implementation uses underscore separator and sanitizes names
-        expected = Path("/tmp/test-mounts/test-repo_test-archive")
+        expected = Path("/tmp/borgitory-mounts/test-repo_test-archive")
         # Convert both to strings and normalize path separators for comparison
         assert str(mount_point).replace("\\", "/") == str(expected).replace("\\", "/")
 
@@ -109,7 +140,7 @@ class TestArchiveMountManagerMounting:
 
         # Mock the mount ready check to return True immediately
         with patch.object(
-            archive_mount_manager, "_wait_for_mount_ready", return_value=True
+            archive_mount_manager, "_verify_mount_ready", return_value=True
         ):
             with patch(
                 "borgitory.services.archives.archive_mount_manager.secure_borg_command"
@@ -119,7 +150,7 @@ class TestArchiveMountManagerMounting:
                         "borg",
                         "mount",
                         "/test/repo/path::test-archive",
-                        "/tmp/test-mounts/test-repo_test-archive",
+                        "/tmp/borgitory-mounts/test-repo_test-archive",
                         "-f",
                     ],
                     {"BORG_PASSPHRASE": "test-passphrase"},
@@ -139,14 +170,16 @@ class TestArchiveMountManagerMounting:
                     "borg",
                     "mount",
                     "/test/repo/path::test-archive",
-                    "/tmp/test-mounts/test-repo_test-archive",
+                    "/tmp/borgitory-mounts/test-repo_test-archive",
                     "-f",
                 ]
                 assert call_args[1]["command"] == expected_command
                 assert "BORG_PASSPHRASE" in call_args[1]["env"]
 
                 # Verify we got a mount point back
-                expected_mount_point = Path("/tmp/test-mounts/test-repo_test-archive")
+                expected_mount_point = Path(
+                    "/tmp/borgitory-mounts/test-repo_test-archive"
+                )
                 assert str(result).replace("\\", "/") == str(
                     expected_mount_point
                 ).replace("\\", "/")
@@ -193,14 +226,17 @@ class TestArchiveMountManagerMounting:
         mock_process = Mock()
         mock_process.pid = 12345
         mock_process.returncode = 1  # Failed process
+        mock_process.stderr = Mock()
         mock_process.stderr.read = AsyncMock(
             return_value=b"Mount failed: permission denied"
         )
+        mock_process.stdout = Mock()
+        mock_process.stdout.read = AsyncMock(return_value=b"")
         mock_command_executor.create_subprocess.return_value = mock_process
 
         # Mock the mount ready check to return False
         with patch.object(
-            archive_mount_manager, "_wait_for_mount_ready", return_value=False
+            archive_mount_manager, "_verify_mount_ready", return_value=False
         ):
             with patch(
                 "borgitory.services.archives.archive_mount_manager.secure_borg_command"
@@ -210,7 +246,7 @@ class TestArchiveMountManagerMounting:
                         "borg",
                         "mount",
                         "/test/repo/path::test-archive",
-                        "/tmp/test-mounts/test-repo/test-archive",
+                        "/tmp/borgitory-mounts/test-repo_test-archive",
                         "-f",
                     ],
                     {"BORG_PASSPHRASE": "test-passphrase"},
@@ -221,66 +257,6 @@ class TestArchiveMountManagerMounting:
                     await archive_mount_manager.mount_archive(
                         mock_repository, "test-archive"
                     )
-
-
-class TestArchiveMountManagerUnmounting:
-    """Test archive unmounting functionality."""
-
-    @pytest.mark.asyncio
-    async def test_unmount_archive_success(
-        self,
-        archive_mount_manager: ArchiveMountManager,
-        mock_repository: Mock,
-    ) -> None:
-        """Test successful archive unmounting."""
-        # Add a mount to the active mounts
-        mount_key = archive_mount_manager._get_mount_key(
-            mock_repository, "test-archive"
-        )
-        mount_point = archive_mount_manager._get_mount_point(
-            mock_repository, "test-archive"
-        )
-
-        from borgitory.utils.datetime_utils import now_utc
-
-        mock_process = Mock()
-        mock_process.terminate = Mock()
-        mock_process.wait = AsyncMock(return_value=0)
-
-        archive_mount_manager.active_mounts[mount_key] = MountInfo(
-            repository_path=mock_repository.path,
-            archive_name="test-archive",
-            mount_point=mount_point,
-            mounted_at=now_utc(),
-            last_accessed=now_utc(),
-            job_executor_process=mock_process,
-        )
-
-        # Mock the _unmount_path method to return True (successful unmount)
-        with patch.object(archive_mount_manager, "_unmount_path", return_value=True):
-            with patch(
-                "borgitory.services.archives.archive_mount_manager.cleanup_temp_keyfile"
-            ):
-                result = await archive_mount_manager.unmount_archive(
-                    mock_repository, "test-archive"
-                )
-
-                assert result is True
-                assert mount_key not in archive_mount_manager.active_mounts
-                mock_process.terminate.assert_called_once()
-                mock_process.wait.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_unmount_archive_not_mounted(
-        self,
-        archive_mount_manager: ArchiveMountManager,
-        mock_repository: Mock,
-    ) -> None:
-        """Test unmounting an archive that's not mounted."""
-        result = await archive_mount_manager.unmount_archive(
-            mock_repository, "test-archive"
-        )
-        assert result is False
 
 
 class TestArchiveMountManagerUtilities:
@@ -305,10 +281,12 @@ class TestArchiveMountManagerUtilities:
         mock_process1 = Mock()
         mock_process1.terminate = Mock()
         mock_process1.wait = AsyncMock(return_value=0)
+        mock_process1.returncode = None  # Process is still running
 
         mock_process2 = Mock()
         mock_process2.terminate = Mock()
         mock_process2.wait = AsyncMock(return_value=0)
+        mock_process2.returncode = None  # Process is still running
 
         archive_mount_manager.active_mounts["repo1::archive1"] = MountInfo(
             repository_path="/repo1",
@@ -316,7 +294,7 @@ class TestArchiveMountManagerUtilities:
             mount_point=Path("/tmp/mount1"),
             mounted_at=now_utc(),
             last_accessed=now_utc(),
-            job_executor_process=mock_process1,
+            process=mock_process1,
         )
 
         archive_mount_manager.active_mounts["repo2::archive2"] = MountInfo(
@@ -325,7 +303,7 @@ class TestArchiveMountManagerUtilities:
             mount_point=Path("/tmp/mount2"),
             mounted_at=now_utc(),
             last_accessed=now_utc(),
-            job_executor_process=mock_process2,
+            process=mock_process2,
         )
 
         with patch(
@@ -360,7 +338,7 @@ class TestArchiveMountManagerErrorHandling:
                     "borg",
                     "mount",
                     "/test/repo/path::test-archive",
-                    "/tmp/test-mounts/test-repo/test-archive",
+                    "/tmp/borgitory-mounts/test-repo_test-archive",
                     "-f",
                 ],
                 {"BORG_PASSPHRASE": "test-passphrase"},

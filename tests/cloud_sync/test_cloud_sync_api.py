@@ -69,9 +69,12 @@ class TestCloudSyncAPIHTMX:
         }
 
         # Mock the service to avoid actual database operations
-        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
-            CloudSyncConfigService, "create_cloud_sync_config"
-        ) as mock_create:
+        with (
+            patch("borgitory.dependencies.get_db") as mock_get_db,
+            patch.object(
+                CloudSyncConfigService, "create_cloud_sync_config"
+            ) as mock_create,
+        ):
             mock_db = Mock()
             mock_get_db.return_value = mock_db
 
@@ -124,9 +127,12 @@ class TestCloudSyncAPIHTMX:
         # Mock service to throw HTTPException
         from fastapi import HTTPException
 
-        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
-            CloudSyncConfigService, "create_cloud_sync_config"
-        ) as mock_create:
+        with (
+            patch("borgitory.dependencies.get_db") as mock_get_db,
+            patch.object(
+                CloudSyncConfigService, "create_cloud_sync_config"
+            ) as mock_create,
+        ):
             mock_db = Mock()
             mock_get_db.return_value = mock_db
             mock_create.side_effect = HTTPException(
@@ -323,9 +329,12 @@ class TestCloudSyncAPIHTMX:
         }
 
         # Mock the service to avoid actual database operations
-        with patch("borgitory.dependencies.get_db") as mock_get_db, patch.object(
-            CloudSyncConfigService, "create_cloud_sync_config"
-        ) as mock_create:
+        with (
+            patch("borgitory.dependencies.get_db") as mock_get_db,
+            patch.object(
+                CloudSyncConfigService, "create_cloud_sync_config"
+            ) as mock_create,
+        ):
             mock_db = Mock()
             mock_get_db.return_value = mock_db
 

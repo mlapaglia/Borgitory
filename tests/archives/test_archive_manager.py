@@ -28,7 +28,7 @@ def archive_manager(
     """ArchiveManager instance with mocked dependencies."""
     mock_mount_manager = Mock()
     mock_mount_manager.mount_archive = AsyncMock()
-    mock_mount_manager.list_directory = Mock(return_value=[])
+    mock_mount_manager.list_directory = AsyncMock(return_value=[])
     return ArchiveManager(
         job_executor=mock_job_executor,
         mount_manager=mock_mount_manager,
@@ -89,11 +89,11 @@ class TestArchiveManager:
 
     @pytest.mark.asyncio
     async def test_list_archive_directory_contents_success(
-        self, archive_manager, test_repository
+        self, archive_manager: ArchiveManager, test_repository: Repository
     ) -> None:
         """Test listing directory contents using FUSE mount."""
         # Configure the mount manager that's already injected in the fixture
-        archive_manager.mount_manager.list_directory.return_value = [
+        expected_entries = [
             ArchiveEntry(
                 name="file1.txt",
                 type="f",
@@ -103,6 +103,7 @@ class TestArchiveManager:
             ),
             ArchiveEntry(name="subdir", type="d", size=0, isdir=True, path="subdir"),
         ]
+        archive_manager.mount_manager.list_directory.return_value = expected_entries
 
         result = await archive_manager.list_archive_directory_contents(
             test_repository, "test-archive", "/data"
@@ -216,7 +217,7 @@ class TestArchiveManager:
 
     @pytest.mark.asyncio
     async def test_extract_file_stream_success(
-        self, archive_manager, test_repository
+        self, archive_manager: ArchiveManager, test_repository: Repository
     ) -> None:
         """Test successful file extraction streaming."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
@@ -239,7 +240,7 @@ class TestArchiveManager:
 
     @pytest.mark.asyncio
     async def test_extract_file_stream_error(
-        self, archive_manager, test_repository
+        self, archive_manager: ArchiveManager, test_repository: Repository
     ) -> None:
         """Test file extraction with Borg error."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
@@ -260,7 +261,7 @@ class TestArchiveManager:
 
     @pytest.mark.asyncio
     async def test_extract_file_stream_process_cleanup(
-        self, archive_manager, test_repository
+        self, archive_manager: ArchiveManager, test_repository: Repository
     ) -> None:
         """Test process cleanup on exception during streaming."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
@@ -282,7 +283,10 @@ class TestArchiveManager:
 
     @pytest.mark.asyncio
     async def test_get_archive_metadata_success(
-        self, archive_manager, test_repository, mock_job_executor
+        self,
+        archive_manager: ArchiveManager,
+        test_repository: Repository,
+        mock_job_executor: Mock,
     ) -> None:
         """Test successful archive metadata retrieval."""
         # Setup mock result
@@ -314,7 +318,10 @@ class TestArchiveManager:
 
     @pytest.mark.asyncio
     async def test_get_archive_metadata_not_found(
-        self, archive_manager, test_repository, mock_job_executor
+        self,
+        archive_manager: ArchiveManager,
+        test_repository: Repository,
+        mock_job_executor: Mock,
     ) -> None:
         """Test archive metadata when archive is not found."""
         # Setup mock result with different archives
@@ -337,7 +344,10 @@ class TestArchiveManager:
 
     @pytest.mark.asyncio
     async def test_get_archive_metadata_borg_error(
-        self, archive_manager, test_repository, mock_job_executor
+        self,
+        archive_manager: ArchiveManager,
+        test_repository: Repository,
+        mock_job_executor: Mock,
     ) -> None:
         """Test archive metadata retrieval with Borg error."""
         result = SimpleNamespace()

@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Scheduler started")
 
         mount_manager = get_archive_mount_manager_singleton()
+        await mount_manager.unmount_all()
 
         yield
 

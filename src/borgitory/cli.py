@@ -4,15 +4,11 @@ Command-line interface for Borgitory
 """
 
 import sys
-import subprocess
 import argparse
 import logging
-import os
-from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from importlib.metadata import version
-from importlib import resources
 
 
 def get_version() -> str:
@@ -28,61 +24,6 @@ def setup_logging(verbose: bool = False) -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         stream=sys.stdout,
     )
-
-
-def run_migrations() -> bool:
-    """Run database migrations before starting the app."""
-    print("Running database migrations...")
-
-    try:
-        # Ensure data directory exists
-        data_dir = Path("data")
-        data_dir.mkdir(exist_ok=True)
-
-        # Find the alembic.ini file in the installed package
-        try:
-            # Try to find alembic.ini in the package data
-            package_dir = resources.files("borgitory")
-            alembic_ini_path = package_dir / "alembic.ini"
-
-            # Convert to string and check if file exists
-            config_path_str = str(alembic_ini_path)
-            if os.path.exists(config_path_str):
-                config_path = config_path_str
-            else:
-                # Try checking with is_file() if available
-                try:
-                    if alembic_ini_path.is_file():
-                        config_path = config_path_str
-                    else:
-                        config_path = "alembic.ini"
-                except (AttributeError, OSError):
-                    config_path = "alembic.ini"
-        except (ImportError, AttributeError, TypeError, OSError):
-            # Fallback for older Python versions or if resources not available
-            config_path = "alembic.ini"
-
-        # Run alembic upgrade head with explicit config
-        subprocess.run(
-            ["alembic", "-c", config_path, "upgrade", "head"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        print("Database migrations completed successfully")
-        return True
-    except subprocess.CalledProcessError as e:
-        print("Database migration failed!")
-        print(f"Error: {e}")
-        if e.stdout:
-            print(f"stdout: {e.stdout}")
-        if e.stderr:
-            print(f"stderr: {e.stderr}")
-        return False
-    except FileNotFoundError:
-        print("Alembic command not found!")
-        print("Make sure alembic is installed and available in your PATH")
-        return False
 
 
 def start_server(

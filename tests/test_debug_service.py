@@ -161,18 +161,15 @@ class TestDebugService:
         job_manager_info.total_jobs = 5
         job_manager_info.job_manager_running = True
 
-        with patch.object(
-            debug_service, "_get_system_info", return_value=system_info
-        ), patch.object(
-            debug_service, "_get_application_info", return_value=app_info
-        ), patch.object(
-            debug_service, "_get_database_info", return_value=db_info
-        ), patch.object(
-            debug_service, "_get_tool_versions", return_value=tools_info
-        ), patch.object(
-            debug_service, "_get_environment_info", return_value=env_info
-        ), patch.object(
-            debug_service, "_get_job_manager_info", return_value=job_manager_info
+        with (
+            patch.object(debug_service, "_get_system_info", return_value=system_info),
+            patch.object(debug_service, "_get_application_info", return_value=app_info),
+            patch.object(debug_service, "_get_database_info", return_value=db_info),
+            patch.object(debug_service, "_get_tool_versions", return_value=tools_info),
+            patch.object(debug_service, "_get_environment_info", return_value=env_info),
+            patch.object(
+                debug_service, "_get_job_manager_info", return_value=job_manager_info
+            ),
         ):
             result = await debug_service.get_debug_info(mock_db_session)
 
@@ -227,20 +224,19 @@ class TestDebugService:
         job_manager_info.total_jobs = 3
         job_manager_info.job_manager_running = True
 
-        with patch.object(
-            debug_service, "_get_system_info", return_value=system_info
-        ), patch.object(
-            debug_service, "_get_application_info", return_value=app_info
-        ), patch.object(
-            debug_service,
-            "_get_database_info",
-            return_value=db_info,
-        ), patch.object(
-            debug_service, "_get_tool_versions", return_value=tools_info
-        ), patch.object(
-            debug_service, "_get_environment_info", return_value=env_info
-        ), patch.object(
-            debug_service, "_get_job_manager_info", return_value=job_manager_info
+        with (
+            patch.object(debug_service, "_get_system_info", return_value=system_info),
+            patch.object(debug_service, "_get_application_info", return_value=app_info),
+            patch.object(
+                debug_service,
+                "_get_database_info",
+                return_value=db_info,
+            ),
+            patch.object(debug_service, "_get_tool_versions", return_value=tools_info),
+            patch.object(debug_service, "_get_environment_info", return_value=env_info),
+            patch.object(
+                debug_service, "_get_job_manager_info", return_value=job_manager_info
+            ),
         ):
             result = await debug_service.get_debug_info(mock_db_session)
 
@@ -255,15 +251,17 @@ class TestDebugService:
     @pytest.mark.asyncio
     async def test_get_system_info(self, debug_service: DebugService) -> None:
         """Test system info collection"""
-        with patch("platform.platform", return_value="Test Platform"), patch(
-            "platform.system", return_value="TestOS"
-        ), patch("platform.release", return_value="1.0"), patch(
-            "platform.version", return_value="1.0.0"
-        ), patch("platform.architecture", return_value=("x64", "")), patch(
-            "platform.processor", return_value="Test Processor"
-        ), patch("platform.node", return_value="test-host"), patch(
-            "sys.version", "Python 3.9.0"
-        ), patch("sys.executable", "/usr/bin/python"):
+        with (
+            patch("platform.platform", return_value="Test Platform"),
+            patch("platform.system", return_value="TestOS"),
+            patch("platform.release", return_value="1.0"),
+            patch("platform.version", return_value="1.0.0"),
+            patch("platform.architecture", return_value=("x64", "")),
+            patch("platform.processor", return_value="Test Processor"),
+            patch("platform.node", return_value="test-host"),
+            patch("sys.version", "Python 3.9.0"),
+            patch("sys.executable", "/usr/bin/python"),
+        ):
             result = await debug_service._get_system_info()
 
             assert result.platform == "Test Platform"
@@ -332,9 +330,11 @@ class TestDebugService:
             return_value=filtered_job_query_mock
         )
 
-        with patch("borgitory.config.DATABASE_URL", "sqlite:///test.db"), patch(
-            "os.path.exists", return_value=True
-        ), patch("os.path.getsize", return_value=1024 * 1024):  # 1MB
+        with (
+            patch("borgitory.config.DATABASE_URL", "sqlite:///test.db"),
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=1024 * 1024),
+        ):  # 1MB
             result = debug_service._get_database_info(mock_db_session)
 
             assert result.repository_count == 5
@@ -353,23 +353,29 @@ class TestDebugService:
         mock_db_session.query.return_value.count.return_value = 1
 
         # Test bytes
-        with patch("borgitory.config.DATABASE_URL", "sqlite:///test.db"), patch(
-            "os.path.exists", return_value=True
-        ), patch("os.path.getsize", return_value=512):
+        with (
+            patch("borgitory.config.DATABASE_URL", "sqlite:///test.db"),
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=512),
+        ):
             result = debug_service._get_database_info(mock_db_session)
             assert result.database_size == "512 B"
 
         # Test KB
-        with patch("borgitory.config.DATABASE_URL", "sqlite:///test.db"), patch(
-            "os.path.exists", return_value=True
-        ), patch("os.path.getsize", return_value=2048):
+        with (
+            patch("borgitory.config.DATABASE_URL", "sqlite:///test.db"),
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=2048),
+        ):
             result = debug_service._get_database_info(mock_db_session)
             assert result.database_size == "2.0 KB"
 
         # Test GB
-        with patch("borgitory.config.DATABASE_URL", "sqlite:///test.db"), patch(
-            "os.path.exists", return_value=True
-        ), patch("os.path.getsize", return_value=2 * 1024 * 1024 * 1024):
+        with (
+            patch("borgitory.config.DATABASE_URL", "sqlite:///test.db"),
+            patch("os.path.exists", return_value=True),
+            patch("os.path.getsize", return_value=2 * 1024 * 1024 * 1024),
+        ):
             result = debug_service._get_database_info(mock_db_session)
             assert result.database_size == "2.0 GB"
 

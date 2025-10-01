@@ -206,11 +206,13 @@ class TestRepositoryManagementBusinessLogic:
             return_value=(b"archive1\narchive2\n", b"")
         )
 
-        with patch(
-            "borgitory.services.repositories.repository_service.secure_borg_command"
-        ) as mock_secure_cmd, patch(
-            "asyncio.create_subprocess_exec", return_value=mock_process
-        ), patch("asyncio.wait_for", return_value=(b"archive1\narchive2\n", b"")):
+        with (
+            patch(
+                "borgitory.services.repositories.repository_service.secure_borg_command"
+            ) as mock_secure_cmd,
+            patch("asyncio.create_subprocess_exec", return_value=mock_process),
+            patch("asyncio.wait_for", return_value=(b"archive1\narchive2\n", b"")),
+        ):
             # Mock the secure_borg_command context manager
             mock_context = AsyncMock()
             mock_context.__aenter__.return_value = (
@@ -317,11 +319,15 @@ class TestRepositoryManagementBusinessLogic:
             return_value=(b"Lock broken successfully\n", b"")
         )
 
-        with patch(
-            "borgitory.services.repositories.repository_service.secure_borg_command"
-        ) as mock_secure_cmd, patch(
-            "asyncio.create_subprocess_exec", return_value=mock_process
-        ), patch("asyncio.wait_for", return_value=(b"Lock broken successfully\n", b"")):
+        with (
+            patch(
+                "borgitory.services.repositories.repository_service.secure_borg_command"
+            ) as mock_secure_cmd,
+            patch("asyncio.create_subprocess_exec", return_value=mock_process),
+            patch(
+                "asyncio.wait_for", return_value=(b"Lock broken successfully\n", b"")
+            ),
+        ):
             # Mock the secure_borg_command context manager
             mock_context = AsyncMock()
             mock_context.__aenter__.return_value = (

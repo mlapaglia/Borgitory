@@ -52,11 +52,12 @@ class TestSimpleCommandRunnerProtocol:
         def mock_runner_factory(config: CommandRunnerConfig = mock_config()):
             return mock_runner
 
-        with override_dependency(
-            get_command_runner_config, mock_config
-        ), override_dependency(
-            get_simple_command_runner, mock_runner_factory
-        ) as client:
+        with (
+            override_dependency(get_command_runner_config, mock_config),
+            override_dependency(
+                get_simple_command_runner, mock_runner_factory
+            ) as client,
+        ):
             # Test that we can make API calls (the override works for FastAPI)
             response = client.get("/")  # Basic endpoint test
             assert response.status_code in [

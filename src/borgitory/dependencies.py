@@ -15,6 +15,7 @@ from typing import (
 import asyncio
 
 from borgitory.services.notifications.registry import get_metadata
+from borgitory.services.path.path_configuration_service import PathConfigurationService
 
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
@@ -430,6 +431,15 @@ def get_file_system() -> "FileSystemInterface":
     return OsFileSystem()
 
 
+def get_path_configuration_service() -> "PathConfigurationService":
+    """Get path configuration service."""
+    from borgitory.services.path.path_configuration_service import (
+        PathConfigurationService,
+    )
+
+    return PathConfigurationService()
+
+
 def get_path_service(
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> "PathServiceInterface":
@@ -443,13 +453,10 @@ def get_path_service(
         PathServiceInterface: Unified path service implementation
     """
     import logging
-    from borgitory.services.path.path_configuration_service import (
-        PathConfigurationService,
-    )
     from borgitory.services.path.path_service import PathService
 
     logger = logging.getLogger(__name__)
-    config = PathConfigurationService()
+    config = get_path_configuration_service()
 
     logger.debug(
         f"Creating unified path service for {config.get_platform_name()} with {type(command_executor).__name__}"
@@ -1088,20 +1095,12 @@ def get_archive_mount_manager_singleton() -> "ArchiveMountManager":
     wsl_executor = get_wsl_command_executor()
     command_executor = get_command_executor(wsl_executor)
     job_executor = get_job_executor(command_executor)
-
-    # Use path configuration service directly for sync access to get base temp dir
-    from borgitory.services.path.path_configuration_service import (
-        PathConfigurationService,
-    )
-
-    config = PathConfigurationService()
-    temp_base = config.get_base_temp_dir()
-    mount_dir = f"{temp_base}/borgitory-mounts"
+    path_config = get_path_configuration_service()
 
     return ArchiveMountManager(
         job_executor=job_executor,
-        command_executor=get_command_executor(),
-        base_mount_dir=mount_dir,
+        command_executor=command_executor,
+        path_config=path_config,
         mount_timeout=timedelta(seconds=1800),
         mounting_timeout=timedelta(seconds=30),
     )

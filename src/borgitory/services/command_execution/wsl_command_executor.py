@@ -241,16 +241,33 @@ class WSLCommandExecutor(CommandExecutorProtocol):
 
         logger.debug(f"Starting interactive WSL process: {' '.join(command[:3])}...")
 
-        process = await asyncio.create_subprocess_exec(
-            *wsl_command,
-            stdout=stdout or asyncio.subprocess.PIPE,
-            stderr=stderr or asyncio.subprocess.PIPE,
-            stdin=stdin,
-            env=env,
-            cwd=cwd,
-        )
+        # For WSL2, we need to be careful about subprocess handles
+        # Try with minimal Windows environment to avoid RPC issues
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *wsl_command,
+                stdout=stdout or asyncio.subprocess.PIPE,
+                stderr=stderr or asyncio.subprocess.PIPE,
+                stdin=stdin,
+                env=None,  # Don't pass WSL env vars to Windows process
+                cwd=None,  # Don't pass WSL cwd to Windows process
+            )
 
-        return process
+            logger.debug(f"WSL subprocess created successfully (PID: {process.pid})")
+            return process
+
+        except Exception as e:
+            logger.error(f"Failed to create WSL subprocess with clean env: {e}")
+            # Fallback to original method
+            process = await asyncio.create_subprocess_exec(
+                *wsl_command,
+                stdout=stdout or asyncio.subprocess.PIPE,
+                stderr=stderr or asyncio.subprocess.PIPE,
+                stdin=stdin,
+                env=env,
+                cwd=cwd,
+            )
+            return process
 
     def get_platform_name(self) -> str:
         """Get the platform name this executor handles."""
