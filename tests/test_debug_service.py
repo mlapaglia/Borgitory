@@ -3,10 +3,12 @@ Tests for DebugService - Service to gather system and application debug informat
 """
 
 import pytest
-from typing import Optional
-from unittest.mock import patch, MagicMock, Mock
+import subprocess
+from typing import Any, Optional, cast
+from unittest.mock import patch, MagicMock, Mock, AsyncMock
 from datetime import datetime
 from sqlalchemy.orm import Session
+from borgitory.protocols.command_executor_protocol import CommandResult
 from borgitory.services.debug_service import DebugService
 
 
@@ -389,7 +391,6 @@ class TestDebugService:
         async def mock_run_command(
             command: list[str],
             timeout: Optional[float] = None,
-            use_wsl_for_tools: bool = True,
         ) -> tuple[int, str, str]:
             if command[0] == "borg":
                 return 0, "borg 1.2.0\n", ""
@@ -420,7 +421,6 @@ class TestDebugService:
         async def mock_run_command(
             command: list[str],
             timeout: Optional[float] = None,
-            use_wsl_for_tools: bool = True,
         ) -> tuple[int, str, str]:
             if command[0] == "borg":
                 return 1, "", "command not found"
@@ -548,3 +548,288 @@ class TestDebugService:
 
         assert result.active_jobs == 1  # Only job2 counts as running
         assert result.total_jobs == 2  # Both jobs counted in total
+
+    def _create_command_result(
+        self,
+        command: list[str],
+        return_code: int,
+        stdout: str,
+        stderr: str = "",
+        success: Optional[bool] = None,
+    ) -> CommandResult:
+        """Helper to create CommandResult objects for testing"""
+        if success is None:
+            success = return_code == 0
+        return CommandResult(
+            command=command,
+            return_code=return_code,
+            stdout=stdout,
+            stderr=stderr,
+            success=success,
+            execution_time=0.1,
+            error=stderr if not success and stderr else None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_wsl_info_not_windows(self, debug_service: DebugService) -> None:
+        """Test WSL info when not running on Windows"""
+        # Mock environment to return non-Windows OS
+        mock_env = cast(MockEnvironment, debug_service.environment)
+        mock_env.env_vars["OS"] = "Linux"
+
+        with patch("platform.system", return_value="Linux"):
+            result = await debug_service._get_wsl_info()
+
+            assert result.wsl_available is False
+            assert result.error == "Not running on Windows - WSL not applicable"
+
+    @pytest.mark.asyncio
+    async def test_get_wsl_info_windows_no_wsl(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test WSL info on Windows but WSL not available"""
+        # Mock environment to return Windows OS
+        mock_env = cast(MockEnvironment, debug_service.environment)
+        mock_env.env_vars["OS"] = "Windows_NT"
+
+        # Mock command executor to simulate WSL not available
+        mock_result = self._create_command_result(
+            command=["cat", "/proc/version"],
+            return_code=1,
+            stdout="",
+            stderr="cat: /proc/version: No such file or directory",
+        )
+
+        with patch.object(
+            debug_service.command_executor,
+            "execute_command",
+            AsyncMock(return_value=mock_result),
+        ):
+            with patch("platform.system", return_value="Windows"):
+                result = await debug_service._get_wsl_info()
+
+                assert result.wsl_available is False
+                assert "WSL not available" in result.error
+
+    @pytest.mark.asyncio
+    async def test_get_wsl_info_os_release_failure(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test WSL info when /etc/os-release cannot be read"""
+        # Mock environment to return Windows OS
+        mock_env = cast(MockEnvironment, debug_service.environment)
+        mock_env.env_vars["OS"] = "Windows_NT"
+
+        async def mock_execute_command(
+            command: list[str], **kwargs: Any
+        ) -> CommandResult:
+            if command == ["cat", "/proc/version"]:
+                return self._create_command_result(
+                    command, 0, "Linux version 6.6.87.2-microsoft-standard-WSL2"
+                )
+            elif command == ["cat", "/etc/os-release"]:
+                return self._create_command_result(command, 1, "", "Permission denied")
+            else:
+                return self._create_command_result(command, 1, "", "Command not found")
+
+        with patch.object(
+            debug_service.command_executor,
+            "execute_command",
+            AsyncMock(side_effect=mock_execute_command),
+        ):
+            with patch("platform.system", return_value="Windows"):
+                result = await debug_service._get_wsl_info()
+
+                assert result.wsl_available is True
+                assert result.wsl_version == "WSL 2"
+                assert result.default_distribution == "Unknown Linux Distribution"
+
+    @pytest.mark.asyncio
+    async def test_get_wsl_info_mount_access_failure(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test WSL info when mount point access fails"""
+        # Mock environment to return Windows OS
+        mock_env = cast(MockEnvironment, debug_service.environment)
+        mock_env.env_vars["OS"] = "Windows_NT"
+
+        async def mock_execute_command(
+            command: list[str], **kwargs: Any
+        ) -> CommandResult:
+            if command == ["cat", "/proc/version"]:
+                return self._create_command_result(
+                    command, 0, "Linux version 6.6.87.2-microsoft-standard-WSL2"
+                )
+            elif command == ["ls", "/mnt"]:
+                return self._create_command_result(command, 1, "", "Permission denied")
+            else:
+                return self._create_command_result(command, 1, "", "Command not found")
+
+        with patch.object(
+            debug_service.command_executor,
+            "execute_command",
+            AsyncMock(side_effect=mock_execute_command),
+        ):
+            with patch("platform.system", return_value="Windows"):
+                result = await debug_service._get_wsl_info()
+
+                assert result.wsl_available is True
+                assert result.wsl_path_accessible is False
+                assert len(result.mount_points) == 0
+
+    @pytest.mark.asyncio
+    async def test_get_wsl_info_command_executor_exception(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test WSL info when command executor raises exception"""
+        # Mock environment to return Windows OS
+        mock_env = cast(MockEnvironment, debug_service.environment)
+        mock_env.env_vars["OS"] = "Windows_NT"
+
+        # Mock command executor to raise exception
+        with patch.object(
+            debug_service.command_executor,
+            "execute_command",
+            AsyncMock(side_effect=FileNotFoundError("WSL command not found")),
+        ):
+            with patch("platform.system", return_value="Windows"):
+                result = await debug_service._get_wsl_info()
+
+                assert result.wsl_available is False
+                assert "WSL command not found" in result.error
+
+    @pytest.mark.asyncio
+    async def test_get_wsl_info_unexpected_exception(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test WSL info when unexpected exception occurs"""
+        # Mock environment to return Windows OS
+        mock_env = cast(MockEnvironment, debug_service.environment)
+        mock_env.env_vars["OS"] = "Windows_NT"
+
+        with patch("platform.system", return_value="Windows"):
+            # Mock an unexpected exception in the command executor
+            with patch.object(
+                debug_service.command_executor,
+                "execute_command",
+                AsyncMock(side_effect=RuntimeError("Unexpected error")),
+            ):
+                result = await debug_service._get_wsl_info()
+
+                assert result.wsl_available is False
+                assert "Unexpected error" in result.error
+
+    def test_get_windows_version_with_platform_info(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test Windows version detection using platform.platform()"""
+        with patch("platform.platform", return_value="Windows-10-10.0.19041-SP0"):
+            result = debug_service._get_windows_version()
+            assert result == "Windows-10-10.0.19041-SP0"
+
+    def test_get_windows_version_with_cmd_ver(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test Windows version detection using cmd ver command"""
+        with patch(
+            "platform.platform", return_value="Linux-5.4.0"
+        ):  # Non-Windows platform
+            with patch("platform.system", return_value="Windows"):
+                with patch("subprocess.run") as mock_run:
+                    # Mock successful ver command
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    mock_result.stdout = "Microsoft Windows [Version 10.0.19045.5011]"
+                    mock_run.return_value = mock_result
+
+                    result = debug_service._get_windows_version()
+                    assert result == "Microsoft Windows [Version 10.0.19045.5011]"
+
+                    # Verify subprocess.run was called with correct arguments
+                    mock_run.assert_called_with(
+                        ["cmd", "/c", "ver"], capture_output=True, text=True, timeout=5
+                    )
+
+    def test_get_windows_version_with_systeminfo(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test Windows version detection using systeminfo command"""
+        with patch(
+            "platform.platform", return_value="Linux-5.4.0"
+        ):  # Non-Windows platform
+            with patch("platform.system", return_value="Windows"):
+                with patch("subprocess.run") as mock_run:
+                    # Mock ver command failure, systeminfo success
+                    def mock_run_side_effect(cmd: list[str], **kwargs: Any) -> Mock:
+                        if cmd == ["cmd", "/c", "ver"]:
+                            mock_result = Mock()
+                            mock_result.returncode = 1
+                            mock_result.stdout = ""
+                            return mock_result
+                        elif cmd == ["systeminfo", "/fo", "csv"]:
+                            mock_result = Mock()
+                            mock_result.returncode = 0
+                            mock_result.stdout = '"OS Name","OS Version","OS Manufacturer"\n"Microsoft Windows 11 Pro","10.0.22000 N/A Build 22000","Microsoft Corporation"'
+                            return mock_result
+                        else:
+                            mock_result = Mock()
+                            mock_result.returncode = 1
+                            return mock_result
+
+                    mock_run.side_effect = mock_run_side_effect
+
+                    result = debug_service._get_windows_version()
+                    assert result == "Microsoft Windows 11 Pro"
+
+    def test_get_windows_version_fallback_to_platform(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test Windows version fallback to basic platform info"""
+        with patch(
+            "platform.platform", return_value="Linux-5.4.0"
+        ):  # Non-Windows platform
+            with patch("platform.system", return_value="Windows"):
+                with patch("platform.release", return_value="10"):
+                    with patch("subprocess.run") as mock_run:
+                        # Mock all subprocess commands to fail
+                        mock_result = Mock()
+                        mock_result.returncode = 1
+                        mock_result.stdout = ""
+                        mock_run.return_value = mock_result
+
+                        result = debug_service._get_windows_version()
+                        assert result == "Windows 10"
+
+    def test_get_windows_version_exception_handling(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test Windows version detection exception handling"""
+        with patch("platform.platform", side_effect=RuntimeError("Platform error")):
+            result = debug_service._get_windows_version()
+            assert result == "Unknown"
+
+    def test_get_windows_version_subprocess_timeout(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test Windows version detection with subprocess timeout"""
+        with patch(
+            "platform.platform", return_value="Linux-5.4.0"
+        ):  # Non-Windows platform
+            with patch("platform.system", return_value="Windows"):
+                with patch("platform.release", return_value="10"):
+                    with patch(
+                        "subprocess.run",
+                        side_effect=subprocess.TimeoutExpired("cmd", 5),
+                    ):
+                        result = debug_service._get_windows_version()
+                        assert result == "Windows 10"
+
+    def test_get_windows_version_non_windows_system(
+        self, debug_service: DebugService
+    ) -> None:
+        """Test Windows version detection on non-Windows system"""
+        with patch("platform.platform", return_value="Linux-5.4.0-generic"):
+            with patch("platform.system", return_value="Linux"):
+                with patch("platform.release", return_value="5.4.0"):
+                    result = debug_service._get_windows_version()
+                    assert result == "Linux 5.4.0"
