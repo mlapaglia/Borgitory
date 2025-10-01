@@ -883,21 +883,16 @@ def get_job_render_service(
 
 def get_debug_service(
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-    wsl_executor: "WSLCommandExecutor" = Depends(get_wsl_command_executor),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> DebugService:
     """
     Provide a DebugService instance with proper dependency injection.
     Uses FastAPI DI with automatic dependency resolution.
     """
-    import platform
-
-    # Only inject WSL executor on Windows
-    wsl_exec = wsl_executor if platform.system() == "Windows" else None
-
     return DebugService(
         job_manager=job_manager,
         environment=DefaultEnvironment(),
-        wsl_executor=wsl_exec,
+        command_executor=command_executor,
     )
 
 

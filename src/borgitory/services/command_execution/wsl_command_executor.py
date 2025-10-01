@@ -142,68 +142,6 @@ class WSLCommandExecutor(CommandExecutorProtocol):
                 error=error_msg,
             )
 
-    async def execute_borg_command(
-        self,
-        borg_args: List[str],
-        env: Optional[Dict[str, str]] = None,
-        cwd: Optional[str] = None,
-        timeout: Optional[float] = None,
-    ) -> CommandResult:
-        """
-        Execute a borg command through WSL.
-
-        Args:
-            borg_args: Borg command arguments (without 'borg' prefix)
-            env: Environment variables
-            cwd: Working directory
-            timeout: Command timeout
-
-        Returns:
-            CommandResult with execution details
-        """
-        command = ["borg"] + borg_args
-        return await self.execute_command(command, env, cwd, timeout)
-
-    async def test_connection(self) -> bool:
-        """
-        Test if WSL connection is working.
-
-        Returns:
-            True if WSL is accessible and working
-        """
-        try:
-            result = await self.execute_command(["echo", "test"], timeout=5.0)
-            return result.success and result.stdout.strip() == "test"
-        except Exception as e:
-            logger.debug(f"WSL connection test failed: {e}")
-            return False
-
-    async def get_wsl_version(self) -> Optional[str]:
-        """Get the WSL version information."""
-        try:
-            result = await self.execute_command(["cat", "/proc/version"], timeout=5.0)
-            if result.success:
-                return result.stdout.strip()
-            return None
-        except Exception:
-            return None
-
-    async def check_command_availability(self, command: str) -> bool:
-        """
-        Check if a command is available in WSL.
-
-        Args:
-            command: Command name to check
-
-        Returns:
-            True if command is available
-        """
-        try:
-            result = await self.execute_command(["which", command], timeout=5.0)
-            return result.success
-        except Exception:
-            return False
-
     def _build_wsl_command(
         self,
         command: List[str],
@@ -221,6 +159,11 @@ class WSLCommandExecutor(CommandExecutorProtocol):
         Returns:
             Complete WSL command list
         """
+        # Special case: if command starts with "wsl.exe", execute it directly
+        # This allows running Windows commands from inside WSL
+        if command and command[0] == "wsl.exe":
+            return command
+
         wsl_cmd = ["wsl"]
 
         # Add distribution if specified

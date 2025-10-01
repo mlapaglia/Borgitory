@@ -1,21 +1,16 @@
-import asyncio
 import platform
 import subprocess
 import sys
 import os
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Dict, Optional
 from sqlalchemy.orm import Session
+from importlib.metadata import version, PackageNotFoundError
 
 from borgitory.models.database import Repository, Job
 from borgitory.protocols import JobManagerProtocol
 from borgitory.protocols.environment_protocol import EnvironmentProtocol
-
-if TYPE_CHECKING:
-    from borgitory.services.command_execution.wsl_command_executor import (
-        WSLCommandExecutor,
-    )
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -130,14 +125,21 @@ class DebugService:
         self,
         job_manager: JobManagerProtocol,
         environment: EnvironmentProtocol,
-        wsl_executor: Optional["WSLCommandExecutor"] = None,
+        command_executor: CommandExecutorProtocol,
     ) -> None:
         self.job_manager = job_manager
         self.environment = environment
-        self.wsl_executor = wsl_executor
+        self.command_executor = command_executor
+
+    def _get_borgitory_version(self) -> str:
+        """Get Borgitory version from package metadata"""
+        try:
+            return version("borgitory")
+        except PackageNotFoundError:
+            return "unknown"
 
     async def _run_command(
-        self, command: list[str], timeout: float = 30.0, use_wsl_for_tools: bool = True
+        self, command: list[str], timeout: float = 30.0
     ) -> tuple[int, str, str]:
         """
         Run command using WSL executor on Windows or direct subprocess on other platforms.
@@ -145,54 +147,12 @@ class DebugService:
         Args:
             command: Command to run
             timeout: Command timeout
-            use_wsl_for_tools: If True, use WSL for tool commands on Windows
 
         Returns:
             Tuple of (return_code, stdout, stderr)
         """
-        # Determine if we should use WSL
-        should_use_wsl = (
-            use_wsl_for_tools
-            and self.wsl_executor is not None
-            and command[0]
-            not in [
-                "wsl",
-                "dpkg",
-            ]  # Don't use WSL for WSL commands or Windows-specific commands
-        )
-
-        if should_use_wsl and self.wsl_executor:
-            # Use WSL command executor
-            result = await self.wsl_executor.execute_command(command, timeout=timeout)
-            return result.return_code, result.stdout, result.stderr
-        else:
-            # Use direct subprocess with thread pool
-            loop = asyncio.get_event_loop()
-
-            def run_command() -> tuple[int, bytes, bytes]:
-                try:
-                    result = subprocess.run(
-                        command,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        timeout=timeout,
-                        text=False,  # Keep as bytes for consistent decoding
-                    )
-                    return result.returncode, result.stdout, result.stderr
-                except subprocess.TimeoutExpired:
-                    return -1, b"", b"Command timed out"
-                except Exception as e:
-                    return -1, b"", str(e).encode()
-
-            with ThreadPoolExecutor() as executor:
-                return_code, stdout, stderr = await loop.run_in_executor(
-                    executor, run_command
-                )
-                return (
-                    return_code,
-                    stdout.decode("utf-8", errors="replace"),
-                    stderr.decode("utf-8", errors="replace"),
-                )
+        result = await self.command_executor.execute_command(command, timeout=timeout)
+        return result.return_code, result.stdout, result.stderr
 
     async def get_debug_info(self, db: Session) -> DebugInfo:
         """Gather comprehensive debug information"""
@@ -230,7 +190,7 @@ class DebugService:
         """Get application information"""
         app_info = ApplicationInfo()
         try:
-            app_info.borgitory_version = self.environment.get_env("BORGITORY_VERSION")
+            app_info.borgitory_version = self._get_borgitory_version()
             debug_env = self.environment.get_env("DEBUG", "false") or "false"
             app_info.debug_mode = debug_env.lower() == "true"
             app_info.startup_time = self.environment.now_utc().isoformat()
@@ -376,7 +336,7 @@ class DebugService:
 
         try:
             return_code, stdout, stderr = await self._run_command(
-                ["dpkg", "-l", "fuse3"], use_wsl_for_tools=False
+                ["dpkg", "-l", "fuse3"]
             )
 
             if return_code == 0:
@@ -490,26 +450,56 @@ class DebugService:
 
             # Check if WSL is available
             try:
-                # Test basic WSL availability
+                # Check WSL by reading /proc/version (we're running inside WSL)
                 return_code, stdout, stderr = await self._run_command(
-                    ["wsl", "--status"], use_wsl_for_tools=False
+                    ["cat", "/proc/version"]
                 )
 
                 if return_code == 0:
-                    wsl_info.wsl_available = True
-                    status_output = stdout.strip()
+                    proc_version = stdout.strip()
 
-                    # Parse WSL status output
-                    for line in status_output.split("\n"):
-                        clean_line = line.replace("\x00", "").strip()
-                        if "Default Distribution:" in clean_line:
-                            wsl_info.default_distribution = clean_line.split(":", 1)[
-                                1
-                            ].strip()
-                        elif "Default Version:" in clean_line:
-                            wsl_info.wsl_version = (
-                                f"WSL {clean_line.split(':', 1)[1].strip()}"
-                            )
+                    # Check if this is WSL
+                    if (
+                        "microsoft" in proc_version.lower()
+                        or "wsl" in proc_version.lower()
+                    ):
+                        wsl_info.wsl_available = True
+
+                        # Parse WSL version from /proc/version
+                        # Example: "Linux version 6.6.87.2-microsoft-standard-WSL2"
+                        if "wsl2" in proc_version.lower():
+                            wsl_info.wsl_version = "WSL 2"
+                        elif "microsoft" in proc_version.lower():
+                            wsl_info.wsl_version = "WSL"
+                        else:
+                            wsl_info.wsl_version = "WSL (unknown version)"
+
+                        # Get distribution info from /etc/os-release
+                        try:
+                            (
+                                distro_return_code,
+                                distro_stdout,
+                                distro_stderr,
+                            ) = await self._run_command(["cat", "/etc/os-release"])
+
+                            if distro_return_code == 0:
+                                for line in distro_stdout.split("\n"):
+                                    if line.startswith("PRETTY_NAME="):
+                                        distro_name = (
+                                            line.split("=", 1)[1].strip().strip('"')
+                                        )
+                                        wsl_info.default_distribution = distro_name
+                                        break
+                                else:
+                                    wsl_info.default_distribution = (
+                                        "Unknown Linux Distribution"
+                                    )
+                            else:
+                                wsl_info.default_distribution = (
+                                    "Unknown Linux Distribution"
+                                )
+                        except Exception:
+                            wsl_info.default_distribution = "Unknown Linux Distribution"
                 else:
                     wsl_info.error = f"WSL not available: {stderr.strip()}"
                     return wsl_info
@@ -524,7 +514,7 @@ class DebugService:
             # Get list of installed distributions
             try:
                 return_code, stdout, stderr = await self._run_command(
-                    ["wsl", "-l", "-v"], use_wsl_for_tools=False
+                    ["wsl.exe", "-l", "-v"]
                 )
 
                 if return_code == 0:
@@ -556,7 +546,7 @@ class DebugService:
             # Get WSL kernel version
             try:
                 return_code, stdout, stderr = await self._run_command(
-                    ["wsl", "--version"], use_wsl_for_tools=False
+                    ["wsl", "--version"]
                 )
 
                 if return_code == 0:
@@ -576,9 +566,7 @@ class DebugService:
             # Test WSL path accessibility
             try:
                 # Try to access /mnt directory which should contain Windows drives
-                return_code, stdout, stderr = await self._run_command(
-                    ["wsl", "ls", "/mnt"], use_wsl_for_tools=False
-                )
+                return_code, stdout, stderr = await self._run_command(["ls", "/mnt"])
 
                 if return_code == 0:
                     wsl_info.wsl_path_accessible = True

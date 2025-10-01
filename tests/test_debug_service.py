@@ -52,14 +52,34 @@ def mock_job_manager() -> Mock:
 
 
 @pytest.fixture
+def mock_command_executor() -> Mock:
+    """Mock command executor for testing"""
+    from unittest.mock import Mock
+
+    mock_executor = Mock()
+    # Set up default return values for common commands
+    mock_executor.execute_command.return_value = Mock(
+        return_code=0,
+        stdout="",
+        stderr="",
+        success=True,
+        execution_time=0.1,
+        error=None,
+    )
+    return mock_executor
+
+
+@pytest.fixture
 def debug_service(
     mock_environment: MockEnvironment,
     mock_job_manager: Mock,
+    mock_command_executor: Mock,
 ) -> DebugService:
     """Debug service with all required dependencies injected"""
     return DebugService(
         job_manager=mock_job_manager,
         environment=mock_environment,
+        command_executor=mock_command_executor,
     )
 
 
