@@ -11,6 +11,7 @@ from typing import List, Tuple
 
 from borgitory.protocols.path_protocols import PathServiceInterface
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.protocols.command_protocols import CommandResult
 from borgitory.services.path.path_configuration_service import PathConfigurationService
 from borgitory.utils.secure_path import DirectoryInfo
 
@@ -255,41 +256,6 @@ class PathService(PathServiceInterface):
             logger.error(f"Error ensuring directory {path}: {e}")
             raise OSError(f"Failed to ensure directory {path}: {str(e)}")
 
-    async def get_available_drives(self) -> List[str]:
-        """
-        Get list of available drives.
-
-        For Windows: Returns WSL-mounted drives (e.g., ["/mnt/c", "/mnt/d"])
-        For Unix: Returns root filesystem ["/"]
-
-        Returns:
-            List of drive paths
-        """
-        if self.config.is_windows():
-            try:
-                result = await self.command_executor.execute_command(
-                    ["ls", "/mnt"], timeout=5.0
-                )
-
-                if not result.success:
-                    logger.warning("Failed to list /mnt directory")
-                    return ["/mnt/c"]  # Default fallback
-
-                drives = []
-                for line in result.stdout.strip().split("\n"):
-                    drive = line.strip()
-                    if drive and len(drive) == 1 and drive.isalpha():
-                        drives.append(f"/mnt/{drive}")
-
-                return drives if drives else ["/mnt/c"]
-
-            except Exception as e:
-                logger.error(f"Error getting available drives: {e}")
-                return ["/mnt/c"]  # Default fallback
-        else:
-            # Unix systems typically have a single root filesystem
-            return ["/"]
-
     async def _parse_ls_output(
         self, ls_output: str, base_path: str, include_files: bool
     ) -> List[DirectoryInfo]:
@@ -374,8 +340,6 @@ class PathService(PathServiceInterface):
         """
         Batch check multiple directories for Borg repository/cache indicators.
 
-        This is much faster than individual checks as it uses a single command.
-
         Args:
             directories_to_check: List of (DirectoryInfo, path) tuples to check
         """
@@ -386,83 +350,94 @@ class PathService(PathServiceInterface):
         # Use find to locate config files and grep to check their content
         paths = [path for _, path in directories_to_check]
 
-        # Create a command that:
-        # 1. Finds all config files in the directories
-        # 2. Checks their content for [repository] or [cache] sections
-        # 3. Handles permission errors gracefully
-
-        find_configs_cmd = (
-            ["find"]
-            + paths
-            + [
-                "-maxdepth",
-                "1",
-                "-name",
-                "config",
-                "-type",
-                "f",
-                "-exec",
-                "sh",
-                "-c",
-                "for file; do "
-                'if head -20 "$file" 2>/dev/null | grep -q "\\[repository\\]"; then '
-                'echo "REPO:$file"; '
-                'elif head -20 "$file" 2>/dev/null | grep -q "\\[cache\\]"; then '
-                'echo "CACHE:$file"; '
-                "fi; "
-                "done",
-                "_",
-                "{}",
-                "+",
-            ]
+        # Step 1: Find all config files in the target directories
+        find_cmd = (
+            ["find"] + paths + ["-maxdepth", "1", "-name", "config", "-type", "f"]
         )
 
         try:
-            result = await self.command_executor.execute_command(
-                find_configs_cmd, timeout=10.0
+            logger.info(f"Finding config files with command: {find_cmd}")
+            find_result = await self.command_executor.execute_command(
+                find_cmd, timeout=10.0
             )
 
-            # Parse results and update DirectoryInfo objects
-            if result.success and result.stdout:
-                for line in result.stdout.strip().split("\n"):
-                    if not line:
-                        continue
+            if not find_result.stdout.strip():
+                logger.info("No config files found")
+                return
 
-                    if line.startswith("REPO:"):
-                        config_path = line[5:]  # Remove "REPO:" prefix
-                        dir_path = config_path.rsplit("/", 1)[0]  # Get directory path
-                        self._mark_directory_as_borg_repo(
-                            directories_to_check, dir_path
-                        )
-                    elif line.startswith("CACHE:"):
-                        config_path = line[6:]  # Remove "CACHE:" prefix
-                        dir_path = config_path.rsplit("/", 1)[0]  # Get directory path
-                        self._mark_directory_as_borg_cache(
-                            directories_to_check, dir_path
-                        )
+            if not find_result.success:
+                logger.info(
+                    f"Find command had errors but may have found some files: {find_result.stderr}"
+                )
 
-            # Check for permission errors in stderr
-            if result.stderr and "Permission denied" in result.stderr:
-                # Parse stderr to identify which directories have permission issues
-                for line in result.stderr.split("\n"):
-                    if "Permission denied" in line:
-                        # Extract directory path from error message
-                        for dir_info, dir_path in directories_to_check:
-                            if dir_path in line:
-                                dir_info.has_permission_error = True
+            config_files = [
+                f.strip() for f in find_result.stdout.strip().split("\n") if f.strip()
+            ]
+            logger.info(f"Found {len(config_files)} config files: {config_files}")
+
+            if not config_files:
+                return
+
+            repo_cmd = ["grep", "-l", "^\\[repository\\]"] + config_files
+            repo_result = await self.command_executor.execute_command(
+                repo_cmd, timeout=5.0
+            )
+
+            cache_cmd = ["grep", "-l", "^\\[cache\\]"] + config_files
+            cache_result = await self.command_executor.execute_command(
+                cache_cmd, timeout=5.0
+            )
+
+            # Combine results
+            all_results = []
+
+            if repo_result.success and repo_result.stdout.strip():
+                for config_file in repo_result.stdout.strip().split("\n"):
+                    if config_file.strip():
+                        all_results.append(f"REPO:{config_file.strip()}")
+
+            if cache_result.success and cache_result.stdout.strip():
+                for config_file in cache_result.stdout.strip().split("\n"):
+                    if config_file.strip():
+                        all_results.append(f"CACHE:{config_file.strip()}")
+
+            logger.info(f"Batch check found {len(all_results)} results: {all_results}")
+
+            # Create result object for existing parsing logic
+            result = CommandResult(
+                success=True,
+                return_code=0,
+                stdout="\n".join(all_results),
+                stderr="",
+                duration=0.0,
+            )
 
         except Exception as e:
-            logger.debug(f"Batch Borg directory check failed: {e}")
-            # Fallback to individual checks if batch fails
-            for dir_info, dir_path in directories_to_check:
-                try:
-                    is_repo, repo_perm_error = await self._is_borg_repository(dir_path)
-                    is_cache, cache_perm_error = await self._is_borg_cache(dir_path)
-                    dir_info.is_borg_repo = is_repo
-                    dir_info.is_borg_cache = is_cache
-                    dir_info.has_permission_error = repo_perm_error or cache_perm_error
-                except Exception:
+            logger.debug(f"Directory query failed: {e}")
+            raise e
+
+        if result.success and result.stdout:
+            for line in result.stdout.strip().split("\n"):
+                if not line:
                     continue
+
+                if line.startswith("REPO:"):
+                    config_path = line[5:]  # Remove "REPO:" prefix
+                    dir_path = config_path.rsplit("/", 1)[0]
+                    self._mark_directory_as_borg_repo(directories_to_check, dir_path)
+                elif line.startswith("CACHE:"):
+                    config_path = line[6:]  # Remove "CACHE:" prefix
+                    dir_path = config_path.rsplit("/", 1)[0]
+                    self._mark_directory_as_borg_cache(directories_to_check, dir_path)
+
+        # For directories that weren't processed (no output), assume they have permission errors
+        processed_dirs = set()
+        if result.stdout:
+            for line in result.stdout.strip().split("\n"):
+                if line.startswith(("REPO:", "CACHE:")):
+                    config_path = line.split(":", 1)[1]
+                    dir_path = config_path.rsplit("/", 1)[0]
+                    processed_dirs.add(dir_path)
 
     def _mark_directory_as_borg_repo(
         self, directories_to_check: List[Tuple[DirectoryInfo, str]], target_path: str
@@ -481,129 +456,3 @@ class PathService(PathServiceInterface):
             if dir_path == target_path:
                 dir_info.is_borg_cache = True
                 break
-
-    async def _is_borg_repository(self, directory_path: str) -> tuple[bool, bool]:
-        """
-        Check if a directory is a Borg repository by looking for a config file with [repository] section.
-
-        Returns:
-            tuple[bool, bool]: (is_borg_repo, has_permission_error)
-        """
-        try:
-            config_path = directory_path.rstrip("/") + "/config"
-
-            # Use ls -la to get detailed information about the config file
-            result = await self.command_executor.execute_command(
-                command=["ls", "-la", config_path], timeout=5.0
-            )
-
-            if not result.success:
-                if "Permission denied" in result.stderr:
-                    logger.debug(
-                        f"Permission denied accessing config file at {config_path}"
-                    )
-                    return False, True  # Not a repo, but has permission error
-                return False, False
-
-            # Check if it's actually a file (not a directory)
-            if not result.stdout.startswith("-"):
-                logger.debug(
-                    f"Config path {config_path} exists but is not a regular file"
-                )
-                return False, False
-
-            # Try to read config file content
-            result = await self.command_executor.execute_command(
-                command=["cat", config_path], timeout=10.0
-            )
-
-            if not result.success:
-                if "Permission denied" in result.stderr:
-                    logger.debug(
-                        f"Permission denied reading config file at {config_path}"
-                    )
-                    return False, True  # Not a repo, but has permission error
-                else:
-                    logger.debug(
-                        f"Failed to read config file at {config_path}: {result.stderr}"
-                    )
-                return False, False
-
-            config_content = result.stdout
-            is_repo = "[repository]" in config_content
-            return is_repo, False
-
-        except Exception as e:
-            logger.debug(f"Error checking if {directory_path} is borg repository: {e}")
-            return False, False
-
-    async def _is_borg_cache(self, directory_path: str) -> tuple[bool, bool]:
-        """
-        Check if a directory is a Borg cache by looking for a config file with [cache] section.
-
-        Returns:
-            tuple[bool, bool]: (is_borg_cache, has_permission_error)
-        """
-        try:
-            config_path = directory_path.rstrip("/") + "/config"
-
-            # Use ls -la to get detailed information about the config file
-            result = await self.command_executor.execute_command(
-                command=["ls", "-la", config_path], timeout=5.0
-            )
-
-            if not result.success:
-                if "Permission denied" in result.stderr:
-                    logger.debug(
-                        f"Permission denied accessing config file at {config_path}"
-                    )
-                    return False, True
-                return False, False
-
-            # Check if it's actually a file (not a directory)
-            if not result.stdout.startswith("-"):
-                logger.debug(
-                    f"Config path {config_path} exists but is not a regular file"
-                )
-                return False, False
-
-            # Try to read config file content
-            result = await self.command_executor.execute_command(
-                command=["cat", config_path], timeout=10.0
-            )
-
-            if not result.success:
-                if "Permission denied" in result.stderr:
-                    logger.debug(
-                        f"Permission denied reading config file at {config_path}"
-                    )
-                    return False, True  # Not a cache, but has permission error
-                else:
-                    logger.debug(
-                        f"Failed to read config file at {config_path}: {result.stderr}"
-                    )
-                return False, False
-
-            config_content = result.stdout
-            is_cache = "[cache]" in config_content
-            return is_cache, False
-
-        except Exception as e:
-            logger.debug(f"Error checking if {directory_path} is borg cache: {e}")
-            return False, False
-
-    async def test_connectivity(self) -> bool:
-        """
-        Test if the command executor connectivity is working.
-
-        Returns:
-            True if command execution is accessible and working
-        """
-        try:
-            result = await self.command_executor.execute_command(
-                ["echo", "test"], timeout=5.0
-            )
-            return result.success and result.stdout.strip() == "test"
-        except Exception as e:
-            logger.debug(f"Connectivity test failed: {e}")
-            return False

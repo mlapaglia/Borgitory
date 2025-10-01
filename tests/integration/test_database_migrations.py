@@ -7,6 +7,7 @@ import tempfile
 import shutil
 from typing import Generator
 
+
 @pytest.fixture
 def temp_data_dir() -> Generator[str, None, None]:
     """Create a temporary directory for integration test data."""
@@ -39,6 +40,7 @@ def migration_env(temp_data_dir: str) -> dict[str, str]:
         }
     )
     return env
+
 
 def test_borgitory_command_available() -> None:
     """Test that the borgitory CLI command is available."""

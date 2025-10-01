@@ -611,15 +611,12 @@ class DebugService:
             platform_info = platform.platform()
             if "Windows" in platform_info:
                 return platform_info
-            
+
             # Method 2: Try subprocess to get Windows version (if on Windows)
             if platform.system() == "Windows":
                 try:
                     result = subprocess.run(
-                        ["cmd", "/c", "ver"],
-                        capture_output=True,
-                        text=True,
-                        timeout=5
+                        ["cmd", "/c", "ver"], capture_output=True, text=True, timeout=5
                     )
                     if result.returncode == 0 and result.stdout:
                         # Extract version from output like "Microsoft Windows [Version 10.0.19045.5011]"
@@ -628,28 +625,28 @@ class DebugService:
                             return version_line
                 except Exception:
                     pass
-                
+
                 # Method 3: Try systeminfo command
                 try:
                     result = subprocess.run(
                         ["systeminfo", "/fo", "csv"],
                         capture_output=True,
                         text=True,
-                        timeout=10
+                        timeout=10,
                     )
                     if result.returncode == 0 and result.stdout:
-                        lines = result.stdout.split('\n')
+                        lines = result.stdout.split("\n")
                         if len(lines) >= 2:
                             # Parse CSV output to get OS Name and Version
-                            headers = lines[0].split(',')
-                            values = lines[1].split(',')
+                            headers = lines[0].split(",")
+                            values = lines[1].split(",")
                             for i, header in enumerate(headers):
-                                if 'OS Name' in header and i < len(values):
+                                if "OS Name" in header and i < len(values):
                                     os_name = values[i].strip('"')
                                     return os_name
                 except Exception:
                     pass
-            
+
             # Fallback to basic platform info
             return f"{platform.system()} {platform.release()}"
 

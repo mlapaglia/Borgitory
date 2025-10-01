@@ -13,8 +13,8 @@
         const targetInput = document.getElementById('{{ target_input }}');
         if (targetInput) {
             targetInput.value = this.dataset.path;
-            // Trigger the autocomplete request manually with the new value
-            htmx.trigger(targetInput, 'input');
+            // Trigger immediate autocomplete request bypassing the 300ms delay
+            htmx.trigger(targetInput, 'autocomplete-immediate');
         }
      "
      {% endif %}>

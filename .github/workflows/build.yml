@@ -215,10 +215,19 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
 
-  build-python-package:
-    runs-on: ubuntu-latest
+  build-python-packages:
+    runs-on: ${{ matrix.os }}
     needs: [code-quality-lint, code-quality-types, test-unit, test-integration]
-    
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+          - os: windows-latest
+            arch: x86_64
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
@@ -226,6 +235,7 @@ jobs:
         fetch-depth: 2
     
     - name: Install system dependencies
+      if: startsWith(matrix.os, 'ubuntu')
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends \
@@ -255,7 +265,11 @@ jobs:
         python -m venv test_env
         
         # Install the built package
-        source test_env/bin/activate
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          test_env\Scripts\activate
+        else
+          source test_env/bin/activate
+        fi
         pip install dist/*.whl
         
         # Test that the CLI works
