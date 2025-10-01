@@ -126,9 +126,6 @@ jobs:
           org.opencontainers.image.licenses=MIT
         cache-from: type=gha,scope=${{ matrix.arch }}
         cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
-        build-args: |
-          VERSION=${{ needs.extract-version.outputs.version }}
-          BORGITORY_VERSION=${{ needs.extract-version.outputs.version }}
         outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
     - name: Export digest

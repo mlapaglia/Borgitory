@@ -262,28 +262,24 @@ jobs:
     - name: Test package installation (Ubuntu)
       if: startsWith(matrix.os, 'ubuntu')
       run: |
-        # Create a virtual environment for testing
         python -m venv test_env
-        
-        # Install the built package
         source test_env/bin/activate
-        pip install dist/*.whl
         
-        # Test that the CLI works
+        pip install dist/*.whl
+
         borgitory --version
         borgitory --help
     
     - name: Test package installation (Windows)
       if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
-        # Create a virtual environment for testing
         python -m venv test_env
-        
-        # Install the built package
-        test_env\Scripts\activate.bat
-        pip install dist/*.whl
-        
-        # Test that the CLI works
+        test_env\Scripts\Activate.ps1
+
+        $whl = Get-ChildItem -Path "dist\*.whl" | Select-Object -First 1
+        pip install $whl.FullName
+
         borgitory --version
         borgitory --help
 
