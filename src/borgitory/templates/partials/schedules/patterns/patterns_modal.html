@@ -1,0 +1,109 @@
+<!-- Patterns Configuration Modal -->
+<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="modal-container">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <!-- Modal Header -->
+        <div class="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Backup Patterns Configuration
+                </h3>
+                <button type="button" 
+                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        hx-get="/api/schedules/patterns/close-modal" 
+                        hx-target="#modal-container"
+                        hx-swap="outerHTML">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Modal Content -->
+        <div class="overflow-y-auto max-h-[calc(90vh-8rem)]">
+            <form hx-post="/api/schedules/patterns/save-patterns" hx-target="body" hx-swap="none" hx-target-error="#patterns-error-container">
+                <!-- Error message container -->
+                <div id="patterns-error-container" class="p-6 pb-0"></div>
+                
+                <div class="p-6">
+                    <!-- Info Banner -->
+                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4 mb-6">
+                        <div class="flex">
+                            <svg class="w-5 h-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div class="ml-3">
+                                <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200">Pattern Configuration</h4>
+                                <p class="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                                    Define include/exclude patterns for your backup. Patterns are processed in order.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Single Column Layout for Patterns -->
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                📋 Patterns
+                            </h4>
+                            <button type="button" 
+                                    class="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+                                    hx-post="/api/schedules/patterns/add-pattern-field"
+                                    hx-include="form"
+                                    hx-target="#patterns-container"
+                                    hx-swap="innerHTML">
+                                + Add Pattern
+                            </button>
+                        </div>
+                        
+                        <div id="patterns-container" class="space-y-4">
+                            {% for pattern in patterns %}
+                                {% set index = loop.index0 %}
+                                {% include 'partials/schedules/patterns/pattern_field_modal.html' with context %}
+                            {% endfor %}
+                            
+                            {% if not patterns %}
+                            <div class="text-center py-8 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                                <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                <p class="text-sm">No patterns configured</p>
+                                <p class="text-xs">Click "Add Pattern" to get started</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-gray-50 dark:bg-gray-900">
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" 
+                                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500"
+                                hx-get="/api/schedules/patterns/close-modal" 
+                                hx-target="#modal-container"
+                                hx-swap="outerHTML">
+                            Cancel
+                        </button>
+                        <button type="button" 
+                                class="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-md transition-colors"
+                                hx-post="/api/schedules/patterns/validate-all-patterns"
+                                hx-include="form"
+                                hx-target="#patterns-validation-results"
+                                hx-swap="innerHTML">
+                            ✓ Validate All Patterns
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500">
+                            Save & Close
+                        </button>
+                    </div>
+                    
+                    <!-- Validation Results Container -->
+                    <div id="patterns-validation-results" class="mt-4"></div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

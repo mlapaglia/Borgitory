@@ -18,6 +18,8 @@ from borgitory.dependencies import (
     UpcomingBackupsServiceDep,
 )
 from borgitory.services.cron_description_service import CronDescriptionService
+from borgitory.models.patterns import BackupPattern, PatternType, PatternStyle
+from borgitory.services.borg.borg_pattern_validation_service import validate_pattern
 
 router = APIRouter()
 
@@ -69,6 +71,69 @@ def convert_hook_fields_to_json(
     return json.dumps(hooks) if hooks else None
 
 
+def convert_patterns_from_form_data(form_data: Dict[str, Any]) -> Optional[str]:
+    """Convert patterns form data to JSON format."""
+    patterns = []
+
+    # Get all pattern field data (position-based)
+    pattern_names = form_data.get("pattern_name", [])
+    pattern_expressions = form_data.get("pattern_expression", [])
+    pattern_actions = form_data.get("pattern_action", [])
+    pattern_styles = form_data.get("pattern_style", [])
+
+    # Ensure they are lists (in case there's only one item)
+    if not isinstance(pattern_names, list):
+        pattern_names = [pattern_names] if pattern_names else []
+    if not isinstance(pattern_expressions, list):
+        pattern_expressions = [pattern_expressions] if pattern_expressions else []
+    if not isinstance(pattern_actions, list):
+        pattern_actions = [pattern_actions] if pattern_actions else []
+    if not isinstance(pattern_styles, list):
+        pattern_styles = [pattern_styles] if pattern_styles else []
+
+    # Pair them up by position
+    max_length = max(
+        len(pattern_names),
+        len(pattern_expressions),
+        len(pattern_actions),
+        len(pattern_styles),
+    )
+    for i in range(max_length):
+        name = (
+            str(pattern_names[i]).strip()
+            if i < len(pattern_names) and pattern_names[i]
+            else ""
+        )
+        expression = (
+            str(pattern_expressions[i]).strip()
+            if i < len(pattern_expressions) and pattern_expressions[i]
+            else ""
+        )
+        action = (
+            str(pattern_actions[i]).strip()
+            if i < len(pattern_actions) and pattern_actions[i]
+            else "include"
+        )
+        style = (
+            str(pattern_styles[i]).strip()
+            if i < len(pattern_styles) and pattern_styles[i]
+            else "sh"
+        )
+
+        # Only add patterns that have both name and expression
+        if name and expression:
+            patterns.append(
+                {
+                    "name": name,
+                    "expression": expression,
+                    "pattern_type": action,
+                    "style": style,
+                }
+            )
+
+    return json.dumps(patterns) if patterns else None
+
+
 @router.get("/form", response_class=HTMLResponse)
 async def get_schedules_form(
     request: Request,
@@ -94,16 +159,6 @@ async def create_schedule(
 ) -> HTMLResponse:
     try:
         json_data = await request.json()
-
-        # Convert hook fields to JSON format
-        pre_hooks_json = convert_hook_fields_to_json(json_data, "pre")
-        post_hooks_json = convert_hook_fields_to_json(json_data, "post")
-
-        # Add converted hooks to json_data
-        if pre_hooks_json:
-            json_data["pre_job_hooks"] = pre_hooks_json
-        if post_hooks_json:
-            json_data["post_job_hooks"] = post_hooks_json
 
         is_valid, processed_data, error_msg = (
             schedule_service.validate_schedule_creation_data(json_data)
@@ -140,6 +195,7 @@ async def create_schedule(
         notification_config_id=schedule.notification_config_id,
         pre_job_hooks=schedule.pre_job_hooks,
         post_job_hooks=schedule.post_job_hooks,
+        patterns=schedule.patterns,
     )
 
     if result.is_error or not result.schedule:
@@ -293,15 +349,25 @@ async def update_schedule(
     try:
         json_data = await request.json()
 
-        # Convert hook fields to JSON format
-        pre_hooks_json = convert_hook_fields_to_json(json_data, "pre")
-        post_hooks_json = convert_hook_fields_to_json(json_data, "post")
+        # The hooks and patterns are already in JSON format from the frontend
+        # Just use them directly if they exist and are not empty
+        if json_data.get("pre_job_hooks") and json_data["pre_job_hooks"].strip():
+            # Already in JSON format, keep as is
+            pass
+        else:
+            json_data["pre_job_hooks"] = None
 
-        # Add converted hooks to json_data
-        if pre_hooks_json:
-            json_data["pre_job_hooks"] = pre_hooks_json
-        if post_hooks_json:
-            json_data["post_job_hooks"] = post_hooks_json
+        if json_data.get("post_job_hooks") and json_data["post_job_hooks"].strip():
+            # Already in JSON format, keep as is
+            pass
+        else:
+            json_data["post_job_hooks"] = None
+
+        if json_data.get("patterns") and json_data["patterns"].strip():
+            # Already in JSON format, keep as is
+            pass
+        else:
+            json_data["patterns"] = None
 
         schedule_update = ScheduleUpdate(**json_data)
         update_data = schedule_update.model_dump(exclude_unset=True)
@@ -627,8 +693,9 @@ async def get_hooks_modal(
     try:
         json_data = await request.json()
 
-        pre_hooks_json = str(json_data.get("pre_hooks", "[]"))
-        post_hooks_json = str(json_data.get("post_hooks", "[]"))
+        # Get data from the actual form field names
+        pre_hooks_json = str(json_data.get("pre_job_hooks", "[]"))
+        post_hooks_json = str(json_data.get("post_job_hooks", "[]"))
     except (ValueError, TypeError, KeyError):
         pre_hooks_json = "[]"
         post_hooks_json = "[]"
@@ -703,4 +770,366 @@ async def save_hooks(
 @router.get("/hooks/close-modal", response_class=HTMLResponse)
 async def close_modal() -> HTMLResponse:
     """Close modal without saving."""
+    return HTMLResponse(content='<div id="modal-container"></div>', status_code=200)
+
+
+# Pattern-related helper functions
+def _extract_patterns_from_form(form_data: Any) -> List[BackupPattern]:
+    """Extract patterns from form data and return as list of BackupPattern objects."""
+    patterns = []
+
+    # Get all pattern data (new compact structure)
+    pattern_names = form_data.getlist("pattern_name")
+    pattern_expressions = form_data.getlist("pattern_expression")
+    pattern_actions = form_data.getlist("pattern_action")
+    pattern_styles = form_data.getlist("pattern_style")
+
+    # Pair them up by position
+    for i in range(
+        min(len(pattern_names), len(pattern_expressions), len(pattern_actions))
+    ):
+        name = str(pattern_names[i]).strip() if pattern_names[i] else ""
+        expression = (
+            str(pattern_expressions[i]).strip() if pattern_expressions[i] else ""
+        )
+        action_str = (
+            str(pattern_actions[i]).strip() if pattern_actions[i] else "include"
+        )
+        style_str = (
+            str(pattern_styles[i]).strip()
+            if len(pattern_styles) > i and pattern_styles[i]
+            else "sh"
+        )
+
+        # Map action string to PatternType
+        if action_str == "exclude":
+            pattern_type = PatternType.EXCLUDE
+        elif action_str == "exclude_norec":
+            pattern_type = PatternType.EXCLUDE_NOREC
+        else:
+            pattern_type = PatternType.INCLUDE
+
+        # Map style string to PatternStyle
+        style_map = {
+            "sh": PatternStyle.SHELL,
+            "fm": PatternStyle.FNMATCH,
+            "re": PatternStyle.REGEX,
+            "pp": PatternStyle.PATH_PREFIX,
+            "pf": PatternStyle.PATH_FULL,
+        }
+        pattern_style = style_map.get(style_str, PatternStyle.SHELL)
+
+        # Add all patterns, even if name or expression is empty (for reordering)
+        patterns.append(
+            BackupPattern(
+                name=name,
+                expression=expression,
+                pattern_type=pattern_type,
+                style=pattern_style,
+            )
+        )
+
+    return patterns
+
+
+def _convert_patterns_to_json(form_data: Any) -> str | None:
+    """Convert patterns to JSON format using unified structure."""
+    patterns = _extract_patterns_from_form(form_data)
+
+    # Filter out patterns that don't have both name and expression for JSON output
+    valid_patterns = [
+        {
+            "name": pattern.name,
+            "expression": pattern.expression,
+            "pattern_type": pattern.pattern_type.value,
+            "style": pattern.style.value,
+        }
+        for pattern in patterns
+        if pattern.name and pattern.expression
+    ]
+
+    return json.dumps(valid_patterns) if valid_patterns else None
+
+
+def _validate_patterns_for_save(form_data: Any) -> tuple[bool, str | None]:
+    """Validate that all patterns have both name and expression filled out."""
+    errors = []
+
+    patterns = _extract_patterns_from_form(form_data)
+    for i, pattern in enumerate(patterns):
+        if not pattern.name.strip() and not pattern.expression.strip():
+            # Empty pattern - skip (will be filtered out)
+            continue
+        elif not pattern.name.strip():
+            errors.append(f"Pattern #{i + 1}: Pattern name is required")
+        elif not pattern.expression.strip():
+            errors.append(f"Pattern #{i + 1}: Pattern expression is required")
+
+    if errors:
+        return False, "; ".join(errors)
+    return True, None
+
+
+# Pattern API endpoints
+@router.post("/patterns/add-pattern-field", response_class=HTMLResponse)
+async def add_pattern_field(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Add a new pattern field row via HTMX."""
+
+    # Get form data (includes both hx-vals and hx-include data)
+    form_data = await request.form()
+
+    current_patterns = _extract_patterns_from_form(form_data)
+
+    # Add a new empty pattern (default to include with shell style)
+    current_patterns.append(
+        BackupPattern(
+            name="",
+            expression="",
+            pattern_type=PatternType.INCLUDE,
+            style=PatternStyle.SHELL,
+        )
+    )
+
+    # Return updated container with all patterns (including the new one)
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/patterns/patterns_container.html",
+        {"patterns": current_patterns},
+    )
+
+
+@router.post("/patterns/move-pattern", response_class=HTMLResponse)
+async def move_pattern(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Move a pattern up or down in the list and return updated container."""
+    form_data = await request.form()
+
+    try:
+        index = int(str(form_data.get("index", "0")))
+        direction = str(form_data.get("direction", "up"))  # "up" or "down"
+
+        current_patterns = _extract_patterns_from_form(form_data)
+
+        if direction == "up" and index > 0 and index < len(current_patterns):
+            current_patterns[index], current_patterns[index - 1] = (
+                current_patterns[index - 1],
+                current_patterns[index],
+            )
+        elif direction == "down" and index >= 0 and index < len(current_patterns) - 1:
+            current_patterns[index], current_patterns[index + 1] = (
+                current_patterns[index + 1],
+                current_patterns[index],
+            )
+
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_container.html",
+            {"patterns": current_patterns},
+        )
+
+    except (ValueError, TypeError, KeyError):
+        return HTMLResponse(content='<div class="space-y-4"></div>')
+
+
+@router.post("/patterns/remove-pattern-field", response_class=HTMLResponse)
+async def remove_pattern_field(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Remove a pattern field row via HTMX."""
+
+    form_data = await request.form()
+
+    try:
+        index = int(str(form_data.get("index", "0")))
+
+        current_patterns = _extract_patterns_from_form(form_data)
+
+        # Remove the pattern at the specified index
+        if 0 <= index < len(current_patterns):
+            current_patterns.pop(index)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_container.html",
+            {"patterns": current_patterns},
+        )
+
+    except (ValueError, TypeError, KeyError):
+        return HTMLResponse(content='<div class="space-y-4"></div>')
+
+
+@router.post("/patterns/patterns-modal", response_class=HTMLResponse)
+async def get_patterns_modal(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Open patterns configuration modal with current pattern data passed from parent."""
+
+    try:
+        # Get JSON data from hx-include="#patterns_field"
+        json_data = await request.json()
+        patterns_json = str(json_data.get("patterns", "[]"))
+
+    except Exception as e:
+        print(f"DEBUG: Exception getting JSON data: {e}")
+        patterns_json = "[]"
+
+    try:
+        patterns_data = (
+            json.loads(patterns_json) if patterns_json and patterns_json != "[]" else []
+        )
+
+        # Convert to BackupPattern objects
+        patterns = [
+            BackupPattern(
+                name=p.get("name", ""),
+                expression=p.get("expression", ""),
+                pattern_type=PatternType(p.get("pattern_type", "include")),
+                style=PatternStyle(p.get("style", "sh")),
+            )
+            for p in patterns_data
+        ]
+
+    except (json.JSONDecodeError, TypeError):
+        patterns = []
+
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/patterns/patterns_modal.html",
+        {
+            "patterns": patterns,
+            "patterns_json": patterns_json,
+        },
+    )
+
+
+@router.post("/patterns/save-patterns", response_class=HTMLResponse)
+async def save_patterns(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Save patterns configuration and update parent component via OOB swap."""
+    form_data = await request.form()
+
+    is_valid, error_message = _validate_patterns_for_save(form_data)
+    if not is_valid:
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_validation_error.html",
+            {"error_message": error_message},
+            status_code=400,
+        )
+
+    patterns_json = _convert_patterns_to_json(form_data)
+
+    try:
+        total_count = len(json.loads(patterns_json)) if patterns_json else 0
+    except (json.JSONDecodeError, TypeError):
+        total_count = 0
+
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/patterns/patterns_save_response.html",
+        {
+            "patterns_json": patterns_json,
+            "total_count": total_count,
+        },
+    )
+
+
+@router.post("/patterns/validate-all-patterns", response_class=HTMLResponse)
+async def validate_all_patterns_endpoint(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Validate all patterns and return validation results."""
+    try:
+        form_data = await request.form()
+
+        # Extract all patterns from form data
+        patterns = _extract_patterns_from_form(form_data)
+
+        # Validate each pattern
+        validation_results = []
+
+        for i, pattern in enumerate(patterns):
+            # Skip empty patterns
+            if not pattern.name.strip() and not pattern.expression.strip():
+                continue
+
+            # Check for required fields
+            if not pattern.expression.strip():
+                validation_results.append(
+                    {
+                        "index": i,
+                        "name": pattern.name or f"Pattern #{i + 1}",
+                        "is_valid": False,
+                        "error": "Pattern expression is required",
+                        "warnings": [],
+                    }
+                )
+                continue
+
+            # Map action to validation format
+            action_map = {
+                PatternType.INCLUDE: "+",
+                PatternType.EXCLUDE: "-",
+                PatternType.EXCLUDE_NOREC: "!",
+            }
+            action = action_map.get(pattern.pattern_type, "+")
+
+            # Validate the pattern
+            is_valid, error, warnings = validate_pattern(
+                pattern_str=pattern.expression, style=pattern.style.value, action=action
+            )
+
+            validation_results.append(
+                {
+                    "index": i,
+                    "name": pattern.name or f"Pattern #{i + 1}",
+                    "is_valid": is_valid,
+                    "error": error,
+                    "warnings": warnings,
+                }
+            )
+
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_validation_results.html",
+            {
+                "validation_results": validation_results,
+                "total_patterns": len(validation_results),
+                "valid_patterns": sum(1 for r in validation_results if r["is_valid"]),
+            },
+        )
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_validation_results.html",
+            {
+                "validation_results": [
+                    {
+                        "index": 0,
+                        "name": "Validation Error",
+                        "is_valid": False,
+                        "error": f"Validation error: {str(e)}",
+                        "warnings": [],
+                    }
+                ],
+                "total_patterns": 1,
+                "valid_patterns": 0,
+            },
+        )
+
+
+@router.get("/patterns/close-modal", response_class=HTMLResponse)
+async def close_patterns_modal() -> HTMLResponse:
+    """Close patterns modal without saving."""
     return HTMLResponse(content='<div id="modal-container"></div>', status_code=200)

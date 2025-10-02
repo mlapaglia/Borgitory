@@ -1006,15 +1006,12 @@ class JobManager:
 
             # Build backup command
             source_path = params.get("source_path")
-            excludes = params.get("excludes", [])
-            if not isinstance(excludes, list):
-                excludes = []
             archive_name = params.get(
                 "archive_name", f"backup-{now_utc().strftime('%Y%m%d-%H%M%S')}"
             )
 
             logger.info(
-                f"Backup task parameters - source_path: {source_path}, excludes: {excludes}, archive_name: {archive_name}"
+                f"Backup task parameters - source_path: {source_path}, archive_name: {archive_name}"
             )
             logger.info(f"All task parameters: {params}")
 
@@ -1022,12 +1019,17 @@ class JobManager:
             additional_args.extend(["--stats", "--list"])
             additional_args.extend(["--filter", "AME"])
 
+            patterns = params.get("patterns", [])
+            if patterns and isinstance(patterns, list):
+                for pattern in patterns:
+                    pattern_arg = f"--pattern={pattern}"
+                    additional_args.append(pattern_arg)
+                    task_output_callback(f"Added pattern: {pattern_arg}")
+                    logger.info(f"Added Borg pattern: {pattern_arg}")
+
             dry_run = params.get("dry_run", False)
             if dry_run:
                 additional_args.append("--dry-run")
-
-            for exclude in excludes:
-                additional_args.extend(["--exclude", exclude])
 
             additional_args.append(f"{repository_path}::{archive_name}")
 
@@ -1057,7 +1059,7 @@ class JobManager:
 
             async with secure_borg_command(
                 base_command="borg create",
-                repository_path="",  # Already in additional_argsborgi
+                repository_path="",
                 passphrase=passphrase,
                 keyfile_content=keyfile_content,
                 additional_args=additional_args,

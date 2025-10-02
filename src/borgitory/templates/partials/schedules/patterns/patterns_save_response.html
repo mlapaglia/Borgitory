@@ -1,0 +1,22 @@
+<!-- Patterns Save Response - Updates parent form and closes modal -->
+
+<!-- Close the modal -->
+<div id="modal-container" hx-swap-oob="innerHTML"></div>
+
+<!-- Update parent form fields via OOB swap -->
+<input type="hidden" 
+       name="patterns" 
+       value="{{ patterns_json or '' }}"
+       hx-swap-oob="true"
+       id="patterns_field">
+
+<!-- Update patterns button text via OOB swap -->
+<span hx-swap-oob="innerHTML:#patterns-button-text">Configure Patterns</span>
+
+<!-- Update patterns count badge via OOB swap -->
+<span hx-swap-oob="innerHTML:#patterns-count-badge">{{ total_count if total_count > 0 else 0 }}</span>
+
+<!-- Update count badge via OOB swap -->
+<span hx-swap-oob="outerHTML:#patterns-count-badge">
+    <span class="px-3 py-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium" id="patterns-count-badge">{{ total_count }}</span>
+</span>

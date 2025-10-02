@@ -83,26 +83,52 @@ class MigrationOperations(MigrationOperationsProtocol):
     """Production implementation of migration operations."""
 
     def run_alembic_upgrade(self, config_path: str) -> bool:
-        """Run alembic upgrade command."""
+        """Run alembic upgrade command with proper environment setup."""
         try:
             logger.info("Running database migrations...")
 
+            # Get database URL using the same logic as the main application
+            database_url = self._get_database_url()
+            logger.info(f"Using database URL: {database_url}")
+
+            # Set environment variable to ensure subprocess uses the correct database URL
+            env = os.environ.copy()
+            env["DATABASE_URL"] = database_url
+
+            # Get the directory containing the alembic.ini file
+            config_dir = os.path.dirname(os.path.abspath(config_path))
+            logger.info(f"Running alembic from directory: {config_dir}")
+
+            # Run alembic upgrade using subprocess with proper environment
             result = subprocess.run(
                 ["alembic", "-c", config_path, "upgrade", "head"],
                 check=True,
                 capture_output=True,
                 text=True,
+                env=env,
+                cwd=config_dir,  # Set working directory to where alembic.ini is located
+                timeout=60,  # Add timeout to prevent hanging
             )
 
             if result.returncode != 0:
                 logger.error(
                     f"Database migration failed with exit code {result.returncode}"
                 )
+                if result.stderr:
+                    logger.error(f"stderr: {result.stderr}")
                 return False
 
             logger.info("Database migrations completed successfully")
+            if result.stdout:
+                logger.info(f"Migration output: {result.stdout}")
+            if result.stderr:
+                logger.info(f"Migration stderr: {result.stderr}")
+
             return True
 
+        except subprocess.TimeoutExpired:
+            logger.error("Migration timed out after 60 seconds")
+            return False
         except subprocess.CalledProcessError as e:
             logger.error(f"Migration failed with exit code {e.returncode}")
             if e.stdout:
@@ -118,3 +144,10 @@ class MigrationOperations(MigrationOperationsProtocol):
         except Exception as e:
             logger.error(f"Migration failed: {e}")
             return False
+
+    def _get_database_url(self) -> str:
+        """Get database URL using the same logic as the main application."""
+        # Use the same DATABASE_URL that the main application uses
+        from borgitory.config_module import DATABASE_URL
+
+        return os.getenv("DATABASE_URL", DATABASE_URL)

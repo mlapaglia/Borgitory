@@ -211,6 +211,7 @@ class Schedule(Base):
     )
     pre_job_hooks: Mapped[str | None] = mapped_column(Text, nullable=True)
     post_job_hooks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    patterns: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     repository: Mapped["Repository"] = relationship(
         "Repository", back_populates="schedules"

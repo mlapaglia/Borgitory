@@ -280,16 +280,20 @@ class TestDebugService:
     ) -> None:
         """Test application info collection"""
         # Configure mock environment
-        mock_environment.env_vars = {"BORGITORY_VERSION": "1.0.0", "DEBUG": "false"}
+        mock_environment.env_vars = {"DEBUG": "false"}
         mock_environment.cwd = "/test/dir"
         mock_environment.current_time = datetime(2023, 1, 1, 12, 0, 0)
 
-        result = await debug_service._get_application_info()
+        # Mock the version method to return expected version
+        with patch.object(
+            debug_service, "_get_borgitory_version", return_value="1.0.0"
+        ):
+            result = await debug_service._get_application_info()
 
-        assert result.borgitory_version == "1.0.0"
-        assert result.debug_mode is False
-        assert result.working_directory == "/test/dir"
-        assert result.startup_time == "2023-01-01T12:00:00"
+            assert result.borgitory_version == "1.0.0"
+            assert result.debug_mode is False
+            assert result.working_directory == "/test/dir"
+            assert result.startup_time == "2023-01-01T12:00:00"
 
     @pytest.mark.asyncio
     async def test_get_application_info_debug_mode_true(

@@ -44,6 +44,7 @@ class TaskDefinitionBuilder:
         compression: str = "zstd",
         dry_run: bool = False,
         ignore_lock: bool = False,
+        patterns: List[str] = [""],
     ) -> TaskDefinition:
         """
         Build a backup task definition.
@@ -66,6 +67,7 @@ class TaskDefinitionBuilder:
                 "compression": compression,
                 "dry_run": dry_run,
                 "ignore_lock": ignore_lock,
+                "patterns": patterns,
             },
         )
 
@@ -388,15 +390,27 @@ class TaskDefinitionBuilder:
         )
         tasks.extend(pre_hook_tasks)
 
-        if include_backup:
-            backup_params = backup_params or {}
+        if include_backup and backup_params:
             source_path = str(backup_params.get("source_path", "/data"))
             compression = str(backup_params.get("compression", "zstd"))
             dry_run = bool(backup_params.get("dry_run", False))
             ignore_lock = bool(backup_params.get("ignore_lock", False))
+
+            # Handle patterns with proper type checking
+            patterns_value = backup_params.get("patterns", [])
+            if isinstance(patterns_value, list):
+                patterns = patterns_value
+            else:
+                patterns = []
+
             tasks.append(
                 self.build_backup_task(
-                    repository_name, source_path, compression, dry_run, ignore_lock
+                    repository_name,
+                    source_path,
+                    compression,
+                    dry_run,
+                    ignore_lock,
+                    patterns,
                 )
             )
 

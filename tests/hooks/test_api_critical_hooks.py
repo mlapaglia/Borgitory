@@ -5,7 +5,7 @@ Tests for API endpoints handling critical and run_on_job_failure flags.
 import json
 from typing import Dict, List, Any
 
-from src.borgitory.api.schedules import (
+from borgitory.api.schedules import (
     convert_hook_fields_to_json,
     _extract_hooks_from_form,
     _convert_hook_fields_to_json,

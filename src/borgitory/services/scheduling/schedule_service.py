@@ -128,6 +128,7 @@ class ScheduleService:
         notification_config_id: Optional[int] = None,
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
+        patterns: Optional[str] = None,
     ) -> ScheduleOperationResult:
         """
         Create a new schedule.
@@ -164,6 +165,7 @@ class ScheduleService:
             db_schedule.notification_config_id = notification_config_id
             db_schedule.pre_job_hooks = pre_job_hooks
             db_schedule.post_job_hooks = post_job_hooks
+            db_schedule.patterns = patterns
 
             self.db.add(db_schedule)
             self.db.commit()
@@ -391,6 +393,12 @@ class ScheduleService:
                 except (ValueError, TypeError):
                     return None
 
+            # Process hooks and patterns (they come as JSON strings)
+            def safe_json_string(value: Any) -> Optional[str]:
+                if not value or (isinstance(value, str) and value.strip() == ""):
+                    return None
+                return str(value).strip()
+
             processed_data = {
                 "name": name,
                 "repository_id": repository_id,
@@ -401,6 +409,9 @@ class ScheduleService:
                 "notification_config_id": safe_int(
                     json_data.get("notification_config_id")
                 ),
+                "pre_job_hooks": safe_json_string(json_data.get("pre_job_hooks")),
+                "post_job_hooks": safe_json_string(json_data.get("post_job_hooks")),
+                "patterns": safe_json_string(json_data.get("patterns")),
             }
 
             return True, processed_data, None
