@@ -25,5 +25,9 @@
 
 <!-- Update count badge via OOB swap -->
 <span hx-swap-oob="outerHTML:#hooks-count-badge">
-    <span class="px-3 py-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium" id="hooks-count-badge">{{ total_count }}</span>
+    {% if total_count > 0 %}
+        <span class="px-3 py-5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-l border-gray-300 dark:border-gray-600 text-xs font-medium" id="hooks-count-badge">{{ total_count }}</span>
+    {% else %}
+        <span class="px-3 py-5 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium" id="hooks-count-badge">{{ total_count }}</span>
+    {% endif %}
 </span>

@@ -395,17 +395,25 @@ class TaskDefinitionBuilder:
         )
         tasks.extend(pre_hook_tasks)
 
-        if include_backup and backup_params:
-            source_path = str(backup_params.get("source_path", "/data"))
-            compression = str(backup_params.get("compression", "zstd"))
-            dry_run = bool(backup_params.get("dry_run", False))
-            ignore_lock = bool(backup_params.get("ignore_lock", False))
+        if include_backup:
+            if backup_params:
+                source_path = str(backup_params.get("source_path", "/data"))
+                compression = str(backup_params.get("compression", "zstd"))
+                dry_run = bool(backup_params.get("dry_run", False))
+                ignore_lock = bool(backup_params.get("ignore_lock", False))
 
-            # Handle patterns with proper type checking
-            patterns_value = backup_params.get("patterns", [])
-            if isinstance(patterns_value, list):
-                patterns = patterns_value
+                # Handle patterns with proper type checking
+                patterns_value = backup_params.get("patterns", [])
+                if isinstance(patterns_value, list):
+                    patterns = patterns_value
+                else:
+                    patterns = []
             else:
+                # Use defaults when no backup_params provided
+                source_path = "/data"
+                compression = "zstd"
+                dry_run = False
+                ignore_lock = False
                 patterns = []
 
             tasks.append(
