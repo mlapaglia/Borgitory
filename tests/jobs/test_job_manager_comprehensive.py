@@ -253,10 +253,15 @@ class TestJobManagerTaskExecution:
             task.completed_at = now_utc()
             return True
 
-        with patch.object(
-            job_manager_with_db, "_execute_backup_task", side_effect=mock_backup_task
-        ), patch.object(
-            job_manager_with_db, "_execute_prune_task", side_effect=mock_prune_task
+        with (
+            patch.object(
+                job_manager_with_db,
+                "_execute_backup_task",
+                side_effect=mock_backup_task,
+            ),
+            patch.object(
+                job_manager_with_db, "_execute_prune_task", side_effect=mock_prune_task
+            ),
         ):
             await job_manager_with_db._execute_composite_job(job)
 
@@ -315,9 +320,14 @@ class TestJobManagerTaskExecution:
         # Prune should not be called due to critical failure
         mock_prune = AsyncMock()
 
-        with patch.object(
-            job_manager_with_db, "_execute_backup_task", side_effect=mock_backup_fail
-        ), patch.object(job_manager_with_db, "_execute_prune_task", mock_prune):
+        with (
+            patch.object(
+                job_manager_with_db,
+                "_execute_backup_task",
+                side_effect=mock_backup_fail,
+            ),
+            patch.object(job_manager_with_db, "_execute_prune_task", mock_prune),
+        ):
             # Wait for the job to complete (it starts automatically)
             import asyncio
 
@@ -425,20 +435,25 @@ class TestJobManagerTaskExecution:
             error=None,
         )
 
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command"
-        ) as mock_build, patch.object(
-            job_manager_with_db.executor, "start_process", return_value=mock_process
-        ), patch.object(
-            job_manager_with_db.executor, "monitor_process_output", return_value=result
-        ), patch.object(
-            job_manager_with_db,
-            "_get_repository_data",
-            return_value={
-                "id": sample_repository.id,
-                "path": "/tmp/test-repo",
-                "passphrase": "test-passphrase",
-            },
+        with (
+            patch("borgitory.utils.security.build_secure_borg_command") as mock_build,
+            patch.object(
+                job_manager_with_db.executor, "start_process", return_value=mock_process
+            ),
+            patch.object(
+                job_manager_with_db.executor,
+                "monitor_process_output",
+                return_value=result,
+            ),
+            patch.object(
+                job_manager_with_db,
+                "_get_repository_data",
+                return_value={
+                    "id": sample_repository.id,
+                    "path": "/tmp/test-repo",
+                    "passphrase": "test-passphrase",
+                },
+            ),
         ):
             mock_build.return_value = (
                 ["borg", "create", "repo::test-archive", "/tmp"],
@@ -482,20 +497,25 @@ class TestJobManagerTaskExecution:
             error="Backup failed",
         )
 
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command"
-        ) as mock_build, patch.object(
-            job_manager_with_db.executor, "start_process", return_value=mock_process
-        ), patch.object(
-            job_manager_with_db.executor, "monitor_process_output", return_value=result
-        ), patch.object(
-            job_manager_with_db,
-            "_get_repository_data",
-            return_value={
-                "id": sample_repository.id,
-                "path": "/tmp/test-repo",
-                "passphrase": "test-passphrase",
-            },
+        with (
+            patch("borgitory.utils.security.build_secure_borg_command") as mock_build,
+            patch.object(
+                job_manager_with_db.executor, "start_process", return_value=mock_process
+            ),
+            patch.object(
+                job_manager_with_db.executor,
+                "monitor_process_output",
+                return_value=result,
+            ),
+            patch.object(
+                job_manager_with_db,
+                "_get_repository_data",
+                return_value={
+                    "id": sample_repository.id,
+                    "path": "/tmp/test-repo",
+                    "passphrase": "test-passphrase",
+                },
+            ),
         ):
             mock_build.return_value = (
                 ["borg", "create", "repo::archive"],
@@ -567,22 +587,29 @@ class TestJobManagerTaskExecution:
 
             return MockContextManager()
 
-        with patch(
-            "borgitory.services.jobs.job_manager.secure_borg_command",
-            side_effect=mock_secure_borg_command,
-        ), patch.object(
-            job_manager_with_db.executor, "start_process", return_value=mock_process
-        ), patch.object(
-            job_manager_with_db.executor, "monitor_process_output", return_value=result
-        ), patch.object(
-            job_manager_with_db,
-            "_get_repository_data",
-            return_value={
-                "id": sample_repository.id,
-                "path": "/tmp/test-repo",
-                "passphrase": "test-passphrase",
-                "keyfile_content": None,
-            },
+        with (
+            patch(
+                "borgitory.services.jobs.job_manager.secure_borg_command",
+                side_effect=mock_secure_borg_command,
+            ),
+            patch.object(
+                job_manager_with_db.executor, "start_process", return_value=mock_process
+            ),
+            patch.object(
+                job_manager_with_db.executor,
+                "monitor_process_output",
+                return_value=result,
+            ),
+            patch.object(
+                job_manager_with_db,
+                "_get_repository_data",
+                return_value={
+                    "id": sample_repository.id,
+                    "path": "/tmp/test-repo",
+                    "passphrase": "test-passphrase",
+                    "keyfile_content": None,
+                },
+            ),
         ):
             success = await job_manager_with_db._execute_backup_task(job, task)
 
@@ -639,10 +666,13 @@ class TestJobManagerTaskExecution:
             return_code=0, stdout=b"Pruning complete", stderr=b"", error=None
         )
 
-        with patch.object(
-            job_manager_with_db.executor, "execute_prune_task", return_value=result
-        ), patch.object(
-            job_manager_with_db, "_get_repository_data", return_value=mock_repo_data
+        with (
+            patch.object(
+                job_manager_with_db.executor, "execute_prune_task", return_value=result
+            ),
+            patch.object(
+                job_manager_with_db, "_get_repository_data", return_value=mock_repo_data
+            ),
         ):
             success = await job_manager_with_db._execute_prune_task(job, task)
 
@@ -679,20 +709,25 @@ class TestJobManagerTaskExecution:
             return_code=0, stdout=b"Repository check passed", stderr=b"", error=None
         )
 
-        with patch(
-            "borgitory.utils.security.build_secure_borg_command"
-        ) as mock_build, patch.object(
-            job_manager_with_db.executor, "start_process", return_value=mock_process
-        ), patch.object(
-            job_manager_with_db.executor, "monitor_process_output", return_value=result
-        ), patch.object(
-            job_manager_with_db,
-            "_get_repository_data",
-            return_value={
-                "id": sample_repository.id,
-                "path": "/tmp/test-repo",
-                "passphrase": "test-passphrase",
-            },
+        with (
+            patch("borgitory.utils.security.build_secure_borg_command") as mock_build,
+            patch.object(
+                job_manager_with_db.executor, "start_process", return_value=mock_process
+            ),
+            patch.object(
+                job_manager_with_db.executor,
+                "monitor_process_output",
+                return_value=result,
+            ),
+            patch.object(
+                job_manager_with_db,
+                "_get_repository_data",
+                return_value={
+                    "id": sample_repository.id,
+                    "path": "/tmp/test-repo",
+                    "passphrase": "test-passphrase",
+                },
+            ),
         ):
             mock_build.return_value = (
                 ["borg", "check", "--repository-only"],
@@ -744,10 +779,15 @@ class TestJobManagerTaskExecution:
             "passphrase": "test-passphrase",
         }
 
-        with patch.object(
-            job_manager_with_db.executor, "execute_cloud_sync_task", return_value=result
-        ), patch.object(
-            job_manager_with_db, "_get_repository_data", return_value=repo_data
+        with (
+            patch.object(
+                job_manager_with_db.executor,
+                "execute_cloud_sync_task",
+                return_value=result,
+            ),
+            patch.object(
+                job_manager_with_db, "_get_repository_data", return_value=repo_data
+            ),
         ):
             success = await job_manager_with_db._execute_cloud_sync_task(job, task)
 
@@ -814,11 +854,12 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.output_manager.create_job_output(job_id)
 
         # Mock successful notification with proper database access
-        with patch(
-            "borgitory.services.jobs.job_manager.get_db_session"
-        ) as mock_get_db, patch(
-            "borgitory.services.notifications.service.NotificationService.send_notification"
-        ) as mock_send:
+        with (
+            patch("borgitory.services.jobs.job_manager.get_db_session") as mock_get_db,
+            patch(
+                "borgitory.services.notifications.service.NotificationService.send_notification"
+            ) as mock_send,
+        ):
             # Set up the database session context manager
             mock_get_db.return_value.__enter__.return_value = test_db
 

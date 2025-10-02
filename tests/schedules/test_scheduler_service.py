@@ -16,11 +16,12 @@ class TestSchedulerService:
     @pytest.mark.asyncio
     async def test_start_scheduler(self) -> None:
         """Test starting the scheduler"""
-        with patch.object(
-            self.scheduler_service.scheduler, "start"
-        ) as mock_start, patch.object(
-            self.scheduler_service, "_reload_schedules", new_callable=AsyncMock
-        ) as mock_reload:
+        with (
+            patch.object(self.scheduler_service.scheduler, "start") as mock_start,
+            patch.object(
+                self.scheduler_service, "_reload_schedules", new_callable=AsyncMock
+            ) as mock_reload,
+        ):
             await self.scheduler_service.start()
 
             mock_start.assert_called_once()
@@ -72,13 +73,15 @@ class TestSchedulerService:
         schedule_name = "Daily Backup"
         cron_expression = "0 2 * * *"  # Daily at 2 AM
 
-        with patch.object(
-            self.scheduler_service.scheduler, "add_job"
-        ) as mock_add_job, patch.object(
-            self.scheduler_service.scheduler, "remove_job"
-        ) as mock_remove_job, patch.object(
-            self.scheduler_service, "_update_next_run_time", new_callable=AsyncMock
-        ) as mock_update:
+        with (
+            patch.object(self.scheduler_service.scheduler, "add_job") as mock_add_job,
+            patch.object(
+                self.scheduler_service.scheduler, "remove_job"
+            ) as mock_remove_job,
+            patch.object(
+                self.scheduler_service, "_update_next_run_time", new_callable=AsyncMock
+            ) as mock_update,
+        ):
             # Mock remove_job to raise exception (job doesn't exist)
             mock_remove_job.side_effect = Exception("Job not found")
 
@@ -151,11 +154,14 @@ class TestSchedulerService:
         cron_expression = "0 3 * * *"
         enabled = True
 
-        with patch.object(
-            self.scheduler_service, "remove_schedule", new_callable=AsyncMock
-        ) as mock_remove, patch.object(
-            self.scheduler_service, "add_schedule", new_callable=AsyncMock
-        ) as mock_add:
+        with (
+            patch.object(
+                self.scheduler_service, "remove_schedule", new_callable=AsyncMock
+            ) as mock_remove,
+            patch.object(
+                self.scheduler_service, "add_schedule", new_callable=AsyncMock
+            ) as mock_add,
+        ):
             await self.scheduler_service.update_schedule(
                 schedule_id, schedule_name, cron_expression, enabled
             )
@@ -174,11 +180,14 @@ class TestSchedulerService:
         cron_expression = "0 3 * * *"
         enabled = False
 
-        with patch.object(
-            self.scheduler_service, "remove_schedule", new_callable=AsyncMock
-        ) as mock_remove, patch.object(
-            self.scheduler_service, "add_schedule", new_callable=AsyncMock
-        ) as mock_add:
+        with (
+            patch.object(
+                self.scheduler_service, "remove_schedule", new_callable=AsyncMock
+            ) as mock_remove,
+            patch.object(
+                self.scheduler_service, "add_schedule", new_callable=AsyncMock
+            ) as mock_add,
+        ):
             await self.scheduler_service.update_schedule(
                 schedule_id, schedule_name, cron_expression, enabled
             )
@@ -242,11 +251,14 @@ class TestSchedulerService:
             mock_schedule2,
         ]
 
-        with patch(
-            "borgitory.services.scheduling.scheduler_service.get_db_session"
-        ) as mock_get_db, patch.object(
-            self.scheduler_service, "_add_schedule_internal", new_callable=AsyncMock
-        ) as mock_add:
+        with (
+            patch(
+                "borgitory.services.scheduling.scheduler_service.get_db_session"
+            ) as mock_get_db,
+            patch.object(
+                self.scheduler_service, "_add_schedule_internal", new_callable=AsyncMock
+            ) as mock_add,
+        ):
             mock_get_db.return_value.__enter__.return_value = mock_db
 
             await self.scheduler_service._reload_schedules()
@@ -271,11 +283,12 @@ class TestSchedulerService:
             mock_schedule
         )
 
-        with patch.object(
-            self.scheduler_service.scheduler, "get_job"
-        ) as mock_get_job, patch(
-            "borgitory.services.scheduling.scheduler_service.get_db_session"
-        ) as mock_get_db:
+        with (
+            patch.object(self.scheduler_service.scheduler, "get_job") as mock_get_job,
+            patch(
+                "borgitory.services.scheduling.scheduler_service.get_db_session"
+            ) as mock_get_db,
+        ):
             mock_get_job.return_value = mock_job
             mock_get_db.return_value.__enter__.return_value = mock_db
 

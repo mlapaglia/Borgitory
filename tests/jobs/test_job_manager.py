@@ -458,11 +458,11 @@ class TestJobManager:
         )
 
         # Mock the underlying dependencies
-        with patch.object(job_manager, "executor") as mock_executor, patch.object(
-            job_manager, "output_manager"
-        ) as mock_output_manager, patch.object(
-            job_manager, "event_broadcaster"
-        ) as mock_broadcaster:
+        with (
+            patch.object(job_manager, "executor") as mock_executor,
+            patch.object(job_manager, "output_manager") as mock_output_manager,
+            patch.object(job_manager, "event_broadcaster") as mock_broadcaster,
+        ):
             # Mock process and result
             mock_process = Mock()
             mock_result = Mock()
@@ -531,9 +531,11 @@ class TestJobManager:
         )
 
         # Mock the underlying dependencies
-        with patch.object(job_manager, "executor") as mock_executor, patch.object(
-            job_manager, "output_manager"
-        ) as mock_output_manager, patch.object(job_manager, "event_broadcaster"):
+        with (
+            patch.object(job_manager, "executor") as mock_executor,
+            patch.object(job_manager, "output_manager") as mock_output_manager,
+            patch.object(job_manager, "event_broadcaster"),
+        ):
             # Mock process and result with failure
             mock_process = Mock()
             mock_result = Mock()
@@ -588,9 +590,11 @@ class TestJobManager:
         )
 
         # Mock the underlying dependencies to raise an exception
-        with patch.object(job_manager, "executor") as mock_executor, patch.object(
-            job_manager, "output_manager"
-        ) as mock_output_manager, patch.object(job_manager, "event_broadcaster"):
+        with (
+            patch.object(job_manager, "executor") as mock_executor,
+            patch.object(job_manager, "output_manager") as mock_output_manager,
+            patch.object(job_manager, "event_broadcaster"),
+        ):
             mock_executor.start_process = AsyncMock(
                 side_effect=Exception("Process failed to start")
             )

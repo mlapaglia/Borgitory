@@ -17,6 +17,7 @@ from typing import (
 )
 
 from borgitory.models.database import Repository
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.utils.datetime_utils import now_utc
 
 logger = logging.getLogger(__name__)
@@ -108,8 +109,8 @@ class ProgressData(TypedDict, total=False):
 
 
 class RcloneService:
-    def __init__(self) -> None:
-        pass  # No longer need config file management
+    def __init__(self, command_executor: CommandExecutorProtocol) -> None:
+        self.command_executor = command_executor
 
     def _build_s3_flags(
         self,
@@ -176,8 +177,10 @@ class RcloneService:
         command.extend(s3_flags)
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            process = await self.command_executor.create_subprocess(
+                command=command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
             yield cast(
@@ -259,15 +262,12 @@ class RcloneService:
             )
             command.extend(s3_flags)
 
-            process = await asyncio.create_subprocess_exec(
-                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            result = await self.command_executor.execute_command(
+                command=command,
+                timeout=30.0,  # Reasonable timeout for connection test
             )
 
-            stdout, stderr = await process.communicate()
-            stdout_text = stdout.decode("utf-8")
-            stderr_text = stderr.decode("utf-8")
-
-            if process.returncode == 0:
+            if result.success:
                 test_result = await self._test_s3_write_permissions(
                     access_key_id, secret_access_key, bucket_name
                 )
@@ -276,18 +276,18 @@ class RcloneService:
                     return {
                         "status": "success",
                         "message": "Connection successful - bucket accessible and writable",
-                        "output": stdout_text,
+                        "output": result.stdout,
                         "details": {"read_test": "passed", "write_test": "passed"},
                     }
                 else:
                     return {
                         "status": "warning",
                         "message": f"Bucket is readable but may have write permission issues: {test_result.get('message', 'Unknown error')}",
-                        "output": stdout_text,
+                        "output": result.stdout,
                         "details": {"read_test": "passed", "write_test": "failed"},
                     }
             else:
-                error_message = stderr_text.lower()
+                error_message = result.stderr.lower()
                 if "no such bucket" in error_message or "nosuchbucket" in error_message:
                     return {
                         "status": "failed",
@@ -304,7 +304,7 @@ class RcloneService:
                 else:
                     return {
                         "status": "failed",
-                        "message": f"Connection failed: {stderr_text}",
+                        "message": f"Connection failed: {result.stderr}",
                     }
 
         except Exception as e:
@@ -335,25 +335,17 @@ class RcloneService:
                 s3_flags = self._build_s3_flags(access_key_id, secret_access_key)
                 upload_command.extend(s3_flags)
 
-                process = await asyncio.create_subprocess_exec(
-                    *upload_command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                upload_result = await self.command_executor.execute_command(
+                    command=upload_command, timeout=30.0
                 )
 
-                stdout, stderr = await process.communicate()
-
-                if process.returncode == 0:
+                if upload_result.success:
                     delete_command = ["rclone", "delete", s3_path]
                     delete_command.extend(s3_flags)
 
-                    delete_process = await asyncio.create_subprocess_exec(
-                        *delete_command,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
+                    await self.command_executor.execute_command(
+                        command=delete_command, timeout=30.0
                     )
-
-                    await delete_process.communicate()
 
                     return {
                         "status": "success",
@@ -362,7 +354,7 @@ class RcloneService:
                 else:
                     return {
                         "status": "failed",
-                        "message": f"Cannot write to bucket: {stderr.decode('utf-8')}",
+                        "message": f"Cannot write to bucket: {upload_result.stderr}",
                     }
 
             finally:
@@ -498,8 +490,10 @@ class RcloneService:
                 if key_file_idx + 1 < len(sftp_flags):
                     key_file_path = sftp_flags[key_file_idx + 1]
 
-            process = await asyncio.create_subprocess_exec(
-                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            process = await self.command_executor.create_subprocess(
+                command=command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
             yield cast(
@@ -590,15 +584,11 @@ class RcloneService:
                 if key_file_idx + 1 < len(sftp_flags):
                     key_file_path = sftp_flags[key_file_idx + 1]
 
-            process = await asyncio.create_subprocess_exec(
-                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            result = await self.command_executor.execute_command(
+                command=command, timeout=30.0
             )
 
-            stdout, stderr = await process.communicate()
-            stdout_text = stdout.decode("utf-8")
-            stderr_text = stderr.decode("utf-8")
-
-            if process.returncode == 0:
+            if result.success:
                 test_result = await self._test_sftp_write_permissions(
                     host, username, remote_path, port, password, private_key
                 )
@@ -607,7 +597,7 @@ class RcloneService:
                     return {
                         "status": "success",
                         "message": "SFTP connection successful - remote directory accessible and writable",
-                        "output": stdout_text,
+                        "output": result.stdout,
                         "details": {
                             "read_test": "passed",
                             "write_test": "passed",
@@ -619,7 +609,7 @@ class RcloneService:
                     return {
                         "status": "warning",
                         "message": f"SFTP directory is readable but may have write permission issues: {test_result['message']}",
-                        "output": stdout_text,
+                        "output": result.stdout,
                         "details": {
                             "read_test": "passed",
                             "write_test": "failed",
@@ -628,7 +618,7 @@ class RcloneService:
                         },
                     }
             else:
-                error_message = stderr_text.lower()
+                error_message = result.stderr.lower()
                 if "connection refused" in error_message:
                     return {
                         "status": "failed",
@@ -650,7 +640,7 @@ class RcloneService:
                 else:
                     return {
                         "status": "failed",
-                        "message": f"SFTP connection failed: {stderr_text}",
+                        "message": f"SFTP connection failed: {result.stderr}",
                     }
 
         except Exception as e:
@@ -705,25 +695,17 @@ class RcloneService:
                     if key_file_idx + 1 < len(sftp_flags):
                         key_file_path = sftp_flags[key_file_idx + 1]
 
-                process = await asyncio.create_subprocess_exec(
-                    *upload_command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                upload_result = await self.command_executor.execute_command(
+                    command=upload_command, timeout=30.0
                 )
 
-                stdout, stderr = await process.communicate()
-
-                if process.returncode == 0:
+                if upload_result.success:
                     delete_command = ["rclone", "delete", sftp_path]
                     delete_command.extend(sftp_flags)
 
-                    delete_process = await asyncio.create_subprocess_exec(
-                        *delete_command,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
+                    await self.command_executor.execute_command(
+                        command=delete_command, timeout=30.0
                     )
-
-                    await delete_process.communicate()
 
                     return {
                         "status": "success",
@@ -732,7 +714,7 @@ class RcloneService:
                 else:
                     return {
                         "status": "failed",
-                        "message": f"Cannot write to SFTP directory: {stderr.decode('utf-8')}",
+                        "message": f"Cannot write to SFTP directory: {upload_result.stderr}",
                     }
 
             finally:
@@ -1014,8 +996,10 @@ class RcloneService:
         command.extend(smb_flags)
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            process = await self.command_executor.create_subprocess(
+                command=command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
             yield cast(
@@ -1110,21 +1094,17 @@ class RcloneService:
             )
             command.extend(smb_flags)
 
-            process = await asyncio.create_subprocess_exec(
-                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            result = await self.command_executor.execute_command(
+                command=command, timeout=30.0
             )
 
-            stdout, stderr = await process.communicate()
-            stdout_text = stdout.decode("utf-8")
-            stderr_text = stderr.decode("utf-8")
+            logger.info(f"SMB test command return code: {result.return_code}")
+            if result.stderr.strip():
+                logger.info(f"SMB test stderr: {result.stderr.strip()}")
+            if result.stdout.strip():
+                logger.info(f"SMB test stdout: {result.stdout.strip()}")
 
-            logger.info(f"SMB test command return code: {process.returncode}")
-            if stderr_text.strip():
-                logger.info(f"SMB test stderr: {stderr_text.strip()}")
-            if stdout_text.strip():
-                logger.info(f"SMB test stdout: {stdout_text.strip()}")
-
-            if process.returncode == 0:
+            if result.success:
                 test_result = await self._test_smb_write_permissions(
                     host,
                     user,
@@ -1147,7 +1127,7 @@ class RcloneService:
                         "details": {
                             "can_list": True,
                             "can_write": bool(test_result.get("can_write", False)),
-                            "stdout": stdout_text,
+                            "stdout": result.stdout,
                         },
                     }
                 else:
@@ -1157,7 +1137,7 @@ class RcloneService:
                         "details": {
                             "can_list": True,
                             "can_write": False,
-                            "stdout": stdout_text,
+                            "stdout": result.stdout,
                             "write_error": test_result.get("message"),
                         },
                     }
@@ -1166,9 +1146,9 @@ class RcloneService:
                     "status": "error",
                     "message": f"Failed to connect to SMB share {share_name} on {host}",
                     "details": {
-                        "return_code": process.returncode,
-                        "stdout": stdout_text,
-                        "stderr": stderr_text,
+                        "return_code": result.return_code,
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
                     },
                 }
 
@@ -1225,13 +1205,11 @@ class RcloneService:
             )
             command.extend(smb_flags)
 
-            process = await asyncio.create_subprocess_exec(
-                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            upload_result = await self.command_executor.execute_command(
+                command=command, timeout=30.0
             )
 
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
+            if upload_result.success:
                 delete_command = [
                     "rclone",
                     "deletefile",
@@ -1240,12 +1218,9 @@ class RcloneService:
                 ]
                 delete_command.extend(smb_flags)
 
-                delete_process = await asyncio.create_subprocess_exec(
-                    *delete_command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                await self.command_executor.execute_command(
+                    command=delete_command, timeout=30.0
                 )
-                await delete_process.communicate()
 
                 return {
                     "status": "success",
@@ -1256,7 +1231,7 @@ class RcloneService:
                 return {
                     "status": "error",
                     "can_write": False,
-                    "message": f"Write test failed: {stderr.decode('utf-8')}",
+                    "message": f"Write test failed: {upload_result.stderr}",
                 }
 
         except Exception as e:

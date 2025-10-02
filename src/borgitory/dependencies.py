@@ -15,6 +15,7 @@ from typing import (
 import asyncio
 
 from borgitory.services.notifications.registry import get_metadata
+from borgitory.services.path.path_configuration_service import PathConfigurationService
 
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
@@ -29,6 +30,11 @@ if TYPE_CHECKING:
     from borgitory.services.cloud_providers.registry_factory import RegistryFactory
     from borgitory.services.volumes.file_system_interface import FileSystemInterface
     from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
+    from borgitory.protocols.path_protocols import PathServiceInterface
+    from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+    from borgitory.services.command_execution.wsl_command_executor import (
+        WSLCommandExecutor,
+    )
     from sqlalchemy.orm import Session
 from functools import lru_cache
 from fastapi import Depends
@@ -117,16 +123,53 @@ if TYPE_CHECKING:
     )
     from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
     from borgitory.factories.service_factory import CloudProviderServiceFactory
-    from borgitory.services.repositories.repository_stats_service import (
-        CommandExecutorInterface,
+
+
+def get_wsl_command_executor() -> "WSLCommandExecutor":
+    """
+    Provide a WSLCommandExecutor instance with proper FastAPI dependency injection.
+
+    Returns:
+        WSLCommandExecutor: WSL command executor instance for Windows WSL operations
+    """
+    from borgitory.services.command_execution.wsl_command_executor import (
+        WSLCommandExecutor,
     )
+
+    return WSLCommandExecutor()
+
+
+def get_command_executor(
+    wsl_executor: "WSLCommandExecutor" = Depends(get_wsl_command_executor),
+) -> "CommandExecutorProtocol":
+    """
+    Provide a command executor for cross-platform command execution.
+
+    This factory creates the appropriate command executor based on the environment:
+    - Windows + WSL: WSLCommandExecutor (injected)
+    - Linux/Docker: LinuxCommandExecutor
+
+    Args:
+        wsl_executor: Injected WSL command executor for Windows
+
+    Returns:
+        CommandExecutorProtocol: Platform-appropriate command executor
+    """
+    from borgitory.services.command_execution.command_executor_factory import (
+        create_command_executor_with_injection,
+    )
+
+    return create_command_executor_with_injection(wsl_executor)
 
 
 def get_subprocess_executor() -> Callable[
     ..., Coroutine[None, None, "asyncio.subprocess.Process"]
 ]:
     """
-    Provide subprocess executor function for process creation.
+    Provide subprocess executor function for process creation (legacy).
+
+    This factory creates subprocess processes using the asyncio event loop.
+    This is kept for backward compatibility but new code should use get_command_executor.
 
     Returns:
         Callable: Function that creates subprocess processes (asyncio.create_subprocess_exec)
@@ -137,20 +180,18 @@ def get_subprocess_executor() -> Callable[
 
 
 def get_job_executor(
-    subprocess_executor: Callable[
-        ..., Coroutine[None, None, "asyncio.subprocess.Process"]
-    ] = Depends(get_subprocess_executor),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> "ProcessExecutorProtocol":
     """
-    Provide a ProcessExecutorProtocol implementation (JobExecutor) with injected subprocess executor.
+    Provide a ProcessExecutorProtocol implementation (JobExecutor) with injected command executor.
 
     Args:
-        subprocess_executor: Injected function for creating subprocess processes
+        command_executor: Injected command executor for cross-platform execution
 
     Returns:
         ProcessExecutorProtocol: JobExecutor instance with injected dependencies
     """
-    return JobExecutor(subprocess_executor=subprocess_executor)
+    return JobExecutor(command_executor)
 
 
 def get_job_output_manager() -> JobOutputManager:
@@ -215,29 +256,36 @@ def get_command_runner_config() -> "CommandRunnerConfig":
 
 def get_simple_command_runner(
     config: "CommandRunnerConfig" = Depends(get_command_runner_config),
+    executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> "CommandRunnerProtocol":
     """
     Provide a CommandRunnerProtocol implementation with injected configuration.
 
     Args:
         config: Configuration for command runner behavior
+        executor: Command executor for cross-platform execution
 
     Returns:
         CommandRunnerProtocol: Configured SimpleCommandRunner instance
     """
     from borgitory.services.simple_command_runner import SimpleCommandRunner
 
-    return SimpleCommandRunner(config=config)
+    return SimpleCommandRunner(config=config, executor=executor)
 
 
-def get_recovery_service() -> RecoveryService:
+def get_recovery_service(
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+) -> RecoveryService:
     """
     Provide a RecoveryService instance with proper FastAPI dependency injection.
+
+    Args:
+        command_executor: Injected command executor for cross-platform execution
 
     Returns:
         RecoveryService: New RecoveryService instance for each request
     """
-    return RecoveryService()
+    return RecoveryService(command_executor=command_executor)
 
 
 def get_http_client() -> "HttpClient":
@@ -341,32 +389,23 @@ def get_notification_config_service(
     return NotificationConfigService(db=db, notification_service=notification_service)
 
 
-def get_rclone_service() -> RcloneService:
+def get_rclone_service(
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+) -> RcloneService:
     """
     Provide a RcloneService instance with proper FastAPI dependency injection.
+
+    Args:
+        command_executor: Injected CommandExecutorProtocol instance
 
     Returns:
         RcloneService: New RcloneService instance for each request
     """
-    return RcloneService()
-
-
-def get_command_executor() -> "CommandExecutorInterface":
-    """
-    Provide a CommandExecutorInterface implementation for repository statistics.
-
-    Returns:
-        CommandExecutorInterface: SubprocessCommandExecutor instance for Borg command execution
-    """
-    from borgitory.services.repositories.repository_stats_service import (
-        SubprocessCommandExecutor,
-    )
-
-    return SubprocessCommandExecutor()
+    return RcloneService(command_executor=command_executor)
 
 
 def get_repository_stats_service(
-    command_executor: "CommandExecutorInterface" = Depends(get_command_executor),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> RepositoryStatsService:
     """
     Provide a RepositoryStatsService with injected command executor.
@@ -377,7 +416,7 @@ def get_repository_stats_service(
     Returns:
         RepositoryStatsService: Service instance with injected dependencies
     """
-    return RepositoryStatsService(command_executor=command_executor)
+    return RepositoryStatsService(command_executor)
 
 
 def get_file_system() -> "FileSystemInterface":
@@ -390,6 +429,39 @@ def get_file_system() -> "FileSystemInterface":
     from borgitory.services.volumes.os_file_system import OsFileSystem
 
     return OsFileSystem()
+
+
+def get_path_configuration_service() -> "PathConfigurationService":
+    """Get path configuration service."""
+    from borgitory.services.path.path_configuration_service import (
+        PathConfigurationService,
+    )
+
+    return PathConfigurationService()
+
+
+def get_path_service(
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+) -> "PathServiceInterface":
+    """
+    Provide PathServiceInterface implementation for cross-platform path operations.
+
+    This function creates a unified path service that uses the appropriate
+    CommandExecutorProtocol based on the current platform.
+
+    Returns:
+        PathServiceInterface: Unified path service implementation
+    """
+    import logging
+    from borgitory.services.path.path_service import PathService
+
+    logger = logging.getLogger(__name__)
+    config = get_path_configuration_service()
+
+    logger.debug(
+        f"Creating unified path service for {config.get_platform_name()} with {type(command_executor).__name__}"
+    )
+    return PathService(config, command_executor)
 
 
 def get_hook_execution_service() -> HookExecutionService:
@@ -664,8 +736,9 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     # Resolve all dependencies directly (not via FastAPI DI)
     env_config = get_job_manager_env_config()
     config = get_job_manager_config(env_config)
-    subprocess_executor = get_subprocess_executor()
-    job_executor = get_job_executor(subprocess_executor)
+    wsl_executor = get_wsl_command_executor()
+    command_executor = get_command_executor(wsl_executor)
+    job_executor = get_job_executor(command_executor)
     output_manager = get_job_output_manager()
     queue_manager = get_job_queue_manager()
     database_manager = get_job_database_manager()
@@ -817,6 +890,7 @@ def get_job_render_service(
 
 def get_debug_service(
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> DebugService:
     """
     Provide a DebugService instance with proper dependency injection.
@@ -825,6 +899,7 @@ def get_debug_service(
     return DebugService(
         job_manager=job_manager,
         environment=DefaultEnvironment(),
+        command_executor=command_executor,
     )
 
 
@@ -951,6 +1026,10 @@ JobStreamServiceDep = Annotated[JobStreamService, Depends(get_job_stream_service
 JobRenderServiceDep = Annotated[JobRenderService, Depends(get_job_render_service)]
 DebugServiceDep = Annotated[DebugService, Depends(get_debug_service)]
 RcloneServiceDep = Annotated[RcloneService, Depends(get_rclone_service)]
+WSLCommandExecutorDep = Annotated[
+    "WSLCommandExecutor", Depends(get_wsl_command_executor)
+]
+CommandExecutorDep = Annotated["CommandExecutorProtocol", Depends(get_command_executor)]
 RepositoryStatsServiceDep = Annotated[
     RepositoryStatsService, Depends(get_repository_stats_service)
 ]
@@ -991,6 +1070,7 @@ HookExecutionServiceDep = Annotated[
     HookExecutionService, Depends(get_hook_execution_service)
 ]
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
+PathServiceDep = Annotated["PathServiceInterface", Depends(get_path_service)]
 
 
 @lru_cache()
@@ -1012,12 +1092,15 @@ def get_archive_mount_manager_singleton() -> "ArchiveMountManager":
     from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
 
     # Resolve dependencies directly (not via FastAPI DI)
-    subprocess_executor = get_subprocess_executor()
-    job_executor = get_job_executor(subprocess_executor)
+    wsl_executor = get_wsl_command_executor()
+    command_executor = get_command_executor(wsl_executor)
+    job_executor = get_job_executor(command_executor)
+    path_config = get_path_configuration_service()
 
     return ArchiveMountManager(
         job_executor=job_executor,
-        base_mount_dir="/tmp/borgitory-mounts",  # More appropriate mount directory
+        command_executor=command_executor,
+        path_config=path_config,
         mount_timeout=timedelta(seconds=1800),
         mounting_timeout=timedelta(seconds=30),
     )
@@ -1085,6 +1168,7 @@ def get_borg_service(
     command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
     archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> BorgService:
     """
     Provide BorgService with all mandatory dependencies injected.
@@ -1094,6 +1178,7 @@ def get_borg_service(
         command_runner: Injected command runner for system commands
         job_manager: Injected job manager for job lifecycle
         archive_service: Injected archive service for archive operations
+        command_executor: Injected command executor for cross-platform execution
 
     Returns:
         BorgService: Fully configured service with all dependencies
@@ -1103,12 +1188,15 @@ def get_borg_service(
         command_runner=command_runner,
         job_manager=job_manager,
         archive_service=archive_service,
+        command_executor=command_executor,
     )
 
 
 def get_repository_service(
     borg_service: BorgService = Depends(get_borg_service),
     scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
+    path_service: "PathServiceInterface" = Depends(get_path_service),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> RepositoryService:
     """
     Provide a RepositoryService instance with proper dependency injection.
@@ -1118,6 +1206,8 @@ def get_repository_service(
     return RepositoryService(
         borg_service=borg_service,
         scheduler_service=scheduler_service,
+        path_service=path_service,
+        command_executor=command_executor,
     )
 
 
@@ -1163,9 +1253,13 @@ def get_package_restoration_service_for_startup() -> PackageRestorationService:
     # The service will manage its own database session during restoration
     db = SessionLocal()
     from borgitory.config.command_runner_config import CommandRunnerConfig
+    from borgitory.services.command_execution.command_executor_factory import (
+        create_command_executor,
+    )
 
     config = CommandRunnerConfig()
-    command_runner = SimpleCommandRunner(config=config)
+    executor = create_command_executor()
+    command_runner = SimpleCommandRunner(config=config, executor=executor)
     package_manager = PackageManagerService(
         command_runner=command_runner, db_session=db
     )

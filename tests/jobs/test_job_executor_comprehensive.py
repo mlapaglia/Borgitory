@@ -17,7 +17,11 @@ class TestJobExecutorPruneTask:
 
     @pytest.fixture
     def executor(self):
-        return JobExecutor()
+        from borgitory.services.command_execution.linux_command_executor import (
+            LinuxCommandExecutor,
+        )
+
+        return JobExecutor(LinuxCommandExecutor())
 
     @pytest.mark.asyncio
     async def test_execute_prune_task_success_basic(self, executor) -> None:
@@ -216,7 +220,11 @@ class TestJobExecutorFormatCommandForLogging:
 
     @pytest.fixture
     def executor(self):
-        return JobExecutor()
+        from borgitory.services.command_execution.linux_command_executor import (
+            LinuxCommandExecutor,
+        )
+
+        return JobExecutor(LinuxCommandExecutor())
 
     def test_format_command_complex_repository_path(self, executor) -> None:
         """Test command formatting with complex repository path"""
@@ -279,7 +287,11 @@ class TestJobExecutorParseProgressLine:
 
     @pytest.fixture
     def executor(self):
-        return JobExecutor()
+        from borgitory.services.command_execution.linux_command_executor import (
+            LinuxCommandExecutor,
+        )
+
+        return JobExecutor(LinuxCommandExecutor())
 
     def test_parse_progress_line_with_special_characters_in_path(
         self, executor

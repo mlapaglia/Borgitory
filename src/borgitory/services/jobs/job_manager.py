@@ -207,9 +207,13 @@ class JobManagerFactory:
         if custom_dependencies.job_executor:
             deps.job_executor = custom_dependencies.job_executor
         else:
-            deps.job_executor = JobExecutor(
-                subprocess_executor=deps.subprocess_executor
+            # Create command executor for JobExecutor
+            from borgitory.services.command_execution.command_executor_factory import (
+                create_command_executor,
             )
+
+            command_executor = create_command_executor()
+            deps.job_executor = JobExecutor(command_executor)
 
         # Job Output Manager
         if custom_dependencies.output_manager:

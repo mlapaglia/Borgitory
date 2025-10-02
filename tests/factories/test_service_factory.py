@@ -7,6 +7,7 @@ based on protocols and manages different implementations.
 
 import pytest
 from unittest.mock import Mock
+from typing import Any, Optional
 
 from borgitory.factories.service_factory import (
     ServiceFactory,
@@ -23,14 +24,25 @@ class MockNotificationService:
     def __init__(self, config_value: str = "default"):
         self.config_value = config_value
 
-    async def send_notification(self, title: str, message: str, **kwargs) -> bool:
+    async def send_notification(self, config: Any, message: Any) -> Any:
+        """Send a notification using the provider system."""
+        return Mock(success=True, message="Mock notification sent")
+
+    async def test_connection(self, config: Any) -> bool:
+        """Test connection to notification service."""
         return True
 
-    def is_configured(self) -> bool:
-        return True
-
-    def get_service_name(self) -> str:
+    def get_connection_info(self, config: Any) -> str:
+        """Get connection information for display."""
         return f"MockNotificationService({self.config_value})"
+
+    def prepare_config_for_storage(self, provider: str, config: Any) -> str:
+        """Prepare configuration for database storage."""
+        return f"mock_config_{provider}"
+
+    def load_config_from_storage(self, provider: str, stored_config: str) -> Any:
+        """Load configuration from database storage."""
+        return {"provider": provider, "config": stored_config}
 
 
 class MockCommandRunner:
@@ -39,14 +51,16 @@ class MockCommandRunner:
     def __init__(self, timeout: int = 30):
         self.timeout = timeout
 
-    async def run_command(self, command, env=None):
+    async def run_command(
+        self, command: list[str], env: Optional[dict[str, str]] = None
+    ) -> Mock:
         return Mock(success=True, stdout=b"mock output", stderr=b"")
 
 
 class TestServiceFactory:
     """Test the base ServiceFactory class."""
 
-    def test_factory_initialization(self):
+    def test_factory_initialization(self) -> None:
         """Test that factory initializes correctly."""
         factory = ServiceFactory[NotificationServiceProtocol]()
 
@@ -54,7 +68,7 @@ class TestServiceFactory:
         assert len(factory._configurations) == 0
         assert factory._default_implementation is None
 
-    def test_register_implementation(self):
+    def test_register_implementation(self) -> None:
         """Test registering service implementations."""
         factory = ServiceFactory[NotificationServiceProtocol]()
         config = {"api_key": "test_key"}
@@ -68,7 +82,7 @@ class TestServiceFactory:
         assert factory._configurations["mock"] == config
         assert factory._default_implementation == "mock"
 
-    def test_create_service_with_default(self):
+    def test_create_service_with_default(self) -> None:
         """Test creating service with default implementation."""
         factory = ServiceFactory[NotificationServiceProtocol]()
         factory.register_implementation(
@@ -80,7 +94,7 @@ class TestServiceFactory:
         assert isinstance(service, MockNotificationService)
         assert service.config_value == "default"
 
-    def test_create_service_with_specific_implementation(self):
+    def test_create_service_with_specific_implementation(self) -> None:
         """Test creating service with specific implementation."""
         factory = ServiceFactory[NotificationServiceProtocol]()
         factory.register_implementation("mock1", MockNotificationService)
@@ -91,7 +105,7 @@ class TestServiceFactory:
         assert isinstance(service, MockNotificationService)
         assert service.config_value == "custom"
 
-    def test_create_service_with_nonexistent_implementation(self):
+    def test_create_service_with_nonexistent_implementation(self) -> None:
         """Test creating service with nonexistent implementation raises error."""
         factory = ServiceFactory[NotificationServiceProtocol]()
 
@@ -100,7 +114,7 @@ class TestServiceFactory:
 
         assert "Implementation 'nonexistent' not found" in str(exc_info.value)
 
-    def test_list_implementations(self):
+    def test_list_implementations(self) -> None:
         """Test listing registered implementations."""
         factory = ServiceFactory[NotificationServiceProtocol]()
         factory.register_implementation("mock1", MockNotificationService)
@@ -117,7 +131,7 @@ class TestServiceFactory:
 class TestNotificationServiceFactory:
     """Test the NotificationServiceFactory."""
 
-    def test_factory_has_default_implementations(self):
+    def test_factory_has_default_implementations(self) -> None:
         """Test that factory comes with default implementations."""
         # Create factory with injected dependency - no more service locator!
         mock_http_client = Mock()
@@ -127,7 +141,7 @@ class TestNotificationServiceFactory:
         assert "provider_based" in implementations
         assert factory.get_default_implementation() == "provider_based"
 
-    def test_create_notification_service(self):
+    def test_create_notification_service(self) -> None:
         """Test creating a notification service."""
         # Create factory with injected dependency - clean and simple!
         mock_http_client = Mock()
@@ -142,7 +156,7 @@ class TestNotificationServiceFactory:
         assert hasattr(service, "prepare_config_for_storage")
         assert hasattr(service, "load_config_from_storage")
 
-    def test_create_default_service(self):
+    def test_create_default_service(self) -> None:
         """Test creating default notification service."""
         # Create factory with injected dependency - no more service locator!
         mock_http_client = Mock()
@@ -158,7 +172,7 @@ class TestNotificationServiceFactory:
 class TestCloudProviderServiceFactory:
     """Test the CloudProviderServiceFactory."""
 
-    def test_factory_has_default_implementations(self):
+    def test_factory_has_default_implementations(self) -> None:
         """Test that factory comes with default implementations."""
         # Create factory with injected dependencies - clean and simple!
         mock_rclone = Mock()
@@ -177,7 +191,7 @@ class TestCloudProviderServiceFactory:
         assert "default" in implementations
         assert factory.get_default_implementation() == "default"
 
-    def test_create_cloud_sync_service(self):
+    def test_create_cloud_sync_service(self) -> None:
         """Test creating a cloud sync service."""
         # Create factory with injected dependencies - no more complex patching!
         mock_db = Mock()
@@ -202,7 +216,7 @@ class TestCloudProviderServiceFactory:
         assert hasattr(service, "update_cloud_sync_config")
         assert hasattr(service, "delete_cloud_sync_config")
 
-    def test_create_cloud_sync_service_with_db_session(self):
+    def test_create_cloud_sync_service_with_db_session(self) -> None:
         """Test creating cloud sync service with proper database session injection."""
         # This tests the DI pattern - db session is injected, dependencies are pre-injected
         mock_db = Mock()
@@ -229,7 +243,7 @@ class TestCloudProviderServiceFactory:
 class TestFactoryIntegration:
     """Integration tests for factory system."""
 
-    def test_notification_factory_creates_protocol_compliant_services(self):
+    def test_notification_factory_creates_protocol_compliant_services(self) -> None:
         """Test that notification factory creates protocol-compliant services."""
         # Create factory with injected dependency - clean and simple!
         mock_http_client = Mock()
@@ -242,7 +256,7 @@ class TestFactoryIntegration:
         assert hasattr(service, "prepare_config_for_storage")
         assert hasattr(service, "load_config_from_storage")
 
-    def test_cloud_sync_factory_creates_protocol_compliant_services(self):
+    def test_cloud_sync_factory_creates_protocol_compliant_services(self) -> None:
         """Test that cloud sync factory creates protocol-compliant services."""
         # Create factory with injected dependencies - no more complex patching!
         mock_db = Mock()

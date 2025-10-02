@@ -13,14 +13,17 @@ from sqlalchemy.orm import Session
 
 from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
-    CommandExecutorInterface,
     ArchiveInfo,
+)
+from borgitory.protocols.command_executor_protocol import (
+    CommandExecutorProtocol,
+    CommandResult,
 )
 from borgitory.models.database import Repository
 
 
-class MockCommandExecutor(CommandExecutorInterface):
-    """Mock implementation of CommandExecutorInterface for testing"""
+class MockCommandExecutor(CommandExecutorProtocol):
+    """Mock implementation of CommandExecutorProtocol for testing"""
 
     def __init__(self) -> None:
         self.archive_list: List[str] = []
@@ -48,27 +51,95 @@ class MockCommandExecutor(CommandExecutorInterface):
         self.should_raise_exception = should_raise
         self.exception_message = message
 
-    async def execute_borg_list(self, repository: Repository) -> List[str]:
-        """Mock execute_borg_list"""
+    async def execute_command(
+        self,
+        command: List[str],
+        env: Dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout: float | None = None,
+        input_data: str | None = None,
+    ) -> CommandResult:
+        """Mock execute_command"""
         if self.should_raise_exception:
             raise Exception(self.exception_message)
-        return self.archive_list
 
-    async def execute_borg_info(
-        self, repository: Repository, archive_name: str
-    ) -> ArchiveInfo:
-        """Mock execute_borg_info"""
-        if self.should_raise_exception:
-            raise Exception(self.exception_message)
-        return self.archive_info_responses.get(archive_name, {})
+        # Simulate different borg commands
+        if len(command) >= 2 and command[0] == "borg" and command[1] == "list":
+            if "--short" in command:
+                # borg list --short
+                stdout = "\n".join(self.archive_list)
+                return CommandResult(
+                    command=command,
+                    return_code=0,
+                    stdout=stdout,
+                    stderr="",
+                    success=True,
+                    execution_time=0.1,
+                )
+        elif len(command) >= 2 and command[0] == "borg" and command[1] == "info":
+            # borg info --json
+            if "--json" in command:
+                # Extract archive name from command
+                archive_name = None
+                for arg in command:
+                    if "::" in arg:
+                        archive_name = arg.split("::")[-1]
+                        break
 
-    async def execute_borg_list_files(
-        self, repository: Repository, archive_name: str
-    ) -> List[Dict[str, object]]:
-        """Mock execute_borg_list_files"""
-        if self.should_raise_exception:
-            raise Exception(self.exception_message)
-        return self.file_list_responses.get(archive_name, [])
+                if archive_name and archive_name in self.archive_info_responses:
+                    import json
+
+                    info = self.archive_info_responses[archive_name]
+                    # Convert ArchiveInfo format to the borg info JSON format
+                    borg_format = {
+                        "name": info["name"],
+                        "start": info["start"],
+                        "end": info["end"],
+                        "duration": info["duration"],
+                        "stats": {
+                            "original_size": info["original_size"],
+                            "compressed_size": info["compressed_size"],
+                            "deduplicated_size": info["deduplicated_size"],
+                            "nfiles": info["nfiles"],
+                        },
+                    }
+                    response = {"archives": [borg_format]}
+                    stdout = json.dumps(response)
+                    return CommandResult(
+                        command=command,
+                        return_code=0,
+                        stdout=stdout,
+                        stderr="",
+                        success=True,
+                        execution_time=0.1,
+                    )
+
+        # Default failure response
+        return CommandResult(
+            command=command,
+            return_code=1,
+            stdout="",
+            stderr="Command not mocked",
+            success=False,
+            execution_time=0.1,
+            error="Command not mocked",
+        )
+
+    async def create_subprocess(
+        self,
+        command: List[str],
+        env: Dict[str, str] | None = None,
+        cwd: str | None = None,
+        stdout: int | None = None,
+        stderr: int | None = None,
+        stdin: int | None = None,
+    ):
+        """Mock create_subprocess - not implemented for this test"""
+        raise NotImplementedError("create_subprocess not implemented in mock")
+
+    def get_platform_name(self) -> str:
+        """Mock get_platform_name"""
+        return "test"
 
 
 class TestRepositoryStatsService:
@@ -311,52 +382,6 @@ class TestRepositoryStatsService:
         )
 
         assert result is None
-
-
-class TestSubprocessCommandExecutor:
-    """Test the actual SubprocessCommandExecutor (integration-style tests)"""
-
-    def setup_method(self) -> None:
-        """Set up test fixtures"""
-        from borgitory.services.repositories.repository_stats_service import (
-            SubprocessCommandExecutor,
-        )
-
-        self.executor = SubprocessCommandExecutor()
-        self.mock_repository = Mock(spec=Repository)
-        self.mock_repository.path = (
-            "/nonexistent/repo"  # Use nonexistent path to avoid actual borg calls
-        )
-        self.mock_repository.get_passphrase.return_value = "test_passphrase"
-        self.mock_repository.get_keyfile_content.return_value = None
-
-    @pytest.mark.asyncio
-    async def test_execute_borg_list_failure(self) -> None:
-        """Test execute_borg_list when borg command fails (expected with nonexistent repo)"""
-        result = await self.executor.execute_borg_list(self.mock_repository)
-
-        # Should return empty list when command fails
-        assert result == []
-
-    @pytest.mark.asyncio
-    async def test_execute_borg_info_failure(self) -> None:
-        """Test execute_borg_info when borg command fails (expected with nonexistent repo)"""
-        result = await self.executor.execute_borg_info(
-            self.mock_repository, "test-archive"
-        )
-
-        # Should return empty dict when command fails
-        assert result == {}
-
-    @pytest.mark.asyncio
-    async def test_execute_borg_list_files_failure(self) -> None:
-        """Test execute_borg_list_files when borg command fails (expected with nonexistent repo)"""
-        result = await self.executor.execute_borg_list_files(
-            self.mock_repository, "test-archive"
-        )
-
-        # Should return empty list when command fails
-        assert result == []
 
 
 class TestRepositoryStatsServiceIntegration:
@@ -717,10 +742,13 @@ class TestRepositoryStatsServiceIntegration:
         async def mock_secure_borg_command(*args, **kwargs):
             yield (["borg", "list"], {}, None)
 
+        # Replace the mock executor's create_subprocess method with a proper AsyncMock
+        self.mock_executor.create_subprocess = AsyncMock(return_value=mock_process)
+
         with patch(
             "borgitory.services.repositories.repository_stats_service.secure_borg_command",
             mock_secure_borg_command,
-        ), patch("asyncio.create_subprocess_exec", return_value=mock_process):
+        ):
             result = await self.stats_service._get_file_type_stats(
                 self.mock_repository, archives
             )

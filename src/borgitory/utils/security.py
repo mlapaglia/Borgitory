@@ -64,8 +64,16 @@ def sanitize_path(path: str) -> str:
         if re.search(pattern, path):
             raise ValueError(f"Path contains dangerous pattern: {pattern}")
 
-    # Normalize the path
-    normalized = str(Path(path).resolve())
+    # Normalize the path using Unix-style normalization (WSL-compatible)
+    import posixpath
+
+    normalized = posixpath.normpath(path)
+
+    # Convert to absolute path if it's relative, but keep Unix-style
+    if not posixpath.isabs(normalized):
+        # For relative paths, we can't safely make them absolute without context
+        # so we'll just normalize what we have
+        pass
 
     return normalized
 

@@ -163,13 +163,17 @@ class TestCompositeJobCriticalFailure:
             return False
 
         # Mock all task execution methods
-        with patch.object(
-            self.job_manager, "_execute_hook_task", side_effect=mock_hook_success
-        ), patch.object(
-            self.job_manager, "_execute_backup_task", side_effect=mock_backup_fail
-        ), patch.object(
-            self.job_manager, "_execute_notification_task", side_effect=AsyncMock()
-        ) as mock_notification:
+        with (
+            patch.object(
+                self.job_manager, "_execute_hook_task", side_effect=mock_hook_success
+            ),
+            patch.object(
+                self.job_manager, "_execute_backup_task", side_effect=mock_backup_fail
+            ),
+            patch.object(
+                self.job_manager, "_execute_notification_task", side_effect=AsyncMock()
+            ) as mock_notification,
+        ):
             # Execute the composite job
             await self.job_manager._execute_composite_job(job)
 

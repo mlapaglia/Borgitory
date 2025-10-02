@@ -8,10 +8,11 @@ import logging
 import os
 import re
 import inspect
-from typing import Dict, List, Optional, Callable, Coroutine, TYPE_CHECKING, cast
+from typing import Dict, List, Optional, Callable, TYPE_CHECKING, cast
 
 from borgitory.constants.retention import RetentionFieldHandler
 from borgitory.utils.security import secure_borg_command
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -31,11 +32,9 @@ class JobExecutor:
 
     def __init__(
         self,
-        subprocess_executor: Optional[
-            Callable[..., Coroutine[None, None, asyncio.subprocess.Process]]
-        ] = None,
+        command_executor: CommandExecutorProtocol,
     ) -> None:
-        self.subprocess_executor = subprocess_executor or asyncio.create_subprocess_exec
+        self.command_executor = command_executor
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
@@ -55,8 +54,9 @@ class JobExecutor:
             if env:
                 merged_env.update(env)
 
-            process = await self.subprocess_executor(
-                *command,
+            # Use the new command executor for cross-platform compatibility
+            process = await self.command_executor.create_subprocess(
+                command=command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=merged_env,

@@ -111,7 +111,7 @@ class ArchiveManager:
         await mount_manager.mount_archive(repository, archive_name)
 
         # List the directory contents using filesystem operations
-        contents = mount_manager.list_directory(repository, archive_name, path)
+        contents = await mount_manager.list_directory(repository, archive_name, path)
 
         logger.info(
             f"Listed {len(contents)} items from mounted archive {archive_name} path '{path}'"

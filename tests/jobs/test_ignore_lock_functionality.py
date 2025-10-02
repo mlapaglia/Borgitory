@@ -123,9 +123,12 @@ class TestIgnoreLockFunctionality:
         job_manager.executor.monitor_process_output.return_value = mock_result  # type: ignore
 
         # Execute the backup task with mocked methods
-        with patch.object(
-            job_manager, "_get_repository_data", return_value=mock_repository_data
-        ), patch.object(job_manager, "_execute_break_lock") as mock_break_lock:
+        with (
+            patch.object(
+                job_manager, "_get_repository_data", return_value=mock_repository_data
+            ),
+            patch.object(job_manager, "_execute_break_lock") as mock_break_lock,
+        ):
             result = await job_manager._execute_backup_task(
                 mock_job, mock_backup_task_with_ignore_lock, task_index=0
             )
@@ -168,9 +171,12 @@ class TestIgnoreLockFunctionality:
         job_manager.executor.monitor_process_output.return_value = mock_result  # type: ignore
 
         # Execute the backup task with mocked methods
-        with patch.object(
-            job_manager, "_get_repository_data", return_value=mock_repository_data
-        ), patch.object(job_manager, "_execute_break_lock") as mock_break_lock:
+        with (
+            patch.object(
+                job_manager, "_get_repository_data", return_value=mock_repository_data
+            ),
+            patch.object(job_manager, "_execute_break_lock") as mock_break_lock,
+        ):
             result = await job_manager._execute_backup_task(
                 mock_job, mock_backup_task_without_ignore_lock, task_index=0
             )
@@ -260,13 +266,16 @@ class TestIgnoreLockFunctionality:
         job_manager.executor.monitor_process_output.return_value = mock_result  # type: ignore
 
         # Execute the backup task with mocked methods
-        with patch.object(
-            job_manager, "_get_repository_data", return_value=mock_repository_data
-        ), patch.object(
-            job_manager,
-            "_execute_break_lock",
-            side_effect=Exception("Break-lock failed"),
-        ) as mock_break_lock:
+        with (
+            patch.object(
+                job_manager, "_get_repository_data", return_value=mock_repository_data
+            ),
+            patch.object(
+                job_manager,
+                "_execute_break_lock",
+                side_effect=Exception("Break-lock failed"),
+            ) as mock_break_lock,
+        ):
             result = await job_manager._execute_backup_task(
                 mock_job, mock_backup_task_with_ignore_lock, task_index=0
             )

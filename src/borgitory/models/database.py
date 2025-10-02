@@ -23,6 +23,9 @@ from sqlalchemy.orm import sessionmaker, relationship, Session
 from typing import Generator
 
 from borgitory.config_module import DATABASE_URL, get_secret_key, DATA_DIR
+from borgitory.services.migrations.migration_factory import (
+    create_migration_service_for_startup,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -406,36 +409,19 @@ class UserInstalledPackage(Base):
 
 
 async def init_db() -> None:
-    """Initialize database - assumes migrations have already been run"""
+    """Initialize database and run migrations"""
 
     try:
-        logger.info(f"Initializing database at: {DATABASE_URL}")
         logger.info(f"Data directory: {DATA_DIR}")
+        logger.info(f"Using database at: {DATABASE_URL}")
 
         os.makedirs(DATA_DIR, exist_ok=True)
-        logger.info("Data directory ensured")
 
-        from sqlalchemy import text
-
-        with engine.connect() as connection:
-            result = connection.execute(text("SELECT 1"))
-            result.fetchone()
-            logger.info("Database connection test successful")
-
-        try:
-            from borgitory.utils.migrations import get_current_revision
-
-            current_revision = get_current_revision()
-            logger.info(f"Current database revision: {current_revision}")
-        except Exception as e:
-            logger.warning(f"Could not check migration status: {e}")
-            logger.error("Make sure migrations have been run with: borgitory migrate")
-
-        logger.info("Database initialization completed successfully")
-
+        migration_service = create_migration_service_for_startup()
+        if not migration_service.run_migrations():
+            raise RuntimeError("Database migration failed")
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
-        logger.error("Make sure migrations have been run with: borgitory migrate")
         raise
 
 

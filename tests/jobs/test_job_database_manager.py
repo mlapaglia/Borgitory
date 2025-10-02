@@ -300,8 +300,9 @@ class TestJobDatabaseManager:
         tasks = [mock_task1, mock_task2]
 
         # Mock the Job and JobTask models
-        with patch("borgitory.models.database.Job"), patch(
-            "borgitory.models.database.JobTask"
+        with (
+            patch("borgitory.models.database.Job"),
+            patch("borgitory.models.database.JobTask"),
         ):
             mock_job_instance = Mock()
             mock_job_instance.id = job_uuid

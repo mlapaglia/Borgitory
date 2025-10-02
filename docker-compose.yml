@@ -4,8 +4,7 @@ services:
     cap_add:
       - SYS_ADMIN
     environment:
-      - BORGITORY_DEV_MODE=false
-      - BORGITORY_DEBUG=false
+      - BORGITORY_DEBUG=true
     devices:
       - /dev/fuse:/dev/fuse:rwm
     ports:

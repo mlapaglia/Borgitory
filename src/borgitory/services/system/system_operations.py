@@ -1,0 +1,120 @@
+"""
+System operations service implementations.
+
+Concrete implementations of system operation protocols for production use.
+"""
+
+import os
+import subprocess
+import logging
+from typing import Any, Optional
+from alembic.runtime.migration import MigrationContext
+
+from borgitory.protocols.system_protocol import (
+    SystemOperationsProtocol,
+    DatabaseOperationsProtocol,
+    MigrationOperationsProtocol,
+)
+from borgitory.config_module import DATA_DIR
+
+logger = logging.getLogger(__name__)
+
+
+class SystemOperations(SystemOperationsProtocol):
+    """Production implementation of system operations."""
+
+    def makedirs(self, path: str, exist_ok: bool = True) -> None:
+        """Create directories recursively."""
+        os.makedirs(path, exist_ok=exist_ok)
+
+    def path_exists(self, path: str) -> bool:
+        """Check if a path exists."""
+        return os.path.exists(path)
+
+    def get_data_dir(self) -> str:
+        """Get the application data directory."""
+        return DATA_DIR
+
+    def import_resources(self) -> Any:
+        """Import importlib.resources module."""
+        from importlib import resources
+
+        return resources
+
+    def resources_files(self, package: str) -> Any:
+        """Get package files using importlib.resources."""
+        resources = self.import_resources()
+        return resources.files(package)
+
+    def path_truediv(self, base_path: Any, sub_path: str) -> Any:
+        """Perform path / operation."""
+        return base_path / sub_path
+
+    def path_str(self, path: Any) -> str:
+        """Convert path to string."""
+        return str(path)
+
+    def path_is_file(self, path: Any) -> bool:
+        """Check if path is a file."""
+        try:
+            result = path.is_file()
+            return bool(result)
+        except (AttributeError, OSError):
+            return False
+
+
+class DatabaseOperations(DatabaseOperationsProtocol):
+    """Production implementation of database operations."""
+
+    def get_current_revision(self) -> Optional[str]:
+        """Get the current database revision."""
+        try:
+            from borgitory.models.database import engine
+
+            with engine.connect() as connection:
+                context = MigrationContext.configure(connection)
+                return context.get_current_revision()
+        except Exception as e:
+            logger.error(f"Failed to get current revision: {e}")
+            return None
+
+
+class MigrationOperations(MigrationOperationsProtocol):
+    """Production implementation of migration operations."""
+
+    def run_alembic_upgrade(self, config_path: str) -> bool:
+        """Run alembic upgrade command."""
+        try:
+            logger.info("Running database migrations...")
+
+            result = subprocess.run(
+                ["alembic", "-c", config_path, "upgrade", "head"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            if result.returncode != 0:
+                logger.error(
+                    f"Database migration failed with exit code {result.returncode}"
+                )
+                return False
+
+            logger.info("Database migrations completed successfully")
+            return True
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Migration failed with exit code {e.returncode}")
+            if e.stdout:
+                logger.error(f"stdout: {e.stdout}")
+            if e.stderr:
+                logger.error(f"stderr: {e.stderr}")
+            return False
+        except FileNotFoundError:
+            logger.error(
+                "Alembic command not found! Make sure alembic is installed and available in your PATH"
+            )
+            return False
+        except Exception as e:
+            logger.error(f"Migration failed: {e}")
+            return False

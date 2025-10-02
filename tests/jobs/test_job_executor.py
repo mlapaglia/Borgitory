@@ -16,7 +16,10 @@ class TestJobExecutor:
     def setup_method(self) -> None:
         """Set up test fixtures"""
         self.mock_subprocess = AsyncMock()
-        self.executor = JobExecutor(subprocess_executor=self.mock_subprocess)
+        # Create a mock command executor that implements the protocol
+        self.mock_command_executor = Mock()
+        self.mock_command_executor.create_subprocess = self.mock_subprocess
+        self.executor = JobExecutor(command_executor=self.mock_command_executor)
 
     @pytest.mark.asyncio
     async def test_start_process_success(self) -> None:

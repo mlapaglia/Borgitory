@@ -8,6 +8,11 @@ from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 
 
+# Unix absolute path pattern for WSL-first approach
+# All paths are Unix-style, including Windows paths as /mnt/c/...
+ABSOLUTE_PATH_PATTERN = r"^/.*"
+
+
 # Enums for type safety and validation
 class JobStatus(str, Enum):
     PENDING = "pending"
@@ -57,14 +62,24 @@ class RepositoryBase(BaseModel):
     )
     path: str = Field(
         min_length=1,
-        pattern=r"^/.*",
-        description="Absolute path to repository (must start with /)",
+        pattern=ABSOLUTE_PATH_PATTERN,
+        description="Absolute path to repository",
     )
     cache_dir: Optional[str] = Field(
         None,
-        pattern=r"^/.*",
-        description="Custom cache directory path (optional, must start with /)",
+        description="Custom cache directory path (optional, absolute path)",
     )
+
+    @field_validator("cache_dir")
+    @classmethod
+    def validate_cache_dir(cls, v: Optional[str]) -> Optional[str]:
+        """Validate cache directory path - can be None, empty string, or absolute path."""
+        if v is None or v == "":
+            return v
+        # Check if it matches our absolute path pattern
+        if not re.match(ABSOLUTE_PATH_PATTERN, v):
+            raise ValueError("Cache directory must be an absolute path")
+        return v
 
 
 class RepositoryCreate(RepositoryBase):
@@ -77,9 +92,22 @@ class RepositoryUpdate(BaseModel):
     name: Optional[str] = Field(
         None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9-_\s]+$"
     )
-    path: Optional[str] = Field(None, min_length=1, pattern=r"^/.*")
+    path: Optional[str] = Field(None, min_length=1, pattern=ABSOLUTE_PATH_PATTERN)
     passphrase: Optional[str] = Field(None, min_length=8)
-    cache_dir: Optional[str] = Field(None, pattern=r"^/.*")
+    cache_dir: Optional[str] = Field(
+        None, description="Custom cache directory path (optional, absolute path)"
+    )
+
+    @field_validator("cache_dir")
+    @classmethod
+    def validate_cache_dir(cls, v: Optional[str]) -> Optional[str]:
+        """Validate cache directory path - can be None, empty string, or absolute path."""
+        if v is None or v == "":
+            return v
+        # Check if it matches our absolute path pattern
+        if not re.match(ABSOLUTE_PATH_PATTERN, v):
+            raise ValueError("Cache directory must be an absolute path")
+        return v
 
 
 class Repository(RepositoryBase):
@@ -304,7 +332,7 @@ class ScheduleUpdate(BaseModel):
 class Schedule(ScheduleBase):
     id: int = Field(gt=0)
     repository_id: int = Field(gt=0)
-    source_path: str = Field(default="/", pattern=r"^/.*")
+    source_path: str = Field(default="/", pattern=ABSOLUTE_PATH_PATTERN)
     enabled: bool
     last_run: Optional[datetime] = None
     next_run: Optional[datetime] = None
@@ -422,7 +450,7 @@ class BackupRequest(BaseModel):
     repository_id: int = Field(gt=0)
     source_path: str = Field(
         default="/",
-        pattern=r"^/.*",
+        pattern=ABSOLUTE_PATH_PATTERN,
         description="Absolute path to source directory",
     )
     compression: CompressionType = CompressionType.ZSTD

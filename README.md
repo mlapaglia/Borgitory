@@ -22,7 +22,7 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
 ### Prerequisites
 
 - **Docker Installation (Recommended)**: Docker with Docker Compose for containerized deployment
-- **PyPI Installation**: Python 3.11+ for direct installation from PyPI
+- **PyPI Installation**: Python 3.13+ for direct installation from PyPI
 
 ### Installation
 
@@ -90,8 +90,16 @@ borgitory serve --host 0.0.0.0 --port 8000
 
 **PyPI Installation Requirements:**
 
-- Python 3.11 or higher
+- Python 3.13 or higher
 - BorgBackup installed and available in PATH
 - Rclone (optional, for cloud sync features)
 - FUSE (optional, for browsing archives)
-- Functionality on Windows is currently limited
+
+**Windows Requirements:**
+
+- WSL2 (Windows Subsystem for Linux) must be installed and configured
+- Inside WSL2, you need:
+  - BorgBackup installed (`sudo apt install borgbackup` or similar)
+  - Python 3.13+ installed
+  - Rclone installed (optional, for cloud sync features)
+- BorgBackup does not have a native Windows executable, so WSL2 is required for all backup operations

@@ -26,6 +26,7 @@ from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.borg_service import BorgService
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.notifications.service import NotificationService
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 
 
 class ProtocolComplianceChecker:
@@ -118,8 +119,15 @@ class TestProtocolCompliance:
 
         # Check that we can instantiate it
         from borgitory.config.command_runner_config import CommandRunnerConfig
+        from borgitory.protocols.command_executor_protocol import (
+            CommandExecutorProtocol,
+        )
+        from unittest.mock import Mock
 
-        runner = SimpleCommandRunner(config=CommandRunnerConfig())
+        mock_executor = Mock(spec=CommandExecutorProtocol)
+        runner = SimpleCommandRunner(
+            config=CommandRunnerConfig(), executor=mock_executor
+        )
         assert runner is not None
         assert hasattr(runner, "run_command")
 
@@ -137,7 +145,11 @@ class TestProtocolCompliance:
         )
 
         # Check instantiation
-        executor = JobExecutor()
+        from borgitory.services.command_execution.linux_command_executor import (
+            LinuxCommandExecutor,
+        )
+
+        executor = JobExecutor(LinuxCommandExecutor())
         assert executor is not None
 
     def test_borg_service_compliance(self) -> None:
@@ -157,12 +169,19 @@ class TestProtocolCompliance:
                 f"BorgService should have {method} method"
             )
 
-        # Check instantiation (with all required dependencies)
+        # Test that BorgService can be instantiated with required dependencies
+        mock_job_executor = Mock()
+        mock_command_runner = Mock()
+        mock_job_manager = Mock()
+        mock_archive_service = Mock()
+        mock_command_executor = Mock(spec=CommandExecutorProtocol)
+
         service = BorgService(
-            job_executor=Mock(),
-            command_runner=Mock(),
-            job_manager=Mock(),
-            archive_service=Mock(),
+            job_executor=mock_job_executor,
+            command_runner=mock_command_runner,
+            job_manager=mock_job_manager,
+            archive_service=mock_archive_service,
+            command_executor=mock_command_executor,
         )
         assert service is not None
 
@@ -183,9 +202,12 @@ class TestProtocolCompliance:
             )
 
         from borgitory.services.jobs.job_executor import JobExecutor
+        from borgitory.services.command_execution.linux_command_executor import (
+            LinuxCommandExecutor,
+        )
 
         manager = ArchiveManager(
-            job_executor=JobExecutor(),
+            job_executor=JobExecutor(LinuxCommandExecutor()),
             mount_manager=Mock(),
         )
         assert manager is not None
@@ -244,8 +266,15 @@ class TestProtocolInstantiation:
 
         # Test with real implementations
         from borgitory.config.command_runner_config import CommandRunnerConfig
+        from borgitory.protocols.command_executor_protocol import (
+            CommandExecutorProtocol,
+        )
+        from unittest.mock import Mock
 
-        use_command_runner(SimpleCommandRunner(config=CommandRunnerConfig()))
+        mock_executor = Mock(spec=CommandExecutorProtocol)
+        use_command_runner(
+            SimpleCommandRunner(config=CommandRunnerConfig(), executor=mock_executor)
+        )
 
         # Test with mocks
         mock_runner = Mock(spec=CommandRunnerProtocol)
