@@ -19,7 +19,8 @@ from borgitory.dependencies import (
 )
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.models.patterns import BackupPattern, PatternType, PatternStyle
-from borgitory.services.borg.borg_pattern_validation_service import validate_pattern
+from borgitory.services.scheduling.pattern_service import PatternService
+from borgitory.services.scheduling.hook_service import HookService
 
 router = APIRouter()
 
@@ -28,110 +29,7 @@ def convert_hook_fields_to_json(
     form_data: Dict[str, Any], hook_type: str
 ) -> Optional[str]:
     """Convert individual hook fields to JSON format using position-based form data."""
-    hooks = []
-
-    # Get all hook field data for this hook type (position-based)
-    hook_names = form_data.get(f"{hook_type}_hook_name", [])
-    hook_commands = form_data.get(f"{hook_type}_hook_command", [])
-    hook_critical = form_data.get(f"{hook_type}_hook_critical", [])
-    hook_run_on_failure = form_data.get(f"{hook_type}_hook_run_on_failure", [])
-
-    # Ensure they are lists (in case there's only one item)
-    if not isinstance(hook_names, list):
-        hook_names = [hook_names] if hook_names else []
-    if not isinstance(hook_commands, list):
-        hook_commands = [hook_commands] if hook_commands else []
-    if not isinstance(hook_critical, list):
-        hook_critical = [hook_critical] if hook_critical else []
-    if not isinstance(hook_run_on_failure, list):
-        hook_run_on_failure = [hook_run_on_failure] if hook_run_on_failure else []
-
-    # Pair them up by position
-    for i in range(min(len(hook_names), len(hook_commands))):
-        name = str(hook_names[i]).strip() if hook_names[i] else ""
-        command = str(hook_commands[i]).strip() if hook_commands[i] else ""
-
-        # Handle checkboxes - they're only present if checked
-        critical = len(hook_critical) > i and hook_critical[i] == "true"
-        run_on_failure = (
-            len(hook_run_on_failure) > i and hook_run_on_failure[i] == "true"
-        )
-
-        # Only add hooks that have both name and command
-        if name and command:
-            hooks.append(
-                {
-                    "name": name,
-                    "command": command,
-                    "critical": critical,
-                    "run_on_job_failure": run_on_failure,
-                }
-            )
-
-    return json.dumps(hooks) if hooks else None
-
-
-def convert_patterns_from_form_data(form_data: Dict[str, Any]) -> Optional[str]:
-    """Convert patterns form data to JSON format."""
-    patterns = []
-
-    # Get all pattern field data (position-based)
-    pattern_names = form_data.get("pattern_name", [])
-    pattern_expressions = form_data.get("pattern_expression", [])
-    pattern_actions = form_data.get("pattern_action", [])
-    pattern_styles = form_data.get("pattern_style", [])
-
-    # Ensure they are lists (in case there's only one item)
-    if not isinstance(pattern_names, list):
-        pattern_names = [pattern_names] if pattern_names else []
-    if not isinstance(pattern_expressions, list):
-        pattern_expressions = [pattern_expressions] if pattern_expressions else []
-    if not isinstance(pattern_actions, list):
-        pattern_actions = [pattern_actions] if pattern_actions else []
-    if not isinstance(pattern_styles, list):
-        pattern_styles = [pattern_styles] if pattern_styles else []
-
-    # Pair them up by position
-    max_length = max(
-        len(pattern_names),
-        len(pattern_expressions),
-        len(pattern_actions),
-        len(pattern_styles),
-    )
-    for i in range(max_length):
-        name = (
-            str(pattern_names[i]).strip()
-            if i < len(pattern_names) and pattern_names[i]
-            else ""
-        )
-        expression = (
-            str(pattern_expressions[i]).strip()
-            if i < len(pattern_expressions) and pattern_expressions[i]
-            else ""
-        )
-        action = (
-            str(pattern_actions[i]).strip()
-            if i < len(pattern_actions) and pattern_actions[i]
-            else "include"
-        )
-        style = (
-            str(pattern_styles[i]).strip()
-            if i < len(pattern_styles) and pattern_styles[i]
-            else "sh"
-        )
-
-        # Only add patterns that have both name and expression
-        if name and expression:
-            patterns.append(
-                {
-                    "name": name,
-                    "expression": expression,
-                    "pattern_type": action,
-                    "style": style,
-                }
-            )
-
-    return json.dumps(patterns) if patterns else None
+    return HookService.convert_hook_fields_to_json_from_dict(form_data, hook_type)
 
 
 @router.get("/form", response_class=HTMLResponse)
@@ -349,26 +247,6 @@ async def update_schedule(
     try:
         json_data = await request.json()
 
-        # The hooks and patterns are already in JSON format from the frontend
-        # Just use them directly if they exist and are not empty
-        if json_data.get("pre_job_hooks") and json_data["pre_job_hooks"].strip():
-            # Already in JSON format, keep as is
-            pass
-        else:
-            json_data["pre_job_hooks"] = None
-
-        if json_data.get("post_job_hooks") and json_data["post_job_hooks"].strip():
-            # Already in JSON format, keep as is
-            pass
-        else:
-            json_data["post_job_hooks"] = None
-
-        if json_data.get("patterns") and json_data["patterns"].strip():
-            # Already in JSON format, keep as is
-            pass
-        else:
-            json_data["patterns"] = None
-
         schedule_update = ScheduleUpdate(**json_data)
         update_data = schedule_update.model_dump(exclude_unset=True)
 
@@ -526,81 +404,6 @@ async def describe_cron_expression(
     )
 
 
-def _extract_hooks_from_form(form_data: Any, hook_type: str) -> List[Dict[str, Any]]:
-    """Extract hooks from form data and return as list of dicts."""
-    hooks = []
-
-    # Get all names and commands for this hook type
-    hook_names = form_data.getlist(f"{hook_type}_hook_name")
-    hook_commands = form_data.getlist(f"{hook_type}_hook_command")
-    hook_critical = form_data.getlist(f"{hook_type}_hook_critical")
-    hook_run_on_failure = form_data.getlist(f"{hook_type}_hook_run_on_failure")
-
-    # Pair them up by position
-    for i in range(min(len(hook_names), len(hook_commands))):
-        name = str(hook_names[i]).strip() if hook_names[i] else ""
-        command = str(hook_commands[i]).strip() if hook_commands[i] else ""
-
-        # Handle checkboxes - they're only present if checked
-        critical = len(hook_critical) > i and hook_critical[i] == "true"
-        run_on_failure = (
-            len(hook_run_on_failure) > i and hook_run_on_failure[i] == "true"
-        )
-
-        # Add all hooks, even if name or command is empty (for reordering)
-        hooks.append(
-            {
-                "name": name,
-                "command": command,
-                "critical": critical,
-                "run_on_job_failure": run_on_failure,
-            }
-        )
-
-    return hooks
-
-
-def _convert_hook_fields_to_json(form_data: Any, hook_type: str) -> str | None:
-    """Convert individual hook fields to JSON format using position-based form data."""
-    hooks = _extract_hooks_from_form(form_data, hook_type)
-
-    # Filter out hooks that don't have both name and command for JSON output
-    valid_hooks = [hook for hook in hooks if hook["name"] and hook["command"]]
-
-    return json.dumps(valid_hooks) if valid_hooks else None
-
-
-def _validate_hooks_for_save(form_data: Any) -> tuple[bool, str | None]:
-    """Validate that all hooks have both name and command filled out."""
-    errors = []
-
-    # Check pre-hooks
-    pre_hooks = _extract_hooks_from_form(form_data, "pre")
-    for i, hook in enumerate(pre_hooks):
-        if not hook["name"].strip() and not hook["command"].strip():
-            # Empty hook - skip (will be filtered out)
-            continue
-        elif not hook["name"].strip():
-            errors.append(f"Pre-hook #{i + 1}: Hook name is required")
-        elif not hook["command"].strip():
-            errors.append(f"Pre-hook #{i + 1}: Hook command is required")
-
-    # Check post-hooks
-    post_hooks = _extract_hooks_from_form(form_data, "post")
-    for i, hook in enumerate(post_hooks):
-        if not hook["name"].strip() and not hook["command"].strip():
-            # Empty hook - skip (will be filtered out)
-            continue
-        elif not hook["name"].strip():
-            errors.append(f"Post-hook #{i + 1}: Hook name is required")
-        elif not hook["command"].strip():
-            errors.append(f"Post-hook #{i + 1}: Hook command is required")
-
-    if errors:
-        return False, "; ".join(errors)
-    return True, None
-
-
 @router.post("/hooks/add-hook-field", response_class=HTMLResponse)
 async def add_hook_field(
     request: Request,
@@ -614,7 +417,7 @@ async def add_hook_field(
     # Get hook_type from form data (sent via hx-vals)
     hook_type = str(form_data.get("hook_type", "pre"))
 
-    current_hooks = _extract_hooks_from_form(form_data, hook_type)
+    current_hooks = HookService.extract_hooks_from_form(form_data, hook_type)
 
     # Add a new empty hook
     current_hooks.append({"name": "", "command": ""})
@@ -640,7 +443,7 @@ async def move_hook(
         index = int(str(form_data.get("index", "0")))
         direction = str(form_data.get("direction", "up"))  # "up" or "down"
 
-        current_hooks = _extract_hooks_from_form(form_data, hook_type)
+        current_hooks = HookService.extract_hooks_from_form(form_data, hook_type)
 
         if direction == "up" and index > 0 and index < len(current_hooks):
             current_hooks[index], current_hooks[index - 1] = (
@@ -674,7 +477,7 @@ async def remove_hook_field(
 
     hook_type = str(form_data.get("hook_type", "pre"))
 
-    current_hooks = _extract_hooks_from_form(form_data, hook_type)
+    current_hooks = HookService.extract_hooks_from_form(form_data, hook_type)
 
     return templates.TemplateResponse(
         request,
@@ -700,20 +503,8 @@ async def get_hooks_modal(
         pre_hooks_json = "[]"
         post_hooks_json = "[]"
 
-    try:
-        pre_hooks = (
-            json.loads(pre_hooks_json)
-            if pre_hooks_json and pre_hooks_json != "[]"
-            else []
-        )
-        post_hooks = (
-            json.loads(post_hooks_json)
-            if post_hooks_json and post_hooks_json != "[]"
-            else []
-        )
-    except (json.JSONDecodeError, TypeError):
-        pre_hooks = []
-        post_hooks = []
+    pre_hooks = HookService.parse_hooks_from_json(pre_hooks_json)
+    post_hooks = HookService.parse_hooks_from_json(post_hooks_json)
 
     return templates.TemplateResponse(
         request,
@@ -735,7 +526,7 @@ async def save_hooks(
     """Save hooks configuration and update parent component via OOB swap."""
     form_data = await request.form()
 
-    is_valid, error_message = _validate_hooks_for_save(form_data)
+    is_valid, error_message = HookService.validate_hooks_for_save(form_data)
     if not is_valid:
         return templates.TemplateResponse(
             request,
@@ -744,8 +535,8 @@ async def save_hooks(
             status_code=400,
         )
 
-    pre_hooks_json = _convert_hook_fields_to_json(form_data, "pre")
-    post_hooks_json = _convert_hook_fields_to_json(form_data, "post")
+    pre_hooks_json = HookService.convert_hook_fields_to_json(form_data, "pre")
+    post_hooks_json = HookService.convert_hook_fields_to_json(form_data, "post")
 
     try:
         pre_count = len(json.loads(pre_hooks_json)) if pre_hooks_json else 0
@@ -773,103 +564,6 @@ async def close_modal() -> HTMLResponse:
     return HTMLResponse(content='<div id="modal-container"></div>', status_code=200)
 
 
-# Pattern-related helper functions
-def _extract_patterns_from_form(form_data: Any) -> List[BackupPattern]:
-    """Extract patterns from form data and return as list of BackupPattern objects."""
-    patterns = []
-
-    # Get all pattern data (new compact structure)
-    pattern_names = form_data.getlist("pattern_name")
-    pattern_expressions = form_data.getlist("pattern_expression")
-    pattern_actions = form_data.getlist("pattern_action")
-    pattern_styles = form_data.getlist("pattern_style")
-
-    # Pair them up by position
-    for i in range(
-        min(len(pattern_names), len(pattern_expressions), len(pattern_actions))
-    ):
-        name = str(pattern_names[i]).strip() if pattern_names[i] else ""
-        expression = (
-            str(pattern_expressions[i]).strip() if pattern_expressions[i] else ""
-        )
-        action_str = (
-            str(pattern_actions[i]).strip() if pattern_actions[i] else "include"
-        )
-        style_str = (
-            str(pattern_styles[i]).strip()
-            if len(pattern_styles) > i and pattern_styles[i]
-            else "sh"
-        )
-
-        # Map action string to PatternType
-        if action_str == "exclude":
-            pattern_type = PatternType.EXCLUDE
-        elif action_str == "exclude_norec":
-            pattern_type = PatternType.EXCLUDE_NOREC
-        else:
-            pattern_type = PatternType.INCLUDE
-
-        # Map style string to PatternStyle
-        style_map = {
-            "sh": PatternStyle.SHELL,
-            "fm": PatternStyle.FNMATCH,
-            "re": PatternStyle.REGEX,
-            "pp": PatternStyle.PATH_PREFIX,
-            "pf": PatternStyle.PATH_FULL,
-        }
-        pattern_style = style_map.get(style_str, PatternStyle.SHELL)
-
-        # Add all patterns, even if name or expression is empty (for reordering)
-        patterns.append(
-            BackupPattern(
-                name=name,
-                expression=expression,
-                pattern_type=pattern_type,
-                style=pattern_style,
-            )
-        )
-
-    return patterns
-
-
-def _convert_patterns_to_json(form_data: Any) -> str | None:
-    """Convert patterns to JSON format using unified structure."""
-    patterns = _extract_patterns_from_form(form_data)
-
-    # Filter out patterns that don't have both name and expression for JSON output
-    valid_patterns = [
-        {
-            "name": pattern.name,
-            "expression": pattern.expression,
-            "pattern_type": pattern.pattern_type.value,
-            "style": pattern.style.value,
-        }
-        for pattern in patterns
-        if pattern.name and pattern.expression
-    ]
-
-    return json.dumps(valid_patterns) if valid_patterns else None
-
-
-def _validate_patterns_for_save(form_data: Any) -> tuple[bool, str | None]:
-    """Validate that all patterns have both name and expression filled out."""
-    errors = []
-
-    patterns = _extract_patterns_from_form(form_data)
-    for i, pattern in enumerate(patterns):
-        if not pattern.name.strip() and not pattern.expression.strip():
-            # Empty pattern - skip (will be filtered out)
-            continue
-        elif not pattern.name.strip():
-            errors.append(f"Pattern #{i + 1}: Pattern name is required")
-        elif not pattern.expression.strip():
-            errors.append(f"Pattern #{i + 1}: Pattern expression is required")
-
-    if errors:
-        return False, "; ".join(errors)
-    return True, None
-
-
 # Pattern API endpoints
 @router.post("/patterns/add-pattern-field", response_class=HTMLResponse)
 async def add_pattern_field(
@@ -881,7 +575,7 @@ async def add_pattern_field(
     # Get form data (includes both hx-vals and hx-include data)
     form_data = await request.form()
 
-    current_patterns = _extract_patterns_from_form(form_data)
+    current_patterns = PatternService.extract_patterns_from_form(form_data)
 
     # Add a new empty pattern (default to include with shell style)
     current_patterns.append(
@@ -913,7 +607,7 @@ async def move_pattern(
         index = int(str(form_data.get("index", "0")))
         direction = str(form_data.get("direction", "up"))  # "up" or "down"
 
-        current_patterns = _extract_patterns_from_form(form_data)
+        current_patterns = PatternService.extract_patterns_from_form(form_data)
 
         if direction == "up" and index > 0 and index < len(current_patterns):
             current_patterns[index], current_patterns[index - 1] = (
@@ -948,7 +642,7 @@ async def remove_pattern_field(
     try:
         index = int(str(form_data.get("index", "0")))
 
-        current_patterns = _extract_patterns_from_form(form_data)
+        current_patterns = PatternService.extract_patterns_from_form(form_data)
 
         # Remove the pattern at the specified index
         if 0 <= index < len(current_patterns):
@@ -980,24 +674,7 @@ async def get_patterns_modal(
         print(f"DEBUG: Exception getting JSON data: {e}")
         patterns_json = "[]"
 
-    try:
-        patterns_data = (
-            json.loads(patterns_json) if patterns_json and patterns_json != "[]" else []
-        )
-
-        # Convert to BackupPattern objects
-        patterns = [
-            BackupPattern(
-                name=p.get("name", ""),
-                expression=p.get("expression", ""),
-                pattern_type=PatternType(p.get("pattern_type", "include")),
-                style=PatternStyle(p.get("style", "sh")),
-            )
-            for p in patterns_data
-        ]
-
-    except (json.JSONDecodeError, TypeError):
-        patterns = []
+    patterns = PatternService.parse_patterns_from_json(patterns_json)
 
     return templates.TemplateResponse(
         request,
@@ -1017,7 +694,7 @@ async def save_patterns(
     """Save patterns configuration and update parent component via OOB swap."""
     form_data = await request.form()
 
-    is_valid, error_message = _validate_patterns_for_save(form_data)
+    is_valid, error_message = PatternService.validate_patterns_for_save(form_data)
     if not is_valid:
         return templates.TemplateResponse(
             request,
@@ -1026,7 +703,7 @@ async def save_patterns(
             status_code=400,
         )
 
-    patterns_json = _convert_patterns_to_json(form_data)
+    patterns_json = PatternService.convert_patterns_to_json(form_data)
 
     try:
         total_count = len(json.loads(patterns_json)) if patterns_json else 0
@@ -1053,51 +730,10 @@ async def validate_all_patterns_endpoint(
         form_data = await request.form()
 
         # Extract all patterns from form data
-        patterns = _extract_patterns_from_form(form_data)
+        patterns = PatternService.extract_patterns_from_form(form_data)
 
-        # Validate each pattern
-        validation_results = []
-
-        for i, pattern in enumerate(patterns):
-            # Skip empty patterns
-            if not pattern.name.strip() and not pattern.expression.strip():
-                continue
-
-            # Check for required fields
-            if not pattern.expression.strip():
-                validation_results.append(
-                    {
-                        "index": i,
-                        "name": pattern.name or f"Pattern #{i + 1}",
-                        "is_valid": False,
-                        "error": "Pattern expression is required",
-                        "warnings": [],
-                    }
-                )
-                continue
-
-            # Map action to validation format
-            action_map = {
-                PatternType.INCLUDE: "+",
-                PatternType.EXCLUDE: "-",
-                PatternType.EXCLUDE_NOREC: "!",
-            }
-            action = action_map.get(pattern.pattern_type, "+")
-
-            # Validate the pattern
-            is_valid, error, warnings = validate_pattern(
-                pattern_str=pattern.expression, style=pattern.style.value, action=action
-            )
-
-            validation_results.append(
-                {
-                    "index": i,
-                    "name": pattern.name or f"Pattern #{i + 1}",
-                    "is_valid": is_valid,
-                    "error": error,
-                    "warnings": warnings,
-                }
-            )
+        # Validate each pattern using the service
+        validation_results = PatternService.validate_all_patterns(patterns)
 
         return templates.TemplateResponse(
             request,

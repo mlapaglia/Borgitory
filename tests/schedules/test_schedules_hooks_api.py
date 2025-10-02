@@ -368,7 +368,7 @@ class TestScheduleHooksAPI:
 
     def test_validate_hooks_for_save_success(self) -> None:
         """Test _validate_hooks_for_save with valid data."""
-        from borgitory.api.schedules import _validate_hooks_for_save
+        from borgitory.services.scheduling.hook_service import HookService
 
         class MockFormData:
             def __init__(self, data: Dict[str, List[str]]) -> None:
@@ -384,13 +384,13 @@ class TestScheduleHooksAPI:
             }
         )
 
-        is_valid, error = _validate_hooks_for_save(form_data)
+        is_valid, error = HookService.validate_hooks_for_save(form_data)
         assert is_valid is True
         assert error is None
 
     def test_validate_hooks_for_save_error(self) -> None:
         """Test _validate_hooks_for_save with invalid data."""
-        from borgitory.api.schedules import _validate_hooks_for_save
+        from borgitory.services.scheduling.hook_service import HookService
 
         class MockFormData:
             def __init__(self, data: Dict[str, List[str]]) -> None:
@@ -406,14 +406,14 @@ class TestScheduleHooksAPI:
             }
         )
 
-        is_valid, error = _validate_hooks_for_save(form_data)
+        is_valid, error = HookService.validate_hooks_for_save(form_data)
         assert is_valid is False
         assert error is not None
         assert "Hook command is required" in error
 
     def test_extract_hooks_from_form(self) -> None:
         """Test _extract_hooks_from_form helper function."""
-        from borgitory.api.schedules import _extract_hooks_from_form
+        from borgitory.services.scheduling.hook_service import HookService
 
         class MockFormData:
             def __init__(self, data: Dict[str, List[str]]) -> None:
@@ -429,7 +429,7 @@ class TestScheduleHooksAPI:
             }
         )
 
-        hooks = _extract_hooks_from_form(form_data, "pre")
+        hooks = HookService.extract_hooks_from_form(form_data, "pre")
 
         assert len(hooks) == 2
         assert hooks[0]["name"] == "Hook 1"
