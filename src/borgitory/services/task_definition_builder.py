@@ -44,7 +44,7 @@ class TaskDefinitionBuilder:
         compression: str = "zstd",
         dry_run: bool = False,
         ignore_lock: bool = False,
-        patterns: List[str] = [""],
+        patterns: List[str] = [],
     ) -> TaskDefinition:
         """
         Build a backup task definition.
@@ -59,16 +59,21 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary
         """
+        parameters: ConfigDict = {
+            "source_path": source_path,
+            "compression": compression,
+            "dry_run": dry_run,
+            "ignore_lock": ignore_lock,
+        }
+
+        # Only include patterns if they exist
+        if patterns:
+            parameters["patterns"] = patterns
+
         return TaskDefinition(
             type="backup",
             name=f"Backup {repository_name}",
-            parameters={
-                "source_path": source_path,
-                "compression": compression,
-                "dry_run": dry_run,
-                "ignore_lock": ignore_lock,
-                "patterns": patterns,
-            },
+            parameters=parameters,
         )
 
     def build_prune_task_from_config(

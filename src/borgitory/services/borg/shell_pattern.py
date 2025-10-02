@@ -86,7 +86,7 @@ def _parse_braces(pat: str) -> List[Tuple[int, int]]:
     queue: pushing opening braces on and popping them off when finding a closing
     brace.
     """
-    curly_q = LifoQueue()
+    curly_q = LifoQueue()  # type: ignore
     pairs: Dict[int, int] = dict()
 
     for idx, c in enumerate(pat):
@@ -94,7 +94,7 @@ def _parse_braces(pat: str) -> List[Tuple[int, int]]:
             if idx == 0 or pat[idx - 1] != "\\":
                 # Opening brace is not escaped.
                 # Add to dict
-                pairs[idx] = None
+                pairs[idx] = 0
                 # Add to queue
                 curly_q.put(idx)
         if c == "}" and curly_q.qsize():
