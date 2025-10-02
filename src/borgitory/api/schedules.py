@@ -572,12 +572,10 @@ async def add_pattern_field(
 ) -> HTMLResponse:
     """Add a new pattern field row via HTMX."""
 
-    # Get form data (includes both hx-vals and hx-include data)
     form_data = await request.form()
 
     current_patterns = PatternService.extract_patterns_from_form(form_data)
 
-    # Add a new empty pattern (default to include with shell style)
     current_patterns.append(
         BackupPattern(
             name="",
@@ -605,7 +603,7 @@ async def move_pattern(
 
     try:
         index = int(str(form_data.get("index", "0")))
-        direction = str(form_data.get("direction", "up"))  # "up" or "down"
+        direction = str(form_data.get("direction", "up"))
 
         current_patterns = PatternService.extract_patterns_from_form(form_data)
 
@@ -644,7 +642,6 @@ async def remove_pattern_field(
 
         current_patterns = PatternService.extract_patterns_from_form(form_data)
 
-        # Remove the pattern at the specified index
         if 0 <= index < len(current_patterns):
             current_patterns.pop(index)
 
@@ -666,12 +663,10 @@ async def get_patterns_modal(
     """Open patterns configuration modal with current pattern data passed from parent."""
 
     try:
-        # Get JSON data from hx-include="#patterns_field"
         json_data = await request.json()
         patterns_json = str(json_data.get("patterns", "[]"))
 
-    except Exception as e:
-        print(f"DEBUG: Exception getting JSON data: {e}")
+    except Exception:
         patterns_json = "[]"
 
     patterns = PatternService.parse_patterns_from_json(patterns_json)
@@ -729,10 +724,8 @@ async def validate_all_patterns_endpoint(
     try:
         form_data = await request.form()
 
-        # Extract all patterns from form data
         patterns = PatternService.extract_patterns_from_form(form_data)
 
-        # Validate each pattern using the service
         validation_results = PatternService.validate_all_patterns(patterns)
 
         return templates.TemplateResponse(

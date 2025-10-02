@@ -62,7 +62,6 @@ def archive_mount_manager(
         job_executor=mock_job_executor,
         command_executor=mock_command_executor,
         path_config=mock_path_config,
-        mount_timeout=timedelta(seconds=30),
         mounting_timeout=timedelta(seconds=10),
     )
 

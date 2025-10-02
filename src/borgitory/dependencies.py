@@ -1101,7 +1101,6 @@ def get_archive_mount_manager_singleton() -> "ArchiveMountManager":
         job_executor=job_executor,
         command_executor=command_executor,
         path_config=path_config,
-        mount_timeout=timedelta(seconds=1800),
         mounting_timeout=timedelta(seconds=30),
     )
 
