@@ -241,16 +241,14 @@ class WSLCommandExecutor(CommandExecutorProtocol):
 
         logger.debug(f"Starting interactive WSL process: {' '.join(command[:3])}...")
 
-        # For WSL2, we need to be careful about subprocess handles
-        # Try with minimal Windows environment to avoid RPC issues
         try:
             process = await asyncio.create_subprocess_exec(
                 *wsl_command,
                 stdout=stdout or asyncio.subprocess.PIPE,
                 stderr=stderr or asyncio.subprocess.PIPE,
                 stdin=stdin,
-                env=None,  # Don't pass WSL env vars to Windows process
-                cwd=None,  # Don't pass WSL cwd to Windows process
+                env=env,
+                cwd=cwd,
             )
 
             logger.debug(f"WSL subprocess created successfully (PID: {process.pid})")

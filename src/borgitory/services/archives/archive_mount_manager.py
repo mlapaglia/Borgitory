@@ -155,7 +155,9 @@ class ArchiveMountManager:
                     logger.info("Using WSL-compatible daemon mode mounting")
 
                     # Modify command to use daemon mode for WSL
-                    daemon_command = command[:-1] + ["-d"]  # Replace -f with -d
+                    daemon_command = command[:-1] + [
+                        ""
+                    ]  # Remove -f to run in daemon mode
 
                     result = await self.command_executor.execute_command(
                         command=daemon_command, env=env, timeout=30.0
@@ -175,7 +177,7 @@ class ArchiveMountManager:
                     process = None
 
                 else:
-                    # For native Linux (Docker), use foreground mode with process tracking
+                    # For native Linux, use foreground mode with process tracking
                     logger.info("Using native Linux foreground mode mounting")
                     process = await self.command_executor.create_subprocess(
                         command=command,
@@ -184,15 +186,11 @@ class ArchiveMountManager:
                         stderr=asyncio.subprocess.PIPE,
                     )
 
-                # Wait for the mount to become ready
                 logger.info("Waiting for mount to become ready...")
                 mount_ready = False
 
-                # Give the mount a moment to initialize
-                await asyncio.sleep(2)
-
                 # Check if mount is ready
-                for attempt in range(15):  # Try for up to 15 seconds
+                for attempt in range(30):  # Try for up to 15 seconds
                     # For foreground mode (Docker), check if process has exited with error
                     if process is not None and process.returncode is not None:
                         try:
@@ -217,7 +215,7 @@ class ArchiveMountManager:
                                 raise
                             raise Exception(f"Mount process failed: {e}")
 
-                    # Check if mount point is accessible (works for both daemon and foreground mode)
+                    # Check if mount point is accessible
                     if await self._verify_mount_ready(mount_point):
                         mount_ready = True
                         logger.info(f"Mount ready after {attempt + 1} second(s)")

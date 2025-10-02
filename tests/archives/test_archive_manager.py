@@ -114,10 +114,10 @@ class TestArchiveManager:
         assert result[1].name == "subdir"
 
         # Verify the mount manager was called correctly
-        archive_manager.mount_manager.mount_archive.assert_called_once_with(
+        archive_manager.mount_manager.mount_archive.assert_called_once_with(  # type: ignore
             test_repository, "test-archive"
         )
-        archive_manager.mount_manager.list_directory.assert_called_once_with(
+        archive_manager.mount_manager.list_directory.assert_called_once_with(  # type: ignore
             test_repository, "test-archive", "/data"
         )
 
@@ -312,9 +312,10 @@ class TestArchiveManager:
         )
 
         assert metadata is not None
-        assert metadata["name"] == "test-archive"
-        assert metadata["size"] == 2000
-        assert metadata["stats"]["nfiles"] == 20
+        assert metadata.get("name") == "test-archive"
+        assert metadata.get("size") == 2000
+        assert metadata.get("stats") is not None
+        assert metadata.get("stats").get("nfiles") == 20
 
     @pytest.mark.asyncio
     async def test_get_archive_metadata_not_found(
