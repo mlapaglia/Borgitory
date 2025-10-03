@@ -309,20 +309,6 @@ class ArchiveManager:
         base_command = "borg list"
         additional_args = [
             "--json-lines",
-            "--format",
-            json.dumps(
-                {
-                    "type": "{type}",
-                    "mode": "{mode}",
-                    "uid": "{uid}",
-                    "gid": "{gid}",
-                    "user": "{user}",
-                    "group": "{group}",
-                    "size": "{size}",
-                    "mtime": "{mtime}",
-                    "path": "{path}",
-                }
-            ),
             f"{repository.path}::{archive_name}",
         ]
 
@@ -387,24 +373,18 @@ class ArchiveManager:
                 else:
                     item_type = "f"  # default to file for other types
 
-                # Parse mtime
-                mtime = None
-                if data.get("mtime"):
-                    try:
-                        # Convert ISO format to string
-                        mtime = data["mtime"]
-                    except (ValueError, TypeError):
-                        pass
-
                 # Extract name from path
                 path = data.get("path", "")
                 name = PurePath(path).name if path else ""
 
-                # Parse size
+                # Parse size from default JSON output
                 try:
                     size = int(data.get("size", 0))
                 except (ValueError, TypeError):
                     size = 0
+
+                # Parse mtime from default JSON output
+                mtime = data.get("mtime")
 
                 # Determine if it's a directory
                 is_directory = item_type == "d"
@@ -433,7 +413,9 @@ class ArchiveManager:
                     gid=int(data.get("gid", 0))
                     if data.get("gid") is not None
                     else None,
-                    healthy=True,  # Assume healthy unless we have evidence otherwise
+                    healthy=data.get(
+                        "healthy", True
+                    ),  # Use actual healthy status from JSON
                 )
 
                 items.append(entry)
