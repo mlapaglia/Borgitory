@@ -107,7 +107,6 @@ class ArchiveMountManager:
     async def _verify_mount_ready(self, mount_point: Path) -> bool:
         """Verify that the mount point is actually mounted"""
         try:
-            # Check if the mount point is listed in the mount table
             result = await self.command_executor.execute_command(
                 command=["mount"], timeout=10.0
             )
@@ -116,7 +115,6 @@ class ArchiveMountManager:
                 logger.warning(f"Could not check mount table: {result.stderr}")
                 return False
 
-            # Check if our mount point appears in the mount output
             mount_point_str = mount_point.as_posix()
             for line in result.stdout.split("\n"):
                 if mount_point_str in line:
