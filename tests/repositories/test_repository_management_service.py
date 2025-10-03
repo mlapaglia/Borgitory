@@ -216,7 +216,7 @@ class TestRepositoryManagementBusinessLogic:
             # Mock the secure_borg_command context manager
             mock_context = AsyncMock()
             mock_context.__aenter__.return_value = (
-                ["borg", "list", "--short", "/test/repo/path"],
+                ["borg", "config", "--list", "/test/repo/path"],
                 {"BORG_PASSPHRASE": "test_passphrase"},
                 None,
             )
@@ -235,11 +235,11 @@ class TestRepositoryManagementBusinessLogic:
 
             # Verify secure_borg_command was called correctly
             mock_secure_cmd.assert_called_once_with(
-                base_command="borg list",
+                base_command="borg config",
                 repository_path=mock_repository.path,
                 passphrase=mock_repository.get_passphrase(),
                 keyfile_content=mock_repository.get_keyfile_content(),
-                additional_args=["--short"],
+                additional_args=["--list"],
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
