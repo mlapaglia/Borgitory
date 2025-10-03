@@ -1,582 +1,241 @@
 """
-Tests for ArchiveManager - Handles Borg archive operations and content management
+Tests for ArchiveManager
 """
 
 import pytest
-import json
-from unittest.mock import Mock, AsyncMock, patch
-from types import SimpleNamespace
-
-from borgitory.services.archives.archive_manager import ArchiveManager, ArchiveEntry
+from unittest.mock import AsyncMock, MagicMock, patch
+from borgitory.services.archives.archive_manager import ArchiveManager
+from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.models.database import Repository
-from borgitory.services.jobs.job_executor import JobExecutor
-
-
-@pytest.fixture
-def mock_job_executor() -> Mock:
-    """Mock JobExecutor."""
-    mock = Mock(spec=JobExecutor)
-    mock.start_process = AsyncMock()
-    mock.monitor_process_output = AsyncMock()
-    return mock
-
-
-@pytest.fixture
-def archive_manager(
-    mock_job_executor: Mock,
-) -> ArchiveManager:
-    """ArchiveManager instance with mocked dependencies."""
-    mock_mount_manager = Mock()
-    mock_mount_manager.mount_archive = AsyncMock()
-    mock_mount_manager.list_directory = AsyncMock(return_value=[])
-    return ArchiveManager(
-        job_executor=mock_job_executor,
-        mount_manager=mock_mount_manager,
-    )
-
-
-@pytest.fixture
-def test_repository() -> Repository:
-    """Test repository object."""
-    repo = Repository()
-    repo.name = "test-repo"
-    repo.path = "/tmp/test-repo"
-    repo.set_passphrase("test-passphrase")
-    return repo
-
-
-@pytest.fixture
-def mock_process_result() -> SimpleNamespace:
-    """Mock process result."""
-    result = SimpleNamespace()
-    result.return_code = 0
-    result.stdout = b'{"path": "test.txt", "type": "f", "size": 1024, "mtime": "2023-01-01T00:00:00"}\n'
-    result.stderr = b""
-    return result
 
 
 class TestArchiveManager:
-    """Test class for ArchiveManager."""
+    """Test cases for ArchiveManager"""
 
-    def test_init_with_dependencies(self) -> None:
-        """Test ArchiveManager initialization with provided dependencies."""
-        mock_executor = Mock(spec=JobExecutor)
-        mock_mount_manager = Mock()
+    @pytest.fixture
+    def mock_job_executor(self):
+        """Mock job executor"""
+        return AsyncMock()
 
+    @pytest.fixture
+    def mock_command_executor(self):
+        """Mock command executor"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_repository(self):
+        """Mock repository"""
+        repo = MagicMock(spec=Repository)
+        repo.path = "/test/repo"
+        repo.name = "test_repo"
+        repo.get_passphrase.return_value = "test_passphrase"
+        repo.get_keyfile_content.return_value = None
+        return repo
+
+    @pytest.fixture
+    def manager(self, mock_job_executor, mock_command_executor):
+        """Create ArchiveManager instance"""
+        return ArchiveManager(
+            job_executor=mock_job_executor,
+            command_executor=mock_command_executor,
+        )
+
+    def test_init_with_dependencies(self, mock_job_executor, mock_command_executor):
+        """Test initialization with dependencies"""
         manager = ArchiveManager(
-            job_executor=mock_executor,
-            mount_manager=mock_mount_manager,
+            job_executor=mock_job_executor,
+            command_executor=mock_command_executor,
         )
 
-        assert manager.job_executor is mock_executor
-        assert manager.mount_manager is mock_mount_manager
-
-    def test_init_with_defaults(self) -> None:
-        """Test ArchiveManager initialization with default dependencies."""
-
-        mock_mount_manager = Mock()
-        from borgitory.services.command_execution.linux_command_executor import (
-            LinuxCommandExecutor,
-        )
-
-        manager = ArchiveManager(
-            job_executor=JobExecutor(LinuxCommandExecutor()),
-            mount_manager=mock_mount_manager,
-        )
-
-        assert isinstance(manager.job_executor, JobExecutor)
-        assert manager.mount_manager is mock_mount_manager
+        assert manager.job_executor == mock_job_executor
+        assert manager.command_executor == mock_command_executor
 
     @pytest.mark.asyncio
-    async def test_list_archive_directory_contents_success(
-        self, archive_manager: ArchiveManager, test_repository: Repository
-    ) -> None:
-        """Test listing directory contents using FUSE mount."""
-        # Configure the mount manager that's already injected in the fixture
-        expected_entries = [
+    async def test_parse_borg_list_output(self, manager):
+        """Test parsing borg list JSON output"""
+        json_output = """{"type": "d", "mode": "drwxr-xr-x", "uid": 1000, "gid": 1000, "user": "user", "group": "user", "size": 0, "mtime": "2023-01-01T00:00:00Z", "path": "test_dir"}
+{"type": "-", "mode": "-rw-r--r--", "uid": 1000, "gid": 1000, "user": "user", "group": "user", "size": 1024, "mtime": "2023-01-01T00:00:00Z", "path": "test_file.txt"}"""
+
+        items = manager._parse_borg_list_output(json_output)
+
+        assert len(items) == 2
+
+        # Check directory entry
+        dir_entry = items[0]
+        assert dir_entry.path == "test_dir"
+        assert dir_entry.name == "test_dir"
+        assert dir_entry.type == "d"
+        assert dir_entry.isdir is True
+        assert dir_entry.size == 0
+
+        # Check file entry
+        file_entry = items[1]
+        assert file_entry.path == "test_file.txt"
+        assert file_entry.name == "test_file.txt"
+        assert file_entry.type == "f"
+        assert file_entry.isdir is False
+        assert file_entry.size == 1024
+
+    def test_filter_directory_contents_root(self, manager):
+        """Test filtering directory contents for root directory"""
+        entries = [
             ArchiveEntry(
-                name="file1.txt",
-                type="f",
-                size=100,
-                isdir=False,
-                path="file1.txt",
-            ),
-            ArchiveEntry(name="subdir", type="d", size=0, isdir=True, path="subdir"),
-        ]
-        archive_manager.mount_manager.list_directory.return_value = expected_entries
-
-        result = await archive_manager.list_archive_directory_contents(
-            test_repository, "test-archive", "/data"
-        )
-
-        assert len(result) == 2
-        assert result[0].name == "file1.txt"
-        assert result[1].name == "subdir"
-
-        # Verify the mount manager was called correctly
-        archive_manager.mount_manager.mount_archive.assert_called_once_with(  # type: ignore
-            test_repository, "test-archive"
-        )
-        archive_manager.mount_manager.list_directory.assert_called_once_with(  # type: ignore
-            test_repository, "test-archive", "/data"
-        )
-
-    def test_filter_directory_contents_root(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test filtering directory contents for root path."""
-        all_entries = [
-            ArchiveEntry(
-                path="file1.txt", type="f", size=100, name="file1.txt", isdir=False
+                path="file1.txt", name="file1.txt", type="f", size=100, isdir=False
             ),
             ArchiveEntry(
-                path="dir1/file2.txt", type="f", size=200, name="file2.txt", isdir=False
+                path="dir1/file2.txt", name="file2.txt", type="f", size=200, isdir=False
             ),
             ArchiveEntry(
                 path="dir1/subdir/file3.txt",
+                name="file3.txt",
                 type="f",
                 size=300,
-                name="file3.txt",
                 isdir=False,
             ),
             ArchiveEntry(
-                path="dir2/file4.txt", type="f", size=400, name="file4.txt", isdir=False
+                path="dir2/file4.txt", name="file4.txt", type="f", size=400, isdir=False
             ),
         ]
 
-        result = archive_manager._filter_directory_contents(all_entries, "")
+        result = manager._filter_directory_contents(entries, "")
 
-        # Should return immediate children at root level
-        assert len(result) == 3
+        assert len(result) == 3  # file1.txt, dir1, dir2
+
+        # Check that we have the right items
         names = [item.name for item in result]
         assert "file1.txt" in names
         assert "dir1" in names
         assert "dir2" in names
 
-        # Check directory detection
-        dir1_item = next(item for item in result if item.name == "dir1")
-        assert dir1_item.type == "d"
-        assert dir1_item.isdir is True
+        # Check that dir1 is marked as directory
+        dir1 = next(item for item in result if item.name == "dir1")
+        assert dir1.isdir is True
+        assert dir1.type == "d"
 
-    def test_filter_directory_contents_subdirectory(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test filtering directory contents for subdirectory path."""
-        all_entries = [
+    def test_filter_directory_contents_subdirectory(self, manager):
+        """Test filtering directory contents for subdirectory"""
+        entries = [
             ArchiveEntry(
-                path="dir1/file1.txt", type="f", size=100, name="file1.txt", isdir=False
+                path="dir1/file1.txt", name="file1.txt", type="f", size=100, isdir=False
             ),
             ArchiveEntry(
-                path="dir1/file2.txt", type="f", size=200, name="file2.txt", isdir=False
+                path="dir1/file2.txt", name="file2.txt", type="f", size=200, isdir=False
             ),
             ArchiveEntry(
                 path="dir1/subdir/file3.txt",
+                name="file3.txt",
                 type="f",
                 size=300,
-                name="file3.txt",
                 isdir=False,
             ),
             ArchiveEntry(
-                path="dir2/file4.txt", type="f", size=400, name="file4.txt", isdir=False
+                path="dir2/file4.txt", name="file4.txt", type="f", size=400, isdir=False
             ),
         ]
 
-        result = archive_manager._filter_directory_contents(all_entries, "dir1")
+        result = manager._filter_directory_contents(entries, "dir1")
 
-        # Should return immediate children of dir1
-        assert len(result) == 3
+        assert len(result) == 3  # file1.txt, file2.txt, subdir
+
+        # Check that we have the right items
         names = [item.name for item in result]
         assert "file1.txt" in names
         assert "file2.txt" in names
         assert "subdir" in names
 
-    def test_filter_directory_contents_sorting(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test that results are sorted correctly (directories first, then alphabetically)."""
-        all_entries = [
+        # Check that subdir is marked as directory
+        subdir = next(item for item in result if item.name == "subdir")
+        assert subdir.isdir is True
+        assert subdir.type == "d"
+
+    def test_filter_directory_contents_sorting(self, manager):
+        """Test that filtered results are sorted correctly (directories first)"""
+        entries = [
             ArchiveEntry(
-                path="zebra.txt", type="f", size=100, name="zebra.txt", isdir=False
+                path="file1.txt", name="file1.txt", type="f", size=100, isdir=False
             ),
             ArchiveEntry(
-                path="bdir/file.txt", type="f", size=200, name="file.txt", isdir=False
+                path="dir1/file2.txt", name="file2.txt", type="f", size=200, isdir=False
             ),
             ArchiveEntry(
-                path="adir/file.txt", type="f", size=300, name="file.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="alpha.txt", type="f", size=400, name="alpha.txt", isdir=False
+                path="dir2/file3.txt", name="file3.txt", type="f", size=300, isdir=False
             ),
         ]
 
-        result = archive_manager._filter_directory_contents(all_entries, "")
+        result = manager._filter_directory_contents(entries, "")
 
-        # Should be: directories first (adir, bdir), then files (alpha.txt, zebra.txt)
-        names = [item.name for item in result]
-        assert names == ["adir", "bdir", "alpha.txt", "zebra.txt"]
-
-    @pytest.mark.asyncio
-    async def test_extract_file_stream_success(
-        self, archive_manager: ArchiveManager, test_repository: Repository
-    ) -> None:
-        """Test successful file extraction streaming."""
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-            # Mock process
-            mock_process = Mock()
-            mock_process.stdout.read = AsyncMock(
-                side_effect=[b"chunk1", b"chunk2", b""]
-            )
-            mock_process.wait = AsyncMock(return_value=0)
-            mock_subprocess.return_value = mock_process
-
-            chunks = []
-            async for chunk in archive_manager.extract_file_stream(
-                test_repository, "test-archive", "test.txt"
-            ):
-                chunks.append(chunk)
-
-            assert chunks == [b"chunk1", b"chunk2"]
-            mock_subprocess.assert_called_once()
+        # Should be sorted: directories first, then files, both alphabetically
+        assert result[0].name == "dir1"  # directory
+        assert result[1].name == "dir2"  # directory
+        assert result[2].name == "file1.txt"  # file
 
     @pytest.mark.asyncio
-    async def test_extract_file_stream_error(
-        self, archive_manager: ArchiveManager, test_repository: Repository
-    ) -> None:
-        """Test file extraction with Borg error."""
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-            mock_process = Mock()
-            mock_process.stdout.read = AsyncMock(return_value=b"")
-            mock_process.wait = AsyncMock(return_value=1)
-            mock_process.stderr.read = AsyncMock(return_value=b"File not found")
-            mock_subprocess.return_value = mock_process
+    async def test_extract_file_stream_success(self, manager, mock_repository):
+        """Test successful file extraction"""
+        # Mock the secure_borg_command context manager
+        mock_process = AsyncMock()
+        mock_process.stdout.read.side_effect = [b"chunk1", b"chunk2", b""]
+        mock_process.wait.return_value = 0
+        mock_process.stderr.read.return_value = b""
 
-            with pytest.raises(Exception) as exc_info:
-                chunks = []
-                async for chunk in archive_manager.extract_file_stream(
-                    test_repository, "test-archive", "nonexistent.txt"
-                ):
-                    chunks.append(chunk)
-
-            assert "Borg extract failed with code 1" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_extract_file_stream_process_cleanup(
-        self, archive_manager: ArchiveManager, test_repository: Repository
-    ) -> None:
-        """Test process cleanup on exception during streaming."""
-        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-            mock_process = Mock()
-            mock_process.stdout.read = AsyncMock(side_effect=Exception("Read error"))
-            mock_process.returncode = None
-            mock_process.terminate = Mock()
-            mock_process.kill = Mock()
-            mock_process.wait = AsyncMock()
-            mock_subprocess.return_value = mock_process
-
-            with pytest.raises(Exception):
-                async for chunk in archive_manager.extract_file_stream(
-                    test_repository, "test-archive", "test.txt"
-                ):
-                    pass
-
-            mock_process.terminate.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_archive_metadata_success(
-        self,
-        archive_manager: ArchiveManager,
-        test_repository: Repository,
-        mock_job_executor: Mock,
-    ) -> None:
-        """Test successful archive metadata retrieval."""
-        # Setup mock result
-        repo_info = {
-            "archives": [
-                {"name": "archive1", "size": 1000, "stats": {"nfiles": 10}},
-                {"name": "test-archive", "size": 2000, "stats": {"nfiles": 20}},
-                {"name": "archive2", "size": 3000, "stats": {"nfiles": 30}},
+        with patch(
+            "borgitory.services.archives.archive_manager.build_secure_borg_command_with_keyfile"
+        ) as mock_secure:
+            mock_result = MagicMock()
+            mock_result.command = [
+                "borg",
+                "extract",
+                "--stdout",
+                "/test/repo::test_archive",
+                "test_file.txt",
             ]
-        }
+            mock_result.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+            mock_result.cleanup_temp_files.return_value = None
+            mock_secure.return_value = mock_result
 
-        result = SimpleNamespace()
-        result.return_code = 0
-        result.stdout = json.dumps(repo_info).encode("utf-8")
-        result.stderr = b""
+            manager.command_executor.create_subprocess.return_value = mock_process
 
-        mock_process = Mock()
-        mock_job_executor.start_process.return_value = mock_process
-        mock_job_executor.monitor_process_output.return_value = result
+            # Test that extract_file_stream returns a StreamingResponse
+            response = await manager.extract_file_stream(
+                mock_repository, "test_archive", "test_file.txt"
+            )
 
-        metadata = await archive_manager.get_archive_metadata(
-            test_repository, "test-archive"
-        )
+            # Verify it's a StreamingResponse
+            from starlette.responses import StreamingResponse
 
-        assert metadata is not None
-        assert metadata.get("name") == "test-archive"
-        assert metadata.get("size") == 2000
-        assert metadata.get("stats") is not None
-        assert metadata.get("stats").get("nfiles") == 20
+            assert isinstance(response, StreamingResponse)
 
     @pytest.mark.asyncio
-    async def test_get_archive_metadata_not_found(
-        self,
-        archive_manager: ArchiveManager,
-        test_repository: Repository,
-        mock_job_executor: Mock,
-    ) -> None:
-        """Test archive metadata when archive is not found."""
-        # Setup mock result with different archives
-        repo_info = {"archives": [{"name": "other-archive", "size": 1000}]}
+    async def test_extract_file_stream_error(self, manager, mock_repository):
+        """Test file extraction with error"""
+        # Mock the secure_borg_command context manager
+        mock_process = AsyncMock()
+        mock_process.stdout.read.return_value = b""
+        mock_process.wait.return_value = 1
+        mock_process.stderr.read.return_value = b"Error: File not found"
 
-        result = SimpleNamespace()
-        result.return_code = 0
-        result.stdout = json.dumps(repo_info).encode("utf-8")
-        result.stderr = b""
-
-        mock_process = Mock()
-        mock_job_executor.start_process.return_value = mock_process
-        mock_job_executor.monitor_process_output.return_value = result
-
-        metadata = await archive_manager.get_archive_metadata(
-            test_repository, "nonexistent-archive"
-        )
-
-        assert metadata is None
-
-    @pytest.mark.asyncio
-    async def test_get_archive_metadata_borg_error(
-        self,
-        archive_manager: ArchiveManager,
-        test_repository: Repository,
-        mock_job_executor: Mock,
-    ) -> None:
-        """Test archive metadata retrieval with Borg error."""
-        result = SimpleNamespace()
-        result.return_code = 1
-        result.stdout = b""
-        result.stderr = b"Repository access denied"
-
-        mock_process = Mock()
-        mock_job_executor.start_process.return_value = mock_process
-        mock_job_executor.monitor_process_output.return_value = result
-
-        metadata = await archive_manager.get_archive_metadata(
-            test_repository, "test-archive"
-        )
-
-        assert metadata is None
-
-    def test_calculate_directory_size_root(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test calculating total size for root directory."""
-        entries = [
-            ArchiveEntry(
-                path="file1.txt", type="f", size=100, name="file1.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="file2.txt", type="f", size=200, name="file2.txt", isdir=False
-            ),
-            ArchiveEntry(path="dir1", type="d", size=0, name="dir1", isdir=True),
-            ArchiveEntry(
-                path="dir1/file3.txt", type="f", size=300, name="file3.txt", isdir=False
-            ),
-        ]
-
-        total_size = archive_manager.calculate_directory_size(entries, "")
-
-        # Should sum all files (ignore directories)
-        assert total_size == 600
-
-    def test_calculate_directory_size_subdirectory(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test calculating size for specific subdirectory."""
-        entries = [
-            ArchiveEntry(
-                path="file1.txt", type="f", size=100, name="file1.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="dir1/file2.txt", type="f", size=200, name="file2.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="dir1/file3.txt", type="f", size=300, name="file3.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="dir2/file4.txt", type="f", size=400, name="file4.txt", isdir=False
-            ),
-        ]
-
-        total_size = archive_manager.calculate_directory_size(entries, "dir1")
-
-        # Should sum only files in dir1
-        assert total_size == 500
-
-    def test_find_entries_by_pattern_case_sensitive(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test finding entries by pattern (case sensitive)."""
-        entries = [
-            ArchiveEntry(
-                path="Test.txt", type="f", size=100, name="Test.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="test.log", type="f", size=100, name="test.log", isdir=False
-            ),
-            ArchiveEntry(
-                path="data/Test.cfg", type="f", size=100, name="Test.cfg", isdir=False
-            ),
-        ]
-
-        matches = archive_manager.find_entries_by_pattern(
-            entries, "Test", case_sensitive=True
-        )
-
-        assert len(matches) == 2
-        names = [entry.name for entry in matches]
-        assert "Test.txt" in names
-        assert "Test.cfg" in names
-
-    def test_find_entries_by_pattern_case_insensitive(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test finding entries by pattern (case insensitive)."""
-        entries = [
-            ArchiveEntry(
-                path="Test.txt", type="f", size=100, name="Test.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="test.log", type="f", size=100, name="test.log", isdir=False
-            ),
-            ArchiveEntry(
-                path="data/config.cfg",
-                type="f",
-                size=100,
-                name="borgitory.config.cfg",
-                isdir=False,
-            ),
-        ]
-
-        matches = archive_manager.find_entries_by_pattern(
-            entries, "test", case_sensitive=False
-        )
-
-        assert len(matches) == 2
-        names = [entry.name for entry in matches]
-        assert "Test.txt" in names
-        assert "test.log" in names
-
-    def test_find_entries_by_pattern_regex(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test finding entries using regex pattern."""
-        entries = [
-            ArchiveEntry(
-                path="file1.txt", type="f", size=100, name="file1.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="file2.log", type="f", size=100, name="file2.log", isdir=False
-            ),
-            ArchiveEntry(
-                path="backup.tar.gz",
-                type="f",
-                size=100,
-                name="backup.tar.gz",
-                isdir=False,
-            ),
-        ]
-
-        matches = archive_manager.find_entries_by_pattern(entries, r"\.txt$")
-
-        assert len(matches) == 1
-        assert matches[0].name == "file1.txt"
-
-    def test_find_entries_by_pattern_invalid_regex(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test finding entries with invalid regex (fallback to literal)."""
-        entries = [
-            ArchiveEntry(
-                path="test[.txt", type="f", size=100, name="test[.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="normal.txt", type="f", size=100, name="normal.txt", isdir=False
-            ),
-        ]
-
-        # This should treat the pattern as literal string
-        matches = archive_manager.find_entries_by_pattern(entries, "[")
-
-        assert len(matches) == 1
-        assert matches[0].name == "test[.txt"
-
-    def test_get_file_type_summary(self, archive_manager: ArchiveManager) -> None:
-        """Test generating file type summary."""
-        entries = [
-            ArchiveEntry(
-                path="doc1.txt", type="f", size=100, name="doc1.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="doc2.txt", type="f", size=100, name="doc2.txt", isdir=False
-            ),
-            ArchiveEntry(
-                path="image.jpg", type="f", size=100, name="image.jpg", isdir=False
-            ),
-            ArchiveEntry(path="folder1", type="d", size=0, name="folder1", isdir=True),
-            ArchiveEntry(path="folder2", type="d", size=0, name="folder2", isdir=True),
-            ArchiveEntry(
-                path="script", type="f", size=100, name="script", isdir=False
-            ),  # no extension
-        ]
-
-        summary = archive_manager.get_file_type_summary(entries)
-
-        # Should be sorted by count descending
-        expected_order = [".txt", "directory", ".jpg", "no extension"]
-        assert list(summary.keys()) == expected_order
-        assert summary[".txt"] == 2
-        assert summary["directory"] == 2
-        assert summary[".jpg"] == 1
-        assert summary["no extension"] == 1
-
-    def test_validate_archive_path_valid(self, archive_manager: ArchiveManager) -> None:
-        """Test validation of valid archive name and path."""
         with patch(
-            "borgitory.services.archives.archive_manager.validate_archive_name"
-        ) as mock_validate_archive:
-            with patch(
-                "borgitory.services.archives.archive_manager.sanitize_path"
-            ) as mock_sanitize_path:
-                mock_validate_archive.return_value = None  # No exception means valid
-                mock_sanitize_path.return_value = "/safe/path"
+            "borgitory.services.archives.archive_manager.build_secure_borg_command_with_keyfile"
+        ) as mock_secure:
+            mock_result = MagicMock()
+            mock_result.command = [
+                "borg",
+                "extract",
+                "--stdout",
+                "/test/repo::test_archive",
+                "missing_file.txt",
+            ]
+            mock_result.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+            mock_result.cleanup_temp_files.return_value = None
+            mock_secure.return_value = mock_result
 
-                errors = archive_manager.validate_archive_path(
-                    "valid-archive", "/safe/path"
+            manager.command_executor.create_subprocess.return_value = mock_process
+
+            # Test that extract_file_stream raises an exception when stream is consumed
+            with pytest.raises(Exception, match="Borg extract failed"):
+                response = await manager.extract_file_stream(
+                    mock_repository, "test_archive", "missing_file.txt"
                 )
-
-                assert len(errors) == 0
-                mock_validate_archive.assert_called_once_with("valid-archive")
-                mock_sanitize_path.assert_called_once_with("/safe/path")
-
-    def test_validate_archive_path_invalid(
-        self, archive_manager: ArchiveManager
-    ) -> None:
-        """Test validation with invalid archive name and path."""
-        with patch(
-            "borgitory.services.archives.archive_manager.validate_archive_name"
-        ) as mock_validate_archive:
-            with patch(
-                "borgitory.services.archives.archive_manager.sanitize_path"
-            ) as mock_sanitize_path:
-                mock_validate_archive.side_effect = Exception("Invalid archive name")
-                mock_sanitize_path.side_effect = Exception("Unsafe path")
-
-                errors = archive_manager.validate_archive_path(
-                    "../evil", "../../etc/passwd"
-                )
-
-                assert len(errors) == 2
-                assert "archive_name" in errors
-                assert "file_path" in errors
-                assert "Invalid archive name" in errors["archive_name"]
-                assert "Unsafe path" in errors["file_path"]
+                # Consume the stream to trigger the exception
+                async for chunk in response.body_iterator:
+                    pass

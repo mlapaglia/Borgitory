@@ -43,6 +43,7 @@ from borgitory.models.database import SessionLocal, get_db
 from borgitory.utils.template_paths import get_template_directory
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
+from borgitory.protocols.archive_manager_protocol import ArchiveManagerProtocol
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.jobs.job_manager import JobManager
@@ -113,7 +114,6 @@ def datetime_browser_filter(
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_sync_service import CloudSyncConfigService
-    from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
     from borgitory.protocols.command_protocols import (
         CommandRunnerProtocol,
         ProcessExecutorProtocol,
@@ -1074,84 +1074,78 @@ PathServiceDep = Annotated["PathServiceInterface", Depends(get_path_service)]
 
 
 @lru_cache()
-def get_archive_mount_manager_singleton() -> "ArchiveMountManager":
+def get_archive_manager_singleton() -> ArchiveManagerProtocol:
     """
-    Create ArchiveMountManager singleton for application-scoped use.
+    Create ArchiveManager singleton for application-scoped use.
 
     📋 USAGE:
     ✅ Use for: Singletons, direct instantiation, tests, background tasks
-    ❌ Don't use for: FastAPI endpoints (use get_archive_mount_manager_dependency instead)
+    ❌ Don't use for: FastAPI endpoints (use get_archive_manager_dependency instead)
 
     📋 PATTERN: Dual Functions
     This is the singleton version that resolves dependencies directly.
-    For FastAPI DI, use get_archive_mount_manager_dependency() with Depends().
+    For FastAPI DI, use get_archive_manager_dependency() with Depends().
 
     Returns:
-        ArchiveMountManager: Cached singleton instance with persistent mount state
+        ArchiveManagerProtocol: Cached singleton instance with persistent cache state
     """
-    from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
-
     # Resolve dependencies directly (not via FastAPI DI)
     wsl_executor = get_wsl_command_executor()
     command_executor = get_command_executor(wsl_executor)
     job_executor = get_job_executor(command_executor)
-    path_config = get_path_configuration_service()
 
-    return ArchiveMountManager(
+    return ArchiveManager(
         job_executor=job_executor,
         command_executor=command_executor,
-        path_config=path_config,
-        mounting_timeout=timedelta(seconds=30),
+        cache_ttl=timedelta(minutes=30),
     )
 
 
-def get_archive_mount_manager_dependency() -> "ArchiveMountManager":
+def get_archive_manager_dependency() -> ArchiveManagerProtocol:
     """
-    Provide ArchiveMountManager with FastAPI dependency injection.
+    Provide ArchiveManager with FastAPI dependency injection.
 
     📋 USAGE:
-    ✅ Use for: FastAPI endpoints with Depends(get_archive_mount_manager_dependency)
+    ✅ Use for: FastAPI endpoints with Depends(get_archive_manager_dependency)
     ❌ Don't use for: Direct calls, singletons, tests
 
     ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
-    ⚠️  For direct calls, use get_archive_mount_manager_singleton() instead.
+    ⚠️  For direct calls, use get_archive_manager_singleton() instead.
 
     📋 PATTERN: Dual Functions
     This is the FastAPI DI version that returns the same singleton instance.
-    For direct calls, use get_archive_mount_manager_singleton().
+    For direct calls, use get_archive_manager_singleton().
 
     Returns:
-        ArchiveMountManager: The same singleton instance as get_archive_mount_manager_singleton()
+        ArchiveManagerProtocol: The same singleton instance as get_archive_manager_singleton()
     """
     # Both functions return the same singleton instance
-    # This ensures mount state consistency across all usage patterns
-    return get_archive_mount_manager_singleton()
-
-
-ArchiveMountManagerDep = Annotated[
-    "ArchiveMountManager", Depends(get_archive_mount_manager_dependency)
-]
+    # This ensures cache state consistency across all usage patterns
+    return get_archive_manager_singleton()
 
 
 def get_archive_manager(
     job_executor: JobExecutor = Depends(get_job_executor),
-    mount_manager: "ArchiveMountManager" = Depends(
-        get_archive_mount_manager_dependency
-    ),
-) -> ArchiveManager:
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+) -> ArchiveManagerProtocol:
     """
     Provide an ArchiveManager instance with proper dependency injection.
 
-    Uses FastAPI DI with automatic dependency resolution.
+    Uses the factory to create the appropriate archive manager implementation.
+    Defaults to borg list-based manager for better reliability.
+
+    Note: This creates a new instance per request. For singleton behavior,
+    use get_archive_manager_dependency() instead.
     """
     return ArchiveManager(
         job_executor=job_executor,
-        mount_manager=mount_manager,
+        command_executor=command_executor,
+        cache_ttl=timedelta(minutes=30),
     )
 
 
 def get_archive_service(
-    archive_manager: ArchiveManager = Depends(get_archive_manager),
+    archive_manager: ArchiveManagerProtocol = Depends(get_archive_manager_dependency),
 ) -> "ArchiveServiceProtocol":
     """
     Provide ArchiveManager service for archive operations.
@@ -1212,7 +1206,9 @@ def get_repository_service(
 
 RequestScopedBorgService = Annotated[BorgService, Depends(get_borg_service)]
 BorgServiceDep = RequestScopedBorgService
-ArchiveManagerDep = Annotated[ArchiveManager, Depends(get_archive_manager)]
+ArchiveManagerDep = Annotated[
+    ArchiveManagerProtocol, Depends(get_archive_manager_dependency)
+]
 RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_service)]
 
 

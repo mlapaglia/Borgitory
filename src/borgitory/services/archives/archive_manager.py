@@ -1,127 +1,460 @@
 """
-ArchiveManager - Handles Borg archive operations and content management
+Borg List Archive Manager - Uses borg list command for archive browsing
 """
 
 import asyncio
-from dataclasses import dataclass
 import json
 import logging
-from typing import Dict, List, Optional, AsyncGenerator, TypedDict, TYPE_CHECKING
+import os
+from pathlib import PurePath
+from typing import List, AsyncGenerator, Dict, Optional, TYPE_CHECKING
+from datetime import datetime, timedelta
+
+from starlette.responses import StreamingResponse
 
 from borgitory.models.database import Repository
-from borgitory.services.jobs.job_executor import JobExecutor
+from borgitory.services.archives.archive_models import ArchiveEntry
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.utils.security import (
-    cleanup_temp_keyfile,
-    validate_archive_name,
-    sanitize_path,
+    build_secure_borg_command_with_keyfile,
     secure_borg_command,
+    validate_archive_name,
 )
 
 if TYPE_CHECKING:
-    from borgitory.services.archives.archive_mount_manager import ArchiveMountManager
+    from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class ArchiveEntry:
-    """Individual archive entry (file/directory) structure"""
-
-    # Required fields
-    path: str
-    name: str
-    type: str  # 'f' for file, 'd' for directory, etc.
-    size: int
-    isdir: bool
-
-    # Optional fields from Borg JSON output
-    mtime: Optional[str] = None
-    mode: Optional[str] = None
-    uid: Optional[int] = None
-    gid: Optional[int] = None
-    healthy: Optional[bool] = None
-
-    # Additional computed fields
-    children_count: Optional[int] = None
-
-
-class ArchiveMetadata(TypedDict, total=False):
-    """Archive metadata structure from Borg repository info"""
-
-    # Standard Borg archive fields
-    name: str
-    id: str
-    start: str
-    end: str
-    duration: float
-    stats: Dict[str, object]
-    # Size field that may be present in some Borg versions
-    size: int
-    # Additional fields that may be present
-    command_line: List[str]
-    hostname: str
-    username: str
-    comment: str
-
-
-class FileTypeSummary(TypedDict):
-    """File type summary structure"""
-
-    # Key is file type (extension or 'directory'), value is count
-    # This is a regular dict with string keys and int values
-
-
-class ArchiveValidationResult(TypedDict):
-    """Archive path validation result structure"""
-
-    # Key is field name, value is error message (empty dict if no errors)
-
-
 class ArchiveManager:
     """
-    Handles Borg archive operations and content management.
+    Archive manager implementation that uses borg list command instead of FUSE mounting.
 
-    Responsibilities:
-    - List and query archive contents
-    - Extract files from archives
-    - Filter and organize archive content listings
-    - Stream file content from archives
-    - Manage archive metadata and structure
+    This approach:
+    - Avoids the complexity of FUSE mounting
+    - Works reliably across different platforms
+    - Uses direct borg commands for better performance
+    - Provides the same interface as the mount-based manager
+    - Caches archive contents in memory for improved performance
     """
 
     def __init__(
         self,
-        job_executor: JobExecutor,
-        mount_manager: "ArchiveMountManager",
+        job_executor: "ProcessExecutorProtocol",
+        command_executor: CommandExecutorProtocol,
+        cache_ttl: timedelta = timedelta(minutes=30),
     ) -> None:
         self.job_executor = job_executor
-        self.mount_manager = mount_manager
+        self.command_executor = command_executor
+        self.cache_ttl = cache_ttl
+
+        # In-memory cache for archive contents
+        # Key: "repository_path::archive_name", Value: (items, cached_at)
+        self._archive_cache: Dict[str, tuple[List[ArchiveEntry], datetime]] = {}
+
+    def _get_cache_key(self, repository: Repository, archive_name: str) -> str:
+        """Generate cache key for repository and archive combination"""
+        return f"{repository.path}::{archive_name}"
+
+    def _is_cache_valid(self, cached_at: datetime) -> bool:
+        """Check if cached data is still valid based on TTL"""
+        return datetime.now() - cached_at < self.cache_ttl
+
+    def _get_cached_items(
+        self, repository: Repository, archive_name: str
+    ) -> Optional[List[ArchiveEntry]]:
+        """Get cached archive items if available and valid"""
+        cache_key = self._get_cache_key(repository, archive_name)
+
+        if cache_key in self._archive_cache:
+            items, cached_at = self._archive_cache[cache_key]
+            if self._is_cache_valid(cached_at):
+                logger.info(f"Cache hit for {cache_key}")
+                return items
+            else:
+                logger.info(f"Cache expired for {cache_key}")
+                # Remove expired entry
+                del self._archive_cache[cache_key]
+
+        return None
+
+    def _cache_items(
+        self, repository: Repository, archive_name: str, items: List[ArchiveEntry]
+    ) -> None:
+        """Cache archive items with current timestamp"""
+        cache_key = self._get_cache_key(repository, archive_name)
+        self._archive_cache[cache_key] = (items, datetime.now())
+        logger.info(f"Cached {len(items)} items for {cache_key}")
+
+    def clear_cache(
+        self,
+        repository: Optional[Repository] = None,
+        archive_name: Optional[str] = None,
+    ) -> None:
+        """
+        Clear cache entries.
+
+        Args:
+            repository: If provided, only clear cache for this repository
+            archive_name: If provided with repository, only clear cache for this specific archive
+        """
+        if repository is None:
+            # Clear all cache
+            self._archive_cache.clear()
+            logger.info("Cleared all archive cache")
+        elif archive_name is None:
+            # Clear cache for all archives in this repository
+            repo_path = repository.path
+            keys_to_remove = [
+                key
+                for key in self._archive_cache.keys()
+                if key.startswith(f"{repo_path}::")
+            ]
+            for key in keys_to_remove:
+                del self._archive_cache[key]
+            logger.info(
+                f"Cleared cache for repository {repo_path} ({len(keys_to_remove)} entries)"
+            )
+        else:
+            # Clear cache for specific repository and archive
+            cache_key = self._get_cache_key(repository, archive_name)
+            if cache_key in self._archive_cache:
+                del self._archive_cache[cache_key]
+                logger.info(f"Cleared cache for {cache_key}")
+
+    def get_cache_stats(self) -> Dict[str, int]:
+        """Get cache statistics"""
+        total_entries = len(self._archive_cache)
+        valid_entries = sum(
+            1
+            for _, cached_at in self._archive_cache.values()
+            if self._is_cache_valid(cached_at)
+        )
+        expired_entries = total_entries - valid_entries
+
+        return {
+            "total_entries": total_entries,
+            "valid_entries": valid_entries,
+            "expired_entries": expired_entries,
+            "cache_ttl_minutes": int(self.cache_ttl.total_seconds() / 60),
+        }
 
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
     ) -> List[ArchiveEntry]:
-        """List contents of a specific directory within an archive using FUSE mount"""
+        """
+        List contents of a specific directory within an archive using borg list command.
+
+        This implementation:
+        1. Checks cache first for the complete archive contents
+        2. Uses borg list with JSON output to get all items if not cached
+        3. Filters items to show only immediate children of the target path
+        4. Groups items by their immediate parent directory
+        5. Returns the same ArchiveEntry format as the mount-based implementation
+        """
         logger.info(
-            f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using FUSE mount"
+            f"Listing directory '{path}' in archive '{archive_name}' of repository '{repository.name}' using borg list"
         )
 
-        mount_manager = self.mount_manager
+        # Clean and normalize the path
+        clean_path = path.strip().strip("/")
 
-        # Mount the archive if not already mounted
-        await mount_manager.mount_archive(repository, archive_name)
+        try:
+            # Try to get cached items first
+            all_items = self._get_cached_items(repository, archive_name)
 
-        # List the directory contents using filesystem operations
-        contents = await mount_manager.list_directory(repository, archive_name, path)
+            if all_items is None:
+                # Cache miss - get all items from the archive using borg list
+                logger.info(
+                    f"Cache miss for {repository.path}::{archive_name}, fetching from borg"
+                )
+                all_items = await self._get_archive_items(repository, archive_name)
 
-        logger.info(
-            f"Listed {len(contents)} items from mounted archive {archive_name} path '{path}'"
-        )
-        return contents
+                # Cache the results
+                self._cache_items(repository, archive_name, all_items)
+            else:
+                logger.info(f"Cache hit for {repository.path}::{archive_name}")
+
+            # Filter to show only immediate children of the target path
+            filtered_items = self._filter_directory_contents(all_items, clean_path)
+
+            logger.info(
+                f"Listed {len(filtered_items)} items from archive {archive_name} path '{path}'"
+            )
+            return filtered_items
+
+        except Exception as e:
+            logger.error(f"Error listing directory {path}: {e}")
+            raise Exception(f"Failed to list directory: {str(e)}")
+
+    async def extract_file_stream(
+        self, repository: Repository, archive_name: str, file_path: str
+    ) -> StreamingResponse:
+        """Extract a single file from an archive and stream it to the client"""
+        result = None
+        try:
+            # Validate inputs
+            if not archive_name or not archive_name.strip():
+                raise ValueError("Archive name must be a non-empty string")
+
+            if not file_path:
+                raise ValueError("File path is required")
+
+            validate_archive_name(archive_name)
+
+            # Build borg extract command with --stdout
+            # Ensure file_path starts with / for borg
+            if not file_path.startswith("/"):
+                file_path = "/" + file_path
+            borg_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
+
+            # Use manual keyfile management for streaming operations
+            result = build_secure_borg_command_with_keyfile(
+                base_command="borg extract",
+                repository_path="",
+                passphrase=repository.get_passphrase(),
+                keyfile_content=repository.get_keyfile_content(),
+                additional_args=borg_args,
+            )
+            command, env = result.command, result.environment
+
+            logger.info(f"Extracting file {file_path} from archive {archive_name}")
+
+            # Start the borg process using command executor for cross-platform compatibility
+            process = await self.command_executor.create_subprocess(
+                command=command,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            async def generate_stream() -> AsyncGenerator[bytes, None]:
+                """Generator function to stream the file content with automatic backpressure"""
+                try:
+                    while True:
+                        if process.stdout is None:
+                            break
+                        chunk = await process.stdout.read(
+                            65536
+                        )  # 64KB chunks for efficiency
+                        if not chunk:
+                            break
+
+                        yield chunk
+
+                    # Wait for process to complete
+                    return_code = await process.wait()
+
+                    # Check for errors after process completes
+                    if return_code != 0:
+                        # Read stderr for error details
+                        stderr_data = b""
+                        if process.stderr:
+                            try:
+                                stderr_data = await process.stderr.read()
+                            except Exception as e:
+                                logger.warning(f"Could not read stderr: {e}")
+
+                        error_msg = (
+                            stderr_data.decode("utf-8", errors="replace")
+                            if stderr_data
+                            else "Unknown error"
+                        )
+                        logger.error(
+                            f"Borg extract process failed with code {return_code}: {error_msg}"
+                        )
+                        raise Exception(
+                            f"Borg extract failed with code {return_code}: {error_msg}"
+                        )
+
+                except Exception:
+                    # Clean up process if still running
+                    if process.returncode is None:
+                        process.terminate()
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=5.0)
+                        except asyncio.TimeoutError:
+                            process.kill()
+                            await process.wait()
+                    raise
+                finally:
+                    # Clean up keyfile after streaming completes
+                    result.cleanup_temp_files()
+
+            filename = os.path.basename(file_path)
+
+            return StreamingResponse(
+                generate_stream(),
+                media_type="application/octet-stream",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+
+        except Exception as e:
+            # Clean up keyfile if error occurs before streaming starts
+            if result:
+                result.cleanup_temp_files()
+            logger.error(f"Failed to extract file {file_path}: {str(e)}")
+            raise Exception(f"Failed to extract file: {str(e)}")
+
+    async def _get_archive_items(
+        self, repository: Repository, archive_name: str
+    ) -> List[ArchiveEntry]:
+        """
+        Get all items from an archive using borg list command with JSON output.
+
+        Returns a flat list of all ArchiveEntry objects in the archive.
+        """
+        # Build the borg list command with JSON output
+        base_command = "borg list"
+        additional_args = [
+            "--json-lines",
+            "--format",
+            json.dumps(
+                {
+                    "type": "{type}",
+                    "mode": "{mode}",
+                    "uid": "{uid}",
+                    "gid": "{gid}",
+                    "user": "{user}",
+                    "group": "{group}",
+                    "size": "{size}",
+                    "mtime": "{mtime}",
+                    "path": "{path}",
+                }
+            ),
+            f"{repository.path}::{archive_name}",
+        ]
+
+        keyfile_content = repository.get_keyfile_content()
+        passphrase = repository.get_passphrase() or ""
+
+        async with secure_borg_command(
+            base_command=base_command,
+            repository_path="",  # Already included in additional_args
+            passphrase=passphrase,
+            keyfile_content=keyfile_content,
+            additional_args=additional_args,
+        ) as (final_command, env, temp_keyfile_path):
+            try:
+                # Use command_executor directly instead of job_executor to avoid WSL FIFO issues
+                cmd_result = await self.command_executor.execute_command(
+                    command=final_command,
+                    env=env,
+                    timeout=60.0,  # 1 minute timeout for listing
+                )
+
+                if not cmd_result.success:
+                    error_text = (
+                        cmd_result.stderr or cmd_result.error or "Unknown error"
+                    )
+                    raise Exception(f"Borg list failed: {error_text}")
+
+                # Parse the JSON lines output
+                items = self._parse_borg_list_output(cmd_result.stdout)
+
+                logger.info(f"Retrieved {len(items)} items from archive {archive_name}")
+                return items
+
+            except Exception as e:
+                logger.error(f"Error getting archive items: {e}")
+                raise
+
+    def _parse_borg_list_output(self, output_text: str) -> List[ArchiveEntry]:
+        """
+        Parse the JSON lines output from borg list command.
+
+        Converts the JSON output into ArchiveEntry objects.
+        """
+        items = []
+        lines = output_text.strip().split("\n")
+
+        for line in lines:
+            if not line.strip():
+                continue
+
+            try:
+                data = json.loads(line)
+
+                # Parse item type
+                type_char = data.get("type", "-")
+                if type_char == "d":
+                    item_type = "d"  # directory
+                elif type_char == "-":
+                    item_type = "f"  # file
+                elif type_char == "l":
+                    item_type = "l"  # symlink
+                else:
+                    item_type = "f"  # default to file for other types
+
+                # Parse mtime
+                mtime = None
+                if data.get("mtime"):
+                    try:
+                        # Convert ISO format to string
+                        mtime = data["mtime"]
+                    except (ValueError, TypeError):
+                        pass
+
+                # Extract name from path
+                path = data.get("path", "")
+                name = PurePath(path).name if path else ""
+
+                # Parse size
+                try:
+                    size = int(data.get("size", 0))
+                except (ValueError, TypeError):
+                    size = 0
+
+                # Determine if it's a directory
+                is_directory = item_type == "d"
+
+                # Extract mode (permissions)
+                mode = data.get("mode", "")
+                if mode and len(mode) >= 4:
+                    # Extract user permissions (e.g., "rwx" from "drwxr-xr-x")
+                    user_mode = (
+                        mode[1:4] if mode.startswith(("d", "-", "l")) else mode[:3]
+                    )
+                else:
+                    user_mode = None
+
+                entry = ArchiveEntry(
+                    path=path,
+                    name=name,
+                    type=item_type,
+                    size=size,
+                    isdir=is_directory,
+                    mtime=mtime,
+                    mode=user_mode,
+                    uid=int(data.get("uid", 0))
+                    if data.get("uid") is not None
+                    else None,
+                    gid=int(data.get("gid", 0))
+                    if data.get("gid") is not None
+                    else None,
+                    healthy=True,  # Assume healthy unless we have evidence otherwise
+                )
+
+                items.append(entry)
+
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                logger.warning(
+                    f"Failed to parse borg list line: {line[:100]}... Error: {e}"
+                )
+                continue
+
+        return items
 
     def _filter_directory_contents(
         self, all_entries: List[ArchiveEntry], target_path: str = ""
     ) -> List[ArchiveEntry]:
-        """Filter entries to show only immediate children of target_path"""
+        """
+        Filter entries to show only immediate children of target_path.
+
+        This is the same logic as the original ArchiveManager but adapted
+        for the borg list output format.
+        """
         target_path = target_path.strip().strip("/")
 
         logger.info(
@@ -201,225 +534,3 @@ class ArchiveManager:
 
         logger.info(f"Filtered to {len(result)} immediate children")
         return result
-
-    async def extract_file_stream(
-        self, repository: Repository, archive_name: str, file_path: str
-    ) -> AsyncGenerator[bytes, None]:
-        """Extract a single file from an archive and stream it as an async generator"""
-        logger.info(f"Extracting file {file_path} from archive {archive_name}")
-
-        # Build the Borg extract command
-        base_command = "borg extract"
-        additional_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
-
-        keyfile_content = repository.get_keyfile_content()
-        passphrase = repository.get_passphrase() or ""
-
-        async with secure_borg_command(
-            base_command=base_command,
-            repository_path="",  # Already included in additional_args
-            passphrase=passphrase,
-            keyfile_content=keyfile_content,
-            additional_args=additional_args,
-            cleanup_keyfile=False,
-        ) as (final_command, env, temp_keyfile_path):
-            try:
-                process = await asyncio.create_subprocess_exec(
-                    *final_command,
-                    env=env,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-
-                try:
-                    while True:
-                        if not process.stdout:
-                            break
-                        chunk = await process.stdout.read(
-                            65536
-                        )  # 64KB chunks for efficiency
-                        if not chunk:
-                            break
-
-                        yield chunk
-
-                    return_code = await process.wait()
-                    if return_code != 0:
-                        stderr_data = (
-                            await process.stderr.read() if process.stderr else b""
-                        )
-                        error_msg = stderr_data.decode("utf-8", errors="replace")
-                        raise Exception(
-                            f"Borg extract failed with code {return_code}: {error_msg}"
-                        )
-
-                except Exception as e:
-                    if process.returncode is None:
-                        process.terminate()
-                        try:
-                            await asyncio.wait_for(process.wait(), timeout=5.0)
-                        except asyncio.TimeoutError:
-                            process.kill()
-                            await process.wait()
-                    raise Exception(f"File extraction failed: {str(e)}")
-            finally:
-                # Always cleanup the temporary keyfile
-                if temp_keyfile_path:
-                    cleanup_temp_keyfile(temp_keyfile_path)
-
-    async def get_archive_metadata(
-        self, repository: Repository, archive_name: str
-    ) -> Optional[ArchiveMetadata]:
-        """Get metadata for a specific archive"""
-        try:
-            base_command = "borg info"
-            additional_args = ["--json", repository.path]
-            keyfile_content = repository.get_keyfile_content()
-            passphrase = repository.get_passphrase() or ""
-
-            async with secure_borg_command(
-                base_command=base_command,
-                repository_path="",  # Already included in additional_args
-                passphrase=passphrase,
-                keyfile_content=keyfile_content,
-                additional_args=additional_args,
-            ) as (final_command, env, temp_keyfile_path):
-                process = await self.job_executor.start_process(final_command, env)
-                result = await self.job_executor.monitor_process_output(process)
-
-                if result.return_code == 0:
-                    output_text = result.stdout.decode("utf-8", errors="replace")
-                    try:
-                        repo_info = json.loads(output_text)
-                        archives = repo_info.get("archives", [])
-
-                        # Find the specific archive
-                        for archive in archives:
-                            if archive.get("name") == archive_name:
-                                # Convert to ArchiveMetadata TypedDict
-                                metadata: ArchiveMetadata = {}
-                                if archive.get("name"):
-                                    metadata["name"] = archive["name"]
-                                if archive.get("id"):
-                                    metadata["id"] = archive["id"]
-                                if archive.get("start"):
-                                    metadata["start"] = archive["start"]
-                                if archive.get("end"):
-                                    metadata["end"] = archive["end"]
-                                if archive.get("duration"):
-                                    metadata["duration"] = archive["duration"]
-                                if archive.get("stats"):
-                                    metadata["stats"] = archive["stats"]
-                                if archive.get("size"):
-                                    metadata["size"] = archive["size"]
-                                if archive.get("command_line"):
-                                    metadata["command_line"] = archive["command_line"]
-                                if archive.get("hostname"):
-                                    metadata["hostname"] = archive["hostname"]
-                                if archive.get("username"):
-                                    metadata["username"] = archive["username"]
-                                if archive.get("comment"):
-                                    metadata["comment"] = archive["comment"]
-                                return metadata
-
-                        return None  # Archive not found
-                    except json.JSONDecodeError:
-                        logger.warning("Could not parse repository info JSON")
-                        return None
-                else:
-                    error_text = (
-                        result.stderr.decode("utf-8", errors="replace")
-                        if result.stderr
-                        else "Unknown error"
-                    )
-                    logger.error(f"Failed to get repository info: {error_text}")
-                    return None
-
-        except Exception as e:
-            logger.error(f"Error getting archive metadata: {e}")
-            return None
-
-    def calculate_directory_size(
-        self, entries: List[ArchiveEntry], directory_path: str = ""
-    ) -> int:
-        """Calculate the total size of all files in a directory path"""
-        total_size = 0
-        directory_path = directory_path.strip().strip("/")
-
-        for entry in entries:
-            entry_path = entry.path.lstrip("/")
-
-            # Check if this entry is within the target directory
-            if directory_path:
-                if (
-                    not entry_path.startswith(directory_path + "/")
-                    and entry_path != directory_path
-                ):
-                    continue
-
-            # Add size if it's a file (not a directory)
-            if entry.type != "d":
-                total_size += entry.size
-
-        return total_size
-
-    def find_entries_by_pattern(
-        self, entries: List[ArchiveEntry], pattern: str, case_sensitive: bool = False
-    ) -> List[ArchiveEntry]:
-        """Find archive entries matching a pattern"""
-        import re
-
-        flags = 0 if case_sensitive else re.IGNORECASE
-        try:
-            regex = re.compile(pattern, flags)
-        except re.error:
-            # If pattern is not a valid regex, treat it as a literal string
-            pattern = re.escape(pattern)
-            regex = re.compile(pattern, flags)
-
-        matching_entries = []
-        for entry in entries:
-            path = entry.path
-            name = entry.name
-
-            if regex.search(path) or regex.search(name):
-                matching_entries.append(entry)
-
-        return matching_entries
-
-    def get_file_type_summary(self, entries: List[ArchiveEntry]) -> Dict[str, int]:
-        """Get a summary of file types in the archive"""
-        type_counts: Dict[str, int] = {}
-
-        for entry in entries:
-            if entry.type == "d":
-                entry_type = "directory"
-            else:
-                path = entry.path
-                if "." in path:
-                    extension = path.split(".")[-1].lower()
-                    entry_type = f".{extension}"
-                else:
-                    entry_type = "no extension"
-
-            type_counts[entry_type] = type_counts.get(entry_type, 0) + 1
-
-        return dict(sorted(type_counts.items(), key=lambda x: x[1], reverse=True))
-
-    def validate_archive_path(
-        self, archive_name: str, file_path: str
-    ) -> Dict[str, str]:
-        """Validate archive name and file path parameters"""
-        errors = {}
-
-        try:
-            validate_archive_name(archive_name)
-        except Exception as e:
-            errors["archive_name"] = str(e)
-
-        try:
-            sanitize_path(file_path)
-        except Exception as e:
-            errors["file_path"] = str(e)
-
-        return errors

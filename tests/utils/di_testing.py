@@ -246,9 +246,8 @@ class MockServiceFactory:
         mock = Mock(spec=ArchiveManager)
 
         # Setup common return values
-        mock.get_archive_metadata.return_value = {"name": "test-archive"}
         mock.list_archive_directory_contents.return_value = []
-        mock.validate_archive_path.return_value = True
+        mock.extract_file_stream.return_value = Mock()  # StreamingResponse mock
 
         return mock
 

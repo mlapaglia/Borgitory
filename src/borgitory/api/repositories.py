@@ -21,6 +21,7 @@ from borgitory.models.schemas import (
 )
 from borgitory.dependencies import (
     BorgServiceDep,
+    ArchiveManagerDep,
     TemplatesDep,
     RepositoryServiceDep,
     PathServiceDep,
@@ -769,7 +770,7 @@ async def extract_file(
     repo_id: int,
     archive_name: str,
     file: str,
-    borg_svc: BorgServiceDep,
+    archive_manager: ArchiveManagerDep,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     repository = db.query(Repository).filter(Repository.id == repo_id).first()
@@ -777,6 +778,6 @@ async def extract_file(
         raise HTTPException(status_code=404, detail="Repository not found")
 
     try:
-        return await borg_svc.extract_file_stream(repository, archive_name, file)
+        return await archive_manager.extract_file_stream(repository, archive_name, file)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

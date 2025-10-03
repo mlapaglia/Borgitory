@@ -143,11 +143,11 @@ class TestMockServiceFactory:
         mock = MockServiceFactory.create_mock_archive_manager()
 
         assert isinstance(mock, Mock)
-        assert hasattr(mock, "get_archive_metadata")
-        assert hasattr(mock, "validate_archive_path")
+        assert hasattr(mock, "list_archive_directory_contents")
+        assert hasattr(mock, "extract_file_stream")
 
         # Verify return values
-        assert mock.validate_archive_path.return_value is True
+        assert mock.list_archive_directory_contents.return_value == []
 
     def test_create_mock_repository_service(self) -> None:
         """Test RepositoryService mock creation."""
