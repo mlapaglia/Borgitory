@@ -59,12 +59,10 @@ class ArchiveMountManager:
         job_executor: "ProcessExecutorProtocol",
         command_executor: CommandExecutorProtocol,
         path_config: "PathConfigurationService",
-        mount_timeout: timedelta = timedelta(seconds=1800),
         mounting_timeout: timedelta = timedelta(seconds=30),
     ) -> None:
         self.path_config = path_config
         self.active_mounts: Dict[str, MountInfo] = {}  # key: repo_path::archive_name
-        self.mount_timeout = mount_timeout
         self.mounting_timeout = mounting_timeout
         self.job_executor = job_executor
         self.command_executor = command_executor

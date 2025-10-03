@@ -2,7 +2,7 @@ import inspect
 import json
 import logging
 from borgitory.utils.datetime_utils import now_utc
-from typing import Any, List, Dict, Callable, cast, Optional, Union, TYPE_CHECKING
+from typing import Any, List, Dict, Callable, cast, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_providers.registry import ProviderMetadata
@@ -20,6 +20,7 @@ from borgitory.services.cloud_providers.registry import (
 )
 from borgitory.services.cloud_providers import StorageFactory
 from borgitory.services.encryption_service import EncryptionService
+from borgitory.custom_types import ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +282,7 @@ class CloudSyncConfigService:
             )
 
         # Build parameters for the test method using parameter mapping
-        test_params: Dict[str, Union[str, int, float, bool, None]] = {}
+        test_params: ConfigDict = {}
         logger.info(f"Decrypted config fields: {list(decrypted_config.keys())}")
         logger.info(f"Parameter mapping: {mapping.parameter_mapping}")
 

@@ -3,9 +3,86 @@ from typing import Dict, Optional, Union, cast
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
+import json
 
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
+
+
+def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
+    """
+    Validate patterns JSON string.
+
+    Args:
+        patterns_json: JSON string containing patterns configuration
+
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not patterns_json or patterns_json.strip() == "":
+        return True, None
+
+    try:
+        from borgitory.models.patterns import PatternType, PatternStyle
+        from borgitory.services.borg.borg_pattern_validation_service import (
+            validate_pattern,
+        )
+
+        patterns_data = json.loads(patterns_json)
+
+        if not isinstance(patterns_data, list):
+            return False, "Patterns must be a list"
+
+        for i, pattern_data in enumerate(patterns_data):
+            if not isinstance(pattern_data, dict):
+                return False, f"Pattern {i + 1} must be an object"
+
+            # Validate required fields
+            required_fields = ["name", "expression", "pattern_type", "style"]
+            for field in required_fields:
+                if field not in pattern_data:
+                    return False, f"Pattern {i + 1} missing required field: {field}"
+
+            # Validate pattern_type
+            try:
+                PatternType(pattern_data["pattern_type"])
+            except ValueError:
+                return (
+                    False,
+                    f"Pattern {i + 1} has invalid pattern_type: {pattern_data['pattern_type']}",
+                )
+
+            # Validate style
+            try:
+                PatternStyle(pattern_data["style"])
+            except ValueError:
+                return (
+                    False,
+                    f"Pattern {i + 1} has invalid style: {pattern_data['style']}",
+                )
+
+            # Validate the actual pattern using the validation service
+            action_map = {"include": "+", "exclude": "-", "exclude_norec": "!"}
+            action = action_map.get(pattern_data["pattern_type"], "+")
+
+            is_valid, error, _ = validate_pattern(
+                pattern_str=pattern_data["expression"],
+                style=pattern_data["style"],
+                action=action,
+            )
+
+            if not is_valid:
+                return (
+                    False,
+                    f"Pattern {i + 1} ({pattern_data['name']}) is invalid: {error}",
+                )
+
+        return True, None
+
+    except json.JSONDecodeError:
+        return False, "Invalid JSON format"
+    except Exception as e:
+        return False, f"Validation error: {str(e)}"
 
 
 # Unix absolute path pattern for WSL-first approach
@@ -182,6 +259,7 @@ class ScheduleCreate(ScheduleBase):
     notification_config_id: Optional[int] = None
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
+    patterns: Optional[str] = None
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
@@ -241,6 +319,17 @@ class ScheduleCreate(ScheduleBase):
             raise ValueError(f"Invalid post-job hooks configuration: {error_msg}")
         return v.strip()
 
+    @field_validator("patterns", mode="before")
+    @classmethod
+    def validate_patterns(cls, v: Union[str, None]) -> Optional[str]:
+        if not v or v.strip() == "":
+            return None
+
+        is_valid, error_msg = validate_patterns_json(v)
+        if not is_valid:
+            raise ValueError(f"Invalid patterns configuration: {error_msg}")
+        return v.strip()
+
 
 class ScheduleUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=128)
@@ -254,6 +343,7 @@ class ScheduleUpdate(BaseModel):
     enabled: Optional[bool] = None
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
+    patterns: Optional[str] = None
 
     @field_validator("pre_job_hooks", mode="before")
     @classmethod
@@ -275,6 +365,17 @@ class ScheduleUpdate(BaseModel):
         is_valid, error_msg = validate_hooks_json(v)
         if not is_valid:
             raise ValueError(f"Invalid post-job hooks configuration: {error_msg}")
+        return v.strip()
+
+    @field_validator("patterns", mode="before")
+    @classmethod
+    def validate_patterns_update(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v.strip() == "":
+            return None
+
+        is_valid, error_msg = validate_patterns_json(v)
+        if not is_valid:
+            raise ValueError(f"Invalid patterns configuration: {error_msg}")
         return v.strip()
 
     @field_validator("cron_expression")
@@ -462,6 +563,7 @@ class BackupRequest(BaseModel):
     notification_config_id: Optional[int] = Field(None, gt=0)
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
+    patterns: Optional[str] = None
 
     @field_validator("dry_run", mode="before")
     @classmethod
@@ -505,6 +607,17 @@ class BackupRequest(BaseModel):
         if v is None:
             return None
         return int(v)
+
+    @field_validator("patterns", mode="before")
+    @classmethod
+    def validate_patterns(cls, v: Union[str, None]) -> Optional[str]:
+        if not v or v.strip() == "":
+            return None
+
+        is_valid, error_msg = validate_patterns_json(v)
+        if not is_valid:
+            raise ValueError(f"Invalid patterns configuration: {error_msg}")
+        return v.strip()
 
 
 class CloudSyncConfigBase(BaseModel):

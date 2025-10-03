@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from dataclasses import dataclass
 from borgitory.custom_types import ConfigDict
 from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, List, Optional, Any, cast
@@ -30,6 +31,17 @@ from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class BackupParams:
+    """Parameters for backup tasks."""
+
+    source_path: str
+    compression: str
+    dry_run: bool
+    ignore_lock: bool
+    patterns: List[str]
 
 
 class JobService:
@@ -66,11 +78,60 @@ class JobService:
 
         builder = TaskDefinitionBuilder(self.db)
 
+        # Convert patterns JSON to Borg command format
+        patterns = []
+        if backup_request.patterns:
+            try:
+                import json
+
+                patterns_data = (
+                    json.loads(backup_request.patterns)
+                    if isinstance(backup_request.patterns, str)
+                    else backup_request.patterns
+                )
+
+                if isinstance(patterns_data, list):
+                    for pattern_data in patterns_data:
+                        if (
+                            isinstance(pattern_data, dict)
+                            and pattern_data.get("name")
+                            and pattern_data.get("expression")
+                        ):
+                            # Convert pattern to Borg format
+                            pattern_type = pattern_data.get("pattern_type", "include")
+                            style = pattern_data.get("style", "sh")
+                            expression = pattern_data["expression"]
+
+                            # Map pattern types to Borg prefixes
+                            if pattern_type == "include":
+                                prefix = "+"
+                            elif pattern_type == "exclude":
+                                prefix = "-"
+                            elif pattern_type == "exclude_norec":
+                                prefix = "!"
+                            else:
+                                prefix = "+"  # Default to include
+
+                            # Build the pattern string
+                            if style != "sh":  # sh is the default, no prefix needed
+                                pattern = f"{prefix}{style}:{expression}"
+                            else:
+                                pattern = f"{prefix}{expression}"
+
+                            patterns.append(pattern)
+                            logger.info(
+                                f"Converted pattern '{pattern_data['name']}' to Borg format: {pattern}"
+                            )
+
+            except Exception as e:
+                logger.warning(f"Failed to parse patterns: {str(e)}")
+
         backup_params: ConfigDict = {
             "source_path": backup_request.source_path,
             "compression": backup_request.compression,
             "dry_run": backup_request.dry_run,
             "ignore_lock": backup_request.ignore_lock,
+            "patterns": patterns,
         }
 
         task_definitions = builder.build_task_list(

@@ -58,6 +58,9 @@ class TestScheduleValidationService:
             "cloud_sync_config_id": 2,
             "prune_config_id": 3,
             "notification_config_id": 4,
+            "pre_job_hooks": None,
+            "post_job_hooks": None,
+            "patterns": None,
         }
 
     def test_validate_schedule_creation_data_minimal_valid_input(
@@ -88,6 +91,9 @@ class TestScheduleValidationService:
             "cloud_sync_config_id": None,
             "prune_config_id": None,
             "notification_config_id": None,
+            "pre_job_hooks": None,
+            "post_job_hooks": None,
+            "patterns": None,
         }
 
     def test_validate_schedule_creation_data_missing_name(

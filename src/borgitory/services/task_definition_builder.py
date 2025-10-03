@@ -44,6 +44,7 @@ class TaskDefinitionBuilder:
         compression: str = "zstd",
         dry_run: bool = False,
         ignore_lock: bool = False,
+        patterns: List[str] = [],
     ) -> TaskDefinition:
         """
         Build a backup task definition.
@@ -58,15 +59,21 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary
         """
+        parameters: ConfigDict = {
+            "source_path": source_path,
+            "compression": compression,
+            "dry_run": dry_run,
+            "ignore_lock": ignore_lock,
+        }
+
+        # Only include patterns if they exist
+        if patterns:
+            parameters["patterns"] = patterns
+
         return TaskDefinition(
             type="backup",
             name=f"Backup {repository_name}",
-            parameters={
-                "source_path": source_path,
-                "compression": compression,
-                "dry_run": dry_run,
-                "ignore_lock": ignore_lock,
-            },
+            parameters=parameters,
         )
 
     def build_prune_task_from_config(
@@ -389,14 +396,34 @@ class TaskDefinitionBuilder:
         tasks.extend(pre_hook_tasks)
 
         if include_backup:
-            backup_params = backup_params or {}
-            source_path = str(backup_params.get("source_path", "/data"))
-            compression = str(backup_params.get("compression", "zstd"))
-            dry_run = bool(backup_params.get("dry_run", False))
-            ignore_lock = bool(backup_params.get("ignore_lock", False))
+            if backup_params:
+                source_path = str(backup_params.get("source_path", "/data"))
+                compression = str(backup_params.get("compression", "zstd"))
+                dry_run = bool(backup_params.get("dry_run", False))
+                ignore_lock = bool(backup_params.get("ignore_lock", False))
+
+                # Handle patterns with proper type checking
+                patterns_value = backup_params.get("patterns", [])
+                if isinstance(patterns_value, list):
+                    patterns = patterns_value
+                else:
+                    patterns = []
+            else:
+                # Use defaults when no backup_params provided
+                source_path = "/data"
+                compression = "zstd"
+                dry_run = False
+                ignore_lock = False
+                patterns = []
+
             tasks.append(
                 self.build_backup_task(
-                    repository_name, source_path, compression, dry_run, ignore_lock
+                    repository_name,
+                    source_path,
+                    compression,
+                    dry_run,
+                    ignore_lock,
+                    patterns,
                 )
             )
 

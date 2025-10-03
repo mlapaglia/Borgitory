@@ -5,12 +5,8 @@ Tests for API endpoints handling critical and run_on_job_failure flags.
 import json
 from typing import Dict, List, Any
 
-from src.borgitory.api.schedules import (
-    convert_hook_fields_to_json,
-    _extract_hooks_from_form,
-    _convert_hook_fields_to_json,
-    _validate_hooks_for_save,
-)
+from borgitory.api.schedules import convert_hook_fields_to_json
+from borgitory.services.scheduling.hook_service import HookService
 
 
 class MockFormData:
@@ -151,7 +147,7 @@ class TestAPIHookCriticalFlags:
             }
         )
 
-        hooks = _extract_hooks_from_form(form_data, "pre")
+        hooks = HookService.extract_hooks_from_form(form_data, "pre")
 
         assert len(hooks) == 2
 
@@ -177,7 +173,7 @@ class TestAPIHookCriticalFlags:
             }
         )
 
-        hooks = _extract_hooks_from_form(form_data, "pre")
+        hooks = HookService.extract_hooks_from_form(form_data, "pre")
 
         assert len(hooks) == 2
 
@@ -202,7 +198,7 @@ class TestAPIHookCriticalFlags:
             }
         )
 
-        result = _convert_hook_fields_to_json(form_data, "pre")
+        result = HookService.convert_hook_fields_to_json(form_data, "pre")
 
         assert result is not None
         hooks = json.loads(result)
@@ -225,7 +221,7 @@ class TestAPIHookCriticalFlags:
             }
         )
 
-        is_valid, error_msg = _validate_hooks_for_save(form_data)
+        is_valid, error_msg = HookService.validate_hooks_for_save(form_data)
 
         # Should be valid - empty hooks are filtered out
         assert is_valid is True
@@ -241,9 +237,10 @@ class TestAPIHookCriticalFlags:
             }
         )
 
-        is_valid, error_msg = _validate_hooks_for_save(form_data)
+        is_valid, error_msg = HookService.validate_hooks_for_save(form_data)
 
         assert is_valid is False
+        assert error_msg is not None
         assert "Hook command is required" in error_msg
 
     def test_validate_hooks_for_save_critical_hook_missing_name(self) -> None:
@@ -256,9 +253,10 @@ class TestAPIHookCriticalFlags:
             }
         )
 
-        is_valid, error_msg = _validate_hooks_for_save(form_data)
+        is_valid, error_msg = HookService.validate_hooks_for_save(form_data)
 
         assert is_valid is False
+        assert error_msg is not None
         assert "Hook name is required" in error_msg
 
     def test_hook_checkbox_handling_true_values(self) -> None:
@@ -325,6 +323,7 @@ class TestAPIHookCriticalFlags:
 
         # Test pre-hooks
         pre_result = convert_hook_fields_to_json(form_data, "pre")
+        assert pre_result is not None
         pre_hooks = json.loads(pre_result)
 
         assert pre_hooks[0]["critical"] is True
@@ -334,6 +333,7 @@ class TestAPIHookCriticalFlags:
 
         # Test post-hooks
         post_result = convert_hook_fields_to_json(form_data, "post")
+        assert post_result is not None
         post_hooks = json.loads(post_result)
 
         assert post_hooks[0]["critical"] is False

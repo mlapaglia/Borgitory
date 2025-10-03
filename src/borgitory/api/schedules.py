@@ -18,6 +18,9 @@ from borgitory.dependencies import (
     UpcomingBackupsServiceDep,
 )
 from borgitory.services.cron_description_service import CronDescriptionService
+from borgitory.models.patterns import BackupPattern, PatternType, PatternStyle
+from borgitory.services.scheduling.pattern_service import PatternService
+from borgitory.services.scheduling.hook_service import HookService
 
 router = APIRouter()
 
@@ -26,47 +29,7 @@ def convert_hook_fields_to_json(
     form_data: Dict[str, Any], hook_type: str
 ) -> Optional[str]:
     """Convert individual hook fields to JSON format using position-based form data."""
-    hooks = []
-
-    # Get all hook field data for this hook type (position-based)
-    hook_names = form_data.get(f"{hook_type}_hook_name", [])
-    hook_commands = form_data.get(f"{hook_type}_hook_command", [])
-    hook_critical = form_data.get(f"{hook_type}_hook_critical", [])
-    hook_run_on_failure = form_data.get(f"{hook_type}_hook_run_on_failure", [])
-
-    # Ensure they are lists (in case there's only one item)
-    if not isinstance(hook_names, list):
-        hook_names = [hook_names] if hook_names else []
-    if not isinstance(hook_commands, list):
-        hook_commands = [hook_commands] if hook_commands else []
-    if not isinstance(hook_critical, list):
-        hook_critical = [hook_critical] if hook_critical else []
-    if not isinstance(hook_run_on_failure, list):
-        hook_run_on_failure = [hook_run_on_failure] if hook_run_on_failure else []
-
-    # Pair them up by position
-    for i in range(min(len(hook_names), len(hook_commands))):
-        name = str(hook_names[i]).strip() if hook_names[i] else ""
-        command = str(hook_commands[i]).strip() if hook_commands[i] else ""
-
-        # Handle checkboxes - they're only present if checked
-        critical = len(hook_critical) > i and hook_critical[i] == "true"
-        run_on_failure = (
-            len(hook_run_on_failure) > i and hook_run_on_failure[i] == "true"
-        )
-
-        # Only add hooks that have both name and command
-        if name and command:
-            hooks.append(
-                {
-                    "name": name,
-                    "command": command,
-                    "critical": critical,
-                    "run_on_job_failure": run_on_failure,
-                }
-            )
-
-    return json.dumps(hooks) if hooks else None
+    return HookService.convert_hook_fields_to_json_from_dict(form_data, hook_type)
 
 
 @router.get("/form", response_class=HTMLResponse)
@@ -94,16 +57,6 @@ async def create_schedule(
 ) -> HTMLResponse:
     try:
         json_data = await request.json()
-
-        # Convert hook fields to JSON format
-        pre_hooks_json = convert_hook_fields_to_json(json_data, "pre")
-        post_hooks_json = convert_hook_fields_to_json(json_data, "post")
-
-        # Add converted hooks to json_data
-        if pre_hooks_json:
-            json_data["pre_job_hooks"] = pre_hooks_json
-        if post_hooks_json:
-            json_data["post_job_hooks"] = post_hooks_json
 
         is_valid, processed_data, error_msg = (
             schedule_service.validate_schedule_creation_data(json_data)
@@ -140,6 +93,7 @@ async def create_schedule(
         notification_config_id=schedule.notification_config_id,
         pre_job_hooks=schedule.pre_job_hooks,
         post_job_hooks=schedule.post_job_hooks,
+        patterns=schedule.patterns,
     )
 
     if result.is_error or not result.schedule:
@@ -292,16 +246,6 @@ async def update_schedule(
     """Update a schedule"""
     try:
         json_data = await request.json()
-
-        # Convert hook fields to JSON format
-        pre_hooks_json = convert_hook_fields_to_json(json_data, "pre")
-        post_hooks_json = convert_hook_fields_to_json(json_data, "post")
-
-        # Add converted hooks to json_data
-        if pre_hooks_json:
-            json_data["pre_job_hooks"] = pre_hooks_json
-        if post_hooks_json:
-            json_data["post_job_hooks"] = post_hooks_json
 
         schedule_update = ScheduleUpdate(**json_data)
         update_data = schedule_update.model_dump(exclude_unset=True)
@@ -460,81 +404,6 @@ async def describe_cron_expression(
     )
 
 
-def _extract_hooks_from_form(form_data: Any, hook_type: str) -> List[Dict[str, Any]]:
-    """Extract hooks from form data and return as list of dicts."""
-    hooks = []
-
-    # Get all names and commands for this hook type
-    hook_names = form_data.getlist(f"{hook_type}_hook_name")
-    hook_commands = form_data.getlist(f"{hook_type}_hook_command")
-    hook_critical = form_data.getlist(f"{hook_type}_hook_critical")
-    hook_run_on_failure = form_data.getlist(f"{hook_type}_hook_run_on_failure")
-
-    # Pair them up by position
-    for i in range(min(len(hook_names), len(hook_commands))):
-        name = str(hook_names[i]).strip() if hook_names[i] else ""
-        command = str(hook_commands[i]).strip() if hook_commands[i] else ""
-
-        # Handle checkboxes - they're only present if checked
-        critical = len(hook_critical) > i and hook_critical[i] == "true"
-        run_on_failure = (
-            len(hook_run_on_failure) > i and hook_run_on_failure[i] == "true"
-        )
-
-        # Add all hooks, even if name or command is empty (for reordering)
-        hooks.append(
-            {
-                "name": name,
-                "command": command,
-                "critical": critical,
-                "run_on_job_failure": run_on_failure,
-            }
-        )
-
-    return hooks
-
-
-def _convert_hook_fields_to_json(form_data: Any, hook_type: str) -> str | None:
-    """Convert individual hook fields to JSON format using position-based form data."""
-    hooks = _extract_hooks_from_form(form_data, hook_type)
-
-    # Filter out hooks that don't have both name and command for JSON output
-    valid_hooks = [hook for hook in hooks if hook["name"] and hook["command"]]
-
-    return json.dumps(valid_hooks) if valid_hooks else None
-
-
-def _validate_hooks_for_save(form_data: Any) -> tuple[bool, str | None]:
-    """Validate that all hooks have both name and command filled out."""
-    errors = []
-
-    # Check pre-hooks
-    pre_hooks = _extract_hooks_from_form(form_data, "pre")
-    for i, hook in enumerate(pre_hooks):
-        if not hook["name"].strip() and not hook["command"].strip():
-            # Empty hook - skip (will be filtered out)
-            continue
-        elif not hook["name"].strip():
-            errors.append(f"Pre-hook #{i + 1}: Hook name is required")
-        elif not hook["command"].strip():
-            errors.append(f"Pre-hook #{i + 1}: Hook command is required")
-
-    # Check post-hooks
-    post_hooks = _extract_hooks_from_form(form_data, "post")
-    for i, hook in enumerate(post_hooks):
-        if not hook["name"].strip() and not hook["command"].strip():
-            # Empty hook - skip (will be filtered out)
-            continue
-        elif not hook["name"].strip():
-            errors.append(f"Post-hook #{i + 1}: Hook name is required")
-        elif not hook["command"].strip():
-            errors.append(f"Post-hook #{i + 1}: Hook command is required")
-
-    if errors:
-        return False, "; ".join(errors)
-    return True, None
-
-
 @router.post("/hooks/add-hook-field", response_class=HTMLResponse)
 async def add_hook_field(
     request: Request,
@@ -548,7 +417,7 @@ async def add_hook_field(
     # Get hook_type from form data (sent via hx-vals)
     hook_type = str(form_data.get("hook_type", "pre"))
 
-    current_hooks = _extract_hooks_from_form(form_data, hook_type)
+    current_hooks = HookService.extract_hooks_from_form(form_data, hook_type)
 
     # Add a new empty hook
     current_hooks.append({"name": "", "command": ""})
@@ -574,7 +443,7 @@ async def move_hook(
         index = int(str(form_data.get("index", "0")))
         direction = str(form_data.get("direction", "up"))  # "up" or "down"
 
-        current_hooks = _extract_hooks_from_form(form_data, hook_type)
+        current_hooks = HookService.extract_hooks_from_form(form_data, hook_type)
 
         if direction == "up" and index > 0 and index < len(current_hooks):
             current_hooks[index], current_hooks[index - 1] = (
@@ -608,7 +477,7 @@ async def remove_hook_field(
 
     hook_type = str(form_data.get("hook_type", "pre"))
 
-    current_hooks = _extract_hooks_from_form(form_data, hook_type)
+    current_hooks = HookService.extract_hooks_from_form(form_data, hook_type)
 
     return templates.TemplateResponse(
         request,
@@ -627,26 +496,15 @@ async def get_hooks_modal(
     try:
         json_data = await request.json()
 
-        pre_hooks_json = str(json_data.get("pre_hooks", "[]"))
-        post_hooks_json = str(json_data.get("post_hooks", "[]"))
+        # Get data from the actual form field names
+        pre_hooks_json = str(json_data.get("pre_job_hooks", "[]"))
+        post_hooks_json = str(json_data.get("post_job_hooks", "[]"))
     except (ValueError, TypeError, KeyError):
         pre_hooks_json = "[]"
         post_hooks_json = "[]"
 
-    try:
-        pre_hooks = (
-            json.loads(pre_hooks_json)
-            if pre_hooks_json and pre_hooks_json != "[]"
-            else []
-        )
-        post_hooks = (
-            json.loads(post_hooks_json)
-            if post_hooks_json and post_hooks_json != "[]"
-            else []
-        )
-    except (json.JSONDecodeError, TypeError):
-        pre_hooks = []
-        post_hooks = []
+    pre_hooks = HookService.parse_hooks_from_json(pre_hooks_json)
+    post_hooks = HookService.parse_hooks_from_json(post_hooks_json)
 
     return templates.TemplateResponse(
         request,
@@ -668,7 +526,7 @@ async def save_hooks(
     """Save hooks configuration and update parent component via OOB swap."""
     form_data = await request.form()
 
-    is_valid, error_message = _validate_hooks_for_save(form_data)
+    is_valid, error_message = HookService.validate_hooks_for_save(form_data)
     if not is_valid:
         return templates.TemplateResponse(
             request,
@@ -677,8 +535,8 @@ async def save_hooks(
             status_code=400,
         )
 
-    pre_hooks_json = _convert_hook_fields_to_json(form_data, "pre")
-    post_hooks_json = _convert_hook_fields_to_json(form_data, "post")
+    pre_hooks_json = HookService.convert_hook_fields_to_json(form_data, "pre")
+    post_hooks_json = HookService.convert_hook_fields_to_json(form_data, "post")
 
     try:
         pre_count = len(json.loads(pre_hooks_json)) if pre_hooks_json else 0
@@ -703,4 +561,204 @@ async def save_hooks(
 @router.get("/hooks/close-modal", response_class=HTMLResponse)
 async def close_modal() -> HTMLResponse:
     """Close modal without saving."""
+    return HTMLResponse(content='<div id="modal-container"></div>', status_code=200)
+
+
+# Pattern API endpoints
+@router.post("/patterns/add-pattern-field", response_class=HTMLResponse)
+async def add_pattern_field(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Add a new pattern field row via HTMX."""
+
+    form_data = await request.form()
+
+    current_patterns = PatternService.extract_patterns_from_form(form_data)
+
+    current_patterns.append(
+        BackupPattern(
+            name="",
+            expression="",
+            pattern_type=PatternType.INCLUDE,
+            style=PatternStyle.SHELL,
+        )
+    )
+
+    # Return updated container with all patterns (including the new one)
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/patterns/patterns_container.html",
+        {"patterns": current_patterns},
+    )
+
+
+@router.post("/patterns/move-pattern", response_class=HTMLResponse)
+async def move_pattern(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Move a pattern up or down in the list and return updated container."""
+    form_data = await request.form()
+
+    try:
+        index = int(str(form_data.get("index", "0")))
+        direction = str(form_data.get("direction", "up"))
+
+        current_patterns = PatternService.extract_patterns_from_form(form_data)
+
+        if direction == "up" and index > 0 and index < len(current_patterns):
+            current_patterns[index], current_patterns[index - 1] = (
+                current_patterns[index - 1],
+                current_patterns[index],
+            )
+        elif direction == "down" and index >= 0 and index < len(current_patterns) - 1:
+            current_patterns[index], current_patterns[index + 1] = (
+                current_patterns[index + 1],
+                current_patterns[index],
+            )
+
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_container.html",
+            {"patterns": current_patterns},
+        )
+
+    except (ValueError, TypeError, KeyError):
+        return HTMLResponse(content='<div class="space-y-4"></div>')
+
+
+@router.post("/patterns/remove-pattern-field", response_class=HTMLResponse)
+async def remove_pattern_field(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Remove a pattern field row via HTMX."""
+
+    form_data = await request.form()
+
+    try:
+        index = int(str(form_data.get("index", "0")))
+
+        current_patterns = PatternService.extract_patterns_from_form(form_data)
+
+        if 0 <= index < len(current_patterns):
+            current_patterns.pop(index)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_container.html",
+            {"patterns": current_patterns},
+        )
+
+    except (ValueError, TypeError, KeyError):
+        return HTMLResponse(content='<div class="space-y-4"></div>')
+
+
+@router.post("/patterns/patterns-modal", response_class=HTMLResponse)
+async def get_patterns_modal(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Open patterns configuration modal with current pattern data passed from parent."""
+
+    try:
+        json_data = await request.json()
+        patterns_json = str(json_data.get("patterns", "[]"))
+
+    except Exception:
+        patterns_json = "[]"
+
+    patterns = PatternService.parse_patterns_from_json(patterns_json)
+
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/patterns/patterns_modal.html",
+        {
+            "patterns": patterns,
+            "patterns_json": patterns_json,
+        },
+    )
+
+
+@router.post("/patterns/save-patterns", response_class=HTMLResponse)
+async def save_patterns(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Save patterns configuration and update parent component via OOB swap."""
+    form_data = await request.form()
+
+    is_valid, error_message = PatternService.validate_patterns_for_save(form_data)
+    if not is_valid:
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_validation_error.html",
+            {"error_message": error_message},
+            status_code=400,
+        )
+
+    patterns_json = PatternService.convert_patterns_to_json(form_data)
+
+    try:
+        total_count = len(json.loads(patterns_json)) if patterns_json else 0
+    except (json.JSONDecodeError, TypeError):
+        total_count = 0
+
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/patterns/patterns_save_response.html",
+        {
+            "patterns_json": patterns_json,
+            "total_count": total_count,
+        },
+    )
+
+
+@router.post("/patterns/validate-all-patterns", response_class=HTMLResponse)
+async def validate_all_patterns_endpoint(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Validate all patterns and return validation results."""
+    try:
+        form_data = await request.form()
+
+        patterns = PatternService.extract_patterns_from_form(form_data)
+
+        validation_results = PatternService.validate_all_patterns(patterns)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_validation_results.html",
+            {
+                "validation_results": validation_results,
+                "total_patterns": len(validation_results),
+                "valid_patterns": sum(1 for r in validation_results if r["is_valid"]),
+            },
+        )
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/patterns/patterns_validation_results.html",
+            {
+                "validation_results": [
+                    {
+                        "index": 0,
+                        "name": "Validation Error",
+                        "is_valid": False,
+                        "error": f"Validation error: {str(e)}",
+                        "warnings": [],
+                    }
+                ],
+                "total_patterns": 1,
+                "valid_patterns": 0,
+            },
+        )
+
+
+@router.get("/patterns/close-modal", response_class=HTMLResponse)
+async def close_patterns_modal() -> HTMLResponse:
+    """Close patterns modal without saving."""
     return HTMLResponse(content='<div id="modal-container"></div>', status_code=200)

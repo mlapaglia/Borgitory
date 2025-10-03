@@ -36,7 +36,6 @@ dependencies = [
     "jinja2>=3.1.4",
     "passlib[bcrypt]>=1.7.4",
     "pydantic>=2.9.0",
-    "pyfuse3>=3.4.0; sys_platform != 'win32'",
     "python-dotenv>=1.0.1",
     "python-multipart>=0.0.12",
     "sqlalchemy>=2.0.35",
@@ -206,7 +205,7 @@ exclude = [
     "^htmlcov/",
     "^\\.",
 ]
-files = ["src/borgitory", "tests/test_task_definition_builder.py"]
+files = ["src"]
 
 # Plugins
 plugins = [
@@ -231,7 +230,6 @@ module = [
     "cryptography.*",
     "docker.*",
     "passlib.*",
-    "pyfuse3.*",
     "sqlalchemy.*",
     "sse_starlette.*",
 ]

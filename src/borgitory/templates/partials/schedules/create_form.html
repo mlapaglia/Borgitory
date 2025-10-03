@@ -99,21 +99,32 @@
                                 Advanced Options
                             </h3>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Configure optional pre and post job hooks
+                                Configure optional pre/post job hooks and backup patterns
                             </p>
                         </div>
-                        <div id="hooks-display-section">
+                        <div id="advanced-options-buttons" class="flex flex-col gap-2">
                             <button type="button" 
-                                    class="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors"
+                                    class="flex items-center w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden"
                                     hx-post="/api/schedules/hooks/hooks-modal"
-                                    hx-vals='{"pre_hooks": "[]", "post_hooks": "[]"}'
+                                    hx-include="#pre-hooks-data, #post-hooks-data"
                                     hx-target="#modal-container">
-                                <span>Pre/Post Job Hooks</span>
+                                <span class="px-4 py-2" id="hooks-button-text">Pre/Post Job Hooks</span>
+                                <span class="px-3 py-5 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium" id="hooks-count-badge">0</span>
+                            </button>
+                            
+                            <button type="button" 
+                                    class="flex items-center w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden"
+                                    hx-post="/api/schedules/patterns/patterns-modal"
+                                    hx-include="#patterns_field"
+                                    hx-target="#modal-container">
+                                <span class="px-4 py-2" id="patterns-button-text">Configure Patterns</span>
+                                <span class="px-3 py-5 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium" id="patterns-count-badge">0</span>
                             </button>
                             
                             <!-- Hidden fields for form submission -->
                             <input type="hidden" name="pre_job_hooks" id="pre-hooks-data" value="">
                             <input type="hidden" name="post_job_hooks" id="post-hooks-data" value="">
+                            <input type="hidden" name="patterns" id="patterns_field" value="">
                         </div>
                     </div>
                 </div>
