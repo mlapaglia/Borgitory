@@ -89,7 +89,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
 
         # Verify critical hook failure message
@@ -113,7 +113,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
 
         # Verify backup failure message
@@ -135,7 +135,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
 
         # Verify warning message for non-critical failure
@@ -158,7 +158,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
 
         # Verify success message
@@ -181,14 +181,14 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
 
         # Should be warning due to failed task
         assert "⚠️ Backup Job Completed with Warnings" in title
         assert "Tasks Completed: 1, Skipped: 1, Total: 3" in message
 
-    def test_notification_message_with_repository_name_from_task(self) -> None:
+    def test_notification_message_with_repository_name_from_repo(self) -> None:
         """Test notification message extracts repository name from task parameters."""
         # Create job with repository name in task parameters
         pre_hook_task = self.create_hook_task("pre", status="completed")
@@ -199,7 +199,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job, "MyBackupRepo")
         )
 
         # Verify repository name is included
@@ -216,7 +216,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
 
         # Verify fallback to "Unknown"
@@ -247,7 +247,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
 
         # Verify multiple task types are listed
@@ -268,7 +268,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
 
         # Verify critical failure message with all skipped
@@ -284,7 +284,7 @@ class TestNotificationMessagesHookFailures:
         job = self.create_test_job([critical_task])
 
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
         assert priority == 1  # HIGH priority
 
@@ -293,7 +293,7 @@ class TestNotificationMessagesHookFailures:
         job = self.create_test_job([normal_task])
 
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
         assert priority == 0  # NORMAL priority
 
@@ -302,6 +302,6 @@ class TestNotificationMessagesHookFailures:
         job = self.create_test_job([success_task])
 
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, 0)
+            self.job_manager._generate_notification_content(job)
         )
         assert priority == 0  # NORMAL priority
