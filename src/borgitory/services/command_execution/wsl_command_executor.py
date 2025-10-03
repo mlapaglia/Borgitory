@@ -63,7 +63,7 @@ class WSLCommandExecutor(CommandExecutorProtocol):
 
         actual_timeout = timeout or self.default_timeout
 
-        logger.debug(
+        logger.info(
             f"Executing WSL command: {' '.join(wsl_command[:3])}... (timeout: {actual_timeout}s)"
         )
 
@@ -115,7 +115,7 @@ class WSLCommandExecutor(CommandExecutorProtocol):
             )
 
             if success:
-                logger.debug(
+                logger.info(
                     f"WSL command completed successfully in {execution_time:.2f}s"
                 )
             else:
@@ -237,35 +237,96 @@ class WSLCommandExecutor(CommandExecutorProtocol):
         Returns:
             Process object for streaming operations
         """
-        wsl_command = self._build_wsl_command(command, env, cwd)
+        # Check if we need streaming (pipes are requested)
+        needs_streaming = (
+            stdout == asyncio.subprocess.PIPE
+            or stderr == asyncio.subprocess.PIPE
+            or stdin == asyncio.subprocess.PIPE
+        )
 
-        logger.debug(f"Starting interactive WSL process: {' '.join(command[:3])}...")
+        if needs_streaming:
+            # Use FIFO-based approach for streaming to avoid WSL RPC handle issues
+            import uuid
 
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *wsl_command,
-                stdout=stdout or asyncio.subprocess.PIPE,
-                stderr=stderr or asyncio.subprocess.PIPE,
-                stdin=stdin,
-                env=env,
-                cwd=cwd,
+            fifo_name = f"/tmp/wsl_stream_{uuid.uuid4().hex}"
+
+            # Build environment exports
+            env_exports = ""
+            if env:
+                env_exports = " ".join([f'export {k}="{v}";' for k, v in env.items()])
+
+            # Build the command with proper escaping
+            escaped_command = " ".join(
+                [f'"{arg}"' if " " in arg else arg for arg in command]
             )
 
-            logger.debug(f"WSL subprocess created successfully (PID: {process.pid})")
-            return process
+            # Build working directory change if needed
+            cwd_command = f'cd "{cwd}" && ' if cwd else ""
 
-        except Exception as e:
-            logger.error(f"Failed to create WSL subprocess with clean env: {e}")
-            # Fallback to original method
-            process = await asyncio.create_subprocess_exec(
-                *wsl_command,
-                stdout=stdout or asyncio.subprocess.PIPE,
-                stderr=stderr or asyncio.subprocess.PIPE,
-                stdin=stdin,
-                env=env,
-                cwd=cwd,
+            # Create shell command that uses a FIFO for streaming
+            if stdout == asyncio.subprocess.PIPE:
+                # For stdout streaming, use a FIFO
+                shell_command = f"""
+                {env_exports}
+                {cwd_command}
+                mkfifo {fifo_name} 2>/dev/null || true
+                ({escaped_command} > {fifo_name} 2>&1 &)
+                cat {fifo_name}
+                rm -f {fifo_name}
+                """
+            else:
+                # For other cases, just run the command directly
+                shell_command = f"""
+                {env_exports}
+                {cwd_command}
+                {escaped_command}
+                """
+
+            # Use bash -c to execute the shell command
+            wsl_command = ["wsl", "bash", "-c", shell_command]
+
+            logger.info(
+                f"Starting streaming WSL process with FIFO: {' '.join(command[:3])}..."
             )
-            return process
+
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *wsl_command,
+                    stdout=stdout,
+                    stderr=stderr
+                    if stderr != asyncio.subprocess.PIPE
+                    else asyncio.subprocess.STDOUT,
+                    stdin=stdin
+                    if stdin != asyncio.subprocess.PIPE
+                    else asyncio.subprocess.DEVNULL,
+                )
+                logger.info(
+                    f"WSL streaming subprocess created successfully (PID: {process.pid})"
+                )
+                return process
+            except Exception as e:
+                logger.error(f"Failed to create WSL streaming subprocess: {e}")
+                raise
+
+        else:
+            # Original non-streaming approach for when pipes aren't needed
+            wsl_command = self._build_wsl_command(command, env, cwd)
+            logger.info(f"Starting WSL process: {' '.join(command[:3])}...")
+
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *wsl_command,
+                    stdout=stdout,
+                    stderr=stderr,
+                    stdin=stdin,
+                    env=env,
+                    cwd=cwd,
+                )
+                logger.info(f"WSL subprocess created successfully (PID: {process.pid})")
+                return process
+            except Exception as e:
+                logger.error(f"Failed to create WSL subprocess: {e}")
+                raise
 
     def get_platform_name(self) -> str:
         """Get the platform name this executor handles."""

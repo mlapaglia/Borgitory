@@ -23,6 +23,7 @@ from borgitory.dependencies import (
     StorageFactoryDep,
     ProviderRegistryDep,
     get_templates,
+    get_browser_timezone_offset,
 )
 
 router = APIRouter()
@@ -270,6 +271,7 @@ async def create_cloud_sync_config(
 
 @router.get("/html", response_class=HTMLResponse)
 def get_cloud_sync_configs_html(
+    request: Request,
     registry: ProviderRegistryDep,
     cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
     templates: Jinja2Templates = Depends(get_templates),
@@ -295,11 +297,13 @@ def get_cloud_sync_configs_html(
             processed_config["provider_details"] = display_info["provider_details"]
             processed_configs.append(type("Config", (), processed_config)())
 
+        browser_tz_offset = get_browser_timezone_offset(request)
         return templates.get_template(
             "partials/cloud_sync/config_list_content.html"
-        ).render(configs=processed_configs)
+        ).render(configs=processed_configs, browser_tz_offset=browser_tz_offset)
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error getting cloud sync configurations: {e}")
         return templates.get_template("partials/jobs/error_state.html").render(
             message="Cloud sync feature is initializing... If this persists, try restarting the application.",
             padding="4",

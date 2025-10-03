@@ -286,11 +286,12 @@ class TestWSLCommandExecutor:
             call_args = mock_create.call_args
             wsl_command = call_args[0]
             assert wsl_command[0] == "wsl"
-            assert "/bin/bash" in wsl_command
+            assert "bash" in wsl_command
 
             kwargs = call_args[1]
             assert kwargs["stdout"] == asyncio.subprocess.PIPE
-            assert kwargs["stderr"] == asyncio.subprocess.PIPE
+            # For FIFO streaming, stderr is redirected to stdout
+            assert kwargs["stderr"] == asyncio.subprocess.STDOUT
 
     @pytest.mark.asyncio
     async def test_create_subprocess_default_pipes(
@@ -305,8 +306,9 @@ class TestWSLCommandExecutor:
             await executor.create_subprocess(["echo", "test"])
 
             kwargs = mock_create.call_args[1]
-            assert kwargs["stdout"] == asyncio.subprocess.PIPE
-            assert kwargs["stderr"] == asyncio.subprocess.PIPE
+            # When no pipes are specified, they should be None (default behavior)
+            assert kwargs.get("stdout") is None
+            assert kwargs.get("stderr") is None
 
     def test_build_wsl_command_complex_scenario(
         self, executor_with_distribution: WSLCommandExecutor

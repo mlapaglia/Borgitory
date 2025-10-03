@@ -4,7 +4,7 @@ Tests for JobExecutor - subprocess execution and process management
 
 import pytest
 import asyncio
-from typing import Dict
+from typing import Any, AsyncGenerator, Dict
 from unittest.mock import AsyncMock, Mock, patch
 
 from borgitory.services.jobs.job_executor import JobExecutor
@@ -42,7 +42,7 @@ class TestJobExecutor:
         """Test process start failure"""
 
         # Use AsyncMock side_effect properly to avoid unawaited coroutine warnings
-        async def mock_failure(*args, **kwargs) -> None:
+        async def mock_failure(*args: Any, **kwargs: Any) -> None:
             raise Exception("Process start failed")
 
         self.mock_subprocess.side_effect = mock_failure
@@ -60,7 +60,7 @@ class TestJobExecutor:
         mock_process.wait = AsyncMock(return_value=0)
 
         # Mock stdout lines
-        async def mock_stdout():
+        async def mock_stdout() -> AsyncGenerator[bytes, None]:
             yield b"line1\n"
             yield b"line2\n"
 
@@ -196,7 +196,7 @@ class TestJobExecutor:
         mock_process.returncode = None
 
         # Use a regular function that raises an exception, not an async mock
-        def terminate_error():
+        def terminate_error() -> None:
             raise Exception("Termination error")
 
         mock_process.terminate = terminate_error

@@ -2,7 +2,7 @@
 Protocol interfaces for repository and backup services.
 """
 
-from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
+from typing import Protocol, Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
 
 from borgitory.models.borg_info import (
@@ -13,7 +13,8 @@ from borgitory.models.borg_info import (
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository
-    from borgitory.services.archives.archive_manager import ArchiveEntry
+    from borgitory.services.archives.archive_models import ArchiveEntry
+    from starlette.responses import StreamingResponse
 
 
 class RepositoryInfo:
@@ -87,12 +88,12 @@ class ArchiveServiceProtocol(Protocol):
         """List contents of a directory within an archive."""
         ...
 
-    def extract_file_stream(
+    async def extract_file_stream(
         self,
         repository: "Repository",  # Repository model
         archive_name: str,
         file_path: str,
-    ) -> AsyncGenerator[bytes, None]:
+    ) -> "StreamingResponse":
         """Stream file content from an archive."""
         ...
 

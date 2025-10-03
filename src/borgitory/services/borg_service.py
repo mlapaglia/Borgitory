@@ -2,11 +2,9 @@ import asyncio
 import json
 import logging
 import re
-import os
-from borgitory.services.archives.archive_manager import ArchiveEntry
-from typing import AsyncGenerator, List
+from borgitory.services.archives.archive_models import ArchiveEntry
+from typing import List
 
-from starlette.responses import StreamingResponse
 
 from borgitory.models.database import Repository
 from borgitory.models.borg_info import (
@@ -21,10 +19,8 @@ from borgitory.protocols import (
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
 from borgitory.utils.security import (
-    build_secure_borg_command_with_keyfile,
     secure_borg_command,
     cleanup_temp_keyfile,
-    validate_archive_name,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,99 +140,12 @@ class BorgService:
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
     ) -> List[ArchiveEntry]:
-        """List contents of a specific directory within an archive using FUSE mount"""
+        """List contents of a specific directory within an archive"""
         entries = await self.archive_service.list_archive_directory_contents(
             repository, archive_name, path
         )
 
         return entries
-
-    async def extract_file_stream(
-        self, repository: Repository, archive_name: str, file_path: str
-    ) -> StreamingResponse:
-        """Extract a single file from an archive and stream it to the client"""
-        result = None
-        try:
-            # Validate inputs
-            if not archive_name or not archive_name.strip():
-                raise ValueError("Archive name must be a non-empty string")
-
-            if not file_path:
-                raise ValueError("File path is required")
-
-            validate_archive_name(archive_name)
-
-            # Build borg extract command with --stdout
-            borg_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
-
-            # Use manual keyfile management for streaming operations
-            result = build_secure_borg_command_with_keyfile(
-                base_command="borg extract",
-                repository_path="",
-                passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
-                additional_args=borg_args,
-            )
-            command, env = result.command, result.environment
-
-            logger.info(f"Extracting file {file_path} from archive {archive_name}")
-
-            # Start the borg process using command executor for cross-platform compatibility
-            process = await self.command_executor.create_subprocess(
-                command=command,
-                env=env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            async def generate_stream() -> AsyncGenerator[bytes, None]:
-                """Generator function to stream the file content with automatic backpressure"""
-                try:
-                    while True:
-                        if process.stdout is None:
-                            break
-                        chunk = await process.stdout.read(
-                            65536
-                        )  # 64KB chunks for efficiency
-                        if not chunk:
-                            break
-
-                        yield chunk
-
-                finally:
-                    if process.returncode is None:
-                        process.terminate()
-                        try:
-                            await asyncio.wait_for(process.wait(), timeout=5.0)
-                        except asyncio.TimeoutError:
-                            process.kill()
-                            await process.wait()
-
-                    if process.returncode != 0 and process.stderr:
-                        stderr = await process.stderr.read()
-                        error_msg = (
-                            stderr.decode("utf-8") if stderr else "Unknown error"
-                        )
-                        logger.error(f"Borg extract process failed: {error_msg}")
-                        raise Exception(f"Borg extract failed: {error_msg}")
-
-                    # Clean up keyfile after streaming completes
-                    result.cleanup_temp_files()
-
-            filename = os.path.basename(file_path)
-
-            return StreamingResponse(
-                generate_stream(),
-                media_type="application/octet-stream",
-                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-            )
-
-        except Exception as e:
-            # Clean up keyfile if error occurs before streaming starts
-            if result:
-                result.cleanup_temp_files()
-            logger.error(f"Failed to extract file {file_path}: {str(e)}")
-            raise Exception(f"Failed to extract file: {str(e)}")
 
     async def verify_repository_access(
         self,

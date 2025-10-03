@@ -4,7 +4,7 @@ Tests for BorgService - Core functionality tests
 
 import pytest
 import re
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 
 from borgitory.services.borg_service import BorgService
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
@@ -122,131 +122,11 @@ class TestBorgServiceCore:
             "list_archives",
             "initialize_repository",
             "verify_repository_access",
-            "extract_file_stream",
         ]
 
         for method_name in required_methods:
             assert hasattr(borg_service, method_name)
             assert callable(getattr(borg_service, method_name))
-
-
-class TestBorgServiceFileExtraction:
-    """Test file extraction functionality."""
-
-    @pytest.mark.asyncio
-    async def test_extract_file_stream_calls_executor(
-        self,
-        borg_service: BorgService,
-        mock_command_executor: Mock,
-        mock_repository: Mock,
-    ) -> None:
-        """Test that extract_file_stream calls the command executor."""
-        # Mock subprocess for streaming
-        mock_process = Mock()
-        mock_process.pid = 12345
-        mock_process.stdout = Mock()
-        mock_process.stderr = Mock()
-        mock_process.stdout.read = AsyncMock(return_value=b"file content chunk")
-        mock_process.wait = AsyncMock(return_value=0)
-        mock_command_executor.create_subprocess.return_value = mock_process
-
-        # Mock the secure command builder
-        with patch(
-            "borgitory.services.borg_service.build_secure_borg_command_with_keyfile"
-        ) as mock_builder:
-            mock_result = Mock()
-            mock_result.command = [
-                "borg",
-                "extract",
-                "--stdout",
-                "/test/repo/path::test-archive",
-                "/test/file.txt",
-            ]
-            mock_result.environment = {"BORG_PASSPHRASE": "test-passphrase"}
-            mock_builder.return_value = mock_result
-
-            # Call the method
-            response = await borg_service.extract_file_stream(
-                repository=mock_repository,
-                archive_name="test-archive",
-                file_path="/test/file.txt",
-            )
-
-            # Verify the command executor was called
-            mock_command_executor.create_subprocess.assert_called_once()
-            call_args = mock_command_executor.create_subprocess.call_args
-
-            # Verify the command contains expected elements
-            assert call_args[1]["command"] == [
-                "borg",
-                "extract",
-                "--stdout",
-                "/test/repo/path::test-archive",
-                "/test/file.txt",
-            ]
-            assert "BORG_PASSPHRASE" in call_args[1]["env"]
-
-            # Verify we got a StreamingResponse
-            from starlette.responses import StreamingResponse
-
-            assert isinstance(response, StreamingResponse)
-
-    @pytest.mark.asyncio
-    async def test_extract_file_stream_validation(
-        self,
-        borg_service: BorgService,
-        mock_repository: Mock,
-    ) -> None:
-        """Test input validation for extract_file_stream."""
-        # Test empty archive name - the method catches and re-raises with "Failed to extract file:" prefix
-        with pytest.raises(
-            Exception,
-            match="Failed to extract file:.*Archive name must be a non-empty string",
-        ):
-            await borg_service.extract_file_stream(
-                repository=mock_repository, archive_name="", file_path="/test/file.txt"
-            )
-
-        # Test empty file path
-        with pytest.raises(
-            Exception, match="Failed to extract file:.*File path is required"
-        ):
-            await borg_service.extract_file_stream(
-                repository=mock_repository, archive_name="test-archive", file_path=""
-            )
-
-    @pytest.mark.asyncio
-    async def test_extract_file_stream_exception_handling(
-        self,
-        borg_service: BorgService,
-        mock_command_executor: Mock,
-        mock_repository: Mock,
-    ) -> None:
-        """Test that extract_file_stream handles exceptions gracefully."""
-        # Mock command executor to raise an exception
-        mock_command_executor.create_subprocess.side_effect = Exception("Process error")
-
-        with patch(
-            "borgitory.services.borg_service.build_secure_borg_command_with_keyfile"
-        ) as mock_builder:
-            mock_result = Mock()
-            mock_result.command = [
-                "borg",
-                "extract",
-                "--stdout",
-                "/test/repo/path::test-archive",
-                "/test/file.txt",
-            ]
-            mock_result.environment = {"BORG_PASSPHRASE": "test-passphrase"}
-            mock_builder.return_value = mock_result
-
-            # Should raise the exception
-            with pytest.raises(Exception, match="Process error"):
-                await borg_service.extract_file_stream(
-                    repository=mock_repository,
-                    archive_name="test-archive",
-                    file_path="/test/file.txt",
-                )
 
 
 class TestBorgServiceIntegration:

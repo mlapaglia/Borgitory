@@ -201,17 +201,6 @@ class TestProtocolCompliance:
                 f"ArchiveManager should have {method} method"
             )
 
-        from borgitory.services.jobs.job_executor import JobExecutor
-        from borgitory.services.command_execution.linux_command_executor import (
-            LinuxCommandExecutor,
-        )
-
-        manager = ArchiveManager(
-            job_executor=JobExecutor(LinuxCommandExecutor()),
-            mount_manager=Mock(),
-        )
-        assert manager is not None
-
     def test_notification_service_compliance(self) -> None:
         """Test that NotificationService satisfies NotificationServiceProtocol."""
         checker = ProtocolComplianceChecker()

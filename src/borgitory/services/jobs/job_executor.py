@@ -463,7 +463,9 @@ class JobExecutor:
 
                 async for progress in progress_generator:
                     if progress.get("type") == "log":
-                        log_line = f"[{progress['stream']}] {progress['message']}"
+                        log_line = (
+                            f"[{progress.get('stream')}] {progress.get('message')}"
+                        )
                         if output_callback:
                             output_callback(log_line)
 
@@ -480,7 +482,7 @@ class JobExecutor:
                         )
 
                     elif progress.get("type") == "completed":
-                        if progress["status"] == "success":
+                        if progress.get("status") == "success":
                             logger.info("Cloud sync completed successfully")
                             if output_callback:
                                 output_callback("Cloud sync completed successfully")
