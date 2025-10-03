@@ -475,15 +475,24 @@ async def remove_hook_field(
 
     form_data = await request.form()
 
-    hook_type = str(form_data.get("hook_type", "pre"))
+    try:
+        hook_type = str(form_data.get("hook_type", "pre"))
+        index = int(str(form_data.get("index", "0")))
 
-    current_hooks = HookService.extract_hooks_from_form(form_data, hook_type)
+        current_hooks = HookService.extract_hooks_from_form(form_data, hook_type)
 
-    return templates.TemplateResponse(
-        request,
-        "partials/schedules/hooks/hooks_container.html",
-        {"hook_type": hook_type, "hooks": current_hooks},
-    )
+        # Remove the hook at the specified index
+        if 0 <= index < len(current_hooks):
+            current_hooks.pop(index)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/schedules/hooks/hooks_container.html",
+            {"hook_type": hook_type, "hooks": current_hooks},
+        )
+
+    except (ValueError, TypeError, KeyError):
+        return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
 @router.post("/hooks/hooks-modal", response_class=HTMLResponse)
