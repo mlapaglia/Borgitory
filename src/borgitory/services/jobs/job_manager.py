@@ -1563,6 +1563,7 @@ class JobManager:
         try:
             with get_db_session() as db:
                 from borgitory.models.database import NotificationConfig
+                from borgitory.models.database import Repository
                 from borgitory.services.notifications.types import (
                     NotificationMessage,
                     NotificationType,
@@ -1620,8 +1621,19 @@ class JobManager:
                     enabled=config.enabled,
                 )
 
+                repository = (
+                    db.query(Repository)
+                    .filter(Repository.id == job.repository_id)
+                    .first()
+                )
+
+                if repository:
+                    repository_name = repository.name
+                else:
+                    repository_name = "Unknown"
+
                 title, message, notification_type_str, priority_value = (
-                    self._generate_notification_content(job, task_index)
+                    self._generate_notification_content(job, repository_name)
                 )
 
                 title_param = params.get("title")
@@ -1712,14 +1724,14 @@ class JobManager:
             return False
 
     def _generate_notification_content(
-        self, job: BorgJob, task_index: int
+        self, job: BorgJob, repository_name: str = "Unknown"
     ) -> tuple[str, str, str, int]:
         """
         Generate notification title, message, type, and priority based on job status.
 
         Args:
             job: The job to generate notification content for
-            task_index: Current task index (for context)
+            repository_name: Name of the repository to include in the notification
 
         Returns:
             Tuple of (title, message, type, priority_value)
@@ -1736,10 +1748,6 @@ class JobManager:
         backup_failures = [t for t in failed_tasks if t.task_type == "backup"]
 
         has_critical_failure = bool(critical_hook_failures or backup_failures)
-
-        repository_name = "Unknown"
-        if len(job.tasks) > 0 and "repository_name" in job.tasks[0].parameters:
-            repository_name = str(job.tasks[0].parameters["repository_name"])
 
         if has_critical_failure:
             if critical_hook_failures:
