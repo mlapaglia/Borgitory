@@ -15,6 +15,7 @@ from borgitory.dependencies import (
     NotificationConfigServiceDep,
     NotificationProviderRegistryDep,
     TemplatesDep,
+    get_browser_timezone_offset,
 )
 
 router = APIRouter()
@@ -166,10 +167,13 @@ def get_notification_configs_html(
     try:
         configs = config_service.get_all_configs()
 
+        browser_tz_offset = get_browser_timezone_offset(request)
         return HTMLResponse(
             templates.get_template(
                 "partials/notifications/config_list_content.html"
-            ).render(request=request, configs=configs)
+            ).render(
+                request=request, configs=configs, browser_tz_offset=browser_tz_offset
+            )
         )
 
     except Exception as e:

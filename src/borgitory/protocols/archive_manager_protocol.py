@@ -15,8 +15,7 @@ class ArchiveManagerProtocol(Protocol):
     Protocol defining the interface for archive management operations.
 
     This allows for different implementations:
-    - FUSE-based mounting (current implementation)
-    - Direct borg list commands (new implementation)
+    - Direct borg list commands
     - Future implementations (e.g., cached, streaming, etc.)
     """
 

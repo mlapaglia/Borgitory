@@ -140,7 +140,7 @@ class BorgService:
     async def list_archive_directory_contents(
         self, repository: Repository, archive_name: str, path: str = ""
     ) -> List[ArchiveEntry]:
-        """List contents of a specific directory within an archive using FUSE mount"""
+        """List contents of a specific directory within an archive"""
         entries = await self.archive_service.list_archive_directory_contents(
             repository, archive_name, path
         )
