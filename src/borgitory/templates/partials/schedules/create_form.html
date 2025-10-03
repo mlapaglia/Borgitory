@@ -104,21 +104,21 @@
                         </div>
                         <div id="advanced-options-buttons" class="flex flex-col gap-2">
                             <button type="button" 
-                                    class="flex items-center w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden"
+                                    class="flex items-stretch w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden"
                                     hx-post="/api/schedules/hooks/hooks-modal"
                                     hx-include="#pre-hooks-data, #post-hooks-data"
                                     hx-target="#modal-container">
-                                <span class="px-4 py-2" id="hooks-button-text">Pre/Post Job Hooks</span>
-                                <span class="px-3 py-5 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium" id="hooks-count-badge">0</span>
+                                <span class="flex-1 px-4 py-2 text-left" id="hooks-button-text">Pre/Post Job Hooks</span>
+                                <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]" id="hooks-count-badge">0</span>
                             </button>
                             
                             <button type="button" 
-                                    class="flex items-center w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden"
+                                    class="flex items-stretch w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden"
                                     hx-post="/api/schedules/patterns/patterns-modal"
                                     hx-include="#patterns_field"
                                     hx-target="#modal-container">
-                                <span class="px-4 py-2" id="patterns-button-text">Configure Patterns</span>
-                                <span class="px-3 py-5 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium" id="patterns-count-badge">0</span>
+                                <span class="flex-1 px-4 py-2 text-left" id="patterns-button-text">Configure Patterns</span>
+                                <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]" id="patterns-count-badge">0</span>
                             </button>
                             
                             <!-- Hidden fields for form submission -->
