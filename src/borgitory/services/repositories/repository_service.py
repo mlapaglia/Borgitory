@@ -584,11 +584,11 @@ class RepositoryService:
         """Check if a repository is currently locked by attempting a quick borg list operation."""
         try:
             async with secure_borg_command(
-                base_command="borg list",
+                base_command="borg config",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 keyfile_content=repository.get_keyfile_content(),
-                additional_args=["--short"],
+                additional_args=["--list"],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 result = await self.command_executor.execute_command(

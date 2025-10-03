@@ -3,24 +3,15 @@ Tests for composite job execution stopping on critical failures and task skippin
 """
 
 from typing import List, Optional
+from unittest.mock import Mock, AsyncMock
 
-from src.borgitory.services.jobs.job_manager import JobManager, BorgJob, BorgJobTask
+from src.borgitory.services.jobs.job_manager import (
+    JobManager,
+    BorgJob,
+    BorgJobTask,
+    JobManagerFactory,
+)
 from src.borgitory.utils.datetime_utils import now_utc
-
-
-class MockDependencies:
-    """Mock dependencies for JobManager testing."""
-
-    def __init__(self) -> None:
-        from unittest.mock import Mock, AsyncMock
-
-        self.hook_execution_service = None
-        self.event_broadcaster = Mock()  # Mock event broadcaster
-        self.database_manager = AsyncMock()  # Mock database manager (async)
-        self.output_manager = Mock()  # Mock output manager
-        self.job_executor = None
-        self.queue_manager = None
-        self.notification_service = None
 
 
 class TestCompositeJobCriticalFailure:
@@ -28,7 +19,16 @@ class TestCompositeJobCriticalFailure:
 
     def setup_method(self) -> None:
         """Set up test dependencies."""
-        self.dependencies = MockDependencies()
+        # Create proper test dependencies using the factory
+        mock_subprocess = AsyncMock()
+        mock_db_session = Mock()
+        mock_rclone = Mock()
+
+        self.dependencies = JobManagerFactory.create_for_testing(
+            mock_subprocess=mock_subprocess,
+            mock_db_session=mock_db_session,
+            mock_rclone_service=mock_rclone,
+        )
         self.job_manager = JobManager(dependencies=self.dependencies)
 
     def create_test_job(self, tasks: List[BorgJobTask]) -> BorgJob:
