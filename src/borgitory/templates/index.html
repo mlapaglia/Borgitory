@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="flex h-screen bg-gray-100 dark:bg-gray-900 lg:p-6 lg:gap-0">
+<div class="flex bg-gray-100 dark:bg-gray-900 lg:p-6 lg:gap-0 lg:justify-center">
     <!-- Mobile sidebar overlay -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden hidden" hx-on:click="
         document.getElementById('sidebar').classList.remove('mobile-open');
@@ -13,18 +13,20 @@
         document.body.classList.remove('mobile-sidebar-open');
     "></div>
     
-    {% include "partials/navigation.html" %}
+    <!-- Container for sidebar and main content -->
+    <div class="flex w-full lg:max-w-[calc(80rem+16rem+1.5rem)] lg:gap-6">
+        {% include "partials/navigation.html" %}
 
-    <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col lg:ml-0">
-        <div class="flex-1 p-3 sm:p-6 lg:pr-6 lg:py-6 lg:pl-0">
-            <!-- Main Content Container - tabs loaded here via HTMX -->
-            <div id="main-content"
-                 class="lg:bg-white lg:dark:bg-gray-800 lg:rounded-lg lg:shadow-lg lg:p-6 min-h-full"
-                 hx-get="{{ initial_content_url or '/api/tabs/repositories' }}"
-                 hx-trigger="load">
-                <!-- Default loading state -->
-                <div class="text-gray-500 dark:text-gray-400 text-sm">Loading {{ active_tab or 'repositories' }}...</div>
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col lg:ml-0">
+            <div class="p-3 sm:p-6 lg:pr-6 lg:py-6 lg:pl-0">
+                <!-- Main Content Container - tabs loaded here via HTMX -->
+                <div id="main-content"
+                     hx-get="{{ initial_content_url or '/api/tabs/repositories' }}"
+                     hx-trigger="load">
+                    <!-- Default loading state -->
+                    <div class="text-gray-500 dark:text-gray-400 text-sm">Loading {{ active_tab or 'repositories' }}...</div>
+                </div>
             </div>
         </div>
     </div>
