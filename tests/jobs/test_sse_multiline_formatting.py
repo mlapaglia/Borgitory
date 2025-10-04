@@ -7,8 +7,9 @@ of the blank message issue where multi-line HTML was breaking SSE format.
 
 import pytest
 from unittest.mock import Mock
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_render_service import JobRenderService
-from borgitory.services.jobs.job_manager import BorgJob
+from borgitory.services.jobs.job_models import BorgJob
 
 from borgitory.utils.datetime_utils import now_utc
 
@@ -50,7 +51,7 @@ class TestSSEMultilineFormatting:
         # Create a mock running job
         running_job = Mock(spec=BorgJob)
         running_job.id = "test-job-123"
-        running_job.status = "running"
+        running_job.status = JobStatusEnum.RUNNING
         running_job.started_at = now_utc()
         running_job.tasks = []
 

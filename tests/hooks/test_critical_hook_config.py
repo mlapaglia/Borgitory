@@ -5,7 +5,7 @@ Tests for HookConfig dataclass and HookConfigParser with critical flags.
 import json
 import pytest
 
-from src.borgitory.services.hooks.hook_config import HookConfig, HookConfigParser
+from borgitory.services.hooks.hook_config import HookConfig, HookConfigParser
 
 
 class TestHookConfig:

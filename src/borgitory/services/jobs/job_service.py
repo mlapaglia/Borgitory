@@ -21,11 +21,11 @@ from borgitory.models.job_results import (
     JobOutputResponse,
     ManagerStats,
     QueueStats,
-    JobStatusEnum,
-    JobTypeEnum,
     JobStopResult,
     JobStopError,
     JobStopResponse,
+    JobStatusEnum,
+    JobTypeEnum,
 )
 from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
@@ -366,7 +366,7 @@ class JobService:
         # Convert dictionary to JobStatus object
         return JobStatus(
             id=str(status_dict["id"]),
-            status=JobStatusEnum(str(status_dict["status"])),
+            status=status_dict["status"],  # Already a JobStatusEnum
             job_type=JobTypeEnum(str(status_dict["job_type"])),
             started_at=datetime.fromisoformat(str(status_dict["started_at"]))
             if status_dict["started_at"]
@@ -393,7 +393,7 @@ class JobService:
         if job and job.tasks:  # All jobs are composite now
             # Get current task output if job is running
             current_task_output = []
-            if job.status == "running":
+            if job.status == JobStatusEnum.RUNNING:
                 current_task = job.get_current_task()
                 if current_task:
                     lines = list(current_task.output_lines)
@@ -404,7 +404,7 @@ class JobService:
 
             return CompositeJobOutput(
                 job_id=job_id,
-                job_type="composite",
+                job_type=JobTypeEnum.COMPOSITE,
                 status=JobStatusEnum(job.status),
                 current_task_index=job.current_task_index,
                 total_tasks=len(job.tasks),
@@ -451,7 +451,7 @@ class JobService:
             )
             if job:
                 # Update database status
-                job.status = "cancelled"
+                job.status = JobStatusEnum.CANCELLED
                 job.finished_at = now_utc()
                 self.db.commit()
                 return True
@@ -499,7 +499,7 @@ class JobService:
                 .first()
             )
             if job:
-                if job.status not in ["running", "queued"]:
+                if job.status not in [JobStatusEnum.RUNNING, JobStatusEnum.QUEUED]:
                     return JobStopError(
                         job_id=job_id,
                         error=f"Cannot stop job in status: {job.status}",
@@ -507,7 +507,7 @@ class JobService:
                     )
 
                 # Update database status
-                job.status = "stopped"
+                job.status = JobStatusEnum.STOPPED
                 job.finished_at = now_utc()
                 job.error = "Manually stopped by user"
                 self.db.commit()
@@ -534,9 +534,15 @@ class JobService:
     def get_manager_stats(self) -> ManagerStats:
         """Get JobManager statistics"""
         jobs = self.job_manager.jobs
-        running_jobs = [job for job in jobs.values() if job.status == "running"]
-        completed_jobs = [job for job in jobs.values() if job.status == "completed"]
-        failed_jobs = [job for job in jobs.values() if job.status == "failed"]
+        running_jobs = [
+            job for job in jobs.values() if job.status == JobStatusEnum.RUNNING
+        ]
+        completed_jobs = [
+            job for job in jobs.values() if job.status == JobStatusEnum.COMPLETED
+        ]
+        failed_jobs = [
+            job for job in jobs.values() if job.status == JobStatusEnum.FAILED
+        ]
 
         return ManagerStats(
             total_jobs=len(jobs),
@@ -553,7 +559,7 @@ class JobService:
         jobs_to_remove = []
 
         for job_id, job in self.job_manager.jobs.items():
-            if job.status in ["completed", "failed"]:
+            if job.status in [JobStatusEnum.COMPLETED, JobStatusEnum.FAILED]:
                 jobs_to_remove.append(job_id)
 
         for job_id in jobs_to_remove:

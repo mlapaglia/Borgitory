@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from borgitory.main import app
 
 # Import service types for mock creation
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.borg_service import BorgService
 from borgitory.services.debug_service import DebugService
 from borgitory.services.jobs.job_stream_service import JobStreamService
@@ -195,7 +196,7 @@ class MockServiceFactory:
             mock_task_0,
             mock_task_1,
         ]  # List with two tasks
-        mock_template_job.job.status = "completed"
+        mock_template_job.job.status = JobStatusEnum.COMPLETED
         mock_template_job.job.id = "test-job-123"
 
         # Set up side_effect to return mock_template_job for known jobs, None for unknown

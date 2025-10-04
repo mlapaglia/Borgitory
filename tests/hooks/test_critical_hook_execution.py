@@ -6,9 +6,9 @@ import pytest
 from typing import Dict, List, Optional, Any
 from unittest.mock import AsyncMock
 
-from src.borgitory.services.hooks.hook_config import HookConfig
-from src.borgitory.services.hooks.hook_execution_service import HookExecutionService
-from src.borgitory.protocols.command_protocols import CommandResult
+from borgitory.services.hooks.hook_config import HookConfig
+from borgitory.services.hooks.hook_execution_service import HookExecutionService
+from borgitory.protocols.command_protocols import CommandResult
 
 
 class MockCommandRunner:

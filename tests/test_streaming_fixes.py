@@ -5,6 +5,7 @@ Test suite for streaming fixes and UUID system improvements
 import pytest
 import uuid
 from unittest.mock import Mock, patch, AsyncMock
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.models.database import Job, JobTask
@@ -33,12 +34,12 @@ class TestJobStreamingFixes:
         """Create a mock composite job with tasks"""
         job = Mock()
         job.id = str(uuid.uuid4())
-        job.status = "running"
+        job.status = JobStatusEnum.RUNNING
 
         # Create mock tasks with output_lines
         task1 = Mock()
         task1.task_name = "backup"
-        task1.status = "completed"
+        task1.status = JobStatusEnum.COMPLETED
         task1.task_order = 0
         task1.output_lines = [
             {"text": "Starting backup..."},
@@ -48,7 +49,7 @@ class TestJobStreamingFixes:
 
         task2 = Mock()
         task2.task_name = "prune"
-        task2.status = "running"
+        task2.status = JobStatusEnum.RUNNING
         task2.task_order = 1
         task2.output_lines = [
             {"text": "Starting prune..."},
@@ -234,7 +235,7 @@ class TestJobRenderServiceUUIDIntegration:
         job = Mock()
         job.id = str(uuid.uuid4())
         job.type = "backup"
-        job.status = "completed"
+        job.status = JobStatusEnum.COMPLETED
         job.started_at = now_utc()
         job.finished_at = now_utc()
         job.error = None

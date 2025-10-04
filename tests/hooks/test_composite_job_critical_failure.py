@@ -3,15 +3,13 @@ Tests for composite job execution stopping on critical failures and task skippin
 """
 
 from typing import List, Optional
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 
-from src.borgitory.services.jobs.job_manager import (
-    JobManager,
-    BorgJob,
-    BorgJobTask,
-    JobManagerFactory,
-)
-from src.borgitory.utils.datetime_utils import now_utc
+from borgitory.models.job_results import JobStatusEnum
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_manager_factory import JobManagerFactory
+from borgitory.utils.datetime_utils import now_utc
 
 
 class TestCompositeJobCriticalFailure:
@@ -137,7 +135,7 @@ class TestCompositeJobCriticalFailure:
         self,
     ) -> None:
         """Test that critical backup task failure marks remaining tasks as skipped."""
-        from unittest.mock import AsyncMock, patch
+        from unittest.mock import AsyncMock
 
         # Create job with pre-hook, backup (critical failure), post-hook, notification
         pre_hook_task = self.create_hook_task("pre")
@@ -149,13 +147,15 @@ class TestCompositeJobCriticalFailure:
         job = self.create_test_job(tasks)
 
         # Mock individual task methods
-        async def mock_hook_success(job, task, task_index, job_has_failed=False):
+        async def mock_hook_success(
+            job, task, task_index, job_has_failed=False
+        ) -> bool:
             task.status = "completed"
             task.return_code = 0
             task.completed_at = now_utc()
             return True
 
-        async def mock_backup_fail(job, task, task_index):
+        async def mock_backup_fail(job, task, task_index) -> bool:
             task.status = "failed"
             task.return_code = 1
             task.error = "Backup failed"
@@ -165,13 +165,19 @@ class TestCompositeJobCriticalFailure:
         # Mock all task execution methods
         with (
             patch.object(
-                self.job_manager, "_execute_hook_task", side_effect=mock_hook_success
+                self.job_manager.hook_executor,
+                "execute_hook_task",
+                side_effect=mock_hook_success,
             ),
             patch.object(
-                self.job_manager, "_execute_backup_task", side_effect=mock_backup_fail
+                self.job_manager.backup_executor,
+                "execute_backup_task",
+                side_effect=mock_backup_fail,
             ),
             patch.object(
-                self.job_manager, "_execute_notification_task", side_effect=AsyncMock()
+                self.job_manager.notification_executor,
+                "execute_notification_task",
+                side_effect=AsyncMock(),
             ) as mock_notification,
         ):
             # Execute the composite job
@@ -269,10 +275,14 @@ class TestCompositeJobCriticalFailure:
                     and t.parameters.get("critical_failure", False)
                     for t in failed_tasks
                 )
-                job.status = "failed" if critical_hook_failed else "completed"
+                job.status = (
+                    JobStatusEnum.FAILED
+                    if critical_hook_failed
+                    else JobStatusEnum.COMPLETED
+                )
 
         # Verify job status is failed due to critical hook failure
-        assert job.status == "failed"
+        assert job.status == JobStatusEnum.FAILED
         assert len(failed_tasks) == 1
         assert len(completed_tasks) == 0
         assert len(skipped_tasks) == 3
@@ -311,13 +321,13 @@ class TestCompositeJobCriticalFailure:
                     for t in failed_tasks
                 )
                 job.status = (
-                    "failed"
+                    JobStatusEnum.FAILED
                     if (critical_task_failed or critical_hook_failed)
-                    else "completed"
+                    else JobStatusEnum.COMPLETED
                 )
 
         # Verify job status is completed (non-critical failure)
-        assert job.status == "completed"
+        assert job.status == JobStatusEnum.COMPLETED
         assert len(failed_tasks) == 1
         assert len(completed_tasks) == 1
         assert len(skipped_tasks) == 1

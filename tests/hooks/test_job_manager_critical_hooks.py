@@ -6,18 +6,18 @@ import pytest
 from typing import Dict, List, Optional
 from unittest.mock import AsyncMock
 
-from src.borgitory.services.jobs.job_manager import (
-    JobManager,
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_models import (
     BorgJob,
     BorgJobTask,
     JobManagerDependencies,
 )
-from src.borgitory.services.hooks.hook_execution_service import (
+from borgitory.services.hooks.hook_execution_service import (
     HookExecutionSummary,
     HookExecutionResult,
 )
-from src.borgitory.services.hooks.hook_config import HookConfig
-from src.borgitory.utils.datetime_utils import now_utc
+from borgitory.services.hooks.hook_config import HookConfig
+from borgitory.utils.datetime_utils import now_utc
 
 
 class MockHookExecutionService:
@@ -107,7 +107,9 @@ class TestJobManagerHookExecution:
         job = self.create_test_job([hook_task])
 
         # Execute hook task
-        result = await self.job_manager._execute_hook_task(job, hook_task, 0, False)
+        result = await self.job_manager.hook_executor.execute_hook_task(
+            job, hook_task, 0, False
+        )
 
         # Verify success
         assert result is True
@@ -143,7 +145,9 @@ class TestJobManagerHookExecution:
         job = self.create_test_job([hook_task])
 
         # Execute hook task
-        result = await self.job_manager._execute_hook_task(job, hook_task, 0, False)
+        result = await self.job_manager.hook_executor.execute_hook_task(
+            job, hook_task, 0, False
+        )
 
         # Verify failure
         assert result is False
@@ -181,7 +185,9 @@ class TestJobManagerHookExecution:
         job = self.create_test_job([hook_task])
 
         # Execute hook task
-        result = await self.job_manager._execute_hook_task(job, hook_task, 0, False)
+        result = await self.job_manager.hook_executor.execute_hook_task(
+            job, hook_task, 0, False
+        )
 
         # Verify failure but not critical
         assert result is False
@@ -220,7 +226,9 @@ class TestJobManagerHookExecution:
         job = self.create_test_job([hook_task])
 
         # Execute hook task with job_has_failed=True
-        result = await self.job_manager._execute_hook_task(job, hook_task, 0, True)
+        result = await self.job_manager.hook_executor.execute_hook_task(
+            job, hook_task, 0, True
+        )
 
         # Verify success
         assert result is True
@@ -239,7 +247,9 @@ class TestJobManagerHookExecution:
         job = self.create_test_job([hook_task])
 
         # Execute hook task
-        result = await self.job_manager._execute_hook_task(job, hook_task, 0, False)
+        result = await self.job_manager.hook_executor.execute_hook_task(
+            job, hook_task, 0, False
+        )
 
         # Verify success (no hooks to execute)
         assert result is True
@@ -257,7 +267,9 @@ class TestJobManagerHookExecution:
         job = self.create_test_job([hook_task])
 
         # Execute hook task
-        result = await self.job_manager._execute_hook_task(job, hook_task, 0, False)
+        result = await self.job_manager.hook_executor.execute_hook_task(
+            job, hook_task, 0, False
+        )
 
         # Verify failure due to invalid JSON
         assert result is False
@@ -281,7 +293,9 @@ class TestJobManagerHookExecution:
         job = self.create_test_job([hook_task])
 
         # Execute hook task
-        result = await job_manager._execute_hook_task(job, hook_task, 0, False)
+        result = await job_manager.hook_executor.execute_hook_task(
+            job, hook_task, 0, False
+        )
 
         # Verify failure due to missing service
         assert result is False
@@ -307,7 +321,7 @@ class TestJobManagerHookExecution:
         job.job_type = "scheduled"
 
         # Execute hook task
-        await self.job_manager._execute_hook_task(job, hook_task, 3, False)
+        await self.job_manager.hook_executor.execute_hook_task(job, hook_task, 3, False)
 
         # Verify context parameters were passed correctly
         self.mock_hook_service.execute_hooks_mock.assert_called_once()

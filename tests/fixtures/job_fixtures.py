@@ -7,12 +7,13 @@ job services with clean dependency injection patterns.
 
 import pytest
 import uuid
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
 from typing import Any, AsyncGenerator, Dict, List
 from sqlalchemy.orm import Session
 
-from borgitory.services.jobs.job_manager import BorgJob, BorgJobTask, JobManagerConfig
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, JobManagerConfig
 from borgitory.models.database import Repository, Job, JobTask
 
 
@@ -115,7 +116,7 @@ def sample_database_job(test_db: Session, sample_repository: Repository) -> Job:
     job.id = str(uuid.uuid4())
     job.repository_id = sample_repository.id
     job.type = "backup"
-    job.status = "completed"
+    job.status = JobStatusEnum.COMPLETED
     job.started_at = now_utc()
     job.finished_at = now_utc()
     test_db.add(job)
@@ -133,7 +134,7 @@ def sample_database_job_with_tasks(
     job.id = str(uuid.uuid4())
     job.repository_id = sample_repository.id
     job.type = "backup"
-    job.status = "completed"
+    job.status = JobStatusEnum.COMPLETED
     job.started_at = now_utc()
     job.finished_at = now_utc()
     test_db.add(job)

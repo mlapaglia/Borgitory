@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_render_service import (
     JobRenderService,
     JobDataConverter,
@@ -49,7 +50,7 @@ class TestJobRenderServiceNewArchitecture:
         mock_job_manager = Mock()
         mock_job = Mock()
         mock_job.id = "test-job-123"
-        mock_job.status = "running"
+        mock_job.status = JobStatusEnum.RUNNING
         mock_job_manager.jobs = {"test-job-123": mock_job}
 
         # Create mock converter
@@ -94,7 +95,7 @@ class TestJobRenderServiceNewArchitecture:
         # Create mock database job
         mock_db_job = Mock()
         mock_db_job.id = "test-job-456"
-        mock_db_job.status = "completed"
+        mock_db_job.status = JobStatusEnum.COMPLETED
 
         mock_db = Mock(spec=Session)
         mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_db_job
@@ -132,7 +133,7 @@ class TestJobRenderServiceNewArchitecture:
         mock_job_manager = Mock()
         mock_job = Mock()
         mock_job.id = "running-job-789"
-        mock_job.status = "running"
+        mock_job.status = JobStatusEnum.RUNNING
         mock_job_manager.jobs = {"running-job-789": mock_job}
 
         # Create mock converter that returns JobDisplayData

@@ -10,6 +10,7 @@ from unittest.mock import Mock, AsyncMock
 
 from borgitory.main import app
 from borgitory.models.database import Repository, Job
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.models.database import get_db
 from borgitory.dependencies import get_job_manager_dependency
@@ -45,7 +46,7 @@ class TestJobStopIntegration:
         job.id = "db-job"  # Short ID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
-        job.status = "running"
+        job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         job.job_type = "simple"  # This is the correct field name
         test_db.add(job)
@@ -65,7 +66,7 @@ class TestJobStopIntegration:
             # Verify database was updated
             updated_job = test_db.query(Job).filter(Job.id == "db-job").first()
             assert updated_job is not None
-            assert updated_job.status == "stopped"
+            assert updated_job.status == JobStatusEnum.STOPPED
             assert updated_job.error == "Manually stopped by user"
             assert updated_job.finished_at is not None
 
@@ -164,7 +165,7 @@ class TestJobStopIntegration:
         job.id = "comp-job"  # Short ID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
-        job.status = "completed"
+        job.status = JobStatusEnum.COMPLETED
         job.started_at = now_utc()
         job.finished_at = now_utc()
         job.job_type = "simple"  # This is the correct field name
@@ -207,7 +208,7 @@ class TestJobStopIntegration:
         job.id = "tmpl-job"  # Short ID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
-        job.status = "running"
+        job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         job.job_type = "simple"  # This is the correct field name
         test_db.add(job)
@@ -234,7 +235,7 @@ class TestJobStopIntegration:
             # Verify database was actually updated
             updated_job = test_db.query(Job).filter(Job.id == "tmpl-job").first()
             assert updated_job is not None
-            assert updated_job.status == "stopped"
+            assert updated_job.status == JobStatusEnum.STOPPED
 
         finally:
             app.dependency_overrides.clear()
@@ -255,7 +256,7 @@ class TestJobStopIntegration:
         job.id = "htmx-job"  # Short ID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
-        job.status = "running"
+        job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         job.job_type = "simple"  # This is the correct field name
         test_db.add(job)

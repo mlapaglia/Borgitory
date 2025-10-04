@@ -16,6 +16,7 @@ from borgitory.models.schemas import (
 from borgitory.dependencies import (
     TemplatesDep,
     PruneServiceDep,
+    get_browser_timezone_offset,
 )
 
 router = APIRouter()
@@ -100,8 +101,11 @@ def get_prune_configs(
     try:
         processed_configs = service.get_configs_with_descriptions()
 
+        browser_tz_offset = get_browser_timezone_offset(request)
         return templates.get_template("partials/prune/config_list_content.html").render(
-            request=request, configs=processed_configs
+            request=request,
+            configs=processed_configs,
+            browser_tz_offset=browser_tz_offset,
         )
 
     except Exception as e:

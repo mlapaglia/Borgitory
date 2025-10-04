@@ -20,7 +20,7 @@ from borgitory.services.jobs.job_render_service import (
 )
 from borgitory.models.database import Job, JobTask, Repository
 from borgitory.models.enums import JobType
-from borgitory.services.jobs.job_manager import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
 
 
 class TestJobDataConverterCoverage:

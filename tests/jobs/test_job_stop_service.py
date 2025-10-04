@@ -11,6 +11,7 @@ from borgitory.services.jobs.job_service import JobService
 from borgitory.models.job_results import JobStopResult, JobStopError
 from borgitory.models.database import Repository, Job
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.models.job_results import JobStatusEnum
 
 
 class TestJobStopService:
@@ -107,7 +108,7 @@ class TestJobStopService:
         job.id = "db-job-123"  # Short ID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
-        job.status = "running"
+        job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         test_db.add(job)
         test_db.commit()
@@ -129,7 +130,7 @@ class TestJobStopService:
         # Verify database was updated
         updated_job = test_db.query(Job).filter(Job.id == "db-job-123").first()
         assert updated_job is not None
-        assert updated_job.status == "stopped"
+        assert updated_job.status == JobStatusEnum.STOPPED
         assert updated_job.error == "Manually stopped by user"
         assert updated_job.finished_at is not None
 
@@ -148,7 +149,7 @@ class TestJobStopService:
         job.id = "job123"  # Short ID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
-        job.status = "completed"
+        job.status = JobStatusEnum.COMPLETED
         job.started_at = now_utc()
         job.finished_at = now_utc()
         test_db.add(job)
@@ -226,7 +227,7 @@ class TestJobStopService:
         job.id = "error-job"
         job.repository_id = repository.id
         job.type = "backup"  # Required field
-        job.status = "running"
+        job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         test_db.add(job)
         test_db.commit()

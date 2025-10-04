@@ -10,6 +10,8 @@ from borgitory.models.job_results import (
     JobCreationResult,
     JobStatusError,
     JobStopResult,
+    JobStatusEnum,
+    JobTypeEnum,
 )
 from borgitory.dependencies import JobServiceDep, get_browser_timezone_offset
 from borgitory.dependencies import JobStreamServiceDep, JobRenderServiceDep
@@ -36,7 +38,7 @@ class JobStatusResponse(BaseModel):
     """Job status response model"""
 
     id: str
-    status: str
+    status: JobStatusEnum
     running: bool
     completed: bool
     failed: bool
@@ -44,7 +46,7 @@ class JobStatusResponse(BaseModel):
     completed_at: Optional[str] = None
     return_code: Optional[int] = None
     error: Optional[str] = None
-    job_type: Optional[str] = None
+    job_type: Optional[JobTypeEnum] = None
     current_task_index: Optional[int] = None
     tasks: Optional[int] = None
 
@@ -238,7 +240,7 @@ async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusRespon
     # Convert JobStatus to Pydantic JobStatusResponse
     return JobStatusResponse(
         id=result.id,
-        status=result.status.value,
+        status=result.status,
         running=result.running,
         completed=result.completed,
         failed=result.failed,
@@ -246,7 +248,7 @@ async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusRespon
         completed_at=result.completed_at.isoformat() if result.completed_at else None,
         return_code=result.return_code,
         error=result.error,
-        job_type=result.job_type.value,
+        job_type=result.job_type,
         current_task_index=result.current_task_index,
         tasks=result.total_tasks,
     )

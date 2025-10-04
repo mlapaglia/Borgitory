@@ -125,11 +125,15 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager, "_get_repository_data", return_value=mock_repository_data
+                job_manager.backup_executor,
+                "_get_repository_data",
+                return_value=mock_repository_data,
             ),
-            patch.object(job_manager, "_execute_break_lock") as mock_break_lock,
+            patch.object(
+                job_manager.backup_executor, "_execute_break_lock"
+            ) as mock_break_lock,
         ):
-            result = await job_manager._execute_backup_task(
+            result = await job_manager.backup_executor.execute_backup_task(
                 mock_job, mock_backup_task_with_ignore_lock, task_index=0
             )
 
@@ -173,11 +177,15 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager, "_get_repository_data", return_value=mock_repository_data
+                job_manager.backup_executor,
+                "_get_repository_data",
+                return_value=mock_repository_data,
             ),
-            patch.object(job_manager, "_execute_break_lock") as mock_break_lock,
+            patch.object(
+                job_manager.backup_executor, "_execute_break_lock"
+            ) as mock_break_lock,
         ):
-            result = await job_manager._execute_backup_task(
+            result = await job_manager.backup_executor.execute_backup_task(
                 mock_job, mock_backup_task_without_ignore_lock, task_index=0
             )
 
@@ -211,7 +219,7 @@ class TestIgnoreLockFunctionality:
         passphrase = "test-passphrase"
 
         # Execute break-lock
-        await job_manager._execute_break_lock(
+        await job_manager.backup_executor._execute_break_lock(
             repository_path, passphrase, output_callback
         )
 
@@ -268,15 +276,17 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager, "_get_repository_data", return_value=mock_repository_data
+                job_manager.backup_executor,
+                "_get_repository_data",
+                return_value=mock_repository_data,
             ),
             patch.object(
-                job_manager,
+                job_manager.backup_executor,
                 "_execute_break_lock",
                 side_effect=Exception("Break-lock failed"),
             ) as mock_break_lock,
         ):
-            result = await job_manager._execute_backup_task(
+            result = await job_manager.backup_executor.execute_backup_task(
                 mock_job, mock_backup_task_with_ignore_lock, task_index=0
             )
 
@@ -320,7 +330,7 @@ class TestIgnoreLockFunctionality:
 
         # Execute break-lock and expect timeout exception
         with pytest.raises(Exception, match="Break-lock operation timed out"):
-            await job_manager._execute_break_lock(
+            await job_manager.backup_executor._execute_break_lock(
                 repository_path, passphrase, output_callback
             )
 
@@ -347,7 +357,9 @@ class TestIgnoreLockFunctionality:
         job_manager.executor.monitor_process_output.return_value = mock_result  # type: ignore
 
         # Execute break-lock
-        await job_manager._execute_break_lock("/test/repo", "test-pass", MagicMock())
+        await job_manager.backup_executor._execute_break_lock(
+            "/test/repo", "test-pass", MagicMock()
+        )
 
         # Verify executor was called with a borg break-lock command
         job_manager.executor.start_process.assert_called_once()

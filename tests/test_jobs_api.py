@@ -57,11 +57,11 @@ class TestJobsAPI:
         job.id = "test-job-123"
         job.repository_id = sample_repository.id
         job.type = "backup"
-        job.status = "completed"
+        job.status = JobStatusEnum.COMPLETED
         job.started_at = now_utc()
         job.finished_at = now_utc()
         job.log_output = "Test job output"
-        job.job_type = "composite"
+        job.job_type = JobTypeEnum.COMPOSITE
         job.total_tasks = 1
         job.completed_tasks = 1
         test_db.add(job)

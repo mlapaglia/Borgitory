@@ -6,7 +6,8 @@ Tests the business logic directly without mocking core components
 import pytest
 from unittest.mock import Mock, AsyncMock
 
-from borgitory.services.jobs.job_manager import JobManager, BorgJob, BorgJobTask
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
 from borgitory.utils.datetime_utils import now_utc
 
 

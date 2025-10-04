@@ -7,6 +7,7 @@ from datetime import datetime
 from dataclasses import dataclass, field
 import asyncio
 from borgitory.custom_types import ConfigDict
+from borgitory.services.jobs.job_models import BorgJob
 
 
 @dataclass
@@ -26,7 +27,6 @@ class TaskDefinition:
 
 
 if TYPE_CHECKING:
-    from borgitory.services.jobs.job_manager import BorgJob
     from borgitory.services.jobs.broadcaster.job_event import JobEvent
     from borgitory.models.database import Repository, Schedule
     from borgitory.services.debug_service import DebugInfo, SystemInfo, JobManagerInfo

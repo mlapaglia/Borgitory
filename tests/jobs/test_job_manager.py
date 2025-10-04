@@ -5,6 +5,7 @@ from unittest.mock import Mock, AsyncMock, patch
 
 from sqlalchemy.orm import Session
 
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_manager import (
     JobManager,
     JobManagerConfig,
@@ -361,7 +362,7 @@ class TestJobManager:
         """Test getting job status"""
         job = Mock()
         job.id = "test"
-        job.status = "completed"
+        job.status = JobStatusEnum.COMPLETED
         job.started_at = datetime(2023, 1, 1, 12, 0, 0)
         job.completed_at = datetime(2023, 1, 1, 12, 5, 0)
         job.return_code = 0
@@ -422,7 +423,7 @@ class TestJobManager:
         # Set up a running job
         job = Mock()
         job.id = "test"
-        job.status = "running"
+        job.status = JobStatusEnum.RUNNING
         job_manager.jobs["test"] = job
 
         # Test cancellation interface exists
@@ -445,7 +446,7 @@ class TestJobManager:
             id="test-job-id",
             command=["borg", "list", "test-repo"],
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[],
         )
