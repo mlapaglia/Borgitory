@@ -4,7 +4,6 @@ Notification Task Executor - Handles notification task execution
 
 import logging
 from typing import Optional, Any, Tuple
-from borgitory.utils.db_session import get_db_session
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
 
 logger = logging.getLogger(__name__)
@@ -37,7 +36,16 @@ class NotificationTaskExecutor:
             return False
 
         try:
-            with get_db_session() as db:
+            # Get database session factory from dependencies
+            db_session_factory = await self._get_db_session_factory()
+            if not db_session_factory:
+                logger.error("Database session factory not available")
+                task.status = "failed"
+                task.return_code = 1
+                task.error = "Database session factory not available"
+                return False
+
+            with db_session_factory() as db:
                 from borgitory.models.database import NotificationConfig
                 from borgitory.models.database import Repository
                 from borgitory.services.notifications.types import (
@@ -271,5 +279,10 @@ class NotificationTaskExecutor:
 
     async def _get_notification_service(self) -> Optional[Any]:
         """Get notification service - this will be injected by the job manager"""
+        # This method will be overridden by the job manager
+        return None
+
+    async def _get_db_session_factory(self) -> Optional[Any]:
+        """Get database session factory - this will be injected by the job manager"""
         # This method will be overridden by the job manager
         return None

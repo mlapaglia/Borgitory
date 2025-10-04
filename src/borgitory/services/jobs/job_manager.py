@@ -126,11 +126,16 @@ class JobManager:
             self._get_cloud_sync_dependencies,
         )
 
-        # Inject notification service into notification executor
+        # Inject notification service and database session factory into notification executor
         setattr(
             self.notification_executor,
             "_get_notification_service",
             self._get_notification_service,
+        )
+        setattr(
+            self.notification_executor,
+            "_get_db_session_factory",
+            self._get_db_session_factory,
         )
 
         # Inject hook execution service into hook executor
@@ -788,6 +793,10 @@ class JobManager:
     async def _get_notification_service(self) -> Optional[Any]:
         """Get notification service"""
         return self.notification_service
+
+    async def _get_db_session_factory(self) -> Optional[Any]:
+        """Get database session factory"""
+        return self.dependencies.db_session_factory
 
     async def _get_hook_execution_service(self) -> Optional[Any]:
         """Get hook execution service"""
