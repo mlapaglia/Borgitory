@@ -103,9 +103,7 @@ def get_prune_configs(
 
         browser_tz_offset = get_browser_timezone_offset(request)
         return templates.get_template("partials/prune/config_list_content.html").render(
-            request=request,
-            configs=processed_configs,
-            browser_tz_offset=browser_tz_offset,
+            request=request, configs=processed_configs, browser_tz_offset=browser_tz_offset
         )
 
     except Exception as e:
