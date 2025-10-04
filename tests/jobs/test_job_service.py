@@ -429,9 +429,9 @@ class TestJobService:
 
     def test_get_job_from_jobmanager(self, test_db: Session) -> None:
         """Test getting a job from JobManager by UUID."""
-        from borgitory.models.job_results import JobStatus, JobStatusEnum, JobTypeEnum
+        from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
         from datetime import datetime
-        
+
         self.mock_job_manager.get_job_status.return_value = JobStatus(
             id="uuid-long-string",
             status=JobStatusEnum.RUNNING,
@@ -460,9 +460,9 @@ class TestJobService:
     @pytest.mark.asyncio
     async def test_get_job_status(self) -> None:
         """Test getting job status."""
-        from borgitory.models.job_results import JobStatus, JobStatusEnum, JobTypeEnum
+        from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
         from datetime import datetime
-        
+
         expected_output = JobStatus(
             id="job-123",
             status=JobStatusEnum.RUNNING,

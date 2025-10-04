@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from dataclasses import dataclass
 from borgitory.custom_types import ConfigDict
 from borgitory.utils.datetime_utils import now_utc
@@ -13,7 +12,6 @@ from borgitory.models.job_results import (
     JobCreationResult,
     JobCreationError,
     JobCreationResponse,
-    JobStatus,
     JobStatusError,
     JobStatusResponse,
     CompositeJobOutput,

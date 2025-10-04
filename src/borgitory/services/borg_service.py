@@ -184,7 +184,10 @@ class BorgService:
                     if not status:
                         return False
 
-                    if status.status == JobStatusEnum.COMPLETED or status.status == JobStatusEnum.FAILED:
+                    if (
+                        status.status == JobStatusEnum.COMPLETED
+                        or status.status == JobStatusEnum.FAILED
+                    ):
                         success = status.return_code == 0
                         # Clean up job
                         self._get_job_manager().cleanup_job(job_id)

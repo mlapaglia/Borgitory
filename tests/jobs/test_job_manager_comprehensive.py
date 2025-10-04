@@ -508,7 +508,6 @@ class TestJobManagerTaskExecution:
         job_manager_with_db.prune_executor.execute_prune_task = mock_prune  # type: ignore[method-assign]
 
         # Wait for the job to complete (it starts automatically)
-        import asyncio
 
         await asyncio.sleep(0.1)  # Give the job time to execute
 
@@ -1106,6 +1105,7 @@ class TestJobManagerExternalIntegration:
             job_manager, mock_output_manager, mock_queue_manager, mock_event_broadcaster
         )
         return job_manager
+
 
 class TestJobManagerDatabaseIntegration:
     """Test database integration methods"""

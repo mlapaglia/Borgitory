@@ -450,9 +450,7 @@ class JobManager:
 
                 # Execute the task based on its type using the appropriate executor
                 try:
-                    success = await self._execute_task_with_executor(
-                        job, task, task_index
-                    )
+                    await self._execute_task_with_executor(job, task, task_index)
 
                     # Task status, return_code, and completed_at are already set by the individual task methods
                     # Just ensure completed_at is set if not already
