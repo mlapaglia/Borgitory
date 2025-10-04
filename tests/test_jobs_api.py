@@ -405,10 +405,7 @@ class TestJobsAPI:
 
         # Verify the core fields are correct
         assert response_data["id"] == "test-job-123"
-        assert response_data["status"] == "running"
-        assert response_data["running"] is True
-        assert response_data["completed"] is False
-        assert response_data["failed"] is False
+        assert response_data["status"] == JobStatusEnum.RUNNING
         assert response_data["job_type"] == "backup"
 
         setup_dependencies["job_service"].get_job_status.assert_called_once_with(

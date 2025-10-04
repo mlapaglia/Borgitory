@@ -429,12 +429,17 @@ class TestJobService:
 
     def test_get_job_from_jobmanager(self, test_db: Session) -> None:
         """Test getting a job from JobManager by UUID."""
-        self.mock_job_manager.get_job_status.return_value = {
-            "status": "running",
-            "started_at": "2023-01-01T00:00:00",
-            "completed_at": None,
-            "error": None,
-        }
+        from borgitory.models.job_results import JobStatus, JobStatusEnum, JobTypeEnum
+        from datetime import datetime
+        
+        self.mock_job_manager.get_job_status.return_value = JobStatus(
+            id="uuid-long-string",
+            status=JobStatusEnum.RUNNING,
+            job_type=JobTypeEnum.COMPOSITE,
+            started_at=datetime.fromisoformat("2023-01-01T00:00:00"),
+            completed_at=None,
+            error=None,
+        )
 
         result = self.job_service.get_job("uuid-long-string")
 
@@ -455,17 +460,20 @@ class TestJobService:
     @pytest.mark.asyncio
     async def test_get_job_status(self) -> None:
         """Test getting job status."""
-        expected_output = {
-            "id": "job-123",
-            "status": JobStatusEnum.RUNNING,
-            "job_type": "backup",
-            "started_at": "2023-01-01T00:00:00",
-            "completed_at": None,
-            "return_code": None,
-            "error": None,
-            "current_task_index": 0,
-            "tasks": 1,
-        }
+        from borgitory.models.job_results import JobStatus, JobStatusEnum, JobTypeEnum
+        from datetime import datetime
+        
+        expected_output = JobStatus(
+            id="job-123",
+            status=JobStatusEnum.RUNNING,
+            job_type=JobTypeEnum.BACKUP,
+            started_at=datetime.fromisoformat("2023-01-01T00:00:00"),
+            completed_at=None,
+            return_code=None,
+            error=None,
+            current_task_index=0,
+            total_tasks=1,
+        )
         self.mock_job_manager.get_job_status.return_value = expected_output
 
         result = await self.job_service.get_job_status("job-123")

@@ -315,10 +315,10 @@ class JobService:
                     "job_id": job_id,
                     "repository_id": None,
                     "type": "unknown",
-                    "status": status["status"],
-                    "started_at": status["started_at"],
-                    "finished_at": status["completed_at"],
-                    "error": status["error"],
+                    "status": status.status,
+                    "started_at": status.started_at,
+                    "finished_at": status.completed_at,
+                    "error": status.error,
                     "source": "jobmanager",
                 }
 
@@ -359,30 +359,12 @@ class JobService:
 
     async def get_job_status(self, job_id: str) -> JobStatusResponse:
         """Get current job status and progress"""
-        status_dict = self.job_manager.get_job_status(job_id)
-        if status_dict is None:
+        job_status = self.job_manager.get_job_status(job_id)
+        if job_status is None:
             return JobStatusError(error="Job not found", job_id=job_id)
 
-        # Convert dictionary to JobStatus object
-        return JobStatus(
-            id=str(status_dict["id"]),
-            status=status_dict["status"],  # Already a JobStatusEnum
-            job_type=JobTypeEnum(str(status_dict["job_type"])),
-            started_at=datetime.fromisoformat(str(status_dict["started_at"]))
-            if status_dict["started_at"]
-            else None,
-            completed_at=datetime.fromisoformat(str(status_dict["completed_at"]))
-            if status_dict["completed_at"]
-            else None,
-            return_code=cast(int, status_dict["return_code"])
-            if status_dict["return_code"] is not None
-            else None,
-            error=str(status_dict["error"]) if status_dict["error"] else None,
-            current_task_index=cast(int, status_dict["current_task_index"])
-            if status_dict["current_task_index"] is not None
-            else None,
-            total_tasks=cast(int, status_dict["tasks"]) if status_dict["tasks"] else 0,
-        )
+        # job_manager.get_job_status now returns JobStatus object directly
+        return job_status
 
     async def get_job_output(
         self, job_id: str, last_n_lines: int = 100

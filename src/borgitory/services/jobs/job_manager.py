@@ -17,7 +17,7 @@ from typing import (
     Any,
 )
 
-from borgitory.models.job_results import JobStatusEnum
+from borgitory.models.job_results import JobStatusEnum, JobStatus, JobTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.services.jobs.job_models import (
@@ -41,7 +41,6 @@ from borgitory.services.jobs.task_executors import (
     NotificationTaskExecutor,
     HookTaskExecutor,
 )
-from borgitory.services.jobs.external_job_manager import ExternalJobManager
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
@@ -87,11 +86,6 @@ class JobManager:
 
         # Initialize task executors
         self._init_task_executors()
-
-        # Initialize external job manager
-        self.external_job_manager = ExternalJobManager(
-            self.jobs, self.output_manager, self.event_broadcaster
-        )
 
         self._setup_callbacks()
 
@@ -801,32 +795,6 @@ class JobManager:
         """Get hook execution service"""
         return self.dependencies.hook_execution_service
 
-    def register_external_job(
-        self, job_id: str, job_type: str = "backup", job_name: str = "External Backup"
-    ) -> None:
-        """Register an external job for monitoring purposes"""
-        self.external_job_manager.register_external_job(job_id, job_type, job_name)
-
-    def update_external_job_status(
-        self,
-        job_id: str,
-        status: str,
-        error: Optional[str] = None,
-        return_code: Optional[int] = None,
-    ) -> None:
-        """Update the status of an external job"""
-        self.external_job_manager.update_external_job_status(
-            job_id, status, error, return_code
-        )
-
-    def add_external_job_output(self, job_id: str, output_line: str) -> None:
-        """Add output line to an external job"""
-        self.external_job_manager.add_external_job_output(job_id, output_line)
-
-    def unregister_external_job(self, job_id: str) -> None:
-        """Unregister an external job"""
-        self.external_job_manager.unregister_external_job(job_id)
-
     # Public API methods
     def subscribe_to_events(self) -> Optional[asyncio.Queue[JobEvent]]:
         """Subscribe to job events"""
@@ -1014,26 +982,37 @@ class JobManager:
         """Get count of active (running/queued) jobs"""
         return len([j for j in self.jobs.values() if j.status in ["running", "queued"]])
 
-    def get_job_status(self, job_id: str) -> Optional[Dict[str, object]]:
+    def get_job_status(self, job_id: str) -> Optional[JobStatus]:
         """Get job status information"""
         job = self.jobs.get(job_id)
         if not job:
             return None
 
-        return {
-            "id": job.id,
-            "status": job.status,
-            "running": job.status == JobStatusEnum.RUNNING,
-            "completed": job.status == JobStatusEnum.COMPLETED,
-            "failed": job.status == JobStatusEnum.FAILED,
-            "started_at": job.started_at.isoformat() if job.started_at else None,
-            "completed_at": job.completed_at.isoformat() if job.completed_at else None,
-            "return_code": job.return_code,
-            "error": job.error,
-            "job_type": job.job_type,
-            "current_task_index": job.current_task_index if job.tasks else None,
-            "tasks": len(job.tasks) if job.tasks else 0,
-        }
+        # Convert job_type string to JobTypeEnum
+        try:
+            job_type_enum = JobTypeEnum(job.job_type)
+        except ValueError:
+            # Default to COMPOSITE if job_type doesn't match enum values
+            job_type_enum = JobTypeEnum.COMPOSITE
+
+        # Convert status string to JobStatusEnum
+        try:
+            status_enum = JobStatusEnum(job.status)
+        except ValueError:
+            # Default to PENDING if status doesn't match enum values
+            status_enum = JobStatusEnum.PENDING
+
+        return JobStatus(
+            id=job.id,
+            status=status_enum,
+            job_type=job_type_enum,
+            started_at=job.started_at,
+            completed_at=job.completed_at,
+            return_code=job.return_code,
+            error=job.error,
+            current_task_index=job.current_task_index if job.tasks else None,
+            total_tasks=len(job.tasks) if job.tasks else 0,
+        )
 
     async def get_job_output_stream(
         self, job_id: str, last_n_lines: Optional[int] = None

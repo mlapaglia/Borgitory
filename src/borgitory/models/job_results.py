@@ -66,19 +66,6 @@ class JobStatus:
     current_task_index: Optional[int] = None
     total_tasks: int = 0
 
-    # Computed properties for backward compatibility
-    @property
-    def running(self) -> bool:
-        return self.status == JobStatusEnum.RUNNING
-
-    @property
-    def completed(self) -> bool:
-        return self.status == JobStatusEnum.COMPLETED
-
-    @property
-    def failed(self) -> bool:
-        return self.status == JobStatusEnum.FAILED
-
 
 @dataclass
 class JobStatusError:

@@ -9,6 +9,9 @@ import asyncio
 from borgitory.custom_types import ConfigDict
 from borgitory.services.jobs.job_models import BorgJob
 
+if TYPE_CHECKING:
+    from borgitory.models.job_results import JobStatus
+
 
 @dataclass
 class TaskDefinition:
@@ -60,7 +63,7 @@ class JobManagerProtocol(Protocol):
         """Get dictionary of all jobs."""
         ...
 
-    def get_job_status(self, job_id: str) -> Optional[Dict[str, object]]:
+    def get_job_status(self, job_id: str) -> Optional["JobStatus"]:
         """Get status of a specific job."""
         ...
 

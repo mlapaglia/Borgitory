@@ -6,8 +6,8 @@ from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy.orm import Session
 
 from borgitory.models.job_results import JobStatusEnum
-from borgitory.services.jobs.job_manager import (
-    JobManager,
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_models import (
     JobManagerConfig,
     BorgJob,
     BorgJobTask,
@@ -376,11 +376,9 @@ class TestJobManager:
         status = job_manager.get_job_status("test")
 
         assert status is not None
-        assert status["running"] is False
-        assert status["completed"] is True
-        assert status["status"] == "completed"
-        assert status["return_code"] == 0
-        assert status["error"] is None
+        assert status.status == JobStatusEnum.COMPLETED
+        assert status.return_code == 0
+        assert status.error is None
 
     def test_get_job_status_not_found(self, job_manager: JobManager) -> None:
         """Test getting status for non-existent job"""

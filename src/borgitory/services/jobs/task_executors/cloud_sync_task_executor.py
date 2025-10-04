@@ -106,7 +106,7 @@ class CloudSyncTaskExecutor:
         # Create a wrapper to convert context manager to direct session
         db_factory = dependencies["db_session_factory"]
 
-        def session_factory():
+        def session_factory() -> Any:
             return db_factory().__enter__()
 
         result = await self.job_executor.execute_cloud_sync_task(

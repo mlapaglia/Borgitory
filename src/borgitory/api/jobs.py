@@ -39,9 +39,6 @@ class JobStatusResponse(BaseModel):
 
     id: str
     status: JobStatusEnum
-    running: bool
-    completed: bool
-    failed: bool
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     return_code: Optional[int] = None
@@ -241,9 +238,6 @@ async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusRespon
     return JobStatusResponse(
         id=result.id,
         status=result.status,
-        running=result.running,
-        completed=result.completed,
-        failed=result.failed,
         started_at=result.started_at.isoformat() if result.started_at else None,
         completed_at=result.completed_at.isoformat() if result.completed_at else None,
         return_code=result.return_code,

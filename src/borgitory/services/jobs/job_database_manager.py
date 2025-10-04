@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
-    from borgitory.services.jobs.job_manager import BorgJobTask
+    from borgitory.services.jobs.job_models import BorgJobTask
 
 logger = logging.getLogger(__name__)
 
@@ -252,8 +252,6 @@ class JobDatabaseManager:
                                 for line in task.output_lines
                             ]
                         )
-                    elif hasattr(task, "output") and task.output:
-                        task_output = task.output
 
                     db_task = JobTask()
                     db_task.job_id = db_job.id
