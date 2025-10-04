@@ -133,7 +133,7 @@ class TestJobRenderServiceNewArchitecture:
         mock_job_manager = Mock()
         mock_job = Mock()
         mock_job.id = "running-job-789"
-        mock_job.status = JobStatusEnum.RUNNING
+        mock_job.status = "running"
         mock_job_manager.jobs = {"running-job-789": mock_job}
 
         # Create mock converter that returns JobDisplayData
