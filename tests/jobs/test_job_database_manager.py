@@ -22,7 +22,7 @@ class TestJobDatabaseManager:
     """Test suite for JobDatabaseManager"""
 
     @pytest.fixture
-    def mock_db_session_factory(self):
+    def mock_db_session_factory(self) -> tuple[Mock, Mock]:
         """Create mock database session factory"""
         session = Mock()
         factory = Mock()
@@ -31,13 +31,17 @@ class TestJobDatabaseManager:
         return factory, session
 
     @pytest.fixture
-    def job_database_manager(self, mock_db_session_factory):
+    def job_database_manager(
+        self, mock_db_session_factory: tuple[Mock, Mock]
+    ) -> JobDatabaseManager:
         """Create JobDatabaseManager with mocked dependencies"""
         factory, _ = mock_db_session_factory
         return JobDatabaseManager(db_session_factory=factory)
 
     @pytest.fixture
-    def job_database_manager_with_coordinator(self, mock_db_session_factory):
+    def job_database_manager_with_coordinator(
+        self, mock_db_session_factory: tuple[Mock, Mock]
+    ) -> JobDatabaseManager:
         """Create JobDatabaseManager with cloud backup coordinator"""
         factory, _ = mock_db_session_factory
         return JobDatabaseManager(
@@ -45,13 +49,13 @@ class TestJobDatabaseManager:
         )
 
     @pytest.fixture
-    def sample_job_data(self):
+    def sample_job_data(self) -> DatabaseJobData:
         """Create sample job data for testing"""
         return DatabaseJobData(
-            job_uuid=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             repository_id=1,
             job_type="backup",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             cloud_sync_config_id=123,
         )
@@ -66,7 +70,7 @@ class TestJobDatabaseManager:
         assert manager.db_session_factory is not None
 
     def test_initialization_with_custom_dependencies(
-        self, mock_db_session_factory
+        self, mock_db_session_factory: tuple[Mock, Mock]
     ) -> None:
         """Test initialization with custom dependencies"""
         factory, _ = mock_db_session_factory
@@ -77,7 +81,9 @@ class TestJobDatabaseManager:
 
         assert manager.db_session_factory == factory
 
-    def test_attribute_access_compatibility(self, job_database_manager) -> None:
+    def test_attribute_access_compatibility(
+        self, job_database_manager: JobDatabaseManager
+    ) -> None:
         """
         Critical test: Ensure the correct attribute name is used
         This prevents the AttributeError: 'JobDatabaseManager' object has no attribute '_db_session_factory'
@@ -91,7 +97,10 @@ class TestJobDatabaseManager:
 
     @pytest.mark.asyncio
     async def test_create_database_job_happy_path(
-        self, job_database_manager, mock_db_session_factory, sample_job_data
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
+        sample_job_data: DatabaseJobData,
     ) -> None:
         """Test successful job creation"""
         factory, mock_session = mock_db_session_factory
@@ -99,7 +108,7 @@ class TestJobDatabaseManager:
         # Mock the Job model and database operations
         with patch("borgitory.models.database.Job") as MockJob:
             mock_job_instance = Mock()
-            mock_job_instance.id = sample_job_data.job_uuid
+            mock_job_instance.id = sample_job_data.id
             MockJob.return_value = mock_job_instance
 
             # Mock database operations
@@ -111,23 +120,25 @@ class TestJobDatabaseManager:
             result = await job_database_manager.create_database_job(sample_job_data)
 
             # Verify results
-            assert result == sample_job_data.job_uuid
+            assert result == sample_job_data.id
             mock_session.add.assert_called_once_with(mock_job_instance)
             mock_session.commit.assert_called_once()
             mock_session.refresh.assert_called_once_with(mock_job_instance)
 
     @pytest.mark.asyncio
     async def test_update_job_status_happy_path(
-        self, job_database_manager, mock_db_session_factory
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test successful job status update"""
         factory, mock_session = mock_db_session_factory
-        job_uuid = str(uuid.uuid4())
+        job_id = uuid.uuid4()
 
         # Mock the Job model and query
         with patch("borgitory.models.database.Job"):
             mock_job_instance = Mock()
-            mock_job_instance.id = job_uuid
+            mock_job_instance.id = job_id
             mock_job_instance.status = "running"
             mock_job_instance.cloud_sync_config_id = None
 
@@ -138,8 +149,8 @@ class TestJobDatabaseManager:
 
             # Execute the test
             result = await job_database_manager.update_job_status(
-                job_uuid=job_uuid,
-                status="completed",
+                job_id=job_id,
+                status=JobStatusEnum.COMPLETED,
                 finished_at=now_utc(),
                 output="Job completed successfully",
             )
@@ -152,17 +163,17 @@ class TestJobDatabaseManager:
     @pytest.mark.asyncio
     async def test_update_job_status_triggers_cloud_backup(
         self,
-        job_database_manager_with_coordinator,
-        mock_db_session_factory,
+        job_database_manager_with_coordinator: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test that completed jobs with cloud sync config trigger cloud backup"""
         factory, mock_session = mock_db_session_factory
-        job_uuid = str(uuid.uuid4())
+        job_id = uuid.uuid4()
 
         # Mock the Job model and query
         with patch("borgitory.models.database.Job"):
             mock_job_instance = Mock()
-            mock_job_instance.id = job_uuid
+            mock_job_instance.id = job_id
             mock_job_instance.cloud_sync_config_id = 123
             mock_job_instance.repository_id = 1
 
@@ -184,7 +195,7 @@ class TestJobDatabaseManager:
 
                 # Execute the test
                 result = await job_database_manager_with_coordinator.update_job_status(
-                    job_uuid=job_uuid, status="completed"
+                    job_id=job_id, status=JobStatusEnum.COMPLETED
                 )
 
                 # Verify results
@@ -192,19 +203,21 @@ class TestJobDatabaseManager:
 
     @pytest.mark.asyncio
     async def test_get_job_by_uuid_happy_path(
-        self, job_database_manager, mock_db_session_factory
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test successful job retrieval by UUID"""
         factory, mock_session = mock_db_session_factory
-        job_uuid = str(uuid.uuid4())
+        job_id = uuid.uuid4()
 
         # Mock the Job model and query
         with patch("borgitory.models.database.Job"):
             mock_job_instance = Mock()
-            mock_job_instance.id = job_uuid
+            mock_job_instance.id = job_id
             mock_job_instance.repository_id = 1
             mock_job_instance.type = "backup"
-            mock_job_instance.status = "completed"
+            mock_job_instance.status = JobStatusEnum.COMPLETED
             mock_job_instance.started_at = now_utc()
             mock_job_instance.finished_at = now_utc()
             mock_job_instance.log_output = "Job output"
@@ -216,20 +229,21 @@ class TestJobDatabaseManager:
             mock_session.query.return_value = mock_query
 
             # Execute the test
-            result = await job_database_manager.get_job_by_uuid(job_uuid)
+            result = await job_database_manager.get_job_by_uuid(job_id)
 
             # Verify results
             assert result is not None
-            assert result["id"] == job_uuid
-            assert result["job_uuid"] == job_uuid
+            assert result["id"] == job_id
             assert result["repository_id"] == 1
             assert result["type"] == "backup"
-            assert result["status"] == "completed"
+            assert result["status"] == JobStatusEnum.COMPLETED
             assert result["output"] == "Job output"
 
     @pytest.mark.asyncio
     async def test_get_jobs_by_repository_happy_path(
-        self, job_database_manager, mock_db_session_factory
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test successful job retrieval by repository"""
         factory, mock_session = mock_db_session_factory
@@ -238,17 +252,17 @@ class TestJobDatabaseManager:
         # Mock the Job model and query
         with patch("borgitory.models.database.Job"):
             mock_job1 = Mock()
-            mock_job1.id = str(uuid.uuid4())
+            mock_job1.id = uuid.uuid4()
             mock_job1.type = "backup"
-            mock_job1.status = "completed"
+            mock_job1.status = JobStatusEnum.COMPLETED
             mock_job1.started_at = now_utc()
             mock_job1.finished_at = now_utc()
             mock_job1.error = None
 
             mock_job2 = Mock()
-            mock_job2.id = str(uuid.uuid4())
+            mock_job2.id = uuid.uuid4()
             mock_job2.type = "prune"
-            mock_job2.status = "running"
+            mock_job2.status = JobStatusEnum.RUNNING
             mock_job2.started_at = now_utc()
             mock_job2.finished_at = None
             mock_job2.error = None
@@ -272,11 +286,13 @@ class TestJobDatabaseManager:
 
     @pytest.mark.asyncio
     async def test_save_job_tasks_happy_path(
-        self, job_database_manager, mock_db_session_factory
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test successful task saving"""
         factory, mock_session = mock_db_session_factory
-        job_uuid = str(uuid.uuid4())
+        job_id = uuid.uuid4()
 
         # Create mock tasks
         mock_task1 = Mock()
@@ -307,7 +323,7 @@ class TestJobDatabaseManager:
             patch("borgitory.models.database.JobTask"),
         ):
             mock_job_instance = Mock()
-            mock_job_instance.id = job_uuid
+            mock_job_instance.id = job_id
 
             mock_query = Mock()
             mock_query.filter.return_value.first.return_value = mock_job_instance
@@ -316,7 +332,7 @@ class TestJobDatabaseManager:
             mock_session.commit = Mock()
 
             # Execute the test
-            result = await job_database_manager.save_job_tasks(job_uuid, tasks)
+            result = await job_database_manager.save_job_tasks(job_id, tasks)
 
             # Verify results
             assert result is True
@@ -326,7 +342,9 @@ class TestJobDatabaseManager:
 
     @pytest.mark.asyncio
     async def test_get_job_statistics_error_handling(
-        self, job_database_manager, mock_db_session_factory
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test job statistics error handling"""
         factory, mock_session = mock_db_session_factory
@@ -340,7 +358,9 @@ class TestJobDatabaseManager:
         # Verify error handling returns empty dict
         assert result == {}
 
-    def test_session_factory_usage_in_external_code(self, job_database_manager) -> None:
+    def test_session_factory_usage_in_external_code(
+        self, job_database_manager: JobDatabaseManager
+    ) -> None:
         """
         Critical test: Verify that external code can access the session factory
         This test simulates how job_manager_modular.py accesses the attribute
@@ -355,7 +375,9 @@ class TestJobDatabaseManager:
 
     @pytest.mark.asyncio
     async def test_error_handling_create_job(
-        self, job_database_manager, mock_db_session_factory
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test error handling in job creation"""
         factory, mock_session = mock_db_session_factory
@@ -365,7 +387,7 @@ class TestJobDatabaseManager:
 
         with patch("borgitory.models.database.Job"):
             sample_data = DatabaseJobData(
-                job_uuid=str(uuid.uuid4()),
+                id=uuid.uuid4(),
                 repository_id=1,
                 job_type=JobTypeEnum.BACKUP,
                 status=JobStatusEnum.RUNNING,
@@ -377,7 +399,9 @@ class TestJobDatabaseManager:
 
     @pytest.mark.asyncio
     async def test_error_handling_update_job_status(
-        self, job_database_manager, mock_db_session_factory
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test error handling in job status update"""
         factory, mock_session = mock_db_session_factory
@@ -392,13 +416,15 @@ class TestJobDatabaseManager:
             mock_session.query.return_value = mock_query
 
             result = await job_database_manager.update_job_status(
-                job_uuid=str(uuid.uuid4()), status="completed"
+                job_id=uuid.uuid4(), status=JobStatusEnum.COMPLETED
             )
             assert result is False
 
     @pytest.mark.asyncio
     async def test_job_not_found_scenarios(
-        self, job_database_manager, mock_db_session_factory
+        self,
+        job_database_manager: JobDatabaseManager,
+        mock_db_session_factory: tuple[Mock, Mock],
     ) -> None:
         """Test scenarios where job is not found"""
         factory, mock_session = mock_db_session_factory
@@ -411,14 +437,14 @@ class TestJobDatabaseManager:
 
             # Test update job status with non-existent job
             result = await job_database_manager.update_job_status(
-                job_uuid="non-existent-uuid", status="completed"
+                job_id=uuid.uuid4(), status=JobStatusEnum.COMPLETED
             )
             assert result is False
 
             # Test get job by UUID with non-existent job
-            result = await job_database_manager.get_job_by_uuid("non-existent-uuid")
+            result = await job_database_manager.get_job_by_uuid(uuid.uuid4())
             assert result is None
 
             # Test save job tasks with non-existent job
-            result = await job_database_manager.save_job_tasks("non-existent-uuid", [])
+            result = await job_database_manager.save_job_tasks(uuid.uuid4(), [])
             assert result is False

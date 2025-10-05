@@ -6,6 +6,7 @@ from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
 from datetime import datetime
 from dataclasses import dataclass, field
 import asyncio
+import uuid
 from borgitory.custom_types import ConfigDict
 from borgitory.services.jobs.job_models import BorgJob, TaskTypeEnum
 
@@ -54,24 +55,24 @@ class JobManagerProtocol(Protocol):
 
     # Properties
     @property
-    def jobs(self) -> Dict[str, "BorgJob"]:
+    def jobs(self) -> Dict[uuid.UUID, "BorgJob"]:
         """Dictionary of active jobs."""
         ...
 
     # Core job methods
-    def list_jobs(self) -> Dict[str, "BorgJob"]:
+    def list_jobs(self) -> Dict[uuid.UUID, "BorgJob"]:
         """Get dictionary of all jobs."""
         ...
 
-    def get_job_status(self, job_id: str) -> Optional["JobStatus"]:
+    def get_job_status(self, job_id: uuid.UUID) -> Optional["JobStatus"]:
         """Get status of a specific job."""
         ...
 
-    async def cancel_job(self, job_id: str) -> bool:
+    async def cancel_job(self, job_id: uuid.UUID) -> bool:
         """Cancel a running job."""
         ...
 
-    async def stop_job(self, job_id: str) -> Dict[str, object]:
+    async def stop_job(self, job_id: uuid.UUID) -> Dict[str, object]:
         """Stop a running job, killing current task and skipping remaining tasks."""
         ...
 
@@ -84,7 +85,9 @@ class JobManagerProtocol(Protocol):
         """Unsubscribe from job events."""
         ...
 
-    def stream_job_output(self, job_id: str) -> AsyncGenerator[Dict[str, object], None]:
+    def stream_job_output(
+        self, job_id: uuid.UUID
+    ) -> AsyncGenerator[Dict[str, object], None]:
         """Stream output for a specific job."""
         ...
 
@@ -93,7 +96,7 @@ class JobManagerProtocol(Protocol):
         ...
 
     async def get_job_output_stream(
-        self, job_id: str, last_n_lines: Optional[int] = None
+        self, job_id: uuid.UUID, last_n_lines: Optional[int] = None
     ) -> Dict[str, object]:
         """Get job output stream."""
         ...
@@ -103,11 +106,11 @@ class JobManagerProtocol(Protocol):
         command: List[str],
         env: Optional[Dict[str, str]] = None,
         is_backup: bool = False,
-    ) -> str:
+    ) -> uuid.UUID:
         """Start a borg command and return job ID."""
         ...
 
-    def cleanup_job(self, job_id: str) -> bool:
+    def cleanup_job(self, job_id: uuid.UUID) -> bool:
         """Clean up a completed job."""
         ...
 
@@ -118,7 +121,7 @@ class JobManagerProtocol(Protocol):
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
-    ) -> str:
+    ) -> uuid.UUID:
         """Create a composite job with multiple tasks."""
         ...
 
@@ -128,7 +131,7 @@ class JobManagerProtocol(Protocol):
 
     # Internal attributes that JobService accesses
     @property
-    def _processes(self) -> Dict[str, "asyncio.subprocess.Process"]:
+    def _processes(self) -> Dict[uuid.UUID, "asyncio.subprocess.Process"]:
         """Internal processes dictionary."""
         ...
 
@@ -136,7 +139,9 @@ class JobManagerProtocol(Protocol):
 class JobStreamServiceProtocol(Protocol):
     """Protocol for job output streaming services."""
 
-    async def stream_job_output(self, job_id: str) -> AsyncGenerator[str, None]: ...
+    async def stream_job_output(
+        self, job_id: uuid.UUID
+    ) -> AsyncGenerator[str, None]: ...
     async def stream_all_job_updates(
         self,
     ) -> AsyncGenerator[Dict[str, object], None]: ...

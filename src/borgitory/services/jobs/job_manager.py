@@ -80,8 +80,8 @@ class JobManager:
             dependencies.notification_service
         )
 
-        self.jobs: Dict[str, BorgJob] = {}
-        self._processes: Dict[str, asyncio.subprocess.Process] = {}
+        self.jobs: Dict[uuid.UUID, BorgJob] = {}
+        self._processes: Dict[uuid.UUID, asyncio.subprocess.Process] = {}
 
         self._initialized = False
         self._shutdown_requested = False
@@ -206,11 +206,11 @@ class JobManager:
         command: List[str],
         env: Optional[Dict[str, str]] = None,
         is_backup: bool = False,
-    ) -> str:
+    ) -> uuid.UUID:
         """Start a Borg command (now always creates composite job with one task)"""
         await self.initialize()
 
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
 
         # Create the main task for this command
         command_str = " ".join(command[:3]) + ("..." if len(command) > 3 else "")
@@ -333,13 +333,13 @@ class JobManager:
             if job.id in self._processes:
                 del self._processes[job.id]
 
-    def _on_job_start(self, job_id: str, queued_job: QueuedJob) -> None:
+    def _on_job_start(self, job_id: uuid.UUID, queued_job: QueuedJob) -> None:
         """Callback when queue manager starts a job"""
         job = self.jobs.get(job_id)
         if job and job.command:
             asyncio.create_task(self._execute_simple_job(job, job.command))
 
-    def _on_job_complete(self, job_id: str, success: bool) -> None:
+    def _on_job_complete(self, job_id: uuid.UUID, success: bool) -> None:
         """Callback when queue manager completes a job"""
         job = self.jobs.get(job_id)
         if job:
@@ -352,11 +352,11 @@ class JobManager:
         repository: "Repository",
         schedule: Optional["Schedule"] = None,
         cloud_sync_config_id: Optional[int] = None,
-    ) -> str:
+    ) -> uuid.UUID:
         """Create a composite job with multiple tasks"""
         await self.initialize()
 
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
 
         tasks = []
         for task_def in task_definitions:
@@ -396,7 +396,7 @@ class JobManager:
             from borgitory.services.jobs.job_database_manager import DatabaseJobData
 
             db_job_data = DatabaseJobData(
-                job_uuid=job_id,
+                id=job_id,
                 repository_id=repository.id,
                 job_type=job_type,
                 status=JobStatusEnum.PENDING,
@@ -823,7 +823,7 @@ class JobManager:
         return False
 
     async def stream_job_output(
-        self, job_id: str
+        self, job_id: uuid.UUID
     ) -> AsyncGenerator[Dict[str, object], None]:
         """Stream job output"""
         if self.output_manager:
@@ -832,16 +832,16 @@ class JobManager:
         else:
             return
 
-    def get_job(self, job_id: str) -> Optional[BorgJob]:
+    def get_job(self, job_id: uuid.UUID) -> Optional[BorgJob]:
         """Get job by ID"""
         return self.jobs.get(job_id)
 
-    def list_jobs(self) -> Dict[str, BorgJob]:
+    def list_jobs(self) -> Dict[uuid.UUID, BorgJob]:
         """List all jobs"""
         return self.jobs.copy()
 
     async def get_job_output(
-        self, job_id: str
+        self, job_id: uuid.UUID
     ) -> AsyncGenerator[Dict[str, object], None]:
         """Get real-time job output"""
         if self.output_manager:
@@ -850,7 +850,7 @@ class JobManager:
         else:
             return
 
-    async def cancel_job(self, job_id: str) -> bool:
+    async def cancel_job(self, job_id: uuid.UUID) -> bool:
         """Cancel a running job"""
         job = self.jobs.get(job_id)
         if not job:
@@ -881,7 +881,7 @@ class JobManager:
 
         return True
 
-    async def stop_job(self, job_id: str) -> Dict[str, object]:
+    async def stop_job(self, job_id: uuid.UUID) -> Dict[str, object]:
         """Stop a running job, killing current task and skipping remaining tasks"""
         job = self.jobs.get(job_id)
         if not job:
@@ -960,7 +960,7 @@ class JobManager:
             "current_task_killed": current_task_killed,
         }
 
-    def cleanup_job(self, job_id: str) -> bool:
+    def cleanup_job(self, job_id: uuid.UUID) -> bool:
         """Clean up job resources"""
         if job_id in self.jobs:
             job = self.jobs[job_id]
@@ -996,7 +996,7 @@ class JobManager:
         """Get count of active (running/queued) jobs"""
         return len([j for j in self.jobs.values() if j.status in ["running", "queued"]])
 
-    def get_job_status(self, job_id: str) -> Optional[JobStatus]:
+    def get_job_status(self, job_id: uuid.UUID) -> Optional[JobStatus]:
         """Get job status information"""
         job = self.jobs.get(job_id)
         if not job:
@@ -1029,7 +1029,7 @@ class JobManager:
         )
 
     async def get_job_output_stream(
-        self, job_id: str, last_n_lines: Optional[int] = None
+        self, job_id: uuid.UUID, last_n_lines: Optional[int] = None
     ) -> Dict[str, object]:
         """Get job output stream data"""
         # Get output from output manager (don't require job to exist, just output)

@@ -423,7 +423,7 @@ class TestJobManagerTaskExecution:
     ) -> None:
         """Test executing a composite job successfully"""
         # Create a simple composite job
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task1 = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Test Backup")
         task2 = BorgJobTask(task_type=TaskTypeEnum.PRUNE, task_name="Test Prune")
 
@@ -599,7 +599,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test successful backup task execution"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
@@ -658,7 +658,7 @@ class TestJobManagerTaskExecution:
         """Test backup task execution"""
 
         # Setup test data
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
@@ -724,7 +724,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test backup task failure handling"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
@@ -779,7 +779,7 @@ class TestJobManagerTaskExecution:
         mock_secure_borg_command: Mock,
     ) -> None:
         """Test backup task execution with dry_run flag"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup Dry Run",
@@ -840,7 +840,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test successful prune task execution"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.PRUNE,
             task_name="Test Prune",
@@ -893,7 +893,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test successful check task execution"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.CHECK,
             task_name="Test Check",
@@ -941,7 +941,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test successful cloud sync task execution"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.CLOUD_SYNC,
             task_name="Test Cloud Sync",
@@ -1012,7 +1012,7 @@ class TestJobManagerTaskExecution:
         test_db.commit()
         test_db.refresh(notification_config)
 
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.NOTIFICATION,
             task_name="Test Notification",
@@ -1063,7 +1063,7 @@ class TestJobManagerTaskExecution:
         self, job_manager_with_mocks: JobManager
     ) -> None:
         """Test notification task with missing config"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.NOTIFICATION,
             task_name="Test Notification",
@@ -1095,7 +1095,7 @@ class TestJobManagerTaskExecution:
         self, job_manager_with_mocks: JobManager
     ) -> None:
         """Test executing task with unknown type"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(task_type="unknown_task", task_name="Unknown Task")
 
         job = BorgJob(
@@ -1276,27 +1276,30 @@ class TestJobManagerStreamingAndUtility:
 
     def test_get_job(self, job_manager: JobManager) -> None:
         """Test getting job by ID"""
-        job = BorgJob(id="test", status=JobStatusEnum.RUNNING, started_at=now_utc())
-        job_manager.jobs["test"] = job
+        job_id = uuid.uuid4()
+        job = BorgJob(id=job_id, status=JobStatusEnum.RUNNING, started_at=now_utc())
+        job_manager.jobs[job_id] = job
 
-        retrieved = job_manager.get_job("test")
+        retrieved = job_manager.get_job(job_id)
         assert retrieved is job
 
         assert job_manager.get_job("nonexistent") is None
 
     def test_list_jobs(self, job_manager: JobManager) -> None:
         """Test listing all jobs"""
-        job1 = BorgJob(id="job1", status=JobStatusEnum.RUNNING, started_at=now_utc())
-        job2 = BorgJob(id="job2", status=JobStatusEnum.COMPLETED, started_at=now_utc())
+        job1_id = uuid.uuid4()
+        job2_id = uuid.uuid4()
+        job1 = BorgJob(id=job1_id, status=JobStatusEnum.RUNNING, started_at=now_utc())
+        job2 = BorgJob(id=job2_id, status=JobStatusEnum.COMPLETED, started_at=now_utc())
 
-        job_manager.jobs["job1"] = job1
-        job_manager.jobs["job2"] = job2
+        job_manager.jobs[job1_id] = job1
+        job_manager.jobs[job2_id] = job2
 
         jobs = job_manager.list_jobs()
 
         assert len(jobs) == 2
-        assert jobs["job1"] is job1
-        assert jobs["job2"] is job2
+        assert jobs[job1_id] is job1
+        assert jobs[job2_id] is job2
         assert jobs is not job_manager.jobs  # Should return copy
 
     @pytest.mark.asyncio

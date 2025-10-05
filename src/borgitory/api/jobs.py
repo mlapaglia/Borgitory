@@ -1,5 +1,6 @@
 import logging
 from typing import List, Dict, Optional
+import uuid
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from starlette.responses import StreamingResponse
@@ -25,7 +26,7 @@ router = APIRouter()
 class JobResponse(BaseModel):
     """Generic job response model"""
 
-    id: str
+    id: uuid.UUID
     status: str
     job_type: Optional[str] = None
     started_at: Optional[str] = None
@@ -37,7 +38,7 @@ class JobResponse(BaseModel):
 class JobStatusResponse(BaseModel):
     """Job status response model"""
 
-    id: str
+    id: uuid.UUID
     status: JobStatusEnum
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
@@ -77,7 +78,7 @@ class JobManagerStatsResponse(BaseModel):
     completed_jobs: int
     failed_jobs: int
     active_processes: int
-    running_job_ids: List[str]
+    running_job_ids: List[uuid.UUID]
 
 
 class QueueStatsResponse(BaseModel):
@@ -227,7 +228,9 @@ async def stream_current_jobs_html(
 
 
 @router.get("/{job_id}/status", response_model=JobStatusResponse)
-async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusResponse:
+async def get_job_status(
+    job_id: uuid.UUID, job_svc: JobServiceDep
+) -> JobStatusResponse:
     """Get current job status and progress"""
     result = await job_svc.get_job_status(job_id)
 
@@ -250,7 +253,7 @@ async def get_job_status(job_id: str, job_svc: JobServiceDep) -> JobStatusRespon
 
 @router.get("/{job_id}/stream")
 async def stream_job_output(
-    job_id: str,
+    job_id: uuid.UUID,
     stream_svc: JobStreamServiceDep,
 ) -> StreamingResponse:
     """Stream real-time job output via Server-Sent Events"""
@@ -259,7 +262,7 @@ async def stream_job_output(
 
 @router.post("/{job_id}/stop", response_class=HTMLResponse)
 async def stop_job(
-    job_id: str,
+    job_id: uuid.UUID,
     request: Request,
     job_svc: JobServiceDep,
     templates: TemplatesDep,
@@ -293,7 +296,7 @@ async def stop_job(
 
 @router.get("/{job_id}/toggle-details", response_class=HTMLResponse)
 async def toggle_job_details(
-    job_id: str,
+    job_id: uuid.UUID,
     request: Request,
     render_svc: JobRenderServiceDep,
     templates: TemplatesDep,
@@ -318,7 +321,7 @@ async def toggle_job_details(
 
 @router.get("/{job_id}/details-static", response_class=HTMLResponse)
 async def get_job_details_static(
-    job_id: str,
+    job_id: uuid.UUID,
     request: Request,
     render_svc: JobRenderServiceDep,
     templates: TemplatesDep,
@@ -336,7 +339,7 @@ async def get_job_details_static(
 
 @router.get("/{job_id}/tasks/{task_order}/toggle-details", response_class=HTMLResponse)
 async def toggle_task_details(
-    job_id: str,
+    job_id: uuid.UUID,
     task_order: int,
     request: Request,
     render_svc: JobRenderServiceDep,
@@ -386,7 +389,7 @@ async def copy_job_output() -> MessageResponse:
 
 @router.get("/{job_id}/tasks/{task_order}/stream")
 async def stream_task_output(
-    job_id: str,
+    job_id: uuid.UUID,
     task_order: int,
     stream_svc: JobStreamServiceDep,
 ) -> StreamingResponse:

@@ -239,7 +239,7 @@ class TestJobManagerTaskExecution:
     ) -> None:
         """Test executing a composite job successfully"""
         # Create a simple composite job
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task1 = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Test Backup")
         task2 = BorgJobTask(task_type=TaskTypeEnum.PRUNE, task_name="Test Prune")
 
@@ -414,7 +414,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test successful backup task execution"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
@@ -473,7 +473,7 @@ class TestJobManagerTaskExecution:
         """Test backup task execution"""
 
         # Setup test data
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
@@ -539,7 +539,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test backup task failure handling"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
@@ -594,7 +594,7 @@ class TestJobManagerTaskExecution:
         mock_secure_borg_command: Mock,
     ) -> None:
         """Test backup task execution with dry_run flag"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup Dry Run",
@@ -655,7 +655,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test successful prune task execution"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.PRUNE,
             task_name="Test Prune",
@@ -708,7 +708,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test successful check task execution"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.CHECK,
             task_name="Test Check",
@@ -756,7 +756,7 @@ class TestJobManagerTaskExecution:
         mock_database_manager: Mock,
     ) -> None:
         """Test successful cloud sync task execution"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.CLOUD_SYNC,
             task_name="Test Cloud Sync",
@@ -827,7 +827,7 @@ class TestJobManagerTaskExecution:
         test_db.commit()
         test_db.refresh(notification_config)
 
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.NOTIFICATION,
             task_name="Test Notification",
@@ -878,7 +878,7 @@ class TestJobManagerTaskExecution:
         self, job_manager_with_mocks: JobManager
     ) -> None:
         """Test notification task with missing config"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(
             task_type=TaskTypeEnum.NOTIFICATION,
             task_name="Test Notification",
@@ -910,7 +910,7 @@ class TestJobManagerTaskExecution:
         self, job_manager_with_mocks: JobManager
     ) -> None:
         """Test executing task with unknown type"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task = BorgJobTask(task_type="unknown_task", task_name="Unknown Task")
 
         job = BorgJob(

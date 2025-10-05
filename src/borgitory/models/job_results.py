@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional, Union
+import uuid
 
 
 class JobStatusEnum(str, Enum):
@@ -36,7 +37,7 @@ class JobTypeEnum(str, Enum):
 class JobCreationResult:
     """Result of creating a new job"""
 
-    job_id: str
+    job_id: uuid.UUID
     status: str = "started"
 
 
@@ -56,7 +57,7 @@ JobCreationResponse = Union[JobCreationResult, JobCreationError]
 class JobStatus:
     """Comprehensive job status information"""
 
-    id: str
+    id: uuid.UUID
     status: JobStatusEnum
     job_type: JobTypeEnum
     started_at: Optional[datetime] = None
@@ -72,7 +73,7 @@ class JobStatusError:
     """Error when job status cannot be retrieved"""
 
     error: str
-    job_id: Optional[str] = None
+    job_id: Optional[uuid.UUID] = None
 
 
 # Union type for job status results
@@ -83,7 +84,7 @@ JobStatusResponse = Union[JobStatus, JobStatusError]
 class CompositeJobOutput:
     """Output information for composite jobs"""
 
-    job_id: str
+    job_id: uuid.UUID
     job_type: str
     status: JobStatusEnum
     current_task_index: int
@@ -97,7 +98,7 @@ class CompositeJobOutput:
 class RegularJobOutput:
     """Output information for regular (non-composite) jobs"""
 
-    job_id: str
+    job_id: uuid.UUID
     lines: List[str]
     total_lines: int
     has_more: bool = False
@@ -117,7 +118,7 @@ class ManagerStats:
     completed_jobs: int
     failed_jobs: int
     active_processes: int
-    running_job_ids: List[str] = field(default_factory=list)
+    running_job_ids: List[uuid.UUID] = field(default_factory=list)
 
 
 @dataclass
@@ -134,7 +135,7 @@ class QueueStats:
 class JobStopResult:
     """Result of stopping a job"""
 
-    job_id: str
+    job_id: uuid.UUID
     success: bool
     message: str
     tasks_skipped: int = 0
@@ -145,7 +146,7 @@ class JobStopResult:
 class JobStopError:
     """Error when stopping a job fails"""
 
-    job_id: str
+    job_id: uuid.UUID
     error: str
     error_code: Optional[str] = None
 

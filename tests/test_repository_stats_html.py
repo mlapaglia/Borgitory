@@ -51,7 +51,7 @@ class TestRepositoryStatsHTML:
 
         # Mock the stats service to return test data
         async def mock_get_stats(
-            repo: Any, db: Any, progress_callback=None
+            repo: Any, db: Any, progress_callback: Any = None
         ) -> dict[str, Any]:
             return {
                 "repository_path": repo.path,
@@ -147,7 +147,7 @@ class TestRepositoryStatsHTML:
 
         # Mock the stats service to return an error
         async def mock_get_stats_error(
-            repo: Any, db: Any, progress_callback=None
+            repo: Any, db: Any, progress_callback: Any = None
         ) -> dict[str, Any]:
             return {"error": "No archives found in repository"}
 

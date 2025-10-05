@@ -5,6 +5,7 @@ Job Database Manager - Handles database operations with dependency injection
 import logging
 from typing import Dict, List, Optional, Callable, TYPE_CHECKING, ContextManager
 from datetime import datetime
+import uuid
 from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 class DatabaseJobData:
     """Data for creating/updating database job records"""
 
-    job_uuid: str
+    id: uuid.UUID
     repository_id: int
     job_type: str
     status: JobStatusEnum
@@ -48,14 +49,16 @@ class JobDatabaseManager:
 
         return get_db_session()
 
-    async def create_database_job(self, job_data: DatabaseJobData) -> Optional[str]:
+    async def create_database_job(
+        self, job_data: DatabaseJobData
+    ) -> Optional[uuid.UUID]:
         """Create a new job record in the database"""
         try:
             from borgitory.models.database import Job
 
             with self.db_session_factory() as db:
                 db_job = Job()
-                db_job.id = job_data.job_uuid  # Use UUID as primary key
+                db_job.id = job_data.id
                 db_job.repository_id = job_data.repository_id
                 db_job.type = str(job_data.job_type)  # Convert JobType enum to string
                 db_job.status = job_data.status
@@ -77,9 +80,9 @@ class JobDatabaseManager:
                 db.refresh(db_job)
 
                 logger.info(
-                    f"Created database job record {db_job.id} for job {job_data.job_uuid}"
+                    f"Created database job record {db_job.id} for job {job_data.id}"
                 )
-                return db_job.id  # Return UUID string
+                return db_job.id
 
         except Exception as e:
             logger.error(f"Failed to create database job record: {e}")
@@ -87,7 +90,7 @@ class JobDatabaseManager:
 
     async def update_job_status(
         self,
-        job_uuid: str,
+        job_id: uuid.UUID,
         status: JobStatusEnum,
         finished_at: Optional[datetime] = None,
         output: Optional[str] = None,
@@ -98,10 +101,10 @@ class JobDatabaseManager:
             from borgitory.models.database import Job
 
             with self.db_session_factory() as db:
-                db_job = db.query(Job).filter(Job.id == job_uuid).first()
+                db_job = db.query(Job).filter(Job.id == job_id).first()
 
                 if not db_job:
-                    logger.warning(f"Database job not found for UUID {job_uuid}")
+                    logger.warning(f"Database job not found for UUID {job_id}")
                     return False
 
                 db_job.status = status
@@ -122,20 +125,19 @@ class JobDatabaseManager:
             logger.error(f"Failed to update job status: {e}")
             return False
 
-    async def get_job_by_uuid(self, job_uuid: str) -> Optional[Dict[str, object]]:
+    async def get_job_by_uuid(self, job_id: uuid.UUID) -> Optional[Dict[str, object]]:
         """Get job data by UUID"""
         try:
             from borgitory.models.database import Job
 
             with self.db_session_factory() as db:
-                db_job = db.query(Job).filter(Job.id == job_uuid).first()
+                db_job = db.query(Job).filter(Job.id == job_id).first()
 
                 if not db_job:
                     return None
 
                 return {
                     "id": db_job.id,
-                    "job_uuid": db_job.id,  # Same as id now
                     "repository_id": db_job.repository_id,
                     "type": db_job.type,
                     "status": db_job.status,
@@ -151,7 +153,7 @@ class JobDatabaseManager:
                 }
 
         except Exception as e:
-            logger.error(f"Failed to get job by UUID {job_uuid}: {e}")
+            logger.error(f"Failed to get job by UUID {job_id}: {e}")
             return None
 
     async def get_jobs_by_repository(
@@ -172,7 +174,6 @@ class JobDatabaseManager:
                 return [
                     {
                         "id": job.id,
-                        "job_uuid": job.id,  # Same as id now
                         "type": job.type,
                         "status": job.status,
                         "started_at": job.started_at.isoformat()
@@ -224,16 +225,18 @@ class JobDatabaseManager:
         """Get repository data - public interface"""
         return await self._get_repository_data(repository_id)
 
-    async def save_job_tasks(self, job_uuid: str, tasks: List["BorgJobTask"]) -> bool:
+    async def save_job_tasks(
+        self, job_id: uuid.UUID, tasks: List["BorgJobTask"]
+    ) -> bool:
         """Save task data for a job to the database"""
         try:
             from borgitory.models.database import Job, JobTask
 
             with self.db_session_factory() as db:
                 # Find the job by UUID
-                db_job = db.query(Job).filter(Job.id == job_uuid).first()
+                db_job = db.query(Job).filter(Job.id == job_id).first()
                 if not db_job:
-                    logger.warning(f"Job not found for UUID {job_uuid}")
+                    logger.warning(f"Job not found for UUID {job_id}")
                     return False
 
                 # Clear existing tasks for this job
@@ -273,11 +276,11 @@ class JobDatabaseManager:
                 )
 
                 db.commit()
-                logger.info(f"Saved {len(tasks)} tasks for job {job_uuid}")
+                logger.info(f"Saved {len(tasks)} tasks for job {job_id}")
                 return True
 
         except Exception as e:
-            logger.error(f"Failed to save job tasks for {job_uuid}: {e}")
+            logger.error(f"Failed to save job tasks for {job_id}: {e}")
             return False
 
     async def get_job_statistics(self) -> Dict[str, object]:

@@ -31,7 +31,7 @@ class TestStreamingErrorHandling:
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming for a job that doesn't exist"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task_order = 0
 
         # No jobs in manager
@@ -62,7 +62,7 @@ class TestStreamingErrorHandling:
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming for a job with Mock tasks attribute (error handling)"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task_order = 0
 
         # Create job with Mock tasks (simulates error condition)
@@ -87,7 +87,7 @@ class TestStreamingErrorHandling:
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming for invalid task order"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task_order = 999  # Invalid task order
 
         # Create composite job with only one task
@@ -112,7 +112,7 @@ class TestStreamingErrorHandling:
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test that streaming handles timeouts gracefully"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task_order = 0
 
         # Create composite job with task
@@ -146,7 +146,7 @@ class TestStreamingErrorHandling:
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test database streaming when connection fails"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task_order = 0
 
         # Job not found in manager, should try database
@@ -242,8 +242,8 @@ class TestEventFiltering:
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test that events are filtered correctly by job ID and task index"""
-        job_id = str(uuid.uuid4())
-        other_job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
+        other_job_id = uuid.uuid4()
         task_order = 1
 
         # Create composite job

@@ -17,6 +17,7 @@ from sqlalchemy import (
     Boolean,
     Text,
     ForeignKey,
+    Uuid,
 )
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 from sqlalchemy.orm import sessionmaker, relationship, Session
@@ -111,8 +112,8 @@ class Repository(Base):
 class Job(Base):
     __tablename__ = "jobs"
 
-    id: Mapped[str] = mapped_column(
-        String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, primary_key=True, index=True, default=uuid.uuid4
     )  # UUID as primary key
     repository_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("repositories.id"), nullable=False
@@ -161,8 +162,8 @@ class JobTask(Base):
     __tablename__ = "job_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    job_id: Mapped[str] = mapped_column(
-        String, ForeignKey("jobs.id"), nullable=False
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("jobs.id"), nullable=False
     )  # UUID foreign key
     task_type: Mapped[str] = mapped_column(
         String, nullable=False

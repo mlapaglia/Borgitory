@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import Dict, List, AsyncGenerator, Optional, Union
 from datetime import datetime
+import uuid
 from borgitory.custom_types import ConfigDict
 from borgitory.utils.datetime_utils import now_utc
 
@@ -56,7 +57,7 @@ class JobEventBroadcaster:
     def broadcast_event(
         self,
         event_type: EventType,
-        job_id: Optional[str] = None,
+        job_id: Optional[uuid.UUID] = None,
         data: Optional[ConfigDict] = None,
     ) -> None:
         """Broadcast an event to all connected clients"""

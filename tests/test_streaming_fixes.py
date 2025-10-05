@@ -34,7 +34,7 @@ class TestJobStreamingFixes:
     def mock_composite_job(self) -> Mock:
         """Create a mock composite job with tasks"""
         job = Mock()
-        job.id = str(uuid.uuid4())
+        job.id = uuid.uuid4()
         job.status = JobStatusEnum.RUNNING
 
         # Create mock tasks with output_lines
@@ -149,7 +149,7 @@ class TestJobStreamingFixes:
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming completed task output from database"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task_order = 0
 
         # Job not in manager, should try database
@@ -201,38 +201,33 @@ class TestUUIDSystemFixes:
         # Test the default function generates valid UUIDs
         # SQLAlchemy lambda defaults receive a context parameter
         generated_id = id_column.default.arg(None)
-        assert isinstance(generated_id, str)
+        assert isinstance(generated_id, uuid.UUID)
 
-        # Should be a valid UUID
-        try:
-            uuid.UUID(generated_id)
-        except ValueError:
-            pytest.fail("Generated ID is not a valid UUID")
+        # Should be a valid UUID (already is since it's a UUID object)
+        assert generated_id.version == 4  # UUID4
 
     def test_job_model_respects_explicit_uuid(self) -> None:
         """Test that Job model uses explicitly provided UUID"""
-        explicit_id = str(uuid.uuid4())
-        job = Job(
-            id=explicit_id,
-            repository_id=1,
-            type=TaskTypeEnum.BACKUP,
-            status=JobStatusEnum.PENDING,
-        )
+        explicit_id = uuid.uuid4()
+        job = Job()
+        job.id = explicit_id
+        job.repository_id = 1
+        job.type = TaskTypeEnum.BACKUP
+        job.status = JobStatusEnum.PENDING
 
         assert job.id == explicit_id
 
     def test_job_task_foreign_key_uses_string_uuid(self) -> None:
         """Test that JobTask foreign key references string UUID"""
-        job_id = str(uuid.uuid4())
-        task = JobTask(
-            job_id=job_id,
-            task_type=TaskTypeEnum.BACKUP,
-            task_name="Test Task",
-            task_order=0,
-        )
+        job_id = uuid.uuid4()
+        task = JobTask()
+        task.job_id = job_id
+        task.task_type = TaskTypeEnum.BACKUP
+        task.task_name = "Test Task"
+        task.task_order = 0
 
         assert task.job_id == job_id
-        assert isinstance(task.job_id, str)
+        assert isinstance(task.job_id, uuid.UUID)
 
 
 class TestJobRenderServiceUUIDIntegration:
@@ -242,7 +237,7 @@ class TestJobRenderServiceUUIDIntegration:
     def mock_job_with_uuid(self) -> Mock:
         """Create a mock job with UUID"""
         job = Mock()
-        job.id = str(uuid.uuid4())
+        job.id = uuid.uuid4()
         job.type = TaskTypeEnum.BACKUP
         job.status = JobStatusEnum.COMPLETED
         job.started_at = now_utc()
@@ -267,7 +262,7 @@ class TestJobRenderServiceUUIDIntegration:
         html = service._render_job_html(mock_job_with_uuid)
 
         # Should contain the UUID in the HTML
-        assert mock_job_with_uuid.id in html
+        assert str(mock_job_with_uuid.id) in html
         assert html != ""  # Should not return empty string
 
     def test_format_database_job_creates_context_with_uuid(

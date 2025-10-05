@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from typing import AsyncGenerator, Dict, TYPE_CHECKING, cast
+import uuid
 from fastapi.responses import StreamingResponse
 
 from borgitory.protocols import JobManagerProtocol
@@ -31,7 +32,7 @@ class JobStreamService:
             },
         )
 
-    async def stream_job_output(self, job_id: str) -> StreamingResponse:
+    async def stream_job_output(self, job_id: uuid.UUID) -> StreamingResponse:
         """Stream real-time job output via Server-Sent Events"""
         return StreamingResponse(
             self._job_output_event_generator(job_id),
@@ -112,7 +113,7 @@ class JobStreamService:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\\n\\n"
 
     async def _job_output_event_generator(
-        self, job_id: str
+        self, job_id: uuid.UUID
     ) -> AsyncGenerator[str, None]:
         """Generate Server-Sent Events for a specific job's output"""
         try:
@@ -291,7 +292,7 @@ class JobStreamService:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     async def stream_task_output(
-        self, job_id: str, task_order: int
+        self, job_id: uuid.UUID, task_order: int
     ) -> StreamingResponse:
         """Stream real-time output for a specific task via Server-Sent Events"""
         return StreamingResponse(
@@ -304,7 +305,7 @@ class JobStreamService:
         )
 
     async def _task_output_event_generator(
-        self, job_id: str, task_order: int
+        self, job_id: uuid.UUID, task_order: int
     ) -> AsyncGenerator[str, None]:
         """Generate Server-Sent Events for a specific task's output"""
         try:
@@ -437,7 +438,7 @@ class JobStreamService:
             error_msg = f"Streaming error for job {job_id}, task {task_order}: {str(e)}"
             yield f"event: error\ndata: {error_msg}\n\n"
 
-    async def get_job_status(self, job_id: str) -> Dict[str, object]:
+    async def get_job_status(self, job_id: uuid.UUID) -> Dict[str, object]:
         """Get current job status and progress for streaming"""
         output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
         return output

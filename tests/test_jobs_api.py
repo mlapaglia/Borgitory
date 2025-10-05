@@ -3,6 +3,7 @@ Tests for jobs API endpoints
 """
 
 import pytest
+import uuid
 from typing import Generator
 from unittest.mock import Mock, AsyncMock
 from borgitory.services.jobs.job_models import TaskStatusEnum
@@ -55,7 +56,7 @@ class TestJobsAPI:
     ) -> Job:
         """Create a sample database job for testing."""
         job = Job()
-        job.id = "test-job-123"
+        job.id = uuid.uuid4()
         job.repository_id = sample_repository.id
         job.type = "backup"
         job.status = JobStatusEnum.COMPLETED
@@ -169,7 +170,7 @@ class TestJobsAPI:
         setup_dependencies[
             "job_service"
         ].create_backup_job.return_value = JobCreationResult(
-            job_id="test-job-123", status="started"
+            job_id=uuid.uuid4(), status="started"
         )
 
         backup_request = {
@@ -247,7 +248,7 @@ class TestJobsAPI:
         setup_dependencies[
             "job_service"
         ].create_prune_job.return_value = JobCreationResult(
-            job_id="prune-job-123", status="started"
+            job_id=uuid.uuid4(), status="started"
         )
 
         prune_request = {
@@ -298,7 +299,7 @@ class TestJobsAPI:
         setup_dependencies[
             "job_service"
         ].create_check_job.return_value = JobCreationResult(
-            job_id="check-job-123", status="started"
+            job_id=uuid.uuid4(), status="started"
         )
 
         check_request = {
@@ -387,7 +388,7 @@ class TestJobsAPI:
         from datetime import datetime
 
         status_data = JobStatus(
-            id="test-job-123",
+            id=uuid.uuid4(),
             status=JobStatusEnum.RUNNING,
             job_type=JobTypeEnum.BACKUP,
             started_at=datetime.fromisoformat("2023-01-01T00:00:00"),
@@ -399,18 +400,18 @@ class TestJobsAPI:
         )
         setup_dependencies["job_service"].get_job_status.return_value = status_data
 
-        response = await async_client.get("/api/jobs/test-job-123/status")
+        response = await async_client.get(f"/api/jobs/{status_data.id}/status")
 
         assert response.status_code == 200
         response_data = response.json()
 
         # Verify the core fields are correct
-        assert response_data["id"] == "test-job-123"
+        assert response_data["id"] == str(status_data.id)
         assert response_data["status"] == JobStatusEnum.RUNNING
         assert response_data["job_type"] == "backup"
 
         setup_dependencies["job_service"].get_job_status.assert_called_once_with(
-            "test-job-123"
+            status_data.id
         )
 
     @pytest.mark.asyncio
@@ -418,11 +419,12 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting job status with error."""
+        job_id = uuid.uuid4()
         setup_dependencies["job_service"].get_job_status.return_value = JobStatusError(
-            error="Job not found", job_id="non-existent-job"
+            error="Job not found", job_id=job_id
         )
 
-        response = await async_client.get("/api/jobs/non-existent-job/status")
+        response = await async_client.get(f"/api/jobs/{job_id}/status")
 
         assert response.status_code == 404
 
@@ -461,12 +463,13 @@ class TestJobsAPI:
             "job_stream_service"
         ].stream_job_output.return_value = mock_response
 
-        response = await async_client.get("/api/jobs/test-job-123/stream")
+        job_id = uuid.uuid4()
+        response = await async_client.get(f"/api/jobs/{job_id}/stream")
 
         assert response.status_code == 200
         setup_dependencies[
             "job_stream_service"
-        ].stream_job_output.assert_called_once_with("test-job-123")
+        ].stream_job_output.assert_called_once_with(job_id)
 
     @pytest.mark.asyncio
     async def test_stream_task_output(
@@ -482,22 +485,55 @@ class TestJobsAPI:
             "job_stream_service"
         ].stream_task_output.return_value = mock_response
 
-        response = await async_client.get("/api/jobs/test-job-123/tasks/1/stream")
+        job_id = uuid.uuid4()
+        response = await async_client.get(f"/api/jobs/{job_id}/tasks/1/stream")
 
         assert response.status_code == 200
         setup_dependencies[
             "job_stream_service"
-        ].stream_task_output.assert_called_once_with("test-job-123", 1)
+        ].stream_task_output.assert_called_once_with(job_id, 1)
 
     @pytest.mark.asyncio
     async def test_toggle_job_details(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test toggling job details visibility."""
-        # The mock already handles this case properly
+        # Configure mock to return valid job data
+        from borgitory.services.jobs.job_render_service import (
+            TemplateJobData,
+            TemplateJobContext,
+            TemplateJobStatus,
+        )
+        from datetime import datetime
 
+        mock_job_data = TemplateJobData(
+            job=TemplateJobContext(
+                id=uuid.uuid4(),
+                status=TemplateJobStatus("running"),
+                started_at=datetime.now(),
+                finished_at=None,
+                error=None,
+            ),
+            job_title="Test Job",
+            status_class="running",
+            status_icon="play",
+            started_at=datetime.now(),
+            finished_at=None,
+            repository_name="test-repo",
+            sorted_tasks=[],
+            expand_details=False,
+        )
+        setup_dependencies[
+            "job_render_service"
+        ].get_job_for_template.return_value = mock_job_data
+        # Also ensure the mock is called with any parameters
+        setup_dependencies["job_render_service"].get_job_for_template.side_effect = (
+            lambda *args, **kwargs: mock_job_data
+        )
+
+        job_id = uuid.uuid4()
         response = await async_client.get(
-            "/api/jobs/test-job-123/toggle-details?expanded=false"
+            f"/api/jobs/{job_id}/toggle-details?expanded=false"
         )
 
         assert response.status_code == 200
@@ -513,7 +549,8 @@ class TestJobsAPI:
         """Test toggling details for non-existent job."""
         # The mock already handles non-existent jobs by returning None
 
-        response = await async_client.get("/api/jobs/non-existent-job/toggle-details")
+        job_id = uuid.uuid4()
+        response = await async_client.get(f"/api/jobs/{job_id}/toggle-details")
 
         assert response.status_code == 404
 
@@ -522,9 +559,41 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test getting static job details."""
-        # The mock already handles this case properly
+        # Configure mock to return valid job data
+        from borgitory.services.jobs.job_render_service import (
+            TemplateJobData,
+            TemplateJobContext,
+            TemplateJobStatus,
+        )
+        from datetime import datetime
 
-        response = await async_client.get("/api/jobs/test-job-123/details-static")
+        mock_job_data = TemplateJobData(
+            job=TemplateJobContext(
+                id=uuid.uuid4(),
+                status=TemplateJobStatus("completed"),
+                started_at=datetime.now(),
+                finished_at=datetime.now(),
+                error=None,
+            ),
+            job_title="Test Job",
+            status_class="completed",
+            status_icon="check",
+            started_at=datetime.now(),
+            finished_at=datetime.now(),
+            repository_name="test-repo",
+            sorted_tasks=[],
+            expand_details=False,
+        )
+        setup_dependencies[
+            "job_render_service"
+        ].get_job_for_template.return_value = mock_job_data
+        # Also ensure the mock is called with any parameters
+        setup_dependencies["job_render_service"].get_job_for_template.side_effect = (
+            lambda *args, **kwargs: mock_job_data
+        )
+
+        job_id = uuid.uuid4()
+        response = await async_client.get(f"/api/jobs/{job_id}/details-static")
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
@@ -541,14 +610,57 @@ class TestJobsAPI:
 
         # Create a proper job object with status attribute
         job_obj = SimpleNamespace()
-        job_obj.id = "test-job-123"
+        job_obj.id = uuid.uuid4()
         job_obj.status = TaskStatusEnum.COMPLETED
 
-        # The mock already handles this case with proper task structure
-        # Task order 1 should find the task we created in the mock
+        # Configure mock to return valid job data with tasks
+        from borgitory.services.jobs.job_render_service import (
+            TemplateJobData,
+            TemplateJobContext,
+            TemplateJobStatus,
+            TemplateTaskData,
+        )
+        from datetime import datetime
+
+        mock_task = TemplateTaskData(
+            task_name="backup",
+            task_type="backup",
+            status="completed",
+            output="Task completed",
+            error=None,
+            task_order=1,
+            started_at=datetime.now(),
+            completed_at=datetime.now(),
+            return_code=0,
+        )
+
+        mock_job_data = TemplateJobData(
+            job=TemplateJobContext(
+                id=job_obj.id,
+                status=TemplateJobStatus("running"),
+                started_at=datetime.now(),
+                finished_at=None,
+                error=None,
+            ),
+            job_title="Test Job",
+            status_class="running",
+            status_icon="play",
+            started_at=datetime.now(),
+            finished_at=None,
+            repository_name="test-repo",
+            sorted_tasks=[mock_task],
+            expand_details=False,
+        )
+        setup_dependencies[
+            "job_render_service"
+        ].get_job_for_template.return_value = mock_job_data
+        # Also ensure the mock is called with any parameters
+        setup_dependencies["job_render_service"].get_job_for_template.side_effect = (
+            lambda *args, **kwargs: mock_job_data
+        )
 
         response = await async_client.get(
-            "/api/jobs/test-job-123/tasks/1/toggle-details"
+            f"/api/jobs/{job_obj.id}/tasks/1/toggle-details"
         )
 
         assert response.status_code == 200
@@ -562,8 +674,9 @@ class TestJobsAPI:
         # The mock will return a job with tasks 0 and 1, but task 999 doesn't exist
         # This should result in a 404
 
+        job_id = uuid.uuid4()
         response = await async_client.get(
-            "/api/jobs/test-job-123/tasks/999/toggle-details"
+            f"/api/jobs/{job_id}/tasks/999/toggle-details"
         )
 
         assert response.status_code == 404
@@ -573,7 +686,8 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test copying job output to clipboard."""
-        response = await async_client.post("/api/jobs/test-job-123/copy-output")
+        job_id = uuid.uuid4()
+        response = await async_client.post(f"/api/jobs/{job_id}/copy-output")
 
         assert response.status_code == 200
         assert response.json() == {"message": "Output copied to clipboard"}

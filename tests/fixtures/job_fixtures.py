@@ -64,7 +64,7 @@ def mock_job_executor() -> Mock:
 def sample_borg_job() -> BorgJob:
     """Create a sample BorgJob for testing."""
     return BorgJob(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         status=JobStatusEnum.COMPLETED,
         started_at=now_utc(),
         completed_at=now_utc(),
@@ -77,7 +77,7 @@ def sample_borg_job() -> BorgJob:
 @pytest.fixture
 def sample_composite_job() -> BorgJob:
     """Create a composite BorgJob with tasks for testing."""
-    job_id = str(uuid.uuid4())
+    job_id = uuid.uuid4()
     task1 = BorgJobTask(
         task_type=TaskTypeEnum.BACKUP,
         task_name="Backup Task",
@@ -119,7 +119,7 @@ def sample_repository(test_db: Session) -> Repository:
 def sample_database_job(test_db: Session, sample_repository: Repository) -> Job:
     """Create a sample Job record in the test database."""
     job = Job()
-    job.id = str(uuid.uuid4())
+    job.id = uuid.uuid4()
     job.repository_id = sample_repository.id
     job.type = "backup"
     job.status = JobStatusEnum.COMPLETED
@@ -137,7 +137,7 @@ def sample_database_job_with_tasks(
 ) -> Job:
     """Create a Job with JobTasks in the test database."""
     job = Job()
-    job.id = str(uuid.uuid4())
+    job.id = uuid.uuid4()
     job.repository_id = sample_repository.id
     job.type = "backup"
     job.status = JobStatusEnum.COMPLETED

@@ -185,7 +185,7 @@ class TestManualRunAPScheduler:
         mock_scheduler_service: AsyncMock,
     ) -> None:
         """Test ScheduleService.run_schedule_manually calls scheduler service correctly"""
-        expected_job_id = str(uuid.uuid4())
+        expected_job_id = uuid.uuid4()
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
         result = await schedule_service.run_schedule_manually(test_schedule.id)
@@ -246,7 +246,7 @@ class TestManualRunAPScheduler:
         """Test the API endpoint for manual run with APScheduler approach"""
         # Setup dependency override
         mock_scheduler_service = AsyncMock()
-        expected_job_id = str(uuid.uuid4())
+        expected_job_id = uuid.uuid4()
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
         schedule_service = ScheduleService(test_db, mock_scheduler_service)

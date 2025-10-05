@@ -16,6 +16,7 @@ from typing import (
 )
 from dataclasses import dataclass, field
 from contextlib import _GeneratorContextManager
+import uuid
 
 from borgitory.models.job_results import JobStatusEnum
 
@@ -150,7 +151,7 @@ class BorgJobTask:
 class BorgJob:
     """Represents a job in the manager"""
 
-    id: str
+    id: uuid.UUID
     status: JobStatusEnum
     started_at: datetime
     completed_at: Optional[datetime] = None

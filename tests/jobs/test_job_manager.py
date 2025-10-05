@@ -82,7 +82,7 @@ class TestBorgJob:
 
     def test_simple_job(self) -> None:
         """Test simple job creation"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         started_at = now_utc()
 
         job = BorgJob(
@@ -102,7 +102,7 @@ class TestBorgJob:
 
     def test_composite_job(self) -> None:
         """Test composite job creation"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         started_at = now_utc()
         task1 = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Backup")
         task2 = BorgJobTask(task_type=TaskTypeEnum.PRUNE, task_name="Prune")
@@ -128,7 +128,7 @@ class TestBorgJob:
         task2 = BorgJobTask(task_type=TaskTypeEnum.PRUNE, task_name="Prune")
 
         job = BorgJob(
-            id="test",
+            id=uuid.uuid4(),
             status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             job_type="composite",
@@ -152,7 +152,7 @@ class TestBorgJob:
 
         # Test simple job
         simple_job = BorgJob(
-            id="simple", status=JobStatusEnum.RUNNING, started_at=now_utc()
+            id=uuid.uuid4(), status=JobStatusEnum.RUNNING, started_at=now_utc()
         )
         assert simple_job.get_current_task() is None
 
@@ -161,7 +161,7 @@ class TestBorgJob:
         # All jobs are now composite with job_type="composite"
         task = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Backup")
         job_with_tasks = BorgJob(
-            id="job1",
+            id=uuid.uuid4(),
             status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             job_type="composite",
@@ -173,7 +173,7 @@ class TestBorgJob:
 
         # Even jobs without tasks are composite type
         job_without_tasks = BorgJob(
-            id="job2",
+            id=uuid.uuid4(),
             status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             job_type="composite",
@@ -244,7 +244,7 @@ class TestJobManager:
 
     def test_create_job(self, job_manager: JobManager) -> None:
         """Test job creation"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         # Test creating a BorgJob directly since _create_job is private/removed
         job = BorgJob(
             id=job_id,
@@ -445,7 +445,7 @@ class TestJobManager:
         """Test successful execution of a composite task"""
         # Create a test job and task
         job = BorgJob(
-            id="test-job-id",
+            id=uuid.uuid4(),
             command=["borg", "list", "test-repo"],
             job_type="composite",
             status=JobStatusEnum.RUNNING,
@@ -518,7 +518,7 @@ class TestJobManager:
         """Test execution of a composite task that fails"""
         # Create a test job and task
         job = BorgJob(
-            id="test-job-id",
+            id=uuid.uuid4(),
             command=["borg", "list", "invalid-repo"],
             job_type="composite",
             status=JobStatusEnum.RUNNING,
@@ -577,7 +577,7 @@ class TestJobManager:
         """Test execution of a composite task that raises an exception"""
         # Create a test job and task
         job = BorgJob(
-            id="test-job-id",
+            id=uuid.uuid4(),
             command=["borg", "list", "test-repo"],
             job_type="composite",
             status=JobStatusEnum.RUNNING,
