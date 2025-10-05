@@ -5,7 +5,6 @@ Job Executor Module - Handles subprocess execution and process management
 import asyncio
 import json
 import logging
-import os
 import re
 import inspect
 from typing import Dict, List, Optional, Callable, TYPE_CHECKING, cast
@@ -50,16 +49,12 @@ class JobExecutor:
         try:
             logger.info(f"Starting process: {' '.join(command[:3])}...")
 
-            merged_env = os.environ.copy()
-            if env:
-                merged_env.update(env)
-
             # Use the new command executor for cross-platform compatibility
             process = await self.command_executor.create_subprocess(
                 command=command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
-                env=merged_env,
+                env=env,
                 cwd=cwd,
             )
 
