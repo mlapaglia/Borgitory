@@ -201,7 +201,7 @@ def mock_subprocess_process() -> AsyncMock:
 
 
 def create_mock_job_context(
-    job_id: str = "",
+    job_id: uuid.UUID = uuid.uuid4(),
     status: str = "completed",
     job_type: str = "simple",
     tasks: List[Dict[str, Any]] = [],

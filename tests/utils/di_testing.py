@@ -5,9 +5,19 @@ This module provides utilities for testing services that use FastAPI's dependenc
 system, including context managers for dependency overrides and mock service factories.
 """
 
-from typing import TypeVar, Callable, Any, Generator, Dict
+from typing import (
+    TypeVar,
+    Callable,
+    Any,
+    Generator,
+    Dict,
+    AsyncGenerator,
+    List,
+    Optional,
+)
 from contextlib import contextmanager
 from unittest.mock import Mock, MagicMock
+import uuid
 from fastapi.testclient import TestClient
 
 # Import the main app
@@ -154,10 +164,12 @@ class MockServiceFactory:
         mock = Mock(spec=JobStreamService)
 
         # Setup async generators for streaming methods
-        async def mock_stream_all_jobs():
+        async def mock_stream_all_jobs() -> AsyncGenerator[str, None]:
             yield "data: test job data\n\n"
 
-        async def mock_stream_job_output(job_id: str):
+        async def mock_stream_job_output(
+            job_id: uuid.UUID,
+        ) -> AsyncGenerator[str, None]:
             yield f"data: output for {job_id}\n\n"
 
         mock.stream_all_jobs.return_value = mock_stream_all_jobs()
@@ -200,7 +212,9 @@ class MockServiceFactory:
         mock_template_job.job.id = "test-job-123"
 
         # Set up side_effect to return mock_template_job for known jobs, None for unknown
-        def get_job_for_template_side_effect(job_id, *args, **kwargs):
+        def get_job_for_template_side_effect(
+            job_id: uuid.UUID, *args: Any, **kwargs: Any
+        ) -> Optional[Mock]:
             if job_id == "test-job-123":
                 return mock_template_job
             return None
@@ -210,7 +224,7 @@ class MockServiceFactory:
         mock._render_job_html.return_value = "<div>Mock job HTML</div>"
 
         # Setup async streaming methods
-        async def mock_stream_current_jobs_html():
+        async def mock_stream_current_jobs_html() -> AsyncGenerator[str, None]:
             yield "<div>Mock streaming HTML</div>"
 
         mock.stream_current_jobs_html.return_value = mock_stream_current_jobs_html()
@@ -219,7 +233,9 @@ class MockServiceFactory:
 
     @staticmethod
     def create_job_render_service_with_mocks(
-        job_manager=None, templates=None, converter=None
+        job_manager: Optional[Mock] = None,
+        templates: Optional[Mock] = None,
+        converter: Optional[Mock] = None,
     ):
         """Create a real JobRenderService with mocked dependencies for testing."""
         from fastapi.templating import Jinja2Templates
@@ -285,7 +301,11 @@ class MockServiceFactory:
         mock = Mock(spec=SimpleCommandRunner)
 
         # Setup common return values
-        async def mock_run_command(command, env=None, timeout=None):
+        async def mock_run_command(
+            command: List[str],
+            env: Optional[Dict[str, str]] = None,
+            timeout: Optional[int] = None,
+        ) -> MagicMock:
             return MagicMock(
                 success=True,
                 return_code=0,

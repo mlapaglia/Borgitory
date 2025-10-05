@@ -7,6 +7,7 @@ import logging
 from collections import deque
 from typing import Dict, List, Optional, AsyncGenerator
 from datetime import datetime
+import uuid
 from borgitory.utils.datetime_utils import now_utc
 from dataclasses import dataclass, field
 
@@ -51,7 +52,7 @@ class OutputLine:
 class JobOutput:
     """Container for job output data"""
 
-    job_id: str
+    job_id: uuid.UUID
     lines: deque[OutputLine] = field(default_factory=deque)
     current_progress: Dict[str, object] = field(default_factory=dict)
     total_lines: int = 0
@@ -68,10 +69,10 @@ class JobOutputManager:
 
     def __init__(self, max_lines_per_job: int = 1000) -> None:
         self.max_lines_per_job = max_lines_per_job
-        self._job_outputs: Dict[str, JobOutput] = {}
-        self._output_locks: Dict[str, asyncio.Lock] = {}
+        self._job_outputs: Dict[uuid.UUID, JobOutput] = {}
+        self._output_locks: Dict[uuid.UUID, asyncio.Lock] = {}
 
-    def create_job_output(self, job_id: str) -> JobOutput:
+    def create_job_output(self, job_id: uuid.UUID) -> JobOutput:
         """Create output container for a new job"""
         job_output = JobOutput(job_id=job_id, max_lines=self.max_lines_per_job)
         job_output.lines = deque(maxlen=self.max_lines_per_job)
@@ -84,7 +85,7 @@ class JobOutputManager:
 
     async def add_output_line(
         self,
-        job_id: str,
+        job_id: uuid.UUID,
         text: str,
         line_type: str = "stdout",
         progress_info: Optional[Dict[str, object]] = None,
@@ -111,11 +112,11 @@ class JobOutputManager:
             if progress_info:
                 job_output.current_progress.update(progress_info)
 
-    def get_job_output(self, job_id: str) -> Optional[JobOutput]:
+    def get_job_output(self, job_id: uuid.UUID) -> Optional[JobOutput]:
         """Get output container for a job"""
         return self._job_outputs.get(job_id)
 
-    async def get_job_output_stream(self, job_id: str) -> Dict[str, object]:
+    async def get_job_output_stream(self, job_id: uuid.UUID) -> Dict[str, object]:
         """Get formatted output data for API responses"""
         job_output = self.get_job_output(job_id)
         if not job_output:
@@ -129,7 +130,7 @@ class JobOutputManager:
             }
 
     async def stream_job_output(
-        self, job_id: str, follow: bool = True
+        self, job_id: uuid.UUID, follow: bool = True
     ) -> AsyncGenerator[Dict[str, object], None]:
         """Stream job output in real-time"""
         job_output = self.get_job_output(job_id)
@@ -156,7 +157,7 @@ class JobOutputManager:
             # Small delay to prevent busy waiting
             await asyncio.sleep(0.1)
 
-    def get_output_summary(self, job_id: str) -> Dict[str, object]:
+    def get_output_summary(self, job_id: uuid.UUID) -> Dict[str, object]:
         """Get summary of job output"""
         job_output = self.get_job_output(job_id)
         if not job_output:
@@ -170,7 +171,7 @@ class JobOutputManager:
             "max_lines": job_output.max_lines,
         }
 
-    def clear_job_output(self, job_id: str) -> bool:
+    def clear_job_output(self, job_id: uuid.UUID) -> bool:
         """Clear output data for a job"""
         if job_id in self._job_outputs:
             del self._job_outputs[job_id]
@@ -181,13 +182,13 @@ class JobOutputManager:
         logger.debug(f"Cleared output for job {job_id}")
         return True
 
-    def get_all_job_outputs(self) -> Dict[str, Dict[str, object]]:
+    def get_all_job_outputs(self) -> Dict[uuid.UUID, Dict[str, object]]:
         """Get summary of all job outputs"""
         return {job_id: self.get_output_summary(job_id) for job_id in self._job_outputs}
 
     async def format_output_for_display(
         self,
-        job_id: str,
+        job_id: uuid.UUID,
         max_lines: Optional[int] = None,
         filter_type: Optional[str] = None,
     ) -> List[str]:

@@ -2,6 +2,7 @@
 Tests for JobManager hook task execution with critical failures.
 """
 
+import uuid
 import pytest
 from typing import Dict, List, Optional
 from unittest.mock import AsyncMock
@@ -33,7 +34,7 @@ class MockHookExecutionService:
         self,
         hooks: List[HookConfig],
         hook_type: str,
-        job_id: str,
+        job_id: uuid.UUID,
         context: Optional[Dict[str, str]] = None,
         job_failed: bool = False,
     ) -> HookExecutionSummary:
