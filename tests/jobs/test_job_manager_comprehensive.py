@@ -6,7 +6,7 @@ import pytest
 import uuid
 import asyncio
 from typing import Generator, Dict, Any, AsyncGenerator
-from borgitory.models.job_results import JobStatusEnum
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
 from contextlib import contextmanager
@@ -288,8 +288,17 @@ class TestJobManagerTaskExecution:
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,
         mock_notification_service: Mock,
+        test_db: Session,
     ) -> JobManager:
         """Create job manager with injected mock dependencies"""
+
+        # Create a mock database session factory
+        @contextmanager
+        def mock_db_session_factory() -> Generator[Session, None, None]:
+            try:
+                yield test_db
+            finally:
+                pass
 
         # Create custom dependencies with mocks
         custom_deps = JobManagerDependencies(
@@ -299,6 +308,7 @@ class TestJobManagerTaskExecution:
             queue_manager=mock_queue_manager,
             event_broadcaster=mock_event_broadcaster,
             notification_service=mock_notification_service,
+            db_session_factory=mock_db_session_factory,
         )
 
         # Create full dependencies with our mocks injected
@@ -368,7 +378,7 @@ class TestJobManagerTaskExecution:
         """Test creating a composite job with multiple tasks"""
         task_definitions = [
             TaskDefinition(
-                type="backup",
+                type=TaskTypeEnum.BACKUP,
                 name="Backup data",
                 parameters={
                     "paths": ["/tmp"],
@@ -376,7 +386,7 @@ class TestJobManagerTaskExecution:
                 },
             ),
             TaskDefinition(
-                type="prune",
+                type=TaskTypeEnum.PRUNE,
                 name="Prune old archives",
                 parameters={
                     "keep_daily": 7,
@@ -465,7 +475,7 @@ class TestJobManagerTaskExecution:
         # Create task definitions for backup and prune
         task_definitions = [
             TaskDefinition(
-                type="backup",
+                type=TaskTypeEnum.BACKUP,
                 name="Test Backup",
                 parameters={
                     "source_path": "/tmp/test",
@@ -474,7 +484,7 @@ class TestJobManagerTaskExecution:
                 },
             ),
             TaskDefinition(
-                type="prune",
+                type=TaskTypeEnum.PRUNE,
                 name="Test Prune",
                 parameters={
                     "keep_daily": 7,
@@ -485,7 +495,7 @@ class TestJobManagerTaskExecution:
 
         # Use the proper job creation method that creates database records
         job_id = await job_manager_with_db.create_composite_job(
-            job_type="backup",
+            job_type=JobTypeEnum.BACKUP,
             task_definitions=task_definitions,
             repository=sample_repository,
         )
@@ -976,15 +986,38 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_notification_task_success(
-        self, job_manager_with_mocks: JobManager, mock_notification_service: Mock
+        self,
+        job_manager_with_mocks: JobManager,
+        mock_notification_service: Mock,
+        test_db: Session,
     ) -> None:
         """Test successful notification task execution"""
+        # Create a notification configuration in the database
+        from borgitory.models.database import NotificationConfig
+
+        notification_config = NotificationConfig()
+        notification_config.name = "test-notification"
+        notification_config.enabled = True
+        notification_config.provider = "pushover"
+        notification_config.provider_config = (
+            '{"user_key": "'
+            + "u"
+            + "x" * 29
+            + '", "app_token": "'
+            + "a"
+            + "x" * 29
+            + '"}'
+        )
+        test_db.add(notification_config)
+        test_db.commit()
+        test_db.refresh(notification_config)
+
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
             task_type=TaskTypeEnum.NOTIFICATION,
             task_name="Test Notification",
             parameters={
-                "notification_config_id": 1,
+                "notification_config_id": notification_config.id,
                 "title": "Test Title",
                 "message": "Test Message",
                 "priority": 1,
@@ -1018,7 +1051,7 @@ class TestJobManagerTaskExecution:
         )
 
         assert success is True
-        assert task.status == "completed"
+        assert task.status == TaskStatusEnum.COMPLETED
         assert task.return_code == 0
         assert task.error is None
 

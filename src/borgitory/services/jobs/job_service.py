@@ -361,7 +361,6 @@ class JobService:
         if job_status is None:
             return JobStatusError(error="Job not found", job_id=job_id)
 
-        # job_manager.get_job_status now returns JobStatus object directly
         return job_status
 
     async def get_job_output(
@@ -370,8 +369,7 @@ class JobService:
         """Get job output lines"""
         # Check if this is a composite job first - look in unified manager
         job = self.job_manager.jobs.get(job_id)
-        if job and job.tasks:  # All jobs are composite now
-            # Get current task output if job is running
+        if job and job.tasks:
             current_task_output = []
             if job.status == JobStatusEnum.RUNNING:
                 current_task = job.get_current_task()
