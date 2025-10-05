@@ -9,7 +9,7 @@ from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi.responses import StreamingResponse
 
-from borgitory.models.job_results import JobStatusEnum
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.services.jobs.job_stream_service import JobStreamService
 
 
@@ -448,7 +448,7 @@ class TestJobStreamService:
         mock_single_task_job.started_at = datetime(2023, 1, 1, 12, 0, 0)
         mock_single_task_job.current_task_index = 0
         mock_single_task_job.tasks = [mock_single_task]  # Single task composite job
-        mock_single_task_job.job_type = "check"
+        mock_single_task_job.job_type = JobTypeEnum.CHECK
         mock_single_task_job.get_current_task.return_value = mock_single_task
         # Composite jobs don't have command attribute or current_progress
         mock_single_task_job.command = None
@@ -494,7 +494,7 @@ class TestJobStreamService:
             if isinstance(job.get("progress"), dict)
             and "task_progress" in job.get("progress", {})
         )
-        assert single_task_job["type"] == "check"
+        assert single_task_job["type"] == JobTypeEnum.CHECK
         assert single_task_job["status"] == JobStatusEnum.RUNNING
         assert single_task_job["progress"]["task_progress"] == "1/1"
 

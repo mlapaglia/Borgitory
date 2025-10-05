@@ -9,6 +9,7 @@ from unittest.mock import Mock
 from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
 
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.services.jobs.job_render_service import (
     JobRenderService,
     JobDataConverter,
@@ -20,7 +21,12 @@ from borgitory.services.jobs.job_render_service import (
 )
 from borgitory.models.database import Job, JobTask, Repository
 from borgitory.models.enums import JobType
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import (
+    BorgJob,
+    BorgJobTask,
+    TaskStatusEnum,
+    TaskTypeEnum,
+)
 
 
 class TestJobDataConverterCoverage:
@@ -54,9 +60,9 @@ class TestJobDataConverterCoverage:
             id=1,
             job_id="test-job-123",
             task_name="Backup Files",
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_order=0,
-            status="completed",
+            status=TaskStatusEnum.COMPLETED,
             started_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
             completed_at=datetime(2023, 1, 1, 12, 15, 0, tzinfo=timezone.utc),
             output="Files backed up successfully",
@@ -67,9 +73,9 @@ class TestJobDataConverterCoverage:
             id=2,
             job_id="test-job-123",
             task_name="Sync to Cloud",
-            task_type="cloud_sync",
+            task_type=TaskTypeEnum.CLOUD_SYNC,
             task_order=1,
-            status="completed",
+            status=TaskStatusEnum.COMPLETED,
             started_at=datetime(2023, 1, 1, 12, 15, 0, tzinfo=timezone.utc),
             completed_at=datetime(2023, 1, 1, 12, 30, 0, tzinfo=timezone.utc),
             output="Sync completed",
@@ -93,13 +99,13 @@ class TestJobDataConverterCoverage:
 
         # Verify task conversion
         assert result.tasks[0].name == "Backup Files"
-        assert result.tasks[0].type == "backup"
+        assert result.tasks[0].type == TaskTypeEnum.BACKUP
         assert result.tasks[0].status.type == JobStatusType.COMPLETED
         assert result.tasks[0].output == "Files backed up successfully"
         assert result.tasks[0].order == 0
 
         assert result.tasks[1].name == "Sync to Cloud"
-        assert result.tasks[1].type == "cloud_sync"
+        assert result.tasks[1].type == TaskTypeEnum.CLOUD_SYNC
         assert result.tasks[1].status.type == JobStatusType.COMPLETED
 
     def test_convert_database_job_no_tasks(self) -> None:
@@ -114,7 +120,7 @@ class TestJobDataConverterCoverage:
         db_job = Job(
             id="empty-job",
             type=JobType.PRUNE,
-            status="pending",
+            status=JobStatusEnum.PENDING,
             started_at=datetime.now(timezone.utc),
             repository=repository,
             tasks=[],  # No tasks
@@ -142,23 +148,23 @@ class TestJobDataConverterCoverage:
         db_job = Job(
             id="memory-job",
             type=JobType.BACKUP,
-            status="running",
+            status=JobStatusEnum.RUNNING,
             repository=repository,
         )
 
         # Create BorgJobTask objects
         task1 = BorgJobTask(
             task_name="Running Backup",
-            task_type="backup",
-            status="running",
+            task_type=TaskTypeEnum.BACKUP,
+            status=TaskStatusEnum.RUNNING,
             output_lines=["Starting backup...", "Processing files..."],
         )
         task1.started_at = datetime.now(timezone.utc)
 
         task2 = BorgJobTask(
             task_name="Pending Sync",
-            task_type="cloud_sync",
-            status="pending",
+            task_type=TaskTypeEnum.CLOUD_SYNC,
+            status=TaskStatusEnum.PENDING,
             output_lines=[],
         )
 
@@ -166,8 +172,8 @@ class TestJobDataConverterCoverage:
         memory_job = BorgJob(
             id="memory-job",
             started_at=datetime.now(timezone.utc),
-            job_type="backup",
-            status="running",
+            job_type=JobTypeEnum.BACKUP,
+            status=JobStatusEnum.RUNNING,
             tasks=[task1, task2],
         )
         memory_job.current_task_index = 0
@@ -200,8 +206,8 @@ class TestJobDataConverterCoverage:
         # Create job data with mixed task statuses
         failed_task = TaskDisplayData(
             name="Failed Task",
-            type="backup",
-            status=JobStatus.from_status_string("failed"),
+            type=TaskTypeEnum.BACKUP,
+            status=JobStatus.from_status_string(JobStatusEnum.FAILED),
             output="Error occurred",
             error="Backup failed",
             order=1,
@@ -212,8 +218,8 @@ class TestJobDataConverterCoverage:
 
         pending_task = TaskDisplayData(
             name="Pending Task",
-            type="cloud_sync",
-            status=JobStatus.from_status_string("pending"),
+            type=TaskTypeEnum.CLOUD_SYNC,
+            status=JobStatus.from_status_string(JobStatusEnum.PENDING),
             output="",
             error=None,
             order=2,
@@ -224,8 +230,8 @@ class TestJobDataConverterCoverage:
 
         running_task = TaskDisplayData(
             name="Running Task",
-            type="notification",
-            status=JobStatus.from_status_string("running"),
+            type=TaskTypeEnum.NOTIFICATION,
+            status=JobStatus.from_status_string(JobStatusEnum.RUNNING),
             output="Sending...",
             error=None,
             order=3,
@@ -237,7 +243,7 @@ class TestJobDataConverterCoverage:
         job_data = JobDisplayData(
             id="failed-job",
             title="Failed Job",
-            status=JobStatus.from_status_string("failed"),
+            status=JobStatus.from_status_string(JobStatusEnum.FAILED),
             repository_name="test-repo",
             started_at=datetime.now(timezone.utc),
             finished_at=None,
@@ -264,8 +270,8 @@ class TestJobDataConverterCoverage:
         """Test fix_failed_job_tasks converts running task to failed in failed job"""
         running_task = TaskDisplayData(
             name="Running Task",
-            type="backup",
-            status=JobStatus.from_status_string("running"),
+            type=TaskTypeEnum.BACKUP,
+            status=JobStatus.from_status_string(JobStatusEnum.RUNNING),
             output="In progress...",
             error=None,
             order=0,
@@ -276,8 +282,8 @@ class TestJobDataConverterCoverage:
 
         pending_task = TaskDisplayData(
             name="Pending Task",
-            type="cloud_sync",
-            status=JobStatus.from_status_string("pending"),
+            type=TaskTypeEnum.CLOUD_SYNC,
+            status=JobStatus.from_status_string(JobStatusEnum.PENDING),
             output="",
             error=None,
             order=1,
@@ -289,7 +295,7 @@ class TestJobDataConverterCoverage:
         job_data = JobDisplayData(
             id="failed-job-2",
             title="Failed Job 2",
-            status=JobStatus.from_status_string("failed"),
+            status=JobStatus.from_status_string(JobStatusEnum.FAILED),
             repository_name="test-repo",
             started_at=datetime.now(timezone.utc),
             finished_at=None,
@@ -313,8 +319,8 @@ class TestJobDataConverterCoverage:
         """Test fix_failed_job_tasks doesn't modify completed jobs"""
         task = TaskDisplayData(
             name="Completed Task",
-            type="backup",
-            status=JobStatus.from_status_string("completed"),
+            type=TaskTypeEnum.BACKUP,
+            status=JobStatus.from_status_string(JobStatusEnum.COMPLETED),
             output="Success",
             error=None,
             order=0,
@@ -326,7 +332,7 @@ class TestJobDataConverterCoverage:
         job_data = JobDisplayData(
             id="completed-job",
             title="Completed Job",
-            status=JobStatus.from_status_string("completed"),
+            status=JobStatus.from_status_string(JobStatusEnum.COMPLETED),
             repository_name="test-repo",
             started_at=datetime.now(timezone.utc),
             finished_at=datetime.now(timezone.utc),
@@ -390,7 +396,7 @@ class TestJobRenderServiceCoverage:
         db_job = Job(
             id="db-job-1",
             type=JobType.BACKUP,
-            status="completed",
+            status=JobStatusEnum.COMPLETED,
             started_at=datetime.now(timezone.utc),
             finished_at=datetime.now(timezone.utc),
             repository=repository,
@@ -469,8 +475,8 @@ class TestJobRenderServiceCoverage:
         running_job = BorgJob(
             id="running-job-1",
             started_at=datetime.now(timezone.utc),
-            job_type="backup",
-            status="running",
+            job_type=JobTypeEnum.BACKUP,
+            status=JobStatusEnum.RUNNING,
             tasks=[],
         )
 

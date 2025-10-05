@@ -7,7 +7,7 @@ from datetime import datetime
 from dataclasses import dataclass, field
 import asyncio
 from borgitory.custom_types import ConfigDict
-from borgitory.services.jobs.job_models import BorgJob
+from borgitory.services.jobs.job_models import BorgJob, TaskTypeEnum
 
 if TYPE_CHECKING:
     from borgitory.models.job_results import JobStatus
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class TaskDefinition:
     """Definition for a task in a composite job."""
 
-    type: str  # Task type: 'backup', 'prune', 'check', 'cloud_sync', 'hook', 'notification'
+    type: TaskTypeEnum
     name: str  # Human-readable task name
 
     # Additional parameters specific to the task type

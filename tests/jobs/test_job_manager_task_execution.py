@@ -18,11 +18,14 @@ from borgitory.services.jobs.job_models import (
     JobManagerDependencies,
     BorgJob,
     BorgJobTask,
+    TaskTypeEnum,
+    TaskStatusEnum,
 )
 from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.models.database import Repository
+from borgitory.models.job_results import JobStatusEnum
 
 
 class TestJobManagerTaskExecution:
@@ -105,8 +108,17 @@ class TestJobManagerTaskExecution:
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,
         mock_notification_service: Mock,
+        test_db: Session,
     ) -> JobManager:
         """Create job manager with injected mock dependencies"""
+
+        # Create a mock database session factory
+        @contextmanager
+        def mock_db_session_factory() -> Generator[Session, None, None]:
+            try:
+                yield test_db
+            finally:
+                pass
 
         # Create custom dependencies with mocks
         custom_deps = JobManagerDependencies(
@@ -116,6 +128,7 @@ class TestJobManagerTaskExecution:
             queue_manager=mock_queue_manager,
             event_broadcaster=mock_event_broadcaster,
             notification_service=mock_notification_service,
+            db_session_factory=mock_db_session_factory,
         )
 
         # Create full dependencies with our mocks injected
@@ -181,7 +194,7 @@ class TestJobManagerTaskExecution:
         """Test creating a composite job with multiple tasks"""
         task_definitions = [
             TaskDefinition(
-                type="backup",
+                type=TaskTypeEnum.BACKUP,
                 name="Backup data",
                 parameters={
                     "paths": ["/tmp"],
@@ -189,7 +202,7 @@ class TestJobManagerTaskExecution:
                 },
             ),
             TaskDefinition(
-                type="prune",
+                type=TaskTypeEnum.PRUNE,
                 name="Prune old archives",
                 parameters={
                     "keep_daily": 7,
@@ -227,13 +240,13 @@ class TestJobManagerTaskExecution:
         """Test executing a composite job successfully"""
         # Create a simple composite job
         job_id = str(uuid.uuid4())
-        task1 = BorgJobTask(task_type="backup", task_name="Test Backup")
-        task2 = BorgJobTask(task_type="prune", task_name="Test Prune")
+        task1 = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Test Backup")
+        task2 = BorgJobTask(task_type=TaskTypeEnum.PRUNE, task_name="Test Prune")
 
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="pending",
+            status=JobStatusEnum.PENDING,
             started_at=now_utc(),
             tasks=[task1, task2],
             repository_id=sample_repository.id,
@@ -245,7 +258,7 @@ class TestJobManagerTaskExecution:
         async def mock_backup_task(
             job: BorgJob, task: BorgJobTask, task_index: int
         ) -> bool:
-            task.status = "completed"
+            task.status = TaskStatusEnum.COMPLETED
             task.return_code = 0
             task.completed_at = now_utc()
             return True
@@ -253,7 +266,7 @@ class TestJobManagerTaskExecution:
         async def mock_prune_task(
             job: BorgJob, task: BorgJobTask, task_index: int
         ) -> bool:
-            task.status = "completed"
+            task.status = TaskStatusEnum.COMPLETED
             task.return_code = 0
             task.completed_at = now_utc()
             return True
@@ -278,7 +291,7 @@ class TestJobManagerTaskExecution:
         # Create task definitions for backup and prune
         task_definitions = [
             TaskDefinition(
-                type="backup",
+                type=TaskTypeEnum.BACKUP,
                 name="Test Backup",
                 parameters={
                     "source_path": "/tmp/test",
@@ -287,7 +300,7 @@ class TestJobManagerTaskExecution:
                 },
             ),
             TaskDefinition(
-                type="prune",
+                type=TaskTypeEnum.PRUNE,
                 name="Test Prune",
                 parameters={
                     "keep_daily": 7,
@@ -310,7 +323,7 @@ class TestJobManagerTaskExecution:
         async def mock_backup_fail(
             job: BorgJob, task: BorgJobTask, task_index: int
         ) -> bool:
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.return_code = 1
             task.error = "Backup failed"
             task.completed_at = now_utc()
@@ -331,7 +344,7 @@ class TestJobManagerTaskExecution:
         task2 = job.tasks[1]  # prune task
 
         # Verify job failed due to critical task failure
-        assert job.status == "failed"
+        assert job.status == JobStatusEnum.FAILED
         assert task1.status == "failed"
 
         # Verify remaining task was marked as skipped due to critical failure
@@ -389,7 +402,7 @@ class TestJobManagerTaskExecution:
             )
 
             # Verify the job status is failed
-            assert db_job.status == "failed"
+            assert db_job.status == JobStatusEnum.FAILED
             assert db_job.finished_at is not None
 
     @pytest.mark.asyncio
@@ -403,7 +416,7 @@ class TestJobManagerTaskExecution:
         """Test successful backup task execution"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
             parameters={
                 "paths": ["/tmp"],
@@ -415,7 +428,7 @@ class TestJobManagerTaskExecution:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
             repository_id=sample_repository.id,
@@ -462,7 +475,7 @@ class TestJobManagerTaskExecution:
         # Setup test data
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
             parameters={
                 "paths": ["/tmp"],
@@ -474,7 +487,7 @@ class TestJobManagerTaskExecution:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
             repository_id=1,
@@ -528,13 +541,15 @@ class TestJobManagerTaskExecution:
         """Test backup task failure handling"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="backup", task_name="Test Backup", parameters={"paths": ["/tmp"]}
+            task_type=TaskTypeEnum.BACKUP,
+            task_name="Test Backup",
+            parameters={"paths": ["/tmp"]},
         )
 
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
             repository_id=sample_repository.id,
@@ -564,7 +579,7 @@ class TestJobManagerTaskExecution:
         )
 
         assert success is False
-        assert task.status == "failed"
+        assert task.status == TaskStatusEnum.FAILED
         assert task.return_code == 2
         assert task.error is not None
         assert "Backup failed" in task.error
@@ -581,7 +596,7 @@ class TestJobManagerTaskExecution:
         """Test backup task execution with dry_run flag"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup Dry Run",
             parameters={
                 "source_path": "/tmp",
@@ -594,7 +609,7 @@ class TestJobManagerTaskExecution:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
             repository_id=sample_repository.id,
@@ -642,7 +657,7 @@ class TestJobManagerTaskExecution:
         """Test successful prune task execution"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="prune",
+            task_type=TaskTypeEnum.PRUNE,
             task_name="Test Prune",
             parameters={
                 "repository_path": "/tmp/test-repo",
@@ -656,7 +671,7 @@ class TestJobManagerTaskExecution:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
             repository_id=1,  # Add repository_id for the updated method
@@ -695,7 +710,7 @@ class TestJobManagerTaskExecution:
         """Test successful check task execution"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="check",
+            task_type=TaskTypeEnum.CHECK,
             task_name="Test Check",
             parameters={"repository_only": True},
         )
@@ -703,7 +718,7 @@ class TestJobManagerTaskExecution:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
             repository_id=sample_repository.id,
@@ -743,7 +758,7 @@ class TestJobManagerTaskExecution:
         """Test successful cloud sync task execution"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="cloud_sync",
+            task_type=TaskTypeEnum.CLOUD_SYNC,
             task_name="Test Cloud Sync",
             parameters={
                 "repository_path": "/tmp/test-repo",
@@ -754,7 +769,7 @@ class TestJobManagerTaskExecution:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
             repository_id=1,  # Add repository_id for cloud sync task
@@ -786,15 +801,38 @@ class TestJobManagerTaskExecution:
 
     @pytest.mark.asyncio
     async def test_execute_notification_task_success(
-        self, job_manager_with_mocks: JobManager, mock_notification_service: Mock
+        self,
+        job_manager_with_mocks: JobManager,
+        mock_notification_service: Mock,
+        test_db: Session,
     ) -> None:
         """Test successful notification task execution"""
+        # Create a notification configuration in the database
+        from borgitory.models.database import NotificationConfig
+
+        notification_config = NotificationConfig()
+        notification_config.name = "test-notification"
+        notification_config.enabled = True
+        notification_config.provider = "pushover"
+        notification_config.provider_config = (
+            '{"user_key": "'
+            + "u"
+            + "x" * 29
+            + '", "app_token": "'
+            + "a"
+            + "x" * 29
+            + '"}'
+        )
+        test_db.add(notification_config)
+        test_db.commit()
+        test_db.refresh(notification_config)
+
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="notification",
+            task_type=TaskTypeEnum.NOTIFICATION,
             task_name="Test Notification",
             parameters={
-                "notification_config_id": 1,
+                "notification_config_id": notification_config.id,
                 "title": "Test Title",
                 "message": "Test Message",
                 "priority": 1,
@@ -804,7 +842,7 @@ class TestJobManagerTaskExecution:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
         )
@@ -828,7 +866,7 @@ class TestJobManagerTaskExecution:
         )
 
         assert success is True
-        assert task.status == "completed"
+        assert task.status == TaskStatusEnum.COMPLETED
         assert task.return_code == 0
         assert task.error is None
 
@@ -842,13 +880,15 @@ class TestJobManagerTaskExecution:
         """Test notification task with missing config"""
         job_id = str(uuid.uuid4())
         task = BorgJobTask(
-            task_type="notification", task_name="Test Notification", parameters={}
+            task_type=TaskTypeEnum.NOTIFICATION,
+            task_name="Test Notification",
+            parameters={},
         )
 
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
         )
@@ -876,7 +916,7 @@ class TestJobManagerTaskExecution:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
         )
@@ -886,7 +926,7 @@ class TestJobManagerTaskExecution:
         success = await job_manager_with_mocks._execute_task_with_executor(job, task, 0)
 
         assert success is False
-        assert task.status == "failed"
+        assert task.status == TaskStatusEnum.FAILED
         assert task.return_code == 1
         assert task.error is not None
         assert "Unknown task type: unknown_task" in task.error

@@ -14,6 +14,7 @@ from borgitory.models.database import (
     NotificationConfig,
 )
 from borgitory.models.schemas import PruneRequest, CheckRequest
+from borgitory.services.jobs.job_models import TaskTypeEnum
 
 
 @pytest.fixture
@@ -102,7 +103,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_backup_task("test-repo")
 
         expected = TaskDefinition(
-            type="backup",
+            type=TaskTypeEnum.BACKUP,
             name="Backup test-repo",
             parameters={
                 "source_path": "/data",
@@ -123,7 +124,7 @@ class TestTaskDefinitionBuilder:
         )
 
         expected = TaskDefinition(
-            type="backup",
+            type=TaskTypeEnum.BACKUP,
             name="Backup custom-repo",
             parameters={
                 "source_path": "/custom/path",
@@ -149,7 +150,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_prune_task_from_config(1, "test-repo")
 
         expected = TaskDefinition(
-            type="prune",
+            type=TaskTypeEnum.PRUNE,
             name="Prune test-repo",
             parameters={
                 "dry_run": False,
@@ -176,7 +177,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_prune_task_from_config(2, "test-repo")
 
         expected = TaskDefinition(
-            type="prune",
+            type=TaskTypeEnum.PRUNE,
             name="Prune test-repo",
             parameters={
                 "dry_run": False,
@@ -219,7 +220,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_prune_task_from_request(prune_request, "test-repo")
 
         expected = TaskDefinition(
-            type="prune",
+            type=TaskTypeEnum.PRUNE,
             name="Prune test-repo",
             parameters={
                 "dry_run": True,
@@ -251,7 +252,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_prune_task_from_request(prune_request, "test-repo")
 
         expected = TaskDefinition(
-            type="prune",
+            type=TaskTypeEnum.PRUNE,
             name="Prune test-repo",
             parameters={
                 "dry_run": False,
@@ -285,7 +286,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_check_task_from_config(1, "test-repo")
 
         expected = TaskDefinition(
-            type="check",
+            type=TaskTypeEnum.CHECK,
             name="Check test-repo (Full Check)",
             parameters={
                 "check_type": "full",
@@ -330,7 +331,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_check_task_from_request(check_request, "test-repo")
 
         expected = TaskDefinition(
-            type="check",
+            type=TaskTypeEnum.CHECK,
             name="Check test-repo",
             parameters={
                 "check_type": "repository_only",
@@ -354,7 +355,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_cloud_sync_task("test-repo")
 
         expected = TaskDefinition(
-            type="cloud_sync",
+            type=TaskTypeEnum.CLOUD_SYNC,
             name="Sync test-repo to Cloud",
             parameters={"cloud_sync_config_id": None},
         )
@@ -368,7 +369,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_cloud_sync_task()
 
         expected = TaskDefinition(
-            type="cloud_sync",
+            type=TaskTypeEnum.CLOUD_SYNC,
             name="Sync to Cloud",
             parameters={"cloud_sync_config_id": None},
         )
@@ -382,7 +383,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_cloud_sync_task("test-repo", cloud_sync_config_id=123)
 
         expected = TaskDefinition(
-            type="cloud_sync",
+            type=TaskTypeEnum.CLOUD_SYNC,
             name="Sync test-repo to Cloud",
             parameters={"cloud_sync_config_id": 123},
         )
@@ -403,7 +404,7 @@ class TestTaskDefinitionBuilder:
         task = task_builder.build_notification_task(1, "test-repo")
 
         expected = TaskDefinition(
-            type="notification",
+            type=TaskTypeEnum.NOTIFICATION,
             name="Send notification for test-repo",
             parameters={"provider": "pushover", "config_id": 1},
         )
@@ -459,14 +460,14 @@ class TestTaskDefinitionBuilder:
 
         # Verify task types
         task_types = [task.type for task in tasks]
-        assert "backup" in task_types
-        assert "prune" in task_types
-        assert "check" in task_types
-        assert "cloud_sync" in task_types
-        assert "notification" in task_types
+        assert TaskTypeEnum.BACKUP in task_types
+        assert TaskTypeEnum.PRUNE in task_types
+        assert TaskTypeEnum.CHECK in task_types
+        assert TaskTypeEnum.CLOUD_SYNC in task_types
+        assert TaskTypeEnum.NOTIFICATION in task_types
 
         # Verify backup task uses custom params
-        backup_task = next(task for task in tasks if task.type == "backup")
+        backup_task = next(task for task in tasks if task.type == TaskTypeEnum.BACKUP)
         assert backup_task.parameters["source_path"] == "/custom"
         assert backup_task.parameters["compression"] == "lz4"
 
@@ -477,7 +478,7 @@ class TestTaskDefinitionBuilder:
         )
 
         assert len(tasks) == 1
-        assert tasks[0].type == "backup"
+        assert tasks[0].type == TaskTypeEnum.BACKUP
         assert tasks[0].name == "Backup test-repo"
 
     def test_build_task_list_no_backup(
@@ -500,9 +501,9 @@ class TestTaskDefinitionBuilder:
 
         assert len(tasks) == 2  # prune + cloud_sync
         task_types = [task.type for task in tasks]
-        assert "backup" not in task_types
-        assert "prune" in task_types
-        assert "cloud_sync" in task_types
+        assert TaskTypeEnum.BACKUP not in task_types
+        assert TaskTypeEnum.PRUNE in task_types
+        assert TaskTypeEnum.CLOUD_SYNC in task_types
 
     def test_build_task_list_prune_request_over_config(
         self, task_builder: TaskDefinitionBuilder
@@ -522,7 +523,7 @@ class TestTaskDefinitionBuilder:
 
         assert len(tasks) == 1
         prune_task = tasks[0]
-        assert prune_task.type == "prune"
+        assert prune_task.type == TaskTypeEnum.PRUNE
         assert prune_task.parameters["dry_run"] is True
         assert prune_task.parameters["keep_within"] == "14d"
 
@@ -543,6 +544,6 @@ class TestTaskDefinitionBuilder:
 
         assert len(tasks) == 1
         check_task = tasks[0]
-        assert check_task.type == "check"
+        assert check_task.type == TaskTypeEnum.CHECK
         assert check_task.parameters["check_type"] == "archives_only"
         assert check_task.parameters["verify_data"] is True

@@ -10,14 +10,17 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Dict, Any
 
-from borgitory.services.jobs.job_manager import (
-    JobManager,
-    JobManagerDependencies,
+from borgitory.protocols.command_protocols import ProcessResult
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.utils.datetime_utils import now_utc
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+from borgitory.services.jobs.job_models import (
     BorgJob,
     BorgJobTask,
+    JobManagerDependencies,
+    TaskTypeEnum,
 )
-from borgitory.protocols.command_protocols import ProcessResult
-from borgitory.utils.datetime_utils import now_utc
+from borgitory.services.jobs.job_models import TaskStatusEnum
 
 
 class TestIgnoreLockFunctionality:
@@ -52,9 +55,9 @@ class TestIgnoreLockFunctionality:
         """Create a mock job for testing"""
         job = BorgJob(
             id="test-job-123",
-            job_type="manual_backup",
+            job_type=JobTypeEnum.BACKUP,
             repository_id=1,
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
         )
         return job
@@ -63,7 +66,7 @@ class TestIgnoreLockFunctionality:
     def mock_backup_task_with_ignore_lock(self) -> BorgJobTask:
         """Create a mock backup task with ignore_lock=True"""
         task = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup with Ignore Lock",
             parameters={
                 "source_path": "/test/source",
@@ -80,7 +83,7 @@ class TestIgnoreLockFunctionality:
     def mock_backup_task_without_ignore_lock(self) -> BorgJobTask:
         """Create a mock backup task with ignore_lock=False"""
         task = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup without Ignore Lock",
             parameters={
                 "source_path": "/test/source",
@@ -148,7 +151,7 @@ class TestIgnoreLockFunctionality:
 
         # Verify the backup task completed successfully
         assert result is True
-        assert mock_backup_task_with_ignore_lock.status == "completed"
+        assert mock_backup_task_with_ignore_lock.status == TaskStatusEnum.COMPLETED
 
     @pytest.mark.asyncio
     async def test_ignore_lock_false_skips_break_lock_command(
@@ -194,7 +197,7 @@ class TestIgnoreLockFunctionality:
 
         # Verify the backup task completed successfully
         assert result is True
-        assert mock_backup_task_without_ignore_lock.status == "completed"
+        assert mock_backup_task_without_ignore_lock.status == TaskStatusEnum.COMPLETED
 
     @pytest.mark.asyncio
     async def test_execute_break_lock_command_construction(
@@ -295,7 +298,7 @@ class TestIgnoreLockFunctionality:
 
         # Verify the backup task still completed successfully despite break-lock failure
         assert result is True
-        assert mock_backup_task_with_ignore_lock.status == "completed"
+        assert mock_backup_task_with_ignore_lock.status == TaskStatusEnum.COMPLETED
 
         # Verify warning message was added to output
         output_lines = mock_backup_task_with_ignore_lock.output_lines

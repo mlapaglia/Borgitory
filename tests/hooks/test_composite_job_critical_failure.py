@@ -102,8 +102,9 @@ class TestCompositeJobCriticalFailure:
         task = tasks[task_index]
 
         # Check for critical hook failure
-        is_critical_hook_failure = task.task_type == "hook" and task.parameters.get(
-            "critical_failure", False
+        is_critical_hook_failure = (
+            task.task_type == TaskTypeEnum.HOOK
+            and task.parameters.get("critical_failure", False)
         )
 
         if is_critical_hook_failure:
@@ -244,8 +245,9 @@ class TestCompositeJobCriticalFailure:
         task = tasks[task_index]
 
         # Check for critical hook failure
-        is_critical_hook_failure = task.task_type == "hook" and task.parameters.get(
-            "critical_failure", False
+        is_critical_hook_failure = (
+            task.task_type == TaskTypeEnum.HOOK
+            and task.parameters.get("critical_failure", False)
         )
 
         # Should not be critical
@@ -283,7 +285,7 @@ class TestCompositeJobCriticalFailure:
             if failed_tasks:
                 # Check if any critical tasks failed
                 critical_hook_failed = any(
-                    t.task_type == "hook"
+                    t.task_type == TaskTypeEnum.HOOK
                     and t.parameters.get("critical_failure", False)
                     for t in failed_tasks
                 )
@@ -325,10 +327,10 @@ class TestCompositeJobCriticalFailure:
             if failed_tasks:
                 # Check if any critical tasks failed
                 critical_task_failed = any(
-                    t.task_type in ["backup"] for t in failed_tasks
+                    t.task_type in [TaskTypeEnum.BACKUP] for t in failed_tasks
                 )
                 critical_hook_failed = any(
-                    t.task_type == "hook"
+                    t.task_type == TaskTypeEnum.HOOK
                     and t.parameters.get("critical_failure", False)
                     for t in failed_tasks
                 )
@@ -364,7 +366,7 @@ class TestCompositeJobCriticalFailure:
         task = tasks[task_index]
 
         # Check if it's a critical task type
-        if task.task_type in ["backup"]:
+        if task.task_type in [TaskTypeEnum.BACKUP]:
             # Mark all remaining tasks as skipped
             remaining_tasks = job.tasks[task_index + 1 :]
             for remaining_task in remaining_tasks:
@@ -402,8 +404,9 @@ class TestCompositeJobCriticalFailure:
         task_index = 0
         task = tasks[task_index]
 
-        is_critical_hook_failure = task.task_type == "hook" and task.parameters.get(
-            "critical_failure", False
+        is_critical_hook_failure = (
+            task.task_type == TaskTypeEnum.HOOK
+            and task.parameters.get("critical_failure", False)
         )
 
         if is_critical_hook_failure:

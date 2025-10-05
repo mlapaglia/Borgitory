@@ -9,6 +9,8 @@ import pytest
 import uuid
 from unittest.mock import Mock, patch
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.services.jobs.job_models import TaskTypeEnum, TaskStatusEnum
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 
 from borgitory.services.jobs.job_database_manager import (
     JobDatabaseManager,
@@ -278,9 +280,9 @@ class TestJobDatabaseManager:
 
         # Create mock tasks
         mock_task1 = Mock()
-        mock_task1.task_type = "backup"
+        mock_task1.task_type = TaskTypeEnum.BACKUP
         mock_task1.task_name = "Create backup"
-        mock_task1.status = "completed"
+        mock_task1.status = TaskStatusEnum.COMPLETED
         mock_task1.started_at = now_utc()
         mock_task1.completed_at = now_utc()
         mock_task1.output_lines = ["Line 1", "Line 2"]
@@ -288,9 +290,9 @@ class TestJobDatabaseManager:
         mock_task1.return_code = 0
 
         mock_task2 = Mock()
-        mock_task2.task_type = "cloud_sync"
+        mock_task2.task_type = TaskTypeEnum.CLOUD_SYNC
         mock_task2.task_name = "Sync to cloud"
-        mock_task2.status = "running"
+        mock_task2.status = TaskStatusEnum.RUNNING
         mock_task2.started_at = now_utc()
         mock_task2.completed_at = None
         mock_task2.output_lines = []
@@ -365,8 +367,8 @@ class TestJobDatabaseManager:
             sample_data = DatabaseJobData(
                 job_uuid=str(uuid.uuid4()),
                 repository_id=1,
-                job_type="backup",
-                status="running",
+                job_type=JobTypeEnum.BACKUP,
+                status=JobStatusEnum.RUNNING,
                 started_at=now_utc(),
             )
 

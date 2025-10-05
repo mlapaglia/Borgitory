@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pytest
 from sqlalchemy.orm import Session
 
+from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 
 
@@ -25,7 +26,7 @@ class TestTaskDefinitionBuilderHookIntegration:
             repository_name="test-repo",
         )
 
-        assert task.type == "hook"
+        assert task.type == TaskTypeEnum.HOOK
         assert task.name == "Pre-job hook: Test Hook (test-repo)"
         assert task.parameters["hook_name"] == "Test Hook"
         assert task.parameters["hook_command"] == "echo 'hello'"
@@ -75,7 +76,7 @@ class TestTaskDefinitionBuilderHookIntegration:
         assert len(tasks) == 1
 
         task = tasks[0]
-        assert task.type == "hook"
+        assert task.type == TaskTypeEnum.HOOK
         assert task.parameters["hook_type"] == "pre"
         assert task.name == "Pre-job hooks (test-repo)"
 
@@ -129,17 +130,17 @@ class TestTaskDefinitionBuilderHookIntegration:
         assert len(tasks) >= 3
 
         # First task should be pre-hook (bundled)
-        assert tasks[0].type == "hook"
+        assert tasks[0].type == TaskTypeEnum.HOOK
         assert tasks[0].parameters["hook_type"] == "pre"
         assert "Pre-job hooks" in tasks[0].name
 
         # Last task should be post-hook (bundled)
-        assert tasks[-1].type == "hook"
+        assert tasks[-1].type == TaskTypeEnum.HOOK
         assert tasks[-1].parameters["hook_type"] == "post"
         assert "Post-job hooks" in tasks[-1].name
 
         # Should have backup task somewhere in the middle
-        backup_tasks = [task for task in tasks if task.type == "backup"]
+        backup_tasks = [task for task in tasks if task.type == TaskTypeEnum.BACKUP]
         assert len(backup_tasks) == 1
 
     def test_build_task_list_with_hooks_and_other_tasks(self) -> None:
@@ -176,13 +177,13 @@ class TestTaskDefinitionBuilderHookIntegration:
         task_types = [task.type for task in tasks]
 
         # Should start with pre-hook and end with post-hook
-        assert task_types[0] == "hook"
-        assert task_types[-1] == "hook"
+        assert task_types[0] == TaskTypeEnum.HOOK
+        assert task_types[-1] == TaskTypeEnum.HOOK
 
         # Should contain all expected task types
-        assert "backup" in task_types
-        assert "prune" in task_types
-        assert "cloud_sync" in task_types
+        assert TaskTypeEnum.BACKUP in task_types
+        assert TaskTypeEnum.PRUNE in task_types
+        assert TaskTypeEnum.CLOUD_SYNC in task_types
 
         # Verify hooks are correctly positioned
         pre_hook_task = tasks[0]
