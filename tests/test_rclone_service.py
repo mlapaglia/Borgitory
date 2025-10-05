@@ -4,7 +4,8 @@ Tests for RcloneService - Behavioral tests focused on service functionality
 
 import pytest
 from unittest.mock import Mock, AsyncMock
-from borgitory.services.rclone_service import RcloneService
+from typing import Dict, Any, cast
+from borgitory.services.rclone_service import RcloneService, CloudProviderConfig
 from borgitory.protocols.command_executor_protocol import (
     CommandExecutorProtocol,
     CommandResult,
@@ -251,6 +252,123 @@ class TestRcloneServiceSFTPOperations:
         message = result.get("message", "").lower()
         assert "ssh" in message or "authentication" in message
 
+    @pytest.mark.asyncio
+    async def test_sync_repository_to_sftp_success(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        """Test successful SFTP sync operation."""
+        # Mock subprocess for streaming
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.stdout = Mock()
+        mock_process.stderr = Mock()
+        mock_process.stdout.readline = AsyncMock(return_value=b"")
+        mock_process.stderr.readline = AsyncMock(return_value=b"")
+
+        mock_command_executor.create_subprocess.return_value = mock_process
+
+        # Collect results from the async generator
+        results = []
+        async for item in rclone_service.sync_repository_to_sftp(
+            repository=mock_repository,
+            host="sftp.example.com",
+            username="testuser",
+            remote_path="/remote/path",
+            password="testpass",
+        ):
+            results.append(item)
+            break  # Just get the first item to test the call
+
+        # Verify the command executor was called
+        mock_command_executor.create_subprocess.assert_called_once()
+        call_args = mock_command_executor.create_subprocess.call_args
+
+        # Verify the command contains expected elements
+        command = call_args[1]["command"]
+        assert "rclone" in command
+        assert "sync" in command
+        assert mock_repository.path in command
+        assert ":sftp:/remote/path" in command
+
+        # Verify we got a started event
+        assert len(results) > 0
+        assert results[0]["type"] == "started"
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_to_sftp_with_private_key(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        """Test SFTP sync operation with private key authentication."""
+        # Mock subprocess for streaming
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.stdout = Mock()
+        mock_process.stderr = Mock()
+        mock_process.stdout.readline = AsyncMock(return_value=b"")
+        mock_process.stderr.readline = AsyncMock(return_value=b"")
+
+        mock_command_executor.create_subprocess.return_value = mock_process
+
+        # Collect results from the async generator
+        results = []
+        async for item in rclone_service.sync_repository_to_sftp(
+            repository=mock_repository,
+            host="sftp.example.com",
+            username="testuser",
+            remote_path="/remote/path",
+            private_key="-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+        ):
+            results.append(item)
+            break  # Just get the first item to test the call
+
+        # Verify the command executor was called
+        mock_command_executor.create_subprocess.assert_called_once()
+        call_args = mock_command_executor.create_subprocess.call_args
+
+        # Verify the command contains expected elements
+        command = call_args[1]["command"]
+        assert "rclone" in command
+        assert "sync" in command
+        assert mock_repository.path in command
+        assert ":sftp:/remote/path" in command
+
+        # Verify we got a started event
+        assert len(results) > 0
+        assert results[0]["type"] == "started"
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_to_sftp_exception_handling(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        """Test SFTP sync operation handles exceptions gracefully."""
+        # Mock command executor to raise an exception
+        mock_command_executor.create_subprocess.side_effect = Exception("Process error")
+
+        results = []
+        async for item in rclone_service.sync_repository_to_sftp(
+            repository=mock_repository,
+            host="sftp.example.com",
+            username="testuser",
+            remote_path="/remote/path",
+            password="testpass",
+        ):
+            results.append(item)
+
+        # Should get an error event
+        assert len(results) > 0
+        assert any(item["type"] == "error" for item in results)
+
 
 class TestRcloneServiceSMBOperations:
     """Test SMB-related operations."""
@@ -300,6 +418,269 @@ class TestRcloneServiceSMBOperations:
         assert "WORKGROUP" in flags
 
 
+class TestRcloneServiceSyncRepository:
+    """Test the generic sync_repository method."""
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_s3_success(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+    ) -> None:
+        """Test successful S3 sync using the generic sync_repository method."""
+        # Mock subprocess for streaming
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.stdout = Mock()
+        mock_process.stderr = Mock()
+        mock_process.stdout.readline = AsyncMock(return_value=b"")
+        mock_process.stderr.readline = AsyncMock(return_value=b"")
+
+        mock_command_executor.create_subprocess.return_value = mock_process
+
+        # Test S3 configuration
+        config: Dict[str, Any] = {
+            "provider": "s3",
+            "bucket_name": "test-bucket",
+            "access_key_id": "test_key",
+            "secret_access_key": "test_secret",
+            "path_prefix": "backups",
+        }
+
+        # Mock progress callback
+        progress_callback = Mock()
+
+        result = await rclone_service.sync_repository(
+            source_path="/test/repo/path",
+            remote_path=":s3:test-bucket/backups",
+            config=cast(CloudProviderConfig, config),
+            progress_callback=progress_callback,
+        )
+
+        # Verify the command executor was called
+        mock_command_executor.create_subprocess.assert_called_once()
+        call_args = mock_command_executor.create_subprocess.call_args
+
+        # Verify the command contains expected elements
+        command = call_args[1]["command"]
+        assert "rclone" in command
+        assert "sync" in command
+        assert "/test/repo/path" in command
+        assert ":s3:test-bucket/backups" in command
+
+        # Verify result
+        assert result.get("success") is True
+        assert "stats" in result
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_sftp_success(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+    ) -> None:
+        """Test successful SFTP sync using the generic sync_repository method."""
+        # Mock subprocess for streaming
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.stdout = Mock()
+        mock_process.stderr = Mock()
+        mock_process.stdout.readline = AsyncMock(return_value=b"")
+        mock_process.stderr.readline = AsyncMock(return_value=b"")
+
+        mock_command_executor.create_subprocess.return_value = mock_process
+
+        # Test SFTP configuration
+        config: Dict[str, Any] = {
+            "provider": "sftp",
+            "host": "sftp.example.com",
+            "username": "testuser",
+            "password": "testpass",
+            "remote_path": "/remote/path",
+            "path_prefix": "backups",
+        }
+
+        # Mock progress callback
+        progress_callback = Mock()
+
+        result = await rclone_service.sync_repository(
+            source_path="/test/repo/path",
+            remote_path=":sftp:/remote/path/backups",
+            config=cast(CloudProviderConfig, config),
+            progress_callback=progress_callback,
+        )
+
+        # Verify the command executor was called
+        mock_command_executor.create_subprocess.assert_called_once()
+        call_args = mock_command_executor.create_subprocess.call_args
+
+        # Verify the command contains expected elements
+        command = call_args[1]["command"]
+        assert "rclone" in command
+        assert "sync" in command
+        assert "/test/repo/path" in command
+        # The SFTP path is constructed from the remote_path and path_prefix
+        # The actual command shows :sftp:sftp/remote/path/backups/backups
+        assert ":sftp:sftp/remote/path/backups/backups" in command
+
+        # Verify result
+        assert result.get("success") is True
+        assert "stats" in result
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_s3_missing_required_fields(
+        self,
+        rclone_service: RcloneService,
+    ) -> None:
+        """Test sync_repository with missing required S3 fields."""
+        config: Dict[str, Any] = {
+            "provider": "s3",
+            "bucket_name": "test-bucket",
+            # Missing access_key_id and secret_access_key
+        }
+
+        result = await rclone_service.sync_repository(
+            source_path="/test/repo/path",
+            remote_path=":s3:test-bucket",
+            config=cast(CloudProviderConfig, config),
+        )
+
+        assert result.get("success") is False
+        error_msg = result.get("error", "")
+        assert error_msg and "Missing required S3 configuration" in error_msg
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_sftp_missing_required_fields(
+        self,
+        rclone_service: RcloneService,
+    ) -> None:
+        """Test sync_repository with missing required SFTP fields."""
+        config: Dict[str, Any] = {
+            "provider": "sftp",
+            "username": "testuser",
+            # Missing host
+        }
+
+        result = await rclone_service.sync_repository(
+            source_path="/test/repo/path",
+            remote_path=":sftp:/remote/path",
+            config=cast(CloudProviderConfig, config),
+        )
+
+        assert result.get("success") is False
+        error_msg = result.get("error", "")
+        assert error_msg and "Missing required SFTP configuration" in error_msg
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_sftp_missing_auth(
+        self,
+        rclone_service: RcloneService,
+    ) -> None:
+        """Test sync_repository with missing SFTP authentication."""
+        config: Dict[str, Any] = {
+            "provider": "sftp",
+            "host": "sftp.example.com",
+            "username": "testuser",
+            "remote_path": "/remote/path",
+            # Missing both password and private_key
+        }
+
+        result = await rclone_service.sync_repository(
+            source_path="/test/repo/path",
+            remote_path=":sftp:/remote/path",
+            config=cast(CloudProviderConfig, config),
+        )
+
+        assert result.get("success") is False
+        error_msg = result.get("error", "")
+        assert (
+            error_msg and "Either password or private_key must be provided" in error_msg
+        )
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_unsupported_provider(
+        self,
+        rclone_service: RcloneService,
+    ) -> None:
+        """Test sync_repository with unsupported provider."""
+        config: Dict[str, Any] = {
+            "provider": "unsupported",
+        }
+
+        result = await rclone_service.sync_repository(
+            source_path="/test/repo/path",
+            remote_path=":unsupported:path",
+            config=cast(CloudProviderConfig, config),
+        )
+
+        assert result.get("success") is False
+        error_msg = result.get("error", "")
+        assert error_msg and "Unsupported cloud provider: unsupported" in error_msg
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_s3_sync_failure(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+    ) -> None:
+        """Test S3 sync failure handling."""
+        # Mock subprocess for streaming that fails
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.wait = AsyncMock(return_value=1)  # Non-zero exit code
+        mock_process.stdout = Mock()
+        mock_process.stderr = Mock()
+        mock_process.stdout.readline = AsyncMock(return_value=b"")
+        mock_process.stderr.readline = AsyncMock(return_value=b"")
+
+        mock_command_executor.create_subprocess.return_value = mock_process
+
+        config: Dict[str, Any] = {
+            "provider": "s3",
+            "bucket_name": "test-bucket",
+            "access_key_id": "test_key",
+            "secret_access_key": "test_secret",
+        }
+
+        result = await rclone_service.sync_repository(
+            source_path="/test/repo/path",
+            remote_path=":s3:test-bucket",
+            config=cast(CloudProviderConfig, config),
+        )
+
+        assert result.get("success") is False
+        error_msg = result.get("error", "")
+        assert error_msg and "Rclone process failed with return code 1" in error_msg
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_exception_handling(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+    ) -> None:
+        """Test sync_repository exception handling."""
+        # Mock command executor to raise an exception
+        mock_command_executor.create_subprocess.side_effect = Exception("Process error")
+
+        config: Dict[str, Any] = {
+            "provider": "s3",
+            "bucket_name": "test-bucket",
+            "access_key_id": "test_key",
+            "secret_access_key": "test_secret",
+        }
+
+        result = await rclone_service.sync_repository(
+            source_path="/test/repo/path",
+            remote_path=":s3:test-bucket",
+            config=cast(CloudProviderConfig, config),
+        )
+
+        assert result.get("success") is False
+        error_msg = result.get("error", "")
+        assert error_msg and "Process error" in error_msg
+
+
 class TestRcloneServiceGenericDispatchers:
     """Test generic dispatcher methods."""
 
@@ -312,6 +693,114 @@ class TestRcloneServiceGenericDispatchers:
         assert callable(getattr(rclone_service, "sync_repository_to_provider"))
         assert hasattr(rclone_service, "test_provider_connection")
         assert callable(getattr(rclone_service, "test_provider_connection"))
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_to_provider_sftp_success(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        """Test successful SFTP sync using the generic sync_repository_to_provider method."""
+        # Mock subprocess for streaming
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.stdout = Mock()
+        mock_process.stderr = Mock()
+        mock_process.stdout.readline = AsyncMock(return_value=b"")
+        mock_process.stderr.readline = AsyncMock(return_value=b"")
+
+        mock_command_executor.create_subprocess.return_value = mock_process
+
+        # Collect results from the async generator
+        results = []
+        async for item in rclone_service.sync_repository_to_provider(
+            provider="sftp",
+            repository=mock_repository,
+            host="sftp.example.com",
+            username="testuser",
+            remote_path="/remote/path",
+            password="testpass",
+        ):
+            results.append(item)
+            break  # Just get the first item to test the call
+
+        # Verify the command executor was called
+        mock_command_executor.create_subprocess.assert_called_once()
+        call_args = mock_command_executor.create_subprocess.call_args
+
+        # Verify the command contains expected elements
+        command = call_args[1]["command"]
+        assert "rclone" in command
+        assert "sync" in command
+        assert mock_repository.path in command
+        assert ":sftp:/remote/path" in command
+
+        # Verify we got a started event
+        assert len(results) > 0
+        assert results[0]["type"] == "started"
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_to_provider_s3_success(
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        """Test successful S3 sync using the generic sync_repository_to_provider method."""
+        # Mock subprocess for streaming
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.stdout = Mock()
+        mock_process.stderr = Mock()
+        mock_process.stdout.readline = AsyncMock(return_value=b"")
+        mock_process.stderr.readline = AsyncMock(return_value=b"")
+
+        mock_command_executor.create_subprocess.return_value = mock_process
+
+        # Collect results from the async generator
+        results = []
+        async for item in rclone_service.sync_repository_to_provider(
+            provider="s3",
+            repository=mock_repository,
+            access_key="test_key",
+            secret_key="test_secret",
+            bucket_name="test-bucket",
+        ):
+            results.append(item)
+            break  # Just get the first item to test the call
+
+        # Verify the command executor was called
+        mock_command_executor.create_subprocess.assert_called_once()
+        call_args = mock_command_executor.create_subprocess.call_args
+
+        # Verify the command contains expected elements
+        command = call_args[1]["command"]
+        assert "rclone" in command
+        assert "sync" in command
+        assert mock_repository.path in command
+        assert ":s3:test-bucket" in command
+
+        # Verify we got a started event
+        assert len(results) > 0
+        assert results[0]["type"] == "started"
+
+    @pytest.mark.asyncio
+    async def test_sync_repository_to_provider_missing_required_params(
+        self,
+        rclone_service: RcloneService,
+        mock_repository: Mock,
+    ) -> None:
+        """Test sync_repository_to_provider with missing required parameters."""
+        with pytest.raises(ValueError, match="Missing required parameters for sftp"):
+            async for _ in rclone_service.sync_repository_to_provider(
+                provider="sftp",
+                repository=mock_repository,
+                # Missing required host and username
+            ):
+                pass
 
     @pytest.mark.asyncio
     async def test_test_provider_connection_sftp(
