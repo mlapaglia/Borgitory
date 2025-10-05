@@ -7,6 +7,7 @@ from borgitory.protocols.command_executor_protocol import CommandExecutorProtoco
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository
+from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.utils.security import secure_borg_command
 
@@ -711,7 +712,7 @@ class RepositoryStatsService:
                 .filter(
                     and_(
                         Job.repository_id == repository.id,
-                        JobTask.status == "completed",
+                        JobTask.status == TaskStatusEnum.COMPLETED,
                         JobTask.started_at.isnot(None),
                         JobTask.completed_at.isnot(None),
                     )
@@ -838,7 +839,9 @@ class RepositoryStatsService:
                 .filter(
                     and_(
                         Job.repository_id == repository.id,
-                        JobTask.status.in_(["completed", "failed"]),
+                        JobTask.status.in_(
+                            [TaskStatusEnum.COMPLETED, TaskStatusEnum.FAILED]
+                        ),
                     )
                 )
                 .all()
@@ -849,9 +852,9 @@ class RepositoryStatsService:
                 lambda: {"successful": 0, "failed": 0}
             )
             for task in task_results:
-                if task.status == "completed":
+                if task.status == TaskStatusEnum.COMPLETED:
                     task_counts[task.task_type]["successful"] += 1
-                elif task.status == "failed":
+                elif task.status == TaskStatusEnum.FAILED:
                     task_counts[task.task_type]["failed"] += 1
 
             success_failure_stats: List[SuccessFailureStats] = []
@@ -943,7 +946,9 @@ class RepositoryStatsService:
                     and_(
                         Job.repository_id == repository.id,
                         JobTask.task_type.in_(["backup", "scheduled_backup"]),
-                        JobTask.status.in_(["completed", "failed"]),
+                        JobTask.status.in_(
+                            [TaskStatusEnum.COMPLETED, TaskStatusEnum.FAILED]
+                        ),
                         JobTask.completed_at >= thirty_days_ago,
                         JobTask.completed_at.isnot(None),
                     )
@@ -958,9 +963,9 @@ class RepositoryStatsService:
             )
             for result in backup_results:
                 date_str = str(result.date) if result.date else "unknown"
-                if result.status == "completed":
+                if result.status == TaskStatusEnum.COMPLETED:
                     daily_counts[date_str]["successful"] += 1
-                elif result.status == "failed":
+                elif result.status == TaskStatusEnum.FAILED:
                     daily_counts[date_str]["failed"] += 1
 
             # Sort dates and create chart data

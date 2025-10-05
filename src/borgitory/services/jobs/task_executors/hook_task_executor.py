@@ -5,7 +5,7 @@ Hook Task Executor - Handles hook task execution
 import logging
 from typing import Optional, Any
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,12 @@ class HookTaskExecutor:
         hook_execution_service = await self._get_hook_execution_service()
         if not hook_execution_service:
             logger.error("Hook execution service not available")
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.error = "Hook execution service not configured"
             return False
 
         try:
-            task.status = "running"
+            task.status = TaskStatusEnum.RUNNING
             task.started_at = now_utc()
 
             hook_configs_data = task.parameters.get("hooks", [])
@@ -44,7 +44,7 @@ class HookTaskExecutor:
                 logger.warning(
                     f"No hook configurations found for {hook_type} hook task"
                 )
-                task.status = "completed"
+                task.status = TaskStatusEnum.COMPLETED
                 task.return_code = 0
                 task.completed_at = now_utc()
                 return True
@@ -59,7 +59,7 @@ class HookTaskExecutor:
                 )
             except Exception as e:
                 logger.error(f"Failed to parse hook configurations: {e}")
-                task.status = "failed"
+                task.status = TaskStatusEnum.FAILED
                 task.error = f"Invalid hook configuration: {str(e)}"
                 task.return_code = 1
                 task.completed_at = now_utc()
@@ -103,7 +103,11 @@ class HookTaskExecutor:
                         f"{result.hook_name}: {result.error or 'Unknown error'}"
                     )
 
-            task.status = "completed" if hook_summary.all_successful else "failed"
+            task.status = (
+                TaskStatusEnum.COMPLETED
+                if hook_summary.all_successful
+                else TaskStatusEnum.FAILED
+            )
             task.return_code = 0 if hook_summary.all_successful else 1
             task.completed_at = now_utc()
 
@@ -131,7 +135,7 @@ class HookTaskExecutor:
 
         except Exception as e:
             logger.error(f"Error executing hook task: {e}")
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.error = str(e)
             task.return_code = 1
             task.completed_at = now_utc()

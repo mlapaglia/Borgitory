@@ -6,6 +6,7 @@ import pytest
 import uuid
 from unittest.mock import Mock, patch, AsyncMock
 from borgitory.models.job_results import JobStatusEnum
+from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.models.database import Job, JobTask
@@ -163,7 +164,7 @@ class TestJobStreamingFixes:
             mock_job.id = job_id
             mock_task = Mock()
             mock_task.task_name = "backup"
-            mock_task.status = "completed"
+            mock_task.status = JobStatusEnum.COMPLETED
             mock_task.output = "Backup completed successfully\nFiles processed: 100"
 
             # Set up the query chain properly
@@ -211,7 +212,12 @@ class TestUUIDSystemFixes:
     def test_job_model_respects_explicit_uuid(self) -> None:
         """Test that Job model uses explicitly provided UUID"""
         explicit_id = str(uuid.uuid4())
-        job = Job(id=explicit_id, repository_id=1, type="backup", status="pending")
+        job = Job(
+            id=explicit_id,
+            repository_id=1,
+            type=TaskTypeEnum.BACKUP,
+            status=JobStatusEnum.PENDING,
+        )
 
         assert job.id == explicit_id
 
@@ -219,7 +225,10 @@ class TestUUIDSystemFixes:
         """Test that JobTask foreign key references string UUID"""
         job_id = str(uuid.uuid4())
         task = JobTask(
-            job_id=job_id, task_type="backup", task_name="Test Task", task_order=0
+            job_id=job_id,
+            task_type=TaskTypeEnum.BACKUP,
+            task_name="Test Task",
+            task_order=0,
         )
 
         assert task.job_id == job_id
@@ -234,7 +243,7 @@ class TestJobRenderServiceUUIDIntegration:
         """Create a mock job with UUID"""
         job = Mock()
         job.id = str(uuid.uuid4())
-        job.type = "backup"
+        job.type = TaskTypeEnum.BACKUP
         job.status = JobStatusEnum.COMPLETED
         job.started_at = now_utc()
         job.finished_at = now_utc()
@@ -357,8 +366,6 @@ class TestStreamingEfficiency:
 
 class TestBackwardCompatibility:
     """Test that changes maintain backward compatibility"""
-
-    # test_job_context_maintains_job_uuid_field removed - was failing due to service changes
 
     def test_task_streaming_maintains_sse_event_format(self) -> None:
         """Test that streaming maintains proper SSE event format"""

@@ -4,6 +4,7 @@ Job Manager Models - Data structures and configuration for job management
 
 import asyncio
 from datetime import datetime
+from enum import Enum
 from typing import (
     Union,
     Dict,
@@ -16,10 +17,40 @@ from typing import (
 from dataclasses import dataclass, field
 from contextlib import _GeneratorContextManager
 
+from borgitory.models.job_results import JobStatusEnum
+
 
 if TYPE_CHECKING:
     from asyncio.subprocess import Process
     from borgitory.models.database import Schedule
+
+
+class TaskTypeEnum(str, Enum):
+    """Task type enumeration"""
+
+    BACKUP = "backup"
+    PRUNE = "prune"
+    CHECK = "check"
+    CLOUD_SYNC = "cloud_sync"
+    NOTIFICATION = "notification"
+    HOOK = "hook"
+    COMMAND = "command"
+    INFO = "info"
+
+
+class TaskStatusEnum(str, Enum):
+    """Task status enumeration"""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    QUEUED = "queued"
+    STOPPED = "stopped"
+
+
+if TYPE_CHECKING:
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
     from borgitory.dependencies import ApplicationScopedNotificationService
     from sqlalchemy.orm import Session
@@ -102,9 +133,9 @@ class JobManagerDependencies:
 class BorgJobTask:
     """Individual task within a job"""
 
-    task_type: str  # 'backup', 'prune', 'check', 'cloud_sync', 'hook', 'notification'
+    task_type: TaskTypeEnum
     task_name: str
-    status: str = "pending"  # 'pending', 'running', 'completed', 'failed', 'skipped'
+    status: TaskStatusEnum = TaskStatusEnum.PENDING
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     return_code: Optional[int] = None
@@ -120,7 +151,7 @@ class BorgJob:
     """Represents a job in the manager"""
 
     id: str
-    status: str  # 'pending', 'queued', 'running', 'completed', 'failed'
+    status: JobStatusEnum
     started_at: datetime
     completed_at: Optional[datetime] = None
     return_code: Optional[int] = None

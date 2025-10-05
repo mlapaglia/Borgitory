@@ -6,8 +6,14 @@ Tests the business logic directly without mocking core components
 import pytest
 from unittest.mock import Mock, AsyncMock
 
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_manager import JobManager
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import (
+    BorgJob,
+    BorgJobTask,
+    TaskStatusEnum,
+    TaskTypeEnum,
+)
 from borgitory.utils.datetime_utils import now_utc
 
 
@@ -39,7 +45,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["borg", "create"],
             started_at=now_utc(),
-            status="completed",
+            status=JobStatusEnum.COMPLETED,
             job_type="simple",
         )
         self.job_manager.jobs[job_id] = job
@@ -49,7 +55,7 @@ class TestJobManagerStop:
 
         # Assert
         assert result["success"] is False
-        assert result["error"] == "Cannot stop job in status: completed"
+        assert result["error"] == "Cannot stop job in status: JobStatusEnum.COMPLETED"
         assert result["error_code"] == "INVALID_STATUS"
 
     @pytest.mark.asyncio
@@ -61,7 +67,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["borg", "create"],
             started_at=now_utc(),
-            status="failed",
+            status=JobStatusEnum.FAILED,
             job_type="simple",
         )
         self.job_manager.jobs[job_id] = job
@@ -71,7 +77,7 @@ class TestJobManagerStop:
 
         # Assert
         assert result["success"] is False
-        assert result["error"] == "Cannot stop job in status: failed"
+        assert result["error"] == "Cannot stop job in status: JobStatusEnum.FAILED"
         assert result["error_code"] == "INVALID_STATUS"
 
     @pytest.mark.asyncio
@@ -83,7 +89,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["borg", "create"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="simple",
         )
         self.job_manager.jobs[job_id] = job
@@ -103,7 +109,7 @@ class TestJobManagerStop:
         assert result["current_task_killed"] is False
 
         # Verify job state
-        assert job.status == "stopped"
+        assert job.status == JobStatusEnum.STOPPED
         assert job.error == "Manually stopped by user"
         assert job.completed_at is not None
 
@@ -121,7 +127,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["borg", "create"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="simple",
         )
         self.job_manager.jobs[job_id] = job
@@ -154,7 +160,7 @@ class TestJobManagerStop:
         assert job_id not in self.job_manager._processes
 
         # Verify job state
-        assert job.status == "stopped"
+        assert job.status == JobStatusEnum.STOPPED
         assert job.error == "Manually stopped by user"
 
     @pytest.mark.asyncio
@@ -166,7 +172,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["borg", "create"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="simple",
         )
         self.job_manager.jobs[job_id] = job
@@ -204,7 +210,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["borg", "create"],
             started_at=now_utc(),
-            status="queued",
+            status=JobStatusEnum.QUEUED,
             job_type="simple",
         )
         self.job_manager.jobs[job_id] = job
@@ -224,7 +230,7 @@ class TestJobManagerStop:
         assert result["current_task_killed"] is False
 
         # Verify job state
-        assert job.status == "stopped"
+        assert job.status == JobStatusEnum.STOPPED
         assert job.error == "Manually stopped by user"
 
     @pytest.mark.asyncio
@@ -235,28 +241,34 @@ class TestJobManagerStop:
 
         # Create tasks
         task1 = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="create-backup",
-            status="completed",
+            status=TaskStatusEnum.COMPLETED,
             started_at=now_utc(),
             completed_at=now_utc(),
         )
         task2 = BorgJobTask(
-            task_type="prune",
+            task_type=TaskTypeEnum.PRUNE,
             task_name="prune-archives",
-            status="running",
+            status=TaskStatusEnum.RUNNING,
             started_at=now_utc(),
         )
         task3 = BorgJobTask(
-            task_type="check", task_name="check-repository", status="pending"
+            task_type=TaskTypeEnum.CHECK,
+            task_name="check-repository",
+            status=TaskStatusEnum.PENDING,
         )
-        task4 = BorgJobTask(task_type="info", task_name="get-info", status="queued")
+        task4 = BorgJobTask(
+            task_type=TaskTypeEnum.INFO,
+            task_name="get-info",
+            status=TaskStatusEnum.QUEUED,
+        )
 
         job = BorgJob(
             id=job_id,
             command=["composite"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="composite",
             tasks=[task1, task2, task3, task4],
             current_task_index=1,  # Currently on task2 (running)
@@ -286,10 +298,10 @@ class TestJobManagerStop:
         assert task2.status == "stopped"  # Current running task stopped
         assert task2.error == "Manually stopped by user"
         assert task2.completed_at is not None
-        assert task3.status == "skipped"  # Pending task skipped
+        assert task3.status == TaskStatusEnum.SKIPPED  # Pending task skipped
         assert task3.error == "Skipped due to manual job stop"
         assert task3.completed_at is not None
-        assert task4.status == "skipped"  # Queued task skipped
+        assert task4.status == TaskStatusEnum.SKIPPED  # Queued task skipped
         assert task4.error == "Skipped due to manual job stop"
         assert task4.completed_at is not None
 
@@ -300,20 +312,22 @@ class TestJobManagerStop:
         job_id = "composite-job-with-process"
 
         task1 = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="create-backup",
-            status="running",
+            status=TaskStatusEnum.RUNNING,
             started_at=now_utc(),
         )
         task2 = BorgJobTask(
-            task_type="prune", task_name="prune-archives", status="pending"
+            task_type=TaskTypeEnum.PRUNE,
+            task_name="prune-archives",
+            status=TaskStatusEnum.PENDING,
         )
 
         job = BorgJob(
             id=job_id,
             command=["composite"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="composite",
             tasks=[task1, task2],
             current_task_index=0,  # Currently on task1
@@ -348,9 +362,9 @@ class TestJobManagerStop:
         assert job_id not in self.job_manager._processes
 
         # Verify task states
-        assert task1.status == "stopped"
+        assert task1.status == TaskStatusEnum.STOPPED
         assert task1.error == "Manually stopped by user"
-        assert task2.status == "skipped"
+        assert task2.status == TaskStatusEnum.SKIPPED
         assert task2.error == "Skipped due to manual job stop"
 
     @pytest.mark.asyncio
@@ -360,16 +374,16 @@ class TestJobManagerStop:
         job_id = "composite-job-last-task"
 
         task1 = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="create-backup",
-            status="completed",
+            status=TaskStatusEnum.COMPLETED,
             started_at=now_utc(),
             completed_at=now_utc(),
         )
         task2 = BorgJobTask(
-            task_type="prune",
+            task_type=TaskTypeEnum.PRUNE,
             task_name="prune-archives",
-            status="running",
+            status=TaskStatusEnum.RUNNING,
             started_at=now_utc(),
         )
 
@@ -377,7 +391,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["composite"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="composite",
             tasks=[task1, task2],
             current_task_index=1,  # Currently on last task
@@ -399,8 +413,8 @@ class TestJobManagerStop:
         assert result["current_task_killed"] is False
 
         # Verify task states
-        assert task1.status == "completed"  # Unchanged
-        assert task2.status == "stopped"  # Current task stopped
+        assert task1.status == TaskStatusEnum.COMPLETED  # Unchanged
+        assert task2.status == TaskStatusEnum.STOPPED  # Current task stopped
 
     @pytest.mark.asyncio
     async def test_stop_job_event_broadcasting(self) -> None:
@@ -411,7 +425,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["borg", "create"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="simple",
         )
         self.job_manager.jobs[job_id] = job
@@ -456,7 +470,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["borg", "create"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="simple",
         )
         self.job_manager.jobs[job_id] = job
@@ -477,9 +491,9 @@ class TestJobManagerStop:
         job_id = "composite-job-invalid-index"
 
         task1 = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="create-backup",
-            status="completed",
+            status=TaskStatusEnum.COMPLETED,
             started_at=now_utc(),
             completed_at=now_utc(),
         )
@@ -488,7 +502,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["composite"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="composite",
             tasks=[task1],
             current_task_index=5,  # Out of bounds
@@ -517,7 +531,7 @@ class TestJobManagerStop:
             id=job_id,
             command=["composite"],
             started_at=now_utc(),
-            status="running",
+            status=JobStatusEnum.RUNNING,
             job_type="composite",
             tasks=[],  # No tasks
             current_task_index=0,

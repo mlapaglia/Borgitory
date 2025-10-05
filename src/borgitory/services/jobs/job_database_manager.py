@@ -5,6 +5,8 @@ Job Database Manager - Handles database operations with dependency injection
 import logging
 from typing import Dict, List, Optional, Callable, TYPE_CHECKING, ContextManager
 from datetime import datetime
+from borgitory.services.jobs.job_models import TaskStatusEnum
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from dataclasses import dataclass
 
@@ -22,7 +24,7 @@ class DatabaseJobData:
     job_uuid: str
     repository_id: int
     job_type: str
-    status: str
+    status: JobStatusEnum
     started_at: datetime
     finished_at: Optional[datetime] = None
     return_code: Optional[int] = None
@@ -86,9 +88,8 @@ class JobDatabaseManager:
     async def update_job_status(
         self,
         job_uuid: str,
-        status: str,
+        status: JobStatusEnum,
         finished_at: Optional[datetime] = None,
-        return_code: Optional[int] = None,
         output: Optional[str] = None,
         error_message: Optional[str] = None,
     ) -> bool:
@@ -103,7 +104,6 @@ class JobDatabaseManager:
                     logger.warning(f"Database job not found for UUID {job_uuid}")
                     return False
 
-                # Update fields
                 db_job.status = status
                 if finished_at:
                     db_job.finished_at = finished_at
@@ -269,7 +269,7 @@ class JobDatabaseManager:
                 # Update job task counts
                 db_job.total_tasks = len(tasks)
                 db_job.completed_tasks = sum(
-                    (1 for task in tasks if task.status == "completed"), 0
+                    (1 for task in tasks if task.status == TaskStatusEnum.COMPLETED), 0
                 )
 
                 db.commit()

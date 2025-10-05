@@ -5,6 +5,7 @@ Tests for jobs API endpoints
 import pytest
 from typing import Generator
 from unittest.mock import Mock, AsyncMock
+from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from fastapi import Request
 from fastapi.responses import HTMLResponse
@@ -541,7 +542,7 @@ class TestJobsAPI:
         # Create a proper job object with status attribute
         job_obj = SimpleNamespace()
         job_obj.id = "test-job-123"
-        job_obj.status = "completed"
+        job_obj.status = TaskStatusEnum.COMPLETED
 
         # The mock already handles this case with proper task structure
         # Task order 1 should find the task we created in the mock

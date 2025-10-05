@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Optional, Dict, Any
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +26,12 @@ class CloudSyncTaskExecutor:
         params = task.parameters
 
         if job.repository_id is None:
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.error = "Repository ID is missing"
             return False
         repo_data = await self._get_repository_data(job.repository_id)
         if not repo_data:
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.return_code = 1
             task.error = "Repository not found"
             task.completed_at = now_utc()
@@ -42,14 +42,14 @@ class CloudSyncTaskExecutor:
 
         # Validate required parameters
         if not repository_path:
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.return_code = 1
             task.error = "Repository path is required for cloud sync"
             task.completed_at = now_utc()
             return False
 
         if not passphrase:
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.return_code = 1
             task.error = "Repository passphrase is required for cloud sync"
             task.completed_at = now_utc()
@@ -84,7 +84,7 @@ class CloudSyncTaskExecutor:
         # Handle skip case at caller level instead of inside executor
         if not cloud_sync_config_id:
             logger.info("No cloud backup configuration - skipping cloud sync")
-            task.status = "completed"
+            task.status = TaskStatusEnum.COMPLETED
             task.return_code = 0
             task.completed_at = now_utc()
             # Add output line for UI feedback
@@ -99,7 +99,7 @@ class CloudSyncTaskExecutor:
         # Get dependencies from the job manager
         dependencies = await self._get_dependencies()
         if not dependencies:
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.error = "Missing required cloud sync dependencies"
             return False
 
@@ -121,7 +121,11 @@ class CloudSyncTaskExecutor:
         )
 
         task.return_code = result.return_code
-        task.status = "completed" if result.return_code == 0 else "failed"
+        task.status = (
+            TaskStatusEnum.COMPLETED
+            if result.return_code == 0
+            else TaskStatusEnum.FAILED
+        )
         task.completed_at = now_utc()
         if result.error:
             task.error = result.error

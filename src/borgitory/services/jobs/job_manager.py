@@ -25,6 +25,8 @@ from borgitory.services.jobs.job_models import (
     JobManagerDependencies,
     BorgJob,
     BorgJobTask,
+    TaskTypeEnum,
+    TaskStatusEnum,
 )
 from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 from borgitory.services.jobs.job_queue_manager import QueuedJob, JobPriority
@@ -213,9 +215,9 @@ class JobManager:
         # Create the main task for this command
         command_str = " ".join(command[:3]) + ("..." if len(command) > 3 else "")
         main_task = BorgJobTask(
-            task_type="command",
+            task_type=TaskTypeEnum.COMMAND,
             task_name=f"Execute: {command_str}",
-            status="queued" if is_backup else "running",
+            status=TaskStatusEnum.QUEUED if is_backup else TaskStatusEnum.RUNNING,
             started_at=now_utc(),
         )
 
@@ -224,7 +226,7 @@ class JobManager:
             id=job_id,
             command=command,
             job_type="composite",  # All jobs are now composite
-            status="queued" if is_backup else "running",
+            status=JobStatusEnum.QUEUED if is_backup else JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[main_task],  # Always has at least one task
         )
@@ -256,7 +258,7 @@ class JobManager:
     ) -> None:
         """Execute a single task within a composite job"""
         job.status = JobStatusEnum.RUNNING
-        task.status = "running"
+        task.status = TaskStatusEnum.RUNNING
 
         try:
             process = await self.safe_executor.start_process(command, env)
@@ -288,10 +290,10 @@ class JobManager:
             task.return_code = result.return_code
 
             if result.return_code == 0:
-                task.status = "completed"
+                task.status = TaskStatusEnum.COMPLETED
                 job.status = JobStatusEnum.COMPLETED
             else:
-                task.status = "failed"
+                task.status = TaskStatusEnum.FAILED
                 task.error = (
                     result.error
                     or f"Process failed with return code {result.return_code}"
@@ -315,7 +317,7 @@ class JobManager:
             )
 
         except Exception as e:
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.error = str(e)
             task.completed_at = now_utc()
             job.status = JobStatusEnum.FAILED
@@ -372,7 +374,7 @@ class JobManager:
                 parameters["retry_count"] = task_def.retry_count
 
             task = BorgJobTask(
-                task_type=task_def.type,
+                task_type=TaskTypeEnum(task_def.type),
                 task_name=task_def.name,
                 parameters=parameters,
             )
@@ -381,7 +383,7 @@ class JobManager:
         job = BorgJob(
             id=job_id,
             job_type="composite",
-            status="pending",
+            status=JobStatusEnum.PENDING,
             started_at=now_utc(),
             tasks=tasks,
             repository_id=repository.id,
@@ -397,7 +399,7 @@ class JobManager:
                 job_uuid=job_id,
                 repository_id=repository.id,
                 job_type=job_type,
-                status="pending",
+                status=JobStatusEnum.PENDING,
                 started_at=job.started_at,
                 cloud_sync_config_id=cloud_sync_config_id,
             )
@@ -428,19 +430,22 @@ class JobManager:
 
         # Update job status in database
         if self.database_manager:
-            await self.database_manager.update_job_status(job.id, "running")
+            await self.database_manager.update_job_status(job.id, JobStatusEnum.RUNNING)
 
         self.safe_event_broadcaster.broadcast_event(
             EventType.JOB_STATUS_CHANGED,
             job_id=job.id,
-            data={"status": "running", "started_at": job.started_at.isoformat()},
+            data={
+                "status": JobStatusEnum.RUNNING,
+                "started_at": job.started_at.isoformat(),
+            },
         )
 
         try:
             for task_index, task in enumerate(job.tasks):
                 job.current_task_index = task_index
 
-                task.status = "running"
+                task.status = TaskStatusEnum.RUNNING
                 task.started_at = now_utc()
 
                 self.safe_event_broadcaster.broadcast_event(
@@ -464,7 +469,7 @@ class JobManager:
 
                     self.safe_event_broadcaster.broadcast_event(
                         EventType.TASK_COMPLETED
-                        if task.status == "completed"
+                        if task.status == TaskStatusEnum.COMPLETED
                         else EventType.TASK_FAILED,
                         job_id=job.id,
                         data={
@@ -489,12 +494,12 @@ class JobManager:
                         except Exception as e:
                             logger.error(f"Failed to update tasks in database: {e}")
 
-                    if task.status == "failed":
+                    if task.status == TaskStatusEnum.FAILED:
                         is_critical_hook_failure = (
-                            task.task_type == "hook"
+                            task.task_type == TaskTypeEnum.HOOK
                             and task.parameters.get("critical_failure", False)
                         )
-                        is_critical_task = task.task_type in ["backup"]
+                        is_critical_task = task.task_type == TaskTypeEnum.BACKUP
 
                         if is_critical_hook_failure or is_critical_task:
                             failed_hook_name = task.parameters.get(
@@ -508,8 +513,8 @@ class JobManager:
 
                             remaining_tasks = job.tasks[task_index + 1 :]
                             for remaining_task in remaining_tasks:
-                                if remaining_task.status == "pending":
-                                    remaining_task.status = "skipped"
+                                if remaining_task.status == TaskStatusEnum.PENDING:
+                                    remaining_task.status = TaskStatusEnum.SKIPPED
                                     remaining_task.completed_at = now_utc()
                                     remaining_task.output_lines.append(
                                         f"Task skipped due to critical {'hook' if is_critical_hook_failure else 'task'} failure"
@@ -538,7 +543,7 @@ class JobManager:
                             break
 
                 except Exception as e:
-                    task.status = "failed"
+                    task.status = TaskStatusEnum.FAILED
                     task.error = str(e)
                     task.completed_at = now_utc()
                     logger.error(f"Task {task.task_type} in job {job.id} failed: {e}")
@@ -563,18 +568,18 @@ class JobManager:
                         except Exception as db_e:
                             logger.error(f"Failed to update tasks in database: {db_e}")
 
-                    if task.task_type in ["backup"]:
+                    if task.task_type == TaskTypeEnum.BACKUP:
                         remaining_tasks = job.tasks[task_index + 1 :]
                         for remaining_task in remaining_tasks:
-                            if remaining_task.status == "pending":
-                                remaining_task.status = "skipped"
-                                remaining_task.completed_at = now_utc()
-                                remaining_task.output_lines.append(
-                                    "Task skipped due to critical task exception"
-                                )
-                                logger.info(
-                                    f"Marked task {remaining_task.task_type} as skipped due to critical task exception"
-                                )
+                            if remaining_task.status == TaskStatusEnum.PENDING:
+                                remaining_task.status = TaskStatusEnum.SKIPPED
+                            remaining_task.completed_at = now_utc()
+                            remaining_task.output_lines.append(
+                                "Task skipped due to critical task exception"
+                            )
+                            logger.info(
+                                f"Marked task {remaining_task.task_type} as skipped due to critical task exception"
+                            )
 
                         # Save all tasks to database after marking remaining as skipped
                         if self.database_manager:
@@ -595,18 +600,20 @@ class JobManager:
 
                         break
 
-            failed_tasks = [t for t in job.tasks if t.status == "failed"]
-            completed_tasks = [t for t in job.tasks if t.status == "completed"]
-            skipped_tasks = [t for t in job.tasks if t.status == "skipped"]
+            failed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.FAILED]
+            completed_tasks = [
+                t for t in job.tasks if t.status == TaskStatusEnum.COMPLETED
+            ]
+            skipped_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.SKIPPED]
             finished_tasks = completed_tasks + skipped_tasks
 
             if len(finished_tasks) + len(failed_tasks) == len(job.tasks):
                 if failed_tasks:
                     critical_task_failed = any(
-                        t.task_type in ["backup"] for t in failed_tasks
+                        t.task_type == TaskTypeEnum.BACKUP for t in failed_tasks
                     )
                     critical_hook_failed = any(
-                        t.task_type == "hook"
+                        t.task_type == TaskTypeEnum.HOOK
                         and t.parameters.get("critical_failure", False)
                         for t in failed_tasks
                     )
@@ -647,7 +654,7 @@ class JobManager:
 
             if self.database_manager:
                 await self.database_manager.update_job_status(
-                    job.id, "failed", job.completed_at, None, None, str(e)
+                    job.id, JobStatusEnum.FAILED, job.completed_at, None, str(e)
                 )
 
             self.safe_event_broadcaster.broadcast_event(
@@ -660,17 +667,17 @@ class JobManager:
         """Execute a task using the appropriate executor"""
         # For post-hooks, determine if job has failed so far
         job_has_failed = False
-        if task.task_type == "hook":
+        if task.task_type == TaskTypeEnum.HOOK:
             hook_type = task.parameters.get("hook_type", "unknown")
             if hook_type == "post":
                 # Check if any previous tasks have failed
                 previous_tasks = job.tasks[:task_index]
                 job_has_failed = any(
-                    t.status == "failed"
+                    t.status == TaskStatusEnum.FAILED
                     and (
-                        t.task_type in ["backup"]  # Critical task types
+                        t.task_type == TaskTypeEnum.BACKUP  # Critical task types
                         or (
-                            t.task_type == "hook"
+                            t.task_type == TaskTypeEnum.HOOK
                             and t.parameters.get("critical_failure", False)
                         )  # Critical hooks
                     )
@@ -678,27 +685,27 @@ class JobManager:
                 )
 
         # Route to appropriate executor
-        if task.task_type == "backup":
+        if task.task_type == TaskTypeEnum.BACKUP:
             return await self.backup_executor.execute_backup_task(job, task, task_index)
-        elif task.task_type == "prune":
+        elif task.task_type == TaskTypeEnum.PRUNE:
             return await self.prune_executor.execute_prune_task(job, task, task_index)
-        elif task.task_type == "check":
+        elif task.task_type == TaskTypeEnum.CHECK:
             return await self.check_executor.execute_check_task(job, task, task_index)
-        elif task.task_type == "cloud_sync":
+        elif task.task_type == TaskTypeEnum.CLOUD_SYNC:
             return await self.cloud_sync_executor.execute_cloud_sync_task(
                 job, task, task_index
             )
-        elif task.task_type == "notification":
+        elif task.task_type == TaskTypeEnum.NOTIFICATION:
             return await self.notification_executor.execute_notification_task(
                 job, task, task_index
             )
-        elif task.task_type == "hook":
+        elif task.task_type == TaskTypeEnum.HOOK:
             return await self.hook_executor.execute_hook_task(
                 job, task, task_index, job_has_failed
             )
         else:
             logger.warning(f"Unknown task type: {task.task_type}")
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.return_code = 1
             task.error = f"Unknown task type: {task.task_type}"
             return False
@@ -909,16 +916,16 @@ class JobManager:
             # Mark current task as stopped if it was running
             if current_index < len(job.tasks):
                 current_task = job.tasks[current_index]
-                if current_task.status == "running":
-                    current_task.status = "stopped"
+                if current_task.status == TaskStatusEnum.RUNNING:
+                    current_task.status = TaskStatusEnum.STOPPED
                     current_task.completed_at = now_utc()
                     current_task.error = "Manually stopped by user"
 
             # Skip all remaining tasks (even critical/always_run ones since this is manual)
             for i in range(current_index + 1, len(job.tasks)):
                 task = job.tasks[i]
-                if task.status in ["pending", "queued"]:
-                    task.status = "skipped"
+                if task.status in [TaskStatusEnum.PENDING, TaskStatusEnum.QUEUED]:
+                    task.status = TaskStatusEnum.SKIPPED
                     task.completed_at = now_utc()
                     task.error = "Skipped due to manual job stop"
                     tasks_skipped += 1
@@ -931,7 +938,7 @@ class JobManager:
         # Update database
         if self.database_manager:
             await self.database_manager.update_job_status(
-                job_id, "stopped", job.completed_at
+                job_id, JobStatusEnum.STOPPED, job.completed_at
             )
 
         # Broadcast stop event

@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Dict, Any
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.utils.security import secure_borg_command
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +28,12 @@ class CheckTaskExecutor:
             params = task.parameters
 
             if job.repository_id is None:
-                task.status = "failed"
+                task.status = TaskStatusEnum.FAILED
                 task.error = "Repository ID is missing"
                 return False
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
-                task.status = "failed"
+                task.status = TaskStatusEnum.FAILED
                 task.return_code = 1
                 task.error = "Repository not found"
                 task.completed_at = now_utc()
@@ -85,7 +85,11 @@ class CheckTaskExecutor:
                 )
 
                 task.return_code = result.return_code
-                task.status = "completed" if result.return_code == 0 else "failed"
+                task.status = (
+                    TaskStatusEnum.COMPLETED
+                    if result.return_code == 0
+                    else TaskStatusEnum.FAILED
+                )
                 task.completed_at = now_utc()
 
             if result.stdout:
@@ -121,7 +125,7 @@ class CheckTaskExecutor:
 
         except Exception as e:
             logger.error(f"Error executing check task for job {job.id}: {str(e)}")
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.return_code = 1
             task.error = str(e)
             task.completed_at = now_utc()

@@ -10,6 +10,9 @@ from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.jobs.job_models import (
     BorgJob,
     BorgJobTask,
+    JobStatusEnum,
+    TaskStatusEnum,
+    TaskTypeEnum,
     JobManagerDependencies,
 )
 from borgitory.services.hooks.hook_execution_service import (
@@ -64,7 +67,7 @@ class TestJobManagerHookExecution:
             id="test-job-123",
             job_type="composite",
             repository_id=1,
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=tasks,
         )
@@ -74,7 +77,7 @@ class TestJobManagerHookExecution:
     ) -> BorgJobTask:
         """Helper to create hook task."""
         return BorgJobTask(
-            task_type="hook",
+            task_type=TaskTypeEnum.HOOK,
             task_name=task_name or f"{hook_type}-job hooks",
             parameters={"hook_type": hook_type, "hooks": hooks_json},
         )
@@ -113,10 +116,11 @@ class TestJobManagerHookExecution:
 
         # Verify success
         assert result is True
-        assert hook_task.status == "completed"
+        assert hook_task.status == TaskStatusEnum.COMPLETED
         assert hook_task.return_code == 0
         assert hook_task.error is None
         assert len(hook_task.output_lines) == 1
+        assert hook_task.output_lines[0]["text"] is not None
         assert "test hook" in hook_task.output_lines[0]["text"]
 
     @pytest.mark.asyncio
@@ -151,8 +155,9 @@ class TestJobManagerHookExecution:
 
         # Verify failure
         assert result is False
-        assert hook_task.status == "failed"
+        assert hook_task.status == TaskStatusEnum.FAILED
         assert hook_task.return_code == 1
+        assert hook_task.error is not None
         assert "Critical hook execution failed" in hook_task.error
 
         # Verify critical failure parameters are set
@@ -191,8 +196,9 @@ class TestJobManagerHookExecution:
 
         # Verify failure but not critical
         assert result is False
-        assert hook_task.status == "failed"
+        assert hook_task.status == TaskStatusEnum.FAILED
         assert hook_task.return_code == 1
+        assert hook_task.error is not None
         assert "Hook execution failed" in hook_task.error
         assert "Critical" not in hook_task.error
 
@@ -232,7 +238,7 @@ class TestJobManagerHookExecution:
 
         # Verify success
         assert result is True
-        assert hook_task.status == "completed"
+        assert hook_task.status == TaskStatusEnum.COMPLETED
 
         # Verify hook service was called with job_failed=True
         self.mock_hook_service.execute_hooks_mock.assert_called_once()
@@ -253,7 +259,7 @@ class TestJobManagerHookExecution:
 
         # Verify success (no hooks to execute)
         assert result is True
-        assert hook_task.status == "completed"
+        assert hook_task.status == TaskStatusEnum.COMPLETED
         assert hook_task.return_code == 0
 
         # Verify hook service was not called
@@ -273,8 +279,9 @@ class TestJobManagerHookExecution:
 
         # Verify failure due to invalid JSON
         assert result is False
-        assert hook_task.status == "failed"
+        assert hook_task.status == TaskStatusEnum.FAILED
         assert hook_task.return_code == 1
+        assert hook_task.error is not None
         assert "Invalid hook configuration" in hook_task.error
 
         # Verify hook service was not called
@@ -299,7 +306,8 @@ class TestJobManagerHookExecution:
 
         # Verify failure due to missing service
         assert result is False
-        assert hook_task.status == "failed"
+        assert hook_task.status == TaskStatusEnum.FAILED
+        assert hook_task.error is not None
         assert "Hook execution service not configured" in hook_task.error
 
     @pytest.mark.asyncio

@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Optional, Dict, Any
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +27,12 @@ class PruneTaskExecutor:
             params = task.parameters
 
             if job.repository_id is None:
-                task.status = "failed"
+                task.status = TaskStatusEnum.FAILED
                 task.error = "Repository ID is missing"
                 return False
             repo_data = await self._get_repository_data(job.repository_id)
             if not repo_data:
-                task.status = "failed"
+                task.status = TaskStatusEnum.FAILED
                 task.return_code = 1
                 task.error = "Repository not found"
                 task.completed_at = now_utc()
@@ -90,7 +90,11 @@ class PruneTaskExecutor:
 
             # Set task status based on result
             task.return_code = result.return_code
-            task.status = "completed" if result.return_code == 0 else "failed"
+            task.status = (
+                TaskStatusEnum.COMPLETED
+                if result.return_code == 0
+                else TaskStatusEnum.FAILED
+            )
             task.completed_at = now_utc()
             if result.error:
                 task.error = result.error
@@ -99,7 +103,7 @@ class PruneTaskExecutor:
 
         except Exception as e:
             logger.error(f"Exception in prune task: {str(e)}")
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.return_code = -1
             task.error = f"Prune task failed: {str(e)}"
             task.completed_at = now_utc()

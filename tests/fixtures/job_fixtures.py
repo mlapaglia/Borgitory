@@ -13,7 +13,13 @@ from unittest.mock import Mock, AsyncMock
 from typing import Any, AsyncGenerator, Dict, List
 from sqlalchemy.orm import Session
 
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, JobManagerConfig
+from borgitory.services.jobs.job_models import (
+    BorgJob,
+    BorgJobTask,
+    JobManagerConfig,
+    TaskStatusEnum,
+    TaskTypeEnum,
+)
 from borgitory.models.database import Repository, Job, JobTask
 
 
@@ -59,7 +65,7 @@ def sample_borg_job() -> BorgJob:
     """Create a sample BorgJob for testing."""
     return BorgJob(
         id=str(uuid.uuid4()),
-        status="completed",
+        status=JobStatusEnum.COMPLETED,
         started_at=now_utc(),
         completed_at=now_utc(),
         command=["borg", "create", "repo::archive", "/data"],
@@ -73,21 +79,21 @@ def sample_composite_job() -> BorgJob:
     """Create a composite BorgJob with tasks for testing."""
     job_id = str(uuid.uuid4())
     task1 = BorgJobTask(
-        task_type="backup",
+        task_type=TaskTypeEnum.BACKUP,
         task_name="Backup Task",
-        status="completed",
+        status=TaskStatusEnum.COMPLETED,
         parameters={"source_path": "/data"},
     )
     task2 = BorgJobTask(
-        task_type="prune",
+        task_type=TaskTypeEnum.PRUNE,
         task_name="Prune Task",
-        status="completed",
+        status=TaskStatusEnum.COMPLETED,
         parameters={"keep_daily": 7},
     )
 
     return BorgJob(
         id=job_id,
-        status="completed",
+        status=JobStatusEnum.COMPLETED,
         started_at=now_utc(),
         completed_at=now_utc(),
         job_type="composite",

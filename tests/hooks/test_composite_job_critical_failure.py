@@ -7,7 +7,12 @@ from unittest.mock import Mock, AsyncMock, patch
 
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_manager import JobManager
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import (
+    BorgJob,
+    BorgJobTask,
+    TaskStatusEnum,
+    TaskTypeEnum,
+)
 from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 from borgitory.utils.datetime_utils import now_utc
 
@@ -35,7 +40,7 @@ class TestCompositeJobCriticalFailure:
             id="test-job-123",
             job_type="composite",
             repository_id=1,
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=tasks,
         )
@@ -48,7 +53,7 @@ class TestCompositeJobCriticalFailure:
     ) -> BorgJobTask:
         """Helper to create hook task."""
         task = BorgJobTask(
-            task_type="hook",
+            task_type=TaskTypeEnum.HOOK,
             task_name=f"{hook_type}-job hooks",
             parameters={"hook_type": hook_type},
         )
@@ -63,7 +68,7 @@ class TestCompositeJobCriticalFailure:
     def create_backup_task(self) -> BorgJobTask:
         """Helper to create backup task."""
         return BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Backup repository",
             parameters={"source_path": "/data"},
         )
@@ -71,7 +76,7 @@ class TestCompositeJobCriticalFailure:
     def create_notification_task(self) -> BorgJobTask:
         """Helper to create notification task."""
         return BorgJobTask(
-            task_type="notification",
+            task_type=TaskTypeEnum.NOTIFICATION,
             task_name="Send notification",
             parameters={"config_id": 1},
         )
@@ -87,7 +92,7 @@ class TestCompositeJobCriticalFailure:
         notification_task = self.create_notification_task()
 
         # Set pre-hook as failed
-        pre_hook_task.status = "failed"
+        pre_hook_task.status = TaskStatusEnum.FAILED
 
         tasks = [pre_hook_task, backup_task, post_hook_task, notification_task]
         job = self.create_test_job(tasks)
@@ -105,17 +110,17 @@ class TestCompositeJobCriticalFailure:
             # Mark all remaining tasks as skipped
             remaining_tasks = job.tasks[task_index + 1 :]
             for remaining_task in remaining_tasks:
-                if remaining_task.status == "pending":
-                    remaining_task.status = "skipped"
+                if remaining_task.status == TaskStatusEnum.PENDING:
+                    remaining_task.status = TaskStatusEnum.SKIPPED
                     remaining_task.completed_at = now_utc()
                     remaining_task.output_lines.append(
                         "Task skipped due to critical hook failure"
                     )
 
         # Verify remaining tasks are marked as skipped
-        assert backup_task.status == "skipped"
-        assert post_hook_task.status == "skipped"
-        assert notification_task.status == "skipped"
+        assert backup_task.status == TaskStatusEnum.SKIPPED
+        assert post_hook_task.status == TaskStatusEnum.SKIPPED
+        assert notification_task.status == TaskStatusEnum.SKIPPED
 
         # Verify they have completion timestamps
         assert backup_task.completed_at is not None
@@ -148,15 +153,20 @@ class TestCompositeJobCriticalFailure:
 
         # Mock individual task methods
         async def mock_hook_success(
-            job, task, task_index, job_has_failed=False
+            job: BorgJob,
+            task: BorgJobTask,
+            task_index: int = 0,
+            job_has_failed: bool = False,
         ) -> bool:
-            task.status = "completed"
+            task.status = TaskStatusEnum.COMPLETED
             task.return_code = 0
             task.completed_at = now_utc()
             return True
 
-        async def mock_backup_fail(job, task, task_index) -> bool:
-            task.status = "failed"
+        async def mock_backup_fail(
+            job: BorgJob, task: BorgJobTask, task_index: int = 0
+        ) -> bool:
+            task.status = TaskStatusEnum.FAILED
             task.return_code = 1
             task.error = "Backup failed"
             task.completed_at = now_utc()
@@ -184,13 +194,15 @@ class TestCompositeJobCriticalFailure:
             await self.job_manager._execute_composite_job(job)
 
         # Verify task statuses after execution
-        assert pre_hook_task.status == "completed"  # Should remain completed
-        assert backup_task.status == "failed"  # Should be failed
         assert (
-            post_hook_task.status == "skipped"
+            pre_hook_task.status == TaskStatusEnum.COMPLETED
+        )  # Should remain completed
+        assert backup_task.status == TaskStatusEnum.FAILED  # Should be failed
+        assert (
+            post_hook_task.status == TaskStatusEnum.SKIPPED
         )  # Should be skipped due to critical failure
         assert (
-            notification_task.status == "skipped"
+            notification_task.status == TaskStatusEnum.SKIPPED
         )  # Should be skipped due to critical failure
 
         # Verify completed_at is set for skipped tasks
@@ -208,7 +220,7 @@ class TestCompositeJobCriticalFailure:
         )
 
         # Verify job status
-        assert job.status == "failed"
+        assert job.status == JobStatusEnum.FAILED
         assert job.completed_at is not None
 
         # Verify notification task was never called due to critical failure
@@ -222,7 +234,7 @@ class TestCompositeJobCriticalFailure:
         post_hook_task = self.create_hook_task("post")
 
         # Set pre-hook as failed but not critical
-        pre_hook_task.status = "failed"
+        pre_hook_task.status = TaskStatusEnum.FAILED
 
         tasks = [pre_hook_task, backup_task, post_hook_task]
         self.create_test_job(tasks)
@@ -240,7 +252,7 @@ class TestCompositeJobCriticalFailure:
         assert is_critical_hook_failure is False
 
         # Remaining tasks should stay pending (would be executed normally)
-        assert backup_task.status == "pending"
+        assert backup_task.status == TaskStatusEnum.PENDING
         assert post_hook_task.status == "pending"
 
     def test_job_status_calculation_with_skipped_tasks(self) -> None:
@@ -252,19 +264,19 @@ class TestCompositeJobCriticalFailure:
         notification_task = self.create_notification_task()
 
         # Set various statuses
-        pre_hook_task.status = "failed"
+        pre_hook_task.status = TaskStatusEnum.FAILED
         pre_hook_task.parameters["critical_failure"] = True
-        backup_task.status = "skipped"
-        post_hook_task.status = "skipped"
-        notification_task.status = "skipped"
+        backup_task.status = TaskStatusEnum.SKIPPED
+        post_hook_task.status = TaskStatusEnum.SKIPPED
+        notification_task.status = TaskStatusEnum.SKIPPED
 
         tasks = [pre_hook_task, backup_task, post_hook_task, notification_task]
         job = self.create_test_job(tasks)
 
         # Simulate job status calculation logic
-        failed_tasks = [t for t in job.tasks if t.status == "failed"]
-        completed_tasks = [t for t in job.tasks if t.status == "completed"]
-        skipped_tasks = [t for t in job.tasks if t.status == "skipped"]
+        failed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.FAILED]
+        completed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.COMPLETED]
+        skipped_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.SKIPPED]
         finished_tasks = completed_tasks + skipped_tasks
 
         if len(finished_tasks) + len(failed_tasks) == len(job.tasks):
@@ -296,17 +308,17 @@ class TestCompositeJobCriticalFailure:
         post_hook_task = self.create_hook_task("post")
 
         # Set non-critical failure and skipped tasks
-        pre_hook_task.status = "failed"  # Non-critical failure
-        backup_task.status = "completed"
-        post_hook_task.status = "skipped"
+        pre_hook_task.status = TaskStatusEnum.FAILED  # Non-critical failure
+        backup_task.status = TaskStatusEnum.COMPLETED
+        post_hook_task.status = TaskStatusEnum.SKIPPED
 
         tasks = [pre_hook_task, backup_task, post_hook_task]
         job = self.create_test_job(tasks)
 
         # Simulate job status calculation logic
-        failed_tasks = [t for t in job.tasks if t.status == "failed"]
-        completed_tasks = [t for t in job.tasks if t.status == "completed"]
-        skipped_tasks = [t for t in job.tasks if t.status == "skipped"]
+        failed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.FAILED]
+        completed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.COMPLETED]
+        skipped_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.SKIPPED]
         finished_tasks = completed_tasks + skipped_tasks
 
         if len(finished_tasks) + len(failed_tasks) == len(job.tasks):
@@ -340,8 +352,8 @@ class TestCompositeJobCriticalFailure:
         post_hook_task = self.create_hook_task("post")
 
         # Set pre-hook as completed, backup as failed due to exception
-        pre_hook_task.status = "completed"
-        backup_task.status = "failed"
+        pre_hook_task.status = TaskStatusEnum.COMPLETED
+        backup_task.status = TaskStatusEnum.FAILED
         backup_task.error = "Exception occurred"
 
         tasks = [pre_hook_task, backup_task, post_hook_task]
@@ -356,17 +368,17 @@ class TestCompositeJobCriticalFailure:
             # Mark all remaining tasks as skipped
             remaining_tasks = job.tasks[task_index + 1 :]
             for remaining_task in remaining_tasks:
-                if remaining_task.status == "pending":
-                    remaining_task.status = "skipped"
+                if remaining_task.status == TaskStatusEnum.PENDING:
+                    remaining_task.status = TaskStatusEnum.SKIPPED
                     remaining_task.completed_at = now_utc()
                     remaining_task.output_lines.append(
                         "Task skipped due to critical task exception"
                     )
 
         # Verify remaining tasks are marked as skipped
-        assert pre_hook_task.status == "completed"
-        assert backup_task.status == "failed"
-        assert post_hook_task.status == "skipped"
+        assert pre_hook_task.status == TaskStatusEnum.COMPLETED
+        assert backup_task.status == TaskStatusEnum.FAILED
+        assert post_hook_task.status == TaskStatusEnum.SKIPPED
         assert any(
             "critical task exception" in line for line in post_hook_task.output_lines
         )
@@ -381,7 +393,7 @@ class TestCompositeJobCriticalFailure:
         post_hook_task = self.create_hook_task("post")
 
         # Set first task as failed (critical)
-        critical_hook_task.status = "failed"
+        critical_hook_task.status = TaskStatusEnum.FAILED
 
         tasks = [critical_hook_task, backup_task, post_hook_task]
         job = self.create_test_job(tasks)
@@ -398,11 +410,11 @@ class TestCompositeJobCriticalFailure:
             # Mark remaining tasks as skipped
             remaining_tasks = job.tasks[task_index + 1 :]
             for remaining_task in remaining_tasks:
-                if remaining_task.status == "pending":
-                    remaining_task.status = "skipped"
+                if remaining_task.status == TaskStatusEnum.PENDING:
+                    remaining_task.status = TaskStatusEnum.SKIPPED
                     remaining_task.completed_at = now_utc()
 
         # Verify all remaining tasks are skipped
-        assert critical_hook_task.status == "failed"
-        assert backup_task.status == "skipped"
-        assert post_hook_task.status == "skipped"
+        assert critical_hook_task.status == TaskStatusEnum.FAILED
+        assert backup_task.status == TaskStatusEnum.SKIPPED
+        assert post_hook_task.status == TaskStatusEnum.SKIPPED

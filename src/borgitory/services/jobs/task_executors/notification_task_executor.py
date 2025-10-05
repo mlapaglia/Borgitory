@@ -4,7 +4,7 @@ Notification Task Executor - Handles notification task execution
 
 import logging
 from typing import Optional, Any, Tuple
-from borgitory.services.jobs.job_models import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class NotificationTaskExecutor:
             logger.info(
                 "No notification configuration provided - skipping notification"
             )
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.return_code = 1
             task.error = "No notification configuration"
             return False
@@ -40,7 +40,7 @@ class NotificationTaskExecutor:
             db_session_factory = await self._get_db_session_factory()
             if not db_session_factory:
                 logger.error("Database session factory not available")
-                task.status = "failed"
+                task.status = TaskStatusEnum.FAILED
                 task.return_code = 1
                 task.error = "Database session factory not available"
                 return False
@@ -63,13 +63,13 @@ class NotificationTaskExecutor:
 
                 if not config:
                     logger.info("Notification configuration not found - skipping")
-                    task.status = "skipped"
+                    task.status = TaskStatusEnum.SKIPPED
                     task.return_code = 0
                     return True
 
                 if not config.enabled:
                     logger.info("Notification configuration disabled - skipping")
-                    task.status = "skipped"
+                    task.status = TaskStatusEnum.SKIPPED
                     task.return_code = 0
                     return True
 
@@ -79,7 +79,7 @@ class NotificationTaskExecutor:
                     logger.error(
                         "NotificationService not available - ensure proper DI setup"
                     )
-                    task.status = "failed"
+                    task.status = TaskStatusEnum.FAILED
                     task.return_code = 1
                     task.error = "NotificationService not available"
                     return False
@@ -91,7 +91,7 @@ class NotificationTaskExecutor:
                     )
                 except Exception as e:
                     logger.error(f"Failed to load notification config: {e}")
-                    task.status = "failed"
+                    task.status = TaskStatusEnum.FAILED
                     task.return_code = 1
                     task.error = f"Failed to load configuration: {str(e)}"
                     return False
@@ -193,7 +193,11 @@ class NotificationTaskExecutor:
                     data={"line": result_message, "task_index": task_index},
                 )
 
-                task.status = "completed" if result.success else "failed"
+                task.status = (
+                    TaskStatusEnum.COMPLETED
+                    if result.success
+                    else TaskStatusEnum.FAILED
+                )
                 task.return_code = 0 if result.success else 1
                 if not result.success:
                     task.error = result.error or "Failed to send notification"
@@ -202,7 +206,7 @@ class NotificationTaskExecutor:
 
         except Exception as e:
             logger.error(f"Error executing notification task: {e}")
-            task.status = "failed"
+            task.status = TaskStatusEnum.FAILED
             task.error = str(e)
             return False
 
@@ -219,9 +223,9 @@ class NotificationTaskExecutor:
         Returns:
             Tuple of (title, message, type, priority_value)
         """
-        failed_tasks = [t for t in job.tasks if t.status == "failed"]
-        completed_tasks = [t for t in job.tasks if t.status == "completed"]
-        skipped_tasks = [t for t in job.tasks if t.status == "skipped"]
+        failed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.FAILED]
+        completed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.COMPLETED]
+        skipped_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.SKIPPED]
 
         critical_hook_failures = [
             t
