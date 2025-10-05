@@ -512,6 +512,7 @@ class JobManager:
                 )
                 job.status = "failed"
                 job.error = task.error
+                logger.error(f"Composite job task {job.id} execution failed: {result.stdout.decode('utf-8')}")
 
             job.return_code = result.return_code
             job.completed_at = now_utc()
