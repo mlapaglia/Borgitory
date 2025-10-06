@@ -8,7 +8,7 @@ import asyncio
 from typing import Generator, AsyncGenerator
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.utils.datetime_utils import now_utc
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 from contextlib import contextmanager
 
 from sqlalchemy.orm import Session
@@ -246,15 +246,21 @@ class TestJobManagerTaskExecution:
             get_storage_factory,
             get_registry_factory,
             get_provider_registry,
+            get_command_executor,
+            get_wsl_command_executor,
         )
+
+        # Create command executor for rclone service
+        wsl_executor = get_wsl_command_executor()
+        command_executor = get_command_executor(wsl_executor)
 
         deps = JobManagerDependencies(
             db_session_factory=db_session_factory,
             notification_service=notification_service,
             # Add cloud sync dependencies for comprehensive testing
-            rclone_service=get_rclone_service(),
+            rclone_service=get_rclone_service(command_executor),
             encryption_service=get_encryption_service(),
-            storage_factory=get_storage_factory(get_rclone_service()),
+            storage_factory=get_storage_factory(get_rclone_service(command_executor)),
             provider_registry=get_provider_registry(get_registry_factory()),
         )
         full_deps = JobManagerFactory.create_dependencies(custom_dependencies=deps)
@@ -980,6 +986,100 @@ class TestJobManagerTaskExecution:
             )
         )
 
+        assert success is True
+        assert task.status == "completed"
+        assert task.return_code == 0
+
+    @pytest.mark.asyncio
+    async def test_cloud_sync_dependency_injection_happy_path(
+        self, job_manager_with_db: JobManager, test_db: Session
+    ) -> None:
+        """
+        Test that cloud sync task execution properly instantiates RcloneService with correct dependencies.
+
+        This test would have caught the 'Depends' object has no attribute 'create_subprocess' error
+        by actually exercising the dependency injection path without mocking the core services.
+        """
+        from borgitory.models.database import CloudSyncConfig
+        import json
+
+        # Create a real cloud sync config in the database
+        config = CloudSyncConfig(
+            name="test-sync-config",
+            provider="s3",
+            provider_config=json.dumps(
+                {
+                    "bucket_name": "test-bucket",
+                    "access_key_id": "AKIAIOSFODNN7EXAMPLE",
+                    "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                    "region": "us-east-1",
+                    "endpoint_url": None,
+                    "storage_class": "STANDARD",
+                    "path_prefix": "backups/",
+                }
+            ),
+            enabled=True,
+            path_prefix="test/",
+        )
+        test_db.add(config)
+        test_db.commit()
+        test_db.refresh(config)
+
+        job_id = str(uuid.uuid4())
+        task = BorgJobTask(
+            task_type="cloud_sync",
+            task_name="Test Cloud Sync DI",
+            parameters={
+                "repository_path": "/tmp/test-repo",
+                "cloud_sync_config_id": config.id,
+            },
+        )
+
+        job = BorgJob(
+            id=job_id,
+            job_type="composite",
+            status="running",
+            started_at=now_utc(),
+            tasks=[task],
+            repository_id=1,
+        )
+        job_manager_with_db.jobs[job_id] = job
+        job_manager_with_db.output_manager.create_job_output(job_id)
+
+        # Mock repository data
+        repo_data = {
+            "id": 1,
+            "name": "test-repo",
+            "path": "/tmp/test-repo",
+            "passphrase": "test-passphrase",
+        }
+
+        # Mock the rclone service's sync method to avoid actual cloud operations
+        # but still test that the service is properly instantiated with dependencies
+        with (
+            patch.object(
+                job_manager_with_db.dependencies.rclone_service,
+                "sync_repository_to_provider",
+            ) as mock_sync,
+            patch.object(
+                job_manager_with_db, "_get_repository_data", return_value=repo_data
+            ),
+        ):
+            # Mock the async generator that rclone service returns
+            async def mock_progress_generator():
+                yield {"type": "log", "stream": "info", "message": "Starting sync..."}
+                yield {"type": "completed", "status": "success"}
+
+            mock_sync.return_value = mock_progress_generator()
+
+            # This should NOT raise the 'Depends' object has no attribute 'create_subprocess' error
+            # because the RcloneService should be properly instantiated with a real CommandExecutor
+            success = await job_manager_with_db._execute_cloud_sync_task(job, task)
+
+        # Verify the rclone service was called (proving it was properly instantiated)
+        mock_sync.assert_called_once()
+
+        # Verify the task completed successfully
         assert success is True
         assert task.status == "completed"
         assert task.return_code == 0

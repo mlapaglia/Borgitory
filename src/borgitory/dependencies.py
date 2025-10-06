@@ -741,7 +741,7 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     queue_manager = get_job_queue_manager()
     database_manager = get_job_database_manager()
     event_broadcaster = get_job_event_broadcaster_dep()
-    rclone_service = get_rclone_service()
+    rclone_service = get_rclone_service(command_executor)
     notification_service = get_notification_service_singleton()  # Use singleton version
     encryption_service = get_encryption_service()
     storage_factory = get_storage_factory(rclone_service)
