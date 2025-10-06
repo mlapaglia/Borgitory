@@ -64,6 +64,23 @@ class JobOutput:
             self.lines = deque(maxlen=self.max_lines)
 
 
+@dataclass
+class JobOutputStreamResponse:
+    """Response class for job output stream data"""
+
+    lines: List[OutputLine]
+    progress: Dict[str, object]
+    total_lines: int
+
+    def to_dict(self) -> Dict[str, object]:
+        """Convert to dictionary for backward compatibility"""
+        return {
+            "lines": self.lines,
+            "progress": self.progress,
+            "total_lines": self.total_lines,
+        }
+
+
 class JobOutputManager:
     """Manages job output collection, storage, and streaming"""
 
@@ -116,18 +133,18 @@ class JobOutputManager:
         """Get output container for a job"""
         return self._job_outputs.get(job_id)
 
-    async def get_job_output_stream(self, job_id: uuid.UUID) -> Dict[str, object]:
+    async def get_job_output_stream(self, job_id: uuid.UUID) -> JobOutputStreamResponse:
         """Get formatted output data for API responses"""
         job_output = self.get_job_output(job_id)
         if not job_output:
-            return {"lines": [], "progress": {}, "total_lines": 0}
+            return JobOutputStreamResponse(lines=[], progress={}, total_lines=0)
 
         async with self._output_locks.get(job_id, asyncio.Lock()):
-            return {
-                "lines": list(job_output.lines),
-                "progress": job_output.current_progress.copy(),
-                "total_lines": job_output.total_lines,
-            }
+            return JobOutputStreamResponse(
+                lines=list(job_output.lines),
+                progress=job_output.current_progress.copy(),
+                total_lines=job_output.total_lines,
+            )
 
     async def stream_job_output(
         self, job_id: uuid.UUID, follow: bool = True

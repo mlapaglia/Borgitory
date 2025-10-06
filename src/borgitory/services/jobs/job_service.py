@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 import uuid
 from borgitory.custom_types import ConfigDict
-from typing import Dict, List, Optional, Any, cast
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 
 from borgitory.models.database import Repository, Job
@@ -391,15 +391,13 @@ class JobService:
             )
         else:
             # Get regular borg job output
-            output_dict = await self.job_manager.get_job_output_stream(job_id)
-            lines = cast(List[Any], output_dict.get("lines", []))
-            if not isinstance(lines, list):
-                lines = []
-            # Convert dict lines to string lines if needed
+            output_response = await self.job_manager.get_job_output_stream(job_id)
+            lines = output_response.lines
+            # Convert OutputLine objects to string lines
             string_lines = []
             for line in lines:
-                if isinstance(line, dict):
-                    string_lines.append(line.get("message", str(line)))
+                if hasattr(line, "text"):
+                    string_lines.append(line.text)
                 else:
                     string_lines.append(str(line))
 

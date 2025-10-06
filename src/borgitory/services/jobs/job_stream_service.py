@@ -440,8 +440,8 @@ class JobStreamService:
 
     async def get_job_status(self, job_id: uuid.UUID) -> Dict[str, object]:
         """Get current job status and progress for streaming"""
-        output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
-        return output
+        output = await self.job_manager.get_job_output_stream(job_id)
+        return output.to_dict()
 
     def get_current_jobs_data(self) -> list[Dict[str, object]]:
         """Get current running jobs data for rendering"""

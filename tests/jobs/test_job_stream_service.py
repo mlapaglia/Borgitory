@@ -4,6 +4,7 @@ Tests for JobStreamService class - Server-Sent Events functionality
 
 import asyncio
 import json
+import uuid
 import pytest
 from typing import AsyncGenerator
 from unittest.mock import Mock, AsyncMock
@@ -205,7 +206,7 @@ class TestJobStreamService:
         call_count = 0
         timeout_count = 0
 
-        async def mock_queue_get():
+        async def mock_queue_get() -> AsyncGenerator[dict[str, object], None]:
             nonlocal call_count, timeout_count
             if call_count < len(event_sequence):
                 event = event_sequence[call_count]
@@ -324,7 +325,7 @@ class TestJobStreamService:
         self.mock_job_manager.jobs = {}
 
         # Mock empty output stream
-        async def mock_empty_generator():
+        async def mock_empty_generator() -> AsyncGenerator[dict[str, object], None]:
             return
             yield  # pragma: no cover
 
@@ -345,23 +346,25 @@ class TestJobStreamService:
     @pytest.mark.asyncio
     async def test_get_job_status(self) -> None:
         """Test getting job status for streaming."""
-        job_id = "test-job-status"
+        job_id = uuid.uuid4()
         expected_output = {
             "status": JobStatusEnum.RUNNING,
             "progress": {"files": 100, "transferred": "2.1 GB"},
             "logs": ["Starting process", "Processing files..."],
         }
 
+        # Create a mock JobOutputStreamResponse
+        mock_response = Mock()
+        mock_response.to_dict.return_value = expected_output
+
         self.mock_job_manager.get_job_output_stream = AsyncMock(
-            return_value=expected_output
+            return_value=mock_response
         )
 
         result = await self.stream_service.get_job_status(job_id)
 
         assert result == expected_output
-        self.mock_job_manager.get_job_output_stream.assert_called_once_with(
-            job_id, last_n_lines=50
-        )
+        self.mock_job_manager.get_job_output_stream.assert_called_once_with(job_id)
 
     def test_get_current_jobs_data_composite_jobs_basic(self) -> None:
         """Test getting current running composite jobs data for rendering."""

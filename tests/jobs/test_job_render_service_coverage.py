@@ -164,22 +164,16 @@ class TestJobDataConverterCoverage:
             output_lines=[],
         )
 
-        # Create BorgJob
+        # Create mock BorgJob
         memory_job_id = uuid.uuid4()
-        memory_job = BorgJob(
-            id=memory_job_id,
-            started_at=datetime.now(timezone.utc),
-            job_type=JobTypeEnum.BACKUP,
-            status=JobStatusEnum.RUNNING,
-            tasks=[task1, task2],
-        )
+        memory_job = Mock()
+        memory_job.id = memory_job_id
+        memory_job.started_at = datetime.now(timezone.utc)
+        memory_job.job_type = JobTypeEnum.BACKUP
+        memory_job.status = JobStatusEnum.RUNNING
+        memory_job.tasks = [task1, task2]
         memory_job.current_task_index = 0
-
-        # Mock get_current_task method
-        def mock_get_current_task() -> BorgJobTask:
-            return task1
-
-        memory_job.get_current_task = mock_get_current_task
+        memory_job.get_current_task.return_value = task1
 
         converter = JobDataConverter()
         result = converter.convert_memory_job(memory_job, db_job)

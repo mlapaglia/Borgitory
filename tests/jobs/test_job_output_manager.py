@@ -103,20 +103,20 @@ class TestJobOutputManager:
 
         output_stream = await self.output_manager.get_job_output_stream(job_id)
 
-        assert len(output_stream["lines"]) == 2
-        assert output_stream["total_lines"] == 2
-        assert "progress" in output_stream
-        assert output_stream["lines"][0]["text"] == "Line 1"
-        assert output_stream["lines"][1]["text"] == "Line 2"
+        assert len(output_stream.lines) == 2
+        assert output_stream.total_lines == 2
+        assert isinstance(output_stream.progress, dict)
+        assert output_stream.lines[0].text == "Line 1"
+        assert output_stream.lines[1].text == "Line 2"
 
     @pytest.mark.asyncio
     async def test_get_job_output_stream_nonexistent(self) -> None:
         """Test getting output stream for nonexistent job"""
         output_stream = await self.output_manager.get_job_output_stream("nonexistent")
 
-        assert output_stream["lines"] == []
-        assert output_stream["total_lines"] == 0
-        assert output_stream["progress"] == {}
+        assert output_stream.lines == []
+        assert output_stream.total_lines == 0
+        assert output_stream.progress == {}
 
     @pytest.mark.asyncio
     async def test_stream_job_output(self) -> None:

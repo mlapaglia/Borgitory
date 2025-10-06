@@ -2,7 +2,7 @@
 Protocol interfaces for job management services.
 """
 
-from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING
+from typing import Protocol, Dict, List, Optional, AsyncGenerator, TYPE_CHECKING, Any
 from datetime import datetime
 from dataclasses import dataclass, field
 import asyncio
@@ -97,7 +97,7 @@ class JobManagerProtocol(Protocol):
 
     async def get_job_output_stream(
         self, job_id: uuid.UUID, last_n_lines: Optional[int] = None
-    ) -> Dict[str, object]:
+    ) -> Any:
         """Get job output stream."""
         ...
 

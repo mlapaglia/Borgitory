@@ -1313,15 +1313,18 @@ class TestJobManagerStreamingAndUtility:
             {"text": "line 2", "timestamp": "2024-01-01T12:00:01"},
         ]
         mock_output.current_progress = {"percent": 75}
+        mock_output.total_lines = 2
 
         job_manager.output_manager.get_job_output = Mock(return_value=mock_output)  # type: ignore[method-assign,union-attr]
 
         result = await job_manager.get_job_output_stream(job_id)
 
-        assert "lines" in result
-        assert "progress" in result
-        assert len(result["lines"]) == 2  # type: ignore[arg-type]
-        assert result["progress"]["percent"] == 75  # type: ignore[index]
+        assert hasattr(result, "lines")
+        assert hasattr(result, "progress")
+        assert hasattr(result, "total_lines")
+        assert len(result.lines) == 2
+        assert result.progress["percent"] == 75
+        assert result.total_lines == 2
 
     @pytest.mark.asyncio
     async def test_get_job_output_stream_no_output(
@@ -1332,8 +1335,8 @@ class TestJobManagerStreamingAndUtility:
 
         result = await job_manager.get_job_output_stream(uuid.uuid4())
 
-        assert result["lines"] == []
-        assert result["progress"] == {}
+        assert result.lines == []
+        assert result.progress == {}
 
     def test_get_active_jobs_count(self, job_manager: JobManager) -> None:
         """Test getting count of active jobs"""

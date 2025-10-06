@@ -28,6 +28,7 @@ from borgitory.services.jobs.job_models import (
     TaskTypeEnum,
     TaskStatusEnum,
 )
+from borgitory.services.jobs.job_output_manager import JobOutputStreamResponse
 from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 from borgitory.services.jobs.job_queue_manager import QueuedJob, JobPriority
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
@@ -1033,21 +1034,26 @@ class JobManager:
 
     async def get_job_output_stream(
         self, job_id: uuid.UUID, last_n_lines: Optional[int] = None
-    ) -> Dict[str, object]:
+    ) -> "JobOutputStreamResponse":
         """Get job output stream data"""
         # Get output from output manager (don't require job to exist, just output)
         job_output = self.safe_output_manager.get_job_output(job_id)
         if job_output:
-            # job_output.lines contains dict objects, not OutputLine objects
+            # job_output.lines contains OutputLine objects
             lines = list(job_output.lines)
             if last_n_lines is not None and last_n_lines > 0:
                 lines = lines[-last_n_lines:]
-            return {
-                "lines": lines,
-                "progress": job_output.current_progress,
-            }
+            return JobOutputStreamResponse(
+                lines=lines,
+                progress=job_output.current_progress.copy(),
+                total_lines=job_output.total_lines,
+            )
 
-        return {"lines": [], "progress": {}}
+        return JobOutputStreamResponse(
+            lines=[],
+            progress={},
+            total_lines=0,
+        )
 
     def get_queue_stats(self) -> Dict[str, int]:
         """Get queue statistics (alias for get_queue_status)"""
