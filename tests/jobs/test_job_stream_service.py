@@ -348,29 +348,6 @@ class TestJobStreamService:
         assert "not found" in error_event
         assert str(job_id) in error_event
 
-    @pytest.mark.asyncio
-    async def test_get_job_status(self) -> None:
-        """Test getting job status for streaming."""
-        job_id = uuid.uuid4()
-        expected_output = {
-            "status": JobStatusEnum.RUNNING,
-            "progress": {"files": 100, "transferred": "2.1 GB"},
-            "logs": ["Starting process", "Processing files..."],
-        }
-
-        # Create a mock JobOutputStreamResponse
-        mock_response = Mock()
-        mock_response.to_dict.return_value = expected_output
-
-        self.mock_job_manager.get_job_output_stream = AsyncMock(
-            return_value=mock_response
-        )
-
-        result = await self.stream_service.get_job_status(job_id)
-
-        assert result == expected_output
-        self.mock_job_manager.get_job_output_stream.assert_called_once_with(job_id)
-
     def test_get_current_jobs_data_composite_jobs_basic(self) -> None:
         """Test getting current running composite jobs data for rendering."""
         # Mock a running composite job (all jobs are now composite)

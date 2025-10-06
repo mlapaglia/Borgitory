@@ -5,13 +5,14 @@ These tests focus on testing the service logic by injecting mock dependencies
 rather than mocking the entire service, providing better code coverage.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from borgitory.protocols.command_executor_protocol import (
     CommandResult as ExecutorCommandResult,
 )
-from typing import List, Dict
+from typing import Any, AsyncGenerator, List, Dict, Tuple
 from sqlalchemy.orm import Session
 
 from borgitory.services.repositories.repository_stats_service import (
@@ -139,7 +140,7 @@ class MockCommandExecutor(CommandExecutorProtocol):
         stdout: int | None = None,
         stderr: int | None = None,
         stdin: int | None = None,
-    ):
+    ) -> asyncio.subprocess.Process:
         """Mock create_subprocess - not implemented for this test"""
         raise NotImplementedError("create_subprocess not implemented in mock")
 
@@ -211,7 +212,7 @@ class TestRepositoryStatsService:
         assert result.dedup_compression_stats is not None
         assert result.summary is not None
 
-    async def test_get_repository_statistics_no_archives_raises_error(self):
+    async def test_get_repository_statistics_no_archives_raises_error(self) -> None:
         """Test that ValueError is raised when no archives are found"""
         # Mock empty archive list
         self.mock_executor.execute_command = AsyncMock(
@@ -231,11 +232,13 @@ class TestRepositoryStatsService:
                 self.mock_repository, self.mock_db
             )
 
-    async def test_get_repository_statistics_no_archive_info_raises_error(self):
+    async def test_get_repository_statistics_no_archive_info_raises_error(self) -> None:
         """Test that ValueError is raised when archive info cannot be retrieved"""
 
         # Mock different responses for different commands
-        def mock_execute_command(command, **kwargs):
+        def mock_execute_command(
+            command: List[str], **kwargs: Any
+        ) -> ExecutorCommandResult:
             if "borg list" in " ".join(command):
                 return ExecutorCommandResult(
                     command=command,
@@ -794,7 +797,9 @@ class TestRepositoryStatsServiceIntegration:
         )
 
         @asynccontextmanager
-        async def mock_secure_borg_command(*args, **kwargs):
+        async def mock_secure_borg_command(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[Tuple[List[str], Dict[str, str], Any], None]:
             yield (["borg", "list"], {}, None)
 
         # Replace the mock executor's create_subprocess method with a proper AsyncMock

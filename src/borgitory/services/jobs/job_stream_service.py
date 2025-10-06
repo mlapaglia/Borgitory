@@ -451,11 +451,6 @@ class JobStreamService:
             error_msg = f"Streaming error for job {job_id}, task {task_order}: {str(e)}"
             yield f"event: error\ndata: {error_msg}\n\n"
 
-    async def get_job_status(self, job_id: uuid.UUID) -> Dict[str, object]:
-        """Get current job status and progress for streaming"""
-        output = await self.job_manager.get_job_output_stream(job_id)
-        return output.to_dict()
-
     def get_current_jobs_data(self) -> list[JobData]:
         """Get current running jobs data for rendering"""
         current_jobs: list[JobData] = []
