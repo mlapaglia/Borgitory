@@ -7,6 +7,7 @@ the ignore_lock parameter is set to True in backup requests.
 
 import asyncio
 import pytest
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Dict, Any
 
@@ -54,7 +55,7 @@ class TestIgnoreLockFunctionality:
     def mock_job(self) -> BorgJob:
         """Create a mock job for testing"""
         job = BorgJob(
-            id="test-job-123",
+            id=uuid.uuid4(),
             job_type=JobTypeEnum.BACKUP,
             repository_id=1,
             status=JobStatusEnum.RUNNING,

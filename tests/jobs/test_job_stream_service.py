@@ -5,6 +5,7 @@ Tests for JobStreamService class - Server-Sent Events functionality
 import asyncio
 import json
 import pytest
+from typing import AsyncGenerator
 from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
 from fastapi.responses import StreamingResponse
@@ -28,7 +29,7 @@ class TestJobStreamService:
         self.mock_job_manager.jobs = {}
 
         # Mock the streaming method to return empty async generator
-        async def mock_stream_generator():
+        async def mock_stream_generator() -> AsyncGenerator[dict[str, object], None]:
             return
             yield  # pragma: no cover
 
@@ -70,7 +71,7 @@ class TestJobStreamService:
         self.mock_job_manager.jobs = {"job-123": mock_job}
 
         # Mock streaming generator that yields one update
-        async def mock_stream_generator():
+        async def mock_stream_generator() -> AsyncGenerator[dict[str, object], None]:
             from borgitory.services.jobs.broadcaster.job_event import JobEvent
             from borgitory.services.jobs.broadcaster.event_type import EventType
 
@@ -111,7 +112,7 @@ class TestJobStreamService:
         self.mock_job_manager.jobs = {}
 
         # Mock streaming method to raise an exception
-        async def mock_error_generator():
+        async def mock_error_generator() -> AsyncGenerator[dict[str, object], None]:
             raise RuntimeError("Test streaming error")
             yield  # pyright: ignore[reportUnreachable]
 
@@ -143,7 +144,7 @@ class TestJobStreamService:
         self.mock_job_manager.jobs = {job_id: mock_job}
 
         # Mock job output stream that returns composite job events
-        async def mock_output_generator():
+        async def mock_output_generator() -> AsyncGenerator[dict[str, object], None]:
             yield {
                 "type": "task_started",
                 "task_name": "backup",

@@ -222,7 +222,7 @@ class TestJobManager:
         await job_manager.initialize()
 
         # Add a test job
-        job_manager.jobs["test"] = Mock()
+        job_manager.jobs[uuid.uuid4()] = Mock()
 
         await job_manager.shutdown()
 
@@ -288,8 +288,8 @@ class TestJobManager:
             )
 
         assert job_id == "test-job-id"
-        assert "test-job-id" in job_manager.jobs
-        job = job_manager.jobs["test-job-id"]
+        assert job_id in job_manager.jobs
+        job = job_manager.jobs[job_id]
         assert job.status == JobStatusEnum.RUNNING
         assert job.command == ["borg", "list", "repo"]
         assert job.job_type == "composite"  # All jobs are now composite
@@ -314,8 +314,8 @@ class TestJobManager:
         )
 
         assert job_id == "backup-job-id"
-        assert "backup-job-id" in job_manager.jobs
-        job = job_manager.jobs["backup-job-id"]
+        assert job_id in job_manager.jobs
+        job = job_manager.jobs[job_id]
         assert job.status == JobStatusEnum.QUEUED
         # In modular architecture, queue processing is handled by JobQueueManager
         assert job.status in [JobStatusEnum.QUEUED, JobStatusEnum.RUNNING]
@@ -349,9 +349,9 @@ class TestJobManager:
         queued_backup.job_type = JobTypeEnum.BACKUP
 
         job_manager.jobs = {
-            "running_backup": running_backup,
-            "running_other": running_other,
-            "queued_backup": queued_backup,
+            uuid.uuid4(): running_backup,
+            uuid.uuid4(): running_other,
+            uuid.uuid4(): queued_backup,
         }
 
         stats = job_manager.get_queue_stats()
@@ -365,7 +365,7 @@ class TestJobManager:
     def test_get_job_status(self, job_manager: JobManager) -> None:
         """Test getting job status"""
         job = Mock()
-        job.id = "test"
+        job.id = uuid.uuid4()
         job.status = JobStatusEnum.COMPLETED
         job.started_at = datetime(2023, 1, 1, 12, 0, 0)
         job.completed_at = datetime(2023, 1, 1, 12, 5, 0)
@@ -375,9 +375,9 @@ class TestJobManager:
         job.current_task_index = 0
         job.tasks = []
 
-        job_manager.jobs["test"] = job
+        job_manager.jobs[job.id] = job
 
-        status = job_manager.get_job_status("test")
+        status = job_manager.get_job_status(job.id)
 
         assert status is not None
         assert status.status == JobStatusEnum.COMPLETED
@@ -386,19 +386,22 @@ class TestJobManager:
 
     def test_get_job_status_not_found(self, job_manager: JobManager) -> None:
         """Test getting status for non-existent job"""
-        status = job_manager.get_job_status("nonexistent")
+        status = job_manager.get_job_status(uuid.uuid4())
         assert status is None
 
     def test_cleanup_job(self, job_manager: JobManager) -> None:
         """Test cleaning up job"""
-        job_manager.jobs["test"] = Mock()
+        job_id = uuid.uuid4()
+        job = Mock()
+        job.id = job_id
+        job_manager.jobs[job_id] = job
 
-        result = job_manager.cleanup_job("test")
+        result = job_manager.cleanup_job(job_id)
         assert result is True
-        assert "test" not in job_manager.jobs
+        assert job_id not in job_manager.jobs
 
         # Test cleanup of non-existent job
-        result = job_manager.cleanup_job("nonexistent")
+        result = job_manager.cleanup_job(uuid.uuid4())
         assert result is False
 
     def test_event_subscription_interface(self, job_manager: JobManager) -> None:
@@ -424,18 +427,18 @@ class TestJobManager:
         """Test cancelling a running job"""
         # Set up a running job
         job = Mock()
-        job.id = "test"
+        job.id = uuid.uuid4()
         job.status = JobStatusEnum.RUNNING
-        job_manager.jobs["test"] = job
+        job_manager.jobs[job.id] = job
 
         # Test cancellation interface exists
-        await job_manager.cancel_job("test")
+        await job_manager.cancel_job(job.id)
         # Result depends on implementation - interface test
 
     @pytest.mark.asyncio
     async def test_cancel_job_not_found(self, job_manager: JobManager) -> None:
         """Test cancelling non-existent job"""
-        result = await job_manager.cancel_job("nonexistent")
+        result = await job_manager.cancel_job(uuid.uuid4())
         assert result is False
 
     @pytest.mark.asyncio

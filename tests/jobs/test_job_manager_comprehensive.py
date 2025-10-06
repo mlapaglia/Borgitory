@@ -5,7 +5,7 @@ Comprehensive tests for JobManager - covering missing lines and functionality
 import pytest
 import uuid
 import asyncio
-from typing import Generator, Dict, Any, AsyncGenerator
+from typing import Generator, AsyncGenerator
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
@@ -1246,16 +1246,15 @@ class TestJobManagerStreamingAndUtility:
     @pytest.mark.asyncio
     async def test_stream_job_output(self, job_manager: JobManager) -> None:
         """Test streaming job output"""
-        job_id = "test-job"
 
-        async def mock_stream() -> AsyncGenerator[Dict[str, Any], None]:
+        async def mock_stream() -> AsyncGenerator[dict[str, object], None]:
             yield {"line": "output line 1", "progress": {}}
             yield {"line": "output line 2", "progress": {"percent": 50}}
 
         job_manager.output_manager.stream_job_output = Mock(return_value=mock_stream())  # type: ignore[method-assign,union-attr]
 
         output_list = []
-        async for output in job_manager.stream_job_output(job_id):
+        async for output in job_manager.stream_job_output(uuid.uuid4()):
             output_list.append(output)
 
         assert len(output_list) == 2
@@ -1269,7 +1268,7 @@ class TestJobManagerStreamingAndUtility:
         manager.output_manager = None
 
         output_list = []
-        async for output in manager.stream_job_output("test"):
+        async for output in manager.stream_job_output(uuid.uuid4()):
             output_list.append(output)
 
         assert len(output_list) == 0
@@ -1283,7 +1282,7 @@ class TestJobManagerStreamingAndUtility:
         retrieved = job_manager.get_job(job_id)
         assert retrieved is job
 
-        assert job_manager.get_job("nonexistent") is None
+        assert job_manager.get_job(uuid.uuid4()) is None
 
     def test_list_jobs(self, job_manager: JobManager) -> None:
         """Test listing all jobs"""
@@ -1305,7 +1304,7 @@ class TestJobManagerStreamingAndUtility:
     @pytest.mark.asyncio
     async def test_get_job_output_stream(self, job_manager: JobManager) -> None:
         """Test getting job output stream data"""
-        job_id = "test-job"
+        job_id = uuid.uuid4()
 
         # Mock output manager with job output data
         mock_output = Mock()
@@ -1331,7 +1330,7 @@ class TestJobManagerStreamingAndUtility:
         """Test getting output stream when no output exists"""
         job_manager.output_manager.get_job_output = Mock(return_value=None)  # type: ignore[method-assign,union-attr]
 
-        result = await job_manager.get_job_output_stream("nonexistent")
+        result = await job_manager.get_job_output_stream(uuid.uuid4())
 
         assert result["lines"] == []
         assert result["progress"] == {}
@@ -1339,11 +1338,11 @@ class TestJobManagerStreamingAndUtility:
     def test_get_active_jobs_count(self, job_manager: JobManager) -> None:
         """Test getting count of active jobs"""
         job_manager.jobs = {
-            "job1": Mock(status="running"),
-            "job2": Mock(status="queued"),
-            "job3": Mock(status="completed"),
-            "job4": Mock(status="failed"),
-            "job5": Mock(status="running"),
+            uuid.uuid4(): Mock(status="running"),
+            uuid.uuid4(): Mock(status="queued"),
+            uuid.uuid4(): Mock(status="completed"),
+            uuid.uuid4(): Mock(status="failed"),
+            uuid.uuid4(): Mock(status="running"),
         }
 
         count = job_manager.get_active_jobs_count()
@@ -1353,32 +1352,34 @@ class TestJobManagerStreamingAndUtility:
     async def test_cancel_job_success(self, job_manager: JobManager) -> None:
         """Test cancelling a job successfully"""
         job = Mock(status="running")
-        job_manager.jobs["test"] = job
+        job_id = uuid.uuid4()
+        job_manager.jobs[job_id] = job
 
         mock_process = AsyncMock()
-        job_manager._processes["test"] = mock_process
+        job_manager._processes[job_id] = mock_process
         job_manager.executor.terminate_process = AsyncMock(return_value=True)  # type: ignore[method-assign,union-attr]
 
-        result = await job_manager.cancel_job("test")
+        result = await job_manager.cancel_job(job_id)
 
         assert result is True
         assert job.status == JobStatusEnum.CANCELLED
         assert job.completed_at is not None
-        assert "test" not in job_manager._processes
+        assert job_id not in job_manager._processes
 
     @pytest.mark.asyncio
     async def test_cancel_job_not_cancellable(self, job_manager: JobManager) -> None:
         """Test cancelling job in non-cancellable state"""
         job = Mock(status="completed")
-        job_manager.jobs["test"] = job
+        job_id = uuid.uuid4()
+        job_manager.jobs[job_id] = job
 
-        result = await job_manager.cancel_job("test")
+        result = await job_manager.cancel_job(job_id)
         assert result is False
 
     @pytest.mark.asyncio
     async def test_cancel_job_not_found(self, job_manager: JobManager) -> None:
         """Test cancelling non-existent job"""
-        result = await job_manager.cancel_job("nonexistent")
+        result = await job_manager.cancel_job(uuid.uuid4())
         assert result is False
 
 

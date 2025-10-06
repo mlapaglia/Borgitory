@@ -2,6 +2,7 @@
 Tests for composite job execution stopping on critical failures and task skipping.
 """
 
+import uuid
 from typing import List, Optional
 from unittest.mock import Mock, AsyncMock, patch
 
@@ -37,7 +38,7 @@ class TestCompositeJobCriticalFailure:
     def create_test_job(self, tasks: List[BorgJobTask]) -> BorgJob:
         """Helper to create test job with tasks."""
         return BorgJob(
-            id="test-job-123",
+            id=uuid.uuid4(),
             job_type="composite",
             repository_id=1,
             status=JobStatusEnum.RUNNING,

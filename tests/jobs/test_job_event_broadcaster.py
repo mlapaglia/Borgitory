@@ -138,6 +138,7 @@ class TestJobEventBroadcaster:
 
         assert len(self.broadcaster._recent_events) == 50
         # Should keep the most recent events
+        assert self.broadcaster._recent_events[-1].data is not None
         assert self.broadcaster._recent_events[-1].data["progress"] == 59
 
     @pytest.mark.asyncio
@@ -264,5 +265,7 @@ class TestJobEventBroadcaster:
         assert self.broadcaster._shutdown_requested is True
 
         # Background tasks should be cancelled
+        assert self.broadcaster._cleanup_task is not None
+        assert self.broadcaster._keepalive_task is not None
         assert self.broadcaster._cleanup_task.done()
         assert self.broadcaster._keepalive_task.done()

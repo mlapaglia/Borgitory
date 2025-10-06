@@ -7,11 +7,11 @@ import pytest
 from typing import Dict, List, Optional
 from unittest.mock import AsyncMock
 
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.jobs.job_models import (
     BorgJob,
     BorgJobTask,
-    JobStatusEnum,
     TaskStatusEnum,
     TaskTypeEnum,
     JobManagerDependencies,
@@ -65,7 +65,7 @@ class TestJobManagerHookExecution:
     def create_test_job(self, tasks: List[BorgJobTask]) -> BorgJob:
         """Helper to create test job with tasks."""
         return BorgJob(
-            id="test-job-123",
+            id=uuid.uuid4(),
             job_type="composite",
             repository_id=1,
             status=JobStatusEnum.RUNNING,
@@ -337,7 +337,7 @@ class TestJobManagerHookExecution:
         call_args = self.mock_hook_service.execute_hooks_mock.call_args
 
         assert call_args.kwargs["hook_type"] == "pre"
-        assert call_args.kwargs["job_id"] == "test-job-123"
+        assert call_args.kwargs["job_id"] == job.id
         assert call_args.kwargs["job_failed"] is False
 
         context = call_args.kwargs["context"]

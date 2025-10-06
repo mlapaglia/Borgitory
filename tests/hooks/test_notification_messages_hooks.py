@@ -2,6 +2,7 @@
 Tests for notification message generation with hook failures.
 """
 
+import uuid
 from typing import List, Optional
 from unittest.mock import Mock, AsyncMock
 
@@ -38,7 +39,7 @@ class TestNotificationMessagesHookFailures:
     def create_test_job(self, tasks: List[BorgJobTask]) -> BorgJob:
         """Helper to create test job with tasks."""
         job = BorgJob(
-            id="test-job-123",
+            id=uuid.uuid4(),
             job_type="composite",
             repository_id=1,
             status=JobStatusEnum.RUNNING,
@@ -105,7 +106,7 @@ class TestNotificationMessagesHookFailures:
         assert "critical hook failure" in message.lower()
         assert "Database Backup" in message
         assert "Tasks Completed: 0, Skipped: 2, Total: 3" in message
-        assert "test-job-123" in message
+        assert str(job.id) in message
         assert msg_type == "error"
         assert priority == 1  # HIGH priority
 

@@ -73,7 +73,7 @@ class TestPackageSelectionEndpoints:
 
         mock_templates.TemplateResponse = mock_template_response
 
-        def override_get_templates():
+        def override_get_templates() -> Mock:
             return mock_templates
 
         # Apply overrides
@@ -89,7 +89,9 @@ class TestPackageSelectionEndpoints:
             "templates": mock_templates,
         }
 
-    def test_select_package_empty_form(self, setup_test_dependencies: Dict[str, Any]):
+    def test_select_package_empty_form(
+        self, setup_test_dependencies: Dict[str, Any]
+    ) -> None:
         """Test selecting a package with no existing selections"""
         try:
             response = client.post(
@@ -109,7 +111,7 @@ class TestPackageSelectionEndpoints:
 
     def test_select_package_with_existing_selections(
         self, setup_test_dependencies: Dict[str, Any]
-    ):
+    ) -> None:
         """Test selecting a package when others are already selected"""
         try:
             response = client.post(
@@ -135,7 +137,7 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_clear_selections(self, setup_test_dependencies: Dict[str, Any]):
+    def test_clear_selections(self, setup_test_dependencies: Dict[str, Any]) -> None:
         """Test clearing all package selections"""
         try:
             response = client.get("/api/packages/clear-selections")
@@ -153,7 +155,7 @@ class TestPackageSelectionEndpoints:
 
     def test_install_with_selected_packages(
         self, setup_test_dependencies: Dict[str, Any]
-    ):
+    ) -> None:
         """Test installing packages using the new form field format"""
         mock_package_service = setup_test_dependencies["package_service"]
 
@@ -183,7 +185,9 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_install_with_no_selections(self, setup_test_dependencies: Dict[str, Any]):
+    def test_install_with_no_selections(
+        self, setup_test_dependencies: Dict[str, Any]
+    ) -> None:
         """Test installing with no packages selected"""
         mock_package_service = setup_test_dependencies["package_service"]
 
@@ -206,7 +210,7 @@ class TestPackageSelectionEndpoints:
 
     def test_install_success_triggers_clear_selections(
         self, setup_test_dependencies: Dict[str, Any]
-    ):
+    ) -> None:
         """Test that successful install triggers clear-selections"""
         mock_package_service = setup_test_dependencies["package_service"]
         mock_package_service.install_packages.return_value = (
@@ -228,7 +232,9 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_install_failure_no_trigger(self, setup_test_dependencies: Dict[str, Any]):
+    def test_install_failure_no_trigger(
+        self, setup_test_dependencies: Dict[str, Any]
+    ) -> None:
         """Test that failed install doesn't trigger clear-selections"""
         mock_package_service = setup_test_dependencies["package_service"]
         mock_package_service.install_packages.return_value = (
@@ -256,7 +262,7 @@ class TestPackageSelectionEndpoints:
 
     def test_missing_package_name_validation(
         self, setup_test_dependencies: Dict[str, Any]
-    ):
+    ) -> None:
         """Test select endpoint without package_name"""
         try:
             response = client.post("/api/packages/select", data={})
@@ -312,7 +318,7 @@ class TestPackageRemovalEndpoints:
 
         mock_templates.TemplateResponse = mock_template_response
 
-        def override_get_templates():
+        def override_get_templates() -> Mock:
             return mock_templates
 
         # Apply overrides
@@ -328,7 +334,7 @@ class TestPackageRemovalEndpoints:
             "templates": mock_templates,
         }
 
-    def test_remove_package_selection(self, setup_removal_test: Dict[str, Any]):
+    def test_remove_package_selection(self, setup_removal_test: Dict[str, Any]) -> None:
         """Test removing a package from selections"""
         try:
             response = client.post(
@@ -353,7 +359,9 @@ class TestPackageRemovalEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_remove_nonexistent_package(self, setup_removal_test: Dict[str, Any]):
+    def test_remove_nonexistent_package(
+        self, setup_removal_test: Dict[str, Any]
+    ) -> None:
         """Test removing a package that's not in selections"""
         try:
             response = client.post(
@@ -420,7 +428,7 @@ class TestErrorHandling:
 
         mock_templates.TemplateResponse = mock_template_response
 
-        def override_get_templates():
+        def override_get_templates() -> Mock:
             return mock_templates
 
         # Apply overrides
@@ -436,7 +444,9 @@ class TestErrorHandling:
             "templates": mock_templates,
         }
 
-    def test_package_service_error_handling(self, setup_error_test: Dict[str, Any]):
+    def test_package_service_error_handling(
+        self, setup_error_test: Dict[str, Any]
+    ) -> None:
         """Test handling of package service errors"""
         mock_package_service = setup_error_test["package_service"]
         mock_package_service.install_packages = AsyncMock(
@@ -529,7 +539,7 @@ class TestPackageSearchEndpoints:
 
         mock_templates.TemplateResponse = mock_template_response
 
-        def override_get_templates():
+        def override_get_templates() -> Mock:
             return mock_templates
 
         # Apply overrides
@@ -547,7 +557,7 @@ class TestPackageSearchEndpoints:
 
     def test_search_packages_autocomplete_valid_query(
         self, setup_search_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test package search with valid query"""
         mock_package_service = setup_search_test["package_service"]
 
@@ -573,7 +583,7 @@ class TestPackageSearchEndpoints:
 
     def test_search_packages_autocomplete_short_query(
         self, setup_search_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test package search with query too short"""
         mock_package_service = setup_search_test["package_service"]
 
@@ -596,7 +606,7 @@ class TestPackageSearchEndpoints:
 
     def test_search_packages_autocomplete_empty_query(
         self, setup_search_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test package search with empty query"""
         mock_package_service = setup_search_test["package_service"]
 
@@ -617,7 +627,7 @@ class TestPackageSearchEndpoints:
 
     def test_search_packages_autocomplete_service_error(
         self, setup_search_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test package search with service error"""
         mock_package_service = setup_search_test["package_service"]
         mock_package_service.search_packages = AsyncMock(
@@ -718,7 +728,7 @@ class TestInstalledPackagesEndpoint:
 
         mock_templates.TemplateResponse = mock_template_response
 
-        def override_get_templates():
+        def override_get_templates() -> Mock:
             return mock_templates
 
         # Apply overrides
@@ -736,7 +746,7 @@ class TestInstalledPackagesEndpoint:
 
     def test_list_installed_packages_success(
         self, setup_installed_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test listing installed packages successfully"""
         mock_package_service = setup_installed_test["package_service"]
 
@@ -763,7 +773,7 @@ class TestInstalledPackagesEndpoint:
 
     def test_list_installed_packages_service_error(
         self, setup_installed_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test listing installed packages with service error"""
         mock_package_service = setup_installed_test["package_service"]
         mock_package_service.list_installed_packages = AsyncMock(
@@ -833,7 +843,7 @@ class TestPackageRemovalEndpoint:
 
         mock_templates.TemplateResponse = mock_template_response
 
-        def override_get_templates():
+        def override_get_templates() -> Mock:
             return mock_templates
 
         # Apply overrides
@@ -849,7 +859,9 @@ class TestPackageRemovalEndpoint:
             "templates": mock_templates,
         }
 
-    def test_remove_packages_success(self, setup_removal_endpoint_test: Dict[str, Any]):
+    def test_remove_packages_success(
+        self, setup_removal_endpoint_test: Dict[str, Any]
+    ) -> None:
         """Test removing packages successfully"""
         mock_package_service = setup_removal_endpoint_test["package_service"]
 
@@ -878,7 +890,7 @@ class TestPackageRemovalEndpoint:
 
     def test_remove_packages_no_selection(
         self, setup_removal_endpoint_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test removing packages with no selection"""
         mock_package_service = setup_removal_endpoint_test["package_service"]
 
@@ -900,7 +912,7 @@ class TestPackageRemovalEndpoint:
 
     def test_remove_packages_service_failure(
         self, setup_removal_endpoint_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test removing packages with service failure"""
         mock_package_service = setup_removal_endpoint_test["package_service"]
         mock_package_service.remove_packages.return_value = (False, "Removal failed")
@@ -922,7 +934,7 @@ class TestPackageRemovalEndpoint:
 
     def test_remove_packages_service_exception(
         self, setup_removal_endpoint_test: Dict[str, Any]
-    ):
+    ) -> None:
         """Test removing packages with service exception"""
         mock_package_service = setup_removal_endpoint_test["package_service"]
         mock_package_service.remove_packages = AsyncMock(
@@ -1003,7 +1015,7 @@ class TestPackageInfoEndpoint:
 
         mock_templates.TemplateResponse = mock_template_response
 
-        def override_get_templates():
+        def override_get_templates() -> Mock:
             return mock_templates
 
         # Apply overrides
@@ -1019,7 +1031,7 @@ class TestPackageInfoEndpoint:
             "templates": mock_templates,
         }
 
-    def test_get_package_info_success(self, setup_info_test: Dict[str, Any]):
+    def test_get_package_info_success(self, setup_info_test: Dict[str, Any]) -> None:
         """Test getting package info successfully"""
         mock_package_service = setup_info_test["package_service"]
 
@@ -1041,7 +1053,7 @@ class TestPackageInfoEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_get_package_info_not_found(self, setup_info_test: Dict[str, Any]):
+    def test_get_package_info_not_found(self, setup_info_test: Dict[str, Any]) -> None:
         """Test getting package info for non-existent package"""
         mock_package_service = setup_info_test["package_service"]
         mock_package_service.get_package_info = AsyncMock(return_value=None)
@@ -1059,7 +1071,9 @@ class TestPackageInfoEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_get_package_info_value_error(self, setup_info_test: Dict[str, Any]):
+    def test_get_package_info_value_error(
+        self, setup_info_test: Dict[str, Any]
+    ) -> None:
         """Test getting package info with invalid package name"""
         mock_package_service = setup_info_test["package_service"]
         mock_package_service.get_package_info = AsyncMock(
@@ -1078,7 +1092,9 @@ class TestPackageInfoEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_get_package_info_service_error(self, setup_info_test: Dict[str, Any]):
+    def test_get_package_info_service_error(
+        self, setup_info_test: Dict[str, Any]
+    ) -> None:
         """Test getting package info with service error"""
         mock_package_service = setup_info_test["package_service"]
         mock_package_service.get_package_info = AsyncMock(

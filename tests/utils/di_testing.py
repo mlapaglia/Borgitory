@@ -11,9 +11,9 @@ from typing import (
     Any,
     Generator,
     Dict,
-    AsyncGenerator,
     List,
     Optional,
+    AsyncGenerator,
 )
 from contextlib import contextmanager
 from unittest.mock import Mock, MagicMock
@@ -209,13 +209,14 @@ class MockServiceFactory:
             mock_task_1,
         ]  # List with two tasks
         mock_template_job.job.status = JobStatusEnum.COMPLETED
-        mock_template_job.job.id = "test-job-123"
+        test_job_id = uuid.uuid4()
+        mock_template_job.job.id = test_job_id
 
         # Set up side_effect to return mock_template_job for known jobs, None for unknown
         def get_job_for_template_side_effect(
             job_id: uuid.UUID, *args: Any, **kwargs: Any
         ) -> Optional[Mock]:
-            if job_id == "test-job-123":
+            if job_id == test_job_id:
                 return mock_template_job
             return None
 
@@ -236,7 +237,7 @@ class MockServiceFactory:
         job_manager: Optional[Mock] = None,
         templates: Optional[Mock] = None,
         converter: Optional[Mock] = None,
-    ):
+    ) -> JobRenderService:
         """Create a real JobRenderService with mocked dependencies for testing."""
         from fastapi.templating import Jinja2Templates
         from borgitory.services.jobs.job_render_service import (
@@ -287,8 +288,9 @@ class MockServiceFactory:
         # Setup common return values
         mock.list_jobs.return_value = []
         mock.get_job_status.return_value = {"status": "completed"}
-        mock.get_job.return_value = {"id": "test-job-123", "status": "completed"}
-        mock.start_borg_command.return_value = {"job_id": "test-job-123"}
+        test_job_id = uuid.uuid4()
+        mock.get_job.return_value = {"id": test_job_id, "status": "completed"}
+        mock.start_borg_command.return_value = {"job_id": test_job_id}
         mock.get_active_jobs_count.return_value = 0
         mock.get_queue_stats.return_value = {"pending": 0, "running": 0}
         mock.cancel_job.return_value = True

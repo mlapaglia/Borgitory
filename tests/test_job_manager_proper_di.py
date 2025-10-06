@@ -2,6 +2,7 @@
 Tests for JobManager proper DI patterns using dual function approach.
 """
 
+import uuid
 from unittest.mock import Mock
 
 from borgitory.dependencies import get_job_manager_singleton, get_job_manager_dependency
@@ -59,7 +60,7 @@ class TestJobManagerProperDI:
         manager2 = get_job_manager_dependency()
 
         # Add a mock job to the first instance
-        test_job_id = "test-job-123"
+        test_job_id = uuid.uuid4()
         mock_job = Mock()
         mock_job.id = test_job_id
         mock_job.status = JobStatusEnum.RUNNING

@@ -3,6 +3,7 @@ Tests for JobManager stop_job functionality
 Tests the business logic directly without mocking core components
 """
 
+import uuid
 import pytest
 from unittest.mock import Mock, AsyncMock
 
@@ -29,7 +30,7 @@ class TestJobManagerStop:
     async def test_stop_job_not_found(self) -> None:
         """Test stopping non-existent job"""
         # Act
-        result = await self.job_manager.stop_job("non-existent-job-id")
+        result = await self.job_manager.stop_job(uuid.uuid4())
 
         # Assert
         assert result["success"] is False
@@ -40,7 +41,7 @@ class TestJobManagerStop:
     async def test_stop_job_invalid_status_completed(self) -> None:
         """Test stopping job that's already completed"""
         # Arrange
-        job_id = "completed-job-id"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["borg", "create"],
@@ -62,7 +63,7 @@ class TestJobManagerStop:
     async def test_stop_job_invalid_status_failed(self) -> None:
         """Test stopping job that's already failed"""
         # Arrange
-        job_id = "failed-job-id"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["borg", "create"],
@@ -84,7 +85,7 @@ class TestJobManagerStop:
     async def test_stop_simple_running_job_no_process(self) -> None:
         """Test stopping simple running job with no active process"""
         # Arrange
-        job_id = "simple-running-job"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["borg", "create"],
@@ -122,7 +123,7 @@ class TestJobManagerStop:
     async def test_stop_running_job_with_process(self) -> None:
         """Test stopping running job with active process"""
         # Arrange
-        job_id = "running-job-with-process"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["borg", "create"],
@@ -167,7 +168,7 @@ class TestJobManagerStop:
     async def test_stop_running_job_process_termination_fails(self) -> None:
         """Test stopping running job when process termination fails"""
         # Arrange
-        job_id = "running-job-term-fails"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["borg", "create"],
@@ -205,7 +206,7 @@ class TestJobManagerStop:
     async def test_stop_queued_job(self) -> None:
         """Test stopping queued job"""
         # Arrange
-        job_id = "queued-job"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["borg", "create"],
@@ -237,7 +238,7 @@ class TestJobManagerStop:
     async def test_stop_composite_job_with_tasks(self) -> None:
         """Test stopping composite job with multiple tasks"""
         # Arrange
-        job_id = "composite-job-with-tasks"
+        job_id = uuid.uuid4()
 
         # Create tasks
         task1 = BorgJobTask(
@@ -309,7 +310,7 @@ class TestJobManagerStop:
     async def test_stop_composite_job_with_process_and_tasks(self) -> None:
         """Test stopping composite job with active process and remaining tasks"""
         # Arrange
-        job_id = "composite-job-with-process"
+        job_id = uuid.uuid4()
 
         task1 = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
@@ -371,7 +372,7 @@ class TestJobManagerStop:
     async def test_stop_composite_job_no_remaining_tasks(self) -> None:
         """Test stopping composite job on last task"""
         # Arrange
-        job_id = "composite-job-last-task"
+        job_id = uuid.uuid4()
 
         task1 = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
@@ -420,7 +421,7 @@ class TestJobManagerStop:
     async def test_stop_job_event_broadcasting(self) -> None:
         """Test that stop job broadcasts the correct event"""
         # Arrange
-        job_id = "job-for-event-test"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["borg", "create"],
@@ -465,7 +466,7 @@ class TestJobManagerStop:
     async def test_stop_job_no_database_manager(self) -> None:
         """Test stopping job when database manager is None"""
         # Arrange
-        job_id = "job-no-db-manager"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["borg", "create"],
@@ -488,7 +489,7 @@ class TestJobManagerStop:
     async def test_stop_composite_job_task_index_out_of_bounds(self) -> None:
         """Test stopping composite job with invalid current_task_index"""
         # Arrange
-        job_id = "composite-job-invalid-index"
+        job_id = uuid.uuid4()
 
         task1 = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
@@ -526,7 +527,7 @@ class TestJobManagerStop:
     async def test_stop_composite_job_no_tasks(self) -> None:
         """Test stopping composite job with no tasks"""
         # Arrange
-        job_id = "composite-job-no-tasks"
+        job_id = uuid.uuid4()
         job = BorgJob(
             id=job_id,
             command=["composite"],

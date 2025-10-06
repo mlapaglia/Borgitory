@@ -156,16 +156,17 @@ class TestJobStopAPISimple:
 
     def test_stop_job_method_not_allowed(self, client: TestClient) -> None:
         """Test that only POST method is allowed for stop endpoint"""
+        job_id = uuid.uuid4()
         # Act & Assert - GET should not be allowed
-        response = client.get("/api/jobs/test-job-123/stop")
+        response = client.get(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
         # Act & Assert - PUT should not be allowed
-        response = client.put("/api/jobs/test-job-123/stop")
+        response = client.put(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
         # Act & Assert - DELETE should not be allowed
-        response = client.delete("/api/jobs/test-job-123/stop")
+        response = client.delete(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
     def test_stop_job_success_with_task_details(

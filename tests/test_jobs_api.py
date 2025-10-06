@@ -697,7 +697,8 @@ class TestJobsAPI:
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
         """Test copying task output to clipboard."""
-        response = await async_client.post("/api/jobs/test-job-123/tasks/1/copy-output")
+        job_id = uuid.uuid4()
+        response = await async_client.post(f"/api/jobs/{job_id}/tasks/1/copy-output")
 
         assert response.status_code == 200
         assert response.json() == {"message": "Task output copied to clipboard"}

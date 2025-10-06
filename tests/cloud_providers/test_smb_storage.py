@@ -4,6 +4,8 @@ from borgitory.services.cloud_providers.storage.smb_storage import (
     SMBStorageConfig,
     SMBStorage,
 )
+from borgitory.services.cloud_providers.types import SyncEvent
+from typing import AsyncGenerator
 
 
 class TestSMBStorageConfig:
@@ -146,11 +148,11 @@ class TestSMBStorage:
     """Test SMB storage implementation"""
 
     @pytest.fixture
-    def mock_rclone_service(self):
+    def mock_rclone_service(self) -> AsyncMock:
         return AsyncMock()
 
     @pytest.fixture
-    def storage_config(self):
+    def storage_config(self) -> SMBStorageConfig:
         return SMBStorageConfig(
             host="server.example.com",
             share_name="backup-share",
@@ -161,11 +163,15 @@ class TestSMBStorage:
         )
 
     @pytest.fixture
-    def storage(self, storage_config, mock_rclone_service):
+    def storage(
+        self, storage_config: SMBStorageConfig, mock_rclone_service: AsyncMock
+    ) -> SMBStorage:
         return SMBStorage(storage_config, mock_rclone_service)
 
     @pytest.mark.asyncio
-    async def test_test_connection_success(self, storage, mock_rclone_service) -> None:
+    async def test_test_connection_success(
+        self, storage: SMBStorage, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test successful connection test"""
         mock_rclone_service.test_smb_connection.return_value = {"status": "success"}
 
@@ -188,7 +194,9 @@ class TestSMBStorage:
         )
 
     @pytest.mark.asyncio
-    async def test_test_connection_failure(self, storage, mock_rclone_service) -> None:
+    async def test_test_connection_failure(
+        self, storage: SMBStorage, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test failed connection test"""
         mock_rclone_service.test_smb_connection.side_effect = Exception(
             "Connection failed"
@@ -199,7 +207,7 @@ class TestSMBStorage:
 
     @pytest.mark.asyncio
     async def test_upload_repository_success(
-        self, storage, mock_rclone_service
+        self, storage: SMBStorage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test successful repository upload"""
 
@@ -212,7 +220,7 @@ class TestSMBStorage:
 
         progress_events = []
 
-        def progress_callback(event) -> None:
+        def progress_callback(event: SyncEvent) -> None:
             progress_events.append(event)
 
         await storage.upload_repository(
@@ -231,7 +239,7 @@ class TestSMBStorage:
 
     @pytest.mark.asyncio
     async def test_upload_repository_failure(
-        self, storage, mock_rclone_service
+        self, storage: SMBStorage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test repository upload failure"""
 
@@ -243,7 +251,7 @@ class TestSMBStorage:
 
         progress_events = []
 
-        def progress_callback(event) -> None:
+        def progress_callback(event: SyncEvent) -> None:
             progress_events.append(event)
 
         with pytest.raises(Exception, match="SMB upload failed: Upload failed"):
@@ -256,13 +264,13 @@ class TestSMBStorage:
         # Verify error event was fired
         assert any(event.type.value == "error" for event in progress_events)
 
-    def test_get_sensitive_fields(self, storage) -> None:
+    def test_get_sensitive_fields(self, storage: SMBStorage) -> None:
         """Test sensitive fields are correctly identified"""
         sensitive_fields = storage.get_sensitive_fields()
         assert "pass" in sensitive_fields
         assert len(sensitive_fields) == 1
 
-    def test_get_connection_info(self, storage) -> None:
+    def test_get_connection_info(self, storage: SMBStorage) -> None:
         """Test connection info formatting"""
         info = storage.get_connection_info()
         assert info.provider == "smb"
@@ -275,7 +283,7 @@ class TestSMBStorage:
         assert info.details["case_insensitive"] is True
         assert "***" in info.details["password"]  # Should be masked
 
-    def test_get_connection_info_kerberos(self, mock_rclone_service) -> None:
+    def test_get_connection_info_kerberos(self, mock_rclone_service: AsyncMock) -> None:
         """Test connection info formatting with Kerberos"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -288,7 +296,9 @@ class TestSMBStorage:
         assert info.details["auth_method"] == "kerberos"
         assert info.details["password"] is None
 
-    def test_get_connection_info_short_password(self, mock_rclone_service) -> None:
+    def test_get_connection_info_short_password(
+        self, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test connection info formatting with short password"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -300,7 +310,9 @@ class TestSMBStorage:
         info = storage.get_connection_info()
         assert info.details["password"] == "***"
 
-    def test_get_connection_info_no_password(self, mock_rclone_service) -> None:
+    def test_get_connection_info_no_password(
+        self, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test connection info formatting with no password"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -316,7 +328,7 @@ class TestSMBStorageAdvancedOptions:
     """Test SMB storage with advanced configuration options"""
 
     @pytest.fixture
-    def mock_rclone_service(self):
+    def mock_rclone_service(self) -> AsyncMock:
         return AsyncMock()
 
     def test_advanced_config_options(self) -> None:
@@ -340,7 +352,9 @@ class TestSMBStorageAdvancedOptions:
         assert config.kerberos_ccache == "FILE:/path/to/ccache"
 
     @pytest.mark.asyncio
-    async def test_upload_with_advanced_options(self, mock_rclone_service) -> None:
+    async def test_upload_with_advanced_options(
+        self, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test upload with advanced configuration options"""
         config = SMBStorageConfig(
             host="server.example.com",
@@ -355,7 +369,9 @@ class TestSMBStorageAdvancedOptions:
         storage = SMBStorage(config, mock_rclone_service)
 
         # Mock the async generator
-        async def mock_sync_generator(*args, **kwargs):
+        async def mock_sync_generator(
+            *args, **kwargs
+        ) -> AsyncGenerator[dict[str, object], None]:
             yield {"type": "completed", "message": "Upload complete"}
 
         mock_rclone_service.sync_repository_to_smb = mock_sync_generator

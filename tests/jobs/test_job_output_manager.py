@@ -3,6 +3,7 @@ Tests for JobOutputManager - job output collection, storage, and streaming
 """
 
 import pytest
+import uuid
 from datetime import timedelta
 
 from borgitory.services.jobs.job_output_manager import JobOutputManager
@@ -18,7 +19,7 @@ class TestJobOutputManager:
 
     def test_create_job_output(self) -> None:
         """Test creating job output container"""
-        job_id = "test-job-123"
+        job_id = uuid.uuid4()
 
         job_output = self.output_manager.create_job_output(job_id)
 
@@ -31,7 +32,7 @@ class TestJobOutputManager:
     @pytest.mark.asyncio
     async def test_add_output_line(self) -> None:
         """Test adding output lines to a job"""
-        job_id = "test-job-123"
+        job_id = uuid.uuid4()
         self.output_manager.create_job_output(job_id)
 
         await self.output_manager.add_output_line(
@@ -39,6 +40,7 @@ class TestJobOutputManager:
         )
 
         job_output = self.output_manager.get_job_output(job_id)
+        assert job_output is not None
         assert job_output.total_lines == 1
         assert len(job_output.lines) == 1
 
@@ -50,7 +52,7 @@ class TestJobOutputManager:
     @pytest.mark.asyncio
     async def test_add_output_line_auto_create(self) -> None:
         """Test adding output line automatically creates job output"""
-        job_id = "test-job-456"
+        job_id = uuid.uuid4()
 
         await self.output_manager.add_output_line(job_id, "Auto created")
 
@@ -61,7 +63,7 @@ class TestJobOutputManager:
     @pytest.mark.asyncio
     async def test_add_output_line_with_progress(self) -> None:
         """Test adding output line with progress information"""
-        job_id = "test-job-789"
+        job_id = uuid.uuid4()
         progress_info = {"bytes_processed": 1000, "percentage": 50}
 
         await self.output_manager.add_output_line(
@@ -75,7 +77,7 @@ class TestJobOutputManager:
     @pytest.mark.asyncio
     async def test_max_lines_limit(self) -> None:
         """Test that output lines respect max limit"""
-        job_id = "test-job-limit"
+        job_id = uuid.uuid4()
         self.output_manager.create_job_output(job_id)
 
         # Add more lines than the limit
@@ -94,7 +96,7 @@ class TestJobOutputManager:
     @pytest.mark.asyncio
     async def test_get_job_output_stream(self) -> None:
         """Test getting formatted job output stream"""
-        job_id = "test-job-stream"
+        job_id = uuid.uuid4()
 
         await self.output_manager.add_output_line(job_id, "Line 1")
         await self.output_manager.add_output_line(job_id, "Line 2")
@@ -119,7 +121,7 @@ class TestJobOutputManager:
     @pytest.mark.asyncio
     async def test_stream_job_output(self) -> None:
         """Test streaming job output"""
-        job_id = "test-job-streaming"
+        job_id = uuid.uuid4()
         self.output_manager.create_job_output(job_id)
 
         # Add initial lines
@@ -139,7 +141,7 @@ class TestJobOutputManager:
 
     def test_get_output_summary(self) -> None:
         """Test getting output summary"""
-        job_id = "test-job-summary"
+        job_id = uuid.uuid4()
         job_output = self.output_manager.create_job_output(job_id)
         job_output.total_lines = 5
         job_output.current_progress = {"status": "running"}
@@ -160,7 +162,7 @@ class TestJobOutputManager:
 
     def test_clear_job_output(self) -> None:
         """Test clearing job output"""
-        job_id = "test-job-clear"
+        job_id = uuid.uuid4()
         self.output_manager.create_job_output(job_id)
 
         result = self.output_manager.clear_job_output(job_id)
@@ -185,7 +187,7 @@ class TestJobOutputManager:
     @pytest.mark.asyncio
     async def test_format_output_for_display(self) -> None:
         """Test formatting output for display"""
-        job_id = "test-job-display"
+        job_id = uuid.uuid4()
 
         await self.output_manager.add_output_line(job_id, "Line 1", "stdout")
         await self.output_manager.add_output_line(job_id, "Error line", "stderr")
