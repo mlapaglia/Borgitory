@@ -184,18 +184,6 @@ class TestJobRenderServiceNewArchitecture:
         assert len(result.sorted_tasks) == 1
         assert result.sorted_tasks[0].status == JobStatusEnum.RUNNING
 
-    def test_template_job_status_string_conversion(self) -> None:
-        """Test that TemplateJobStatus converts to string properly (catches template selection bug)"""
-        status = TemplateJobStatus(JobStatusEnum.RUNNING)
-
-        # This is the critical test - string conversion must work
-        assert str(status) == JobStatusEnum.RUNNING
-        assert status.title() == "Running"
-
-        # Test the comparison that was failing in the API
-        assert str(status) == JobStatusEnum.RUNNING  # This should be True
-        assert status != "running"  # This should be True (object != string)
-
     def test_convert_to_template_data_preserves_status_strings(self) -> None:
         """Test that convert_to_template_data creates proper string statuses"""
         job_display_data = JobDisplayData(

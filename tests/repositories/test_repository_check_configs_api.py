@@ -8,6 +8,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 
 from borgitory.models.schemas import (
+    CheckType,
     RepositoryCheckConfigCreate,
     RepositoryCheckConfigUpdate,
 )
@@ -44,10 +45,15 @@ def sample_config_create() -> RepositoryCheckConfigCreate:
     return RepositoryCheckConfigCreate(
         name="test-config",
         description="Test configuration",
-        check_type="full",
-        verify_data=True,
+        check_type=CheckType.REPOSITORY_ONLY,
+        verify_data=False,
         repair_mode=False,
         save_space=False,
+        max_duration=3600,
+        archive_prefix=None,
+        archive_glob=None,
+        first_n_archives=None,
+        last_n_archives=None,
     )
 
 
@@ -57,7 +63,15 @@ def sample_config_update() -> RepositoryCheckConfigUpdate:
     return RepositoryCheckConfigUpdate(
         name="updated-config",
         description="Updated configuration",
-        check_type="repository_only",
+        check_type=CheckType.REPOSITORY_ONLY,
+        verify_data=False,
+        repair_mode=False,
+        save_space=True,
+        max_duration=3600,
+        archive_prefix=None,
+        archive_glob=None,
+        first_n_archives=None,
+        last_n_archives=None,
     )
 
 

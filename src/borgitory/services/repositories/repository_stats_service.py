@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from typing import Dict, List, Callable, Optional, TypedDict
+from dataclasses import dataclass
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from sqlalchemy.orm import Session
@@ -135,7 +136,8 @@ class SummaryStats(TypedDict):
     average_archive_size_gb: float
 
 
-class RepositoryStats(TypedDict, total=False):
+@dataclass
+class RepositoryStats:
     """Complete repository statistics structure"""
 
     # Success fields
@@ -151,8 +153,6 @@ class RepositoryStats(TypedDict, total=False):
     success_failure_chart: SuccessFailureChartData
     timeline_success_failure: TimelineSuccessFailureData
     summary: SummaryStats
-    # Error field
-    error: str
 
 
 class RepositoryStatsService:
@@ -247,7 +247,7 @@ class RepositoryStatsService:
                 progress_callback("Scanning repository for archives...", 10)
             archives = await self.execute_borg_list(repository)
             if not archives:
-                return {"error": "No archives found in repository"}
+                raise ValueError("No archives found in repository")
 
             if progress_callback:
                 progress_callback(
@@ -269,7 +269,7 @@ class RepositoryStatsService:
                     archive_stats.append(archive_info)
 
             if not archive_stats:
-                return {"error": "Could not retrieve archive information"}
+                raise ValueError("Could not retrieve archive information")
 
             # Sort archives by date
             archive_stats.sort(key=lambda x: str(x.get("start", "")))
@@ -311,22 +311,22 @@ class RepositoryStatsService:
                 progress_callback("Finalizing statistics and building charts...", 90)
 
             # Build statistics
-            stats: RepositoryStats = {
-                "repository_path": repository.path,
-                "total_archives": len(archive_stats),
-                "archive_stats": archive_stats,
-                "size_over_time": self._build_size_timeline(archive_stats),
-                "dedup_compression_stats": self._build_dedup_compression_stats(
+            stats = RepositoryStats(
+                repository_path=repository.path,
+                total_archives=len(archive_stats),
+                archive_stats=archive_stats,
+                size_over_time=self._build_size_timeline(archive_stats),
+                dedup_compression_stats=self._build_dedup_compression_stats(
                     archive_stats
                 ),
-                "file_type_stats": file_type_stats,
-                "execution_time_stats": execution_time_stats,
-                "execution_time_chart": execution_time_chart,
-                "success_failure_stats": success_failure_stats,
-                "success_failure_chart": success_failure_chart,
-                "timeline_success_failure": timeline_success_failure,
-                "summary": self._build_summary_stats(archive_stats),
-            }
+                file_type_stats=file_type_stats,
+                execution_time_stats=execution_time_stats,
+                execution_time_chart=execution_time_chart,
+                success_failure_stats=success_failure_stats,
+                success_failure_chart=success_failure_chart,
+                timeline_success_failure=timeline_success_failure,
+                summary=self._build_summary_stats(archive_stats),
+            )
 
             if progress_callback:
                 progress_callback("Statistics analysis complete!", 100)
@@ -335,7 +335,7 @@ class RepositoryStatsService:
 
         except Exception as e:
             logger.error(f"Error getting repository statistics: {str(e)}")
-            return {"error": str(e)}
+            raise
 
     async def _get_archive_list(self, repository: Repository) -> List[str]:
         """Get list of all archives in repository"""

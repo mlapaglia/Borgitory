@@ -12,6 +12,8 @@ from datetime import datetime, UTC
 from fastapi.responses import StreamingResponse
 
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+from borgitory.services.jobs.broadcaster.event_type import EventType
+from borgitory.services.jobs.broadcaster.job_event import JobEvent
 from borgitory.services.jobs.job_stream_service import JobStreamService
 
 
@@ -68,17 +70,14 @@ class TestJobStreamService:
         mock_job.current_task_index = 0
         mock_job.tasks = [Mock()]  # Has tasks - all jobs are composite now
         mock_job.job_type = "backup"
-
-        self.mock_job_manager.jobs = {"job-123": mock_job}
+        mock_job.id = str(uuid.uuid4())
+        self.mock_job_manager.jobs = {str(mock_job.id): mock_job}
 
         # Mock streaming generator that yields one update
-        async def mock_stream_generator() -> AsyncGenerator[dict[str, object], None]:
-            from borgitory.services.jobs.broadcaster.job_event import JobEvent
-            from borgitory.services.jobs.broadcaster.event_type import EventType
-
+        async def mock_stream_generator() -> AsyncGenerator[JobEvent, None]:
             yield JobEvent(
                 event_type=EventType.JOB_STATUS_CHANGED,
-                job_id="job-123",
+                job_id=mock_job.id,
                 data={"status": JobStatusEnum.COMPLETED},
             )
 
@@ -100,7 +99,7 @@ class TestJobStreamService:
         assert "event: jobs_update" in events[0]
         jobs_data = json.loads(events[0].split("data: ")[1].split("\\n")[0])
         assert len(jobs_data["jobs"]) == 1
-        assert jobs_data["jobs"][0]["id"] == "job-123"
+        assert jobs_data["jobs"][0]["id"] == str(mock_job.id)
         assert jobs_data["jobs"][0]["type"] == "composite_job_status"
         assert jobs_data["jobs"][0]["status"] == JobStatusEnum.RUNNING
 
@@ -113,7 +112,7 @@ class TestJobStreamService:
         self.mock_job_manager.jobs = {}
 
         # Mock streaming method to raise an exception
-        async def mock_error_generator() -> AsyncGenerator[dict[str, object], None]:
+        async def mock_error_generator() -> AsyncGenerator[JobEvent, None]:
             raise RuntimeError("Test streaming error")
             yield  # pyright: ignore[reportUnreachable]
 
@@ -136,7 +135,7 @@ class TestJobStreamService:
     @pytest.mark.asyncio
     async def test_stream_job_output_composite_job_basic(self) -> None:
         """Test streaming output for a composite job (all jobs are now composite)."""
-        job_id = "composite-job-789"
+        job_id = uuid.uuid4()
 
         # Mock a composite job
         mock_job = Mock()
@@ -145,14 +144,22 @@ class TestJobStreamService:
         self.mock_job_manager.jobs = {job_id: mock_job}
 
         # Mock job output stream that returns composite job events
-        async def mock_output_generator() -> AsyncGenerator[dict[str, object], None]:
-            yield {
-                "type": "task_started",
-                "task_name": "backup",
-                "timestamp": "10:00:00",
-            }
-            yield {"type": "task_progress", "task_name": "backup", "progress": 50}
-            yield {"type": "task_completed", "task_name": "backup", "status": "success"}
+        async def mock_output_generator() -> AsyncGenerator[JobEvent, None]:
+            yield JobEvent(
+                event_type=EventType.TASK_STARTED,
+                job_id=job_id,
+                data={"task_name": "backup", "timestamp": "10:00:00"},
+            )
+            yield JobEvent(
+                event_type=EventType.TASK_PROGRESS,
+                job_id=job_id,
+                data={"task_name": "backup", "progress": 50},
+            )
+            yield JobEvent(
+                event_type=EventType.TASK_COMPLETED,
+                job_id=job_id,
+                data={"task_name": "backup", "status": "success"},
+            )
 
         self.mock_job_manager.stream_job_output = AsyncMock(
             return_value=mock_output_generator()
@@ -177,7 +184,7 @@ class TestJobStreamService:
     @pytest.mark.asyncio
     async def test_stream_job_output_composite_job(self) -> None:
         """Test streaming output for a composite job."""
-        job_id = "composite-job-101"
+        job_id = uuid.uuid4()
 
         # Mock a composite job
         mock_job = Mock()
@@ -206,12 +213,16 @@ class TestJobStreamService:
         call_count = 0
         timeout_count = 0
 
-        async def mock_queue_get() -> AsyncGenerator[dict[str, object], None]:
+        async def mock_queue_get() -> JobEvent:
             nonlocal call_count, timeout_count
             if call_count < len(event_sequence):
-                event = event_sequence[call_count]
+                event_sequence[call_count]
                 call_count += 1
-                return event
+                return JobEvent(
+                    event_type=EventType.TASK_STARTED,
+                    job_id=job_id,
+                    data={"task_name": "backup", "timestamp": "10:00:00"},
+                )
             else:
                 # Only allow one timeout to prevent infinite loop
                 timeout_count += 1
@@ -276,7 +287,7 @@ class TestJobStreamService:
         ]
         if initial_events:
             initial_data = initial_events[0][1]
-            assert initial_data["job_id"] == job_id
+            assert initial_data["job_id"] == str(job_id)
 
         # Verify unsubscribe was called
         self.mock_job_manager.unsubscribe_from_events.assert_called_once()
@@ -284,7 +295,7 @@ class TestJobStreamService:
     @pytest.mark.asyncio
     async def test_stream_job_output_composite_job_error(self) -> None:
         """Test error handling in composite job streaming."""
-        job_id = "composite-job-error"
+        job_id = uuid.uuid4()
 
         # Mock a composite job
         mock_job = Mock()
@@ -321,17 +332,8 @@ class TestJobStreamService:
     @pytest.mark.asyncio
     async def test_stream_job_output_nonexistent_job(self) -> None:
         """Test streaming output for a job that doesn't exist."""
-        job_id = "nonexistent-job"
+        job_id = uuid.uuid4()
         self.mock_job_manager.jobs = {}
-
-        # Mock empty output stream
-        async def mock_empty_generator() -> AsyncGenerator[dict[str, object], None]:
-            return
-            yield  # pragma: no cover
-
-        self.mock_job_manager.stream_job_output = Mock(
-            return_value=mock_empty_generator()
-        )
 
         response = await self.stream_service.stream_job_output(job_id)
 
@@ -339,9 +341,12 @@ class TestJobStreamService:
         async for event in response.body_iterator:
             events.append(event)
 
-        # Should handle gracefully (may be empty or have error)
-        # The exact behavior depends on job_manager implementation
-        assert len(events) >= 0
+        # Should return an error message when job doesn't exist
+        assert len(events) == 1
+        error_event = events[0]
+        assert "Job" in error_event
+        assert "not found" in error_event
+        assert str(job_id) in error_event
 
     @pytest.mark.asyncio
     async def test_get_job_status(self) -> None:
@@ -391,15 +396,15 @@ class TestJobStreamService:
         composite_job = next(
             job
             for job in current_jobs
-            if job["id"] == "running-job-1"
-            and isinstance(job.get("progress"), dict)
-            and "task_progress" in job.get("progress", {})
+            if job.id == "running-job-1"
+            and isinstance(job.progress, dict)
+            and "task_progress" in job.progress
         )
-        assert composite_job["type"] == "backup"
-        assert composite_job["status"] == JobStatusEnum.RUNNING
-        assert composite_job["started_at"] == "10:00:00"
-        assert composite_job["progress"]["current_task"] == "backup_task"
-        assert composite_job["progress"]["task_progress"] == "1/1"
+        assert composite_job.type == "backup"
+        assert composite_job.status == JobStatusEnum.RUNNING
+        assert composite_job.started_at == "10:00:00"
+        assert composite_job.progress["current_task"] == "backup_task"
+        assert composite_job.progress["task_progress"] == "1/1"
 
     def test_get_current_jobs_data_composite_jobs(self) -> None:
         """Test getting current composite jobs data for rendering."""
@@ -430,16 +435,16 @@ class TestJobStreamService:
         composite_job = next(
             job
             for job in current_jobs
-            if job["id"] == "composite-running-1"
-            and isinstance(job.get("progress"), dict)
-            and "task_progress" in job.get("progress", {})
+            if job.id == "composite-running-1"
+            and isinstance(job.progress, dict)
+            and "task_progress" in job.progress
         )
-        assert composite_job["type"] == "scheduled_backup"
-        assert composite_job["status"] == JobStatusEnum.RUNNING
-        assert composite_job["started_at"] == "15:30:00"
-        assert composite_job["progress"]["current_task"] == "backup_task"
-        assert composite_job["progress"]["task_progress"] == "1/3"
-        assert "Task: backup_task (1/3)" in composite_job["progress_info"]
+        assert composite_job.type == "scheduled_backup"
+        assert composite_job.status == JobStatusEnum.RUNNING
+        assert composite_job.started_at == "15:30:00"
+        assert composite_job.progress["current_task"] == "backup_task"
+        assert composite_job.progress["task_progress"] == "1/3"
+        assert "Task: backup_task (1/3)" in composite_job.progress_info
 
     def test_get_current_jobs_data_mixed_jobs(self) -> None:
         """Test getting current jobs data with different types of composite jobs."""
@@ -489,29 +494,25 @@ class TestJobStreamService:
         assert len(current_jobs) == 4
 
         # Find single-task composite job
-        single_task_jobs = [
-            job for job in current_jobs if job["id"] == "single-task-job"
-        ]
+        single_task_jobs = [job for job in current_jobs if job.id == "single-task-job"]
         single_task_job = next(
             job
             for job in single_task_jobs
-            if isinstance(job.get("progress"), dict)
-            and "task_progress" in job.get("progress", {})
+            if isinstance(job.progress, dict) and "task_progress" in job.progress
         )
-        assert single_task_job["type"] == JobTypeEnum.CHECK
-        assert single_task_job["status"] == JobStatusEnum.RUNNING
-        assert single_task_job["progress"]["task_progress"] == "1/1"
+        assert single_task_job.type == JobTypeEnum.CHECK
+        assert single_task_job.status == JobStatusEnum.RUNNING
+        assert single_task_job.progress["task_progress"] == "1/1"
 
         # Find multi-task composite job
-        multi_task_jobs = [job for job in current_jobs if job["id"] == "multi-task-job"]
+        multi_task_jobs = [job for job in current_jobs if job.id == "multi-task-job"]
         multi_task_job = next(
             job
             for job in multi_task_jobs
-            if isinstance(job.get("progress"), dict)
-            and "task_progress" in job.get("progress", {})
+            if isinstance(job.progress, dict) and "task_progress" in job.progress
         )
-        assert multi_task_job["type"] == "verification"
-        assert multi_task_job["progress"]["task_progress"] == "3/3"
+        assert multi_task_job.type == "verification"
+        assert multi_task_job.progress["task_progress"] == "3/3"
 
     def test_get_current_jobs_data_no_running_jobs(self) -> None:
         """Test getting current jobs data when no jobs are running."""

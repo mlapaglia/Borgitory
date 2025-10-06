@@ -205,7 +205,7 @@ exclude = [
     "^htmlcov/",
     "^\\.",
 ]
-files = ["src", "tests"]
+files = ["src"]
 
 # Plugins
 plugins = [

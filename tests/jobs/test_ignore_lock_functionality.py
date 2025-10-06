@@ -321,29 +321,30 @@ class TestIgnoreLockFunctionality:
             await asyncio.sleep(0.1)  # Small delay to simulate work
             raise asyncio.TimeoutError()
 
-        job_manager.executor.monitor_process_output = AsyncMock(
-            side_effect=mock_monitor_timeout
-        )  # type: ignore
+        with patch.object(
+            job_manager.executor,
+            "monitor_process_output",
+            side_effect=mock_monitor_timeout,
+        ):
+            # Mock output callback
+            output_callback = MagicMock()
 
-        # Mock output callback
-        output_callback = MagicMock()
+            # Test parameters
+            repository_path = "/test/repo/path"
+            passphrase = "test-passphrase"
 
-        # Test parameters
-        repository_path = "/test/repo/path"
-        passphrase = "test-passphrase"
+            # Execute break-lock and expect timeout exception
+            with pytest.raises(Exception, match="Break-lock operation timed out"):
+                await job_manager.backup_executor._execute_break_lock(
+                    repository_path, passphrase, output_callback
+                )
 
-        # Execute break-lock and expect timeout exception
-        with pytest.raises(Exception, match="Break-lock operation timed out"):
-            await job_manager.backup_executor._execute_break_lock(
-                repository_path, passphrase, output_callback
-            )
+            # Verify process was killed
+            mock_process.kill.assert_called_once()
+            mock_process.wait.assert_called_once()
 
-        # Verify process was killed
-        mock_process.kill.assert_called_once()
-        mock_process.wait.assert_called_once()
-
-        # Verify timeout message was sent to callback
-        output_callback.assert_any_call("Break-lock timed out, terminating process")
+            # Verify timeout message was sent to callback
+            output_callback.assert_any_call("Break-lock timed out, terminating process")
 
     @pytest.mark.asyncio
     async def test_break_lock_uses_secure_command_builder(
@@ -353,25 +354,30 @@ class TestIgnoreLockFunctionality:
 
         # Mock the executor methods
         mock_process = MagicMock()
-        job_manager.executor.start_process.return_value = mock_process  # type: ignore
-
         mock_result = ProcessResult(
             return_code=0, stdout=b"Success", stderr=b"", error=None
         )
-        job_manager.executor.monitor_process_output.return_value = mock_result  # type: ignore
 
-        # Execute break-lock
-        await job_manager.backup_executor._execute_break_lock(
-            "/test/repo", "test-pass", MagicMock()
-        )
+        with (
+            patch.object(
+                job_manager.executor, "start_process", return_value=mock_process
+            ) as mock_start_process,
+            patch.object(
+                job_manager.executor, "monitor_process_output", return_value=mock_result
+            ),
+        ):
+            # Execute break-lock
+            await job_manager.backup_executor._execute_break_lock(
+                "/test/repo", "test-pass", MagicMock()
+            )
 
-        # Verify executor was called with a borg break-lock command
-        job_manager.executor.start_process.assert_called_once()
-        call_args = job_manager.executor.start_process.call_args
-        command = call_args[0][0]  # First positional argument
-        env = call_args[0][1]  # Second positional argument
+            # Verify executor was called with a borg break-lock command
+            mock_start_process.assert_called_once()
+            call_args = mock_start_process.call_args
+            command = call_args[0][0]  # First positional argument
+            env = call_args[0][1]  # Second positional argument
 
-        # Verify it's a borg break-lock command
-        assert "borg" in command[0]
-        assert "break-lock" in command
-        assert "BORG_PASSPHRASE" in env
+            # Verify it's a borg break-lock command
+            assert "borg" in command[0]
+            assert "break-lock" in command
+            assert "BORG_PASSPHRASE" in env

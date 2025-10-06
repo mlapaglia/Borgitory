@@ -21,11 +21,11 @@ def service(test_db: Session) -> PruneService:
 @pytest.fixture
 def sample_repository(test_db: Session) -> Repository:
     """Create a sample repository for testing."""
-    repository = Repository(
-        name="test-repo",
-        path="/tmp/test-repo",
-        encrypted_passphrase="test-encrypted-passphrase",
-    )
+    repository = Repository()
+    repository.name = "test-repo"
+    repository.path = "/tmp/test-repo"
+    repository.encrypted_passphrase = "test-encrypted-passphrase"
+
     test_db.add(repository)
     test_db.commit()
     test_db.refresh(repository)
@@ -44,31 +44,30 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting prune configs with data."""
-        config1 = PruneConfig(
-            name="config-1",
-            strategy="simple",
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
-        config2 = PruneConfig(
-            name="config-2",
-            strategy="advanced",
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=7,
-            keep_weekly=4,
-            keep_monthly=12,
-            keep_yearly=2,
-            enabled=False,
-        )
+        config1 = PruneConfig()
+        config1.name = "config-1"
+        config1.strategy = "simple"
+        config1.keep_within_days = 30
+        config1.keep_secondly = 0
+        config1.keep_minutely = 0
+        config1.keep_hourly = 0
+        config1.keep_daily = 0
+        config1.keep_weekly = 0
+        config1.keep_monthly = 0
+        config1.keep_yearly = 0
+        config1.enabled = True
+
+        config2 = PruneConfig()
+        config2.name = "config-2"
+        config2.strategy = "advanced"
+        config2.keep_secondly = 0
+        config2.keep_minutely = 0
+        config2.keep_hourly = 0
+        config2.keep_daily = 7
+        config2.keep_weekly = 4
+        config2.keep_monthly = 12
+        config2.keep_yearly = 2
+        config2.enabled = False
         test_db.add_all([config1, config2])
         test_db.commit()
 
@@ -83,19 +82,18 @@ class TestPruneService:
     ) -> None:
         """Test getting prune configs with pagination."""
         for i in range(5):
-            config = PruneConfig(
-                name=f"config-{i}",
-                strategy="simple",
-                keep_within_days=30,
-                keep_secondly=0,
-                keep_minutely=0,
-                keep_hourly=0,
-                keep_daily=0,
-                keep_weekly=0,
-                keep_monthly=0,
-                keep_yearly=0,
-                enabled=True,
-            )
+            config = PruneConfig()
+            config.name = f"config-{i}"
+            config.strategy = "simple"
+            config.keep_within_days = 30
+            config.keep_secondly = 0
+            config.keep_minutely = 0
+            config.keep_hourly = 0
+            config.keep_daily = 0
+            config.keep_weekly = 0
+            config.keep_monthly = 0
+            config.keep_yearly = 0
+            config.enabled = True
             test_db.add(config)
         test_db.commit()
 
@@ -106,19 +104,18 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting prune config by ID successfully."""
-        config = PruneConfig(
-            name="test-config",
-            strategy="simple",
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
+        config = PruneConfig()
+        config.name = "test-config"
+        config.strategy = "simple"
+        config.keep_within_days = 30
+        config.keep_secondly = 0
+        config.keep_minutely = 0
+        config.keep_hourly = 0
+        config.keep_daily = 0
+        config.keep_weekly = 0
+        config.keep_monthly = 0
+        config.keep_yearly = 0
+        config.enabled = True
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
@@ -157,6 +154,7 @@ class TestPruneService:
 
         assert success is True
         assert error is None
+        assert config is not None
         assert config.name == "new-config"
         assert config.strategy == PruneStrategy.SIMPLE
         assert config.keep_within_days == 30
@@ -173,18 +171,17 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test prune config creation with duplicate name."""
-        existing_config = PruneConfig(
-            name="duplicate-name",
-            strategy=PruneStrategy.SIMPLE,
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-        )
+        existing_config = PruneConfig()
+        existing_config.name = "duplicate-name"
+        existing_config.strategy = PruneStrategy.SIMPLE
+        existing_config.keep_within_days = 30
+        existing_config.keep_secondly = 0
+        existing_config.keep_minutely = 0
+        existing_config.keep_hourly = 0
+        existing_config.keep_daily = 0
+        existing_config.keep_weekly = 0
+        existing_config.keep_monthly = 0
+        existing_config.keep_yearly = 0
         test_db.add(existing_config)
         test_db.commit()
 
@@ -239,19 +236,18 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test successful prune config update."""
-        config = PruneConfig(
-            name="original-config",
-            strategy=PruneStrategy.SIMPLE,
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
+        config = PruneConfig()
+        config.name = "original-config"
+        config.strategy = PruneStrategy.SIMPLE
+        config.keep_within_days = 30
+        config.keep_secondly = 0
+        config.keep_minutely = 0
+        config.keep_hourly = 0
+        config.keep_daily = 0
+        config.keep_weekly = 0
+        config.keep_monthly = 0
+        config.keep_yearly = 0
+        config.enabled = True
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
@@ -268,6 +264,7 @@ class TestPruneService:
 
         assert success is True
         assert error is None
+        assert updated_config is not None
         assert updated_config.name == "updated-config"
         assert updated_config.keep_within_days == 60
 
@@ -287,31 +284,30 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test updating prune config with duplicate name."""
-        config1 = PruneConfig(
-            name="config-1",
-            strategy=PruneStrategy.SIMPLE,
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
-        config2 = PruneConfig(
-            name="config-2",
-            strategy=PruneStrategy.ADVANCED,
-            keep_daily=7,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
+        config1 = PruneConfig()
+        config1.name = "config-1"
+        config1.strategy = PruneStrategy.SIMPLE
+        config1.keep_within_days = 30
+        config1.keep_secondly = 0
+        config1.keep_minutely = 0
+        config1.keep_hourly = 0
+        config1.keep_daily = 0
+        config1.keep_weekly = 0
+        config1.keep_monthly = 0
+        config1.keep_yearly = 0
+        config1.enabled = True
+
+        config2 = PruneConfig()
+        config2.name = "config-2"
+        config2.strategy = PruneStrategy.ADVANCED
+        config2.keep_daily = 7
+        config2.keep_secondly = 0
+        config2.keep_minutely = 0
+        config2.keep_hourly = 0
+        config2.keep_weekly = 0
+        config2.keep_monthly = 0
+        config2.keep_yearly = 0
+        config2.enabled = True
         test_db.add_all([config1, config2])
         test_db.commit()
 
@@ -329,19 +325,18 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test successfully enabling prune config."""
-        config = PruneConfig(
-            name="test-config",
-            strategy=PruneStrategy.SIMPLE,
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=False,
-        )
+        config = PruneConfig()
+        config.name = "test-config"
+        config.strategy = PruneStrategy.SIMPLE
+        config.keep_within_days = 30
+        config.keep_secondly = 0
+        config.keep_minutely = 0
+        config.keep_hourly = 0
+        config.keep_daily = 0
+        config.keep_weekly = 0
+        config.keep_monthly = 0
+        config.keep_yearly = 0
+        config.enabled = False
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
@@ -355,6 +350,7 @@ class TestPruneService:
 
         assert success is True
         assert error is None
+        assert updated_config is not None
         assert updated_config.enabled is True
 
     def test_enable_prune_config_not_found(self, service: PruneService) -> None:
@@ -370,19 +366,18 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test successfully disabling prune config."""
-        config = PruneConfig(
-            name="test-config",
-            strategy=PruneStrategy.SIMPLE,
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
+        config = PruneConfig()
+        config.name = "test-config"
+        config.strategy = PruneStrategy.SIMPLE
+        config.keep_within_days = 30
+        config.keep_secondly = 0
+        config.keep_minutely = 0
+        config.keep_hourly = 0
+        config.keep_daily = 0
+        config.keep_weekly = 0
+        config.keep_monthly = 0
+        config.keep_yearly = 0
+        config.enabled = True
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
@@ -396,6 +391,7 @@ class TestPruneService:
 
         assert success is True
         assert error is None
+        assert updated_config is not None
         assert updated_config.enabled is False
 
     def test_disable_prune_config_not_found(self, service: PruneService) -> None:
@@ -412,19 +408,18 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test successful prune config deletion."""
-        config = PruneConfig(
-            name="test-config",
-            strategy=PruneStrategy.SIMPLE,
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
+        config = PruneConfig()
+        config.name = "test-config"
+        config.strategy = PruneStrategy.SIMPLE
+        config.keep_within_days = 30
+        config.keep_secondly = 0
+        config.keep_minutely = 0
+        config.keep_hourly = 0
+        config.keep_daily = 0
+        config.keep_weekly = 0
+        config.keep_monthly = 0
+        config.keep_yearly = 0
+        config.enabled = True
         test_db.add(config)
         test_db.commit()
         test_db.refresh(config)
@@ -465,19 +460,18 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting configs with descriptions for simple strategy."""
-        config = PruneConfig(
-            name="simple-config",
-            strategy=PruneStrategy.SIMPLE,
-            keep_within_days=30,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
+        config = PruneConfig()
+        config.name = "simple-config"
+        config.strategy = PruneStrategy.SIMPLE
+        config.keep_within_days = 30
+        config.keep_secondly = 0
+        config.keep_minutely = 0
+        config.keep_hourly = 0
+        config.keep_daily = 0
+        config.keep_weekly = 0
+        config.keep_monthly = 0
+        config.keep_yearly = 0
+        config.enabled = True
         test_db.add(config)
         test_db.commit()
 
@@ -490,15 +484,14 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting configs with descriptions for advanced strategy."""
-        config = PruneConfig(
-            name="advanced-config",
-            strategy=PruneStrategy.ADVANCED,
-            keep_daily=7,
-            keep_weekly=4,
-            keep_monthly=12,
-            keep_yearly=2,
-            enabled=True,
-        )
+        config = PruneConfig()
+        config.name = "advanced-config"
+        config.strategy = PruneStrategy.ADVANCED
+        config.keep_daily = 7
+        config.keep_weekly = 4
+        config.keep_monthly = 12
+        config.keep_yearly = 2
+        config.enabled = True
         test_db.add(config)
         test_db.commit()
 
@@ -512,13 +505,12 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting configs with descriptions for partial advanced strategy."""
-        config = PruneConfig(
-            name="partial-config",
-            strategy=PruneStrategy.ADVANCED,
-            keep_daily=7,
-            keep_monthly=12,
-            enabled=True,
-        )
+        config = PruneConfig()
+        config.name = "partial-config"
+        config.strategy = PruneStrategy.ADVANCED
+        config.keep_daily = 7
+        config.keep_monthly = 12
+        config.enabled = True
         test_db.add(config)
         test_db.commit()
 
@@ -532,18 +524,17 @@ class TestPruneService:
         self, service: PruneService, test_db: Session
     ) -> None:
         """Test getting configs with descriptions for no retention rules."""
-        config = PruneConfig(
-            name="empty-config",
-            strategy=PruneStrategy.ADVANCED,
-            keep_secondly=0,
-            keep_minutely=0,
-            keep_hourly=0,
-            keep_daily=0,
-            keep_weekly=0,
-            keep_monthly=0,
-            keep_yearly=0,
-            enabled=True,
-        )
+        config = PruneConfig()
+        config.name = "empty-config"
+        config.strategy = PruneStrategy.ADVANCED
+        config.keep_secondly = 0
+        config.keep_minutely = 0
+        config.keep_hourly = 0
+        config.keep_daily = 0
+        config.keep_weekly = 0
+        config.keep_monthly = 0
+        config.keep_yearly = 0
+        config.enabled = True
         test_db.add(config)
         test_db.commit()
 
@@ -637,11 +628,11 @@ class TestPruneService:
         assert result.config.enabled is True
 
         # Delete
-        result = service.delete_prune_config(config_id)
-        assert result is not None
-        assert result.success is True
-        assert result.config_name is not None
-        assert result.config_name == "lifecycle-test"
+        result2 = service.delete_prune_config(config_id)
+        assert result2 is not None
+        assert result2.success is True
+        assert result2.config_name is not None
+        assert result2.config_name == "lifecycle-test"
 
         # Verify completely removed
         deleted_config = (

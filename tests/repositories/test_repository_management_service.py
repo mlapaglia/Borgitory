@@ -256,14 +256,16 @@ class TestRepositoryManagementBusinessLogic:
         mock_executor = repository_service.command_executor
 
         # Mock the executor to return a timeout result
-        mock_executor.execute_command.return_value = ExecutorCommandResult(
-            command=["borg", "list", "/test/repo/path", "--short"],
-            return_code=-1,
-            stdout="",
-            stderr="Command timed out after 10.0 seconds",
-            success=False,
-            execution_time=10.0,
-            error="Command timed out after 10.0 seconds",
+        mock_executor.execute_command = AsyncMock(
+            return_value=ExecutorCommandResult(
+                command=["borg", "list", "/test/repo/path", "--short"],
+                return_code=-1,
+                stdout="",
+                stderr="Command timed out after 10.0 seconds",
+                success=False,
+                execution_time=10.0,
+                error="Command timed out after 10.0 seconds",
+            )
         )
 
         result = await repository_service.check_repository_lock_status(mock_repository)
@@ -289,14 +291,16 @@ class TestRepositoryManagementBusinessLogic:
         mock_executor = repository_service.command_executor
 
         # Mock the executor to return a lock error
-        mock_executor.execute_command.return_value = ExecutorCommandResult(
-            command=["borg", "list", "/test/repo/path", "--short"],
-            return_code=2,
-            stdout="",
-            stderr="Failed to create/acquire the lock",
-            success=False,
-            execution_time=5.0,
-            error="Failed to create/acquire the lock",
+        mock_executor.execute_command = AsyncMock(
+            return_value=ExecutorCommandResult(
+                command=["borg", "list", "/test/repo/path", "--short"],
+                return_code=2,
+                stdout="",
+                stderr="Failed to create/acquire the lock",
+                success=False,
+                execution_time=5.0,
+                error="Failed to create/acquire the lock",
+            )
         )
 
         result = await repository_service.check_repository_lock_status(mock_repository)
@@ -368,14 +372,16 @@ class TestRepositoryManagementBusinessLogic:
         mock_executor = repository_service.command_executor
 
         # Mock the executor to return a failure result
-        mock_executor.execute_command.return_value = ExecutorCommandResult(
-            command=["borg", "break-lock", "/test/repo/path"],
-            return_code=1,
-            stdout="",
-            stderr="Permission denied",
-            success=False,
-            execution_time=2.0,
-            error="Permission denied",
+        mock_executor.execute_command = AsyncMock(
+            return_value=ExecutorCommandResult(
+                command=["borg", "break-lock", "/test/repo/path"],
+                return_code=1,
+                stdout="",
+                stderr="Permission denied",
+                success=False,
+                execution_time=2.0,
+                error="Permission denied",
+            )
         )
 
         result = await repository_service.break_repository_lock(mock_repository)
@@ -416,26 +422,28 @@ class TestRepositoryManagementBusinessLogic:
         mock_executor = repository_service.command_executor
 
         # Mock the executor to return different results for different calls
-        mock_executor.execute_command.side_effect = [
-            # First call: borg info
-            ExecutorCommandResult(
-                command=["borg", "info", "/test/repo/path", "--json"],
-                return_code=0,
-                stdout=json.dumps(borg_info_json),
-                stderr="",
-                success=True,
-                execution_time=3.0,
-            ),
-            # Second call: borg config
-            ExecutorCommandResult(
-                command=["borg", "config", "/test/repo/path", "--list"],
-                return_code=0,
-                stdout=borg_config_output,
-                stderr="",
-                success=True,
-                execution_time=1.0,
-            ),
-        ]
+        mock_executor.execute_command = AsyncMock(
+            side_effect=[
+                # First call: borg info
+                ExecutorCommandResult(
+                    command=["borg", "info", "/test/repo/path", "--json"],
+                    return_code=0,
+                    stdout=json.dumps(borg_info_json),
+                    stderr="",
+                    success=True,
+                    execution_time=3.0,
+                ),
+                # Second call: borg config
+                ExecutorCommandResult(
+                    command=["borg", "config", "/test/repo/path", "--list"],
+                    return_code=0,
+                    stdout=borg_config_output,
+                    stderr="",
+                    success=True,
+                    execution_time=1.0,
+                ),
+            ]
+        )
 
         result = await repository_service.get_repository_info(mock_repository)
 
@@ -469,13 +477,15 @@ class TestRepositoryManagementBusinessLogic:
         mock_executor = repository_service.command_executor
 
         # Mock the executor to return successful key export
-        mock_executor.execute_command.return_value = ExecutorCommandResult(
-            command=["borg", "key", "export", "/test/repo/path"],
-            return_code=0,
-            stdout=key_data,
-            stderr="",
-            success=True,
-            execution_time=2.0,
+        mock_executor.execute_command = AsyncMock(
+            return_value=ExecutorCommandResult(
+                command=["borg", "key", "export", "/test/repo/path"],
+                return_code=0,
+                stdout=key_data,
+                stderr="",
+                success=True,
+                execution_time=2.0,
+            )
         )
 
         result = await repository_service.export_repository_key(mock_repository)
@@ -498,14 +508,16 @@ class TestRepositoryManagementBusinessLogic:
         mock_executor = repository_service.command_executor
 
         # Mock the executor to return a failure result
-        mock_executor.execute_command.return_value = ExecutorCommandResult(
-            command=["borg", "key", "export", "/test/repo/path"],
-            return_code=1,
-            stdout="",
-            stderr="Repository not found",
-            success=False,
-            execution_time=1.0,
-            error="Repository not found",
+        mock_executor.execute_command = AsyncMock(
+            return_value=ExecutorCommandResult(
+                command=["borg", "key", "export", "/test/repo/path"],
+                return_code=1,
+                stdout="",
+                stderr="Repository not found",
+                success=False,
+                execution_time=1.0,
+                error="Repository not found",
+            )
         )
 
         result = await repository_service.export_repository_key(mock_repository)

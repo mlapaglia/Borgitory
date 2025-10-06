@@ -9,7 +9,7 @@ import pytest
 import uuid
 from unittest.mock import Mock, patch
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.services.jobs.job_models import TaskTypeEnum, TaskStatusEnum
+from borgitory.services.jobs.job_models import BorgJobTask, TaskTypeEnum, TaskStatusEnum
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 
 from borgitory.services.jobs.job_database_manager import (
@@ -315,7 +315,7 @@ class TestJobDatabaseManager:
         mock_task2.error = None
         mock_task2.return_code = None
 
-        tasks = [mock_task1, mock_task2]
+        tasks: list[BorgJobTask] = [mock_task1, mock_task2]
 
         # Mock the Job and JobTask models
         with (
@@ -442,8 +442,8 @@ class TestJobDatabaseManager:
             assert result is False
 
             # Test get job by UUID with non-existent job
-            result = await job_database_manager.get_job_by_uuid(uuid.uuid4())
-            assert result is None
+            resultJob = await job_database_manager.get_job_by_uuid(uuid.uuid4())
+            assert resultJob is None
 
             # Test save job tasks with non-existent job
             result = await job_database_manager.save_job_tasks(uuid.uuid4(), [])

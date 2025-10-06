@@ -2,7 +2,7 @@
 
 import pytest
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 from unittest.mock import Mock
 
 from borgitory.constants.retention import (
@@ -50,7 +50,7 @@ class MockRetentionConfigWithKeepWithin:
 class TestRetentionConstants:
     """Test retention constant definitions"""
 
-    def test_retention_fields_order(self):
+    def test_retention_fields_order(self) -> None:
         """Test that retention fields are in expected order"""
         expected = [
             "secondly",
@@ -63,20 +63,20 @@ class TestRetentionConstants:
         ]
         assert RETENTION_FIELDS == expected
 
-    def test_retention_field_mapping_completeness(self):
+    def test_retention_field_mapping_completeness(self) -> None:
         """Test that mapping covers all retention fields"""
         for field in RETENTION_FIELDS:
             assert field in RETENTION_FIELD_MAPPING
             assert RETENTION_FIELD_MAPPING[field] == f"--keep-{field}"
 
-    def test_default_retention_values_completeness(self):
+    def test_default_retention_values_completeness(self) -> None:
         """Test that defaults cover all retention fields"""
         for field in RETENTION_FIELDS:
             assert field in DEFAULT_RETENTION_VALUES
             assert isinstance(DEFAULT_RETENTION_VALUES[field], int)
             assert DEFAULT_RETENTION_VALUES[field] >= 0
 
-    def test_retention_field_labels_completeness(self):
+    def test_retention_field_labels_completeness(self) -> None:
         """Test that labels cover all retention fields"""
         for field in RETENTION_FIELDS:
             assert field in RETENTION_FIELD_LABELS
@@ -86,7 +86,7 @@ class TestRetentionConstants:
 class TestRetentionPolicy:
     """Test RetentionPolicy dataclass"""
 
-    def test_default_initialization(self):
+    def test_default_initialization(self) -> None:
         """Test default initialization"""
         policy = RetentionPolicy()
         assert policy.secondly is None
@@ -97,7 +97,7 @@ class TestRetentionPolicy:
         assert policy.monthly is None
         assert policy.yearly is None
 
-    def test_explicit_initialization(self):
+    def test_explicit_initialization(self) -> None:
         """Test explicit initialization"""
         policy = RetentionPolicy(daily=7, weekly=4, monthly=6, yearly=2)
         assert policy.daily == 7
@@ -108,7 +108,7 @@ class TestRetentionPolicy:
         assert policy.minutely is None
         assert policy.hourly is None
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         """Test conversion to dictionary"""
         policy = RetentionPolicy(daily=7, weekly=4)
         result = policy.to_dict()
@@ -124,7 +124,7 @@ class TestRetentionPolicy:
         }
         assert result == expected
 
-    def test_get_active_fields(self):
+    def test_get_active_fields(self) -> None:
         """Test getting only active (non-None, non-zero) fields"""
         policy = RetentionPolicy(
             secondly=0,  # Should be excluded (zero)
@@ -138,7 +138,7 @@ class TestRetentionPolicy:
         expected = {"daily": 7, "weekly": 4, "yearly": 2}
         assert result == expected
 
-    def test_get_active_fields_empty(self):
+    def test_get_active_fields_empty(self) -> None:
         """Test getting active fields when all are None or zero"""
         policy = RetentionPolicy(daily=0, weekly=None)
         result = policy.get_active_fields()
@@ -148,7 +148,7 @@ class TestRetentionPolicy:
 class TestRetentionFieldHandler:
     """Test RetentionFieldHandler utility methods"""
 
-    def test_build_borg_args_from_config_object(self):
+    def test_build_borg_args_from_config_object(self) -> None:
         """Test building borg args from config object"""
         config = MockRetentionConfig(keep_daily=7, keep_weekly=4, keep_monthly=6)
 
@@ -166,7 +166,7 @@ class TestRetentionFieldHandler:
         ]
         assert args == expected
 
-    def test_build_borg_args_from_dict(self):
+    def test_build_borg_args_from_dict(self) -> None:
         """Test building borg args from dictionary"""
         params = {
             "keep_daily": 7,
@@ -180,7 +180,7 @@ class TestRetentionFieldHandler:
         expected = ["--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "6"]
         assert args == expected
 
-    def test_build_borg_args_with_keep_within(self):
+    def test_build_borg_args_with_keep_within(self) -> None:
         """Test building borg args with keep_within"""
         config = MockRetentionConfigWithKeepWithin(keep_within="14d", keep_daily=7)
 
@@ -191,7 +191,7 @@ class TestRetentionFieldHandler:
         assert "--keep-daily" in args
         assert "7" in args
 
-    def test_build_borg_args_skip_keep_within(self):
+    def test_build_borg_args_skip_keep_within(self) -> None:
         """Test building borg args without keep_within"""
         config = MockRetentionConfigWithKeepWithin(keep_within="14d", keep_daily=7)
 
@@ -202,7 +202,7 @@ class TestRetentionFieldHandler:
         assert "--keep-daily" in args
         assert "7" in args
 
-    def test_build_borg_args_handles_string_values(self):
+    def test_build_borg_args_handles_string_values(self) -> None:
         """Test that string values are converted to integers"""
         params = {"keep_daily": "7", "keep_weekly": "4"}
 
@@ -211,7 +211,7 @@ class TestRetentionFieldHandler:
         expected = ["--keep-daily", "7", "--keep-weekly", "4"]
         assert args == expected
 
-    def test_build_borg_args_skips_invalid_values(self):
+    def test_build_borg_args_skips_invalid_values(self) -> None:
         """Test that invalid values are skipped"""
         params = {
             "keep_daily": "invalid",
@@ -224,7 +224,7 @@ class TestRetentionFieldHandler:
         expected = ["--keep-weekly", "4"]
         assert args == expected
 
-    def test_build_borg_args_skips_zero_values(self):
+    def test_build_borg_args_skips_zero_values(self) -> None:
         """Test that zero values are skipped"""
         params = {"keep_daily": 0, "keep_weekly": 4}
 
@@ -233,7 +233,7 @@ class TestRetentionFieldHandler:
         expected = ["--keep-weekly", "4"]
         assert args == expected
 
-    def test_build_borg_args_explicit(self):
+    def test_build_borg_args_explicit(self) -> None:
         """Test explicit parameter method"""
         args = RetentionFieldHandler.build_borg_args_explicit(
             keep_within="7d",
@@ -255,7 +255,7 @@ class TestRetentionFieldHandler:
         ]
         assert args == expected
 
-    def test_build_borg_args_explicit_skip_keep_within(self):
+    def test_build_borg_args_explicit_skip_keep_within(self) -> None:
         """Test explicit method without keep_within"""
         args = RetentionFieldHandler.build_borg_args_explicit(
             keep_within="7d", keep_daily=7, include_keep_within=False
@@ -264,7 +264,7 @@ class TestRetentionFieldHandler:
         expected = ["--keep-daily", "7"]
         assert args == expected
 
-    def test_build_borg_args_explicit_skip_none_and_zero(self):
+    def test_build_borg_args_explicit_skip_none_and_zero(self) -> None:
         """Test explicit method skips None and zero values"""
         args = RetentionFieldHandler.build_borg_args_explicit(
             keep_daily=7,
@@ -276,7 +276,7 @@ class TestRetentionFieldHandler:
         expected = ["--keep-daily", "7", "--keep-yearly", "2"]
         assert args == expected
 
-    def test_copy_fields(self):
+    def test_copy_fields(self) -> None:
         """Test copying retention fields between objects"""
         source = MockRetentionConfig(keep_daily=10, keep_weekly=5, keep_monthly=12)
         target = MockRetentionConfig()
@@ -288,7 +288,7 @@ class TestRetentionFieldHandler:
         assert target.keep_monthly == 12
         assert target.keep_yearly == 2  # Original value preserved
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         """Test converting config to dictionary"""
         config = MockRetentionConfig(keep_daily=7, keep_weekly=4)
 
@@ -305,7 +305,7 @@ class TestRetentionFieldHandler:
         }
         assert result == expected
 
-    def test_to_dict_with_custom_prefix(self):
+    def test_to_dict_with_custom_prefix(self) -> None:
         """Test converting config to dictionary with custom prefix"""
         # Create a mock object with custom prefix
         mock_obj = Mock()
@@ -313,7 +313,7 @@ class TestRetentionFieldHandler:
         mock_obj.retain_weekly = 4
 
         # Mock the getattr calls for all fields
-        def mock_getattr(obj, attr, default=None):
+        def mock_getattr(obj, attr, default=None) -> Any:
             if attr == "retain_daily":
                 return 7
             elif attr == "retain_weekly":
@@ -342,14 +342,14 @@ class TestRetentionFieldHandler:
         finally:
             builtins.getattr = original_getattr
 
-    def test_build_description(self):
+    def test_build_description(self) -> None:
         """Test building human-readable description"""
         config = MockRetentionConfig(keep_daily=7, keep_weekly=4, keep_yearly=2)
 
         result = RetentionFieldHandler.build_description(config)
         assert result == "7 daily, 4 weekly, 6 monthly, 2 yearly"
 
-    def test_build_description_empty(self):
+    def test_build_description_empty(self) -> None:
         """Test description when no retention rules are active"""
         config = MockRetentionConfig(
             keep_daily=0, keep_weekly=None, keep_monthly=0, keep_yearly=None
@@ -358,7 +358,7 @@ class TestRetentionFieldHandler:
         result = RetentionFieldHandler.build_description(config)
         assert result == "No retention rules"
 
-    def test_extract_from_params(self):
+    def test_extract_from_params(self) -> None:
         """Test extracting retention fields from parameters"""
         params = {
             "keep_daily": "7",
@@ -381,7 +381,7 @@ class TestRetentionFieldHandler:
         }
         assert result == expected
 
-    def test_create_policy_from_config(self):
+    def test_create_policy_from_config(self) -> None:
         """Test creating RetentionPolicy from config object"""
         config = MockRetentionConfig(keep_daily=7, keep_weekly=4)
 
@@ -398,7 +398,7 @@ class TestRetentionFieldHandler:
 class TestRetentionUtilityFunctions:
     """Test standalone utility functions"""
 
-    def test_get_retention_field_names_with_prefix(self):
+    def test_get_retention_field_names_with_prefix(self) -> None:
         """Test getting field names with prefix"""
         result = get_retention_field_names(with_prefix=True)
         expected = [
@@ -412,7 +412,7 @@ class TestRetentionUtilityFunctions:
         ]
         assert result == expected
 
-    def test_get_retention_field_names_without_prefix(self):
+    def test_get_retention_field_names_without_prefix(self) -> None:
         """Test getting field names without prefix"""
         result = get_retention_field_names(with_prefix=False)
         expected = [
@@ -426,7 +426,7 @@ class TestRetentionUtilityFunctions:
         ]
         assert result == expected
 
-    def test_validate_retention_values_valid(self):
+    def test_validate_retention_values_valid(self) -> None:
         """Test validation with valid values"""
         values = {
             "keep_daily": 7,
@@ -448,28 +448,28 @@ class TestRetentionUtilityFunctions:
         }
         assert result == expected
 
-    def test_validate_retention_values_negative(self):
+    def test_validate_retention_values_negative(self) -> None:
         """Test validation rejects negative values"""
         values = {"keep_daily": -1}
 
         with pytest.raises(ValueError, match="Invalid value for keep_daily"):
             validate_retention_values(values)
 
-    def test_validate_retention_values_invalid_string(self):
+    def test_validate_retention_values_invalid_string(self) -> None:
         """Test validation rejects invalid string values"""
         values = {"keep_daily": "invalid"}
 
         with pytest.raises(ValueError, match="Invalid value for keep_daily"):
             validate_retention_values(values)
 
-    def test_validate_retention_values_invalid_type(self):
+    def test_validate_retention_values_invalid_type(self) -> None:
         """Test validation rejects invalid types"""
         values = {"keep_daily": [1, 2, 3]}
 
         with pytest.raises(ValueError, match="Invalid type for keep_daily"):
             validate_retention_values(values)
 
-    def test_validate_retention_values_explicit_valid(self):
+    def test_validate_retention_values_explicit_valid(self) -> None:
         """Test explicit validation with valid values"""
         result = validate_retention_values_explicit(
             keep_daily=7, keep_weekly="4", keep_monthly=0, keep_yearly=None
@@ -486,7 +486,7 @@ class TestRetentionUtilityFunctions:
         }
         assert result == expected
 
-    def test_validate_retention_values_explicit_invalid(self):
+    def test_validate_retention_values_explicit_invalid(self) -> None:
         """Test explicit validation with invalid values"""
         with pytest.raises(ValueError, match="Invalid value for keep_daily"):
             validate_retention_values_explicit(keep_daily=-1)
@@ -495,17 +495,17 @@ class TestRetentionUtilityFunctions:
 class TestProtocolCompliance:
     """Test that mock objects comply with protocols"""
 
-    def test_mock_config_implements_retention_config_protocol(self):
+    def test_mock_config_implements_retention_config_protocol(self) -> None:
         """Test that MockRetentionConfig implements RetentionConfigProtocol"""
         config = MockRetentionConfig()
         assert isinstance(config, RetentionConfigProtocol)
 
-    def test_mock_config_with_keep_within_implements_protocol(self):
+    def test_mock_config_with_keep_within_implements_protocol(self) -> None:
         """Test that MockRetentionConfigWithKeepWithin implements extended protocol"""
         config = MockRetentionConfigWithKeepWithin()
         assert isinstance(config, RetentionConfigWithKeepWithinProtocol)
 
-    def test_retention_policy_has_correct_fields(self):
+    def test_retention_policy_has_correct_fields(self) -> None:
         """Test that RetentionPolicy has the expected retention fields"""
         policy = RetentionPolicy()
         # RetentionPolicy uses field names without keep_ prefix
@@ -521,7 +521,7 @@ class TestProtocolCompliance:
 class TestEdgeCases:
     """Test edge cases and error conditions"""
 
-    def test_build_borg_args_empty_config(self):
+    def test_build_borg_args_empty_config(self) -> None:
         """Test building args with empty config"""
         config = MockRetentionConfig(
             keep_daily=None, keep_weekly=None, keep_monthly=None, keep_yearly=None
@@ -530,12 +530,12 @@ class TestEdgeCases:
         args = RetentionFieldHandler.build_borg_args(config, include_keep_within=False)
         assert args == []
 
-    def test_build_borg_args_empty_dict(self):
+    def test_build_borg_args_empty_dict(self) -> None:
         """Test building args with empty dictionary"""
         args = RetentionFieldHandler.build_borg_args({}, include_keep_within=False)
         assert args == []
 
-    def test_build_description_single_field(self):
+    def test_build_description_single_field(self) -> None:
         """Test description with single retention field"""
         config = MockRetentionConfig(
             keep_daily=7, keep_weekly=None, keep_monthly=None, keep_yearly=None
@@ -544,7 +544,7 @@ class TestEdgeCases:
         result = RetentionFieldHandler.build_description(config)
         assert result == "7 daily"
 
-    def test_copy_fields_missing_attributes(self):
+    def test_copy_fields_missing_attributes(self) -> None:
         """Test copying fields when source is missing some attributes"""
 
         # Create a partial source object with only some retention fields
