@@ -269,16 +269,22 @@ class JobManagerFactory:
             get_registry_factory,
             get_provider_registry,
             get_hook_execution_service,
+            get_command_executor,
+            get_wsl_command_executor,
         )
 
         # Create complete dependencies with all cloud sync and notification services
         # Import singleton dependency functions
         from borgitory.dependencies import get_notification_service_singleton
 
+        # Create command executor for rclone service
+        wsl_executor = get_wsl_command_executor()
+        command_executor = get_command_executor(wsl_executor)
+
         complete_deps = JobManagerDependencies(
-            rclone_service=get_rclone_service(),
+            rclone_service=get_rclone_service(command_executor),
             encryption_service=get_encryption_service(),
-            storage_factory=get_storage_factory(get_rclone_service()),
+            storage_factory=get_storage_factory(get_rclone_service(command_executor)),
             provider_registry=get_provider_registry(
                 registry_factory=get_registry_factory()
             ),
