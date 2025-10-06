@@ -513,7 +513,7 @@ class TestJobStreamService:
 
         # Test that JobStreamService works in FastAPI context
         mock_service = Mock(spec=JobStreamService)
-        mock_service.get_job_status.return_value = {"status": JobStatusEnum.RUNNING}
+        mock_service.get_current_jobs_data.return_value = []
 
         with override_dependency(get_job_stream_service, lambda: mock_service):
             # Test that the override works

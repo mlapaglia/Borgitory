@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from fastapi.templating import Jinja2Templates
 
 from borgitory.models.database import Job
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.protocols import JobManagerProtocol
 from borgitory.services.jobs.job_models import BorgJob
 
@@ -387,7 +388,10 @@ class JobRenderService:
                 .first()
             )
 
-            if db_job and db_job.status in ["completed", "failed"]:
+            if db_job and db_job.status in [
+                JobStatusEnum.COMPLETED,
+                JobStatusEnum.FAILED,
+            ]:
                 logger.info(f"Using database data for completed/failed job {job_id}")
                 job_data = self.converter.convert_database_job(db_job)
                 return self.converter.fix_failed_job_tasks(job_data)

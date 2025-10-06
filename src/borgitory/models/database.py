@@ -113,7 +113,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, index=True, default=uuid.uuid4
+        Uuid(native_uuid=False), primary_key=True, index=True, default=uuid.uuid4
     )  # UUID as primary key
     repository_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("repositories.id"), nullable=False
@@ -163,7 +163,7 @@ class JobTask(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     job_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("jobs.id"), nullable=False
+        Uuid(native_uuid=False), ForeignKey("jobs.id"), nullable=False
     )  # UUID foreign key
     task_type: Mapped[str] = mapped_column(
         String, nullable=False

@@ -89,9 +89,12 @@ async def get_repository_statistics_html(
             content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>{str(e)}</p>",
             status_code=400,
         )
-    except Exception as e:
+    except Exception:
         # Handle other errors - log exception for diagnostics, return only generic info to user
-        logging.exception("Exception occurred while generating repository statistics HTML (repository_id=%s)", repository_id)
+        logging.exception(
+            "Exception occurred while generating repository statistics HTML (repository_id=%s)",
+            repository_id,
+        )
         return HTMLResponse(
             content="<p class='text-red-700 dark:text-red-300 text-sm text-center'>An internal error has occurred while generating repository statistics.</p>",
             status_code=500,
