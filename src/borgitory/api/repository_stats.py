@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+import logging
 
 from borgitory.api.cancel_on_disconnect import with_cancel_on_disconnect
 from borgitory.models.database import get_db, Repository
@@ -89,8 +90,9 @@ async def get_repository_statistics_html(
             status_code=400,
         )
     except Exception as e:
-        # Handle other errors
+        # Handle other errors - log exception for diagnostics, return only generic info to user
+        logging.exception("Exception occurred while generating repository statistics HTML (repository_id=%s)", repository_id)
         return HTMLResponse(
-            content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>Error generating statistics: {str(e)}</p>",
+            content="<p class='text-red-700 dark:text-red-300 text-sm text-center'>An internal error has occurred while generating repository statistics.</p>",
             status_code=500,
         )
