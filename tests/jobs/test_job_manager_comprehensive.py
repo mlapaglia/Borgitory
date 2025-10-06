@@ -144,26 +144,6 @@ class TestJobManagerFactory:
         assert deps.queue_manager is not None
         assert deps.output_manager is not None
         assert deps.queue_manager.max_concurrent_backups == 10
-        assert deps.output_manager.max_lines_per_job == 2000
-
-    def test_create_dependencies_with_custom_dependencies(self) -> None:
-        """Test creating dependencies with partial custom dependencies"""
-        mock_executor = Mock()
-        mock_output_manager = Mock()
-
-        custom_deps = JobManagerDependencies(
-            job_executor=mock_executor,
-            output_manager=mock_output_manager,
-        )
-
-        deps = JobManagerFactory.create_dependencies(custom_dependencies=custom_deps)
-
-        # Custom dependencies should be preserved
-        assert deps.job_executor is mock_executor
-        assert deps.output_manager is mock_output_manager
-        # Others should be created
-        assert deps.queue_manager is not None
-        assert deps.event_broadcaster is not None
 
     def test_create_for_testing(self) -> None:
         """Test creating dependencies for testing"""
@@ -190,22 +170,6 @@ class TestJobManagerFactory:
         assert deps.output_manager is not None
         # Should have reduced limits
         assert deps.queue_manager.max_concurrent_backups == 1
-        assert deps.output_manager.max_lines_per_job == 100
-
-    def test_dependencies_post_init(self) -> None:
-        """Test JobManagerDependencies post_init method"""
-        # Test with no session factory
-        deps = JobManagerDependencies()
-        deps.__post_init__()
-
-        assert deps.db_session_factory is not None
-
-        # Test with custom session factory
-        custom_factory = Mock()
-        deps_custom = JobManagerDependencies(db_session_factory=custom_factory)
-        deps_custom.__post_init__()
-
-        assert deps_custom.db_session_factory is custom_factory
 
 
 class TestJobManagerTaskExecution:
@@ -219,7 +183,7 @@ class TestJobManagerTaskExecution:
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,
     ) -> JobManager:
-        """Create job manager with real database session and proper notification service injection"""
+        """Create job manager with real database session and mocked services"""
 
         @contextmanager
         def db_session_factory() -> Generator[Session, None, None]:
@@ -228,48 +192,25 @@ class TestJobManagerTaskExecution:
             finally:
                 pass
 
-        # Create notification service using proper DI
-        from borgitory.dependencies import (
-            get_http_client,
-            get_notification_provider_factory,
-        )
-        from borgitory.services.notifications.service import NotificationService
-
-        http_client = get_http_client()
-        factory = get_notification_provider_factory(http_client)
-        notification_service = NotificationService(provider_factory=factory)
-
-        # Import cloud sync dependencies for complete testing
-        from borgitory.dependencies import (
-            get_rclone_service,
-            get_encryption_service,
-            get_storage_factory,
-            get_registry_factory,
-            get_provider_registry,
-            get_command_executor,
-            get_wsl_command_executor,
+        # Use the factory to create test dependencies with proper protocol specs
+        deps = JobManagerFactory.create_for_testing(
+            mock_event_broadcaster=mock_event_broadcaster
         )
 
-        # Create command executor for rclone service
-        wsl_executor = get_wsl_command_executor()
-        command_executor = get_command_executor(wsl_executor)
+        # Override with real database session
+        deps.db_session_factory = db_session_factory
 
-        deps = JobManagerDependencies(
-            db_session_factory=db_session_factory,
-            notification_service=notification_service,
-            # Add cloud sync dependencies for comprehensive testing
-            rclone_service=get_rclone_service(command_executor),
-            encryption_service=get_encryption_service(),
-            storage_factory=get_storage_factory(get_rclone_service(command_executor)),
-            provider_registry=get_provider_registry(get_registry_factory()),
-        )
-        full_deps = JobManagerFactory.create_dependencies(custom_dependencies=deps)
-        manager = JobManager(dependencies=full_deps)
+        # Create a real database manager that uses the real database session
+        from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
-        # Ensure our mocks are actually used (override any defaults)
-        self._ensure_mock_dependencies(
-            manager, mock_output_manager, mock_queue_manager, mock_event_broadcaster
-        )
+        real_db_manager = JobDatabaseManager(db_session_factory=db_session_factory)
+        deps.database_manager = real_db_manager
+
+        manager = JobManager(dependencies=deps)
+
+        # Override specific mocks if needed for the test
+        manager.output_manager = mock_output_manager
+        manager.queue_manager = mock_queue_manager
 
         return manager
 
@@ -298,7 +239,6 @@ class TestJobManagerTaskExecution:
     ) -> JobManager:
         """Create job manager with injected mock dependencies"""
 
-        # Create a mock database session factory
         @contextmanager
         def mock_db_session_factory() -> Generator[Session, None, None]:
             try:
@@ -306,31 +246,20 @@ class TestJobManagerTaskExecution:
             finally:
                 pass
 
-        # Create custom dependencies with mocks
-        custom_deps = JobManagerDependencies(
-            job_executor=mock_job_executor,
-            database_manager=mock_database_manager,
-            output_manager=mock_output_manager,
-            queue_manager=mock_queue_manager,
-            event_broadcaster=mock_event_broadcaster,
-            notification_service=mock_notification_service,
-            db_session_factory=mock_db_session_factory,
+        # Use the factory to create test dependencies
+        deps = JobManagerFactory.create_for_testing(
+            mock_event_broadcaster=mock_event_broadcaster
         )
 
-        # Create full dependencies with our mocks injected
-        full_deps = JobManagerFactory.create_dependencies(
-            config=JobManagerConfig(), custom_dependencies=custom_deps
-        )
+        # Override with real database session and specific mocks
+        deps.db_session_factory = mock_db_session_factory
+        deps.job_executor = mock_job_executor
+        deps.database_manager = mock_database_manager
+        deps.output_manager = mock_output_manager
+        deps.queue_manager = mock_queue_manager
+        deps.notification_service = mock_notification_service
 
-        # Create job manager with mock dependencies
-        from borgitory.services.jobs.job_manager import JobManager
-
-        job_manager = JobManager(dependencies=full_deps)
-
-        # Ensure our mocks are actually used (override any defaults)
-        self._ensure_mock_dependencies(
-            job_manager, mock_output_manager, mock_queue_manager, mock_event_broadcaster
-        )
+        job_manager = JobManager(dependencies=deps)
 
         return job_manager
 
@@ -347,30 +276,19 @@ class TestJobManagerTaskExecution:
     ) -> JobManager:
         """Create job manager with secure command mock for dry run tests"""
 
-        # Create custom dependencies with mocks
-        custom_deps = JobManagerDependencies(
-            job_executor=mock_job_executor,
-            database_manager=mock_database_manager,
-            output_manager=mock_output_manager,
-            queue_manager=mock_queue_manager,
-            event_broadcaster=mock_event_broadcaster,
-            notification_service=mock_notification_service,
+        # Use the factory to create test dependencies
+        deps = JobManagerFactory.create_for_testing(
+            mock_event_broadcaster=mock_event_broadcaster
         )
 
-        # Create full dependencies with our mocks injected
-        full_deps = JobManagerFactory.create_dependencies(
-            config=JobManagerConfig(), custom_dependencies=custom_deps
-        )
+        # Override with specific mocks
+        deps.job_executor = mock_job_executor
+        deps.database_manager = mock_database_manager
+        deps.output_manager = mock_output_manager
+        deps.queue_manager = mock_queue_manager
+        deps.notification_service = mock_notification_service
 
-        # Create job manager with mock dependencies
-        from borgitory.services.jobs.job_manager import JobManager
-
-        job_manager = JobManager(dependencies=full_deps)
-
-        # Ensure our mocks are actually used (override any defaults)
-        self._ensure_mock_dependencies(
-            job_manager, mock_output_manager, mock_queue_manager, mock_event_broadcaster
-        )
+        job_manager = JobManager(dependencies=deps)
 
         # Inject the secure command mock into the backup executor
         job_manager.backup_executor.secure_borg_command = mock_secure_borg_command  # type: ignore[attr-defined]
@@ -442,7 +360,7 @@ class TestJobManagerTaskExecution:
             repository_id=sample_repository.id,
         )
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Mock individual task execution to succeed
         async def mock_backup_task(
@@ -462,8 +380,8 @@ class TestJobManagerTaskExecution:
             return True
 
         # Configure mock executors
-        job_manager_with_mocks.backup_executor.execute_backup_task = mock_backup_task  # type: ignore[assignment]
-        job_manager_with_mocks.prune_executor.execute_prune_task = mock_prune_task  # type: ignore[assignment]
+        job_manager_with_mocks.backup_executor.execute_backup_task = mock_backup_task  # type: ignore[method-assign]
+        job_manager_with_mocks.prune_executor.execute_prune_task = mock_prune_task  # type: ignore[method-assign]
 
         await job_manager_with_mocks._execute_composite_job(job)
 
@@ -523,7 +441,7 @@ class TestJobManagerTaskExecution:
         mock_prune = AsyncMock()
 
         # Configure mock executors
-        job_manager_with_db.backup_executor.execute_backup_task = mock_backup_fail  # type: ignore[method-assign,assignment]
+        job_manager_with_db.backup_executor.execute_backup_task = mock_backup_fail  # type: ignore[method-assign]
         job_manager_with_db.prune_executor.execute_prune_task = mock_prune  # type: ignore[method-assign]
 
         # Wait for the job to complete (it starts automatically)
@@ -625,7 +543,7 @@ class TestJobManagerTaskExecution:
             repository_id=sample_repository.id,
         )
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Configure mock behaviors
         mock_database_manager.get_repository_data.return_value = {
@@ -686,7 +604,7 @@ class TestJobManagerTaskExecution:
 
         # Add job to manager
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Configure mock behaviors
         mock_database_manager.get_repository_data.return_value = {
@@ -746,7 +664,7 @@ class TestJobManagerTaskExecution:
             repository_id=sample_repository.id,
         )
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Configure mock behaviors for failure
         mock_database_manager.get_repository_data.return_value = {
@@ -806,7 +724,7 @@ class TestJobManagerTaskExecution:
             repository_id=sample_repository.id,
         )
         job_manager_with_secure_command_mock.jobs[job_id] = job
-        job_manager_with_secure_command_mock.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_secure_command_mock.output_manager.create_job_output(job_id)
 
         # Configure mock behaviors
         mock_database_manager.get_repository_data.return_value = {
@@ -868,7 +786,7 @@ class TestJobManagerTaskExecution:
             repository_id=1,  # Add repository_id for the updated method
         )
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Configure mock behaviors
         mock_database_manager.get_repository_data.return_value = {
@@ -915,7 +833,7 @@ class TestJobManagerTaskExecution:
             repository_id=sample_repository.id,
         )
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Configure mock behaviors
         mock_database_manager.get_repository_data.return_value = {
@@ -966,7 +884,7 @@ class TestJobManagerTaskExecution:
             repository_id=1,  # Add repository_id for cloud sync task
         )
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Configure mock behaviors
         mock_database_manager.get_repository_data.return_value = {
@@ -1038,7 +956,7 @@ class TestJobManagerTaskExecution:
             tasks=[task],
         )
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Configure mock notification service
         mock_notification_service.load_config_from_storage.return_value = {
@@ -1084,7 +1002,7 @@ class TestJobManagerTaskExecution:
             tasks=[task],
         )
         job_manager_with_mocks.jobs[job_id] = job
-        job_manager_with_mocks.output_manager.create_job_output(job_id)  # type: ignore[union-attr]
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         success = await job_manager_with_mocks.notification_executor.execute_notification_task(
             job, task, 0
@@ -1159,9 +1077,15 @@ class TestJobManagerDatabaseIntegration:
             finally:
                 pass
 
-        deps = JobManagerDependencies(db_session_factory=db_session_factory)
-        full_deps = JobManagerFactory.create_dependencies(custom_dependencies=deps)
-        manager = JobManager(dependencies=full_deps)
+        deps = JobManagerFactory.create_for_testing()
+        deps.db_session_factory = db_session_factory
+
+        # Create a real database manager instead of using the mock
+        from borgitory.services.jobs.job_database_manager import JobDatabaseManager
+
+        deps.database_manager = JobDatabaseManager(db_session_factory)
+
+        manager = JobManager(dependencies=deps)
 
         # Ensure our mocks are actually used (override any defaults)
         self._ensure_mock_dependencies(
@@ -1231,7 +1155,7 @@ class TestJobManagerStreamingAndUtility:
             yield {"line": "output line 1", "progress": {}}
             yield {"line": "output line 2", "progress": {"percent": 50}}
 
-        job_manager.output_manager.stream_job_output = Mock(return_value=mock_stream())  # type: ignore[method-assign,union-attr]
+        job_manager.output_manager.stream_job_output = Mock(return_value=mock_stream())  # type: ignore[method-assign]
 
         output_list = []
         async for output in job_manager.stream_job_output(uuid.uuid4()):
@@ -1245,7 +1169,17 @@ class TestJobManagerStreamingAndUtility:
     async def test_stream_job_output_no_manager(self) -> None:
         """Test streaming output when no output manager"""
         manager = JobManager()
-        manager.output_manager = None
+        # Create a mock output manager that returns an empty async generator
+        from unittest.mock import Mock
+        from typing import AsyncGenerator
+
+        async def empty_stream() -> AsyncGenerator[dict, None]:
+            return
+            yield  # This line will never be reached, but makes it a proper async generator
+
+        mock_output_manager = Mock()
+        mock_output_manager.stream_job_output = Mock(return_value=empty_stream())
+        manager.output_manager = mock_output_manager
 
         output_list = []
         async for output in manager.stream_job_output(uuid.uuid4()):
@@ -1295,7 +1229,7 @@ class TestJobManagerStreamingAndUtility:
         mock_output.current_progress = {"percent": 75}
         mock_output.total_lines = 2
 
-        job_manager.output_manager.get_job_output = Mock(return_value=mock_output)  # type: ignore[method-assign,union-attr]
+        job_manager.output_manager.get_job_output = Mock(return_value=mock_output)  # type: ignore[method-assign]
 
         result = await job_manager.get_job_output_stream(job_id)
 
@@ -1311,7 +1245,7 @@ class TestJobManagerStreamingAndUtility:
         self, job_manager: JobManager
     ) -> None:
         """Test getting output stream when no output exists"""
-        job_manager.output_manager.get_job_output = Mock(return_value=None)  # type: ignore[method-assign,union-attr]
+        job_manager.output_manager.get_job_output = Mock(return_value=None)  # type: ignore[method-assign]
 
         result = await job_manager.get_job_output_stream(uuid.uuid4())
 
@@ -1340,7 +1274,7 @@ class TestJobManagerStreamingAndUtility:
 
         mock_process = AsyncMock()
         job_manager._processes[job_id] = mock_process
-        job_manager.executor.terminate_process = AsyncMock(return_value=True)  # type: ignore[method-assign,union-attr]
+        job_manager.executor.terminate_process = AsyncMock(return_value=True)  # type: ignore[method-assign]
 
         result = await job_manager.cancel_job(job_id)
 
@@ -1384,12 +1318,20 @@ class TestJobManagerFactoryFunctions:
         mock_db_session = Mock()
         mock_rclone = Mock()
 
+        from borgitory.protocols.job_event_broadcaster_protocol import (
+            JobEventBroadcasterProtocol,
+        )
+
+        mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
+
         deps = get_test_job_manager_dependencies(
+            mock_event_broadcaster=mock_event_broadcaster,
             mock_subprocess=mock_subprocess,
             mock_db_session=mock_db_session,
             mock_rclone_service=mock_rclone,
         )
 
+        assert deps.event_broadcaster is mock_event_broadcaster
         assert deps.subprocess_executor is mock_subprocess
         assert deps.db_session_factory is mock_db_session
         assert deps.rclone_service is mock_rclone

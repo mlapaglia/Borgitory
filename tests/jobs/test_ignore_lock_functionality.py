@@ -30,15 +30,30 @@ class TestIgnoreLockFunctionality:
     @pytest.fixture
     def mock_dependencies(self) -> JobManagerDependencies:
         """Create mock dependencies for JobManager"""
-        deps = JobManagerDependencies()
+        from borgitory.services.jobs.job_manager_factory import JobManagerFactory
+        from borgitory.protocols.job_event_broadcaster_protocol import (
+            JobEventBroadcasterProtocol,
+        )
+        from unittest.mock import Mock
+
+        # Create a mock event broadcaster
+        mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
+
+        # Use the factory to create test dependencies
+        deps = JobManagerFactory.create_for_testing(
+            mock_event_broadcaster=mock_event_broadcaster
+        )
+
+        # Override the job executor with our custom mock
         mock_executor = MagicMock()
         mock_executor.start_process = AsyncMock()
         mock_executor.monitor_process_output = AsyncMock()
-        deps.job_executor = mock_executor
+        setattr(deps, "job_executor", mock_executor)
 
-        deps.output_manager = MagicMock()
-        deps.output_manager.add_output_line = AsyncMock()
-        deps.event_broadcaster = MagicMock()
+        # Override output manager with our custom mock
+        mock_output_manager = MagicMock()
+        mock_output_manager.add_output_line = AsyncMock()
+        setattr(deps, "output_manager", mock_output_manager)
 
         return deps
 
@@ -48,7 +63,6 @@ class TestIgnoreLockFunctionality:
         manager = JobManager(dependencies=mock_dependencies)
         # Ensure the executor is properly set and not None
         assert mock_dependencies.job_executor is not None
-        manager.executor = mock_dependencies.job_executor
         return manager
 
     @pytest.fixture

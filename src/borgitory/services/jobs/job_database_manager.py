@@ -54,11 +54,11 @@ class JobDatabaseManager:
     ) -> Optional[uuid.UUID]:
         """Create a new job record in the database"""
         try:
-            from borgitory.models.database import Job
+            from borgitory.models.database import Job, StringUUID
 
             with self.db_session_factory() as db:
                 db_job = Job()
-                db_job.id = job_data.id
+                db_job.id = StringUUID(job_data.id.hex)
                 db_job.repository_id = job_data.repository_id
                 db_job.type = str(job_data.job_type)  # Convert JobType enum to string
                 db_job.status = job_data.status

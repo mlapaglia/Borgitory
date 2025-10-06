@@ -4,7 +4,13 @@ Backup Task Executor - Handles backup task execution
 
 import asyncio
 import logging
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
+from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
+from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.utils.security import secure_borg_command, cleanup_temp_keyfile
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
@@ -15,7 +21,12 @@ logger = logging.getLogger(__name__)
 class BackupTaskExecutor:
     """Handles backup task execution"""
 
-    def __init__(self, job_executor: Any, output_manager: Any, event_broadcaster: Any):
+    def __init__(
+        self,
+        job_executor: ProcessExecutorProtocol,
+        output_manager: JobOutputManagerProtocol,
+        event_broadcaster: JobEventBroadcasterProtocol,
+    ):
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
@@ -59,7 +70,7 @@ class BackupTaskExecutor:
                 )
 
                 self.event_broadcaster.broadcast_event(
-                    "JOB_OUTPUT",
+                    EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={
                         "line": line,
@@ -272,7 +283,7 @@ class BackupTaskExecutor:
 
     async def _get_repository_data(
         self, repository_id: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Dict[str, object]]:
         """Get repository data by ID - this will be injected by the job manager"""
         # This method will be overridden by the job manager
         return None

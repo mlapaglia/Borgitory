@@ -19,6 +19,13 @@ from contextlib import _GeneratorContextManager
 import uuid
 
 from borgitory.models.job_results import JobStatusEnum
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
+from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
+from borgitory.protocols.job_queue_manager_protocol import JobQueueManagerProtocol
+from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 
 
 if TYPE_CHECKING:
@@ -61,12 +68,6 @@ if TYPE_CHECKING:
     from borgitory.services.cloud_providers.registry import ProviderRegistry
     from borgitory.services.hooks.hook_execution_service import HookExecutionService
     from borgitory.services.rclone_service import RcloneService
-    from borgitory.services.jobs.job_output_manager import JobOutputManager
-    from borgitory.services.jobs.job_queue_manager import JobQueueManager
-    from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
-        JobEventBroadcaster,
-    )
-    from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
 
 @dataclass
@@ -95,12 +96,12 @@ class JobManagerConfig:
 class JobManagerDependencies:
     """Injectable dependencies for the job manager"""
 
-    # Core services
-    job_executor: Optional["ProcessExecutorProtocol"] = None
-    output_manager: Optional["JobOutputManager"] = None
-    queue_manager: Optional["JobQueueManager"] = None
-    event_broadcaster: Optional["JobEventBroadcaster"] = None
-    database_manager: Optional["JobDatabaseManager"] = None
+    # Core services - all required
+    event_broadcaster: JobEventBroadcasterProtocol
+    job_executor: ProcessExecutorProtocol
+    output_manager: JobOutputManagerProtocol
+    queue_manager: JobQueueManagerProtocol
+    database_manager: JobDatabaseManagerProtocol
 
     # External dependencies (for testing/customization)
     subprocess_executor: Optional[Callable[..., Coroutine[None, None, "Process"]]] = (

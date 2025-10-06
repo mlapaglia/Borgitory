@@ -23,15 +23,16 @@ class TestCompositeJobCriticalFailure:
 
     def setup_method(self) -> None:
         """Set up test dependencies."""
-        # Create proper test dependencies using the factory
-        mock_subprocess = AsyncMock()
-        mock_db_session = Mock()
-        mock_rclone = Mock()
+        from borgitory.protocols.job_event_broadcaster_protocol import (
+            JobEventBroadcasterProtocol,
+        )
 
+        # Create a mock event broadcaster
+        mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
+
+        # Create proper test dependencies using the factory
         self.dependencies = JobManagerFactory.create_for_testing(
-            mock_subprocess=mock_subprocess,
-            mock_db_session=mock_db_session,
-            mock_rclone_service=mock_rclone,
+            mock_event_broadcaster=mock_event_broadcaster
         )
         self.job_manager = JobManager(dependencies=self.dependencies)
 
@@ -142,7 +143,6 @@ class TestCompositeJobCriticalFailure:
         self,
     ) -> None:
         """Test that critical backup task failure marks remaining tasks as skipped."""
-        from unittest.mock import AsyncMock
 
         # Create job with pre-hook, backup (critical failure), post-hook, notification
         pre_hook_task = self.create_hook_task("pre")

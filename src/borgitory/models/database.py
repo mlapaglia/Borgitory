@@ -4,8 +4,12 @@ import logging
 import uuid
 import os
 from datetime import datetime
+from borgitory.config_module import DATA_DIR, DATABASE_URL, get_secret_key
+from borgitory.services.migrations.migration_factory import (
+    create_migration_service_for_startup,
+)
 from borgitory.utils.datetime_utils import now_utc
-from typing import List
+from typing import List, Any
 
 from cryptography.fernet import Fernet
 from passlib.context import CryptContext
@@ -23,10 +27,30 @@ from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from typing import Generator
 
-from borgitory.config_module import DATABASE_URL, get_secret_key, DATA_DIR
-from borgitory.services.migrations.migration_factory import (
-    create_migration_service_for_startup,
-)
+
+class StringUUID(uuid.UUID):
+    """UUID subclass that returns string representation by default"""
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+    def __repr__(self) -> str:
+        return f"'{super().__str__()}'"
+
+
+class StringUuidType(Uuid[str]):
+    """Custom UUID type that returns StringUUID objects"""
+
+    def result_processor(self, dialect: Any, coltype: Any) -> Any:
+        """Convert database result to StringUUID"""
+
+        def process(value: Any) -> Any:
+            if value is None:
+                return None
+            return StringUUID(value)
+
+        return process
+
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +136,11 @@ class Repository(Base):
 class Job(Base):
     __tablename__ = "jobs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(native_uuid=False), primary_key=True, index=True, default=uuid.uuid4
+    id: Mapped[StringUUID] = mapped_column(
+        StringUuidType(native_uuid=False),
+        primary_key=True,
+        index=True,
+        default=uuid.uuid4,
     )  # UUID as primary key
     repository_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("repositories.id"), nullable=False
@@ -162,8 +189,8 @@ class JobTask(Base):
     __tablename__ = "job_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    job_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(native_uuid=False), ForeignKey("jobs.id"), nullable=False
+    job_id: Mapped[StringUUID] = mapped_column(
+        StringUuidType(native_uuid=False), ForeignKey("jobs.id"), nullable=False
     )  # UUID foreign key
     task_type: Mapped[str] = mapped_column(
         String, nullable=False

@@ -5,8 +5,14 @@ Cloud Sync Task Executor - Handles cloud sync task execution
 import asyncio
 import logging
 from typing import Optional, Dict, Any
+from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
+from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +20,12 @@ logger = logging.getLogger(__name__)
 class CloudSyncTaskExecutor:
     """Handles cloud sync task execution"""
 
-    def __init__(self, job_executor: Any, output_manager: Any, event_broadcaster: Any):
+    def __init__(
+        self,
+        job_executor: ProcessExecutorProtocol,
+        output_manager: JobOutputManagerProtocol,
+        event_broadcaster: JobEventBroadcasterProtocol,
+    ):
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
@@ -64,7 +75,7 @@ class CloudSyncTaskExecutor:
             )
 
             self.event_broadcaster.broadcast_event(
-                "JOB_OUTPUT",
+                EventType.JOB_OUTPUT,
                 job_id=job.id,
                 data={
                     "line": line,

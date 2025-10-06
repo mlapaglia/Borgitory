@@ -10,6 +10,7 @@ from datetime import datetime
 import uuid
 from borgitory.utils.datetime_utils import now_utc
 from dataclasses import dataclass, field
+from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ class JobOutputStreamResponse:
         }
 
 
-class JobOutputManager:
+class JobOutputManager(JobOutputManagerProtocol):
     """Manages job output collection, storage, and streaming"""
 
     def __init__(self, max_lines_per_job: int = 1000) -> None:

@@ -31,9 +31,6 @@ from borgitory.services.jobs.job_models import (
 from borgitory.services.jobs.job_output_manager import JobOutputStreamResponse
 from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 from borgitory.services.jobs.job_queue_manager import QueuedJob, JobPriority
-from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
-    JobEventBroadcaster,
-)
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.services.jobs.broadcaster.job_event import JobEvent
 from borgitory.services.jobs.task_executors import (
@@ -47,8 +44,6 @@ from borgitory.services.jobs.task_executors import (
 
 if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
-    from borgitory.protocols.command_protocols import ProcessExecutorProtocol
-
 logger = logging.getLogger(__name__)
 
 
@@ -148,38 +143,6 @@ class JobManager:
             self._get_hook_execution_service,
         )
 
-    @property
-    def safe_executor(self) -> "ProcessExecutorProtocol":
-        if self.executor is None:
-            raise RuntimeError(
-                "JobManager executor is None - ensure proper initialization"
-            )
-        return self.executor
-
-    @property
-    def safe_output_manager(self) -> Any:
-        if self.output_manager is None:
-            raise RuntimeError(
-                "JobManager output_manager is None - ensure proper initialization"
-            )
-        return self.output_manager
-
-    @property
-    def safe_queue_manager(self) -> Any:
-        if self.queue_manager is None:
-            raise RuntimeError(
-                "JobManager queue_manager is None - ensure proper initialization"
-            )
-        return self.queue_manager
-
-    @property
-    def safe_event_broadcaster(self) -> JobEventBroadcaster:
-        if self.event_broadcaster is None:
-            raise RuntimeError(
-                "JobManager event_broadcaster is None - ensure proper initialization"
-            )
-        return self.event_broadcaster
-
     def _setup_callbacks(self) -> None:
         """Set up callbacks between modules"""
         if self.queue_manager:
@@ -197,7 +160,7 @@ class JobManager:
             await self.queue_manager.initialize()
 
         if self.event_broadcaster:
-            await self.safe_event_broadcaster.initialize()
+            await self.event_broadcaster.initialize()
 
         self._initialized = True
         logger.info("Job manager initialized successfully")
@@ -233,16 +196,16 @@ class JobManager:
         )
         self.jobs[job_id] = job
 
-        self.safe_output_manager.create_job_output(job_id)
+        self.output_manager.create_job_output(job_id)
 
         if is_backup:
-            await self.safe_queue_manager.enqueue_job(
+            await self.queue_manager.enqueue_job(
                 job_id=job_id, job_type="backup", priority=JobPriority.NORMAL
             )
         else:
             await self._execute_composite_task(job, main_task, command, env)
 
-        self.safe_event_broadcaster.broadcast_event(
+        self.event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
             data={"command": command_str, "is_backup": is_backup},
@@ -262,7 +225,7 @@ class JobManager:
         task.status = TaskStatusEnum.RUNNING
 
         try:
-            process = await self.safe_executor.start_process(command, env)
+            process = await self.executor.start_process(command, env)
             self._processes[job.id] = process
 
             def output_callback(line: str) -> None:
@@ -271,18 +234,18 @@ class JobManager:
                 # Add output to both the task and the output manager
                 task.output_lines.append(line)
                 asyncio.create_task(
-                    self.safe_output_manager.add_output_line(
+                    self.output_manager.add_output_line(
                         job.id, line, "stdout", progress
                     )
                 )
 
-                self.safe_event_broadcaster.broadcast_event(
+                self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={"line": line, "progress": None},  # No progress data
                 )
 
-            result = await self.safe_executor.monitor_process_output(
+            result = await self.executor.monitor_process_output(
                 process, output_callback=output_callback
             )
 
@@ -312,7 +275,7 @@ class JobManager:
                 task.error = result.error
                 job.error = result.error
 
-            self.safe_event_broadcaster.broadcast_event(
+            self.event_broadcaster.broadcast_event(
                 EventType.JOB_COMPLETED
                 if job.status == JobStatusEnum.COMPLETED
                 else EventType.JOB_FAILED,
@@ -329,7 +292,7 @@ class JobManager:
             job.completed_at = now_utc()
             logger.error(f"Composite job task {job.id} execution failed: {e}")
 
-            self.safe_event_broadcaster.broadcast_event(
+            self.event_broadcaster.broadcast_event(
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
             )
 
@@ -416,11 +379,11 @@ class JobManager:
             except Exception as e:
                 logger.error(f"Failed to pre-save tasks for job {job_id}: {e}")
 
-        self.safe_output_manager.create_job_output(job_id)
+        self.output_manager.create_job_output(job_id)
 
         asyncio.create_task(self._execute_composite_job(job))
 
-        self.safe_event_broadcaster.broadcast_event(
+        self.event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
             job_id=job_id,
             data={"job_type": job_type, "task_count": len(tasks)},
@@ -436,7 +399,7 @@ class JobManager:
         if self.database_manager:
             await self.database_manager.update_job_status(job.id, JobStatusEnum.RUNNING)
 
-        self.safe_event_broadcaster.broadcast_event(
+        self.event_broadcaster.broadcast_event(
             EventType.JOB_STATUS_CHANGED,
             job_id=job.id,
             data={
@@ -452,7 +415,7 @@ class JobManager:
                 task.status = TaskStatusEnum.RUNNING
                 task.started_at = now_utc()
 
-                self.safe_event_broadcaster.broadcast_event(
+                self.event_broadcaster.broadcast_event(
                     EventType.TASK_STARTED,
                     job_id=job.id,
                     data={
@@ -471,7 +434,7 @@ class JobManager:
                     if not task.completed_at:
                         task.completed_at = now_utc()
 
-                    self.safe_event_broadcaster.broadcast_event(
+                    self.event_broadcaster.broadcast_event(
                         EventType.TASK_COMPLETED
                         if task.status == TaskStatusEnum.COMPLETED
                         else EventType.TASK_FAILED,
@@ -552,7 +515,7 @@ class JobManager:
                     task.completed_at = now_utc()
                     logger.error(f"Task {task.task_type} in job {job.id} failed: {e}")
 
-                    self.safe_event_broadcaster.broadcast_event(
+                    self.event_broadcaster.broadcast_event(
                         EventType.TASK_FAILED,
                         job_id=job.id,
                         data={"task_index": task_index, "error": str(e)},
@@ -639,7 +602,7 @@ class JobManager:
                     job.id, job.status, job.completed_at
                 )
 
-            self.safe_event_broadcaster.broadcast_event(
+            self.event_broadcaster.broadcast_event(
                 EventType.JOB_COMPLETED
                 if job.status == JobStatusEnum.COMPLETED
                 else EventType.JOB_FAILED,
@@ -661,7 +624,7 @@ class JobManager:
                     job.id, JobStatusEnum.FAILED, job.completed_at, None, str(e)
                 )
 
-            self.safe_event_broadcaster.broadcast_event(
+            self.event_broadcaster.broadcast_event(
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
             )
 
@@ -721,25 +684,25 @@ class JobManager:
         job.status = JobStatusEnum.RUNNING
 
         try:
-            process = await self.safe_executor.start_process(command, env)
+            process = await self.executor.start_process(command, env)
             self._processes[job.id] = process
 
             def output_callback(line: str) -> None:
                 # Provide default progress since callback now only receives line
                 progress: Dict[str, object] = {}
                 asyncio.create_task(
-                    self.safe_output_manager.add_output_line(
+                    self.output_manager.add_output_line(
                         job.id, line, "stdout", progress
                     )
                 )
 
-                self.safe_event_broadcaster.broadcast_event(
+                self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={"line": line, "progress": None},  # No progress data
                 )
 
-            result = await self.safe_executor.monitor_process_output(
+            result = await self.executor.monitor_process_output(
                 process, output_callback=output_callback
             )
 
@@ -754,7 +717,7 @@ class JobManager:
             if result.error:
                 job.error = result.error
 
-            self.safe_event_broadcaster.broadcast_event(
+            self.event_broadcaster.broadcast_event(
                 EventType.JOB_COMPLETED
                 if job.status == JobStatusEnum.COMPLETED
                 else EventType.JOB_FAILED,
@@ -768,7 +731,7 @@ class JobManager:
             job.completed_at = now_utc()
             logger.error(f"Job {job.id} execution failed: {e}")
 
-            self.safe_event_broadcaster.broadcast_event(
+            self.event_broadcaster.broadcast_event(
                 EventType.JOB_FAILED, job_id=job.id, data={"error": str(e)}
             )
 
@@ -831,7 +794,7 @@ class JobManager:
     ) -> AsyncGenerator[Dict[str, object], None]:
         """Stream job output"""
         if self.output_manager:
-            async for output in self.safe_output_manager.stream_job_output(job_id):
+            async for output in self.output_manager.stream_job_output(job_id):
                 yield output
         else:
             return
@@ -849,7 +812,7 @@ class JobManager:
     ) -> AsyncGenerator[Dict[str, object], None]:
         """Get real-time job output"""
         if self.output_manager:
-            async for output in self.safe_output_manager.stream_job_output(job_id):
+            async for output in self.output_manager.stream_job_output(job_id):
                 yield output
         else:
             return
@@ -865,7 +828,7 @@ class JobManager:
 
         if job_id in self._processes:
             process = self._processes[job_id]
-            success = await self.safe_executor.terminate_process(process)
+            success = await self.executor.terminate_process(process)
             if success:
                 del self._processes[job_id]
 
@@ -877,7 +840,7 @@ class JobManager:
                 job_id, JobStatusEnum.CANCELLED, job.completed_at
             )
 
-        self.safe_event_broadcaster.broadcast_event(
+        self.event_broadcaster.broadcast_event(
             EventType.JOB_CANCELLED,
             job_id=job_id,
             data={"cancelled_at": job.completed_at.isoformat()},
@@ -908,7 +871,7 @@ class JobManager:
         # Kill current running process if exists
         if job_id in self._processes:
             process = self._processes[job_id]
-            success = await self.safe_executor.terminate_process(process)
+            success = await self.executor.terminate_process(process)
             if success:
                 del self._processes[job_id]
                 current_task_killed = True
@@ -946,7 +909,7 @@ class JobManager:
             )
 
         # Broadcast stop event
-        self.safe_event_broadcaster.broadcast_event(
+        self.event_broadcaster.broadcast_event(
             EventType.JOB_CANCELLED,  # Reuse existing event type
             job_id=job_id,
             data={
@@ -972,7 +935,7 @@ class JobManager:
 
             del self.jobs[job_id]
 
-            self.safe_output_manager.clear_job_output(job_id)
+            self.output_manager.clear_job_output(job_id)
 
             if job_id in self._processes:
                 del self._processes[job_id]
@@ -1037,7 +1000,7 @@ class JobManager:
     ) -> "JobOutputStreamResponse":
         """Get job output stream data"""
         # Get output from output manager (don't require job to exist, just output)
-        job_output = self.safe_output_manager.get_job_output(job_id)
+        job_output = self.output_manager.get_job_output(job_id)
         if job_output:
             # job_output.lines contains OutputLine objects
             lines = list(job_output.lines)
@@ -1061,7 +1024,7 @@ class JobManager:
 
     async def stream_all_job_updates(self) -> AsyncGenerator[JobEvent, None]:
         """Stream all job updates via event broadcaster"""
-        async for event in self.safe_event_broadcaster.stream_all_events():
+        async for event in self.event_broadcaster.stream_all_events():
             yield event
 
     async def shutdown(self) -> None:
@@ -1079,7 +1042,7 @@ class JobManager:
             await self.queue_manager.shutdown()
 
         if self.event_broadcaster:
-            await self.safe_event_broadcaster.shutdown()
+            await self.event_broadcaster.shutdown()
 
         # Clear data
         self.jobs.clear()
