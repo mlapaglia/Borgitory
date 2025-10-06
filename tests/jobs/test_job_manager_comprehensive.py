@@ -7,6 +7,9 @@ import uuid
 import asyncio
 from typing import Generator, AsyncGenerator
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
 from contextlib import contextmanager
@@ -1317,10 +1320,6 @@ class TestJobManagerFactoryFunctions:
         mock_subprocess = AsyncMock()
         mock_db_session = Mock()
         mock_rclone = Mock()
-
-        from borgitory.protocols.job_event_broadcaster_protocol import (
-            JobEventBroadcasterProtocol,
-        )
 
         mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
 

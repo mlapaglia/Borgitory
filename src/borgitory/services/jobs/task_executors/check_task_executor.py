@@ -5,6 +5,11 @@ Check Task Executor - Handles repository check task execution
 import asyncio
 import logging
 from typing import Optional, Dict, Any
+from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
+from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.utils.security import secure_borg_command
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
@@ -15,7 +20,12 @@ logger = logging.getLogger(__name__)
 class CheckTaskExecutor:
     """Handles repository check task execution"""
 
-    def __init__(self, job_executor: Any, output_manager: Any, event_broadcaster: Any):
+    def __init__(
+        self,
+        job_executor: ProcessExecutorProtocol,
+        output_manager: JobOutputManagerProtocol,
+        event_broadcaster: JobEventBroadcasterProtocol,
+    ):
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster

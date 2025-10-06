@@ -7,6 +7,9 @@ from typing import List, Optional
 from unittest.mock import Mock, AsyncMock, patch
 
 from borgitory.models.job_results import JobStatusEnum
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.jobs.job_models import (
     BorgJob,
@@ -23,10 +26,6 @@ class TestCompositeJobCriticalFailure:
 
     def setup_method(self) -> None:
         """Set up test dependencies."""
-        from borgitory.protocols.job_event_broadcaster_protocol import (
-            JobEventBroadcasterProtocol,
-        )
-
         # Create a mock event broadcaster
         mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
 

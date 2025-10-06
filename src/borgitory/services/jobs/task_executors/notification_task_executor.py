@@ -4,6 +4,12 @@ Notification Task Executor - Handles notification task execution
 
 import logging
 from typing import Optional, Any, Tuple
+from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
+from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
+from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
@@ -12,7 +18,12 @@ logger = logging.getLogger(__name__)
 class NotificationTaskExecutor:
     """Handles notification task execution"""
 
-    def __init__(self, job_executor: Any, output_manager: Any, event_broadcaster: Any):
+    def __init__(
+        self,
+        job_executor: ProcessExecutorProtocol,
+        output_manager: JobOutputManagerProtocol,
+        event_broadcaster: JobEventBroadcasterProtocol,
+    ):
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
@@ -166,7 +177,7 @@ class NotificationTaskExecutor:
                 task.output_lines.append(f"Priority: {priority.value}")
 
                 self.event_broadcaster.broadcast_event(
-                    "JOB_OUTPUT",
+                    EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={
                         "line": f"Sending {config.provider} notification to {config.name}",
@@ -188,7 +199,7 @@ class NotificationTaskExecutor:
                     task.output_lines.append(result_message)
 
                 self.event_broadcaster.broadcast_event(
-                    "JOB_OUTPUT",
+                    EventType.JOB_OUTPUT,
                     job_id=job.id,
                     data={"line": result_message, "task_index": task_index},
                 )

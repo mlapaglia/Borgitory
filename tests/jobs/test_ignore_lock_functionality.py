@@ -8,11 +8,15 @@ the ignore_lock parameter is set to True in backup requests.
 import asyncio
 import pytest
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from typing import Dict, Any
 
 from borgitory.protocols.command_protocols import ProcessResult
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
 from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.services.jobs.job_models import (
@@ -30,12 +34,6 @@ class TestIgnoreLockFunctionality:
     @pytest.fixture
     def mock_dependencies(self) -> JobManagerDependencies:
         """Create mock dependencies for JobManager"""
-        from borgitory.services.jobs.job_manager_factory import JobManagerFactory
-        from borgitory.protocols.job_event_broadcaster_protocol import (
-            JobEventBroadcasterProtocol,
-        )
-        from unittest.mock import Mock
-
         # Create a mock event broadcaster
         mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
 

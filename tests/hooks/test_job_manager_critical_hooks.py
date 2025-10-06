@@ -5,10 +5,14 @@ Tests for JobManager hook task execution with critical failures.
 import uuid
 import pytest
 from typing import Dict, List, Optional
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 from borgitory.models.job_results import JobStatusEnum
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
 from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 from borgitory.services.jobs.job_models import (
     BorgJob,
     BorgJobTask,
@@ -63,13 +67,6 @@ class TestJobManagerHookExecution:
     def setup_method(self) -> None:
         """Set up test dependencies."""
         self.mock_hook_service = MockHookExecutionService()
-
-        # Create complete dependencies using the factory, then override the hook service
-        from borgitory.services.jobs.job_manager_factory import JobManagerFactory
-        from borgitory.protocols.job_event_broadcaster_protocol import (
-            JobEventBroadcasterProtocol,
-        )
-        from unittest.mock import Mock
 
         # Create a mock event broadcaster
         mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)

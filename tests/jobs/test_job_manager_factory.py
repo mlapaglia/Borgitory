@@ -4,6 +4,9 @@ Tests for JobManagerFactory methods for dependency injection
 
 from unittest.mock import Mock, AsyncMock
 
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
 from borgitory.services.jobs.job_models import (
     JobManagerConfig,
     JobManagerDependencies,
@@ -45,14 +48,9 @@ class TestJobManagerFactory:
         assert deps.queue_manager is not None
         assert deps.output_manager is not None
         assert deps.queue_manager.max_concurrent_backups == 10
-        # Note: max_lines_per_job is not part of the protocol interface
 
     def test_create_dependencies_with_custom_dependencies(self) -> None:
         """Test creating dependencies with partial custom dependencies"""
-        from borgitory.protocols.job_event_broadcaster_protocol import (
-            JobEventBroadcasterProtocol,
-        )
-
         mock_executor = Mock()
         mock_output_manager = Mock()
         mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
@@ -73,10 +71,6 @@ class TestJobManagerFactory:
 
     def test_create_for_testing(self) -> None:
         """Test creating dependencies for testing"""
-        from borgitory.protocols.job_event_broadcaster_protocol import (
-            JobEventBroadcasterProtocol,
-        )
-
         mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
         mock_subprocess = AsyncMock()
         mock_db_session = Mock()
@@ -103,7 +97,6 @@ class TestJobManagerFactory:
         assert deps.output_manager is not None
         # Should have reduced limits
         assert deps.queue_manager.max_concurrent_backups == 1
-        # Note: max_lines_per_job is not part of the protocol interface
 
     def test_dependencies_post_init(self) -> None:
         """Test JobManagerDependencies post_init method"""
@@ -137,10 +130,6 @@ class TestJobManagerFactoryFunctions:
 
     def test_get_test_job_manager_dependencies(self) -> None:
         """Test getting test dependencies"""
-        from borgitory.protocols.job_event_broadcaster_protocol import (
-            JobEventBroadcasterProtocol,
-        )
-
         mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
         mock_subprocess = AsyncMock()
         mock_db_session = Mock()
