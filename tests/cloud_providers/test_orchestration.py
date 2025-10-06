@@ -8,6 +8,8 @@ proper DI patterns and real database usage where appropriate.
 import pytest
 import asyncio
 import time
+from typing import Optional, Callable, Coroutine, Any
+from typing import Dict
 from unittest.mock import Mock
 
 from borgitory.services.cloud_providers.orchestration import (
@@ -26,18 +28,23 @@ from borgitory.services.cloud_providers.storage import CloudStorage
 class MockCloudStorage(CloudStorage):
     """Mock storage for testing orchestration"""
 
-    def __init__(self, test_connection_result=True, upload_should_fail=False) -> None:
+    def __init__(
+        self, test_connection_result: bool = True, upload_should_fail: bool = False
+    ) -> None:
         self._test_connection_result = test_connection_result
         self._upload_should_fail = upload_should_fail
-        self._upload_calls = []
+        self._upload_calls: list[tuple[str, str]] = []
         self._progress_callback = None
 
     async def test_connection(self) -> bool:
         return self._test_connection_result
 
     async def upload_repository(
-        self, repository_path: str, remote_path: str, progress_callback=None
-    ):
+        self,
+        repository_path: str,
+        remote_path: str,
+        progress_callback: Optional[Callable[[SyncEvent], None]] = None,
+    ) -> None:
         self._upload_calls.append((repository_path, remote_path))
         self._progress_callback = progress_callback
 
@@ -67,7 +74,7 @@ class MockCloudStorage(CloudStorage):
     def get_sensitive_fields(self) -> list[str]:
         return ["password", "secret_key"]
 
-    def get_display_details(self, config_dict: dict) -> dict:
+    def get_display_details(self, config_dict: dict) -> Dict[str, object]:
         return {
             "provider_name": "Mock Provider",
             "provider_details": "<div><strong>Mock:</strong> Test Provider</div>",
@@ -78,7 +85,7 @@ class MockSyncEventHandler(SyncEventHandler):
     """Mock event handler for testing"""
 
     def __init__(self) -> None:
-        self.events = []
+        self.events: list[SyncEvent] = []
 
     async def handle_event(self, event: SyncEvent) -> None:
         self.events.append(event)
@@ -88,31 +95,36 @@ class TestLoggingSyncEventHandler:
     """Test LoggingSyncEventHandler with all event types and edge cases"""
 
     @pytest.fixture
-    def mock_logger(self):
+    def mock_logger(self) -> Mock:
         return Mock()
 
     @pytest.fixture
-    def output_messages(self):
+    def output_messages(self) -> list[str]:
         return []
 
     @pytest.fixture
-    def output_callback(self, output_messages):
-        def callback(message) -> None:
+    def output_callback(self, output_messages: list[str]) -> Callable[[str], None]:
+        def callback(message: str) -> None:
             output_messages.append(message)
 
         return callback
 
     @pytest.fixture
-    def handler_with_callback(self, mock_logger, output_callback):
+    def handler_with_callback(
+        self, mock_logger: Mock, output_callback: Callable[[str], None]
+    ) -> LoggingSyncEventHandler:
         return LoggingSyncEventHandler(mock_logger, output_callback)
 
     @pytest.fixture
-    def handler_without_callback(self, mock_logger):
+    def handler_without_callback(self, mock_logger: Mock) -> LoggingSyncEventHandler:
         return LoggingSyncEventHandler(mock_logger)
 
     @pytest.mark.asyncio
     async def test_handle_started_event(
-        self, handler_with_callback, mock_logger, output_messages
+        self,
+        handler_with_callback: LoggingSyncEventHandler,
+        mock_logger: Mock,
+        output_messages: list[str],
     ) -> None:
         """Test handling STARTED event type"""
         event = SyncEvent(type=SyncEventType.STARTED, message="Starting sync")
@@ -124,7 +136,10 @@ class TestLoggingSyncEventHandler:
 
     @pytest.mark.asyncio
     async def test_handle_progress_event(
-        self, handler_with_callback, mock_logger, output_messages
+        self,
+        handler_with_callback: LoggingSyncEventHandler,
+        mock_logger: Mock,
+        output_messages: list[str],
     ) -> None:
         """Test handling PROGRESS event type with percentage"""
         event = SyncEvent(
@@ -138,7 +153,10 @@ class TestLoggingSyncEventHandler:
 
     @pytest.mark.asyncio
     async def test_handle_completed_event(
-        self, handler_with_callback, mock_logger, output_messages
+        self,
+        handler_with_callback: LoggingSyncEventHandler,
+        mock_logger: Mock,
+        output_messages: list[str],
     ) -> None:
         """Test handling COMPLETED event type"""
         event = SyncEvent(type=SyncEventType.COMPLETED, message="Sync completed")
@@ -150,7 +168,10 @@ class TestLoggingSyncEventHandler:
 
     @pytest.mark.asyncio
     async def test_handle_error_event(
-        self, handler_with_callback, mock_logger, output_messages
+        self,
+        handler_with_callback: LoggingSyncEventHandler,
+        mock_logger: Mock,
+        output_messages: list[str],
     ) -> None:
         """Test handling ERROR event type with error details"""
         event = SyncEvent(
@@ -164,7 +185,10 @@ class TestLoggingSyncEventHandler:
 
     @pytest.mark.asyncio
     async def test_handle_log_event(
-        self, handler_with_callback, mock_logger, output_messages
+        self,
+        handler_with_callback: LoggingSyncEventHandler,
+        mock_logger: Mock,
+        output_messages: list[str],
     ) -> None:
         """Test handling LOG event type"""
         event = SyncEvent(type=SyncEventType.LOG, message="General log message")
@@ -176,7 +200,7 @@ class TestLoggingSyncEventHandler:
 
     @pytest.mark.asyncio
     async def test_handle_event_without_callback(
-        self, handler_without_callback, mock_logger
+        self, handler_without_callback: LoggingSyncEventHandler, mock_logger: Mock
     ) -> None:
         """Test handler without output callback still logs"""
         event = SyncEvent(type=SyncEventType.STARTED, message="Starting sync")
@@ -187,7 +211,7 @@ class TestLoggingSyncEventHandler:
 
     @pytest.mark.asyncio
     async def test_handle_error_event_without_error_details(
-        self, handler_with_callback, mock_logger
+        self, handler_with_callback: LoggingSyncEventHandler, mock_logger: Mock
     ) -> None:
         """Test error event without error field"""
         event = SyncEvent(type=SyncEventType.ERROR, message="Something went wrong")
@@ -198,7 +222,7 @@ class TestLoggingSyncEventHandler:
 
     @pytest.mark.asyncio
     async def test_handle_progress_event_zero_progress(
-        self, handler_with_callback, mock_logger
+        self, handler_with_callback: LoggingSyncEventHandler, mock_logger: Mock
     ) -> None:
         """Test progress event with zero progress"""
         event = SyncEvent(
@@ -214,36 +238,48 @@ class TestCloudSyncer:
     """Test CloudSyncer orchestration with comprehensive coverage"""
 
     @pytest.fixture
-    def mock_storage_success(self):
+    def mock_storage_success(self) -> MockCloudStorage:
         return MockCloudStorage(test_connection_result=True)
 
     @pytest.fixture
-    def mock_storage_connection_fail(self):
+    def mock_storage_connection_fail(self) -> MockCloudStorage:
         return MockCloudStorage(test_connection_result=False)
 
     @pytest.fixture
-    def mock_storage_upload_fail(self):
+    def mock_storage_upload_fail(self) -> MockCloudStorage:
         return MockCloudStorage(test_connection_result=True, upload_should_fail=True)
 
     @pytest.fixture
-    def mock_event_handler(self):
+    def mock_event_handler(self) -> MockSyncEventHandler:
         return MockSyncEventHandler()
 
     @pytest.fixture
-    def syncer_success(self, mock_storage_success, mock_event_handler):
+    def syncer_success(
+        self,
+        mock_storage_success: MockCloudStorage,
+        mock_event_handler: MockSyncEventHandler,
+    ) -> CloudSyncer:
         return CloudSyncer(mock_storage_success, mock_event_handler)
 
     @pytest.fixture
-    def syncer_connection_fail(self, mock_storage_connection_fail, mock_event_handler):
+    def syncer_connection_fail(
+        self,
+        mock_storage_connection_fail: MockCloudStorage,
+        mock_event_handler: MockSyncEventHandler,
+    ) -> CloudSyncer:
         return CloudSyncer(mock_storage_connection_fail, mock_event_handler)
 
     @pytest.fixture
-    def syncer_upload_fail(self, mock_storage_upload_fail, mock_event_handler):
+    def syncer_upload_fail(
+        self,
+        mock_storage_upload_fail: MockCloudStorage,
+        mock_event_handler: MockSyncEventHandler,
+    ) -> CloudSyncer:
         return CloudSyncer(mock_storage_upload_fail, mock_event_handler)
 
     @pytest.mark.asyncio
     async def test_successful_sync_with_default_remote_path(
-        self, syncer_success, mock_event_handler
+        self, syncer_success: CloudSyncer, mock_event_handler: MockSyncEventHandler
     ) -> None:
         """Test successful sync operation with default remote path"""
         repository_path = "/test/repo"
@@ -278,7 +314,7 @@ class TestCloudSyncer:
 
     @pytest.mark.asyncio
     async def test_successful_sync_with_custom_remote_path(
-        self, syncer_success, mock_event_handler
+        self, syncer_success: CloudSyncer, mock_event_handler: MockSyncEventHandler
     ) -> None:
         """Test successful sync with custom remote path"""
         repository_path = "/test/repo"
@@ -295,7 +331,9 @@ class TestCloudSyncer:
 
     @pytest.mark.asyncio
     async def test_sync_connection_test_failure(
-        self, syncer_connection_fail, mock_event_handler
+        self,
+        syncer_connection_fail: CloudSyncer,
+        mock_event_handler: MockSyncEventHandler,
     ) -> None:
         """Test sync when connection test fails"""
         repository_path = "/test/repo"
@@ -322,7 +360,7 @@ class TestCloudSyncer:
 
     @pytest.mark.asyncio
     async def test_sync_upload_failure(
-        self, syncer_upload_fail, mock_event_handler
+        self, syncer_upload_fail: CloudSyncer, mock_event_handler: MockSyncEventHandler
     ) -> None:
         """Test sync when upload fails with exception"""
         repository_path = "/test/repo"
@@ -331,6 +369,7 @@ class TestCloudSyncer:
 
         # Verify result indicates failure
         assert result.success is False
+        assert result.error is not None
         assert "Upload failed" in result.error
         assert result.duration_seconds > 0
 
@@ -340,11 +379,12 @@ class TestCloudSyncer:
         ]
         assert len(error_events) == 1
         assert "Sync failed" in error_events[0].message
+        assert error_events[0].error is not None
         assert "Upload failed" in error_events[0].error
 
     @pytest.mark.asyncio
     async def test_sync_progress_callback_integration(
-        self, syncer_success, mock_event_handler
+        self, syncer_success: CloudSyncer, mock_event_handler: MockSyncEventHandler
     ) -> None:
         """Test that progress callbacks are properly integrated"""
         repository_path = "/test/repo"
@@ -361,7 +401,9 @@ class TestCloudSyncer:
         # Note: The exact events depend on the mock implementation
 
     @pytest.mark.asyncio
-    async def test_sync_measures_duration_on_success(self, syncer_success) -> None:
+    async def test_sync_measures_duration_on_success(
+        self, syncer_success: CloudSyncer
+    ) -> None:
         """Test that duration is properly measured for successful sync"""
         start_time = time.time()
 
@@ -375,7 +417,9 @@ class TestCloudSyncer:
         )  # Allow some margin
 
     @pytest.mark.asyncio
-    async def test_sync_measures_duration_on_failure(self, syncer_upload_fail) -> None:
+    async def test_sync_measures_duration_on_failure(
+        self, syncer_upload_fail: CloudSyncer
+    ) -> None:
         """Test that duration is measured even on failure during upload"""
         start_time = time.time()
 
@@ -389,7 +433,7 @@ class TestCloudSyncer:
 
     @pytest.mark.asyncio
     async def test_test_connection_success(
-        self, syncer_success, mock_event_handler
+        self, syncer_success: CloudSyncer, mock_event_handler: MockSyncEventHandler
     ) -> None:
         """Test successful connection test"""
         result = await syncer_success.test_connection()
@@ -414,7 +458,9 @@ class TestCloudSyncer:
 
     @pytest.mark.asyncio
     async def test_test_connection_failure(
-        self, syncer_connection_fail, mock_event_handler
+        self,
+        syncer_connection_fail: CloudSyncer,
+        mock_event_handler: MockSyncEventHandler,
     ) -> None:
         """Test failed connection test"""
         result = await syncer_connection_fail.test_connection()
@@ -430,26 +476,31 @@ class TestCloudSyncer:
         assert "Connection test returned false" in error_events[0].error
 
     @pytest.mark.asyncio
-    async def test_test_connection_exception(self, mock_event_handler) -> None:
+    async def test_test_connection_exception(
+        self, mock_event_handler: MockSyncEventHandler
+    ) -> None:
         """Test connection test with exception"""
 
         # Create storage that raises exception on test_connection
         class ExceptionStorage(CloudStorage):
-            async def test_connection(self):
+            async def test_connection(self) -> bool:
                 raise Exception("Network error")
 
             async def upload_repository(
-                self, repository_path, remote_path, progress_callback=None
+                self,
+                repository_path: str,
+                remote_path: str,
+                progress_callback: Optional[Callable[[SyncEvent], None]] = None,
             ) -> None:
                 pass
 
-            def get_connection_info(self):
+            def get_connection_info(self) -> ConnectionInfo:
                 return ConnectionInfo(provider="test", details={})
 
-            def get_sensitive_fields(self):
+            def get_sensitive_fields(self) -> list[str]:
                 return []
 
-            def get_display_details(self, config_dict: dict) -> dict:
+            def get_display_details(self, config_dict: dict) -> Dict[str, object]:
                 return {
                     "provider_name": "Exception Provider",
                     "provider_details": "<div><strong>Test:</strong> Exception Provider</div>",
@@ -470,7 +521,7 @@ class TestCloudSyncer:
         assert "Connection test error" in error_events[0].message
         assert "Network error" in error_events[0].error
 
-    def test_get_connection_info(self, syncer_success) -> None:
+    def test_get_connection_info(self, syncer_success: CloudSyncer) -> None:
         """Test getting connection info"""
         info = syncer_success.get_connection_info()
 
@@ -480,7 +531,7 @@ class TestCloudSyncer:
 
     @pytest.mark.asyncio
     async def test_sync_with_empty_repository_path(
-        self, syncer_success, mock_event_handler
+        self, syncer_success: CloudSyncer, mock_event_handler: MockSyncEventHandler
     ) -> None:
         """Test sync with empty repository path"""
         result = await syncer_success.sync_repository("")
@@ -494,7 +545,9 @@ class TestCloudSyncer:
         assert storage._upload_calls[0][0] == ""
 
     @pytest.mark.asyncio
-    async def test_sync_with_none_remote_path(self, syncer_success) -> None:
+    async def test_sync_with_none_remote_path(
+        self, syncer_success: CloudSyncer
+    ) -> None:
         """Test sync with None remote path (should use default)"""
         # This tests the default parameter handling
         result = await syncer_success.sync_repository("/test/repo")
@@ -507,7 +560,7 @@ class TestCloudSyncer:
 
     @pytest.mark.asyncio
     async def test_progress_callback_asyncio_task_creation(
-        self, syncer_success
+        self, syncer_success: CloudSyncer
     ) -> None:
         """Test that progress callback properly creates asyncio tasks"""
         # This test verifies the asyncio.create_task line in the progress callback
@@ -515,9 +568,9 @@ class TestCloudSyncer:
 
         # Mock asyncio.create_task to verify it's called
         original_create_task = asyncio.create_task
-        create_task_calls = []
+        create_task_calls: list[Any] = []
 
-        def mock_create_task(coro):
+        def mock_create_task(coro: Coroutine) -> asyncio.Task:
             create_task_calls.append(coro)
             return original_create_task(coro)
 
@@ -538,7 +591,9 @@ class TestCloudSyncer:
 
     @pytest.mark.asyncio
     async def test_multiple_sync_operations_independence(
-        self, mock_storage_success, mock_event_handler
+        self,
+        mock_storage_success: MockCloudStorage,
+        mock_event_handler: MockSyncEventHandler,
     ) -> None:
         """Test that multiple sync operations are independent"""
         syncer = CloudSyncer(mock_storage_success, mock_event_handler)
@@ -551,7 +606,7 @@ class TestCloudSyncer:
         assert result2.success is True
 
         # Verify both operations were recorded
-        storage = mock_storage_success
+        storage: MockCloudStorage = mock_storage_success
         assert len(storage._upload_calls) == 2
         assert storage._upload_calls[0] == ("/repo1", "path1")
         assert storage._upload_calls[1] == ("/repo2", "path2")

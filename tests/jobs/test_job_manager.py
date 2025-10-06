@@ -5,11 +5,14 @@ from unittest.mock import Mock, AsyncMock, patch
 
 from sqlalchemy.orm import Session
 
-from borgitory.services.jobs.job_manager import (
-    JobManager,
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_models import (
     JobManagerConfig,
     BorgJob,
     BorgJobTask,
+    TaskStatusEnum,
+    TaskTypeEnum,
 )
 from borgitory.models.database import Repository
 from borgitory.utils.datetime_utils import now_utc
@@ -47,11 +50,11 @@ class TestBorgJobTask:
 
     def test_default_task(self) -> None:
         """Test default task creation"""
-        task = BorgJobTask(task_type="backup", task_name="Test Backup")
+        task = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Test Backup")
 
-        assert task.task_type == "backup"
+        assert task.task_type == TaskTypeEnum.BACKUP
         assert task.task_name == "Test Backup"
-        assert task.status == "pending"
+        assert task.status == TaskStatusEnum.PENDING
         assert task.started_at is None
         assert task.completed_at is None
         assert task.return_code is None
@@ -61,9 +64,9 @@ class TestBorgJobTask:
     def test_custom_task(self) -> None:
         """Test custom task creation with parameters"""
         task = BorgJobTask(
-            task_type="prune",
+            task_type=TaskTypeEnum.PRUNE,
             task_name="Test Prune",
-            status="running",
+            status=TaskStatusEnum.RUNNING,
             parameters={"keep_daily": 7, "keep_weekly": 4},
         )
 
@@ -79,18 +82,18 @@ class TestBorgJob:
 
     def test_simple_job(self) -> None:
         """Test simple job creation"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         started_at = now_utc()
 
         job = BorgJob(
             id=job_id,
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=started_at,
             command=["borg", "create", "repo::archive", "/data"],
         )
 
         assert job.id == job_id
-        assert job.status == "running"
+        assert job.status == JobStatusEnum.RUNNING
         assert job.started_at == started_at
         assert job.command == ["borg", "create", "repo::archive", "/data"]
         assert job.job_type == "simple"
@@ -99,14 +102,14 @@ class TestBorgJob:
 
     def test_composite_job(self) -> None:
         """Test composite job creation"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         started_at = now_utc()
-        task1 = BorgJobTask(task_type="backup", task_name="Backup")
-        task2 = BorgJobTask(task_type="prune", task_name="Prune")
+        task1 = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Backup")
+        task2 = BorgJobTask(task_type=TaskTypeEnum.PRUNE, task_name="Prune")
 
         job = BorgJob(
             id=job_id,
-            status="pending",
+            status=JobStatusEnum.PENDING,
             started_at=started_at,
             job_type="composite",
             tasks=[task1, task2],
@@ -114,19 +117,19 @@ class TestBorgJob:
         )
 
         assert job.id == job_id
-        assert job.status == "pending"
+        assert job.status == JobStatusEnum.PENDING
         assert job.job_type == "composite"
         assert len(job.tasks) == 2
         assert job.repository_id == 1
 
     def test_get_current_task(self) -> None:
         """Test getting current task from composite job"""
-        task1 = BorgJobTask(task_type="backup", task_name="Backup")
-        task2 = BorgJobTask(task_type="prune", task_name="Prune")
+        task1 = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Backup")
+        task2 = BorgJobTask(task_type=TaskTypeEnum.PRUNE, task_name="Prune")
 
         job = BorgJob(
-            id="test",
-            status="running",
+            id=uuid.uuid4(),
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             job_type="composite",
             tasks=[task1, task2],
@@ -148,16 +151,18 @@ class TestBorgJob:
         assert current_task is None
 
         # Test simple job
-        simple_job = BorgJob(id="simple", status="running", started_at=now_utc())
+        simple_job = BorgJob(
+            id=uuid.uuid4(), status=JobStatusEnum.RUNNING, started_at=now_utc()
+        )
         assert simple_job.get_current_task() is None
 
     def test_unified_composite_jobs(self) -> None:
         """Test unified composite job approach - all jobs are now composite"""
         # All jobs are now composite with job_type="composite"
-        task = BorgJobTask(task_type="backup", task_name="Backup")
+        task = BorgJobTask(task_type=TaskTypeEnum.BACKUP, task_name="Backup")
         job_with_tasks = BorgJob(
-            id="job1",
-            status="running",
+            id=uuid.uuid4(),
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             job_type="composite",
             tasks=[task],
@@ -168,8 +173,8 @@ class TestBorgJob:
 
         # Even jobs without tasks are composite type
         job_without_tasks = BorgJob(
-            id="job2",
-            status="running",
+            id=uuid.uuid4(),
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             job_type="composite",
         )
@@ -217,7 +222,7 @@ class TestJobManager:
         await job_manager.initialize()
 
         # Add a test job
-        job_manager.jobs["test"] = Mock()
+        job_manager.jobs[uuid.uuid4()] = Mock()
 
         await job_manager.shutdown()
 
@@ -228,7 +233,7 @@ class TestJobManager:
         """Test task creation"""
         # Test creating a BorgJobTask directly since _create_job_task is private/removed
         task = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
             parameters={"source_path": "/data"},
         )
@@ -239,16 +244,16 @@ class TestJobManager:
 
     def test_create_job(self, job_manager: JobManager) -> None:
         """Test job creation"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         # Test creating a BorgJob directly since _create_job is private/removed
         job = BorgJob(
             id=job_id,
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
         )
 
         assert job.id == job_id
-        assert job.status == "running"
+        assert job.status == JobStatusEnum.RUNNING
 
     def test_repository_integration(
         self, sample_repository: Repository, test_db: Session
@@ -283,14 +288,14 @@ class TestJobManager:
             )
 
         assert job_id == "test-job-id"
-        assert "test-job-id" in job_manager.jobs
-        job = job_manager.jobs["test-job-id"]
-        assert job.status == "running"
+        assert job_id in job_manager.jobs
+        job = job_manager.jobs[job_id]
+        assert job.status == JobStatusEnum.RUNNING
         assert job.command == ["borg", "list", "repo"]
         assert job.job_type == "composite"  # All jobs are now composite
         assert len(job.tasks) == 1  # Should have one task
         assert job.tasks[0].task_name == "Execute: borg list repo"
-        assert job.tasks[0].status == "running"
+        assert job.tasks[0].status == TaskStatusEnum.RUNNING
         mock_run.assert_called_once()
 
     @pytest.mark.asyncio
@@ -309,11 +314,11 @@ class TestJobManager:
         )
 
         assert job_id == "backup-job-id"
-        assert "backup-job-id" in job_manager.jobs
-        job = job_manager.jobs["backup-job-id"]
-        assert job.status == "queued"
+        assert job_id in job_manager.jobs
+        job = job_manager.jobs[job_id]
+        assert job.status == JobStatusEnum.QUEUED
         # In modular architecture, queue processing is handled by JobQueueManager
-        assert job.status in ["queued", "running"]
+        assert job.status in [JobStatusEnum.QUEUED, JobStatusEnum.RUNNING]
 
     def test_event_broadcasting(self, job_manager: JobManager) -> None:
         """Test event broadcasting functionality"""
@@ -330,23 +335,23 @@ class TestJobManager:
 
         # Add some mock jobs with proper job_type attribute
         running_backup = Mock()
-        running_backup.status = "running"
+        running_backup.status = JobStatusEnum.RUNNING
         running_backup.command = ["borg", "create", "repo::archive", "/data"]
-        running_backup.job_type = "backup"
+        running_backup.job_type = JobTypeEnum.BACKUP
 
         running_other = Mock()
-        running_other.status = "running"
+        running_other.status = JobStatusEnum.RUNNING
         running_other.command = ["borg", "list", "repo"]
         running_other.job_type = "simple"
 
         queued_backup = Mock()
-        queued_backup.status = "queued"
-        queued_backup.job_type = "backup"
+        queued_backup.status = JobStatusEnum.QUEUED
+        queued_backup.job_type = JobTypeEnum.BACKUP
 
         job_manager.jobs = {
-            "running_backup": running_backup,
-            "running_other": running_other,
-            "queued_backup": queued_backup,
+            uuid.uuid4(): running_backup,
+            uuid.uuid4(): running_other,
+            uuid.uuid4(): queued_backup,
         }
 
         stats = job_manager.get_queue_stats()
@@ -360,8 +365,8 @@ class TestJobManager:
     def test_get_job_status(self, job_manager: JobManager) -> None:
         """Test getting job status"""
         job = Mock()
-        job.id = "test"
-        job.status = "completed"
+        job.id = uuid.uuid4()
+        job.status = JobStatusEnum.COMPLETED
         job.started_at = datetime(2023, 1, 1, 12, 0, 0)
         job.completed_at = datetime(2023, 1, 1, 12, 5, 0)
         job.return_code = 0
@@ -370,32 +375,33 @@ class TestJobManager:
         job.current_task_index = 0
         job.tasks = []
 
-        job_manager.jobs["test"] = job
+        job_manager.jobs[job.id] = job
 
-        status = job_manager.get_job_status("test")
+        status = job_manager.get_job_status(job.id)
 
         assert status is not None
-        assert status["running"] is False
-        assert status["completed"] is True
-        assert status["status"] == "completed"
-        assert status["return_code"] == 0
-        assert status["error"] is None
+        assert status.status == JobStatusEnum.COMPLETED
+        assert status.return_code == 0
+        assert status.error is None
 
     def test_get_job_status_not_found(self, job_manager: JobManager) -> None:
         """Test getting status for non-existent job"""
-        status = job_manager.get_job_status("nonexistent")
+        status = job_manager.get_job_status(uuid.uuid4())
         assert status is None
 
     def test_cleanup_job(self, job_manager: JobManager) -> None:
         """Test cleaning up job"""
-        job_manager.jobs["test"] = Mock()
+        job_id = uuid.uuid4()
+        job = Mock()
+        job.id = job_id
+        job_manager.jobs[job_id] = job
 
-        result = job_manager.cleanup_job("test")
+        result = job_manager.cleanup_job(job_id)
         assert result is True
-        assert "test" not in job_manager.jobs
+        assert job_id not in job_manager.jobs
 
         # Test cleanup of non-existent job
-        result = job_manager.cleanup_job("nonexistent")
+        result = job_manager.cleanup_job(uuid.uuid4())
         assert result is False
 
     def test_event_subscription_interface(self, job_manager: JobManager) -> None:
@@ -421,18 +427,18 @@ class TestJobManager:
         """Test cancelling a running job"""
         # Set up a running job
         job = Mock()
-        job.id = "test"
-        job.status = "running"
-        job_manager.jobs["test"] = job
+        job.id = uuid.uuid4()
+        job.status = JobStatusEnum.RUNNING
+        job_manager.jobs[job.id] = job
 
         # Test cancellation interface exists
-        await job_manager.cancel_job("test")
+        await job_manager.cancel_job(job.id)
         # Result depends on implementation - interface test
 
     @pytest.mark.asyncio
     async def test_cancel_job_not_found(self, job_manager: JobManager) -> None:
         """Test cancelling non-existent job"""
-        result = await job_manager.cancel_job("nonexistent")
+        result = await job_manager.cancel_job(uuid.uuid4())
         assert result is False
 
     @pytest.mark.asyncio
@@ -442,18 +448,18 @@ class TestJobManager:
         """Test successful execution of a composite task"""
         # Create a test job and task
         job = BorgJob(
-            id="test-job-id",
+            id=uuid.uuid4(),
             command=["borg", "list", "test-repo"],
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[],
         )
 
         task = BorgJobTask(
-            task_type="command",
+            task_type=TaskTypeEnum.COMMAND,
             task_name="Test Command",
-            status="running",
+            status=TaskStatusEnum.RUNNING,
             started_at=now_utc(),
         )
 
@@ -515,18 +521,18 @@ class TestJobManager:
         """Test execution of a composite task that fails"""
         # Create a test job and task
         job = BorgJob(
-            id="test-job-id",
+            id=uuid.uuid4(),
             command=["borg", "list", "invalid-repo"],
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[],
         )
 
         task = BorgJobTask(
-            task_type="command",
+            task_type=TaskTypeEnum.COMMAND,
             task_name="Test Command",
-            status="running",
+            status=TaskStatusEnum.RUNNING,
             started_at=now_utc(),
         )
 
@@ -574,18 +580,18 @@ class TestJobManager:
         """Test execution of a composite task that raises an exception"""
         # Create a test job and task
         job = BorgJob(
-            id="test-job-id",
+            id=uuid.uuid4(),
             command=["borg", "list", "test-repo"],
             job_type="composite",
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[],
         )
 
         task = BorgJobTask(
-            task_type="command",
+            task_type=TaskTypeEnum.COMMAND,
             task_name="Test Command",
-            status="running",
+            status=TaskStatusEnum.RUNNING,
             started_at=now_utc(),
         )
 

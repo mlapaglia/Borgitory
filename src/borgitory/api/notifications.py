@@ -7,7 +7,7 @@ import os
 import re
 import html
 from typing import Optional
-from fastapi import APIRouter, HTTPException, status, Request
+from fastapi import APIRouter, HTTPException, status, Request, Depends
 from fastapi.responses import HTMLResponse
 from starlette.templating import _TemplateResponse
 
@@ -16,7 +16,9 @@ from borgitory.dependencies import (
     NotificationProviderRegistryDep,
     TemplatesDep,
     get_browser_timezone_offset,
+    get_notification_service,
 )
+from borgitory.services.notifications.service import NotificationService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -27,15 +29,12 @@ def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]
     if not provider:
         return None
 
-    # Validate provider name: only allow alphanumerics, underscores, hyphens
     if not re.fullmatch(r"^[\w-]+$", provider):
         return None
 
-    # Use unified template (no more separate _edit templates)
     template_path = f"partials/notifications/providers/{provider}_fields.html"
     full_path = f"src/borgitory/templates/{template_path}"
 
-    # Ensure fully resolved full_path remains inside the intended provider templates dir
     base_templates_dir = os.path.realpath(
         os.path.normpath("src/borgitory/templates/partials/notifications/providers/")
     )
@@ -78,9 +77,7 @@ async def get_provider_fields(
             "submit_button_text": submit_button_text,
         }
 
-        # For edit mode, include any configuration values passed via query params or form data
         if mode == "edit":
-            # Get configuration data from query parameters (for HTMX requests)
             for key, value in request.query_params.items():
                 if key not in ["provider", "mode"]:
                     context[key] = value
@@ -101,14 +98,11 @@ async def create_notification_config(
 ) -> _TemplateResponse:
     """Create a new notification configuration using the provider system"""
     try:
-        # Get form data
         form_data = await request.form()
 
-        # Extract basic fields
         name_field = form_data.get("name", "")
         provider_field = form_data.get("provider", "")
 
-        # Handle both str and UploadFile types
         name = name_field.strip() if isinstance(name_field, str) else ""
         provider = provider_field.strip() if isinstance(provider_field, str) else ""
 
@@ -120,13 +114,11 @@ async def create_notification_config(
                 status_code=400,
             )
 
-        # Extract provider-specific configuration
         provider_config = {}
         for key, value in form_data.items():
             if key not in ["name", "provider"] and value:
                 provider_config[key] = value
 
-        # Create config using service
         try:
             db_config = config_service.create_config(
                 name=name, provider=provider, provider_config=provider_config
@@ -191,13 +183,10 @@ async def test_notification_config(
     config_id: int,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    notification_service: NotificationService = Depends(get_notification_service),
 ) -> _TemplateResponse:
     """Test a notification configuration using the provider system"""
     try:
-        # Pass encryption service like cloud sync does
-        from borgitory.dependencies import get_notification_service_singleton
-
-        notification_service = get_notification_service_singleton()
         success, message = await config_service.test_config_with_service(
             config_id, notification_service
         )

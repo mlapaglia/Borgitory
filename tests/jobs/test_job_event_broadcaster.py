@@ -2,14 +2,16 @@
 Tests for JobEventBroadcaster - SSE streaming and event distribution
 """
 
+import uuid
 import pytest
 import asyncio
 from unittest.mock import patch
 
+from borgitory.models.job_results import JobStatusEnum
+from borgitory.services.jobs.broadcaster.event_type import EventType
+from borgitory.services.jobs.broadcaster.job_event import JobEvent
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     JobEventBroadcaster,
-    EventType,
-    JobEvent,
 )
 
 
@@ -24,17 +26,18 @@ class TestJobEventBroadcaster:
 
     def test_job_event_creation(self) -> None:
         """Test JobEvent creation and serialization"""
+        job_id = uuid.uuid4()
         event = JobEvent(
             event_type=EventType.JOB_STARTED,
-            job_id="test-job-123",
+            job_id=job_id,
             data={"status": "running"},
         )
 
         event_dict = event.to_dict()
 
         assert event_dict["type"] == "job_started"
-        assert event_dict["job_id"] == "test-job-123"
-        assert event_dict["data"]["status"] == "running"
+        assert event_dict["job_id"] == job_id
+        assert event_dict["data"]["status"] == JobStatusEnum.RUNNING
         assert "timestamp" in event_dict
 
     def test_job_event_defaults(self) -> None:
@@ -82,7 +85,7 @@ class TestJobEventBroadcaster:
     def test_broadcast_event_no_clients(self) -> None:
         """Test broadcasting event with no subscribed clients"""
         self.broadcaster.broadcast_event(
-            EventType.JOB_STARTED, job_id="test-job", data={"status": "running"}
+            EventType.JOB_STARTED, job_id=uuid.uuid4(), data={"status": "running"}
         )
 
         # Should not raise error and should add to recent events
@@ -95,8 +98,9 @@ class TestJobEventBroadcaster:
         queue1 = self.broadcaster.subscribe_client(client_id="client-1")
         queue2 = self.broadcaster.subscribe_client(client_id="client-2")
 
+        job_id = uuid.uuid4()
         self.broadcaster.broadcast_event(
-            EventType.JOB_COMPLETED, job_id="test-job", data={"result": "success"}
+            EventType.JOB_COMPLETED, job_id=job_id, data={"result": "success"}
         )
 
         # Both queues should have the event
@@ -106,7 +110,7 @@ class TestJobEventBroadcaster:
         # Check event content
         event1 = queue1.get_nowait()
         assert event1["type"] == "job_completed"
-        assert event1["job_id"] == "test-job"
+        assert event1["job_id"] == job_id
         assert event1["data"]["result"] == "success"
 
     def test_broadcast_event_full_queue(self) -> None:
@@ -134,6 +138,7 @@ class TestJobEventBroadcaster:
 
         assert len(self.broadcaster._recent_events) == 50
         # Should keep the most recent events
+        assert self.broadcaster._recent_events[-1].data is not None
         assert self.broadcaster._recent_events[-1].data["progress"] == 59
 
     @pytest.mark.asyncio
@@ -260,5 +265,7 @@ class TestJobEventBroadcaster:
         assert self.broadcaster._shutdown_requested is True
 
         # Background tasks should be cancelled
+        assert self.broadcaster._cleanup_task is not None
+        assert self.broadcaster._keepalive_task is not None
         assert self.broadcaster._cleanup_task.done()
         assert self.broadcaster._keepalive_task.done()

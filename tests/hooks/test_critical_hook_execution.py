@@ -3,12 +3,13 @@ Tests for HookExecutionService critical failure and early exit logic.
 """
 
 import pytest
+import uuid
 from typing import Dict, List, Optional, Any
 from unittest.mock import AsyncMock
 
-from src.borgitory.services.hooks.hook_config import HookConfig
-from src.borgitory.services.hooks.hook_execution_service import HookExecutionService
-from src.borgitory.protocols.command_protocols import CommandResult
+from borgitory.services.hooks.hook_config import HookConfig
+from borgitory.services.hooks.hook_execution_service import HookExecutionService
+from borgitory.protocols.command_protocols import CommandResult
 
 
 class MockCommandRunner:
@@ -78,7 +79,7 @@ class TestHookExecutionServiceCriticalFailure:
 
         # Execute hooks
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="pre", job_id="test-job-123"
+            hooks=hooks, hook_type="pre", job_id=uuid.uuid4()
         )
 
         # Verify critical failure detected
@@ -119,7 +120,7 @@ class TestHookExecutionServiceCriticalFailure:
 
         # Execute hooks
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="pre", job_id="test-job-123"
+            hooks=hooks, hook_type="pre", job_id=uuid.uuid4()
         )
 
         # Verify no critical failure
@@ -152,7 +153,7 @@ class TestHookExecutionServiceCriticalFailure:
 
         # Execute hooks
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="pre", job_id="test-job-123"
+            hooks=hooks, hook_type="pre", job_id=uuid.uuid4()
         )
 
         # Verify no critical failure
@@ -189,7 +190,7 @@ class TestHookExecutionServiceCriticalFailure:
 
         # Execute hooks
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="pre", job_id="test-job-123"
+            hooks=hooks, hook_type="pre", job_id=uuid.uuid4()
         )
 
         # Verify critical failure on first hook
@@ -227,7 +228,7 @@ class TestHookExecutionServiceCriticalFailure:
 
         # Execute hooks
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="pre", job_id="test-job-123"
+            hooks=hooks, hook_type="pre", job_id=uuid.uuid4()
         )
 
         # Verify no critical failure (since hook wasn't critical)
@@ -243,7 +244,7 @@ class TestHookExecutionServiceCriticalFailure:
     async def test_empty_hooks_list(self) -> None:
         """Test executing empty hooks list returns successful summary."""
         summary = await self.service.execute_hooks(
-            hooks=[], hook_type="pre", job_id="test-job-123"
+            hooks=[], hook_type="pre", job_id=uuid.uuid4()
         )
 
         assert summary.critical_failure is False
@@ -279,7 +280,7 @@ class TestHookExecutionServicePostHookConditional:
 
         # Execute hooks with job_failed=False (job succeeded)
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="post", job_id="test-job-123", job_failed=False
+            hooks=hooks, hook_type="post", job_id=uuid.uuid4(), job_failed=False
         )
 
         assert len(summary.results) == 1
@@ -297,7 +298,7 @@ class TestHookExecutionServicePostHookConditional:
 
         # Execute hooks with job_failed=True (job failed)
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="post", job_id="test-job-123", job_failed=True
+            hooks=hooks, hook_type="post", job_id=uuid.uuid4(), job_failed=True
         )
 
         # Hook should be skipped
@@ -321,7 +322,7 @@ class TestHookExecutionServicePostHookConditional:
 
         # Execute hooks with job_failed=True (job failed)
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="post", job_id="test-job-123", job_failed=True
+            hooks=hooks, hook_type="post", job_id=uuid.uuid4(), job_failed=True
         )
 
         assert len(summary.results) == 1
@@ -350,7 +351,7 @@ class TestHookExecutionServicePostHookConditional:
 
         # Execute hooks with job_failed=True (job failed)
         summary = await self.service.execute_hooks(
-            hooks=hooks, hook_type="post", job_id="test-job-123", job_failed=True
+            hooks=hooks, hook_type="post", job_id=uuid.uuid4(), job_failed=True
         )
 
         # Only hooks with run_on_job_failure=True should execute
@@ -376,7 +377,7 @@ class TestHookExecutionServicePostHookConditional:
         summary = await self.service.execute_hooks(
             hooks=hooks,
             hook_type="pre",  # Pre-hooks
-            job_id="test-job-123",
+            job_id=uuid.uuid4(),
             job_failed=True,
         )
 

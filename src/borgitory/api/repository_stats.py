@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+import logging
 
 from borgitory.api.cancel_on_disconnect import with_cancel_on_disconnect
 from borgitory.models.database import get_db, Repository
@@ -47,12 +48,17 @@ async def get_repository_statistics(
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    stats = await stats_svc.get_repository_statistics(repository, db)
-
-    if "error" in stats:
-        raise HTTPException(status_code=500, detail=stats["error"])
-
-    return stats
+    try:
+        stats = await stats_svc.get_repository_statistics(repository, db)
+        return stats
+    except ValueError as e:
+        # Handle validation errors (e.g., no archives found)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Handle other errors
+        raise HTTPException(
+            status_code=500, detail=f"Error generating statistics: {str(e)}"
+        )
 
 
 @router.get("/{repository_id}/stats/html")
@@ -68,17 +74,28 @@ async def get_repository_statistics_html(
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    # Generate statistics (no timeout for now)
-    stats = await stats_svc.get_repository_statistics(repository, db)
+    try:
+        # Generate statistics (no timeout for now)
+        stats = await stats_svc.get_repository_statistics(repository, db)
 
-    if "error" in stats:
+        return templates.TemplateResponse(
+            request,
+            "partials/repository_stats/stats_panel.html",
+            {"repository": repository, "stats": stats},
+        )
+    except ValueError as e:
+        # Handle validation errors (e.g., no archives found)
         return HTMLResponse(
-            content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>{stats['error']}</p>",
+            content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>{str(e)}</p>",
+            status_code=400,
+        )
+    except Exception:
+        # Handle other errors - log exception for diagnostics, return only generic info to user
+        logging.exception(
+            "Exception occurred while generating repository statistics HTML (repository_id=%s)",
+            repository_id,
+        )
+        return HTMLResponse(
+            content="<p class='text-red-700 dark:text-red-300 text-sm text-center'>An internal error has occurred while generating repository statistics.</p>",
             status_code=500,
         )
-
-    return templates.TemplateResponse(
-        request,
-        "partials/repository_stats/stats_panel.html",
-        {"repository": repository, "stats": stats},
-    )

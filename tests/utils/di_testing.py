@@ -5,15 +5,26 @@ This module provides utilities for testing services that use FastAPI's dependenc
 system, including context managers for dependency overrides and mock service factories.
 """
 
-from typing import TypeVar, Callable, Any, Generator, Dict
+from typing import (
+    TypeVar,
+    Callable,
+    Any,
+    Generator,
+    Dict,
+    List,
+    Optional,
+    AsyncGenerator,
+)
 from contextlib import contextmanager
 from unittest.mock import Mock, MagicMock
+import uuid
 from fastapi.testclient import TestClient
 
 # Import the main app
 from borgitory.main import app
 
 # Import service types for mock creation
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.borg_service import BorgService
 from borgitory.services.debug_service import DebugService
 from borgitory.services.jobs.job_stream_service import JobStreamService
@@ -153,10 +164,12 @@ class MockServiceFactory:
         mock = Mock(spec=JobStreamService)
 
         # Setup async generators for streaming methods
-        async def mock_stream_all_jobs():
+        async def mock_stream_all_jobs() -> AsyncGenerator[str, None]:
             yield "data: test job data\n\n"
 
-        async def mock_stream_job_output(job_id: str):
+        async def mock_stream_job_output(
+            job_id: uuid.UUID,
+        ) -> AsyncGenerator[str, None]:
             yield f"data: output for {job_id}\n\n"
 
         mock.stream_all_jobs.return_value = mock_stream_all_jobs()
@@ -195,12 +208,15 @@ class MockServiceFactory:
             mock_task_0,
             mock_task_1,
         ]  # List with two tasks
-        mock_template_job.job.status = "completed"
-        mock_template_job.job.id = "test-job-123"
+        mock_template_job.job.status = JobStatusEnum.COMPLETED
+        test_job_id = uuid.uuid4()
+        mock_template_job.job.id = test_job_id
 
         # Set up side_effect to return mock_template_job for known jobs, None for unknown
-        def get_job_for_template_side_effect(job_id, *args, **kwargs):
-            if job_id == "test-job-123":
+        def get_job_for_template_side_effect(
+            job_id: uuid.UUID, *args: Any, **kwargs: Any
+        ) -> Optional[Mock]:
+            if job_id == test_job_id:
                 return mock_template_job
             return None
 
@@ -209,7 +225,7 @@ class MockServiceFactory:
         mock._render_job_html.return_value = "<div>Mock job HTML</div>"
 
         # Setup async streaming methods
-        async def mock_stream_current_jobs_html():
+        async def mock_stream_current_jobs_html() -> AsyncGenerator[str, None]:
             yield "<div>Mock streaming HTML</div>"
 
         mock.stream_current_jobs_html.return_value = mock_stream_current_jobs_html()
@@ -218,8 +234,10 @@ class MockServiceFactory:
 
     @staticmethod
     def create_job_render_service_with_mocks(
-        job_manager=None, templates=None, converter=None
-    ):
+        job_manager: Optional[Mock] = None,
+        templates: Optional[Mock] = None,
+        converter: Optional[Mock] = None,
+    ) -> JobRenderService:
         """Create a real JobRenderService with mocked dependencies for testing."""
         from fastapi.templating import Jinja2Templates
         from borgitory.services.jobs.job_render_service import (
@@ -270,8 +288,9 @@ class MockServiceFactory:
         # Setup common return values
         mock.list_jobs.return_value = []
         mock.get_job_status.return_value = {"status": "completed"}
-        mock.get_job.return_value = {"id": "test-job-123", "status": "completed"}
-        mock.start_borg_command.return_value = {"job_id": "test-job-123"}
+        test_job_id = uuid.uuid4()
+        mock.get_job.return_value = {"id": test_job_id, "status": "completed"}
+        mock.start_borg_command.return_value = {"job_id": test_job_id}
         mock.get_active_jobs_count.return_value = 0
         mock.get_queue_stats.return_value = {"pending": 0, "running": 0}
         mock.cancel_job.return_value = True
@@ -284,7 +303,11 @@ class MockServiceFactory:
         mock = Mock(spec=SimpleCommandRunner)
 
         # Setup common return values
-        async def mock_run_command(command, env=None, timeout=None):
+        async def mock_run_command(
+            command: List[str],
+            env: Optional[Dict[str, str]] = None,
+            timeout: Optional[int] = None,
+        ) -> MagicMock:
             return MagicMock(
                 success=True,
                 return_code=0,

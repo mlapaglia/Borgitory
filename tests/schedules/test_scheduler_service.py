@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from borgitory.utils.datetime_utils import now_utc
@@ -271,7 +272,7 @@ class TestSchedulerService:
     async def test_update_next_run_time_success(self) -> None:
         """Test updating next run time in database"""
         schedule_id = 123
-        job_id = "backup_schedule_123"
+        job_id = str(uuid.uuid4())
         next_run_time = now_utc()
 
         mock_job = Mock()
@@ -299,7 +300,7 @@ class TestSchedulerService:
     def test_handle_job_event_success(self) -> None:
         """Test handling successful job event"""
         mock_event = Mock()
-        mock_event.job_id = "backup_schedule_123"
+        mock_event.job_id = uuid.uuid4()
         mock_event.exception = None
 
         # Should not raise exception
@@ -308,7 +309,7 @@ class TestSchedulerService:
     def test_handle_job_event_failure(self) -> None:
         """Test handling failed job event"""
         mock_event = Mock()
-        mock_event.job_id = "backup_schedule_123"
+        mock_event.job_id = uuid.uuid4()
         mock_event.exception = Exception("Job failed")
 
         # Should not raise exception

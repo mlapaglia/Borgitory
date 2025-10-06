@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Optional
+import uuid
 
 from borgitory.custom_types import ConfigDict
 from borgitory.services.jobs.broadcaster.event_type import EventType
@@ -12,7 +13,7 @@ class JobEvent:
     """Represents a job event"""
 
     event_type: EventType
-    job_id: Optional[str] = None
+    job_id: Optional[uuid.UUID] = None
     data: Optional[ConfigDict] = None
     timestamp: Optional[datetime] = None
 

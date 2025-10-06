@@ -2,6 +2,7 @@
 Tests for hook execution service.
 """
 
+import uuid
 import pytest
 from unittest.mock import AsyncMock, Mock
 from typing import Dict, List, Optional
@@ -58,7 +59,7 @@ class TestHookExecutionService:
         mock_runner = MockCommandRunner()
         service = HookExecutionService(command_runner=mock_runner)
 
-        summary = await service.execute_hooks([], "pre", "job-123")
+        summary = await service.execute_hooks([], "pre", uuid.uuid4())
 
         assert summary.results == []
         assert summary.all_successful is True
@@ -76,7 +77,7 @@ class TestHookExecutionService:
         service = HookExecutionService(command_runner=mock_runner)
         hook = HookConfig(name="Test Hook", command="echo 'Hello World'")
 
-        summary = await service.execute_hooks([hook], "pre", "job-123")
+        summary = await service.execute_hooks([hook], "pre", uuid.uuid4())
 
         assert len(summary.results) == 1
         result = summary.results[0]
@@ -107,7 +108,7 @@ class TestHookExecutionService:
             name="Shell Hook", command="ls -la", shell="/bin/sh", timeout=60
         )
 
-        await service.execute_hooks([hook], "post", "job-456")
+        await service.execute_hooks([hook], "post", uuid.uuid4())
 
         # Verify correct shell and timeout were used
         call_args = mock_runner._run_command_mock.call_args
@@ -129,7 +130,7 @@ class TestHookExecutionService:
             environment_vars={"TEST_VAR": "test_value"},
         )
 
-        await service.execute_hooks([hook], "pre", "job-789")
+        await service.execute_hooks([hook], "pre", uuid.uuid4())
 
         # Verify environment variables were passed
         call_args = mock_runner._run_command_mock.call_args
@@ -154,7 +155,7 @@ class TestHookExecutionService:
             "task_index": "2",
             "job_type": "scheduled",
         }
-        await service.execute_hooks([hook], "pre", "job-123", context)
+        await service.execute_hooks([hook], "pre", uuid.uuid4(), context)
 
         # Verify context was added to environment
         call_args = mock_runner._run_command_mock.call_args
@@ -178,7 +179,7 @@ class TestHookExecutionService:
         service = HookExecutionService(command_runner=mock_runner)
         hook = HookConfig(name="Failing Hook", command="exit 1")
 
-        summary = await service.execute_hooks([hook], "pre", "job-123")
+        summary = await service.execute_hooks([hook], "pre", uuid.uuid4())
 
         assert len(summary.results) == 1
         result = summary.results[0]
@@ -208,7 +209,7 @@ class TestHookExecutionService:
             HookConfig(name="Hook 2", command="echo Success", continue_on_failure=True),
         ]
 
-        summary = await service.execute_hooks(hooks, "pre", "job-123")
+        summary = await service.execute_hooks(hooks, "pre", uuid.uuid4())
 
         assert len(summary.results) == 2
         assert summary.results[0].success is False
@@ -229,7 +230,7 @@ class TestHookExecutionService:
             HookConfig(name="Hook 2", command="echo Success", continue_on_failure=True),
         ]
 
-        summary = await service.execute_hooks(hooks, "pre", "job-123")
+        summary = await service.execute_hooks(hooks, "pre", uuid.uuid4())
 
         # Should only execute first hook
         assert len(summary.results) == 1
@@ -255,7 +256,7 @@ class TestHookExecutionService:
 
         hook = HookConfig(name="Logging Hook", command="echo test", log_output=True)
 
-        await service.execute_hooks([hook], "pre", "job-123")
+        await service.execute_hooks([hook], "pre", uuid.uuid4())
 
         # Verify output was logged
         assert mock_handler.log_hook_output.call_count == 2
@@ -285,7 +286,7 @@ class TestHookExecutionService:
 
         hook = HookConfig(name="Silent Hook", command="echo test", log_output=False)
 
-        await service.execute_hooks([hook], "pre", "job-123")
+        await service.execute_hooks([hook], "pre", uuid.uuid4())
 
         # Verify output was not logged
         mock_handler.log_hook_output.assert_not_called()

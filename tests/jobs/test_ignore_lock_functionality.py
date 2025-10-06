@@ -7,17 +7,25 @@ the ignore_lock parameter is set to True in backup requests.
 
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+import uuid
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from typing import Dict, Any
 
-from borgitory.services.jobs.job_manager import (
-    JobManager,
-    JobManagerDependencies,
+from borgitory.protocols.command_protocols import ProcessResult
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_manager_factory import JobManagerFactory
+from borgitory.utils.datetime_utils import now_utc
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+from borgitory.services.jobs.job_models import (
     BorgJob,
     BorgJobTask,
+    JobManagerDependencies,
+    TaskTypeEnum,
 )
-from borgitory.protocols.command_protocols import ProcessResult
-from borgitory.utils.datetime_utils import now_utc
+from borgitory.services.jobs.job_models import TaskStatusEnum
 
 
 class TestIgnoreLockFunctionality:
@@ -26,15 +34,24 @@ class TestIgnoreLockFunctionality:
     @pytest.fixture
     def mock_dependencies(self) -> JobManagerDependencies:
         """Create mock dependencies for JobManager"""
-        deps = JobManagerDependencies()
+        # Create a mock event broadcaster
+        mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
+
+        # Use the factory to create test dependencies
+        deps = JobManagerFactory.create_for_testing(
+            mock_event_broadcaster=mock_event_broadcaster
+        )
+
+        # Override the job executor with our custom mock
         mock_executor = MagicMock()
         mock_executor.start_process = AsyncMock()
         mock_executor.monitor_process_output = AsyncMock()
-        deps.job_executor = mock_executor
+        setattr(deps, "job_executor", mock_executor)
 
-        deps.output_manager = MagicMock()
-        deps.output_manager.add_output_line = AsyncMock()
-        deps.event_broadcaster = MagicMock()
+        # Override output manager with our custom mock
+        mock_output_manager = MagicMock()
+        mock_output_manager.add_output_line = AsyncMock()
+        setattr(deps, "output_manager", mock_output_manager)
 
         return deps
 
@@ -44,17 +61,16 @@ class TestIgnoreLockFunctionality:
         manager = JobManager(dependencies=mock_dependencies)
         # Ensure the executor is properly set and not None
         assert mock_dependencies.job_executor is not None
-        manager.executor = mock_dependencies.job_executor
         return manager
 
     @pytest.fixture
     def mock_job(self) -> BorgJob:
         """Create a mock job for testing"""
         job = BorgJob(
-            id="test-job-123",
-            job_type="manual_backup",
+            id=uuid.uuid4(),
+            job_type=JobTypeEnum.BACKUP,
             repository_id=1,
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
         )
         return job
@@ -63,7 +79,7 @@ class TestIgnoreLockFunctionality:
     def mock_backup_task_with_ignore_lock(self) -> BorgJobTask:
         """Create a mock backup task with ignore_lock=True"""
         task = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup with Ignore Lock",
             parameters={
                 "source_path": "/test/source",
@@ -80,7 +96,7 @@ class TestIgnoreLockFunctionality:
     def mock_backup_task_without_ignore_lock(self) -> BorgJobTask:
         """Create a mock backup task with ignore_lock=False"""
         task = BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup without Ignore Lock",
             parameters={
                 "source_path": "/test/source",
@@ -125,11 +141,15 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager, "_get_repository_data", return_value=mock_repository_data
+                job_manager.backup_executor,
+                "_get_repository_data",
+                return_value=mock_repository_data,
             ),
-            patch.object(job_manager, "_execute_break_lock") as mock_break_lock,
+            patch.object(
+                job_manager.backup_executor, "_execute_break_lock"
+            ) as mock_break_lock,
         ):
-            result = await job_manager._execute_backup_task(
+            result = await job_manager.backup_executor.execute_backup_task(
                 mock_job, mock_backup_task_with_ignore_lock, task_index=0
             )
 
@@ -144,7 +164,7 @@ class TestIgnoreLockFunctionality:
 
         # Verify the backup task completed successfully
         assert result is True
-        assert mock_backup_task_with_ignore_lock.status == "completed"
+        assert mock_backup_task_with_ignore_lock.status == TaskStatusEnum.COMPLETED
 
     @pytest.mark.asyncio
     async def test_ignore_lock_false_skips_break_lock_command(
@@ -173,11 +193,15 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager, "_get_repository_data", return_value=mock_repository_data
+                job_manager.backup_executor,
+                "_get_repository_data",
+                return_value=mock_repository_data,
             ),
-            patch.object(job_manager, "_execute_break_lock") as mock_break_lock,
+            patch.object(
+                job_manager.backup_executor, "_execute_break_lock"
+            ) as mock_break_lock,
         ):
-            result = await job_manager._execute_backup_task(
+            result = await job_manager.backup_executor.execute_backup_task(
                 mock_job, mock_backup_task_without_ignore_lock, task_index=0
             )
 
@@ -186,7 +210,7 @@ class TestIgnoreLockFunctionality:
 
         # Verify the backup task completed successfully
         assert result is True
-        assert mock_backup_task_without_ignore_lock.status == "completed"
+        assert mock_backup_task_without_ignore_lock.status == TaskStatusEnum.COMPLETED
 
     @pytest.mark.asyncio
     async def test_execute_break_lock_command_construction(
@@ -211,7 +235,7 @@ class TestIgnoreLockFunctionality:
         passphrase = "test-passphrase"
 
         # Execute break-lock
-        await job_manager._execute_break_lock(
+        await job_manager.backup_executor._execute_break_lock(
             repository_path, passphrase, output_callback
         )
 
@@ -268,15 +292,17 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager, "_get_repository_data", return_value=mock_repository_data
+                job_manager.backup_executor,
+                "_get_repository_data",
+                return_value=mock_repository_data,
             ),
             patch.object(
-                job_manager,
+                job_manager.backup_executor,
                 "_execute_break_lock",
                 side_effect=Exception("Break-lock failed"),
             ) as mock_break_lock,
         ):
-            result = await job_manager._execute_backup_task(
+            result = await job_manager.backup_executor.execute_backup_task(
                 mock_job, mock_backup_task_with_ignore_lock, task_index=0
             )
 
@@ -285,7 +311,7 @@ class TestIgnoreLockFunctionality:
 
         # Verify the backup task still completed successfully despite break-lock failure
         assert result is True
-        assert mock_backup_task_with_ignore_lock.status == "completed"
+        assert mock_backup_task_with_ignore_lock.status == TaskStatusEnum.COMPLETED
 
         # Verify warning message was added to output
         output_lines = mock_backup_task_with_ignore_lock.output_lines
@@ -307,29 +333,30 @@ class TestIgnoreLockFunctionality:
             await asyncio.sleep(0.1)  # Small delay to simulate work
             raise asyncio.TimeoutError()
 
-        job_manager.executor.monitor_process_output = AsyncMock(
-            side_effect=mock_monitor_timeout
-        )  # type: ignore
+        with patch.object(
+            job_manager.executor,
+            "monitor_process_output",
+            side_effect=mock_monitor_timeout,
+        ):
+            # Mock output callback
+            output_callback = MagicMock()
 
-        # Mock output callback
-        output_callback = MagicMock()
+            # Test parameters
+            repository_path = "/test/repo/path"
+            passphrase = "test-passphrase"
 
-        # Test parameters
-        repository_path = "/test/repo/path"
-        passphrase = "test-passphrase"
+            # Execute break-lock and expect timeout exception
+            with pytest.raises(Exception, match="Break-lock operation timed out"):
+                await job_manager.backup_executor._execute_break_lock(
+                    repository_path, passphrase, output_callback
+                )
 
-        # Execute break-lock and expect timeout exception
-        with pytest.raises(Exception, match="Break-lock operation timed out"):
-            await job_manager._execute_break_lock(
-                repository_path, passphrase, output_callback
-            )
+            # Verify process was killed
+            mock_process.kill.assert_called_once()
+            mock_process.wait.assert_called_once()
 
-        # Verify process was killed
-        mock_process.kill.assert_called_once()
-        mock_process.wait.assert_called_once()
-
-        # Verify timeout message was sent to callback
-        output_callback.assert_any_call("Break-lock timed out, terminating process")
+            # Verify timeout message was sent to callback
+            output_callback.assert_any_call("Break-lock timed out, terminating process")
 
     @pytest.mark.asyncio
     async def test_break_lock_uses_secure_command_builder(
@@ -339,23 +366,30 @@ class TestIgnoreLockFunctionality:
 
         # Mock the executor methods
         mock_process = MagicMock()
-        job_manager.executor.start_process.return_value = mock_process  # type: ignore
-
         mock_result = ProcessResult(
             return_code=0, stdout=b"Success", stderr=b"", error=None
         )
-        job_manager.executor.monitor_process_output.return_value = mock_result  # type: ignore
 
-        # Execute break-lock
-        await job_manager._execute_break_lock("/test/repo", "test-pass", MagicMock())
+        with (
+            patch.object(
+                job_manager.executor, "start_process", return_value=mock_process
+            ) as mock_start_process,
+            patch.object(
+                job_manager.executor, "monitor_process_output", return_value=mock_result
+            ),
+        ):
+            # Execute break-lock
+            await job_manager.backup_executor._execute_break_lock(
+                "/test/repo", "test-pass", MagicMock()
+            )
 
-        # Verify executor was called with a borg break-lock command
-        job_manager.executor.start_process.assert_called_once()
-        call_args = job_manager.executor.start_process.call_args
-        command = call_args[0][0]  # First positional argument
-        env = call_args[0][1]  # Second positional argument
+            # Verify executor was called with a borg break-lock command
+            mock_start_process.assert_called_once()
+            call_args = mock_start_process.call_args
+            command = call_args[0][0]  # First positional argument
+            env = call_args[0][1]  # Second positional argument
 
-        # Verify it's a borg break-lock command
-        assert "borg" in command[0]
-        assert "break-lock" in command
-        assert "BORG_PASSPHRASE" in env
+            # Verify it's a borg break-lock command
+            assert "borg" in command[0]
+            assert "break-lock" in command
+            assert "BORG_PASSPHRASE" in env

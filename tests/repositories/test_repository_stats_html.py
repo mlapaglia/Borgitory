@@ -51,7 +51,7 @@ class TestRepositoryStatsHTML:
 
         # Mock the stats service to return test data
         async def mock_get_stats(
-            repo: Any, db: Any, progress_callback=None
+            repo: Any, db: Any, progress_callback: Any = None
         ) -> dict[str, Any]:
             return {
                 "repository_path": repo.path,
@@ -145,11 +145,11 @@ class TestRepositoryStatsHTML:
 
         app.dependency_overrides[get_db] = override_get_db
 
-        # Mock the stats service to return an error
+        # Mock the stats service to raise an exception
         async def mock_get_stats_error(
-            repo: Any, db: Any, progress_callback=None
-        ) -> dict[str, Any]:
-            return {"error": "No archives found in repository"}
+            repo: Any, db: Any, progress_callback: Any = None
+        ) -> None:
+            raise ValueError("No archives found in repository")
 
         # Mock the dependency injection for error case
         mock_stats_service = Mock(spec=RepositoryStatsService)
@@ -167,7 +167,7 @@ class TestRepositoryStatsHTML:
                     f"/api/repositories/{mock_repository.id}/stats/html"
                 )
 
-                assert response.status_code == 500
+                assert response.status_code == 400
                 assert "text/html" in response.headers["content-type"]
 
                 html_content = response.text

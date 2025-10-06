@@ -264,6 +264,7 @@ class TestRegisterProviderDecorator:
         metadata = get_metadata("test")
         assert metadata is not None
         assert metadata.supports_versioning is True
+        assert metadata.additional_info is not None
         assert metadata.additional_info["custom_field"] == "custom_value"
 
     def test_register_provider_missing_config_class(self) -> None:

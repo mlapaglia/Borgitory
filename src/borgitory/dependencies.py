@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from borgitory.services.notifications.providers.discord_provider import HttpClient
     from borgitory.config.command_runner_config import CommandRunnerConfig
     from borgitory.config.job_manager_config import JobManagerEnvironmentConfig
-    from borgitory.services.jobs.job_manager import JobManagerConfig
+    from borgitory.services.jobs.job_models import JobManagerConfig
     from borgitory.services.cloud_providers.registry_factory import RegistryFactory
     from borgitory.services.volumes.file_system_interface import FileSystemInterface
     from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
@@ -699,7 +699,7 @@ def get_job_manager_config(
     Returns:
         JobManagerConfig: Configured JobManager instance
     """
-    from borgitory.services.jobs.job_manager import JobManagerConfig
+    from borgitory.services.jobs.job_models import JobManagerConfig
 
     return JobManagerConfig(
         max_concurrent_backups=env_config.max_concurrent_backups,
@@ -728,10 +728,8 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     Returns:
         JobManagerProtocol: Cached singleton instance
     """
-    from borgitory.services.jobs.job_manager import (
-        JobManagerDependencies,
-        JobManagerFactory,
-    )
+    from borgitory.services.jobs.job_models import JobManagerDependencies
+    from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 
     # Resolve all dependencies directly (not via FastAPI DI)
     env_config = get_job_manager_env_config()

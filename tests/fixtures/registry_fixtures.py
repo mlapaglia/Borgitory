@@ -14,7 +14,7 @@ from borgitory.services.notifications.registry import NotificationProviderRegist
 from borgitory.services.notifications.registry_factory import (
     NotificationRegistryFactory,
 )
-from borgitory.services.jobs.job_manager import JobManagerDependencies
+from borgitory.services.jobs.job_models import JobManagerDependencies
 from borgitory.services.jobs.job_executor import JobExecutor
 
 

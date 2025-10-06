@@ -4,11 +4,14 @@ These tests use real dependencies and minimal mocking to exercise actual code pa
 """
 
 import pytest
+import uuid
 from datetime import datetime, timezone
 from unittest.mock import Mock
 from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
+from typing import AsyncGenerator
 
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.services.jobs.job_render_service import (
     JobRenderService,
     JobDataConverter,
@@ -20,7 +23,12 @@ from borgitory.services.jobs.job_render_service import (
 )
 from borgitory.models.database import Job, JobTask, Repository
 from borgitory.models.enums import JobType
-from borgitory.services.jobs.job_manager import BorgJob, BorgJobTask
+from borgitory.services.jobs.job_models import (
+    BorgJob,
+    BorgJobTask,
+    TaskStatusEnum,
+    TaskTypeEnum,
+)
 
 
 class TestJobDataConverterCoverage:
@@ -29,52 +37,49 @@ class TestJobDataConverterCoverage:
     def test_convert_database_job_with_tasks(self) -> None:
         """Test convert_database_job with a complete database job"""
         # Create a real Repository object
-        repository = Repository(
-            name="test-repo",
-            path="/test/repo",
-            encrypted_passphrase="encrypted_test",
-        )
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.encrypted_passphrase = "encrypted_test"
         repository.id = 1
 
         # Create a real Job object with tasks
-        db_job = Job(
-            id="test-job-123",
-            type=JobType.BACKUP,
-            status="completed",
-            started_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            finished_at=datetime(2023, 1, 1, 12, 30, 0, tzinfo=timezone.utc),
-            completed_tasks=2,
-            total_tasks=2,
-            repository=repository,
-            error=None,
-        )
+        test_job_id = uuid.uuid4()
+        db_job = Job()
+        db_job.id = test_job_id
+        db_job.type = JobType.BACKUP
+        db_job.status = JobStatusEnum.COMPLETED
+        db_job.started_at = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        db_job.finished_at = datetime(2023, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
+        db_job.completed_tasks = 2
+        db_job.total_tasks = 2
+        db_job.repository = repository
+        db_job.error = None
 
         # Add tasks
-        task1 = JobTask(
-            id=1,
-            job_id="test-job-123",
-            task_name="Backup Files",
-            task_type="backup",
-            task_order=0,
-            status="completed",
-            started_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            completed_at=datetime(2023, 1, 1, 12, 15, 0, tzinfo=timezone.utc),
-            output="Files backed up successfully",
-            return_code=0,
-        )
+        task1 = JobTask()
+        task1.id = 1
+        task1.job_id = test_job_id
+        task1.task_name = "Backup Files"
+        task1.task_type = TaskTypeEnum.BACKUP
+        task1.task_order = 0
+        task1.status = TaskStatusEnum.COMPLETED
+        task1.started_at = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        task1.completed_at = datetime(2023, 1, 1, 12, 15, 0, tzinfo=timezone.utc)
+        task1.output = "Files backed up successfully"
+        task1.return_code = 0
 
-        task2 = JobTask(
-            id=2,
-            job_id="test-job-123",
-            task_name="Sync to Cloud",
-            task_type="cloud_sync",
-            task_order=1,
-            status="completed",
-            started_at=datetime(2023, 1, 1, 12, 15, 0, tzinfo=timezone.utc),
-            completed_at=datetime(2023, 1, 1, 12, 30, 0, tzinfo=timezone.utc),
-            output="Sync completed",
-            return_code=0,
-        )
+        task2 = JobTask()
+        task2.id = 2
+        task2.job_id = test_job_id
+        task2.task_name = "Sync to Cloud"
+        task2.task_type = TaskTypeEnum.CLOUD_SYNC
+        task2.task_order = 1
+        task2.status = TaskStatusEnum.COMPLETED
+        task2.started_at = datetime(2023, 1, 1, 12, 15, 0, tzinfo=timezone.utc)
+        task2.completed_at = datetime(2023, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
+        task2.output = "Sync completed"
+        task2.return_code = 0
 
         db_job.tasks = [task1, task2]
 
@@ -83,7 +88,7 @@ class TestJobDataConverterCoverage:
         result = converter.convert_database_job(db_job)
 
         # Verify the conversion
-        assert result.id == "test-job-123"
+        assert result.id == test_job_id
         assert result.title == "Backup - test-repo (2/2 tasks)"
         assert result.status.type == JobStatusType.COMPLETED
         assert result.repository_name == "test-repo"
@@ -93,37 +98,36 @@ class TestJobDataConverterCoverage:
 
         # Verify task conversion
         assert result.tasks[0].name == "Backup Files"
-        assert result.tasks[0].type == "backup"
+        assert result.tasks[0].type == TaskTypeEnum.BACKUP
         assert result.tasks[0].status.type == JobStatusType.COMPLETED
         assert result.tasks[0].output == "Files backed up successfully"
         assert result.tasks[0].order == 0
 
         assert result.tasks[1].name == "Sync to Cloud"
-        assert result.tasks[1].type == "cloud_sync"
+        assert result.tasks[1].type == TaskTypeEnum.CLOUD_SYNC
         assert result.tasks[1].status.type == JobStatusType.COMPLETED
 
     def test_convert_database_job_no_tasks(self) -> None:
         """Test convert_database_job with no tasks"""
-        repository = Repository(
-            name="empty-repo",
-            path="/empty/repo",
-            encrypted_passphrase="encrypted_test",
-        )
+        repository = Repository()
+        repository.name = "empty-repo"
+        repository.path = "/empty/repo"
+        repository.encrypted_passphrase = "encrypted_test"
         repository.id = 1
 
-        db_job = Job(
-            id="empty-job",
-            type=JobType.PRUNE,
-            status="pending",
-            started_at=datetime.now(timezone.utc),
-            repository=repository,
-            tasks=[],  # No tasks
-        )
+        test_job_id = uuid.uuid4()
+        db_job = Job()
+        db_job.id = test_job_id
+        db_job.type = JobType.PRUNE
+        db_job.status = JobStatusEnum.PENDING
+        db_job.started_at = datetime.now(timezone.utc)
+        db_job.repository = repository
+        db_job.tasks = []  # No tasks
 
         converter = JobDataConverter()
         result = converter.convert_database_job(db_job)
 
-        assert result.id == "empty-job"
+        assert result.id == test_job_id
         assert result.title == "Prune - empty-repo"
         assert result.status.type == JobStatusType.PENDING
         assert len(result.tasks) == 0
@@ -132,56 +136,49 @@ class TestJobDataConverterCoverage:
     def test_convert_memory_job_with_tasks(self) -> None:
         """Test convert_memory_job with running tasks"""
         # Create a mock repository for the db_job
-        repository = Repository(
-            name="memory-repo",
-            path="/memory/repo",
-            encrypted_passphrase="encrypted_test",
-        )
+        repository = Repository()
+        repository.name = "memory-repo"
+        repository.path = "/memory/repo"
+        repository.encrypted_passphrase = "encrypted_test"
         repository.id = 1
 
-        db_job = Job(
-            id="memory-job",
-            type=JobType.BACKUP,
-            status="running",
-            repository=repository,
-        )
+        db_job = Job()
+        db_job.id = uuid.uuid4()
+        db_job.type = JobType.BACKUP
+        db_job.status = JobStatusEnum.RUNNING
+        db_job.repository = repository
 
         # Create BorgJobTask objects
         task1 = BorgJobTask(
             task_name="Running Backup",
-            task_type="backup",
-            status="running",
+            task_type=TaskTypeEnum.BACKUP,
+            status=TaskStatusEnum.RUNNING,
             output_lines=["Starting backup...", "Processing files..."],
         )
         task1.started_at = datetime.now(timezone.utc)
 
         task2 = BorgJobTask(
             task_name="Pending Sync",
-            task_type="cloud_sync",
-            status="pending",
+            task_type=TaskTypeEnum.CLOUD_SYNC,
+            status=TaskStatusEnum.PENDING,
             output_lines=[],
         )
 
-        # Create BorgJob
-        memory_job = BorgJob(
-            id="memory-job",
-            started_at=datetime.now(timezone.utc),
-            job_type="backup",
-            status="running",
-            tasks=[task1, task2],
-        )
+        # Create mock BorgJob
+        memory_job_id = uuid.uuid4()
+        memory_job = Mock()
+        memory_job.id = memory_job_id
+        memory_job.started_at = datetime.now(timezone.utc)
+        memory_job.job_type = JobTypeEnum.BACKUP
+        memory_job.status = JobStatusEnum.RUNNING
+        memory_job.tasks = [task1, task2]
         memory_job.current_task_index = 0
-
-        # Mock get_current_task method
-        def mock_get_current_task():
-            return task1
-
-        memory_job.get_current_task = mock_get_current_task
+        memory_job.get_current_task.return_value = task1
 
         converter = JobDataConverter()
         result = converter.convert_memory_job(memory_job, db_job)
 
-        assert result.id == "memory-job"
+        assert result.id == memory_job_id
         assert result.title.startswith("Backup - memory-repo")
         assert result.status.type == JobStatusType.RUNNING
         assert len(result.tasks) == 2
@@ -200,8 +197,8 @@ class TestJobDataConverterCoverage:
         # Create job data with mixed task statuses
         failed_task = TaskDisplayData(
             name="Failed Task",
-            type="backup",
-            status=JobStatus.from_status_string("failed"),
+            type=TaskTypeEnum.BACKUP,
+            status=JobStatus.from_status_string(JobStatusEnum.FAILED),
             output="Error occurred",
             error="Backup failed",
             order=1,
@@ -212,8 +209,8 @@ class TestJobDataConverterCoverage:
 
         pending_task = TaskDisplayData(
             name="Pending Task",
-            type="cloud_sync",
-            status=JobStatus.from_status_string("pending"),
+            type=TaskTypeEnum.CLOUD_SYNC,
+            status=JobStatus.from_status_string(JobStatusEnum.PENDING),
             output="",
             error=None,
             order=2,
@@ -224,8 +221,8 @@ class TestJobDataConverterCoverage:
 
         running_task = TaskDisplayData(
             name="Running Task",
-            type="notification",
-            status=JobStatus.from_status_string("running"),
+            type=TaskTypeEnum.NOTIFICATION,
+            status=JobStatus.from_status_string(JobStatusEnum.RUNNING),
             output="Sending...",
             error=None,
             order=3,
@@ -235,9 +232,9 @@ class TestJobDataConverterCoverage:
         )
 
         job_data = JobDisplayData(
-            id="failed-job",
+            id=uuid.uuid4(),
             title="Failed Job",
-            status=JobStatus.from_status_string("failed"),
+            status=JobStatus.from_status_string(JobStatusEnum.FAILED),
             repository_name="test-repo",
             started_at=datetime.now(timezone.utc),
             finished_at=None,
@@ -264,8 +261,8 @@ class TestJobDataConverterCoverage:
         """Test fix_failed_job_tasks converts running task to failed in failed job"""
         running_task = TaskDisplayData(
             name="Running Task",
-            type="backup",
-            status=JobStatus.from_status_string("running"),
+            type=TaskTypeEnum.BACKUP,
+            status=JobStatus.from_status_string(JobStatusEnum.RUNNING),
             output="In progress...",
             error=None,
             order=0,
@@ -276,8 +273,8 @@ class TestJobDataConverterCoverage:
 
         pending_task = TaskDisplayData(
             name="Pending Task",
-            type="cloud_sync",
-            status=JobStatus.from_status_string("pending"),
+            type=TaskTypeEnum.CLOUD_SYNC,
+            status=JobStatus.from_status_string(JobStatusEnum.PENDING),
             output="",
             error=None,
             order=1,
@@ -287,9 +284,9 @@ class TestJobDataConverterCoverage:
         )
 
         job_data = JobDisplayData(
-            id="failed-job-2",
+            id=uuid.uuid4(),
             title="Failed Job 2",
-            status=JobStatus.from_status_string("failed"),
+            status=JobStatus.from_status_string(JobStatusEnum.FAILED),
             repository_name="test-repo",
             started_at=datetime.now(timezone.utc),
             finished_at=None,
@@ -313,8 +310,8 @@ class TestJobDataConverterCoverage:
         """Test fix_failed_job_tasks doesn't modify completed jobs"""
         task = TaskDisplayData(
             name="Completed Task",
-            type="backup",
-            status=JobStatus.from_status_string("completed"),
+            type=TaskTypeEnum.BACKUP,
+            status=JobStatus.from_status_string(JobStatusEnum.COMPLETED),
             output="Success",
             error=None,
             order=0,
@@ -324,9 +321,9 @@ class TestJobDataConverterCoverage:
         )
 
         job_data = JobDisplayData(
-            id="completed-job",
+            id=uuid.uuid4(),
             title="Completed Job",
-            status=JobStatus.from_status_string("completed"),
+            status=JobStatus.from_status_string(JobStatusEnum.COMPLETED),
             repository_name="test-repo",
             started_at=datetime.now(timezone.utc),
             finished_at=datetime.now(timezone.utc),
@@ -365,7 +362,7 @@ class TestJobRenderServiceCoverage:
         job_manager.jobs = {}
 
         # Mock stream_all_job_updates as async generator
-        async def mock_stream():
+        async def mock_stream() -> AsyncGenerator[dict[str, object], None]:
             yield {"type": "job_status_changed", "job_id": "test"}
 
         job_manager.stream_all_job_updates = mock_stream
@@ -382,20 +379,20 @@ class TestJobRenderServiceCoverage:
     ) -> None:
         """Test render_jobs_html with database jobs"""
         # Setup mock database query
-        repository = Repository(
-            name="test-repo", path="/test", encrypted_passphrase="encrypted_test"
-        )
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/test"
+        repository.encrypted_passphrase = "encrypted_test"
         repository.id = 1
 
-        db_job = Job(
-            id="db-job-1",
-            type=JobType.BACKUP,
-            status="completed",
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
-            repository=repository,
-            tasks=[],
-        )
+        db_job = Job()
+        db_job.id = uuid.uuid4()
+        db_job.type = JobType.BACKUP
+        db_job.status = JobStatusEnum.COMPLETED
+        db_job.started_at = datetime.now(timezone.utc)
+        db_job.finished_at = datetime.now(timezone.utc)
+        db_job.repository = repository
+        db_job.tasks = []
 
         # Mock the query chain
         mock_query = Mock()
@@ -467,10 +464,10 @@ class TestJobRenderServiceCoverage:
         """Test render_current_jobs_html with running jobs"""
         # Create a running job in the job manager
         running_job = BorgJob(
-            id="running-job-1",
+            id=uuid.uuid4(),
             started_at=datetime.now(timezone.utc),
-            job_type="backup",
-            status="running",
+            job_type=JobTypeEnum.BACKUP,
+            status=JobStatusEnum.RUNNING,
             tasks=[],
         )
 
@@ -540,7 +537,7 @@ class TestJobRenderServiceCoverage:
         mock_job_manager.jobs = {}
 
         # Create async generator that yields one event then stops
-        async def mock_stream():
+        async def mock_stream() -> AsyncGenerator[dict[str, object], None]:
             yield {"type": "job_status_changed", "job_id": "test"}
 
         mock_job_manager.stream_all_job_updates = mock_stream
@@ -569,7 +566,7 @@ class TestJobRenderServiceCoverage:
         """Test stream_current_jobs_html error handling"""
 
         # Make job manager stream raise an exception
-        async def mock_stream_error():
+        async def mock_stream_error() -> AsyncGenerator[dict[str, object], None]:
             raise Exception("Stream error")
 
         mock_job_manager.stream_all_job_updates = mock_stream_error

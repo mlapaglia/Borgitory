@@ -3,12 +3,14 @@ Tests for JobRenderService new architecture with proper DI patterns.
 Focuses on the new dataclass-based approach and catches template selection bugs.
 """
 
+import uuid
 import pytest
 from unittest.mock import Mock
 from datetime import datetime, timezone
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_render_service import (
     JobRenderService,
     JobDataConverter,
@@ -48,14 +50,14 @@ class TestJobRenderServiceNewArchitecture:
         # Create mock job manager with a running job
         mock_job_manager = Mock()
         mock_job = Mock()
-        mock_job.id = "test-job-123"
-        mock_job.status = "running"
-        mock_job_manager.jobs = {"test-job-123": mock_job}
+        mock_job.id = uuid.uuid4()
+        mock_job.status = JobStatusEnum.RUNNING
+        mock_job_manager.jobs = {mock_job.id: mock_job}
 
         # Create mock converter
         mock_converter = Mock(spec=JobDataConverter)
         expected_job_data = JobDisplayData(
-            id="test-job-123",
+            id=mock_job.id,
             title="Test Job",
             status=JobStatus(JobStatusType.RUNNING, "bg-blue-100", "⟳"),
             repository_name="test-repo",
@@ -79,7 +81,7 @@ class TestJobRenderServiceNewArchitecture:
         mock_db = Mock(spec=Session)
         mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = None
 
-        result = service.get_job_display_data("test-job-123", mock_db)
+        result = service.get_job_display_data(mock_job.id, mock_db)
 
         assert result == expected_job_data
         # The converter is called with memory_job and db_job (which is None when not found in DB)
@@ -93,8 +95,8 @@ class TestJobRenderServiceNewArchitecture:
 
         # Create mock database job
         mock_db_job = Mock()
-        mock_db_job.id = "test-job-456"
-        mock_db_job.status = "completed"
+        mock_db_job.id = uuid.uuid4()
+        mock_db_job.status = JobStatusEnum.COMPLETED
 
         mock_db = Mock(spec=Session)
         mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_db_job
@@ -102,7 +104,7 @@ class TestJobRenderServiceNewArchitecture:
         # Create mock converter
         mock_converter = Mock(spec=JobDataConverter)
         expected_job_data = JobDisplayData(
-            id="test-job-456",
+            id=mock_db_job.id,
             title="Completed Job",
             status=JobStatus(JobStatusType.COMPLETED, "bg-green-100", "✓"),
             repository_name="test-repo",
@@ -121,7 +123,7 @@ class TestJobRenderServiceNewArchitecture:
             converter=mock_converter,
         )
 
-        result = service.get_job_display_data("test-job-456", mock_db)
+        result = service.get_job_display_data(mock_db_job.id, mock_db)
 
         assert result == expected_job_data
         mock_converter.convert_database_job.assert_called_once_with(mock_db_job)
@@ -131,14 +133,14 @@ class TestJobRenderServiceNewArchitecture:
         # Create mock job manager with a running job
         mock_job_manager = Mock()
         mock_job = Mock()
-        mock_job.id = "running-job-789"
-        mock_job.status = "running"
-        mock_job_manager.jobs = {"running-job-789": mock_job}
+        mock_job.id = uuid.uuid4()
+        mock_job.status = JobStatusEnum.RUNNING
+        mock_job_manager.jobs = {mock_job.id: mock_job}
 
         # Create mock converter that returns JobDisplayData
         mock_converter = Mock(spec=JobDataConverter)
         job_display_data = JobDisplayData(
-            id="running-job-789",
+            id=mock_job.id,
             title="Running Backup",
             status=JobStatus(JobStatusType.RUNNING, "bg-blue-100", "⟳"),
             repository_name="my-repo",
@@ -170,36 +172,22 @@ class TestJobRenderServiceNewArchitecture:
         )
 
         mock_db = Mock(spec=Session)
-        result = service.get_job_for_template(
-            "running-job-789", mock_db, expand_details=True
-        )
+        result = service.get_job_for_template(mock_job.id, mock_db, expand_details=True)
 
         assert result is not None
         assert isinstance(result, TemplateJobData)
-        assert result.job.id == "running-job-789"
+        assert result.job.id == mock_job.id
         assert (
-            str(result.job.status) == "running"
+            str(result.job.status) == JobStatusEnum.RUNNING
         )  # This is key for template selection!
         assert result.expand_details is True
         assert len(result.sorted_tasks) == 1
-        assert result.sorted_tasks[0].status == "running"
-
-    def test_template_job_status_string_conversion(self) -> None:
-        """Test that TemplateJobStatus converts to string properly (catches template selection bug)"""
-        status = TemplateJobStatus("running")
-
-        # This is the critical test - string conversion must work
-        assert str(status) == "running"
-        assert status.title() == "Running"
-
-        # Test the comparison that was failing in the API
-        assert str(status) == "running"  # This should be True
-        assert status != "running"  # This should be True (object != string)
+        assert result.sorted_tasks[0].status == JobStatusEnum.RUNNING
 
     def test_convert_to_template_data_preserves_status_strings(self) -> None:
         """Test that convert_to_template_data creates proper string statuses"""
         job_display_data = JobDisplayData(
-            id="test-job",
+            id=uuid.uuid4(),
             title="Test Job",
             status=JobStatus(JobStatusType.RUNNING, "bg-blue-100", "⟳"),
             repository_name="test-repo",
@@ -226,17 +214,17 @@ class TestJobRenderServiceNewArchitecture:
 
         # Verify job status is TemplateJobStatus (for .title() method)
         assert isinstance(template_data.job.status, TemplateJobStatus)
-        assert str(template_data.job.status) == "running"
+        assert str(template_data.job.status) == JobStatusEnum.RUNNING
 
         # Verify task status is string (for template conditionals)
         assert isinstance(template_data.sorted_tasks[0].status, str)
-        assert template_data.sorted_tasks[0].status == "running"
+        assert template_data.sorted_tasks[0].status == JobStatusEnum.RUNNING
 
     def test_render_job_html_uses_correct_template_data(self) -> None:
         """Test that _render_job_html passes correct data to templates"""
         # Create job display data
         job_display_data = JobDisplayData(
-            id="test-job",
+            id=uuid.uuid4(),
             title="Test Job",
             status=JobStatus(JobStatusType.COMPLETED, "bg-green-100", "✓"),
             repository_name="test-repo",
@@ -334,7 +322,7 @@ class TestTemplateSelectionBugRegression:
         This test ensures str(template_job.job.status) == "running" works.
         """
         # Create a TemplateJobStatus like the API would
-        template_job_status = TemplateJobStatus("running")
+        template_job_status = TemplateJobStatus(JobStatusEnum.RUNNING)
 
         # This was the failing comparison in the API
         assert template_job_status != "running"  # Object != string (expected to fail)
@@ -356,7 +344,7 @@ class TestTemplateSelectionBugRegression:
         """
         # Create a TemplateJobData with running status
         job_display_data = JobDisplayData(
-            id="test-job",
+            id=uuid.uuid4(),
             title="Test Job",
             status=JobStatus(JobStatusType.RUNNING, "bg-blue-100", "⟳"),
             repository_name="test-repo",
@@ -412,7 +400,7 @@ class TestTemplateSelectionBugRegression:
         )
 
         job_display_data = JobDisplayData(
-            id="test-job",
+            id=uuid.uuid4(),
             title="Test Job",
             status=JobStatus(JobStatusType.RUNNING, "bg-blue-100", "⟳"),
             repository_name="test-repo",
