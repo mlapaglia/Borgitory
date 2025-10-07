@@ -19,6 +19,7 @@ from contextlib import _GeneratorContextManager
 import uuid
 
 from borgitory.models.job_results import JobStatusEnum
+from borgitory.services.borg_service import BorgService
 from borgitory.protocols.job_event_broadcaster_protocol import (
     JobEventBroadcasterProtocol,
 )
@@ -26,6 +27,7 @@ from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.protocols.job_queue_manager_protocol import JobQueueManagerProtocol
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
+from borgitory.services.repositories.repository_service import RepositoryService
 
 
 if TYPE_CHECKING:
@@ -97,11 +99,13 @@ class JobManagerDependencies:
     """Injectable dependencies for the job manager"""
 
     # Core services - all required
+    borg_service: BorgService
     event_broadcaster: JobEventBroadcasterProtocol
     job_executor: ProcessExecutorProtocol
     output_manager: JobOutputManagerProtocol
     queue_manager: JobQueueManagerProtocol
     database_manager: JobDatabaseManagerProtocol
+    repository_service: RepositoryService
 
     # External dependencies (for testing/customization)
     subprocess_executor: Optional[Callable[..., Coroutine[None, None, "Process"]]] = (

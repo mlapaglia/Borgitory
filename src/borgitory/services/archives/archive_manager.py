@@ -15,8 +15,8 @@ from starlette.responses import StreamingResponse
 from borgitory.models.database import Repository
 from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.services.borg_service import BorgService
 from borgitory.utils.security import (
-    build_secure_borg_command_with_keyfile,
     secure_borg_command,
     validate_archive_name,
 )
@@ -41,10 +41,12 @@ class ArchiveManager:
 
     def __init__(
         self,
+        borg_service: BorgService,
         job_executor: "ProcessExecutorProtocol",
         command_executor: CommandExecutorProtocol,
         cache_ttl: timedelta = timedelta(minutes=30),
     ) -> None:
+        self.borg_service = borg_service
         self.job_executor = job_executor
         self.command_executor = command_executor
         self.cache_ttl = cache_ttl
@@ -210,90 +212,81 @@ class ArchiveManager:
             borg_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
 
             # Use manual keyfile management for streaming operations
-            result = build_secure_borg_command_with_keyfile(
+            result = self.borg_service.create_borg_command(
+                repository=repository,
                 base_command="borg extract",
-                repository_path="",
-                passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=borg_args,
             )
-            command, env = result.command, result.environment
+            async with result as (command, env, _):
+                logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
-            logger.info(f"Extracting file {file_path} from archive {archive_name}")
+                # Start the borg process using command executor for cross-platform compatibility
+                process = await self.command_executor.create_subprocess(
+                    command=command,
+                    env=env,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
 
-            # Start the borg process using command executor for cross-platform compatibility
-            process = await self.command_executor.create_subprocess(
-                command=command,
-                env=env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+                async def generate_stream() -> AsyncGenerator[bytes, None]:
+                    """Generator function to stream the file content with automatic backpressure"""
+                    try:
+                        while True:
+                            if process.stdout is None:
+                                break
+                            chunk = await process.stdout.read(
+                                65536
+                            )  # 64KB chunks for efficiency
+                            if not chunk:
+                                break
 
-            async def generate_stream() -> AsyncGenerator[bytes, None]:
-                """Generator function to stream the file content with automatic backpressure"""
-                try:
-                    while True:
-                        if process.stdout is None:
-                            break
-                        chunk = await process.stdout.read(
-                            65536
-                        )  # 64KB chunks for efficiency
-                        if not chunk:
-                            break
+                            yield chunk
 
-                        yield chunk
+                        # Wait for process to complete
+                        return_code = await process.wait()
 
-                    # Wait for process to complete
-                    return_code = await process.wait()
+                        # Check for errors after process completes
+                        if return_code != 0:
+                            # Read stderr for error details
+                            stderr_data = b""
+                            if process.stderr:
+                                try:
+                                    stderr_data = await process.stderr.read()
+                                except Exception as e:
+                                    logger.warning(f"Could not read stderr: {e}")
 
-                    # Check for errors after process completes
-                    if return_code != 0:
-                        # Read stderr for error details
-                        stderr_data = b""
-                        if process.stderr:
+                            error_msg = (
+                                stderr_data.decode("utf-8", errors="replace")
+                                if stderr_data
+                                else "Unknown error"
+                            )
+                            logger.error(
+                                f"Borg extract process failed with code {return_code}: {error_msg}"
+                            )
+                            raise Exception(
+                                f"Borg extract failed with code {return_code}: {error_msg}"
+                            )
+
+                    except Exception:
+                        # Clean up process if still running
+                        if process.returncode is None:
+                            process.terminate()
                             try:
-                                stderr_data = await process.stderr.read()
-                            except Exception as e:
-                                logger.warning(f"Could not read stderr: {e}")
+                                await asyncio.wait_for(process.wait(), timeout=5.0)
+                            except asyncio.TimeoutError:
+                                process.kill()
+                                await process.wait()
+                        raise
 
-                        error_msg = (
-                            stderr_data.decode("utf-8", errors="replace")
-                            if stderr_data
-                            else "Unknown error"
-                        )
-                        logger.error(
-                            f"Borg extract process failed with code {return_code}: {error_msg}"
-                        )
-                        raise Exception(
-                            f"Borg extract failed with code {return_code}: {error_msg}"
-                        )
+                filename = os.path.basename(file_path)
 
-                except Exception:
-                    # Clean up process if still running
-                    if process.returncode is None:
-                        process.terminate()
-                        try:
-                            await asyncio.wait_for(process.wait(), timeout=5.0)
-                        except asyncio.TimeoutError:
-                            process.kill()
-                            await process.wait()
-                    raise
-                finally:
-                    # Clean up keyfile after streaming completes
-                    result.cleanup_temp_files()
-
-            filename = os.path.basename(file_path)
-
-            return StreamingResponse(
-                generate_stream(),
-                media_type="application/octet-stream",
-                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-            )
+                return StreamingResponse(
+                    generate_stream(),
+                    media_type="application/octet-stream",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                )
 
         except Exception as e:
-            # Clean up keyfile if error occurs before streaming starts
-            if result:
-                result.cleanup_temp_files()
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
             raise Exception(f"Failed to extract file: {str(e)}")
 
@@ -312,22 +305,16 @@ class ArchiveManager:
             f"{repository.path}::{archive_name}",
         ]
 
-        keyfile_content = repository.get_keyfile_content()
-        passphrase = repository.get_passphrase() or ""
-
-        async with secure_borg_command(
+        async with self.borg_service.create_borg_command(
             base_command=base_command,
-            repository_path="",  # Already included in additional_args
-            passphrase=passphrase,
-            keyfile_content=keyfile_content,
+            repository=repository,
             additional_args=additional_args,
-        ) as (final_command, env, temp_keyfile_path):
+        ) as (final_command, env, _):
             try:
-                # Use command_executor directly instead of job_executor to avoid WSL FIFO issues
                 cmd_result = await self.command_executor.execute_command(
                     command=final_command,
                     env=env,
-                    timeout=60.0,  # 1 minute timeout for listing
+                    timeout=60.0,
                 )
 
                 if not cmd_result.success:

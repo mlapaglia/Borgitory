@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, User, get_db
+from borgitory.models.enums import EncryptionType
 from borgitory.models.schemas import (
     Repository as RepositorySchema,
     RepositoryCreate,
@@ -61,8 +62,8 @@ async def create_repository(
     create_request = CreateRepositoryRequest(
         name=repo.name,
         path=repo.path,
-        passphrase=repo.passphrase or "",
-        user_id=current_user.id,
+        passphrase=repo.passphrase,
+        encryption_type=repo.encryption_type,
         cache_dir=repo.cache_dir,
     )
 
@@ -202,6 +203,20 @@ async def get_import_encryption_fields(
     )
 
 
+@router.get("/create-encryption-fields", response_class=HTMLResponse)
+async def get_create_encryption_fields(
+    request: Request,
+    templates: TemplatesDep,
+    encryption_type: str = "",
+) -> _TemplateResponse:
+    """Get the appropriate encryption fields based on encryption type selection for create form."""
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/import/encryption_fields.html",
+        {"encryption_type": encryption_type},
+    )
+
+
 @router.get("/create-form", response_class=HTMLResponse)
 async def get_create_form(
     request: Request, templates: TemplatesDep
@@ -219,8 +234,7 @@ async def import_repository(
     name: str = Form(...),
     path: str = Form(...),
     passphrase: str = Form(...),
-    keyfile: UploadFile = File(None),
-    encryption_type: str = Form(None),
+    encryption_type: EncryptionType = Form(None),
     keyfile_content: str = Form(None),
     cache_dir: str = Form(None),
     db: Session = Depends(get_db),
@@ -230,10 +244,8 @@ async def import_repository(
         name=name,
         path=path.strip(),
         passphrase=passphrase,
-        keyfile=keyfile,
         encryption_type=encryption_type,
         keyfile_content=keyfile_content,
-        user_id=None,  # Import doesn't require user ID currently
         cache_dir=cache_dir.strip(),
     )
 

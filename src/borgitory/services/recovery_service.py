@@ -10,9 +10,9 @@ import logging
 from borgitory.models.database import Repository
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.security import secure_borg_command
 from borgitory.utils.db_session import get_db_session
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.services.borg_service import BorgService
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -21,9 +21,10 @@ logger = logging.getLogger(__name__)
 class RecoveryService:
     """Service to recover from application crashes during backup operations"""
 
-    def __init__(self, command_executor: CommandExecutorProtocol) -> None:
+    def __init__(self, command_executor: CommandExecutorProtocol, borg_service: BorgService) -> None:
         """Initialize RecoveryService with command executor for cross-platform compatibility."""
         self.command_executor = command_executor
+        self.borg_service = borg_service
 
     async def recover_stale_jobs(self) -> None:
         """
@@ -127,11 +128,9 @@ class RecoveryService:
         try:
             logger.info(f"Attempting to release lock on repository: {repository.name}")
 
-            async with secure_borg_command(
+            async with self.borg_service.create_borg_command(
+                repository=repository,
                 base_command="borg break-lock",
-                repository_path=repository.path,
-                passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
             ) as (command, env, _):
                 # Execute the break-lock command with a timeout using command executor

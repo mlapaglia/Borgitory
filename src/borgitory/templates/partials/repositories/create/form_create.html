@@ -17,19 +17,39 @@
                     <input type="text" name="name" required class="input-modern mt-1">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Path</label>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository Path</label>
                     {% set input_id = "create-path" %}
                     {% set input_name = "path" %}
                     {% set input_value = "" %}
-                    {% set placeholder = "my-new-repo" %}
+                    {% set placeholder = "/repos/my-repo" %}
                     {% set required = true %}
                     {% include "partials/shared/path_autocomplete.html" %}
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Enter the full path to your new Borg repository
+                    </p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                        Passphrase
+                        Encryption Type
                     </label>
-                    <input type="password" name="passphrase" required class="input-modern mt-1">
+                    <select name="encryption_type"
+                            class="input-modern mt-1">
+                        <option value="">Select encryption type...</option>
+                        <option value="repokey">Repository Key (repokey)</option>
+                        <option value="repokey-blake2">Repository Key Blake2 (repokey-blake2)</option>
+                        <option value="keyfile">Keyfile (keyfile)</option>
+                        <option value="keyfile-blake2">Keyfile Blake2 (keyfile-blake2)</option>
+                        <option value="authenticated">Authenticated (authenticated)</option>
+                        <option value="authenticated-blake2">Authenticated Blake2 (authenticated-blake2)</option>
+                        <option value="none">No Encryption (none)</option>
+                    </select>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Choose the <a href="https://borgbackup.readthedocs.io/en/stable/usage/init.html#more-encryption-modes" target="_blank" class="text-blue-600 hover:text-blue-700">encryption method</a> for your new repository
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Passphrase</label>
+                    <input type="password" name="passphrase" required class="input-modern mt-1" placeholder="Enter repository passphrase">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">

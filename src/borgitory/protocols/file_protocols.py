@@ -20,16 +20,21 @@ class FileServiceProtocol(Protocol):
         ...
 
     @abstractmethod
-    def open_file(self, file_path: str, mode: str) -> IO[bytes]:
+    async def open_file(self, file_path: str, mode: str) -> IO[bytes]:
         """Open a file at the given path with the specified mode."""
         ...
 
     @abstractmethod
-    def exists(self, file_path: str) -> bool:
+    async def exists(self, file_path: str) -> bool:
         """Check if a file or directory exists at the given path."""
         ...
 
     @abstractmethod
-    def isfile(self, file_path: str) -> bool:
+    async def isfile(self, file_path: str) -> bool:
         """Check if the path is a file."""
+        ...
+
+    @abstractmethod
+    def get_platform_name(self) -> str:
+        """Get the platform name this file service handles."""
         ...

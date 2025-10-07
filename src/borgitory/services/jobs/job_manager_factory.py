@@ -3,6 +3,8 @@ Job Manager Factory - Factory pattern for creating job manager instances with pr
 """
 
 from typing import Optional, Callable, Any
+from borgitory.dependencies import get_borg_service, get_repository_service
+from borgitory.services.borg_service import BorgService
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     get_job_event_broadcaster,
 )
@@ -14,6 +16,7 @@ from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.protocols.job_queue_manager_protocol import JobQueueManagerProtocol
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
+from borgitory.services.repositories.repository_service import RepositoryService
 
 
 class JobManagerFactory:
@@ -43,7 +46,7 @@ class JobManagerFactory:
             from borgitory.services.jobs.job_queue_manager import JobQueueManager
             from borgitory.services.jobs.job_database_manager import JobDatabaseManager
             from borgitory.utils.db_session import get_db_session
-
+            from borgitory.dependencies import get_borg_service, get_repository_service
             # Create all required core services
             event_broadcaster = JobEventBroadcaster(
                 max_queue_size=config.sse_max_queue_size,
@@ -68,6 +71,8 @@ class JobManagerFactory:
             )
 
             custom_dependencies = JobManagerDependencies(
+                borg_service=get_borg_service(),
+                repository_service=get_repository_service(),
                 event_broadcaster=event_broadcaster,
                 job_executor=job_executor,
                 output_manager=output_manager,
@@ -77,6 +82,8 @@ class JobManagerFactory:
 
         # Create core services with proper configuration
         deps = JobManagerDependencies(
+            borg_service=custom_dependencies.borg_service,
+            repository_service=custom_dependencies.repository_service,
             event_broadcaster=custom_dependencies.event_broadcaster,
             job_executor=custom_dependencies.job_executor,
             output_manager=custom_dependencies.output_manager,
@@ -150,6 +157,8 @@ class JobManagerFactory:
         )
 
         complete_deps = JobManagerDependencies(
+            borg_service=get_borg_service(),
+            repository_service=get_repository_service(),
             event_broadcaster=get_job_event_broadcaster(),
             job_executor=job_executor,
             output_manager=output_manager,
@@ -186,11 +195,15 @@ class JobManagerFactory:
         mock_output_manager = Mock(spec=JobOutputManagerProtocol)
         mock_queue_manager = Mock(spec=JobQueueManagerProtocol)
         mock_database_manager = Mock(spec=JobDatabaseManagerProtocol)
+        mock_borg_service = Mock(spec=BorgService)
+        mock_repository_service = Mock(spec=RepositoryService)
         mock_event_broadcaster = mock_event_broadcaster or Mock(
             spec=JobEventBroadcasterProtocol
         )
 
         test_deps = JobManagerDependencies(
+            borg_service=mock_borg_service,
+            repository_service=mock_repository_service,
             event_broadcaster=mock_event_broadcaster,
             job_executor=mock_job_executor,
             output_manager=mock_output_manager,

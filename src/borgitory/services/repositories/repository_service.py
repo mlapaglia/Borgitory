@@ -8,6 +8,7 @@ from typing import Dict, List, Protocol, TypedDict, Union, Any
 from sqlalchemy.orm import Session
 
 from borgitory.models.database import Repository, Job, Schedule
+from borgitory.models.enums import EncryptionType
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
     ImportRepositoryRequest,
@@ -112,9 +113,9 @@ class RepositoryService:
             db_repo.name = request.name
             db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
+            db_repo.encryption_type = request.encryption_type
             db_repo.cache_dir = request.cache_dir
 
-            # Initialize repository with Borg
             init_result = await self.borg_service.initialize_repository(db_repo)
             if not init_result.success:
                 borg_error = init_result.message
@@ -129,7 +130,16 @@ class RepositoryService:
                     borg_error=borg_error,
                 )
 
-            # Save to database
+            if db_repo.encryption_type in [EncryptionType.KEYFILE, EncryptionType.KEYFILE_BLAKE2]:
+                keyfile_result = await self.export_repository_key(db_repo)
+                keyfile_contents = keyfile_result.get("key_data")
+                if keyfile_contents:
+                    db_repo.set_keyfile_content(keyfile_contents)
+                    db.commit()
+                    logger.info(f"Saved keyfile contents for repository '{request.name}'")
+                else:
+                    logger.warning(f"Could not retrieve keyfile contents for repository '{request.name}'")
+
             db.add(db_repo)
             db.commit()
             db.refresh(db_repo)
@@ -155,44 +165,11 @@ class RepositoryService:
         self, request: ImportRepositoryRequest, db: Session
     ) -> RepositoryOperationResult:
         """Import an existing Borg repository."""
-        keyfile_path: str | None = None
         try:
-            # Validate repository doesn't already exist
             validation_errors = await self._validate_repository_import(request, db)
             if validation_errors:
                 return RepositoryOperationResult(
                     success=False, validation_errors=validation_errors
-                )
-
-            # Handle keyfile if provided
-            if request.keyfile and request.keyfile.filename:
-                keyfile_result = await self._save_keyfile(request.name, request.keyfile)
-                if not keyfile_result["success"]:
-                    error_msg = keyfile_result.get("error")
-                    return RepositoryOperationResult(
-                        success=False,
-                        error_message=str(error_msg)
-                        if error_msg
-                        else "Unknown keyfile error",
-                    )
-
-                path_value = keyfile_result.get("path")
-                keyfile_path = str(path_value) if path_value else None
-
-            verification_successful = await self.borg_service.verify_repository_access(
-                repo_path=request.path,
-                passphrase=request.passphrase,
-                keyfile_path=str(keyfile_path) if keyfile_path else "",
-                keyfile_content=request.keyfile_content or "",
-            )
-
-            if not verification_successful:
-                if keyfile_path:
-                    await self.file_service.remove_file(keyfile_path)
-
-                return RepositoryOperationResult(
-                    success=False,
-                    error_message="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
                 )
 
             db_repo = Repository()
@@ -207,9 +184,14 @@ class RepositoryService:
             if request.keyfile_content:
                 db_repo.set_keyfile_content(request.keyfile_content)
 
-            db.add(db_repo)
-            db.commit()
-            db.refresh(db_repo)
+
+            verification_successful = await self.borg_service.verify_repository_access(db_repo)
+
+            if not verification_successful:
+                return RepositoryOperationResult(
+                    success=False,
+                    error_message="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
+                )
 
             try:
                 archives_response = await self.borg_service.list_archives(db_repo)
@@ -217,9 +199,17 @@ class RepositoryService:
                     f"Successfully imported repository '{request.name}' with {len(archives_response.archives)} archives"
                 )
             except Exception:
-                logger.info(
-                    f"Successfully imported repository '{request.name}' (could not count archives)"
+                logger.warning(
+                    f"Imported repository could not list archives '{request.name}'"
                 )
+                return RepositoryOperationResult(
+                    success=False,
+                    error_message="Failed to list archives. Please check the path, passphrase, and keyfile (if required).",
+                )
+
+            db.add(db_repo)
+            db.commit()
+            db.refresh(db_repo)
 
             return RepositoryOperationResult(
                 success=True,
@@ -229,12 +219,6 @@ class RepositoryService:
             )
 
         except Exception as e:
-            db.rollback()
-            if keyfile_path is not None:
-                try:
-                    await self.file_service.remove_file(keyfile_path)
-                except Exception:
-                    pass
             error_message = f"Failed to import repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
@@ -329,7 +313,7 @@ class RepositoryService:
                     success=True, path=request.path, directories=[]
                 )
 
-            directory_data = get_directory_listing(
+            directory_data = await get_directory_listing(
                 request.path, self.file_service, include_files=request.include_files
             )
 
@@ -727,11 +711,9 @@ class RepositoryService:
     async def _get_borg_info(self, repository: Repository) -> Dict[str, Any]:
         """Get repository information using borg info command."""
         try:
-            async with secure_borg_command(
+            async with self.borg_service.create_borg_command(
+                repository=repository,
                 base_command="borg info",
-                repository_path=repository.path,
-                passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json"],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
@@ -752,6 +734,7 @@ class RepositoryService:
                         "repository_id": info_data.get("repository", {}).get("id"),
                         "location": info_data.get("repository", {}).get("location"),
                         "encryption": info_data.get("encryption"),
+                        "keyfile": info_data.get("key file"),
                         "cache": info_data.get("cache"),
                         "security_dir": info_data.get("security_dir"),
                     }
@@ -822,11 +805,9 @@ class RepositoryService:
     async def _get_borg_config(self, repository: Repository) -> Dict[str, Any]:
         """Get repository configuration using borg config --list command."""
         try:
-            async with secure_borg_command(
+            async with self.borg_service.create_borg_command(
+                repository=repository,
                 base_command="borg config",
-                repository_path=repository.path,
-                passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--list"],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
@@ -871,12 +852,9 @@ class RepositoryService:
     async def export_repository_key(self, repository: Repository) -> Dict[str, Any]:
         """Export repository key using borg key export command."""
         try:
-            async with secure_borg_command(
+            async with self.borg_service.create_borg_command(
+                repository=repository,
                 base_command="borg key export",
-                repository_path=repository.path,
-                passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
-                additional_args=[],
                 environment_overrides=_build_repository_env_overrides(repository),
             ) as (command, env, _):
                 result = await self.command_executor.execute_command(
@@ -925,6 +903,10 @@ class RepositoryService:
             value /= 1024.0
         return f"{value:.1f} PB"
 
+    async def get_repository_by_id(self, repository_id: int, db: Session) -> Repository | None:
+        """Get a repository by its ID from the database."""
+        return db.query(Repository).filter(Repository.id == repository_id).first()
+
     async def list_directories_for_autocomplete(
         self, path: str, search_term: str = "", include_files: bool = False
     ) -> List[DirectoryInfo]:
@@ -961,7 +943,7 @@ class RepositoryService:
                 elif not secure_isdir(path):
                     directories = []
                 else:
-                    directories = get_directory_listing(
+                    directories = await get_directory_listing(
                         path, self.file_service, include_files=include_files
                     )
 

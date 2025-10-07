@@ -9,6 +9,7 @@ from borgitory.services.migrations.migration_factory import (
     create_migration_service_for_startup,
 )
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.models.enums import EncryptionType
 from typing import List, Any
 
 from cryptography.fernet import Fernet
@@ -87,9 +88,7 @@ class Repository(Base):
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
     encrypted_passphrase: Mapped[str] = mapped_column(String, nullable=False)
-    encryption_type: Mapped[str | None] = mapped_column(
-        String, nullable=True
-    )  # "repokey", "keyfile", "none", etc.
+    encryption_type: Mapped[EncryptionType] = mapped_column(String, nullable=False)
     encrypted_keyfile_content: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # Encrypted keyfile content

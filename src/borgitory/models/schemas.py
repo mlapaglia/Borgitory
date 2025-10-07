@@ -7,6 +7,7 @@ import json
 
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
+from borgitory.models.enums import EncryptionType
 
 
 def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
@@ -137,6 +138,12 @@ class RepositoryBase(BaseModel):
         pattern=r"^[A-Za-z0-9-_\s]+$",
         description="Repository name (alphanumeric, hyphens, underscores, spaces only)",
     )
+    passphrase: str = Field(
+        min_length=8, description="Passphrase must be at least 8 characters"
+    )
+    encryption_type: EncryptionType = Field(
+        description="Encryption type",
+    )
     path: str = Field(
         min_length=1,
         pattern=ABSOLUTE_PATH_PATTERN,
@@ -160,10 +167,7 @@ class RepositoryBase(BaseModel):
 
 
 class RepositoryCreate(RepositoryBase):
-    passphrase: str = Field(
-        min_length=8, description="Passphrase must be at least 8 characters"
-    )
-
+    pass
 
 class RepositoryUpdate(BaseModel):
     name: Optional[str] = Field(
