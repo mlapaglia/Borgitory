@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 import json
 
+from sqlalchemy.sql import false
+
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 
@@ -858,15 +860,17 @@ class PruneRequest(BaseModel):
     keep_monthly: Optional[int] = Field(None, ge=0)
     keep_yearly: Optional[int] = Field(None, ge=0)
     # Options
-    show_list: bool = True
-    show_stats: bool = True
+    show_list: bool = False
+    show_stats: bool = False
     save_space: bool = False
     force_prune: bool = False
-    dry_run: bool = True
+    dry_run: bool = False
 
     @field_validator("dry_run", mode="before")
     @classmethod
-    def validate_dry_run(cls, v: Union[str, bool, int]) -> bool:
+    def validate_dry_run(cls, v: Union[str, bool, int, None]) -> bool:
+        if v is None:
+            return False
         if isinstance(v, str):
             return v.lower() in ("true", "1", "yes", "on")
         return bool(v)
