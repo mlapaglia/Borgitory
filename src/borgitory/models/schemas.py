@@ -5,8 +5,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 import json
 
-from sqlalchemy.sql import false
-
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 
