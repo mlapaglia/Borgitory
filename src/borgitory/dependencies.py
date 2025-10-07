@@ -14,6 +14,8 @@ from typing import (
 )
 import asyncio
 
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+from borgitory.services.jobs.job_models import TaskStatusEnum, TaskTypeEnum
 from borgitory.services.notifications.registry import get_metadata
 from borgitory.services.path.path_configuration_service import PathConfigurationService
 
@@ -581,6 +583,10 @@ def get_templates() -> TimezoneAwareJinja2Templates:
     templates.env.filters["format_datetime_browser"] = datetime_browser_filter
     templates.env.filters["from_json"] = from_json_filter
     templates.env.filters["tojson"] = to_json_filter
+    templates.env.globals["TaskStatusEnum"] = TaskStatusEnum
+    templates.env.globals["TaskTypeEnum"] = TaskTypeEnum
+    templates.env.globals["JobStatusEnum"] = JobStatusEnum
+    templates.env.globals["JobTypeEnum"] = JobTypeEnum
 
     return templates
 
