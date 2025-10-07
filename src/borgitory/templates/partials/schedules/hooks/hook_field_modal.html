@@ -49,7 +49,7 @@
                     class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     hx-post="/api/schedules/hooks/remove-hook-field"
                     hx-include="form"
-                    hx-vals='{"hook_type": "{{ hook_type }}", "index": {{ loop.index0 if loop is defined else 0 }}}'
+                    hx-vals='{"hook_type": "{{ hook_type }}", "index": {{ loop.index0 if loop is defined else 0 }} }'
                     hx-target="#{{ hook_type }}-hooks-container"
                     hx-swap="innerHTML"
                     hx-confirm="Are you sure you want to remove this hook?"

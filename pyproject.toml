@@ -240,6 +240,14 @@ ignore_missing_imports = true
 profile = "jinja"
 indent = 4
 max_line_length = 88
+per_file_ignores = [
+    "src/borgitory/templates/partials/archives/directory_contents.html:J018",
+    "src/borgitory/templates/partials/auth/login_form_active.html:J018",
+    "src/borgitory/templates/partials/auth/register_form_active.html:J018",
+    "src/borgitory/templates/partials/repositories/modal/details_modal.html:J018",
+    "src/borgitory/templates/base.html:J004",
+]
+ignore="H021,J004,J018"
 
 [tool.pyright]
 include = ["src", "tests"]
