@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
     from borgitory.protocols.path_protocols import PathServiceInterface
     from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+    from borgitory.protocols.file_protocols import FileServiceProtocol
     from borgitory.services.command_execution.wsl_command_executor import (
         WSLCommandExecutor,
     )
@@ -1183,11 +1184,24 @@ def get_borg_service(
     )
 
 
+def get_file_service() -> "FileServiceProtocol":
+    """
+    Provide a FileService instance for file operations.
+
+    Returns:
+        FileServiceProtocol: File service implementation
+    """
+    from borgitory.services.file_service import FileService
+
+    return FileService()
+
+
 def get_repository_service(
     borg_service: BorgService = Depends(get_borg_service),
     scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
     path_service: "PathServiceInterface" = Depends(get_path_service),
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    file_service: "FileServiceProtocol" = Depends(get_file_service),
 ) -> RepositoryService:
     """
     Provide a RepositoryService instance with proper dependency injection.
@@ -1199,6 +1213,7 @@ def get_repository_service(
         scheduler_service=scheduler_service,
         path_service=path_service,
         command_executor=command_executor,
+        file_service=file_service,
     )
 
 

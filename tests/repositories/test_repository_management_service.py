@@ -42,11 +42,21 @@ class TestRepositoryManagementService:
         return mock
 
     @pytest.fixture
+    def mock_file_service(self) -> Any:
+        """Create mock file service."""
+        mock = Mock()
+        mock.write_file = AsyncMock()
+        mock.remove_file = AsyncMock()
+        mock.open_file = Mock()
+        return mock
+
+    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
         mock_path_service: Any,
+        mock_file_service: Any,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         from unittest.mock import Mock, AsyncMock
@@ -60,6 +70,7 @@ class TestRepositoryManagementService:
             scheduler_service=mock_scheduler_service,
             path_service=mock_path_service,
             command_executor=mock_command_executor,
+            file_service=mock_file_service,
         )
 
     @pytest.fixture
@@ -162,11 +173,21 @@ class TestRepositoryManagementBusinessLogic:
         return mock
 
     @pytest.fixture
+    def mock_file_service(self) -> Any:
+        """Create mock file service."""
+        mock = Mock()
+        mock.write_file = AsyncMock()
+        mock.remove_file = AsyncMock()
+        mock.open_file = Mock()
+        return mock
+
+    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Any,
         mock_scheduler_service: Any,
         mock_path_service: Any,
+        mock_file_service: Any,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         from unittest.mock import Mock, AsyncMock
@@ -180,6 +201,7 @@ class TestRepositoryManagementBusinessLogic:
             scheduler_service=mock_scheduler_service,
             path_service=mock_path_service,
             command_executor=mock_command_executor,
+            file_service=mock_file_service,
         )
 
     @pytest.fixture
