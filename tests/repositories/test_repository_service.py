@@ -13,7 +13,9 @@ from borgitory.protocols.command_executor_protocol import CommandExecutorProtoco
 from borgitory.services.repositories.repository_service import RepositoryService
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
+    ImportRepositoryRequest,
 )
+from borgitory.models.database import Repository
 
 
 class TestRepositoryService:
@@ -67,12 +69,22 @@ class TestRepositoryService:
         return mock
 
     @pytest.fixture
+    def mock_file_service(self) -> Mock:
+        """Create mock file service."""
+        mock = Mock()
+        mock.write_file = AsyncMock()
+        mock.remove_file = AsyncMock()
+        mock.open_file = Mock()
+        return mock
+
+    @pytest.fixture
     def repository_service(
         self,
         mock_borg_service: Mock,
         mock_scheduler_service: Mock,
         mock_path_service: Mock,
         mock_command_executor: Mock,
+        mock_file_service: Mock,
     ) -> RepositoryService:
         """Create repository service with mocked dependencies."""
         return RepositoryService(
@@ -80,6 +92,7 @@ class TestRepositoryService:
             scheduler_service=mock_scheduler_service,
             path_service=mock_path_service,
             command_executor=mock_command_executor,
+            file_service=mock_file_service,
         )
 
     @pytest.mark.asyncio
@@ -410,3 +423,405 @@ class TestRepositoryService:
         assert "original_size" in result
         assert "config" in result
         assert result["config"]["repository.id"] == "abc123"
+
+    # Import Repository Tests
+
+    @pytest.mark.asyncio
+    async def test_import_repository_success_without_keyfile(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful repository import without keyfile."""
+        # Arrange
+        request = ImportRepositoryRequest(
+            name="imported-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="secret123",
+            user_id=1,
+        )
+
+        # Mock successful verification
+        mock_borg_service.verify_repository_access = AsyncMock(return_value=True)
+
+        # Mock successful archive listing
+        mock_archives_response = Mock()
+        mock_archives_response.archives = [Mock(), Mock()]  # 2 archives
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id is not None
+        assert result.repository_name == "imported-repo"
+        assert result.message == "Repository 'imported-repo' imported successfully"
+
+        # Verify database operations
+        mock_borg_service.verify_repository_access.assert_called_once()
+        mock_borg_service.list_archives.assert_called_once()
+
+        # Verify repository was saved to database
+        saved_repo = (
+            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        )
+        assert saved_repo is not None
+        assert saved_repo.path == "/mnt/backup/existing-repo"
+        assert saved_repo.get_passphrase() == "secret123"
+
+    @pytest.mark.asyncio
+    async def test_import_repository_success_with_keyfile_upload(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        mock_path_service: Mock,
+        mock_file_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful repository import with keyfile upload."""
+        # Arrange
+        mock_keyfile = Mock()
+        mock_keyfile.filename = "test.key"
+        mock_keyfile.read = AsyncMock(return_value=b"keyfile content")
+
+        request = ImportRepositoryRequest(
+            name="imported-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="secret123",
+            keyfile=mock_keyfile,
+            user_id=1,
+        )
+
+        # Mock successful keyfile save
+        mock_path_service.get_keyfiles_dir = AsyncMock(return_value="/test/keyfiles")
+        mock_path_service.ensure_directory = AsyncMock()
+        mock_path_service.secure_join.return_value = (
+            "/test/keyfiles/imported-repo_test.key_uuid"
+        )
+
+        # Mock successful verification
+        mock_borg_service.verify_repository_access = AsyncMock(return_value=True)
+
+        # Mock successful archive listing
+        mock_archives_response = Mock()
+        mock_archives_response.archives = []
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id is not None
+        assert result.repository_name == "imported-repo"
+
+        # Verify keyfile operations
+        mock_path_service.get_keyfiles_dir.assert_called_once()
+        mock_path_service.ensure_directory.assert_called_once()
+        mock_keyfile.read.assert_called_once()
+        mock_file_service.write_file.assert_called_once_with(
+            "/test/keyfiles/imported-repo_test.key_uuid", b"keyfile content"
+        )
+
+        # Verify verification was called with keyfile path
+        mock_borg_service.verify_repository_access.assert_called_once()
+        call_args = mock_borg_service.verify_repository_access.call_args
+        assert (
+            call_args[1]["keyfile_path"] == "/test/keyfiles/imported-repo_test.key_uuid"
+        )
+
+    @pytest.mark.asyncio
+    async def test_import_repository_success_with_keyfile_content(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful repository import with keyfile content."""
+        # Arrange
+        request = ImportRepositoryRequest(
+            name="imported-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="secret123",
+            keyfile_content="keyfile content as text",
+            encryption_type="keyfile",
+            user_id=1,
+        )
+
+        # Mock successful verification
+        mock_borg_service.verify_repository_access = AsyncMock(return_value=True)
+
+        # Mock successful archive listing
+        mock_archives_response = Mock()
+        mock_archives_response.archives = [Mock()]
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id is not None
+        assert result.repository_name == "imported-repo"
+
+        # Verify verification was called with keyfile content
+        mock_borg_service.verify_repository_access.assert_called_once()
+        call_args = mock_borg_service.verify_repository_access.call_args
+        assert call_args[1]["keyfile_content"] == "keyfile content as text"
+
+        # Verify repository was saved with keyfile content and encryption type
+        saved_repo = (
+            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        )
+        assert saved_repo is not None
+        assert saved_repo.encryption_type == "keyfile"
+        assert saved_repo.get_keyfile_content() == "keyfile content as text"
+
+    @pytest.mark.asyncio
+    async def test_import_repository_name_already_exists(
+        self,
+        repository_service: RepositoryService,
+        test_db: Session,
+    ) -> None:
+        """Test import fails when repository name already exists."""
+        # Arrange - create existing repository
+        existing_repo = Repository()
+        existing_repo.name = "existing-repo"
+        existing_repo.path = "/different/path"
+        existing_repo.set_passphrase("different-passphrase")
+        test_db.add(existing_repo)
+        test_db.commit()
+
+        request = ImportRepositoryRequest(
+            name="existing-repo",
+            path="/mnt/backup/new-repo",
+            passphrase="secret123",
+            user_id=1,
+        )
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.is_validation_error is True
+        assert result.validation_errors is not None
+        assert len(result.validation_errors) == 1
+        assert result.validation_errors[0].field == "name"
+        assert "already exists" in result.validation_errors[0].message
+
+    @pytest.mark.asyncio
+    async def test_import_repository_path_already_exists(
+        self,
+        repository_service: RepositoryService,
+        test_db: Session,
+    ) -> None:
+        """Test import fails when repository path already exists."""
+        # Arrange - create existing repository
+        existing_repo = Repository()
+        existing_repo.name = "different-repo"
+        existing_repo.path = "/mnt/backup/existing-repo"
+        existing_repo.set_passphrase("different-passphrase")
+        test_db.add(existing_repo)
+        test_db.commit()
+
+        request = ImportRepositoryRequest(
+            name="new-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="secret123",
+            user_id=1,
+        )
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.is_validation_error is True
+        assert result.validation_errors is not None
+        assert len(result.validation_errors) == 1
+        assert result.validation_errors[0].field == "path"
+        assert "already exists" in result.validation_errors[0].message
+        assert "different-repo" in result.validation_errors[0].message
+
+    @pytest.mark.asyncio
+    async def test_import_repository_keyfile_save_fails(
+        self,
+        repository_service: RepositoryService,
+        mock_path_service: Mock,
+        mock_file_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test import fails when keyfile save fails."""
+        # Arrange
+        mock_keyfile = Mock()
+        mock_keyfile.filename = "test.key"
+        mock_keyfile.read = AsyncMock(side_effect=Exception("File read error"))
+
+        request = ImportRepositoryRequest(
+            name="imported-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="secret123",
+            keyfile=mock_keyfile,
+            user_id=1,
+        )
+
+        # Mock path service methods to be async
+        mock_path_service.get_keyfiles_dir = AsyncMock(return_value="/test/keyfiles")
+        mock_path_service.ensure_directory = AsyncMock()
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.error_message is not None
+        assert "Failed to import repository" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_import_repository_verification_fails(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test import fails when repository verification fails."""
+        # Arrange
+        request = ImportRepositoryRequest(
+            name="imported-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="wrong-passphrase",
+            user_id=1,
+        )
+
+        # Mock failed verification
+        mock_borg_service.verify_repository_access = AsyncMock(return_value=False)
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.error_message is not None
+        assert "Failed to verify repository access" in result.error_message
+
+        # Verify repository was not saved to database (verification happens before save now)
+        saved_repo = (
+            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        )
+        assert saved_repo is None
+
+    @pytest.mark.asyncio
+    async def test_import_repository_with_cache_dir(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful repository import with cache directory."""
+        # Arrange
+        request = ImportRepositoryRequest(
+            name="imported-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="secret123",
+            cache_dir="/custom/cache/dir",
+            user_id=1,
+        )
+
+        # Mock successful verification
+        mock_borg_service.verify_repository_access = AsyncMock(return_value=True)
+
+        # Mock successful archive listing
+        mock_archives_response = Mock()
+        mock_archives_response.archives = []
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id is not None
+
+        # Verify repository was saved with cache directory
+        saved_repo = (
+            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        )
+        assert saved_repo is not None
+        assert saved_repo.cache_dir == "/custom/cache/dir"
+
+    @pytest.mark.asyncio
+    async def test_import_repository_exception_handling(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test import handles exceptions and performs rollback."""
+        # Arrange
+        request = ImportRepositoryRequest(
+            name="imported-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="secret123",
+            user_id=1,
+        )
+
+        # Mock verification to raise exception during the verification step
+        mock_borg_service.verify_repository_access = AsyncMock(
+            side_effect=Exception("Database error")
+        )
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.error_message is not None
+        assert "Failed to import repository" in result.error_message
+        assert "Database error" in result.error_message
+
+        # Verify repository was not saved to database (verification happens before save now)
+        saved_repo = (
+            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        )
+        assert saved_repo is None
+
+    @pytest.mark.asyncio
+    async def test_import_repository_archive_listing_exception(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test import succeeds even when archive listing fails."""
+        # Arrange
+        request = ImportRepositoryRequest(
+            name="imported-repo",
+            path="/mnt/backup/existing-repo",
+            passphrase="secret123",
+            user_id=1,
+        )
+
+        # Mock successful verification
+        mock_borg_service.verify_repository_access = AsyncMock(return_value=True)
+
+        # Mock archive listing to raise exception
+        mock_borg_service.list_archives.side_effect = Exception(
+            "Archive listing failed"
+        )
+
+        # Act
+        result = await repository_service.import_repository(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id is not None
+        assert result.repository_name == "imported-repo"
+
+        # Verify repository was still saved despite archive listing failure
+        saved_repo = (
+            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        )
+        assert saved_repo is not None
