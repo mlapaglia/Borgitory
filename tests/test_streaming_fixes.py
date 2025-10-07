@@ -5,6 +5,8 @@ Test suite for streaming fixes and UUID system improvements
 import pytest
 import uuid
 from unittest.mock import Mock, patch, AsyncMock
+from borgitory.models.job_results import JobStatusEnum
+from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.models.database import Job, JobTask
@@ -32,13 +34,13 @@ class TestJobStreamingFixes:
     def mock_composite_job(self) -> Mock:
         """Create a mock composite job with tasks"""
         job = Mock()
-        job.id = str(uuid.uuid4())
-        job.status = "running"
+        job.id = uuid.uuid4()
+        job.status = JobStatusEnum.RUNNING
 
         # Create mock tasks with output_lines
         task1 = Mock()
         task1.task_name = "backup"
-        task1.status = "completed"
+        task1.status = JobStatusEnum.COMPLETED
         task1.task_order = 0
         task1.output_lines = [
             {"text": "Starting backup..."},
@@ -48,7 +50,7 @@ class TestJobStreamingFixes:
 
         task2 = Mock()
         task2.task_name = "prune"
-        task2.status = "running"
+        task2.status = JobStatusEnum.RUNNING
         task2.task_order = 1
         task2.output_lines = [
             {"text": "Starting prune..."},
@@ -147,7 +149,7 @@ class TestJobStreamingFixes:
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
         """Test streaming completed task output from database"""
-        job_id = str(uuid.uuid4())
+        job_id = uuid.uuid4()
         task_order = 0
 
         # Job not in manager, should try database
@@ -162,7 +164,7 @@ class TestJobStreamingFixes:
             mock_job.id = job_id
             mock_task = Mock()
             mock_task.task_name = "backup"
-            mock_task.status = "completed"
+            mock_task.status = JobStatusEnum.COMPLETED
             mock_task.output = "Backup completed successfully\nFiles processed: 100"
 
             # Set up the query chain properly
@@ -199,30 +201,33 @@ class TestUUIDSystemFixes:
         # Test the default function generates valid UUIDs
         # SQLAlchemy lambda defaults receive a context parameter
         generated_id = id_column.default.arg(None)
-        assert isinstance(generated_id, str)
+        assert isinstance(generated_id, uuid.UUID)
 
-        # Should be a valid UUID
-        try:
-            uuid.UUID(generated_id)
-        except ValueError:
-            pytest.fail("Generated ID is not a valid UUID")
+        # Should be a valid UUID (already is since it's a UUID object)
+        assert generated_id.version == 4  # UUID4
 
     def test_job_model_respects_explicit_uuid(self) -> None:
         """Test that Job model uses explicitly provided UUID"""
-        explicit_id = str(uuid.uuid4())
-        job = Job(id=explicit_id, repository_id=1, type="backup", status="pending")
+        explicit_id = uuid.uuid4()
+        job = Job()
+        job.id = explicit_id
+        job.repository_id = 1
+        job.type = TaskTypeEnum.BACKUP
+        job.status = JobStatusEnum.PENDING
 
         assert job.id == explicit_id
 
     def test_job_task_foreign_key_uses_string_uuid(self) -> None:
         """Test that JobTask foreign key references string UUID"""
-        job_id = str(uuid.uuid4())
-        task = JobTask(
-            job_id=job_id, task_type="backup", task_name="Test Task", task_order=0
-        )
+        job_id = uuid.uuid4()
+        task = JobTask()
+        task.job_id = job_id
+        task.task_type = TaskTypeEnum.BACKUP
+        task.task_name = "Test Task"
+        task.task_order = 0
 
         assert task.job_id == job_id
-        assert isinstance(task.job_id, str)
+        assert isinstance(task.job_id, uuid.UUID)
 
 
 class TestJobRenderServiceUUIDIntegration:
@@ -232,9 +237,9 @@ class TestJobRenderServiceUUIDIntegration:
     def mock_job_with_uuid(self) -> Mock:
         """Create a mock job with UUID"""
         job = Mock()
-        job.id = str(uuid.uuid4())
-        job.type = "backup"
-        job.status = "completed"
+        job.id = uuid.uuid4()
+        job.type = TaskTypeEnum.BACKUP
+        job.status = JobStatusEnum.COMPLETED
         job.started_at = now_utc()
         job.finished_at = now_utc()
         job.error = None
@@ -257,7 +262,7 @@ class TestJobRenderServiceUUIDIntegration:
         html = service._render_job_html(mock_job_with_uuid)
 
         # Should contain the UUID in the HTML
-        assert mock_job_with_uuid.id in html
+        assert str(mock_job_with_uuid.id) in html
         assert html != ""  # Should not return empty string
 
     def test_format_database_job_creates_context_with_uuid(
@@ -356,8 +361,6 @@ class TestStreamingEfficiency:
 
 class TestBackwardCompatibility:
     """Test that changes maintain backward compatibility"""
-
-    # test_job_context_maintains_job_uuid_field removed - was failing due to service changes
 
     def test_task_streaming_maintains_sse_event_format(self) -> None:
         """Test that streaming maintains proper SSE event format"""

@@ -1,67 +1,67 @@
 {% if not configs %}
-<div class="text-gray-600 dark:text-gray-400 text-sm py-4 text-center">
-    <p>No notification configurations.</p>
-    <p class="mt-1">Add one using the form above to get notified when backups complete or fail.</p>
-</div>
-{% else %}
-{% for config in configs %}
-<div class="border border-gray-600 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800 mb-3">
-    <div class="flex justify-between items-start">
-        <div class="flex-1">
-            <div class="flex items-center mb-2">
-                <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ config.name }}</h4>
-                <span class="ml-2 px-2 py-1 text-xs rounded-full {{ 'bg-green-100 text-green-800' if config.enabled else 'bg-red-100 text-red-800' }}">
-                    {{ 'Enabled' if config.enabled else 'Disabled' }}
-                </span>
-            </div>
-            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
-                <div><strong>Provider:</strong> {{ config.provider.title() }}</div>
-                <div><strong>Notifications:</strong> {{ config.notification_desc }}</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400">Created: {{ config.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) }}</div>
-            </div>
-        </div>
-        <div class="flex flex-col space-y-2 ml-4">
-            <button 
-                hx-get="/api/notifications/{{ config.id }}/edit"
-                hx-target="#notification-form-container"
-                hx-swap="innerHTML"
-                class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500"
-            >
-                Edit
-            </button>
-            <button 
-                hx-post="/api/notifications/{{ config.id }}/test"
-                hx-target="#notification-status"
-                hx-swap="innerHTML"
-                hx-indicator="this"
-                class="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 [&.htmx-request]:opacity-50"
-            >
-                <span class="[.htmx-request_&]:hidden">Test</span>
-                <span class="hidden [.htmx-request_&]:inline">Testing...</span>
-            </button>
-            <button 
-                hx-post="/api/notifications/{{ config.id }}/{{ 'disable' if config.enabled else 'enable' }}"
-                hx-target="#notification-status"
-                hx-swap="innerHTML"
-                hx-indicator="this"
-                class="px-3 py-1 text-xs {{ 'bg-yellow-600 hover:bg-yellow-700' if config.enabled else 'bg-blue-600 hover:bg-blue-700' }} text-white rounded focus:ring-2 focus:ring-blue-500 [&.htmx-request]:opacity-50"
-            >
-                <span class="[.htmx-request_&]:hidden">{{ 'Disable' if config.enabled else 'Enable' }}</span>
-                <span class="hidden [.htmx-request_&]:inline">{{ 'Disabling...' if config.enabled else 'Enabling...' }}</span>
-            </button>
-            <button 
-                hx-delete="/api/notifications/{{ config.id }}"
-                hx-target="#notification-status"
-                hx-swap="innerHTML"
-                hx-indicator="this"
-                hx-confirm="Are you sure you want to delete the notification configuration '{{ config.name }}'?"
-                class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500 [&.htmx-request]:opacity-50"
-            >
-                <span class="[.htmx-request_&]:hidden">Delete</span>
-                <span class="hidden [.htmx-request_&]:inline">Deleting...</span>
-            </button>
-        </div>
+    <div class="text-gray-600 dark:text-gray-400 text-sm py-4 text-center">
+        <p>No notification configurations.</p>
+        <p class="mt-1">
+            Add one using the form above to get notified when backups complete or fail.
+        </p>
     </div>
-</div>
-{% endfor %}
+{% else %}
+    {% for config in configs %}
+        <div class="border border-gray-600 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800 mb-3">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <div class="flex items-center mb-2">
+                        <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ config.name }}</h4>
+                        <span class="ml-2 px-2 py-1 text-xs rounded-full {{ 'bg-green-100 text-green-800' if config.enabled else 'bg-red-100 text-red-800' }}">
+                            {{ 'Enabled' if config.enabled else 'Disabled' }}
+                        </span>
+                    </div>
+                    <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                        <div>
+                            <strong>Provider:</strong> {{ config.provider.title() }}
+                        </div>
+                        <div>
+                            <strong>Notifications:</strong> {{ config.notification_desc }}
+                        </div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400">
+                            Created: {{ config.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) }}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-col space-y-2 ml-4">
+                    <button hx-get="/api/notifications/{{ config.id }}/edit"
+                            hx-target="#notification-form-container"
+                            hx-swap="innerHTML"
+                            class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500">
+                        Edit
+                    </button>
+                    <button hx-post="/api/notifications/{{ config.id }}/test"
+                            hx-target="#notification-status"
+                            hx-swap="innerHTML"
+                            hx-indicator="this"
+                            class="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 [&.htmx-request]:opacity-50">
+                        <span class="[.htmx-request_&]:hidden">Test</span>
+                        <span class="hidden [.htmx-request_&]:inline">Testing...</span>
+                    </button>
+                    <button hx-post="/api/notifications/{{ config.id }}/{{ 'disable' if config.enabled else 'enable' }}"
+                            hx-target="#notification-status"
+                            hx-swap="innerHTML"
+                            hx-indicator="this"
+                            class="px-3 py-1 text-xs {{ 'bg-yellow-600 hover:bg-yellow-700' if config.enabled else 'bg-blue-600 hover:bg-blue-700' }} text-white rounded focus:ring-2 focus:ring-blue-500 [&.htmx-request]:opacity-50">
+                        <span class="[.htmx-request_&]:hidden">{{ 'Disable' if config.enabled else 'Enable' }}</span>
+                        <span class="hidden [.htmx-request_&]:inline">{{ 'Disabling...' if config.enabled else 'Enabling...' }}</span>
+                    </button>
+                    <button hx-delete="/api/notifications/{{ config.id }}"
+                            hx-target="#notification-status"
+                            hx-swap="innerHTML"
+                            hx-indicator="this"
+                            hx-confirm="Are you sure you want to delete the notification configuration '{{ config.name }}'?"
+                            class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500 [&.htmx-request]:opacity-50">
+                        <span class="[.htmx-request_&]:hidden">Delete</span>
+                        <span class="hidden [.htmx-request_&]:inline">Deleting...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
 {% endif %}

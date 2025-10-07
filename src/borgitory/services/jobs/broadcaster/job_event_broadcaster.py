@@ -6,16 +6,20 @@ import asyncio
 import logging
 from typing import Dict, List, AsyncGenerator, Optional, Union
 from datetime import datetime
+import uuid
 from borgitory.custom_types import ConfigDict
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.services.jobs.broadcaster.job_event import JobEvent
+from borgitory.protocols.job_event_broadcaster_protocol import (
+    JobEventBroadcasterProtocol,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class JobEventBroadcaster:
+class JobEventBroadcaster(JobEventBroadcasterProtocol):
     """Handles SSE streaming and event distribution to clients"""
 
     def __init__(
@@ -56,7 +60,7 @@ class JobEventBroadcaster:
     def broadcast_event(
         self,
         event_type: EventType,
-        job_id: Optional[str] = None,
+        job_id: Optional[uuid.UUID] = None,
         data: Optional[ConfigDict] = None,
     ) -> None:
         """Broadcast an event to all connected clients"""
@@ -165,9 +169,6 @@ class JobEventBroadcaster:
                     yield event
 
                 except asyncio.TimeoutError:
-                    # Send keepalive if no events
-                    from borgitory.services.jobs.broadcaster.job_event import JobEvent
-
                     keepalive_event = JobEvent(
                         event_type=EventType.KEEPALIVE, data={"message": "keepalive"}
                     )

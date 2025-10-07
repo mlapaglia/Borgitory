@@ -1,9 +1,8 @@
 import logging
-from datetime import datetime
 from dataclasses import dataclass
+import uuid
 from borgitory.custom_types import ConfigDict
-from borgitory.utils.datetime_utils import now_utc
-from typing import Dict, List, Optional, Any, cast
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 
 from borgitory.models.database import Repository, Job
@@ -13,7 +12,6 @@ from borgitory.models.job_results import (
     JobCreationResult,
     JobCreationError,
     JobCreationResponse,
-    JobStatus,
     JobStatusError,
     JobStatusResponse,
     CompositeJobOutput,
@@ -21,11 +19,11 @@ from borgitory.models.job_results import (
     JobOutputResponse,
     ManagerStats,
     QueueStats,
-    JobStatusEnum,
-    JobTypeEnum,
     JobStopResult,
     JobStopError,
     JobStopResponse,
+    JobStatusEnum,
+    JobTypeEnum,
 )
 from borgitory.protocols.job_protocols import JobManagerProtocol
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
@@ -304,23 +302,22 @@ class JobService:
 
         return jobs_list
 
-    def get_job(self, job_id: str) -> Optional[Dict[str, object]]:
+    def get_job(self, job_id: uuid.UUID) -> Optional[Dict[str, object]]:
         """Get job details - supports both database IDs and JobManager IDs"""
         # Try to get from JobManager first (if it's a UUID format)
-        if len(job_id) > 10:  # Probably a UUID
-            status = self.job_manager.get_job_status(job_id)
-            if status:
-                return {
-                    "id": f"jm_{job_id}",
-                    "job_id": job_id,
-                    "repository_id": None,
-                    "type": "unknown",
-                    "status": status["status"],
-                    "started_at": status["started_at"],
-                    "finished_at": status["completed_at"],
-                    "error": status["error"],
-                    "source": "jobmanager",
-                }
+        status = self.job_manager.get_job_status(job_id)
+        if status:
+            return {
+                "id": f"jm_{job_id}",
+                "job_id": job_id,
+                "repository_id": None,
+                "type": "unknown",
+                "status": status.status,
+                "started_at": status.started_at,
+                "finished_at": status.completed_at,
+                "error": status.error,
+                "source": "jobmanager",
+            }
 
         # Try database lookup
         try:
@@ -357,43 +354,23 @@ class JobService:
 
         return None
 
-    async def get_job_status(self, job_id: str) -> JobStatusResponse:
+    async def get_job_status(self, job_id: uuid.UUID) -> JobStatusResponse:
         """Get current job status and progress"""
-        status_dict = self.job_manager.get_job_status(job_id)
-        if status_dict is None:
+        job_status = self.job_manager.get_job_status(job_id)
+        if job_status is None:
             return JobStatusError(error="Job not found", job_id=job_id)
 
-        # Convert dictionary to JobStatus object
-        return JobStatus(
-            id=str(status_dict["id"]),
-            status=JobStatusEnum(str(status_dict["status"])),
-            job_type=JobTypeEnum(str(status_dict["job_type"])),
-            started_at=datetime.fromisoformat(str(status_dict["started_at"]))
-            if status_dict["started_at"]
-            else None,
-            completed_at=datetime.fromisoformat(str(status_dict["completed_at"]))
-            if status_dict["completed_at"]
-            else None,
-            return_code=cast(int, status_dict["return_code"])
-            if status_dict["return_code"] is not None
-            else None,
-            error=str(status_dict["error"]) if status_dict["error"] else None,
-            current_task_index=cast(int, status_dict["current_task_index"])
-            if status_dict["current_task_index"] is not None
-            else None,
-            total_tasks=cast(int, status_dict["tasks"]) if status_dict["tasks"] else 0,
-        )
+        return job_status
 
     async def get_job_output(
-        self, job_id: str, last_n_lines: int = 100
+        self, job_id: uuid.UUID, last_n_lines: int = 100
     ) -> JobOutputResponse:
         """Get job output lines"""
         # Check if this is a composite job first - look in unified manager
         job = self.job_manager.jobs.get(job_id)
-        if job and job.tasks:  # All jobs are composite now
-            # Get current task output if job is running
+        if job and job.tasks:
             current_task_output = []
-            if job.status == "running":
+            if job.status == JobStatusEnum.RUNNING:
                 current_task = job.get_current_task()
                 if current_task:
                     lines = list(current_task.output_lines)
@@ -404,7 +381,7 @@ class JobService:
 
             return CompositeJobOutput(
                 job_id=job_id,
-                job_type="composite",
+                job_type=JobTypeEnum.COMPOSITE,
                 status=JobStatusEnum(job.status),
                 current_task_index=job.current_task_index,
                 total_tasks=len(job.tasks),
@@ -414,15 +391,13 @@ class JobService:
             )
         else:
             # Get regular borg job output
-            output_dict = await self.job_manager.get_job_output_stream(job_id)
-            lines = cast(List[Any], output_dict.get("lines", []))
-            if not isinstance(lines, list):
-                lines = []
-            # Convert dict lines to string lines if needed
+            output_response = await self.job_manager.get_job_output_stream(job_id)
+            lines = output_response.lines
+            # Convert OutputLine objects to string lines
             string_lines = []
             for line in lines:
-                if isinstance(line, dict):
-                    string_lines.append(line.get("message", str(line)))
+                if hasattr(line, "text"):
+                    string_lines.append(line.text)
                 else:
                     string_lines.append(str(line))
 
@@ -433,110 +408,49 @@ class JobService:
                 has_more=False,  # Could be enhanced to track this
             )
 
-    async def cancel_job(self, job_id: str) -> bool:
+    async def cancel_job(self, job_id: uuid.UUID) -> bool:
         """Cancel a running job"""
-        # Try to cancel in JobManager first
-        if len(job_id) > 10:  # Probably a UUID
-            success = await self.job_manager.cancel_job(job_id)
-            if success:
-                return True
+        return await self.job_manager.cancel_job(job_id)
 
-        # Try database job
-        try:
-            job = (
-                self.db.query(Job)
-                .options(joinedload(Job.repository))
-                .filter(Job.id == job_id)
-                .first()
-            )
-            if job:
-                # Update database status
-                job.status = "cancelled"
-                job.finished_at = now_utc()
-                self.db.commit()
-                return True
-        except ValueError:
-            pass
-
-        return False
-
-    async def stop_job(self, job_id: str) -> JobStopResponse:
+    async def stop_job(self, job_id: uuid.UUID) -> JobStopResponse:
         """Stop a running job, killing current task and skipping remaining tasks"""
         # Try to stop in JobManager first (for composite jobs)
-        if len(job_id) > 10:  # Probably a UUID
-            result = await self.job_manager.stop_job(job_id)
+        result = await self.job_manager.stop_job(job_id)
 
-            if result["success"]:
-                # Safely extract values with type casting
-                tasks_skipped_val = result.get("tasks_skipped", 0)
-                current_task_killed_val = result.get("current_task_killed", False)
+        if result["success"]:
+            # Safely extract values with type casting
+            tasks_skipped_val = result.get("tasks_skipped", 0)
+            current_task_killed_val = result.get("current_task_killed", False)
 
-                return JobStopResult(
-                    job_id=job_id,
-                    success=True,
-                    message=str(result["message"]),
-                    tasks_skipped=int(tasks_skipped_val)
-                    if isinstance(tasks_skipped_val, (int, str))
-                    else 0,
-                    current_task_killed=bool(current_task_killed_val),
-                )
-            else:
-                error_code_val = result.get("error_code")
-                return JobStopError(
-                    job_id=job_id,
-                    error=str(result["error"]),
-                    error_code=str(error_code_val)
-                    if error_code_val is not None
-                    else None,
-                )
-
-        # Try database job (fallback for older jobs)
-        try:
-            job = (
-                self.db.query(Job)
-                .options(joinedload(Job.repository))
-                .filter(Job.id == job_id)
-                .first()
+            return JobStopResult(
+                job_id=job_id,
+                success=True,
+                message=str(result["message"]),
+                tasks_skipped=int(tasks_skipped_val)
+                if isinstance(tasks_skipped_val, (int, str))
+                else 0,
+                current_task_killed=bool(current_task_killed_val),
             )
-            if job:
-                if job.status not in ["running", "queued"]:
-                    return JobStopError(
-                        job_id=job_id,
-                        error=f"Cannot stop job in status: {job.status}",
-                        error_code="INVALID_STATUS",
-                    )
-
-                # Update database status
-                job.status = "stopped"
-                job.finished_at = now_utc()
-                job.error = "Manually stopped by user"
-                self.db.commit()
-
-                return JobStopResult(
-                    job_id=job_id,
-                    success=True,
-                    message="Database job stopped successfully",
-                    tasks_skipped=0,
-                    current_task_killed=False,
-                )
-        except Exception as e:
-            logger.error(f"Error stopping database job {job_id}: {e}")
+        else:
+            error_code_val = result.get("error_code")
             return JobStopError(
                 job_id=job_id,
-                error=f"Failed to stop job: {str(e)}",
-                error_code="STOP_FAILED",
+                error=str(result["error"]),
+                error_code=str(error_code_val) if error_code_val is not None else None,
             )
-
-        return JobStopError(
-            job_id=job_id, error="Job not found", error_code="JOB_NOT_FOUND"
-        )
 
     def get_manager_stats(self) -> ManagerStats:
         """Get JobManager statistics"""
         jobs = self.job_manager.jobs
-        running_jobs = [job for job in jobs.values() if job.status == "running"]
-        completed_jobs = [job for job in jobs.values() if job.status == "completed"]
-        failed_jobs = [job for job in jobs.values() if job.status == "failed"]
+        running_jobs = [
+            job for job in jobs.values() if job.status == JobStatusEnum.RUNNING
+        ]
+        completed_jobs = [
+            job for job in jobs.values() if job.status == JobStatusEnum.COMPLETED
+        ]
+        failed_jobs = [
+            job for job in jobs.values() if job.status == JobStatusEnum.FAILED
+        ]
 
         return ManagerStats(
             total_jobs=len(jobs),
@@ -553,7 +467,7 @@ class JobService:
         jobs_to_remove = []
 
         for job_id, job in self.job_manager.jobs.items():
-            if job.status in ["completed", "failed"]:
+            if job.status in [JobStatusEnum.COMPLETED, JobStatusEnum.FAILED]:
                 jobs_to_remove.append(job_id)
 
         for job_id in jobs_to_remove:

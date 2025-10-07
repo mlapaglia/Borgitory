@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 from typing import Dict, List, Optional, Protocol, NamedTuple
+import uuid
 
 from borgitory.services.hooks.hook_config import HookConfig
 from borgitory.protocols.command_protocols import CommandRunnerProtocol
@@ -87,7 +88,7 @@ class HookExecutionService:
         self,
         hooks: List[HookConfig],
         hook_type: str,
-        job_id: str,
+        job_id: uuid.UUID,
         context: Optional[Dict[str, str]] = None,
         job_failed: bool = False,
     ) -> HookExecutionSummary:
@@ -189,7 +190,10 @@ class HookExecutionService:
         )
 
     async def _execute_single_hook(
-        self, hook: HookConfig, job_id: str, context: Optional[Dict[str, str]] = None
+        self,
+        hook: HookConfig,
+        job_id: uuid.UUID,
+        context: Optional[Dict[str, str]] = None,
     ) -> HookExecutionResult:
         """
         Execute a single hook command.

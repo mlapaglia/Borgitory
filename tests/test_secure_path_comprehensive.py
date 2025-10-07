@@ -8,7 +8,9 @@ various edge cases and security scenarios correctly.
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
+from typing import IO
+import io
 
 from borgitory.utils.secure_path import (
     DirectoryInfo,
@@ -22,6 +24,45 @@ from borgitory.utils.secure_path import (
     secure_remove_file,
     get_directory_listing,
 )
+
+
+class MockFileService:
+    """Mock implementation of FileServiceProtocol for testing."""
+
+    def __init__(self) -> None:
+        self.mock_files: dict[str, bytes] = {}
+        self.mock_errors: dict[str, Exception] = {}
+        self.mock_exists: dict[str, bool] = {}
+        self.mock_isfile: dict[str, bool] = {}
+
+    def open_file(self, file_path: str, mode: str) -> IO[bytes]:
+        """Mock file opening with configurable content and errors."""
+        if file_path in self.mock_errors:
+            raise self.mock_errors[file_path]
+
+        content = self.mock_files.get(file_path, b"")
+        return io.BytesIO(content)
+
+    async def write_file(self, file_path: str, content: bytes) -> None:
+        """Mock file writing."""
+        self.mock_files[file_path] = content
+
+    async def remove_file(self, file_path: str) -> None:
+        """Mock file removal."""
+        if file_path in self.mock_files:
+            del self.mock_files[file_path]
+
+    def exists(self, file_path: str) -> bool:
+        """Mock file existence check."""
+        if file_path in self.mock_exists:
+            return self.mock_exists[file_path]
+        return file_path in self.mock_files
+
+    def isfile(self, file_path: str) -> bool:
+        """Mock file type check."""
+        if file_path in self.mock_isfile:
+            return self.mock_isfile[file_path]
+        return file_path in self.mock_files
 
 
 class TestDirectoryInfo:
@@ -51,79 +92,95 @@ class TestIsBorgRepository:
 
     def test_is_borg_repository_with_valid_config(self) -> None:
         """Test detection of valid borg repository."""
+        file_service = MockFileService()
         config_content = """
 [repository]
 version = 1
 segments_per_dir = 1000
 """
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=True),
-            patch("builtins.open", mock_open(read_data=config_content)),
-        ):
-            assert _is_borg_repository("/test/repo") is True
+        # Use os.path.join to get the correct path format for the current OS
+        config_path = os.path.join("/test/repo", "config")
+        file_service.mock_files[config_path] = config_content.encode("utf-8")
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = True
+
+        assert _is_borg_repository("/test/repo", file_service) is True
 
     def test_is_borg_repository_no_config_file(self) -> None:
         """Test with missing config file."""
-        with patch("os.path.exists", return_value=False):
-            assert _is_borg_repository("/test/repo") is False
+        file_service = MockFileService()
+        config_path = os.path.join("/test/repo", "config")
+        file_service.mock_exists[config_path] = False
+
+        assert _is_borg_repository("/test/repo", file_service) is False
 
     def test_is_borg_repository_config_is_directory(self) -> None:
         """Test with config being a directory instead of file."""
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=False),
-        ):
-            assert _is_borg_repository("/test/repo") is False
+        file_service = MockFileService()
+        config_path = os.path.join("/test/repo", "config")
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = False
+
+        assert _is_borg_repository("/test/repo", file_service) is False
 
     def test_is_borg_repository_no_repository_section(self) -> None:
         """Test with config file missing [repository] section."""
+        file_service = MockFileService()
         config_content = """
 [cache]
 version = 1
 """
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=True),
-            patch("builtins.open", mock_open(read_data=config_content)),
-        ):
-            assert _is_borg_repository("/test/repo") is False
+        config_path = os.path.join("/test/repo", "config")
+        file_service.mock_files[config_path] = config_content.encode("utf-8")
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = True
+
+        assert _is_borg_repository("/test/repo", file_service) is False
 
     def test_is_borg_repository_invalid_config(self) -> None:
         """Test with invalid config file content."""
+        file_service = MockFileService()
         config_content = "invalid config content"
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=True),
-            patch("builtins.open", mock_open(read_data=config_content)),
-        ):
-            assert _is_borg_repository("/test/repo") is False
+        config_path = os.path.join("/test/repo", "config")
+        file_service.mock_files[config_path] = config_content.encode("utf-8")
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = True
+
+        assert _is_borg_repository("/test/repo", file_service) is False
 
     def test_is_borg_repository_permission_error(self) -> None:
         """Test handling of permission errors."""
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=True),
-            patch("builtins.open", side_effect=PermissionError("Access denied")),
-        ):
-            assert _is_borg_repository("/test/repo") is False
+        file_service = MockFileService()
+        config_path = os.path.join("/test/repo", "config")
+        file_service.mock_errors[config_path] = PermissionError("Access denied")
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = True
+
+        assert _is_borg_repository("/test/repo", file_service) is False
 
     def test_is_borg_repository_unicode_error(self) -> None:
         """Test handling of unicode decode errors."""
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=True),
-            patch(
-                "builtins.open",
-                side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "invalid"),
-            ),
-        ):
-            assert _is_borg_repository("/test/repo") is False
+        file_service = MockFileService()
+        config_path = os.path.join("/test/repo", "config")
+        file_service.mock_errors[config_path] = UnicodeDecodeError(
+            "utf-8", b"", 0, 1, "invalid"
+        )
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = True
+
+        assert _is_borg_repository("/test/repo", file_service) is False
 
     def test_is_borg_repository_general_exception(self) -> None:
         """Test handling of general exceptions."""
-        with patch("os.path.exists", side_effect=Exception("General error")):
-            assert _is_borg_repository("/test/repo") is False
+        file_service = MockFileService()
+
+        # Mock the exists method to raise an exception
+        def mock_exists_raises(file_path: str) -> bool:
+            raise Exception("General error")
+
+        file_service.exists = mock_exists_raises
+
+        assert _is_borg_repository("/test/repo", file_service) is False
 
 
 class TestIsBorgCache:
@@ -131,44 +188,50 @@ class TestIsBorgCache:
 
     def test_is_borg_cache_with_valid_config(self) -> None:
         """Test detection of valid borg cache."""
+        file_service = MockFileService()
         config_content = """
 [cache]
 version = 1
 repository = /path/to/repo
 """
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=True),
-            patch("builtins.open", mock_open(read_data=config_content)),
-        ):
-            assert _is_borg_cache("/test/cache") is True
+        config_path = os.path.join("/test/cache", "config")
+        file_service.mock_files[config_path] = config_content.encode("utf-8")
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = True
+
+        assert _is_borg_cache("/test/cache", file_service) is True
 
     def test_is_borg_cache_no_config_file(self) -> None:
         """Test with missing config file."""
-        with patch("os.path.exists", return_value=False):
-            assert _is_borg_cache("/test/cache") is False
+        file_service = MockFileService()
+        config_path = os.path.join("/test/cache", "config")
+        file_service.mock_exists[config_path] = False
+
+        assert _is_borg_cache("/test/cache", file_service) is False
 
     def test_is_borg_cache_no_cache_section(self) -> None:
         """Test with config file missing [cache] section."""
+        file_service = MockFileService()
         config_content = """
 [repository]
 version = 1
 """
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=True),
-            patch("builtins.open", mock_open(read_data=config_content)),
-        ):
-            assert _is_borg_cache("/test/cache") is False
+        config_path = os.path.join("/test/cache", "config")
+        file_service.mock_files[config_path] = config_content.encode("utf-8")
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = True
+
+        assert _is_borg_cache("/test/cache", file_service) is False
 
     def test_is_borg_cache_permission_error(self) -> None:
         """Test handling of permission errors."""
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("os.path.isfile", return_value=True),
-            patch("builtins.open", side_effect=PermissionError("Access denied")),
-        ):
-            assert _is_borg_cache("/test/cache") is False
+        file_service = MockFileService()
+        config_path = os.path.join("/test/cache", "config")
+        file_service.mock_errors[config_path] = PermissionError("Access denied")
+        file_service.mock_exists[config_path] = True
+        file_service.mock_isfile[config_path] = True
+
+        assert _is_borg_cache("/test/cache", file_service) is False
 
 
 class TestSanitizeFilename:
@@ -388,6 +451,8 @@ class TestGetDirectoryListing:
 
     def test_get_directory_listing_basic(self) -> None:
         """Test basic directory listing."""
+        file_service = MockFileService()
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create test directories
             subdir1 = Path(temp_dir) / "subdir1"
@@ -399,7 +464,7 @@ class TestGetDirectoryListing:
             test_file = Path(temp_dir) / "test.txt"
             test_file.write_text("test")
 
-            result = get_directory_listing(temp_dir)
+            result = get_directory_listing(temp_dir, file_service)
 
             assert len(result) == 2  # Only directories by default
             dir_names = [item.name for item in result]
@@ -408,6 +473,8 @@ class TestGetDirectoryListing:
 
     def test_get_directory_listing_include_files(self) -> None:
         """Test directory listing including files."""
+        file_service = MockFileService()
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create test directory and file
             subdir = Path(temp_dir) / "subdir"
@@ -415,7 +482,7 @@ class TestGetDirectoryListing:
             test_file = Path(temp_dir) / "test.txt"
             test_file.write_text("test")
 
-            result = get_directory_listing(temp_dir, include_files=True)
+            result = get_directory_listing(temp_dir, file_service, include_files=True)
 
             assert len(result) == 2  # Directory + file
             names = [item.name for item in result]
@@ -424,6 +491,8 @@ class TestGetDirectoryListing:
 
     def test_get_directory_listing_borg_repo(self) -> None:
         """Test detection of borg repositories."""
+        file_service = MockFileService()
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a mock borg repository
             repo_dir = Path(temp_dir) / "borg_repo"
@@ -431,7 +500,12 @@ class TestGetDirectoryListing:
             config_file = repo_dir / "config"
             config_file.write_text("[repository]\nversion = 1\n")
 
-            result = get_directory_listing(temp_dir)
+            # Set up the mock file service to return the config content
+            file_service.mock_files[str(config_file)] = (
+                "[repository]\nversion = 1\n".encode("utf-8")
+            )
+
+            result = get_directory_listing(temp_dir, file_service)
 
             assert len(result) == 1
             assert result[0].name == "borg_repo"
@@ -440,6 +514,8 @@ class TestGetDirectoryListing:
 
     def test_get_directory_listing_borg_cache(self) -> None:
         """Test detection of borg caches."""
+        file_service = MockFileService()
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a mock borg cache
             cache_dir = Path(temp_dir) / "borg_cache"
@@ -447,7 +523,12 @@ class TestGetDirectoryListing:
             config_file = cache_dir / "config"
             config_file.write_text("[cache]\nversion = 1\n")
 
-            result = get_directory_listing(temp_dir)
+            # Set up the mock file service to return the config content
+            file_service.mock_files[str(config_file)] = "[cache]\nversion = 1\n".encode(
+                "utf-8"
+            )
+
+            result = get_directory_listing(temp_dir, file_service)
 
             assert len(result) == 1
             assert result[0].name == "borg_cache"
@@ -456,28 +537,34 @@ class TestGetDirectoryListing:
 
     def test_get_directory_listing_non_directory(self) -> None:
         """Test with non-directory path."""
+        file_service = MockFileService()
+
         with tempfile.NamedTemporaryFile() as temp_file:
-            result = get_directory_listing(temp_file.name)
+            result = get_directory_listing(temp_file.name, file_service)
             assert result == []
 
     def test_get_directory_listing_permission_error(self) -> None:
         """Test handling of permission errors."""
+        file_service = MockFileService()
+
         with (
             patch.object(Path, "is_dir", return_value=True),
             patch.object(Path, "iterdir", side_effect=PermissionError("Access denied")),
         ):
-            result = get_directory_listing("/test/path")
+            result = get_directory_listing("/test/path", file_service)
             assert result == []
 
     def test_get_directory_listing_sorted(self) -> None:
         """Test that results are sorted alphabetically."""
+        file_service = MockFileService()
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create directories in non-alphabetical order
             dirs = ["zebra", "apple", "banana"]
             for dir_name in dirs:
                 (Path(temp_dir) / dir_name).mkdir()
 
-            result = get_directory_listing(temp_dir)
+            result = get_directory_listing(temp_dir, file_service)
 
             names = [item.name for item in result]
             assert names == ["apple", "banana", "zebra"]

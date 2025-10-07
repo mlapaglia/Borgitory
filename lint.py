@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Simple script to run ruff linting, formatting, and mypy type checking.
+Simple script to run ruff linting, formatting, mypy type checking, and djLint HTML formatting.
 Usage:
   python lint.py check    - Check for linting issues
   python lint.py fix      - Fix auto-fixable linting issues
   python lint.py format   - Format code with ruff
   python lint.py mypy     - Run mypy type checking
+  python lint.py html     - Lint HTML templates with djLint
+  python lint.py html-fix - Format HTML templates with djLint
   python lint.py all      - Run all checks and formatting
 """
 
@@ -38,6 +40,10 @@ def main() -> None:
     elif command == "mypy":
         python_exe = sys.executable
         exit_code = run_command([python_exe, "-m", "mypy", "src/borgitory"])
+    elif command == "html":
+        exit_code = run_command(["djlint", "src/borgitory/templates"])
+    elif command == "html-fix":
+        exit_code = run_command(["djlint", "src/borgitory/templates", "--reformat"])
     elif command == "all":
         # Run all checks and formatting
         print("Running ruff check...")
@@ -60,6 +66,9 @@ def main() -> None:
                 ],
                 env=env,
             )
+        if exit_code == 0:
+            print("Running djLint HTML formatting...")
+            exit_code = run_command(["djlint", "src/borgitory/templates", "--reformat"])
     else:
         print(f"Unknown command: {command}")
         print(__doc__)

@@ -1,5 +1,6 @@
 """Integration tests for basic endpoint functionality."""
 
+from typing import Generator
 import threading
 import pytest
 import requests
@@ -8,7 +9,7 @@ from .test_app_startup import AppRunner
 
 
 @pytest.fixture
-def app_runner(temp_data_dir):
+def app_runner(temp_data_dir: str) -> Generator[AppRunner, None, None]:
     """Create an AppRunner instance for individual tests that need their own instance."""
     runner = AppRunner(temp_data_dir)
 
@@ -21,7 +22,7 @@ def app_runner(temp_data_dir):
     runner.stop()
 
 
-def test_auth_check_users_endpoint(app_runner):
+def test_auth_check_users_endpoint(app_runner: AppRunner) -> None:
     """Test the auth check-users endpoint returns proper response."""
 
     response = requests.get(f"{app_runner.base_url}/auth/check-users", timeout=10)
@@ -52,7 +53,7 @@ def test_auth_check_users_endpoint(app_runner):
     )
 
 
-def test_debug_info_endpoint(app_runner):
+def test_debug_info_endpoint(app_runner: AppRunner) -> None:
     """Test the debug info endpoint returns proper JSON structure."""
 
     response = requests.get(f"{app_runner.base_url}/api/debug/info", timeout=10)
@@ -81,7 +82,7 @@ def test_debug_info_endpoint(app_runner):
             pytest.fail(f"Debug endpoint returned invalid JSON: {response.text[:200]}")
 
 
-def test_login_endpoint_post(app_runner):
+def test_login_endpoint_post(app_runner: AppRunner) -> None:
     """Test the login POST endpoint handles requests properly."""
 
     # Test login with invalid credentials (should fail gracefully)
@@ -101,7 +102,7 @@ def test_login_endpoint_post(app_runner):
     assert len(response.text) > 0, "Login endpoint should return some content"
 
 
-def test_register_endpoint_post(app_runner):
+def test_register_endpoint_post(app_runner: AppRunner) -> None:
     """Test the register POST endpoint handles requests properly."""
 
     # Test registration with valid data
@@ -121,7 +122,7 @@ def test_register_endpoint_post(app_runner):
     assert len(response.text) > 0, "Register endpoint should return some content"
 
 
-def test_root_endpoint(app_runner):
+def test_root_endpoint(app_runner: AppRunner) -> None:
     """Test that the root endpoint serves the main application."""
 
     response = requests.get(f"{app_runner.base_url}/", timeout=10)
@@ -142,7 +143,7 @@ def test_root_endpoint(app_runner):
         )
 
 
-def test_static_assets_accessible(app_runner):
+def test_static_assets_accessible(app_runner: AppRunner) -> None:
     """Test that static assets are accessible."""
 
     # Test common static asset paths
@@ -162,7 +163,7 @@ def test_static_assets_accessible(app_runner):
         )
 
 
-def test_api_endpoints_return_proper_content_types(app_runner):
+def test_api_endpoints_return_proper_content_types(app_runner: AppRunner) -> None:
     """Test that API endpoints return appropriate content types."""
 
     # Test endpoints and their expected content types
@@ -191,7 +192,7 @@ def test_api_endpoints_return_proper_content_types(app_runner):
         )
 
 
-def test_error_handling_graceful(app_runner):
+def test_error_handling_graceful(app_runner: AppRunner) -> None:
     """Test that the application handles invalid requests gracefully."""
 
     # Test various invalid requests
@@ -226,12 +227,12 @@ def test_error_handling_graceful(app_runner):
             pytest.fail(f"Request {method} {path} caused connection error: {e}")
 
 
-def test_concurrent_requests_handling(app_runner):
+def test_concurrent_requests_handling(app_runner: AppRunner) -> None:
     """Test that the application can handle multiple concurrent requests."""
 
     results = []
 
-    def make_request():
+    def make_request() -> None:
         try:
             response = requests.get(
                 f"{app_runner.base_url}/auth/check-users", timeout=10

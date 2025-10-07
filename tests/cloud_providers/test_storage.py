@@ -15,7 +15,11 @@ from borgitory.services.cloud_providers.storage import (
     S3StorageConfig,
     SFTPStorageConfig,
 )
-from borgitory.services.cloud_providers.types import SyncEventType, ConnectionInfo
+from borgitory.services.cloud_providers.types import (
+    SyncEvent,
+    SyncEventType,
+    ConnectionInfo,
+)
 
 
 class TestS3StorageConfig:
@@ -381,7 +385,7 @@ class TestS3Storage:
     """Test S3Storage implementation"""
 
     @pytest.fixture
-    def s3_config(self):
+    def s3_config(self) -> S3StorageConfig:
         """Valid S3 configuration"""
         return S3StorageConfig(
             bucket_name="test-bucket",
@@ -391,23 +395,27 @@ class TestS3Storage:
         )
 
     @pytest.fixture
-    def mock_rclone_service(self):
+    def mock_rclone_service(self) -> AsyncMock:
         """Mock rclone service"""
         return AsyncMock()
 
     @pytest.fixture
-    def s3_storage(self, s3_config, mock_rclone_service):
+    def s3_storage(
+        self, s3_config: S3StorageConfig, mock_rclone_service: AsyncMock
+    ) -> S3Storage:
         """S3Storage instance with mocked dependencies"""
         return S3Storage(s3_config, mock_rclone_service)
 
-    def test_initialization(self, s3_config, mock_rclone_service) -> None:
+    def test_initialization(
+        self, s3_config: S3StorageConfig, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test S3Storage initialization"""
         storage = S3Storage(s3_config, mock_rclone_service)
 
         assert storage._config is s3_config
         assert storage._rclone_service is mock_rclone_service
 
-    def test_get_connection_info(self, s3_storage) -> None:
+    def test_get_connection_info(self, s3_storage: S3Storage) -> None:
         """Test getting connection info"""
         info = s3_storage.get_connection_info()
 
@@ -425,7 +433,9 @@ class TestS3Storage:
             "AKIATESTKEY123456789"
         )  # Could be same length if masking pattern changes
 
-    def test_get_connection_info_short_access_key(self, mock_rclone_service) -> None:
+    def test_get_connection_info_short_access_key(
+        self, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test connection info with short access key that still meets validation"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
@@ -438,7 +448,7 @@ class TestS3Storage:
         # Should still mask the key
         assert "***" in info.details["access_key"]
 
-    def test_get_sensitive_fields(self, s3_storage) -> None:
+    def test_get_sensitive_fields(self, s3_storage: S3Storage) -> None:
         """Test getting sensitive field names"""
         fields = s3_storage.get_sensitive_fields()
 
@@ -447,7 +457,7 @@ class TestS3Storage:
 
     @pytest.mark.asyncio
     async def test_upload_repository_success(
-        self, s3_storage, mock_rclone_service
+        self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test successful repository upload"""
 
@@ -461,7 +471,7 @@ class TestS3Storage:
         # Capture progress events
         events = []
 
-        def progress_callback(event) -> None:
+        def progress_callback(event: SyncEvent) -> None:
             events.append(event)
 
         # Execute upload
@@ -482,7 +492,7 @@ class TestS3Storage:
 
     @pytest.mark.asyncio
     async def test_upload_repository_without_callback(
-        self, s3_storage, mock_rclone_service
+        self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test upload without progress callback"""
 
@@ -496,7 +506,7 @@ class TestS3Storage:
 
     @pytest.mark.asyncio
     async def test_upload_repository_error(
-        self, s3_storage, mock_rclone_service
+        self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test upload with error"""
 
@@ -508,7 +518,7 @@ class TestS3Storage:
 
         events = []
 
-        def progress_callback(event) -> None:
+        def progress_callback(event: SyncEvent) -> None:
             events.append(event)
 
         # Should raise exception
@@ -526,7 +536,7 @@ class TestS3Storage:
 
     @pytest.mark.asyncio
     async def test_test_connection_success(
-        self, s3_storage, mock_rclone_service
+        self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test successful connection test"""
         mock_rclone_service.test_s3_connection.return_value = {"status": "success"}
@@ -544,7 +554,7 @@ class TestS3Storage:
 
     @pytest.mark.asyncio
     async def test_test_connection_failure(
-        self, s3_storage, mock_rclone_service
+        self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test failed connection test"""
         mock_rclone_service.test_s3_connection.return_value = {"status": "error"}
@@ -554,7 +564,7 @@ class TestS3Storage:
 
     @pytest.mark.asyncio
     async def test_test_connection_exception(
-        self, s3_storage, mock_rclone_service
+        self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test connection test with exception"""
         mock_rclone_service.test_s3_connection.side_effect = Exception("Network error")
@@ -567,7 +577,7 @@ class TestSFTPStorage:
     """Test SFTPStorage implementation"""
 
     @pytest.fixture
-    def sftp_config(self):
+    def sftp_config(self) -> SFTPStorageConfig:
         """Valid SFTP configuration"""
         return SFTPStorageConfig(
             host="backup.example.com",
@@ -578,23 +588,27 @@ class TestSFTPStorage:
         )
 
     @pytest.fixture
-    def mock_rclone_service(self):
+    def mock_rclone_service(self) -> AsyncMock:
         """Mock rclone service"""
         return AsyncMock()
 
     @pytest.fixture
-    def sftp_storage(self, sftp_config, mock_rclone_service):
+    def sftp_storage(
+        self, sftp_config: SFTPStorageConfig, mock_rclone_service: AsyncMock
+    ) -> SFTPStorage:
         """SFTPStorage instance with mocked dependencies"""
         return SFTPStorage(sftp_config, mock_rclone_service)
 
-    def test_initialization(self, sftp_config, mock_rclone_service) -> None:
+    def test_initialization(
+        self, sftp_config: SFTPStorageConfig, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test SFTPStorage initialization"""
         storage = SFTPStorage(sftp_config, mock_rclone_service)
 
         assert storage._config is sftp_config
         assert storage._rclone_service is mock_rclone_service
 
-    def test_get_connection_info_password_auth(self, sftp_storage) -> None:
+    def test_get_connection_info_password_auth(self, sftp_storage: SFTPStorage) -> None:
         """Test getting connection info with password auth"""
         info = sftp_storage.get_connection_info()
 
@@ -607,7 +621,9 @@ class TestSFTPStorage:
         assert info.details["auth_method"] == "password"
         assert info.details["host_key_checking"] is True
 
-    def test_get_connection_info_private_key_auth(self, mock_rclone_service) -> None:
+    def test_get_connection_info_private_key_auth(
+        self, mock_rclone_service: AsyncMock
+    ) -> None:
         """Test getting connection info with private key auth"""
         config = SFTPStorageConfig(
             host="backup.example.com",
@@ -620,7 +636,7 @@ class TestSFTPStorage:
         info = storage.get_connection_info()
         assert info.details["auth_method"] == "private_key"
 
-    def test_get_sensitive_fields(self, sftp_storage) -> None:
+    def test_get_sensitive_fields(self, sftp_storage: SFTPStorage) -> None:
         """Test getting sensitive field names"""
         fields = sftp_storage.get_sensitive_fields()
 
@@ -629,7 +645,7 @@ class TestSFTPStorage:
 
     @pytest.mark.asyncio
     async def test_upload_repository_success(
-        self, sftp_storage, mock_rclone_service
+        self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test successful repository upload"""
 
@@ -641,7 +657,7 @@ class TestSFTPStorage:
 
         events = []
 
-        def progress_callback(event) -> None:
+        def progress_callback(event: SyncEvent) -> None:
             events.append(event)
 
         await sftp_storage.upload_repository("/test/repo", "daily/", progress_callback)
@@ -654,7 +670,7 @@ class TestSFTPStorage:
 
     @pytest.mark.asyncio
     async def test_upload_repository_error(
-        self, sftp_storage, mock_rclone_service
+        self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test upload with error"""
 
@@ -666,7 +682,7 @@ class TestSFTPStorage:
 
         events = []
 
-        def progress_callback(event) -> None:
+        def progress_callback(event: SyncEvent) -> None:
             events.append(event)
 
         with pytest.raises(
@@ -682,7 +698,7 @@ class TestSFTPStorage:
 
     @pytest.mark.asyncio
     async def test_test_connection_success(
-        self, sftp_storage, mock_rclone_service
+        self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test successful connection test"""
         mock_rclone_service.test_sftp_connection.return_value = {"status": "success"}
@@ -701,7 +717,7 @@ class TestSFTPStorage:
 
     @pytest.mark.asyncio
     async def test_test_connection_failure(
-        self, sftp_storage, mock_rclone_service
+        self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test failed connection test"""
         mock_rclone_service.test_sftp_connection.return_value = {"status": "error"}
@@ -711,7 +727,7 @@ class TestSFTPStorage:
 
     @pytest.mark.asyncio
     async def test_test_connection_exception(
-        self, sftp_storage, mock_rclone_service
+        self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
         """Test connection test with exception"""
         mock_rclone_service.test_sftp_connection.side_effect = Exception("Timeout")

@@ -1,20 +1,19 @@
 <!-- Prune Policies -->
 <div class="border dark:border-gray-600 rounded-lg p-4">
     <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Prune Policies</h3>
-    
     <!-- Cleanup Prune Form Container -->
-    <div id="cleanup-policy-form-container" class="mb-4 pb-4 border-b" 
-         hx-get="/api/prune/policy-form" 
+    <div id="cleanup-policy-form-container"
+         class="mb-4 pb-4 border-b"
+         hx-get="/api/prune/policy-form"
          hx-trigger="load"
          hx-swap="innerHTML">
         <div class="text-gray-600 dark:text-gray-400 text-sm">Loading form...</div>
     </div>
     <div id="cleanup-policy-status" class="mb-4"></div>
-    
     <!-- Existing Prune Policies -->
-    <div id="cleanup-config-list" 
-         hx-get="/api/prune/" 
-         hx-trigger="load, pruneConfigUpdate from:body" 
+    <div id="cleanup-config-list"
+         hx-get="/api/prune/"
+         hx-trigger="load, pruneConfigUpdate from:body"
          hx-swap="innerHTML">
         <div class="text-gray-600 dark:text-gray-400 text-sm">Loading prune policies...</div>
     </div>

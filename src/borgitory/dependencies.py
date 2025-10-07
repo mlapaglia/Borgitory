@@ -14,6 +14,8 @@ from typing import (
 )
 import asyncio
 
+from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+from borgitory.services.jobs.job_models import TaskStatusEnum, TaskTypeEnum
 from borgitory.services.notifications.registry import get_metadata
 from borgitory.services.path.path_configuration_service import PathConfigurationService
 
@@ -26,12 +28,13 @@ if TYPE_CHECKING:
     from borgitory.services.notifications.providers.discord_provider import HttpClient
     from borgitory.config.command_runner_config import CommandRunnerConfig
     from borgitory.config.job_manager_config import JobManagerEnvironmentConfig
-    from borgitory.services.jobs.job_manager import JobManagerConfig
+    from borgitory.services.jobs.job_models import JobManagerConfig
     from borgitory.services.cloud_providers.registry_factory import RegistryFactory
     from borgitory.services.volumes.file_system_interface import FileSystemInterface
     from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
     from borgitory.protocols.path_protocols import PathServiceInterface
     from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+    from borgitory.protocols.file_protocols import FileServiceProtocol
     from borgitory.services.command_execution.wsl_command_executor import (
         WSLCommandExecutor,
     )
@@ -582,6 +585,10 @@ def get_templates() -> TimezoneAwareJinja2Templates:
     templates.env.filters["format_datetime_browser"] = datetime_browser_filter
     templates.env.filters["from_json"] = from_json_filter
     templates.env.filters["tojson"] = to_json_filter
+    templates.env.globals["TaskStatusEnum"] = TaskStatusEnum
+    templates.env.globals["TaskTypeEnum"] = TaskTypeEnum
+    templates.env.globals["JobStatusEnum"] = JobStatusEnum
+    templates.env.globals["JobTypeEnum"] = JobTypeEnum
 
     return templates
 
@@ -701,7 +708,7 @@ def get_job_manager_config(
     Returns:
         JobManagerConfig: Configured JobManager instance
     """
-    from borgitory.services.jobs.job_manager import JobManagerConfig
+    from borgitory.services.jobs.job_models import JobManagerConfig
 
     return JobManagerConfig(
         max_concurrent_backups=env_config.max_concurrent_backups,
@@ -730,10 +737,8 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     Returns:
         JobManagerProtocol: Cached singleton instance
     """
-    from borgitory.services.jobs.job_manager import (
-        JobManagerDependencies,
-        JobManagerFactory,
-    )
+    from borgitory.services.jobs.job_models import JobManagerDependencies
+    from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 
     # Resolve all dependencies directly (not via FastAPI DI)
     env_config = get_job_manager_env_config()
@@ -1187,11 +1192,24 @@ def get_borg_service(
     )
 
 
+def get_file_service() -> "FileServiceProtocol":
+    """
+    Provide a FileService instance for file operations.
+
+    Returns:
+        FileServiceProtocol: File service implementation
+    """
+    from borgitory.services.file_service import FileService
+
+    return FileService()
+
+
 def get_repository_service(
     borg_service: BorgService = Depends(get_borg_service),
     scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
     path_service: "PathServiceInterface" = Depends(get_path_service),
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    file_service: "FileServiceProtocol" = Depends(get_file_service),
 ) -> RepositoryService:
     """
     Provide a RepositoryService instance with proper dependency injection.
@@ -1203,6 +1221,7 @@ def get_repository_service(
         scheduler_service=scheduler_service,
         path_service=path_service,
         command_executor=command_executor,
+        file_service=file_service,
     )
 
 

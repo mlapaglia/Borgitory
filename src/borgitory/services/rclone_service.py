@@ -608,7 +608,7 @@ class RcloneService:
                 else:
                     return {
                         "status": "warning",
-                        "message": f"SFTP directory is readable but may have write permission issues: {test_result['message']}",
+                        "message": f"SFTP directory is readable but may have write permission issues: {test_result.get('message')}",
                         "output": result.stdout,
                         "details": {
                             "read_test": "passed",

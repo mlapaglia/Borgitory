@@ -2,6 +2,7 @@
 Tests for job stop functionality
 """
 
+import uuid
 import pytest
 from unittest.mock import Mock, AsyncMock
 from borgitory.services.jobs.job_service import JobService
@@ -30,11 +31,12 @@ class TestJobStopFunctionality:
             }
         )
 
-        result = await self.job_service.stop_job("test-job-uuid-123")
+        job_id = uuid.uuid4()
+        result = await self.job_service.stop_job(job_id)
 
         assert isinstance(result, JobStopResult)
         assert result.success is True
-        assert result.job_id == "test-job-uuid-123"
+        assert result.job_id == job_id
         assert result.message == "Job stopped successfully. 2 tasks skipped."
         assert result.tasks_skipped == 2
         assert result.current_task_killed is True
@@ -51,10 +53,11 @@ class TestJobStopFunctionality:
             }
         )
 
-        result = await self.job_service.stop_job("non-existent-job-123")
+        job_id = uuid.uuid4()
+        result = await self.job_service.stop_job(job_id)
 
         assert isinstance(result, JobStopError)
-        assert result.job_id == "non-existent-job-123"
+        assert result.job_id == job_id
         assert result.error == "Job not found"
         assert result.error_code == "JOB_NOT_FOUND"
 
@@ -70,10 +73,11 @@ class TestJobStopFunctionality:
             }
         )
 
-        result = await self.job_service.stop_job("completed-job-123")
+        job_id = uuid.uuid4()
+        result = await self.job_service.stop_job(job_id)
 
         assert isinstance(result, JobStopError)
-        assert result.job_id == "completed-job-123"
+        assert result.job_id == job_id
         assert "Cannot stop job in status: completed" in result.error
         assert result.error_code == "INVALID_STATUS"
 
@@ -90,7 +94,8 @@ class TestJobStopFunctionality:
             }
         )
 
-        result = await self.job_service.stop_job("single-task-job-123")
+        job_id = uuid.uuid4()
+        result = await self.job_service.stop_job(job_id)
 
         assert isinstance(result, JobStopResult)
         assert result.success is True

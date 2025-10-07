@@ -5,7 +5,7 @@ This test file ensures complete coverage of the service layer with
 proper DI patterns and real database usage where appropriate.
 """
 
-from typing import Any
+from typing import Any, Dict
 import pytest
 import json
 from unittest.mock import Mock, AsyncMock, patch
@@ -30,7 +30,7 @@ class TestConfigValidator:
 
     def test_validate_s3_config_success(self, validator: ConfigValidator) -> None:
         """Test successful S3 configuration validation"""
-        config = {
+        config: Dict[str, Any] = {
             "bucket_name": "test-bucket",
             "access_key": "AKIAIOSFODNN7EXAMPLE",
             "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -48,7 +48,7 @@ class TestConfigValidator:
 
     def test_validate_s3_config_minimal(self, validator: ConfigValidator) -> None:
         """Test S3 config with minimal required fields"""
-        config = {
+        config: Dict[str, Any] = {
             "bucket_name": "test-bucket",
             "access_key": "AKIAIOSFODNN7EXAMPLE",
             "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -66,7 +66,7 @@ class TestConfigValidator:
         self, validator: ConfigValidator
     ) -> None:
         """Test S3 config validation with missing bucket name"""
-        config = {
+        config: Dict[str, Any] = {
             "access_key": "AKIAIOSFODNN7EXAMPLE",
             "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         }
@@ -78,7 +78,7 @@ class TestConfigValidator:
         self, validator: ConfigValidator
     ) -> None:
         """Test S3 config validation with missing credentials"""
-        config = {"bucket_name": "test-bucket"}
+        config: Dict[str, Any] = {"bucket_name": "test-bucket"}
 
         with pytest.raises(Exception):  # Pydantic validation error
             validator.validate_config("s3", config)
@@ -87,7 +87,7 @@ class TestConfigValidator:
         self, validator: ConfigValidator
     ) -> None:
         """Test successful SFTP configuration validation with password"""
-        config = {
+        config: Dict[str, Any] = {
             "host": "sftp.example.com",
             "username": "testuser",
             "password": "testpass",
@@ -108,7 +108,7 @@ class TestConfigValidator:
         self, validator: ConfigValidator
     ) -> None:
         """Test SFTP configuration with private key authentication"""
-        config = {
+        config: Dict[str, Any] = {
             "host": "sftp.example.com",
             "username": "testuser",
             "private_key": "-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----",
@@ -127,7 +127,7 @@ class TestConfigValidator:
 
     def test_validate_sftp_config_minimal(self, validator: ConfigValidator) -> None:
         """Test SFTP config with minimal required fields"""
-        config = {
+        config: Dict[str, Any] = {
             "host": "sftp.example.com",
             "username": "testuser",
             "password": "testpass",
@@ -144,7 +144,7 @@ class TestConfigValidator:
         self, validator: ConfigValidator
     ) -> None:
         """Test SFTP config without password or private key"""
-        config = {
+        config: Dict[str, Any] = {
             "host": "sftp.example.com",
             "username": "testuser",
             "remote_path": "/backups",
@@ -157,14 +157,14 @@ class TestConfigValidator:
         self, validator: ConfigValidator
     ) -> None:
         """Test SFTP config with missing required fields"""
-        config = {"host": "sftp.example.com", "password": "testpass"}
+        config: Dict[str, Any] = {"host": "sftp.example.com", "password": "testpass"}
 
         with pytest.raises(Exception):  # Missing username and remote_path
             validator.validate_config("sftp", config)
 
     def test_validate_unknown_provider(self, validator: ConfigValidator) -> None:
         """Test validation with unknown provider"""
-        config = {"bucket_name": "test"}
+        config: Dict[str, Any] = {"bucket_name": "test"}
 
         with pytest.raises(ValueError, match="Unknown provider: azure"):
             validator.validate_config("azure", config)
@@ -193,7 +193,7 @@ class TestStorageFactory:
         self, factory: StorageFactory, mock_rclone_service: Mock
     ) -> None:
         """Test successful S3 storage creation"""
-        config = {
+        config: Dict[str, Any] = {
             "bucket_name": "test-bucket",
             "access_key": "AKIAIOSFODNN7EXAMPLE",
             "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -210,7 +210,7 @@ class TestStorageFactory:
         self, factory: StorageFactory, mock_rclone_service: Mock
     ) -> None:
         """Test successful SFTP storage creation"""
-        config = {
+        config: Dict[str, Any] = {
             "host": "sftp.example.com",
             "username": "testuser",
             "password": "testpass",
@@ -225,14 +225,14 @@ class TestStorageFactory:
 
     def test_create_storage_invalid_config(self, factory: StorageFactory) -> None:
         """Test storage creation with invalid configuration"""
-        config = {"invalid": "config"}
+        config: Dict[str, Any] = {"invalid": "config"}
 
         with pytest.raises(Exception):  # Validation should fail
             factory.create_storage("s3", config)
 
     def test_create_storage_unknown_provider(self, factory: StorageFactory) -> None:
         """Test storage creation with unknown provider"""
-        config = {"bucket_name": "test"}
+        config: Dict[str, Any] = {"bucket_name": "test"}
 
         with pytest.raises(ValueError, match="Unknown provider: unknown"):
             factory.create_storage("unknown", config)
@@ -243,7 +243,7 @@ class TestStorageFactory:
         """Test that factory uses the injected rclone service"""
         factory = StorageFactory(mock_rclone_service, registry=production_registry)
 
-        config = {
+        config: Dict[str, Any] = {
             "bucket_name": "test-bucket",
             "access_key": "AKIAIOSFODNN7EXAMPLE",
             "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -258,7 +258,7 @@ class TestStorageFactory:
     def test_factory_validator_integration(self, factory: StorageFactory) -> None:
         """Test that factory properly integrates with validator"""
         # The factory should validate config before creating storage
-        invalid_config = {}
+        invalid_config: Dict[str, Any] = {}
 
         with pytest.raises(Exception):
             factory.create_storage("s3", invalid_config)
@@ -328,7 +328,7 @@ class TestEncryptionService:
 
     def test_encrypt_multiple_fields(self, service: EncryptionService) -> None:
         """Test encryption of multiple sensitive fields"""
-        config = {
+        config: Dict[str, Any] = {
             "access_key": "AKIA123",
             "secret_key": "secret456",
             "region": "us-east-1",
@@ -350,7 +350,7 @@ class TestEncryptionService:
 
     def test_decrypt_multiple_fields(self, service: EncryptionService) -> None:
         """Test decryption of multiple sensitive fields"""
-        config = {
+        config: Dict[str, Any] = {
             "access_key": "AKIA123",
             "secret_key": "secret456",
             "region": "us-east-1",
@@ -392,7 +392,11 @@ class TestEncryptionService:
 
     def test_encrypt_empty_field_values(self, service: EncryptionService) -> None:
         """Test encryption of empty field values"""
-        config = {"password": "", "secret_key": None, "host": "example.com"}
+        config: Dict[str, Any] = {
+            "password": "",
+            "secret_key": None,
+            "host": "example.com",
+        }
         sensitive_fields = ["password", "secret_key"]
 
         encrypted_config = service.encrypt_sensitive_fields(config, sensitive_fields)
@@ -410,7 +414,7 @@ class TestEncryptionService:
 
     def test_decrypt_missing_encrypted_fields(self, service: EncryptionService) -> None:
         """Test decryption when encrypted fields are missing"""
-        config = {"host": "example.com", "username": "testuser"}
+        config: Dict[str, Any] = {"host": "example.com", "username": "testuser"}
         sensitive_fields = ["password"]
 
         decrypted_config = service.decrypt_sensitive_fields(config, sensitive_fields)
@@ -420,7 +424,7 @@ class TestEncryptionService:
 
     def test_roundtrip_encryption_decryption(self, service: EncryptionService) -> None:
         """Test that encrypt->decrypt produces original data"""
-        original_config = {
+        original_config: Dict[str, Any] = {
             "host": "sftp.example.com",
             "username": "testuser",
             "password": "super_secret_password_123!@#",
@@ -714,7 +718,7 @@ class TestCloudSyncService:
     ) -> None:
         """Test preparing config for database storage"""
         provider = "s3"
-        config = {
+        config: Dict[str, Any] = {
             "bucket_name": "test-bucket",
             "access_key": "AKIA123",
             "secret_key": "secret456",
@@ -725,7 +729,7 @@ class TestCloudSyncService:
         mock_storage.get_sensitive_fields.return_value = ["access_key", "secret_key"]
         mock_storage_factory.create_storage.return_value = mock_storage
 
-        encrypted_config = {
+        encrypted_config: Dict[str, Any] = {
             "bucket_name": "test-bucket",
             "encrypted_access_key": "encrypted_akia123",
             "encrypted_secret_key": "encrypted_secret456",
@@ -768,7 +772,7 @@ class TestCloudSyncService:
         mock_storage.get_sensitive_fields.return_value = ["password"]
         mock_storage_factory.create_storage.return_value = mock_storage
 
-        decrypted_config = {
+        decrypted_config: Dict[str, Any] = {
             "host": "sftp.example.com",
             "username": "testuser",
             "password": "decrypted_pass123",
@@ -779,7 +783,7 @@ class TestCloudSyncService:
         result = service.load_config_from_storage(provider, stored_config)
 
         # Verify decryption was called with parsed config
-        expected_parsed_config = {
+        expected_parsed_config: Dict[str, Any] = {
             "host": "sftp.example.com",
             "username": "testuser",
             "encrypted_password": "encrypted_pass123",

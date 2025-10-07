@@ -30,11 +30,11 @@ def service(test_db: Session, mock_scheduler_service: AsyncMock) -> ScheduleServ
 @pytest.fixture
 def sample_repository(test_db: Session) -> Repository:
     """Create a sample repository for testing."""
-    repository = Repository(
-        name="test-repo",
-        path="/tmp/test-repo",
-        encrypted_passphrase="test-encrypted-passphrase",
-    )
+    repository = Repository()
+    repository.name = "test-repo"
+    repository.path = "/tmp/test-repo"
+    repository.encrypted_passphrase = "test-encrypted-passphrase"
+
     test_db.add(repository)
     test_db.commit()
     test_db.refresh(repository)
@@ -61,12 +61,11 @@ class TestScheduleService:
         self, service: ScheduleService, test_db: Session, sample_repository: Repository
     ) -> None:
         """Test getting schedule by ID successfully."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -90,18 +89,17 @@ class TestScheduleService:
         self, service: ScheduleService, test_db: Session, sample_repository: Repository
     ) -> None:
         """Test getting schedules with data."""
-        schedule1 = Schedule(
-            name="schedule-1",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data1",
-        )
-        schedule2 = Schedule(
-            name="schedule-2",
-            repository_id=sample_repository.id,
-            cron_expression="0 3 * * *",
-            source_path="/data2",
-        )
+        schedule1 = Schedule()
+        schedule1.name = "schedule-1"
+        schedule1.repository_id = sample_repository.id
+        schedule1.cron_expression = "0 2 * * *"
+        schedule1.source_path = "/data1"
+
+        schedule2 = Schedule()
+        schedule2.name = "schedule-2"
+        schedule2.repository_id = sample_repository.id
+        schedule2.cron_expression = "0 3 * * *"
+        schedule2.source_path = "/data2"
         test_db.add(schedule1)
         test_db.add(schedule2)
         test_db.commit()
@@ -117,12 +115,11 @@ class TestScheduleService:
     ) -> None:
         """Test getting schedules with pagination."""
         for i in range(5):
-            schedule = Schedule(
-                name=f"schedule-{i}",
-                repository_id=sample_repository.id,
-                cron_expression="0 2 * * *",
-                source_path=f"/data{i}",
-            )
+            schedule = Schedule()
+            schedule.name = f"schedule-{i}"
+            schedule.repository_id = sample_repository.id
+            schedule.cron_expression = "0 2 * * *"
+            schedule.source_path = f"/data{i}"
             test_db.add(schedule)
         test_db.commit()
 
@@ -133,12 +130,11 @@ class TestScheduleService:
         self, service: ScheduleService, test_db: Session, sample_repository: Repository
     ) -> None:
         """Test getting all schedules."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
         test_db.add(schedule)
         test_db.commit()
 
@@ -252,13 +248,12 @@ class TestScheduleService:
     ) -> None:
         """Test successful schedule update."""
         # Create initial schedule
-        schedule = Schedule(
-            name="original-name",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-            enabled=True,
-        )
+        schedule = Schedule()
+        schedule.name = "original-name"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = True
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -295,13 +290,12 @@ class TestScheduleService:
         mock_scheduler_service: AsyncMock,
     ) -> None:
         """Test enabling a disabled schedule."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-            enabled=False,
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = False
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -325,13 +319,12 @@ class TestScheduleService:
         mock_scheduler_service: AsyncMock,
     ) -> None:
         """Test disabling an enabled schedule."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-            enabled=True,
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = True
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -365,13 +358,12 @@ class TestScheduleService:
         mock_scheduler_service: AsyncMock,
     ) -> None:
         """Test toggle schedule when scheduler fails."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-            enabled=False,
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = False
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -396,12 +388,11 @@ class TestScheduleService:
         mock_scheduler_service: AsyncMock,
     ) -> None:
         """Test successful schedule deletion."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -441,12 +432,11 @@ class TestScheduleService:
         mock_scheduler_service: AsyncMock,
     ) -> None:
         """Test delete schedule when scheduler fails."""
-        schedule = Schedule(
-            name="test-schedule",
-            repository_id=sample_repository.id,
-            cron_expression="0 2 * * *",
-            source_path="/data",
-        )
+        schedule = Schedule()
+        schedule.name = "test-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
         test_db.add(schedule)
         test_db.commit()
         test_db.refresh(schedule)
@@ -503,9 +493,9 @@ class TestScheduleService:
         assert result.schedule.enabled is True
 
         # Delete
-        result = await service.delete_schedule(schedule_id)
-        assert result.success is True
-        assert result.schedule_name == "lifecycle-test"
+        delete_result = await service.delete_schedule(schedule_id)
+        assert delete_result.success is True
+        assert delete_result.schedule_name == "lifecycle-test"
 
         # Verify completely removed
         deleted_schedule = (

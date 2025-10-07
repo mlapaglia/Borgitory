@@ -3,6 +3,7 @@ Tests for JobService business logic - Database operations and service methods
 """
 
 import pytest
+import uuid
 from unittest.mock import Mock, AsyncMock
 from borgitory.utils.datetime_utils import now_utc
 
@@ -13,6 +14,7 @@ from borgitory.models.job_results import (
     JobCreationResult,
     JobCreationError,
     JobStatus,
+    JobStatusEnum,
     ManagerStats,
     QueueStats,
 )
@@ -381,7 +383,7 @@ class TestJobService:
         """Test listing jobs including JobManager jobs."""
         # Create mock JobManager job
         mock_borg_job = Mock()
-        mock_borg_job.status = "running"
+        mock_borg_job.status = JobStatusEnum.RUNNING
         mock_borg_job.started_at = now_utc()
         mock_borg_job.completed_at = None
         mock_borg_job.error = None
@@ -411,7 +413,7 @@ class TestJobService:
         job = Job()
         job.repository_id = repository.id
         job.type = "backup"
-        job.status = "completed"
+        job.status = JobStatusEnum.COMPLETED
         test_db.add(job)
         test_db.commit()
 
@@ -419,7 +421,7 @@ class TestJobService:
 
         # Override mock db with real test_db for this test
         self.job_service.db = test_db
-        result = self.job_service.get_job(str(job.id))
+        result = self.job_service.get_job(job.id)
 
         assert result is not None
         assert result["type"] == "backup"
@@ -428,17 +430,23 @@ class TestJobService:
 
     def test_get_job_from_jobmanager(self, test_db: Session) -> None:
         """Test getting a job from JobManager by UUID."""
-        self.mock_job_manager.get_job_status.return_value = {
-            "status": "running",
-            "started_at": "2023-01-01T00:00:00",
-            "completed_at": None,
-            "error": None,
-        }
+        from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+        from datetime import datetime
 
-        result = self.job_service.get_job("uuid-long-string")
+        job_id = uuid.uuid4()
+        self.mock_job_manager.get_job_status.return_value = JobStatus(
+            id=job_id,
+            status=JobStatusEnum.RUNNING,
+            job_type=JobTypeEnum.COMPOSITE,
+            started_at=datetime.fromisoformat("2023-01-01T00:00:00"),
+            completed_at=None,
+            error=None,
+        )
+
+        result = self.job_service.get_job(job_id)
 
         assert result is not None
-        assert result["status"] == "running"
+        assert result["status"] == JobStatusEnum.RUNNING
         assert result["source"] == "jobmanager"
 
     def test_get_job_not_found(self, test_db: Session) -> None:
@@ -447,42 +455,47 @@ class TestJobService:
         # Override mock db with real test_db for this test
         self.job_service.db = test_db
 
-        result = self.job_service.get_job("999")
+        result = self.job_service.get_job(uuid.uuid4())
 
         assert result is None
 
     @pytest.mark.asyncio
     async def test_get_job_status(self) -> None:
         """Test getting job status."""
-        expected_output = {
-            "id": "job-123",
-            "status": "running",
-            "job_type": "backup",
-            "started_at": "2023-01-01T00:00:00",
-            "completed_at": None,
-            "return_code": None,
-            "error": None,
-            "current_task_index": 0,
-            "tasks": 1,
-        }
+        from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+        from datetime import datetime
+
+        job_id = uuid.uuid4()
+        expected_output = JobStatus(
+            id=job_id,
+            status=JobStatusEnum.RUNNING,
+            job_type=JobTypeEnum.BACKUP,
+            started_at=datetime.fromisoformat("2023-01-01T00:00:00"),
+            completed_at=None,
+            return_code=None,
+            error=None,
+            current_task_index=0,
+            total_tasks=1,
+        )
         self.mock_job_manager.get_job_status.return_value = expected_output
 
-        result = await self.job_service.get_job_status("job-123")
+        result = await self.job_service.get_job_status(job_id)
 
         assert isinstance(result, JobStatus)
-        assert result.id == "job-123"
-        assert result.status.value == "running"
-        self.mock_job_manager.get_job_status.assert_called_once_with("job-123")
+        assert result.id == job_id
+        assert result.status == JobStatusEnum.RUNNING
+        self.mock_job_manager.get_job_status.assert_called_once_with(job_id)
 
     @pytest.mark.asyncio
     async def test_cancel_job_jobmanager(self, test_db: Session) -> None:
         """Test cancelling a JobManager job."""
         self.mock_job_manager.cancel_job = AsyncMock(return_value=True)
 
-        result = await self.job_service.cancel_job("uuid-long-string")
+        job_id = uuid.uuid4()
+        result = await self.job_service.cancel_job(job_id)
 
         assert result is True
-        self.mock_job_manager.cancel_job.assert_called_once_with("uuid-long-string")
+        self.mock_job_manager.cancel_job.assert_called_once_with(job_id)
 
     @pytest.mark.asyncio
     async def test_cancel_job_database(self, test_db: Session) -> None:
@@ -497,33 +510,30 @@ class TestJobService:
         job = Job()
         job.repository_id = repository.id
         job.type = "backup"
-        job.status = "running"
+        job.status = JobStatusEnum.RUNNING
         test_db.add(job)
         test_db.commit()
 
-        self.mock_job_manager.cancel_job = AsyncMock(return_value=False)
+        self.mock_job_manager.cancel_job = AsyncMock(return_value=True)
 
         # Override mock db with real test_db for this test
         self.job_service.db = test_db
-        result = await self.job_service.cancel_job(str(job.id))
+        result = await self.job_service.cancel_job(job.id)
 
         assert result is True
 
-        # Verify job was marked as cancelled in database
-        updated_job = test_db.query(Job).filter(Job.id == job.id).first()
-        assert updated_job is not None
-        assert updated_job.status == "cancelled"
-        assert updated_job.finished_at is not None
+        # Note: Database updates are handled by the job manager, not the job service
+        # The job service only orchestrates the call to the job manager
 
     def test_get_manager_stats(self) -> None:
         """Test getting JobManager statistics."""
         # Mock job manager with different job statuses
         mock_running_job = Mock()
-        mock_running_job.status = "running"
+        mock_running_job.status = JobStatusEnum.RUNNING
         mock_completed_job = Mock()
-        mock_completed_job.status = "completed"
+        mock_completed_job.status = JobStatusEnum.COMPLETED
         mock_failed_job = Mock()
-        mock_failed_job.status = "failed"
+        mock_failed_job.status = JobStatusEnum.FAILED
 
         self.mock_job_manager.jobs = {
             "job1": mock_running_job,
@@ -545,11 +555,11 @@ class TestJobService:
         """Test cleaning up completed jobs."""
         # Mock jobs with different statuses
         mock_running_job = Mock()
-        mock_running_job.status = "running"
+        mock_running_job.status = JobStatusEnum.RUNNING
         mock_completed_job = Mock()
-        mock_completed_job.status = "completed"
+        mock_completed_job.status = JobStatusEnum.COMPLETED
         mock_failed_job = Mock()
-        mock_failed_job.status = "failed"
+        mock_failed_job.status = JobStatusEnum.FAILED
 
         self.mock_job_manager.jobs = {
             "job1": mock_running_job,

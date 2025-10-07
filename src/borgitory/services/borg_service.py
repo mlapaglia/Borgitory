@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.archives.archive_models import ArchiveEntry
 from typing import List
 
@@ -183,8 +184,11 @@ class BorgService:
                     if not status:
                         return False
 
-                    if status["completed"] or status["status"] == "failed":
-                        success = status["return_code"] == 0
+                    if (
+                        status.status == JobStatusEnum.COMPLETED
+                        or status.status == JobStatusEnum.FAILED
+                    ):
+                        success = status.return_code == 0
                         # Clean up job
                         self._get_job_manager().cleanup_job(job_id)
                         # Clean up temporary keyfile if created

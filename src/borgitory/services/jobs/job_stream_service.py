@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 from typing import AsyncGenerator, Dict, TYPE_CHECKING, cast
+import uuid
+from dataclasses import dataclass
 from fastapi.responses import StreamingResponse
 
 from borgitory.protocols import JobManagerProtocol
@@ -10,6 +12,18 @@ if TYPE_CHECKING:
     from borgitory.services.jobs.broadcaster.job_event import JobEvent
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class JobData:
+    """Data class representing current job information for UI rendering"""
+
+    id: uuid.UUID
+    type: str
+    status: str
+    started_at: str
+    progress: Dict[str, str]
+    progress_info: str
 
 
 class JobStreamService:
@@ -31,7 +45,7 @@ class JobStreamService:
             },
         )
 
-    async def stream_job_output(self, job_id: str) -> StreamingResponse:
+    async def stream_job_output(self, job_id: uuid.UUID) -> StreamingResponse:
         """Stream real-time job output via Server-Sent Events"""
         return StreamingResponse(
             self._job_output_event_generator(job_id),
@@ -54,7 +68,7 @@ class JobStreamService:
                     # Composite job
                     jobs_data.append(
                         {
-                            "id": job_id,
+                            "id": str(job_id),
                             "type": "composite_job_status",
                             "status": job.status,
                             "started_at": job.started_at.isoformat(),
@@ -80,7 +94,7 @@ class JobStreamService:
 
                     jobs_data.append(
                         {
-                            "id": job_id,
+                            "id": str(job_id),
                             "type": "job_status",
                             "status": job.status,
                             "started_at": job.started_at.isoformat(),
@@ -112,7 +126,7 @@ class JobStreamService:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\\n\\n"
 
     async def _job_output_event_generator(
-        self, job_id: str
+        self, job_id: uuid.UUID
     ) -> AsyncGenerator[str, None]:
         """Generate Server-Sent Events for a specific job's output"""
         try:
@@ -123,7 +137,7 @@ class JobStreamService:
 
             if not job:
                 logger.warning(f"Job {job_id} not found in memory - cannot stream")
-                yield f"data: {json.dumps({'type': 'error', 'message': f'Job {job_id} not found or not active'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Job {str(job_id)} not found or not active'})}\n\n"
                 return
 
             if job.tasks:  # All jobs are composite now
@@ -132,7 +146,7 @@ class JobStreamService:
 
                 try:
                     # Send initial state
-                    yield f"data: {json.dumps({'type': 'initial_state', 'job_id': job_id, 'status': job.status})}\n\n"
+                    yield f"data: {json.dumps({'type': 'initial_state', 'job_id': str(job_id), 'status': job.status})}\n\n"
 
                     # Stream events
                     while True:
@@ -291,7 +305,7 @@ class JobStreamService:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     async def stream_task_output(
-        self, job_id: str, task_order: int
+        self, job_id: uuid.UUID, task_order: int
     ) -> StreamingResponse:
         """Stream real-time output for a specific task via Server-Sent Events"""
         return StreamingResponse(
@@ -304,7 +318,7 @@ class JobStreamService:
         )
 
     async def _task_output_event_generator(
-        self, job_id: str, task_order: int
+        self, job_id: uuid.UUID, task_order: int
     ) -> AsyncGenerator[str, None]:
         """Generate Server-Sent Events for a specific task's output"""
         try:
@@ -437,14 +451,9 @@ class JobStreamService:
             error_msg = f"Streaming error for job {job_id}, task {task_order}: {str(e)}"
             yield f"event: error\ndata: {error_msg}\n\n"
 
-    async def get_job_status(self, job_id: str) -> Dict[str, object]:
-        """Get current job status and progress for streaming"""
-        output = await self.job_manager.get_job_output_stream(job_id, last_n_lines=50)
-        return output
-
-    def get_current_jobs_data(self) -> list[Dict[str, object]]:
+    def get_current_jobs_data(self) -> list[JobData]:
         """Get current running jobs data for rendering"""
-        current_jobs: list[Dict[str, object]] = []
+        current_jobs: list[JobData] = []
 
         # Get current jobs from JobManager (simple borg jobs)
         for job_id, borg_job in self.job_manager.jobs.items():
@@ -463,14 +472,14 @@ class JobStreamService:
                 progress_info = ""
 
                 current_jobs.append(
-                    {
-                        "id": job_id,
-                        "type": job_type,
-                        "status": borg_job.status,
-                        "started_at": borg_job.started_at.strftime("%H:%M:%S"),
-                        "progress": {},
-                        "progress_info": progress_info,
-                    }
+                    JobData(
+                        id=job_id,
+                        type=job_type,
+                        status=borg_job.status,
+                        started_at=borg_job.started_at.strftime("%H:%M:%S"),
+                        progress={},
+                        progress_info=progress_info,
+                    )
                 )
 
         # Get current composite jobs from unified manager
@@ -482,19 +491,19 @@ class JobStreamService:
                 progress_info = f"Task: {current_task.task_name if current_task else 'Unknown'} ({job.current_task_index + 1}/{len(job.tasks)})"
 
                 current_jobs.append(
-                    {
-                        "id": job_id,
-                        "type": getattr(job, "job_type", "composite"),
-                        "status": job.status,
-                        "started_at": job.started_at.strftime("%H:%M:%S"),
-                        "progress": {
+                    JobData(
+                        id=job_id,
+                        type=getattr(job, "job_type", "composite"),
+                        status=job.status,
+                        started_at=job.started_at.strftime("%H:%M:%S"),
+                        progress={
                             "current_task": current_task.task_name
                             if current_task
                             else "Unknown",
                             "task_progress": f"{job.current_task_index + 1}/{len(job.tasks)}",
                         },
-                        "progress_info": progress_info,
-                    }
+                        progress_info=progress_info,
+                    )
                 )
 
         return current_jobs

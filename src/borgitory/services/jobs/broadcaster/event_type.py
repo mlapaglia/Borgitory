@@ -12,6 +12,7 @@ class EventType(Enum):
     JOB_STATUS_CHANGED = "job_status_changed"
     JOB_OUTPUT = "job_output"
     TASK_STARTED = "task_started"
+    TASK_PROGRESS = "task_progress"
     TASK_COMPLETED = "task_completed"
     TASK_FAILED = "task_failed"
     JOBS_UPDATE = "jobs_update"

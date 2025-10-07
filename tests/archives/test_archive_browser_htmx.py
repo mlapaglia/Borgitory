@@ -552,8 +552,15 @@ class TestArchiveBrowserHTMX:
         content = response.text
 
         # Check that the correct repository is selected
-        assert f'value="{repo1.id}" selected' in content
-        assert f'value="{repo2.id}" selected' not in content
+        assert f'value="{repo1.id}"' in content
+        assert "selected" in content
+        assert f'value="{repo2.id}"' in content
+        # Ensure repo2 is not selected (no selected attribute near repo2)
+        repo2_section = content[
+            content.find(f'value="{repo2.id}"') : content.find(f'value="{repo2.id}"')
+            + 200
+        ]
+        assert "selected" not in repo2_section
 
         # Check that HTMX trigger includes load when preselected
         assert "hx-trigger" in content

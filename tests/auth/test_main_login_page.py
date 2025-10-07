@@ -5,14 +5,18 @@ Tests for the main.py login_page endpoint
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
+from typing import AsyncGenerator
 
 from borgitory.models.database import User
 
 
 @pytest.fixture
-async def authenticated_user(test_db: Session, async_client: AsyncClient):
+async def authenticated_user(
+    test_db: Session, async_client: AsyncClient
+) -> AsyncGenerator[User, None]:
     """Create a real user and return auth cookie for testing."""
-    test_user = User(username="loginpagetest")
+    test_user = User()
+    test_user.username = "loginpagetest"
     test_user.set_password("testpass123")
     test_db.add(test_user)
     test_db.commit()
@@ -75,7 +79,7 @@ class TestLoginPageEndpoint:
 
     @pytest.mark.asyncio
     async def test_login_page_authenticated_user_redirects_default(
-        self, async_client: AsyncClient, authenticated_user
+        self, async_client: AsyncClient, authenticated_user: User
     ) -> None:
         """Test login page with authenticated user redirects to default location."""
         response = await async_client.get("/login", follow_redirects=False)
@@ -84,7 +88,7 @@ class TestLoginPageEndpoint:
 
     @pytest.mark.asyncio
     async def test_login_page_authenticated_user_redirects_to_next(
-        self, async_client: AsyncClient, authenticated_user
+        self, async_client: AsyncClient, authenticated_user: User
     ) -> None:
         """Test login page with authenticated user redirects to next parameter."""
         response = await async_client.get(
@@ -125,7 +129,7 @@ class TestLoginPageEndpoint:
 
     @pytest.mark.asyncio
     async def test_login_page_authenticated_user_with_malicious_next_redirects_safely(
-        self, async_client: AsyncClient, authenticated_user
+        self, async_client: AsyncClient, authenticated_user: User
     ) -> None:
         """Test authenticated user with malicious next param redirects safely."""
         response = await async_client.get(
@@ -157,7 +161,7 @@ class TestLoginPageEndpoint:
 
     @pytest.mark.asyncio
     async def test_login_page_authenticated_user_preserves_valid_next(
-        self, async_client: AsyncClient, authenticated_user
+        self, async_client: AsyncClient, authenticated_user: User
     ) -> None:
         """Test authenticated user with valid next parameter gets redirected correctly."""
         response = await async_client.get(

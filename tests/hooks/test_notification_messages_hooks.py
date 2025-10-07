@@ -2,16 +2,21 @@
 Tests for notification message generation with hook failures.
 """
 
+import uuid
 from typing import List, Optional
 from unittest.mock import Mock, AsyncMock
 
-from src.borgitory.services.jobs.job_manager import (
-    JobManager,
+
+from borgitory.models.job_results import JobStatusEnum
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_manager_factory import JobManagerFactory
+from borgitory.services.jobs.job_models import (
     BorgJob,
     BorgJobTask,
-    JobManagerFactory,
+    TaskStatusEnum,
+    TaskTypeEnum,
 )
-from src.borgitory.utils.datetime_utils import now_utc
+from borgitory.utils.datetime_utils import now_utc
 
 
 class TestNotificationMessagesHookFailures:
@@ -34,10 +39,10 @@ class TestNotificationMessagesHookFailures:
     def create_test_job(self, tasks: List[BorgJobTask]) -> BorgJob:
         """Helper to create test job with tasks."""
         job = BorgJob(
-            id="test-job-123",
+            id=uuid.uuid4(),
             job_type="composite",
             repository_id=1,
-            status="running",
+            status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=tasks,
         )
@@ -46,13 +51,13 @@ class TestNotificationMessagesHookFailures:
     def create_hook_task(
         self,
         hook_type: str,
-        status: str = "pending",
+        status: TaskStatusEnum = TaskStatusEnum.PENDING,
         critical_failure: bool = False,
         failed_hook_name: Optional[str] = None,
     ) -> BorgJobTask:
         """Helper to create hook task."""
         task = BorgJobTask(
-            task_type="hook",
+            task_type=TaskTypeEnum.HOOK,
             task_name=f"{hook_type}-job hooks",
             status=status,
             parameters={"hook_type": hook_type, "repository_name": "test-repo"},
@@ -65,10 +70,12 @@ class TestNotificationMessagesHookFailures:
 
         return task
 
-    def create_backup_task(self, status: str = "pending") -> BorgJobTask:
+    def create_backup_task(
+        self, status: TaskStatusEnum = TaskStatusEnum.PENDING
+    ) -> BorgJobTask:
         """Helper to create backup task."""
         return BorgJobTask(
-            task_type="backup",
+            task_type=TaskTypeEnum.BACKUP,
             task_name="Backup repository",
             status=status,
             parameters={"repository_name": "test-repo"},
@@ -79,19 +86,19 @@ class TestNotificationMessagesHookFailures:
         # Create job with critical hook failure
         failed_hook_task = self.create_hook_task(
             "pre",
-            status="failed",
+            status=TaskStatusEnum.FAILED,
             critical_failure=True,
             failed_hook_name="Database Backup",
         )
-        backup_task = self.create_backup_task(status="skipped")
-        post_hook_task = self.create_hook_task("post", status="skipped")
+        backup_task = self.create_backup_task(status=TaskStatusEnum.SKIPPED)
+        post_hook_task = self.create_hook_task("post", status=TaskStatusEnum.SKIPPED)
 
         tasks = [failed_hook_task, backup_task, post_hook_task]
         job = self.create_test_job(tasks)
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
 
         # Verify critical hook failure message
@@ -99,23 +106,23 @@ class TestNotificationMessagesHookFailures:
         assert "critical hook failure" in message.lower()
         assert "Database Backup" in message
         assert "Tasks Completed: 0, Skipped: 2, Total: 3" in message
-        assert "test-job-123" in message
+        assert str(job.id) in message
         assert msg_type == "error"
         assert priority == 1  # HIGH priority
 
     def test_backup_failure_notification_message(self) -> None:
         """Test notification message for backup task failure."""
         # Create job with backup failure
-        pre_hook_task = self.create_hook_task("pre", status="completed")
-        failed_backup_task = self.create_backup_task(status="failed")
-        post_hook_task = self.create_hook_task("post", status="skipped")
+        pre_hook_task = self.create_hook_task("pre", status=TaskStatusEnum.COMPLETED)
+        failed_backup_task = self.create_backup_task(status=TaskStatusEnum.FAILED)
+        post_hook_task = self.create_hook_task("post", status=TaskStatusEnum.SKIPPED)
 
         tasks = [pre_hook_task, failed_backup_task, post_hook_task]
         job = self.create_test_job(tasks)
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
 
         # Verify backup failure message
@@ -128,16 +135,18 @@ class TestNotificationMessagesHookFailures:
     def test_non_critical_hook_failure_notification_message(self) -> None:
         """Test notification message for non-critical hook failure."""
         # Create job with non-critical hook failure
-        pre_hook_task = self.create_hook_task("pre", status="completed")
-        backup_task = self.create_backup_task(status="completed")
-        failed_post_hook_task = self.create_hook_task("post", status="failed")
+        pre_hook_task = self.create_hook_task("pre", status=TaskStatusEnum.COMPLETED)
+        backup_task = self.create_backup_task(status=TaskStatusEnum.COMPLETED)
+        failed_post_hook_task = self.create_hook_task(
+            "post", status=TaskStatusEnum.FAILED
+        )
 
         tasks = [pre_hook_task, backup_task, failed_post_hook_task]
         job = self.create_test_job(tasks)
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
 
         # Verify warning message for non-critical failure
@@ -151,16 +160,16 @@ class TestNotificationMessagesHookFailures:
     def test_successful_job_notification_message(self) -> None:
         """Test notification message for successful job."""
         # Create job with all successful tasks
-        pre_hook_task = self.create_hook_task("pre", status="completed")
-        backup_task = self.create_backup_task(status="completed")
-        post_hook_task = self.create_hook_task("post", status="completed")
+        pre_hook_task = self.create_hook_task("pre", status=TaskStatusEnum.COMPLETED)
+        backup_task = self.create_backup_task(status=TaskStatusEnum.COMPLETED)
+        post_hook_task = self.create_hook_task("post", status=TaskStatusEnum.COMPLETED)
 
         tasks = [pre_hook_task, backup_task, post_hook_task]
         job = self.create_test_job(tasks)
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
 
         # Verify success message
@@ -174,16 +183,18 @@ class TestNotificationMessagesHookFailures:
     def test_successful_job_with_skipped_tasks_notification_message(self) -> None:
         """Test notification message for successful job with some skipped tasks."""
         # Create job with successful and skipped tasks (non-critical failure scenario)
-        pre_hook_task = self.create_hook_task("pre", status="failed")  # Non-critical
-        backup_task = self.create_backup_task(status="completed")
-        post_hook_task = self.create_hook_task("post", status="skipped")
+        pre_hook_task = self.create_hook_task(
+            "pre", status=TaskStatusEnum.FAILED
+        )  # Non-critical
+        backup_task = self.create_backup_task(status=TaskStatusEnum.COMPLETED)
+        post_hook_task = self.create_hook_task("post", status=TaskStatusEnum.SKIPPED)
 
         tasks = [pre_hook_task, backup_task, post_hook_task]
         job = self.create_test_job(tasks)
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
 
         # Should be warning due to failed task
@@ -193,7 +204,7 @@ class TestNotificationMessagesHookFailures:
     def test_notification_message_with_repository_name_from_repo(self) -> None:
         """Test notification message extracts repository name from task parameters."""
         # Create job with repository name in task parameters
-        pre_hook_task = self.create_hook_task("pre", status="completed")
+        pre_hook_task = self.create_hook_task("pre", status=TaskStatusEnum.COMPLETED)
         pre_hook_task.parameters["repository_name"] = "MyBackupRepo"
 
         tasks = [pre_hook_task]
@@ -201,7 +212,9 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job, "MyBackupRepo")
+            self.job_manager.notification_executor._generate_notification_content(
+                job, "MyBackupRepo"
+            )
         )
 
         # Verify repository name is included
@@ -210,7 +223,7 @@ class TestNotificationMessagesHookFailures:
     def test_notification_message_unknown_repository(self) -> None:
         """Test notification message with unknown repository name."""
         # Create job without repository name
-        pre_hook_task = self.create_hook_task("pre", status="completed")
+        pre_hook_task = self.create_hook_task("pre", status=TaskStatusEnum.COMPLETED)
         del pre_hook_task.parameters["repository_name"]
 
         tasks = [pre_hook_task]
@@ -218,7 +231,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
 
         # Verify fallback to "Unknown"
@@ -227,15 +240,17 @@ class TestNotificationMessagesHookFailures:
     def test_notification_message_multiple_failed_task_types(self) -> None:
         """Test notification message with multiple failed task types."""
         # Create job with multiple different failed tasks
-        failed_hook_task = self.create_hook_task("pre", status="failed")
-        completed_backup_task = self.create_backup_task(status="completed")
-        failed_post_hook_task = self.create_hook_task("post", status="failed")
+        failed_hook_task = self.create_hook_task("pre", status=TaskStatusEnum.FAILED)
+        completed_backup_task = self.create_backup_task(status=TaskStatusEnum.COMPLETED)
+        failed_post_hook_task = self.create_hook_task(
+            "post", status=TaskStatusEnum.FAILED
+        )
 
         # Add a different task type
         notification_task = BorgJobTask(
-            task_type="notification",
+            task_type=TaskTypeEnum.NOTIFICATION,
             task_name="Send notification",
-            status="failed",
+            status=TaskStatusEnum.FAILED,
             parameters={},
         )
 
@@ -249,7 +264,7 @@ class TestNotificationMessagesHookFailures:
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
 
         # Verify multiple task types are listed
@@ -260,17 +275,17 @@ class TestNotificationMessagesHookFailures:
         """Test notification message when all tasks are skipped (edge case)."""
         # Create job where all tasks are skipped (e.g., critical pre-hook failed before any execution)
         pre_hook_task = self.create_hook_task(
-            "pre", status="failed", critical_failure=True
+            "pre", status=TaskStatusEnum.FAILED, critical_failure=True
         )
-        backup_task = self.create_backup_task(status="skipped")
-        post_hook_task = self.create_hook_task("post", status="skipped")
+        backup_task = self.create_backup_task(status=TaskStatusEnum.SKIPPED)
+        post_hook_task = self.create_hook_task("post", status=TaskStatusEnum.SKIPPED)
 
         tasks = [pre_hook_task, backup_task, post_hook_task]
         job = self.create_test_job(tasks)
 
         # Generate notification content
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
 
         # Verify critical failure message with all skipped
@@ -281,29 +296,29 @@ class TestNotificationMessagesHookFailures:
         """Test notification message priority levels for different scenarios."""
         # Test critical failure - HIGH priority
         critical_task = self.create_hook_task(
-            "pre", status="failed", critical_failure=True
+            "pre", status=TaskStatusEnum.FAILED, critical_failure=True
         )
         job = self.create_test_job([critical_task])
 
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
         assert priority == 1  # HIGH priority
 
         # Test non-critical failure - NORMAL priority
-        normal_task = self.create_hook_task("pre", status="failed")
+        normal_task = self.create_hook_task("pre", status=TaskStatusEnum.FAILED)
         job = self.create_test_job([normal_task])
 
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
         assert priority == 0  # NORMAL priority
 
         # Test success - NORMAL priority
-        success_task = self.create_hook_task("pre", status="completed")
+        success_task = self.create_hook_task("pre", status=TaskStatusEnum.COMPLETED)
         job = self.create_test_job([success_task])
 
         title, message, msg_type, priority = (
-            self.job_manager._generate_notification_content(job)
+            self.job_manager.notification_executor._generate_notification_content(job)
         )
         assert priority == 0  # NORMAL priority

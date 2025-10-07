@@ -8,6 +8,7 @@ shut down or crashed while backup jobs were running.
 import logging
 
 from borgitory.models.database import Repository
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.utils.security import secure_borg_command
 from borgitory.utils.db_session import get_db_session
@@ -72,7 +73,7 @@ class RecoveryService:
                     )
 
                     # Mark job as failed
-                    job.status = "failed"
+                    job.status = JobStatusEnum.FAILED
                     job.finished_at = now_utc()
                     job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {job.started_at})"
 
@@ -87,7 +88,7 @@ class RecoveryService:
                     )
 
                     for task in running_tasks:
-                        task.status = "failed"
+                        task.status = JobStatusEnum.FAILED
                         task.completed_at = now_utc()
                         task.error = "Task cancelled on startup - job was interrupted by application shutdown"
                         logger.info(f"  Task '{task.task_name}' marked as failed")
