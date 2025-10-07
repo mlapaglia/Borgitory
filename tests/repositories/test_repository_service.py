@@ -825,3 +825,430 @@ class TestRepositoryService:
             test_db.query(Repository).filter(Repository.name == "imported-repo").first()
         )
         assert saved_repo is not None
+
+    # List Archives Tests
+
+    @pytest.mark.asyncio
+    async def test_list_archives_success_with_multiple_archives(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful archive listing with multiple archives."""
+        from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create mock archives
+        archive1 = BorgArchive(
+            name="archive1",
+            id="id1",
+            start="2023-01-01T10:00:00",
+            end="2023-01-01T10:05:00",
+            duration=300.0,
+            original_size=1024000,  # 1MB
+            compressed_size=512000,  # 512KB
+            deduplicated_size=256000,  # 256KB
+            nfiles=100,
+        )
+        archive2 = BorgArchive(
+            name="archive2",
+            id="id2",
+            start="2023-01-02T10:00:00",
+            end="2023-01-02T10:05:00",
+            duration=300.0,
+            original_size=2048000,  # 2MB
+            compressed_size=1024000,  # 1MB
+            deduplicated_size=512000,  # 512KB
+            nfiles=200,
+        )
+
+        # Mock borg service response
+        mock_archives_response = BorgArchiveListResponse(archives=[archive1, archive2])
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.list_archives(1, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id == 1
+        assert result.repository_name == "test-repo"
+        assert len(result.archives) == 2
+        assert len(result.recent_archives) == 2
+
+        # Check first archive
+        archive_info1 = result.archives[0]
+        assert archive_info1.name == "archive1"
+        assert archive_info1.time == "2023-01-01T10:00:00"
+        assert archive_info1.formatted_time is not None
+        assert archive_info1.size_info == "1000.0 KB"  # 1024000 bytes = 1000 KB
+        assert archive_info1.stats is not None
+        assert archive_info1.stats["original_size"] == 1024000
+
+        # Check second archive
+        archive_info2 = result.archives[1]
+        assert archive_info2.name == "archive2"
+        assert archive_info2.time == "2023-01-02T10:00:00"
+        assert archive_info2.formatted_time is not None
+        assert archive_info2.size_info == "2.0 MB"  # 2048000 bytes = 2 MB
+        assert archive_info2.stats is not None
+        assert archive_info2.stats["original_size"] == 2048000
+
+        # Check recent archives are in reverse order (newest first)
+        assert result.recent_archives[0].name == "archive2"
+        assert result.recent_archives[1].name == "archive1"
+
+        mock_borg_service.list_archives.assert_called_once_with(repository)
+
+    @pytest.mark.asyncio
+    async def test_list_archives_success_with_no_archives(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful archive listing with no archives."""
+        from borgitory.models.borg_info import BorgArchiveListResponse
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "empty-repo"
+        repository.path = "/test/empty-repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Mock empty archives response
+        mock_archives_response = BorgArchiveListResponse(archives=[])
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.list_archives(1, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id == 1
+        assert result.repository_name == "empty-repo"
+        assert len(result.archives) == 0
+        assert len(result.recent_archives) == 0
+        assert result.error_message is None
+
+        mock_borg_service.list_archives.assert_called_once_with(repository)
+
+    @pytest.mark.asyncio
+    async def test_list_archives_repository_not_found(
+        self,
+        repository_service: RepositoryService,
+        test_db: Session,
+    ) -> None:
+        """Test archive listing when repository is not found in database."""
+        # Act
+        result = await repository_service.list_archives(999, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.repository_id == 999
+        assert result.repository_name == "Unknown"
+        assert len(result.archives) == 0
+        assert len(result.recent_archives) == 0
+        assert result.error_message == "Repository not found"
+
+    @pytest.mark.asyncio
+    async def test_list_archives_borg_service_exception(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test archive listing when borg service raises an exception."""
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Mock borg service to raise exception
+        mock_borg_service.list_archives.side_effect = Exception("Borg service error")
+
+        # Act
+        result = await repository_service.list_archives(1, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.repository_id == 1
+        assert result.repository_name == "Unknown"
+        assert len(result.archives) == 0
+        assert len(result.recent_archives) == 0
+        assert result.error_message is not None
+        assert "Error loading archives: Borg service error" in result.error_message
+
+        mock_borg_service.list_archives.assert_called_once_with(repository)
+
+    @pytest.mark.asyncio
+    async def test_list_archives_archive_size_formatting(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test archive size formatting for different sizes."""
+        from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create archives with different sizes
+        archives = [
+            BorgArchive(
+                name="small",
+                id="id1",
+                start="2023-01-01T10:00:00",
+                end="2023-01-01T10:05:00",
+                duration=300.0,
+                original_size=500,  # 500 bytes
+            ),
+            BorgArchive(
+                name="medium",
+                id="id2",
+                start="2023-01-02T10:00:00",
+                end="2023-01-02T10:05:00",
+                duration=300.0,
+                original_size=1048576,  # 1 MB
+            ),
+            BorgArchive(
+                name="large",
+                id="id3",
+                start="2023-01-03T10:00:00",
+                end="2023-01-03T10:05:00",
+                duration=300.0,
+                original_size=1073741824,  # 1 GB
+            ),
+            BorgArchive(
+                name="huge",
+                id="id4",
+                start="2023-01-04T10:00:00",
+                end="2023-01-04T10:05:00",
+                duration=300.0,
+                original_size=1099511627776,  # 1 TB
+            ),
+        ]
+
+        mock_archives_response = BorgArchiveListResponse(archives=archives)
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.list_archives(1, test_db)
+
+        # Assert
+        assert result.success is True
+        assert len(result.archives) == 4
+
+        # Check size formatting
+        assert result.archives[0].size_info == "500.0 B"  # 500 bytes
+        assert result.archives[1].size_info == "1.0 MB"  # 1 MB
+        assert result.archives[2].size_info == "1.0 GB"  # 1 GB
+        assert result.archives[3].size_info == "1.0 TB"  # 1 TB
+
+    @pytest.mark.asyncio
+    async def test_list_archives_archive_with_no_size(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test archive listing with archive that has no size information."""
+        from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create archive with no size information
+        archive = BorgArchive(
+            name="no-size-archive",
+            id="id1",
+            start="2023-01-01T10:00:00",
+            end="2023-01-01T10:05:00",
+            duration=300.0,
+            original_size=None,  # No size information
+        )
+
+        mock_archives_response = BorgArchiveListResponse(archives=[archive])
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.list_archives(1, test_db)
+
+        # Assert
+        assert result.success is True
+        assert len(result.archives) == 1
+
+        archive_info = result.archives[0]
+        assert archive_info.name == "no-size-archive"
+        assert archive_info.time == "2023-01-01T10:00:00"
+        assert archive_info.formatted_time is not None
+        assert archive_info.size_info is None  # No size info should be set
+        assert archive_info.stats is None  # No stats should be set
+
+    @pytest.mark.asyncio
+    async def test_list_archives_recent_archives_limit(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test that recent archives are limited to 10 and in reverse order."""
+        from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create 15 archives
+        archives = []
+        for i in range(15):
+            archive = BorgArchive(
+                name=f"archive{i:02d}",
+                id=f"id{i}",
+                start=f"2023-01-{i + 1:02d}T10:00:00",
+                end=f"2023-01-{i + 1:02d}T10:05:00",
+                duration=300.0,
+                original_size=1024,
+            )
+            archives.append(archive)
+
+        mock_archives_response = BorgArchiveListResponse(archives=archives)
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.list_archives(1, test_db)
+
+        # Assert
+        assert result.success is True
+        assert len(result.archives) == 15  # All archives
+        assert len(result.recent_archives) == 10  # Limited to 10
+
+        # Check that recent archives are the last 10 in reverse order
+        expected_recent_names = [f"archive{i:02d}" for i in range(14, 4, -1)]
+        actual_recent_names = [arch.name for arch in result.recent_archives]
+        assert actual_recent_names == expected_recent_names
+
+    @pytest.mark.asyncio
+    async def test_list_archives_archive_time_formatting(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test archive time formatting."""
+        from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create archive with valid timestamp
+        archive = BorgArchive(
+            name="test-archive",
+            id="id1",
+            start="2023-01-01T10:30:45",  # Valid ISO format
+            end="2023-01-01T10:35:45",
+            duration=300.0,
+            original_size=1024,
+        )
+
+        mock_archives_response = BorgArchiveListResponse(archives=[archive])
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.list_archives(1, test_db)
+
+        # Assert
+        assert result.success is True
+        assert len(result.archives) == 1
+
+        archive_info = result.archives[0]
+        assert archive_info.name == "test-archive"
+        assert archive_info.time == "2023-01-01T10:30:45"
+        assert archive_info.formatted_time is not None
+        assert archive_info.formatted_time != archive_info.time  # Should be formatted
+
+    @pytest.mark.asyncio
+    async def test_list_archives_archive_invalid_time(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test archive with invalid time format falls back to original time."""
+        from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create archive with invalid timestamp
+        archive = BorgArchive(
+            name="invalid-time-archive",
+            id="id1",
+            start="invalid-timestamp",  # Invalid format
+            end="2023-01-01T10:35:45",
+            duration=300.0,
+            original_size=1024,
+        )
+
+        mock_archives_response = BorgArchiveListResponse(archives=[archive])
+        mock_borg_service.list_archives.return_value = mock_archives_response
+
+        # Act
+        result = await repository_service.list_archives(1, test_db)
+
+        # Assert
+        assert result.success is True
+        assert len(result.archives) == 1
+
+        archive_info = result.archives[0]
+        assert archive_info.name == "invalid-time-archive"
+        assert archive_info.time == "invalid-timestamp"
+        assert (
+            archive_info.formatted_time == "invalid-timestamp"
+        )  # Falls back to original
