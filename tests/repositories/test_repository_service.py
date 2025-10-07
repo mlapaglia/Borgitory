@@ -29,6 +29,7 @@ class TestRepositoryService:
         mock.verify_repository_access = AsyncMock()
         mock.scan_for_repositories = AsyncMock()
         mock.list_archives = AsyncMock()
+        mock.list_archive_directory_contents = AsyncMock()
         return mock
 
     @pytest.fixture
@@ -1252,3 +1253,643 @@ class TestRepositoryService:
         assert (
             archive_info.formatted_time == "invalid-timestamp"
         )  # Falls back to original
+
+    # Get Directories Tests
+
+    @pytest.mark.asyncio
+    async def test_get_directories_success_with_directories_only(
+        self,
+        repository_service: RepositoryService,
+        mock_file_service: Mock,
+    ) -> None:
+        """Test successful directory listing with directories only."""
+        from borgitory.models.repository_dtos import DirectoryListingRequest
+        from borgitory.utils.secure_path import DirectoryInfo
+
+        # Arrange
+        request = DirectoryListingRequest(
+            path="/test/path",
+            include_files=False,
+            max_items=1000,
+        )
+
+        # Mock directory data
+        mock_directory_data = [
+            DirectoryInfo(
+                name="dir1",
+                path="/test/path/dir1",
+                is_borg_repo=False,
+                is_borg_cache=False,
+                has_permission_error=False,
+            ),
+            DirectoryInfo(
+                name="dir2",
+                path="/test/path/dir2",
+                is_borg_repo=True,
+                is_borg_cache=False,
+                has_permission_error=False,
+            ),
+            DirectoryInfo(
+                name="dir3",
+                path="/test/path/dir3",
+                is_borg_repo=False,
+                is_borg_cache=True,
+                has_permission_error=False,
+            ),
+        ]
+
+        with (
+            patch(
+                "borgitory.services.repositories.repository_service.secure_exists",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.secure_isdir",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.get_directory_listing",
+                return_value=mock_directory_data,
+            ),
+        ):
+            # Act
+            result = await repository_service.get_directories(request)
+
+            # Assert
+            assert result.success is True
+            assert result.path == "/test/path"
+            assert result.directories == ["dir1", "dir2", "dir3"]
+            assert result.error_message is None
+
+    @pytest.mark.asyncio
+    async def test_get_directories_success_with_files_included(
+        self,
+        repository_service: RepositoryService,
+        mock_file_service: Mock,
+    ) -> None:
+        """Test successful directory listing with files included."""
+        from borgitory.models.repository_dtos import DirectoryListingRequest
+        from borgitory.utils.secure_path import DirectoryInfo
+
+        # Arrange
+        request = DirectoryListingRequest(
+            path="/test/path",
+            include_files=True,
+            max_items=1000,
+        )
+
+        # Mock directory data with files
+        mock_directory_data = [
+            DirectoryInfo(
+                name="dir1",
+                path="/test/path/dir1",
+                is_borg_repo=False,
+                is_borg_cache=False,
+                has_permission_error=False,
+            ),
+            DirectoryInfo(
+                name="file1.txt",
+                path="/test/path/file1.txt",
+                is_borg_repo=False,
+                is_borg_cache=False,
+                has_permission_error=False,
+            ),
+            DirectoryInfo(
+                name="file2.log",
+                path="/test/path/file2.log",
+                is_borg_repo=False,
+                is_borg_cache=False,
+                has_permission_error=False,
+            ),
+        ]
+
+        with (
+            patch(
+                "borgitory.services.repositories.repository_service.secure_exists",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.secure_isdir",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.get_directory_listing",
+                return_value=mock_directory_data,
+            ),
+        ):
+            # Act
+            result = await repository_service.get_directories(request)
+
+            # Assert
+            assert result.success is True
+            assert result.path == "/test/path"
+            assert result.directories == ["dir1", "file1.txt", "file2.log"]
+            assert result.error_message is None
+
+    @pytest.mark.asyncio
+    async def test_get_directories_success_with_max_items_limit(
+        self,
+        repository_service: RepositoryService,
+        mock_file_service: Mock,
+    ) -> None:
+        """Test successful directory listing with max_items limit."""
+        from borgitory.models.repository_dtos import DirectoryListingRequest
+        from borgitory.utils.secure_path import DirectoryInfo
+
+        # Arrange
+        request = DirectoryListingRequest(
+            path="/test/path",
+            include_files=False,
+            max_items=2,  # Limit to 2 items
+        )
+
+        # Mock directory data with more items than limit
+        mock_directory_data = [
+            DirectoryInfo(
+                name="dir1",
+                path="/test/path/dir1",
+                is_borg_repo=False,
+                is_borg_cache=False,
+                has_permission_error=False,
+            ),
+            DirectoryInfo(
+                name="dir2",
+                path="/test/path/dir2",
+                is_borg_repo=False,
+                is_borg_cache=False,
+                has_permission_error=False,
+            ),
+            DirectoryInfo(
+                name="dir3",
+                path="/test/path/dir3",
+                is_borg_repo=False,
+                is_borg_cache=False,
+                has_permission_error=False,
+            ),
+        ]
+
+        with (
+            patch(
+                "borgitory.services.repositories.repository_service.secure_exists",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.secure_isdir",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.get_directory_listing",
+                return_value=mock_directory_data,
+            ),
+        ):
+            # Act
+            result = await repository_service.get_directories(request)
+
+            # Assert
+            assert result.success is True
+            assert result.path == "/test/path"
+            assert len(result.directories) == 2  # Limited to max_items
+            assert result.directories == ["dir1", "dir2"]  # First 2 items
+            assert result.error_message is None
+
+    @pytest.mark.asyncio
+    async def test_get_directories_path_not_exists(
+        self,
+        repository_service: RepositoryService,
+        mock_file_service: Mock,
+    ) -> None:
+        """Test directory listing when path does not exist."""
+        from borgitory.models.repository_dtos import DirectoryListingRequest
+
+        # Arrange
+        request = DirectoryListingRequest(
+            path="/nonexistent/path",
+            include_files=False,
+            max_items=1000,
+        )
+
+        with patch(
+            "borgitory.services.repositories.repository_service.secure_exists",
+            return_value=False,
+        ):
+            # Act
+            result = await repository_service.get_directories(request)
+
+            # Assert
+            assert result.success is True  # Still successful, just empty
+            assert result.path == "/nonexistent/path"
+            assert result.directories == []
+            assert result.error_message is None
+
+    @pytest.mark.asyncio
+    async def test_get_directories_path_not_directory(
+        self,
+        repository_service: RepositoryService,
+        mock_file_service: Mock,
+    ) -> None:
+        """Test directory listing when path is not a directory."""
+        from borgitory.models.repository_dtos import DirectoryListingRequest
+
+        # Arrange
+        request = DirectoryListingRequest(
+            path="/test/file.txt",
+            include_files=False,
+            max_items=1000,
+        )
+
+        with (
+            patch(
+                "borgitory.services.repositories.repository_service.secure_exists",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.secure_isdir",
+                return_value=False,
+            ),
+        ):
+            # Act
+            result = await repository_service.get_directories(request)
+
+            # Assert
+            assert result.success is True  # Still successful, just empty
+            assert result.path == "/test/file.txt"
+            assert result.directories == []
+            assert result.error_message is None
+
+    @pytest.mark.asyncio
+    async def test_get_directories_exception_handling(
+        self,
+        repository_service: RepositoryService,
+        mock_file_service: Mock,
+    ) -> None:
+        """Test directory listing exception handling."""
+        from borgitory.models.repository_dtos import DirectoryListingRequest
+
+        # Arrange
+        request = DirectoryListingRequest(
+            path="/test/path",
+            include_files=False,
+            max_items=1000,
+        )
+
+        with (
+            patch(
+                "borgitory.services.repositories.repository_service.secure_exists",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.secure_isdir",
+                return_value=True,
+            ),
+            patch(
+                "borgitory.services.repositories.repository_service.get_directory_listing",
+                side_effect=Exception("Permission denied"),
+            ),
+        ):
+            # Act
+            result = await repository_service.get_directories(request)
+
+            # Assert
+            assert result.success is False
+            assert result.path == "/test/path"
+            assert result.directories == []
+            assert result.error_message is not None
+            assert (
+                "Failed to list directories: Permission denied" in result.error_message
+            )
+
+    # Get Archive Contents Tests
+
+    @pytest.mark.asyncio
+    async def test_get_archive_contents_success(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful archive contents retrieval."""
+        from borgitory.models.repository_dtos import ArchiveContentsRequest
+        from borgitory.services.archives.archive_models import ArchiveEntry
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create mock archive entries
+        mock_entries = [
+            ArchiveEntry(
+                path="documents/file1.txt",
+                name="file1.txt",
+                type="f",
+                size=1024,
+                isdir=False,
+                mtime="2023-01-01T10:00:00",
+            ),
+            ArchiveEntry(
+                path="documents/subdir",
+                name="subdir",
+                type="d",
+                size=0,
+                isdir=True,
+                mtime="2023-01-01T09:00:00",
+            ),
+            ArchiveEntry(
+                path="documents/file2.pdf",
+                name="file2.pdf",
+                type="f",
+                size=2048,
+                isdir=False,
+                mtime="2023-01-01T11:00:00",
+            ),
+        ]
+
+        mock_borg_service.list_archive_directory_contents.return_value = mock_entries
+
+        request = ArchiveContentsRequest(
+            repository_id=1,
+            archive_name="test-archive",
+            path="documents",
+        )
+
+        # Act
+        result = await repository_service.get_archive_contents(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id == 1
+        assert result.archive_name == "test-archive"
+        assert result.path == "documents"
+        assert len(result.items) == 3
+        assert result.breadcrumb_parts == ["documents"]
+
+        # Check first item
+        item1 = result.items[0]
+        assert item1.name == "file1.txt"
+        assert item1.type == "f"
+        assert item1.path == "documents/file1.txt"
+        assert item1.size == 1024
+        assert item1.modified == "2023-01-01T10:00:00"
+
+        # Check second item (directory)
+        item2 = result.items[1]
+        assert item2.name == "subdir"
+        assert item2.type == "d"
+        assert item2.path == "documents/subdir"
+        assert item2.size == 0
+        assert item2.modified == "2023-01-01T09:00:00"
+
+        # Check third item
+        item3 = result.items[2]
+        assert item3.name == "file2.pdf"
+        assert item3.type == "f"
+        assert item3.path == "documents/file2.pdf"
+        assert item3.size == 2048
+        assert item3.modified == "2023-01-01T11:00:00"
+
+        mock_borg_service.list_archive_directory_contents.assert_called_once_with(
+            repository, "test-archive", "documents"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_archive_contents_success_root_path(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful archive contents retrieval for root path."""
+        from borgitory.models.repository_dtos import ArchiveContentsRequest
+        from borgitory.services.archives.archive_models import ArchiveEntry
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create mock archive entries for root
+        mock_entries = [
+            ArchiveEntry(
+                path="documents",
+                name="documents",
+                type="d",
+                size=0,
+                isdir=True,
+                mtime="2023-01-01T10:00:00",
+            ),
+            ArchiveEntry(
+                path="images",
+                name="images",
+                type="d",
+                size=0,
+                isdir=True,
+                mtime="2023-01-01T11:00:00",
+            ),
+        ]
+
+        mock_borg_service.list_archive_directory_contents.return_value = mock_entries
+
+        request = ArchiveContentsRequest(
+            repository_id=1,
+            archive_name="test-archive",
+            path="",  # Root path
+        )
+
+        # Act
+        result = await repository_service.get_archive_contents(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id == 1
+        assert result.archive_name == "test-archive"
+        assert result.path == ""
+        assert len(result.items) == 2
+        assert result.breadcrumb_parts == []  # Empty for root path
+
+        mock_borg_service.list_archive_directory_contents.assert_called_once_with(
+            repository, "test-archive", ""
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_archive_contents_success_nested_path(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test successful archive contents retrieval for nested path."""
+        from borgitory.models.repository_dtos import ArchiveContentsRequest
+        from borgitory.services.archives.archive_models import ArchiveEntry
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Create mock archive entries for nested path
+        mock_entries = [
+            ArchiveEntry(
+                path="documents/work/project1/file1.txt",
+                name="file1.txt",
+                type="f",
+                size=1024,
+                isdir=False,
+                mtime="2023-01-01T10:00:00",
+            ),
+        ]
+
+        mock_borg_service.list_archive_directory_contents.return_value = mock_entries
+
+        request = ArchiveContentsRequest(
+            repository_id=1,
+            archive_name="test-archive",
+            path="documents/work/project1",
+        )
+
+        # Act
+        result = await repository_service.get_archive_contents(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id == 1
+        assert result.archive_name == "test-archive"
+        assert result.path == "documents/work/project1"
+        assert len(result.items) == 1
+        assert result.breadcrumb_parts == ["documents", "work", "project1"]
+
+        mock_borg_service.list_archive_directory_contents.assert_called_once_with(
+            repository, "test-archive", "documents/work/project1"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_archive_contents_repository_not_found(
+        self,
+        repository_service: RepositoryService,
+        test_db: Session,
+    ) -> None:
+        """Test archive contents when repository is not found."""
+        from borgitory.models.repository_dtos import ArchiveContentsRequest
+
+        request = ArchiveContentsRequest(
+            repository_id=999,
+            archive_name="test-archive",
+            path="documents",
+        )
+
+        # Act
+        result = await repository_service.get_archive_contents(request, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.repository_id == 999
+        assert result.archive_name == "test-archive"
+        assert result.path == "documents"
+        assert len(result.items) == 0
+        assert result.breadcrumb_parts == []
+        assert result.error_message == "Repository not found"
+
+    @pytest.mark.asyncio
+    async def test_get_archive_contents_borg_service_exception(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test archive contents when borg service raises an exception."""
+        from borgitory.models.repository_dtos import ArchiveContentsRequest
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Mock borg service to raise exception
+        mock_borg_service.list_archive_directory_contents.side_effect = Exception(
+            "Archive not found"
+        )
+
+        request = ArchiveContentsRequest(
+            repository_id=1,
+            archive_name="nonexistent-archive",
+            path="documents",
+        )
+
+        # Act
+        result = await repository_service.get_archive_contents(request, test_db)
+
+        # Assert
+        assert result.success is False
+        assert result.repository_id == 1
+        assert result.archive_name == "nonexistent-archive"
+        assert result.path == "documents"
+        assert len(result.items) == 0
+        assert result.breadcrumb_parts == []
+        assert result.error_message is not None
+        assert (
+            "Error loading directory contents: Archive not found"
+            in result.error_message
+        )
+
+        mock_borg_service.list_archive_directory_contents.assert_called_once_with(
+            repository, "nonexistent-archive", "documents"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_archive_contents_empty_archive(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: Session,
+    ) -> None:
+        """Test archive contents when archive is empty."""
+        from borgitory.models.repository_dtos import ArchiveContentsRequest
+
+        # Arrange - create repository in database
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        test_db.commit()
+
+        # Mock empty archive contents
+        mock_borg_service.list_archive_directory_contents.return_value = []
+
+        request = ArchiveContentsRequest(
+            repository_id=1,
+            archive_name="empty-archive",
+            path="documents",
+        )
+
+        # Act
+        result = await repository_service.get_archive_contents(request, test_db)
+
+        # Assert
+        assert result.success is True
+        assert result.repository_id == 1
+        assert result.archive_name == "empty-archive"
+        assert result.path == "documents"
+        assert len(result.items) == 0
+        assert result.breadcrumb_parts == ["documents"]
+        assert result.error_message is None
+
+        mock_borg_service.list_archive_directory_contents.assert_called_once_with(
+            repository, "empty-archive", "documents"
+        )
