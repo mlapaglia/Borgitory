@@ -168,7 +168,6 @@ class RepositoryService:
             if request.keyfile and request.keyfile.filename:
                 keyfile_result = await self._save_keyfile(request.name, request.keyfile)
                 if not keyfile_result["success"]:
-                    # Type narrowing: if success is False, it's a KeyfileErrorResult
                     error_msg = keyfile_result.get("error")
                     return RepositoryOperationResult(
                         success=False,
@@ -176,11 +175,10 @@ class RepositoryService:
                         if error_msg
                         else "Unknown keyfile error",
                     )
-                # Type narrowing: if success is True, it's a KeyfileSuccessResult
+
                 path_value = keyfile_result.get("path")
                 keyfile_path = str(path_value) if path_value else None
 
-            # Verify repository access BEFORE saving to database
             verification_successful = await self.borg_service.verify_repository_access(
                 repo_path=request.path,
                 passphrase=request.passphrase,
@@ -189,7 +187,6 @@ class RepositoryService:
             )
 
             if not verification_successful:
-                # Clean up keyfile if it was saved
                 if keyfile_path:
                     await self.file_service.remove_file(keyfile_path)
 
@@ -198,18 +195,15 @@ class RepositoryService:
                     error_message="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
                 )
 
-            # Create and save repository to database only after successful verification
             db_repo = Repository()
             db_repo.name = request.name
             db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
             db_repo.cache_dir = request.cache_dir
 
-            # Set encryption type if provided
             if request.encryption_type:
                 db_repo.encryption_type = request.encryption_type
 
-            # Set keyfile content if provided
             if request.keyfile_content:
                 db_repo.set_keyfile_content(request.keyfile_content)
 
@@ -217,7 +211,6 @@ class RepositoryService:
             db.commit()
             db.refresh(db_repo)
 
-            # Try to get archive count for logging (non-critical)
             try:
                 archives_response = await self.borg_service.list_archives(db_repo)
                 logger.info(
@@ -237,12 +230,10 @@ class RepositoryService:
 
         except Exception as e:
             db.rollback()
-            # Clean up keyfile if it was saved
             if keyfile_path is not None:
                 try:
                     await self.file_service.remove_file(keyfile_path)
                 except Exception:
-                    # Ignore cleanup errors during exception handling
                     pass
             error_message = f"Failed to import repository: {str(e)}"
             logger.error(error_message)
@@ -339,7 +330,7 @@ class RepositoryService:
                 )
 
             directory_data = get_directory_listing(
-                request.path, include_files=request.include_files
+                request.path, self.file_service, include_files=request.include_files
             )
 
             if request.max_items > 0:
@@ -971,7 +962,7 @@ class RepositoryService:
                     directories = []
                 else:
                     directories = get_directory_listing(
-                        path, include_files=include_files
+                        path, self.file_service, include_files=include_files
                     )
 
             # Filter directories based on search term
