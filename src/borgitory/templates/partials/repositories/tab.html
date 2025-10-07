@@ -1,25 +1,33 @@
 <!-- Repositories Tab -->
 <div id="tab-repositories" class="tab-content">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Repository Management</h2>
-        
+        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+            Repository Management
+        </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Repository Forms -->
             <div class="border dark:border-gray-600 rounded-lg p-4">
                 <!-- Hidden radio buttons for tab state -->
-                <input type="radio" id="tab-create" name="repo-tab" class="hidden peer/create" checked>
-                <input type="radio" id="tab-import" name="repo-tab" class="hidden peer/import">
-                
+                <input type="radio"
+                       id="tab-create"
+                       name="repo-tab"
+                       class="hidden peer/create"
+                       checked>
+                <input type="radio"
+                       id="tab-import"
+                       name="repo-tab"
+                       class="hidden peer/import">
                 <!-- Tab buttons -->
                 <div class="flex mb-4 border-b dark:border-gray-600">
-                    <label for="tab-create" class="cursor-pointer px-4 py-2 text-sm font-medium peer-checked/create:text-blue-600 peer-checked/create:border-b-2 peer-checked/create:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                    <label for="tab-create"
+                           class="cursor-pointer px-4 py-2 text-sm font-medium peer-checked/create:text-blue-600 peer-checked/create:border-b-2 peer-checked/create:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
                         Create New
                     </label>
-                    <label for="tab-import" class="cursor-pointer px-4 py-2 text-sm font-medium peer-checked/import:text-blue-600 peer-checked/import:border-b-2 peer-checked/import:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                    <label for="tab-import"
+                           class="cursor-pointer px-4 py-2 text-sm font-medium peer-checked/import:text-blue-600 peer-checked/import:border-b-2 peer-checked/import:border-blue-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
                         Import Existing
                     </label>
                 </div>
-                
                 <!-- Tab content -->
                 <div class="peer-checked/create:block peer-checked/import:hidden">
                     {% include "partials/repositories/create/form_create.html" %}
@@ -28,7 +36,6 @@
                     {% include "partials/repositories/import/form_import.html" %}
                 </div>
             </div>
-
             {% include "partials/repositories/list.html" %}
         </div>
     </div>

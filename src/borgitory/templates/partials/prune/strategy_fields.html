@@ -1,12 +1,16 @@
 <!-- Dynamic Strategy Fields -->
 {% if strategy == "simple" %}
-<div id="simple-strategy" class="ml-6 flex items-center space-x-2">
-    <span class="text-sm text-gray-900 dark:text-gray-100">Keep archives within:</span>
-    <input type="number" name="keep_within_days" value="30" min="1" class="w-20 input-modern">
-    <span class="text-sm text-gray-900 dark:text-gray-100">days</span>
-</div>
+    <div id="simple-strategy" class="ml-6 flex items-center space-x-2">
+        <span class="text-sm text-gray-900 dark:text-gray-100">Keep archives within:</span>
+        <input type="number"
+               name="keep_within_days"
+               value="30"
+               min="1"
+               class="w-20 input-modern">
+        <span class="text-sm text-gray-900 dark:text-gray-100">days</span>
+    </div>
 {% elif strategy == "advanced" %}
-<div id="advanced-strategy" class="ml-6 space-y-2">
-    {% include 'partials/prune/retention_fields.html' %}
-</div>
+    <div id="advanced-strategy" class="ml-6 space-y-2">
+        {% include 'partials/prune/retention_fields.html' %}
+    </div>
 {% endif %}

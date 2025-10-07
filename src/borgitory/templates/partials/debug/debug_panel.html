@@ -3,8 +3,12 @@
     <!-- System Information -->
     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                </path>
             </svg>
             System Information
         </h3>
@@ -14,65 +18,70 @@
                     <span class="font-semibold">✗ System Error:</span> {{ debug_info.system.error }}
                 </div>
             {% else %}
-            <!-- Main platform info (always visible) -->
-            <div class="flex justify-between">
-                <span class="text-gray-600 dark:text-gray-400">Kernel:</span>
-                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.release }}</span>
-            </div>
-            
-            <!-- Expandable details section -->
-            <div class="mt-3">
-                <button 
-                    class="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium"
-                    onclick="toggleSystemDetails()"
-                    id="system-toggle-btn"
-                >
-                    <svg id="system-chevron" class="w-4 h-4 mr-1 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                    Show Details
-                </button>
-                
-                <div id="system-details" class="hidden mt-2 pl-5 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">System:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.system }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Platform:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.platform }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Version:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.version }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Architecture:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.architecture }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Processor:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.processor or 'Unknown' }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Hostname:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.hostname }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Python Executable:</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100 break-all">{{ debug_info.system.python_executable }}</span>
+                <!-- Main platform info (always visible) -->
+                <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Kernel:</span>
+                    <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.release }}</span>
+                </div>
+                <!-- Expandable details section -->
+                <div class="mt-3">
+                    <button class="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium"
+                            onclick="toggleSystemDetails()"
+                            id="system-toggle-btn">
+                        <svg id="system-chevron"
+                             class="w-4 h-4 mr-1 transform transition-transform duration-200"
+                             fill="none"
+                             stroke="currentColor"
+                             viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
+                            </path>
+                        </svg>
+                        Show Details
+                    </button>
+                    <div id="system-details"
+                         class="hidden mt-2 pl-5 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">System:</span>
+                            <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.system }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Platform:</span>
+                            <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.platform }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Version:</span>
+                            <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.version }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Architecture:</span>
+                            <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.architecture }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Processor:</span>
+                            <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.processor or 'Unknown' }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Hostname:</span>
+                            <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.system.hostname }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Python Executable:</span>
+                            <span class="font-mono text-gray-900 dark:text-gray-100 break-all">{{ debug_info.system.python_executable }}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
             {% endif %}
         </div>
     </div>
-
     <!-- Application Information -->
     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z">
+                </path>
             </svg>
             Application Information
         </h3>
@@ -82,23 +91,26 @@
                     <span class="font-semibold">✗ Application Error:</span> {{ debug_info.application.error }}
                 </div>
             {% else %}
-            <div class="flex justify-between">
-                <span class="text-gray-600 dark:text-gray-400">Borgitory Version:</span>
-                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.application.borgitory_version }}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-gray-600 dark:text-gray-400">Working Directory:</span>
-                <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.application.working_directory }}</span>
-            </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Borgitory Version:</span>
+                    <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.application.borgitory_version }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Working Directory:</span>
+                    <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.application.working_directory }}</span>
+                </div>
             {% endif %}
         </div>
     </div>
-
     <!-- Database Information -->
     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4">
+                </path>
             </svg>
             Database Information
         </h3>
@@ -139,54 +151,64 @@
             {% endif %}
         </div>
     </div>
-
     <!-- Tool Versions -->
     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                </path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z">
+                </path>
             </svg>
             Tool Versions
         </h3>
         <div class="space-y-3 text-sm">
             <!-- Python Version (always first) -->
             {% if not debug_info.system.error %}
-            <div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600 dark:text-gray-400">Python:</span>
-                    <span class="text-green-600 font-semibold">✓ Available</span>
+                <div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Python:</span>
+                        <span class="text-green-600 font-semibold">✓ Available</span>
+                    </div>
+                    <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">
+                        {{ debug_info.system.python_version.split()[0] }}
+                    </div>
                 </div>
-                <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ debug_info.system.python_version.split()[0] }}</div>
-            </div>
             {% endif %}
-            
             <!-- Other tools -->
             {% for tool_name, tool_info in debug_info.tools.items() %}
-            <div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600 dark:text-gray-400">{{ tool_name|title }}:</span>
+                <div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">{{ tool_name|title }}:</span>
+                        {% if tool_info.accessible %}
+                            <span class="text-green-600 font-semibold">✓ Available</span>
+                        {% else %}
+                            <span class="text-red-600 font-semibold">✗ Not Available</span>
+                        {% endif %}
+                    </div>
                     {% if tool_info.accessible %}
-                        <span class="text-green-600 font-semibold">✓ Available</span>
+                        <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">
+                            {{ tool_info.version }}
+                        </div>
                     {% else %}
-                        <span class="text-red-600 font-semibold">✗ Not Available</span>
+                        <div class="text-red-600 text-xs mt-1">{{ tool_info.error }}</div>
                     {% endif %}
                 </div>
-                {% if tool_info.accessible %}
-                    <div class="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1">{{ tool_info.version }}</div>
-                {% else %}
-                    <div class="text-red-600 text-xs mt-1">{{ tool_info.error }}</div>
-                {% endif %}
-            </div>
             {% endfor %}
         </div>
     </div>
-
     <!-- Job Manager Information -->
     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z">
+                </path>
             </svg>
             Job Manager Information
         </h3>
@@ -211,12 +233,15 @@
             {% endif %}
         </div>
     </div>
-
     <!-- WSL Information -->
     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
+                </path>
             </svg>
             WSL Information
         </h3>
@@ -239,16 +264,16 @@
                     <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.wsl.default_distribution or 'None' }}</span>
                 </div>
                 {% if debug_info.wsl.wsl_kernel_version %}
-                <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Kernel Version:</span>
-                    <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.wsl.wsl_kernel_version }}</span>
-                </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Kernel Version:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.wsl.wsl_kernel_version }}</span>
+                    </div>
                 {% endif %}
                 {% if debug_info.wsl.windows_version %}
-                <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Windows Version:</span>
-                    <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.wsl.windows_version }}</span>
-                </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600 dark:text-gray-400">Windows Version:</span>
+                        <span class="font-mono text-gray-900 dark:text-gray-100">{{ debug_info.wsl.windows_version }}</span>
+                    </div>
                 {% endif %}
                 <div class="flex justify-between">
                     <span class="text-gray-600 dark:text-gray-400">Path Access:</span>
@@ -258,41 +283,42 @@
                         <span class="text-red-600 font-semibold">✗ Failed</span>
                     {% endif %}
                 </div>
-                
                 <!-- Expandable details for distributions and mount points -->
                 <div class="mt-3">
-                    <button 
-                        class="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium"
-                        onclick="toggleWSLDetails()"
-                        id="wsl-toggle-btn"
-                    >
-                        <svg id="wsl-chevron" class="w-4 h-4 mr-1 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    <button class="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium"
+                            onclick="toggleWSLDetails()"
+                            id="wsl-toggle-btn">
+                        <svg id="wsl-chevron"
+                             class="w-4 h-4 mr-1 transform transition-transform duration-200"
+                             fill="none"
+                             stroke="currentColor"
+                             viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
+                            </path>
                         </svg>
                         Show Details
                     </button>
-                    
-                    <div id="wsl-details" class="hidden mt-2 pl-5 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
+                    <div id="wsl-details"
+                         class="hidden mt-2 pl-5 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
                         {% if debug_info.wsl.installed_distributions %}
-                        <div>
-                            <span class="text-gray-600 dark:text-gray-400">Installed Distributions:</span>
-                            <div class="mt-1">
-                                {% for distro in debug_info.wsl.installed_distributions %}
-                                <span class="inline-block bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs mr-1 mb-1">{{ distro }}</span>
-                                {% endfor %}
+                            <div>
+                                <span class="text-gray-600 dark:text-gray-400">Installed Distributions:</span>
+                                <div class="mt-1">
+                                    {% for distro in debug_info.wsl.installed_distributions %}
+                                        <span class="inline-block bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs mr-1 mb-1">{{ distro }}</span>
+                                    {% endfor %}
+                                </div>
                             </div>
-                        </div>
                         {% endif %}
-                        
                         {% if debug_info.wsl.mount_points %}
-                        <div>
-                            <span class="text-gray-600 dark:text-gray-400">Mount Points:</span>
-                            <div class="mt-1">
-                                {% for mount in debug_info.wsl.mount_points %}
-                                <div class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ mount }}</div>
-                                {% endfor %}
+                            <div>
+                                <span class="text-gray-600 dark:text-gray-400">Mount Points:</span>
+                                <div class="mt-1">
+                                    {% for mount in debug_info.wsl.mount_points %}
+                                        <div class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ mount }}</div>
+                                    {% endfor %}
+                                </div>
                             </div>
-                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -304,26 +330,27 @@
         </div>
     </div>
 </div>
-
-
 <!-- Environment Variables Section -->
 <div class="mt-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-        <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+        <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2"
+             fill="none"
+             stroke="currentColor"
+             viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z">
+            </path>
         </svg>
         Environment Variables
     </h3>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         {% for key, value in debug_info.environment.items() %}
-        <div class="flex justify-between text-sm">
-            <span class="text-gray-600 dark:text-gray-400 font-mono">{{ key }}:</span>
-            <span class="font-mono text-gray-900 dark:text-gray-100 break-all ml-4">{{ value }}</span>
-        </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400 font-mono">{{ key }}:</span>
+                <span class="font-mono text-gray-900 dark:text-gray-100 break-all ml-4">{{ value }}</span>
+            </div>
         {% endfor %}
     </div>
 </div>
-
 <!-- JavaScript for expandable system details -->
 <script>
 function toggleSystemDetails() {

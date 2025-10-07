@@ -1,5 +1,4 @@
 {# Datetime formatting macros for consistent timezone handling #}
-
 {# 
   Format datetime with automatic browser timezone conversion
   Usage: {{ datetime_tz(job.started_at, "%H:%M:%S") }}
@@ -8,33 +7,30 @@
   which is injected by TimezoneAwareJinja2Templates or defaults to server timezone
 #}
 {% macro datetime_tz(dt, format_str="%Y-%m-%d %H:%M:%S", fallback="N/A") -%}
-  {%- if dt -%}
-    {{- dt | format_datetime_browser(format_str, browser_tz_offset) -}}
-  {%- else -%}
-    {{- fallback -}}
-  {%- endif -%}
+    {%- if dt -%}
+        {{- dt | format_datetime_browser(format_str, browser_tz_offset) -}}
+    {%- else -%}
+        {{- fallback -}}
+    {%- endif -%}
 {%- endmacro %}
-
 {# 
   Format datetime for time-only display (common pattern)
   Usage: {{ time_tz(job.started_at) }}
 #}
 {% macro time_tz(dt, fallback="N/A") -%}
-  {{- datetime_tz(dt, "%H:%M:%S", fallback) -}}
+    {{- datetime_tz(dt, "%H:%M:%S", fallback) -}}
 {%- endmacro %}
-
 {# 
   Format datetime for date and time display (common pattern)
   Usage: {{ datetime_full_tz(job.created_at) }}
 #}
 {% macro datetime_full_tz(dt, fallback="Unknown") -%}
-  {{- datetime_tz(dt, "%Y-%m-%d %H:%M", fallback) -}}
+    {{- datetime_tz(dt, "%Y-%m-%d %H:%M", fallback) -}}
 {%- endmacro %}
-
 {# 
   Format datetime for full timestamp display
   Usage: {{ timestamp_tz(job.started_at) }}
 #}
 {% macro timestamp_tz(dt, fallback="N/A") -%}
-  {{- datetime_tz(dt, "%Y-%m-%d %H:%M:%S", fallback) -}}
+    {{- datetime_tz(dt, "%Y-%m-%d %H:%M:%S", fallback) -}}
 {%- endmacro %}

@@ -1,28 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Borgitory - BorgBackup Manager{% endblock %}</title>
-    
-    <!-- Favicon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
-    <link rel="icon" type="image/x-icon" href="/static/favicon/favicon.ico">
-    <link rel="manifest" href="/static/favicon/site.webmanifest">
-    
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>
+            {% block title %}Borgitory - BorgBackup Manager{% endblock %}
+        </title>
+        <!-- Favicon -->
+        <link rel="apple-touch-icon"
+              sizes="180x180"
+              href="/static/favicon/apple-touch-icon.png">
+        <link rel="icon"
+              type="image/png"
+              sizes="32x32"
+              href="/static/favicon/favicon-32x32.png">
+        <link rel="icon"
+              type="image/png"
+              sizes="16x16"
+              href="/static/favicon/favicon-16x16.png">
+        <link rel="icon" type="image/x-icon" href="/static/favicon/favicon.ico">
+        <link rel="manifest" href="/static/favicon/site.webmanifest">
+        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+        <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+        <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
         tailwind.config = {
             darkMode: 'class'
         }
-    </script>
-
-    <script>
+        </script>
+        <script>
         function toggleDarkMode() {
             const html = document.documentElement;
             const isDark = html.classList.contains('dark');
@@ -64,68 +71,68 @@
             button.setAttribute('aria-expanded', 'false');
             body.classList.remove('mobile-sidebar-open');
         }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/css/modern-components.css">
-</head>
-<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
-    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <!-- Hamburger Menu Button (Mobile Only) -->
-                    <button 
-                        id="mobile-menu-button" 
-                        hx-on:click="
-                            document.getElementById('sidebar').classList.toggle('mobile-open');
-                            document.getElementById('sidebar-overlay').classList.toggle('hidden');
-                            document.getElementById('sidebar-overlay').classList.toggle('show');
-                            document.getElementById('hamburger-icon').classList.toggle('hidden');
-                            document.getElementById('close-icon').classList.toggle('hidden');
-                            document.body.classList.toggle('mobile-sidebar-open');
-                            this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');
-                        "
-                        class="lg:hidden mr-3 p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
-                        aria-expanded="false"
-                        aria-controls="mobile-sidebar"
-                    >
-                        <span class="sr-only">Open sidebar</span>
-                        <!-- Hamburger Icon -->
-                        <svg id="hamburger-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                        </svg>
-                        <!-- Close Icon (hidden by default) -->
-                        <svg id="close-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <link rel="stylesheet" href="/static/css/modern-components.css">
+    </head>
+    <body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+        <nav class="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
                     <div class="flex items-center">
-                        <img src="/static/favicon/favicon-32x32.png" alt="Borgitory Logo" class="w-8 h-8 mr-3">
-                        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Borgitory</h1>
+                        <!-- Hamburger Menu Button (Mobile Only) -->
+                        <button id="mobile-menu-button"
+                                hx-on:click=" document.getElementById('sidebar').classList.toggle('mobile-open'); document.getElementById('sidebar-overlay').classList.toggle('hidden'); document.getElementById('sidebar-overlay').classList.toggle('show'); document.getElementById('hamburger-icon').classList.toggle('hidden'); document.getElementById('close-icon').classList.toggle('hidden'); document.body.classList.toggle('mobile-sidebar-open'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); "
+                                class="lg:hidden mr-3 p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                                aria-expanded="false"
+                                aria-controls="mobile-sidebar">
+                            <span class="sr-only">Open sidebar</span>
+                            <!-- Hamburger Icon -->
+                            <svg id="hamburger-icon"
+                                 class="w-6 h-6"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16">
+                                </path>
+                            </svg>
+                            <!-- Close Icon (hidden by default) -->
+                            <svg id="close-icon"
+                                 class="w-6 h-6 hidden"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                                </path>
+                            </svg>
+                        </button>
+                        <div class="flex items-center">
+                            <img src="/static/favicon/favicon-32x32.png"
+                                 alt="Borgitory Logo"
+                                 class="w-8 h-8 mr-3">
+                            <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Borgitory</h1>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        {% if current_user %}
+                            <span class="text-sm text-gray-700 dark:text-gray-300">
+                                Welcome, <span class="font-medium">{{ current_user.username }}</span>
+                            </span>
+                            <button onclick="logout()"
+                                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors">
+                                Logout
+                            </button>
+                        {% endif %}
                     </div>
                 </div>
-                <div class="flex items-center space-x-4">
-                    {% if current_user %}
-                        <span class="text-sm text-gray-700 dark:text-gray-300">
-                            Welcome, <span class="font-medium">{{ current_user.username }}</span>
-                        </span>
-                        <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                            Logout
-                        </button>
-                    {% endif %}
-                </div>
             </div>
-        </div>
-    </nav>
-
-    <main>
-        {% block content %}{% endblock %}
-    </main>
-
-    <div id="notification-area" class="fixed top-4 right-4 z-50"></div>
-
-    <!-- Timezone Detection Script -->
-    <script>
+        </nav>
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+        <div id="notification-area" class="fixed top-4 right-4 z-50"></div>
+        <!-- Timezone Detection Script -->
+        <script>
         function getBrowserTimezoneOffset() {
             return new Date().getTimezoneOffset();
         }
@@ -143,14 +150,12 @@
         
         // Set timezone cookie when DOM is ready
         document.addEventListener('DOMContentLoaded', setupTimezoneCookie);
-    </script>
-
-    <!-- Component JavaScript Files -->
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/components/navigation.js"></script>
-    <script src="/static/js/components/jobs.js"></script>
-
-    <script>
+        </script>
+        <!-- Component JavaScript Files -->
+        <script src="/static/js/app.js"></script>
+        <script src="/static/js/components/navigation.js"></script>
+        <script src="/static/js/components/jobs.js"></script>
+        <script>
         // HTMX notification helper function
         function showHTMXNotification(message, type, targetContainer = '#notification-status') {
             // Try to use the page-specific notification container first
@@ -250,9 +255,8 @@
         });
         
         
-    </script>
-
-    <!-- Archive Contents Modal -->
-    {% include 'partials/archives/contents_modal.html' %}
-</body>
+        </script>
+        <!-- Archive Contents Modal -->
+        {% include 'partials/archives/contents_modal.html' %}
+    </body>
 </html>
