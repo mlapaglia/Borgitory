@@ -208,8 +208,7 @@ class HookExecutionService:
 
         try:
             # Prepare environment variables
-            env = os.environ.copy()
-            env.update(hook.environment_vars)
+            env = hook.environment_vars
 
             # Add job context to environment
             if context:
