@@ -264,6 +264,7 @@ class JobManager:
                 )
                 job.status = JobStatusEnum.FAILED
                 job.error = task.error
+
                 logger.error(
                     f"Composite job task {job.id} execution failed: {result.stdout.decode('utf-8')}"
                 )
