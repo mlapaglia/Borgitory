@@ -33,7 +33,7 @@
         <div class="space-y-2" id="tasks-container-{{ job.id }}" sse-swap="tasks">
             {% for task in sorted_tasks %}
                 {% set task_expanded = false %}
-                {% include 'partials/jobs/task_item_streaming.html' %}
+                {% include "partials/jobs/task_item_streaming.html" %}
             {% endfor %}
         </div>
     </div>

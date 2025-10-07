@@ -38,9 +38,9 @@
     <div id="job-details-{{ job.id }}">
         {% if expand_details %}
             {% if job.status|string == 'running' %}
-                {% include 'partials/jobs/job_details_streaming.html' %}
+                {% include "partials/jobs/job_details_streaming.html" %}
             {% else %}
-                {% include 'partials/jobs/job_details_static.html' %}
+                {% include "partials/jobs/job_details_static.html" %}
             {% endif %}
         {% endif %}
     </div>

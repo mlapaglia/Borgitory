@@ -14,7 +14,7 @@
                class="input-modern mt-1">
     </div>
     {% set retention_config = config %}
-    {% include 'partials/prune/retention_fields.html' %}
+    {% include "partials/prune/retention_fields.html" %}
     <input type="hidden" name="strategy" value="{{ config.strategy }}">
     <div class="flex space-x-2">
         <button type="submit"
