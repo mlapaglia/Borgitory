@@ -17,7 +17,7 @@ from borgitory.dependencies import (
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.config.command_runner_config import CommandRunnerConfig
 from borgitory.config.job_manager_config import JobManagerEnvironmentConfig
-from borgitory.services.jobs.job_manager import JobManagerConfig
+from borgitory.services.jobs.job_models import JobManagerConfig
 from borgitory.services.configuration_service import ConfigurationService
 from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 from borgitory.services.cloud_providers.registry import ProviderRegistry

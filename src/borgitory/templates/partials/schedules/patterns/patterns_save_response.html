@@ -1,20 +1,16 @@
 <!-- Patterns Save Response - Updates parent form and closes modal -->
-
 <!-- Close the modal -->
 <div id="modal-container" hx-swap-oob="innerHTML"></div>
-
 <!-- Update parent form fields via OOB swap -->
-<input type="hidden" 
-       name="patterns" 
+<input type="hidden"
+       name="patterns"
        value="{{ patterns_json or '' }}"
        hx-swap-oob="true"
        id="patterns_field">
-
 <!-- Update patterns button text via OOB swap -->
 <span hx-swap-oob="innerHTML:#patterns-button-text">Configure Patterns</span>
-
 <!-- Update the entire button to ensure proper layout -->
-<button type="button" 
+<button type="button"
         class="flex items-stretch w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden"
         hx-post="/api/schedules/patterns/patterns-modal"
         hx-include="#patterns_field"
@@ -22,8 +18,10 @@
         hx-swap-oob="outerHTML:[hx-post*='patterns-modal']">
     <span class="flex-1 px-4 py-2 text-left" id="patterns-button-text">Configure Patterns</span>
     {% if total_count > 0 %}
-        <span class="flex items-center justify-center px-3 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]" id="patterns-count-badge">{{ total_count }}</span>
+        <span class="flex items-center justify-center px-3 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]"
+              id="patterns-count-badge">{{ total_count }}</span>
     {% else %}
-        <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]" id="patterns-count-badge">{{ total_count }}</span>
+        <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]"
+              id="patterns-count-badge">{{ total_count }}</span>
     {% endif %}
 </button>

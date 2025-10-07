@@ -10,8 +10,11 @@ import re
 import uuid
 import configparser
 from pathlib import Path
-from typing import List
+from typing import List, TYPE_CHECKING
 from dataclasses import dataclass
+
+if TYPE_CHECKING:
+    from borgitory.protocols.file_protocols import FileServiceProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -41,18 +44,20 @@ class DirectoryInfo:
         return self.path + "/"
 
 
-def _is_borg_repository(directory_path: str) -> bool:
+def _is_borg_repository(
+    directory_path: str, file_service: "FileServiceProtocol"
+) -> bool:
     """Check if a directory is a Borg repository by looking for a config file."""
     try:
         config_path = os.path.join(directory_path, "config")
 
-        if not os.path.exists(config_path) or not os.path.isfile(config_path):
+        if not file_service.exists(config_path) or not file_service.isfile(config_path):
             return False
 
         # Try to read the config file and check for [repository] section
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config_content = f.read()
+            with file_service.open_file(config_path, "r") as f:
+                config_content = f.read().decode("utf-8")
 
             config = configparser.ConfigParser()
             config.read_string(config_content)
@@ -66,18 +71,18 @@ def _is_borg_repository(directory_path: str) -> bool:
         return False
 
 
-def _is_borg_cache(directory_path: str) -> bool:
+def _is_borg_cache(directory_path: str, file_service: "FileServiceProtocol") -> bool:
     """Check if a directory is a Borg cache by looking for a config file with [cache] section."""
     try:
         config_path = os.path.join(directory_path, "config")
 
-        if not os.path.exists(config_path) or not os.path.isfile(config_path):
+        if not file_service.exists(config_path) or not file_service.isfile(config_path):
             return False
 
         # Try to read the config file and check for [cache] section
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config_content = f.read()
+            with file_service.open_file(config_path, "r") as f:
+                config_content = f.read().decode("utf-8")
 
             config = configparser.ConfigParser()
             config.read_string(config_content)
@@ -259,6 +264,7 @@ def secure_remove_file(file_path: str) -> bool:
 
 def get_directory_listing(
     path: str,
+    file_service: "FileServiceProtocol",
     include_files: bool = False,
 ) -> List[DirectoryInfo]:
     """
@@ -266,6 +272,7 @@ def get_directory_listing(
 
     Args:
         path: Directory path to list
+        file_service: File service for file operations
         include_files: Whether to include files (default: directories only)
 
     Returns:
@@ -280,8 +287,8 @@ def get_directory_listing(
     try:
         for item in validated_path.iterdir():
             if item.is_dir():
-                is_borg_repo = _is_borg_repository(str(item))
-                is_borg_cache = _is_borg_cache(str(item))
+                is_borg_repo = _is_borg_repository(str(item), file_service)
+                is_borg_cache = _is_borg_cache(str(item), file_service)
                 items.append(
                     DirectoryInfo(
                         name=item.name,

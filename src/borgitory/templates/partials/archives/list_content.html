@@ -2,11 +2,12 @@
 {% if archives %}
     <div class="mb-4">
         <div class="flex items-center justify-between">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Archives for {{ repository.name }}</h3>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+                Archives for {{ repository.name }}
+            </h3>
             <span class="text-sm text-gray-500 dark:text-gray-400">{{ archives|length }} archives</span>
         </div>
     </div>
-
     {% if archives|length > 10 %}
         <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
             <p class="text-sm text-blue-700 dark:text-blue-300">
@@ -14,34 +15,34 @@
             </p>
         </div>
     {% endif %}
-
     <div class="space-y-2">
         {% for archive in recent_archives %}
             <div class="border dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                 <div class="flex items-center justify-between">
                     <div class="flex-1">
                         <div class="flex items-center space-x-3">
-                            <svg class="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            <svg class="w-5 h-5 text-gray-400 dark:text-gray-500"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                                </path>
                             </svg>
                             <div>
                                 <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ archive.name }}</h4>
                                 <div class="text-sm text-gray-500 dark:text-gray-400 space-x-4">
                                     <span>Created: {{ archive.formatted_time }}</span>
-                                    {% if archive.size_info %}
-                                        <span>Size: {{ archive.size_info }}</span>
-                                    {% endif %}
+                                    {% if archive.size_info %}<span>Size: {{ archive.size_info }}</span>{% endif %}
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="flex-shrink-0">
-                        <button 
-                            hx-post="/api/repositories/{{ repository.id }}/archives/{{ archive.name }}/contents/load-with-spinner"
-                            hx-target="#archive-browser-container"
-                            hx-swap="innerHTML"
-                            onclick="document.getElementById('archive-contents-modal').classList.remove('hidden')"
-                            class="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800/50 focus:ring-2 focus:ring-blue-500">
+                        <button hx-post="/api/repositories/{{ repository.id }}/archives/{{ archive.name }}/contents/load-with-spinner"
+                                hx-target="#archive-browser-container"
+                                hx-swap="innerHTML"
+                                onclick="document.getElementById('archive-contents-modal').classList.remove('hidden')"
+                                class="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800/50 focus:ring-2 focus:ring-blue-500">
                             View Contents
                         </button>
                     </div>
@@ -51,10 +52,16 @@
     </div>
 {% else %}
     <div class="text-gray-500 dark:text-gray-400 text-center py-8">
-        <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+        <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4"
+             fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+            </path>
         </svg>
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Archives Found</h3>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            No Archives Found
+        </h3>
         <p class="text-sm">This repository doesn't contain any backup archives yet.</p>
         <p class="text-sm mt-1">Create a backup to see archives here.</p>
     </div>

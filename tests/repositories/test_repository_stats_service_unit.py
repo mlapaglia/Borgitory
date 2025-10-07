@@ -5,15 +5,22 @@ These tests focus on testing the service logic by injecting mock dependencies
 rather than mocking the entire service, providing better code coverage.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
-from typing import List, Dict
+from borgitory.protocols.command_executor_protocol import (
+    CommandResult as ExecutorCommandResult,
+)
+from typing import Any, AsyncGenerator, List, Dict, Tuple
 from sqlalchemy.orm import Session
 
 from borgitory.services.repositories.repository_stats_service import (
+    ExecutionTimeStats,
+    FileTypeTimelineData,
     RepositoryStatsService,
     ArchiveInfo,
+    SuccessFailureStats,
 )
 from borgitory.protocols.command_executor_protocol import (
     CommandExecutorProtocol,
@@ -133,7 +140,7 @@ class MockCommandExecutor(CommandExecutorProtocol):
         stdout: int | None = None,
         stderr: int | None = None,
         stdin: int | None = None,
-    ):
+    ) -> asyncio.subprocess.Process:
         """Mock create_subprocess - not implemented for this test"""
         raise NotImplementedError("create_subprocess not implemented in mock")
 
@@ -164,16 +171,16 @@ class TestRepositoryStatsService:
         self, name: str, start: str = "2024-01-01T10:00:00"
     ) -> ArchiveInfo:
         """Helper to create sample archive info"""
-        return {
-            "name": name,
-            "start": start,
-            "end": "2024-01-01T11:00:00",
-            "duration": 3600.0,
-            "original_size": 1024 * 1024 * 100,  # 100 MB
-            "compressed_size": 1024 * 1024 * 80,  # 80 MB
-            "deduplicated_size": 1024 * 1024 * 60,  # 60 MB
-            "nfiles": 1000,
-        }
+        return ArchiveInfo(
+            name=name,
+            start=start,
+            end="2024-01-01T11:00:00",
+            duration=3600.0,
+            original_size=1024 * 1024 * 100,  # 100 MB
+            compressed_size=1024 * 1024 * 80,  # 80 MB
+            deduplicated_size=1024 * 1024 * 60,  # 60 MB
+            nfiles=1000,
+        )
 
     @pytest.mark.asyncio
     async def test_get_repository_statistics_success(self) -> None:
@@ -196,33 +203,88 @@ class TestRepositoryStatsService:
         )
 
         # Verify results
-        assert "error" not in result
-        assert result["repository_path"] == "/test/repo"
-        assert result["total_archives"] == 2
-        assert len(result["archive_stats"]) == 2
+        assert result.repository_path == "/test/repo"
+        assert result.total_archives == 2
+        assert len(result.archive_stats) == 2
 
         # Verify chart data structures exist
-        assert "size_over_time" in result
-        assert "dedup_compression_stats" in result
-        assert "summary" in result
+        assert result.size_over_time is not None
+        assert result.dedup_compression_stats is not None
+        assert result.summary is not None
 
-        # Verify summary statistics
-        summary = result["summary"]
-        assert summary["total_archives"] == 2
-        assert summary["total_original_size_gb"] > 0
-        assert summary["overall_compression_ratio"] > 0
+    async def test_get_repository_statistics_no_archives_raises_error(self) -> None:
+        """Test that ValueError is raised when no archives are found"""
+        # Mock empty archive list
+        self.mock_executor.execute_command = AsyncMock(
+            return_value=ExecutorCommandResult(
+                command=["borg", "list", "/test/repo", "--short"],
+                return_code=0,
+                stdout="",
+                stderr="",
+                success=True,
+                execution_time=1.0,
+            )
+        )
+
+        # Execute and expect ValueError
+        with pytest.raises(ValueError, match="No archives found in repository"):
+            await self.stats_service.get_repository_statistics(
+                self.mock_repository, self.mock_db
+            )
+
+    async def test_get_repository_statistics_no_archive_info_raises_error(self) -> None:
+        """Test that ValueError is raised when archive info cannot be retrieved"""
+
+        # Mock different responses for different commands
+        def mock_execute_command(
+            command: List[str], **kwargs: Any
+        ) -> ExecutorCommandResult:
+            if "borg list" in " ".join(command):
+                return ExecutorCommandResult(
+                    command=command,
+                    return_code=0,
+                    stdout="archive1\narchive2",
+                    stderr="",
+                    success=True,
+                    execution_time=1.0,
+                )
+            elif "borg info" in " ".join(command):
+                return ExecutorCommandResult(
+                    command=command,
+                    return_code=1,
+                    stdout="",
+                    stderr="Archive not found",
+                    success=False,
+                    execution_time=1.0,
+                )
+            else:
+                return ExecutorCommandResult(
+                    command=command,
+                    return_code=0,
+                    stdout="",
+                    stderr="",
+                    success=True,
+                    execution_time=1.0,
+                )
+
+        self.mock_executor.execute_command = AsyncMock(side_effect=mock_execute_command)
+
+        # Execute and expect ValueError
+        with pytest.raises(ValueError, match="Could not retrieve archive information"):
+            await self.stats_service.get_repository_statistics(
+                self.mock_repository, self.mock_db
+            )
 
     @pytest.mark.asyncio
     async def test_get_repository_statistics_no_archives(self) -> None:
         """Test when repository has no archives"""
         self.mock_executor.set_archive_list([])
 
-        result = await self.stats_service.get_repository_statistics(
-            self.mock_repository, self.mock_db
-        )
-
-        assert "error" in result
-        assert result["error"] == "No archives found in repository"
+        # Should raise ValueError
+        with pytest.raises(ValueError, match="No archives found in repository"):
+            await self.stats_service.get_repository_statistics(
+                self.mock_repository, self.mock_db
+            )
 
     @pytest.mark.asyncio
     async def test_get_repository_statistics_archive_info_failure(self) -> None:
@@ -231,12 +293,11 @@ class TestRepositoryStatsService:
         self.mock_executor.set_archive_list(archives)
         # Don't set archive info, so it returns empty dict
 
-        result = await self.stats_service.get_repository_statistics(
-            self.mock_repository, self.mock_db
-        )
-
-        assert "error" in result
-        assert result["error"] == "Could not retrieve archive information"
+        # Should raise ValueError
+        with pytest.raises(ValueError, match="Could not retrieve archive information"):
+            await self.stats_service.get_repository_statistics(
+                self.mock_repository, self.mock_db
+            )
 
     @pytest.mark.asyncio
     async def test_get_repository_statistics_with_progress_callback(self) -> None:
@@ -256,7 +317,7 @@ class TestRepositoryStatsService:
         def progress_callback(message: str, percentage: int) -> None:
             progress_calls.append((message, percentage))
 
-        result = await self.stats_service.get_repository_statistics(
+        await self.stats_service.get_repository_statistics(
             self.mock_repository, self.mock_db, progress_callback
         )
 
@@ -264,19 +325,17 @@ class TestRepositoryStatsService:
         assert len(progress_calls) > 0
         assert any("Initializing" in call[0] for call in progress_calls)
         assert any(call[1] == 100 for call in progress_calls)  # Should reach 100%
-        assert "error" not in result
 
     @pytest.mark.asyncio
     async def test_get_repository_statistics_exception_handling(self) -> None:
         """Test exception handling in statistics gathering"""
         self.mock_executor.set_exception(True, "Test exception")
 
-        result = await self.stats_service.get_repository_statistics(
-            self.mock_repository, self.mock_db
-        )
-
-        assert "error" in result
-        assert "Test exception" in result["error"]
+        # Should raise the exception
+        with pytest.raises(Exception, match="Test exception"):
+            await self.stats_service.get_repository_statistics(
+                self.mock_repository, self.mock_db
+            )
 
     def test_build_size_timeline(self) -> None:
         """Test size timeline building"""
@@ -413,36 +472,36 @@ class TestRepositoryStatsServiceIntegration:
 
         # Create varied archive info to test calculations
         archive_infos = [
-            {
-                "name": archives[0],
-                "start": "2024-01-01T10:00:00",
-                "end": "2024-01-01T11:30:00",
-                "duration": 5400.0,  # 1.5 hours
-                "original_size": 1024 * 1024 * 1024,  # 1 GB
-                "compressed_size": 1024 * 1024 * 800,  # 800 MB
-                "deduplicated_size": 1024 * 1024 * 600,  # 600 MB
-                "nfiles": 5000,
-            },
-            {
-                "name": archives[1],
-                "start": "2024-01-02T10:00:00",
-                "end": "2024-01-02T10:45:00",
-                "duration": 2700.0,  # 45 minutes
-                "original_size": 1024 * 1024 * 1200,  # 1.2 GB
-                "compressed_size": 1024 * 1024 * 900,  # 900 MB
-                "deduplicated_size": 1024 * 1024 * 650,  # 650 MB (good dedup)
-                "nfiles": 6000,
-            },
-            {
-                "name": archives[2],
-                "start": "2024-01-03T10:00:00",
-                "end": "2024-01-03T12:00:00",
-                "duration": 7200.0,  # 2 hours
-                "original_size": 1024 * 1024 * 800,  # 800 MB
-                "compressed_size": 1024 * 1024 * 700,  # 700 MB (poor compression)
-                "deduplicated_size": 1024 * 1024 * 500,  # 500 MB
-                "nfiles": 4000,
-            },
+            ArchiveInfo(
+                name=archives[0],
+                start="2024-01-01T10:00:00",
+                end="2024-01-01T11:30:00",
+                duration=5400.0,  # 1.5 hours
+                original_size=1024 * 1024 * 1024,  # 1 GB
+                compressed_size=1024 * 1024 * 800,  # 800 MB
+                deduplicated_size=1024 * 1024 * 600,  # 600 MB
+                nfiles=5000,
+            ),
+            ArchiveInfo(
+                name=archives[1],
+                start="2024-01-02T10:00:00",
+                end="2024-01-02T10:45:00",
+                duration=2700.0,  # 45 minutes
+                original_size=1024 * 1024 * 1200,  # 1.2 GB
+                compressed_size=1024 * 1024 * 900,  # 900 MB
+                deduplicated_size=1024 * 1024 * 650,  # 650 MB (good dedup)
+                nfiles=6000,
+            ),
+            ArchiveInfo(
+                name=archives[2],
+                start="2024-01-03T10:00:00",
+                end="2024-01-03T12:00:00",
+                duration=7200.0,  # 2 hours
+                original_size=1024 * 1024 * 800,  # 800 MB
+                compressed_size=1024 * 1024 * 700,  # 700 MB (poor compression)
+                deduplicated_size=1024 * 1024 * 500,  # 500 MB
+                nfiles=4000,
+            ),
         ]
 
         for i, archive in enumerate(archives):
@@ -457,23 +516,22 @@ class TestRepositoryStatsServiceIntegration:
         )
 
         # Comprehensive assertions
-        assert "error" not in result
-        assert result["total_archives"] == 3
-        assert len(result["archive_stats"]) == 3
+        assert result.total_archives == 3
+        assert len(result.archive_stats) == 3
 
         # Verify timeline data
-        timeline = result["size_over_time"]
+        timeline = result.size_over_time
         assert len(timeline["labels"]) == 3
         assert len(timeline["datasets"]) == 3
         assert all(len(dataset["data"]) == 3 for dataset in timeline["datasets"])
 
         # Verify dedup/compression stats
-        dedup_stats = result["dedup_compression_stats"]
+        dedup_stats = result.dedup_compression_stats
         assert len(dedup_stats["labels"]) == 3
         assert len(dedup_stats["datasets"]) == 2
 
         # Verify summary calculations
-        summary = result["summary"]
+        summary = result.summary
         assert summary["total_archives"] == 3
         # Total original size should be ~3GB
         assert 2.5 < summary["total_original_size_gb"] < 3.5
@@ -546,20 +604,20 @@ class TestRepositoryStatsServiceIntegration:
     def test_build_execution_time_chart(self) -> None:
         """Test execution time chart building"""
         execution_stats = [
-            {
-                "task_type": "backup",
-                "average_duration_minutes": 45.0,
-                "total_executions": 2,
-                "min_duration_minutes": 30.0,
-                "max_duration_minutes": 60.0,
-            },
-            {
-                "task_type": "prune",
-                "average_duration_minutes": 15.0,
-                "total_executions": 1,
-                "min_duration_minutes": 15.0,
-                "max_duration_minutes": 15.0,
-            },
+            ExecutionTimeStats(
+                task_type="backup",
+                average_duration_minutes=45.0,
+                total_executions=2,
+                min_duration_minutes=30.0,
+                max_duration_minutes=60.0,
+            ),
+            ExecutionTimeStats(
+                task_type="prune",
+                average_duration_minutes=15.0,
+                total_executions=1,
+                min_duration_minutes=15.0,
+                max_duration_minutes=15.0,
+            ),
         ]
 
         chart_data = self.stats_service._build_execution_time_chart(execution_stats)
@@ -629,18 +687,18 @@ class TestRepositoryStatsServiceIntegration:
     def test_build_success_failure_chart(self) -> None:
         """Test success/failure chart building"""
         success_failure_stats = [
-            {
-                "task_type": "backup",
-                "successful_count": 2,
-                "failed_count": 1,
-                "success_rate": 66.67,
-            },
-            {
-                "task_type": "prune",
-                "successful_count": 1,
-                "failed_count": 0,
-                "success_rate": 100.0,
-            },
+            SuccessFailureStats(
+                task_type="backup",
+                successful_count=2,
+                failed_count=1,
+                success_rate=66.67,
+            ),
+            SuccessFailureStats(
+                task_type="prune",
+                successful_count=1,
+                failed_count=0,
+                success_rate=100.0,
+            ),
         ]
 
         chart_data = self.stats_service._build_success_failure_chart(
@@ -698,19 +756,19 @@ class TestRepositoryStatsServiceIntegration:
 
     def test_build_file_type_chart_data(self) -> None:
         """Test file type chart data building"""
-        timeline_data = {
-            "labels": ["2024-01-01", "2024-01-02"],
-            "count_data": {
+        timeline_data = FileTypeTimelineData(
+            labels=["2024-01-01", "2024-01-02"],
+            count_data={
                 "txt": [10, 15],
                 "jpg": [5, 8],
                 "pdf": [2, 3],
             },
-            "size_data": {
+            size_data={
                 "txt": [1.5, 2.0],  # MB
                 "jpg": [10.0, 12.0],  # MB
                 "pdf": [5.0, 6.0],  # MB
             },
-        }
+        )
 
         chart_data = self.stats_service._build_file_type_chart_data(timeline_data)
 
@@ -739,7 +797,9 @@ class TestRepositoryStatsServiceIntegration:
         )
 
         @asynccontextmanager
-        async def mock_secure_borg_command(*args, **kwargs):
+        async def mock_secure_borg_command(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[Tuple[List[str], Dict[str, str], Any], None]:
             yield (["borg", "list"], {}, None)
 
         # Replace the mock executor's create_subprocess method with a proper AsyncMock

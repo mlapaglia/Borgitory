@@ -1,8 +1,9 @@
 {# HTMX-based job item template with SSE streaming support #}
-<div class="border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800" id="job-item-{{ job.id }}">
-    <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" 
-         hx-get="/api/jobs/{{ job.id }}/toggle-details?expanded={{ 'true' if expand_details else 'false' }}" 
-         hx-target="#job-item-{{ job.id }}" 
+<div class="border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+     id="job-item-{{ job.id }}">
+    <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+         hx-get="/api/jobs/{{ job.id }}/toggle-details?expanded={{ 'true' if expand_details else 'false' }}"
+         hx-target="#job-item-{{ job.id }}"
          hx-swap="outerHTML">
         <div class="flex items-center justify-between">
             <div class="flex-1">
@@ -19,26 +20,27 @@
                     {% if job.finished_at %}
                         <span>Finished: {{ job.finished_at | format_datetime_browser("%Y-%m-%d %H:%M:%S", browser_tz_offset) }}</span>
                     {% endif %}
-                    {% if job.error %}
-                        <span class="text-red-600">Error: {{ job.error }}</span>
-                    {% endif %}
+                    {% if job.error %}<span class="text-red-600">Error: {{ job.error }}</span>{% endif %}
                 </div>
             </div>
             <div class="flex-shrink-0 flex items-center space-x-2">
                 <span class="text-sm text-gray-500 dark:text-gray-400">#{{ job.id }}</span>
-                <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200 {{ 'rotate-180' if expand_details else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200 {{ 'rotate-180' if expand_details else '' }}"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
+                    </path>
                 </svg>
             </div>
         </div>
     </div>
-    
     <div id="job-details-{{ job.id }}">
         {% if expand_details %}
             {% if job.status|string == 'running' %}
-                {% include 'partials/jobs/job_details_streaming.html' %}
+                {% include "partials/jobs/job_details_streaming.html" %}
             {% else %}
-                {% include 'partials/jobs/job_details_static.html' %}
+                {% include "partials/jobs/job_details_static.html" %}
             {% endif %}
         {% endif %}
     </div>

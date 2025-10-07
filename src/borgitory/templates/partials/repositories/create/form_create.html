@@ -1,18 +1,16 @@
 <!-- Create New Repository Form -->
 <div id="create-form-container" class="repository-form">
     <div id="create-form">
-        <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create New Repository</h3>
-        
+        <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">
+            Create New Repository
+        </h3>
         <!-- Status div for trigger templates -->
         <div id="create-form-status"></div>
-        
-        <form 
-            hx-post="/api/repositories/" 
-            hx-ext="json-enc"
-            hx-target="#create-form-status" 
-            hx-swap="innerHTML"
-            hx-indicator="#create-loading"
-        >
+        <form hx-post="/api/repositories/"
+              hx-ext="json-enc"
+              hx-target="#create-form-status"
+              hx-swap="innerHTML"
+              hx-indicator="#create-loading">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
@@ -28,25 +26,32 @@
                     {% include "partials/shared/path_autocomplete.html" %}
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Passphrase</label>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Passphrase
+                    </label>
                     <input type="password" name="passphrase" required class="input-modern mt-1">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Cache Directory (Optional)</label>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Cache Directory (Optional)
+                    </label>
                     {% set input_id = "create-cache-dir" %}
                     {% set input_name = "cache_dir" %}
                     {% set input_value = "" %}
                     {% set placeholder = "Leave empty for default" %}
                     {% set required = false %}
                     {% include "partials/shared/path_autocomplete.html" %}
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Custom cache directory for Borg operations. Leave empty to use default.</p>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Custom cache directory for Borg operations. Leave empty to use default.
+                    </p>
                 </div>
-                <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
+                <button type="submit"
+                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
                     Create Repository
                 </button>
-                
                 <!-- HTMX Loading Indicator -->
-                <div id="create-loading" class="[&.htmx-request]:flex hidden items-center justify-center text-sm text-gray-600 mt-2">
+                <div id="create-loading"
+                     class="[&.htmx-request]:flex hidden items-center justify-center text-sm text-gray-600 mt-2">
                     <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
                     Creating repository...
                 </div>

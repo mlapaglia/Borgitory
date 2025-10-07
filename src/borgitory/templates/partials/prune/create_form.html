@@ -1,20 +1,22 @@
 <!-- Create Prune Policy -->
-<form 
-    hx-post="/api/prune/" 
-    hx-ext="json-enc"
-    hx-target="#cleanup-policy-status"
-    class="space-y-3"
->
+<form hx-post="/api/prune/"
+      hx-ext="json-enc"
+      hx-target="#cleanup-policy-status"
+      class="space-y-3">
     <div>
-        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Policy Name</label>
-        <input type="text" name="name" required placeholder="Daily Cleanup" class="input-modern mt-1">
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Policy Name
+        </label>
+        <input type="text"
+               name="name"
+               required
+               placeholder="Daily Cleanup"
+               class="input-modern mt-1">
     </div>
-    
-    {% include 'partials/prune/retention_fields.html' %}
-    
+    {% include "partials/prune/retention_fields.html" %}
     <input type="hidden" name="strategy" value="advanced">
-    
-    <button type="submit" class="w-full bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 text-sm">
+    <button type="submit"
+            class="w-full bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 text-sm">
         Create Prune Policy
     </button>
 </form>

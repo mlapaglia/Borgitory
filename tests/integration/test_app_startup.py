@@ -5,6 +5,7 @@ import subprocess
 import time
 import requests
 import os
+import uuid
 from typing import Generator, Optional
 
 
@@ -39,7 +40,6 @@ class AppRunner:
         """Start the application and wait for it to be ready."""
         # Set up environment
         env = os.environ.copy()
-        import uuid
 
         secret_key = f"test-secret-key-{uuid.uuid4().hex}"
         env.update(

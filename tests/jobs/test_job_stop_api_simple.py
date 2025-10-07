@@ -3,6 +3,7 @@ Simplified tests for job stop API endpoints
 Tests that the endpoint calls the service correctly and returns HTML
 """
 
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock
@@ -31,7 +32,7 @@ class TestJobStopAPISimple:
     ) -> None:
         """Test that successful job stop calls the service correctly"""
         # Arrange
-        job_id = "test-job-123456789012"
+        job_id = uuid.uuid4()
         mock_job_service.stop_job = AsyncMock(
             return_value=JobStopResult(
                 job_id=job_id,
@@ -67,7 +68,7 @@ class TestJobStopAPISimple:
     ) -> None:
         """Test that job stop error calls the service correctly"""
         # Arrange
-        job_id = "non-existent-job-123456789012"
+        job_id = uuid.uuid4()
         mock_job_service.stop_job = AsyncMock(
             return_value=JobStopError(
                 job_id=job_id, error="Job not found", error_code="JOB_NOT_FOUND"
@@ -99,7 +100,7 @@ class TestJobStopAPISimple:
     ) -> None:
         """Test stopping job in invalid status returns proper error"""
         # Arrange
-        job_id = "completed-job-123456789012"
+        job_id = uuid.uuid4()
         mock_job_service.stop_job = AsyncMock(
             return_value=JobStopError(
                 job_id=job_id,
@@ -128,7 +129,7 @@ class TestJobStopAPISimple:
     ) -> None:
         """Test that the stop job endpoint is correctly routed"""
         # Arrange
-        job_id = "path-test-job-123456789012"
+        job_id = uuid.uuid4()
         mock_job_service.stop_job = AsyncMock(
             return_value=JobStopResult(
                 job_id=job_id,
@@ -155,16 +156,17 @@ class TestJobStopAPISimple:
 
     def test_stop_job_method_not_allowed(self, client: TestClient) -> None:
         """Test that only POST method is allowed for stop endpoint"""
+        job_id = uuid.uuid4()
         # Act & Assert - GET should not be allowed
-        response = client.get("/api/jobs/test-job-123/stop")
+        response = client.get(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
         # Act & Assert - PUT should not be allowed
-        response = client.put("/api/jobs/test-job-123/stop")
+        response = client.put(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
         # Act & Assert - DELETE should not be allowed
-        response = client.delete("/api/jobs/test-job-123/stop")
+        response = client.delete(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
     def test_stop_job_success_with_task_details(
@@ -172,7 +174,7 @@ class TestJobStopAPISimple:
     ) -> None:
         """Test successful job stop with task details in response"""
         # Arrange
-        job_id = "task-details-job-123456789012"
+        job_id = uuid.uuid4()
         mock_job_service.stop_job = AsyncMock(
             return_value=JobStopResult(
                 job_id=job_id,
@@ -204,7 +206,7 @@ class TestJobStopAPISimple:
     ) -> None:
         """Test stopping job with no remaining tasks"""
         # Arrange
-        job_id = "single-task-job-123456789012"
+        job_id = uuid.uuid4()
         mock_job_service.stop_job = AsyncMock(
             return_value=JobStopResult(
                 job_id=job_id,

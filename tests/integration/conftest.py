@@ -4,14 +4,16 @@ import pytest
 import tempfile
 import os
 import shutil
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import uuid
+from sqlalchemy import create_engine, Engine
+from sqlalchemy.orm import sessionmaker, Session
+from typing import Generator
 
 from borgitory.models.database import Base
 
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir() -> Generator[str, None, None]:
     """Create a temporary directory for integration test data."""
     import time
 
@@ -25,9 +27,8 @@ def temp_data_dir():
 
 
 @pytest.fixture
-def temp_db_path(temp_data_dir):
+def temp_db_path(temp_data_dir: str) -> Generator[str, None, None]:
     """Create a temporary database path for testing."""
-    import uuid
 
     # Use unique database filename to avoid conflicts
     db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"
@@ -37,7 +38,7 @@ def temp_db_path(temp_data_dir):
 
 
 @pytest.fixture
-def test_db_engine(temp_db_path):
+def test_db_engine(temp_db_path: str) -> Generator[Engine, None, None]:
     """Create a test database engine."""
     engine = create_engine(f"sqlite:///{temp_db_path}", echo=False)
     yield engine
@@ -45,7 +46,7 @@ def test_db_engine(temp_db_path):
 
 
 @pytest.fixture
-def test_db_session(test_db_engine):
+def test_db_session(test_db_engine: Engine) -> Generator[Session, None, None]:
     """Create a test database session."""
     Base.metadata.create_all(bind=test_db_engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db_engine)
@@ -55,11 +56,10 @@ def test_db_session(test_db_engine):
 
 
 @pytest.fixture
-def test_env_vars(temp_data_dir):
+def test_env_vars(temp_data_dir: str) -> Generator[dict[str, str], None, None]:
     """Set up environment variables for integration tests."""
-    import uuid
 
-    original_env = {}
+    original_env: dict[str, str | None] = {}
 
     # Use unique database filename and secret key
     db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"

@@ -6,9 +6,11 @@ of the blank message issue where multi-line HTML was breaking SSE format.
 """
 
 import pytest
+import uuid
 from unittest.mock import Mock
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_render_service import JobRenderService
-from borgitory.services.jobs.job_manager import BorgJob
+from borgitory.services.jobs.job_models import BorgJob
 
 from borgitory.utils.datetime_utils import now_utc
 
@@ -29,7 +31,7 @@ class TestSSEMultilineFormatting:
             <div class="flex-1">
                 <div class="flex items-center space-x-2">
                     <span class="font-medium text-blue-900">Backup</span>
-                    <span class="text-blue-700 text-sm">#test-job-123</span>
+                    <span class="text-blue-700 text-sm">#test-job-uuid</span>
                 </div>
                 <div class="text-xs text-blue-600 mt-1">
                     Started: 10:30:45 | Task 1/3
@@ -48,17 +50,18 @@ class TestSSEMultilineFormatting:
         mock = Mock()
 
         # Create a mock running job
+        test_job_id = uuid.uuid4()
         running_job = Mock(spec=BorgJob)
-        running_job.id = "test-job-123"
-        running_job.status = "running"
+        running_job.id = test_job_id
+        running_job.status = JobStatusEnum.RUNNING
         running_job.started_at = now_utc()
         running_job.tasks = []
 
-        mock.jobs = {"test-job-123": running_job}
+        mock.jobs = {test_job_id: running_job}
 
         # Mock the stream method
         async def mock_stream():
-            yield {"type": "job_status_changed", "job_id": "test-job-123"}
+            yield {"type": "job_status_changed", "job_id": test_job_id}
 
         mock.stream_all_job_updates = mock_stream
         return mock

@@ -6,96 +6,109 @@
         <div class="flex items-center gap-3">
             <!-- Action Dropdown -->
             <div class="flex-shrink-0">
-                <select name="pattern_action" 
+                <select name="pattern_action"
                         required
                         class="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-                    <option value="include" {{ 'selected' if pattern is defined and pattern.pattern_type.value == 'include' else '' }}>+</option>
-                    <option value="exclude" {{ 'selected' if pattern is defined and pattern.pattern_type.value == 'exclude' else '' }}>-</option>
-                    <option value="exclude_norec" {{ 'selected' if pattern is defined and pattern.pattern_type.value == 'exclude_norec' else '' }}>!</option>
+                    <option value="include"
+                            {{ 'selected' if pattern is defined and pattern.pattern_type.value == 'include' else '' }}>+
+                    </option>
+                    <option value="exclude"
+                            {{ 'selected' if pattern is defined and pattern.pattern_type.value == 'exclude' else '' }}>-
+                    </option>
+                    <option value="exclude_norec"
+                            {{ 'selected' if pattern is defined and pattern.pattern_type.value == 'exclude_norec' else '' }}>!
+                    </option>
                 </select>
             </div>
-
             <!-- Style Dropdown -->
             <div class="flex-shrink-0">
-                <select name="pattern_style" 
+                <select name="pattern_style"
                         class="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-                    <option value="sh" {{ 'selected' if pattern is defined and pattern.style == 'sh' else '' }}>sh</option>
-                    <option value="fm" {{ 'selected' if pattern is defined and pattern.style == 'fm' else '' }}>fm</option>
-                    <option value="re" {{ 'selected' if pattern is defined and pattern.style == 're' else '' }}>re</option>
-                    <option value="pp" {{ 'selected' if pattern is defined and pattern.style == 'pp' else '' }}>pp</option>
-                    <option value="pf" {{ 'selected' if pattern is defined and pattern.style == 'pf' else '' }}>pf</option>
+                    <option value="sh"
+                            {{ 'selected' if pattern is defined and pattern.style == 'sh' else '' }}>sh
+                    </option>
+                    <option value="fm"
+                            {{ 'selected' if pattern is defined and pattern.style == 'fm' else '' }}>fm
+                    </option>
+                    <option value="re"
+                            {{ 'selected' if pattern is defined and pattern.style == 're' else '' }}>re
+                    </option>
+                    <option value="pp"
+                            {{ 'selected' if pattern is defined and pattern.style == 'pp' else '' }}>pp
+                    </option>
+                    <option value="pf"
+                            {{ 'selected' if pattern is defined and pattern.style == 'pf' else '' }}>pf
+                    </option>
                 </select>
             </div>
-
             <!-- Reorder and Remove Controls - moved to top row on mobile -->
             <div class="flex items-center space-x-1 flex-shrink-0 ml-auto sm:ml-0">
                 <!-- Move Up Button -->
                 {% if loop is defined and loop.index0 > 0 %}
-                <button type="button"
-                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        hx-post="/api/schedules/patterns/move-pattern"
-                        hx-include="form"
-                        hx-vals='{"index": {{ loop.index0 }}, "direction": "up"}'
-                        hx-target="#patterns-container"
-                        hx-swap="innerHTML"
-                        title="Move up">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                    </svg>
-                </button>
+                    <button type="button"
+                            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            hx-post="/api/schedules/patterns/move-pattern"
+                            hx-include="form"
+                            hx-vals='{"index": {{ loop.index0 }}, "direction": "up"}'
+                            hx-target="#patterns-container"
+                            hx-swap="innerHTML"
+                            title="Move up">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7">
+                            </path>
+                        </svg>
+                    </button>
                 {% else %}
-                <div class="w-5 h-5"></div>
+                    <div class="w-5 h-5"></div>
                 {% endif %}
-                
                 <!-- Move Down Button -->
                 {% if loop is defined and not loop.last %}
-                <button type="button"
-                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        hx-post="/api/schedules/patterns/move-pattern"
-                        hx-include="form"
-                        hx-vals='{"index": {{ loop.index0 }}, "direction": "down"}'
-                        hx-target="#patterns-container"
-                        hx-swap="innerHTML"
-                        title="Move down">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    <button type="button"
+                            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            hx-post="/api/schedules/patterns/move-pattern"
+                            hx-include="form"
+                            hx-vals='{"index": {{ loop.index0 }}, "direction": "down"}'
+                            hx-target="#patterns-container"
+                            hx-swap="innerHTML"
+                            title="Move down">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
+                            </path>
+                        </svg>
+                    </button>
                 {% else %}
-                <div class="w-5 h-5"></div>
+                    <div class="w-5 h-5"></div>
                 {% endif %}
-                
                 <!-- Remove Button -->
                 <button type="button"
                         class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                         hx-post="/api/schedules/patterns/remove-pattern-field"
                         hx-include="form"
-                        hx-vals='{"index": {{ loop.index0 if loop is defined else 0 }}}'
+                        hx-vals='{"index": {{ loop.index0 if loop is defined else 0 }} }'
                         hx-target="#patterns-container"
                         hx-swap="innerHTML"
                         hx-confirm="Are you sure you want to remove this pattern?"
                         title="Remove pattern">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                        </path>
                     </svg>
                 </button>
             </div>
         </div>
-
         <!-- Pattern Name - separate row on mobile -->
         <div class="w-full sm:flex-1 sm:min-w-0">
-            <input type="text" 
-                   name="pattern_name" 
+            <input type="text"
+                   name="pattern_name"
                    value="{{ pattern.name if pattern is defined else '' }}"
                    placeholder="Pattern name"
                    required
                    class="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400">
         </div>
-
         <!-- Pattern Expression - separate row on mobile -->
         <div class="w-full sm:flex-1 sm:min-w-0">
-            <input type="text" 
-                   name="pattern_expression" 
+            <input type="text"
+                   name="pattern_expression"
                    value="{{ pattern.expression if pattern is defined else '' }}"
                    placeholder="*.pdf, ~/Documents/**, etc."
                    required

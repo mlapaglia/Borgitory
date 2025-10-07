@@ -46,7 +46,7 @@ class TestSimpleCommandRunnerProtocol:
         mock_runner = ProtocolMockFactory.create_command_runner_mock()
 
         # Override dependency with protocol mock
-        def mock_config():
+        def mock_config() -> CommandRunnerConfig:
             return CommandRunnerConfig(timeout=999)
 
         def mock_runner_factory(config: CommandRunnerConfig = mock_config()):

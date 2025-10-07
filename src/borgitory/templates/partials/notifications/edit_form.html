@@ -1,33 +1,43 @@
 <!-- Edit Notification Configuration -->
 <div class="border dark:border-gray-600 rounded-lg p-4">
-    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Edit Notification Configuration</h3>
-    <form 
-        hx-put="/api/notifications/{{ config.id }}" 
-        hx-target="#notification-status"
-        class="space-y-4"
-        id="notification-edit-form"
-    >
+    <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">
+        Edit Notification Configuration
+    </h3>
+    <form hx-put="/api/notifications/{{ config.id }}"
+          hx-target="#notification-status"
+          class="space-y-4"
+          id="notification-edit-form">
         <div>
             <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
-            <input type="text" name="name" required value="{{ config.name }}" placeholder="My Phone" class="input-modern mt-1">
+            <input type="text"
+                   name="name"
+                   required
+                   value="{{ config.name }}"
+                   placeholder="My Phone"
+                   class="input-modern mt-1">
         </div>
-        
         <!-- Provider field (read-only for edit) -->
         <div>
-            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Provider Type</label>
-            <input type="text" value="{{ config.provider|title }}" disabled class="input-modern mt-1 bg-gray-100 dark:bg-gray-700">
+            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                Provider Type
+            </label>
+            <input type="text"
+                   value="{{ config.provider|title }}"
+                   disabled
+                   class="input-modern mt-1 bg-gray-100 dark:bg-gray-700">
             <input type="hidden" name="provider" value="{{ config.provider }}">
-            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Provider type cannot be changed when editing</p>
+            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                Provider type cannot be changed when editing
+            </p>
         </div>
-
         <!-- Provider Fields Container -->
         <div id="provider-fields-container">
             {% if provider_template %}
                 {% include provider_template %}
             {% endif %}
-
             <div class="flex space-x-2 mt-4">
-                <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                <button type="submit"
+                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
                     Update Configuration
                 </button>
                 <button type="button"

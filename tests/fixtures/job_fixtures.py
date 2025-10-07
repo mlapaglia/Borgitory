@@ -7,12 +7,19 @@ job services with clean dependency injection patterns.
 
 import pytest
 import uuid
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
 from typing import Any, AsyncGenerator, Dict, List
 from sqlalchemy.orm import Session
 
-from borgitory.services.jobs.job_manager import BorgJob, BorgJobTask, JobManagerConfig
+from borgitory.services.jobs.job_models import (
+    BorgJob,
+    BorgJobTask,
+    JobManagerConfig,
+    TaskStatusEnum,
+    TaskTypeEnum,
+)
 from borgitory.models.database import Repository, Job, JobTask
 
 
@@ -57,8 +64,8 @@ def mock_job_executor() -> Mock:
 def sample_borg_job() -> BorgJob:
     """Create a sample BorgJob for testing."""
     return BorgJob(
-        id=str(uuid.uuid4()),
-        status="completed",
+        id=uuid.uuid4(),
+        status=JobStatusEnum.COMPLETED,
         started_at=now_utc(),
         completed_at=now_utc(),
         command=["borg", "create", "repo::archive", "/data"],
@@ -70,23 +77,23 @@ def sample_borg_job() -> BorgJob:
 @pytest.fixture
 def sample_composite_job() -> BorgJob:
     """Create a composite BorgJob with tasks for testing."""
-    job_id = str(uuid.uuid4())
+    job_id = uuid.uuid4()
     task1 = BorgJobTask(
-        task_type="backup",
+        task_type=TaskTypeEnum.BACKUP,
         task_name="Backup Task",
-        status="completed",
+        status=TaskStatusEnum.COMPLETED,
         parameters={"source_path": "/data"},
     )
     task2 = BorgJobTask(
-        task_type="prune",
+        task_type=TaskTypeEnum.PRUNE,
         task_name="Prune Task",
-        status="completed",
+        status=TaskStatusEnum.COMPLETED,
         parameters={"keep_daily": 7},
     )
 
     return BorgJob(
         id=job_id,
-        status="completed",
+        status=JobStatusEnum.COMPLETED,
         started_at=now_utc(),
         completed_at=now_utc(),
         job_type="composite",
@@ -112,10 +119,10 @@ def sample_repository(test_db: Session) -> Repository:
 def sample_database_job(test_db: Session, sample_repository: Repository) -> Job:
     """Create a sample Job record in the test database."""
     job = Job()
-    job.id = str(uuid.uuid4())
+    job.id = uuid.uuid4()
     job.repository_id = sample_repository.id
     job.type = "backup"
-    job.status = "completed"
+    job.status = JobStatusEnum.COMPLETED
     job.started_at = now_utc()
     job.finished_at = now_utc()
     test_db.add(job)
@@ -130,10 +137,10 @@ def sample_database_job_with_tasks(
 ) -> Job:
     """Create a Job with JobTasks in the test database."""
     job = Job()
-    job.id = str(uuid.uuid4())
+    job.id = uuid.uuid4()
     job.repository_id = sample_repository.id
     job.type = "backup"
-    job.status = "completed"
+    job.status = JobStatusEnum.COMPLETED
     job.started_at = now_utc()
     job.finished_at = now_utc()
     test_db.add(job)
@@ -194,7 +201,7 @@ def mock_subprocess_process() -> AsyncMock:
 
 
 def create_mock_job_context(
-    job_id: str = "",
+    job_id: uuid.UUID = uuid.uuid4(),
     status: str = "completed",
     job_type: str = "simple",
     tasks: List[Dict[str, Any]] = [],

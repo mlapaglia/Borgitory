@@ -3,8 +3,12 @@
     {% if is_valid %}
         <!-- Valid pattern -->
         <div class="flex items-start space-x-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-            <svg class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            <svg class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7">
+                </path>
             </svg>
             <div class="text-sm">
                 <p class="text-green-800 dark:text-green-200 font-medium">Pattern is valid</p>
@@ -20,8 +24,12 @@
     {% else %}
         <!-- Invalid pattern -->
         <div class="flex items-start space-x-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-            <svg class="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            <svg class="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                </path>
             </svg>
             <div class="text-sm">
                 <p class="text-red-800 dark:text-red-200 font-medium">Pattern is invalid</p>
@@ -32,4 +40,3 @@
         </div>
     {% endif %}
 </div>
-

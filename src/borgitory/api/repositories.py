@@ -11,7 +11,6 @@ from fastapi import (
 )
 from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
 
 from borgitory.models.database import Repository, User, get_db
 from borgitory.models.schemas import (
@@ -40,12 +39,6 @@ from borgitory.utils.template_responses import (
     ArchiveResponseHandler,
 )
 from borgitory.api.auth import get_current_user
-from borgitory.utils.secure_path import (
-    DirectoryInfo,
-    secure_exists,
-    secure_isdir,
-    get_directory_listing,
-)
 from borgitory.utils.path_prefix import (
     parse_path_for_autocomplete,
 )
@@ -53,15 +46,6 @@ from starlette.templating import _TemplateResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-class DirectoryListResponse(BaseModel):
-    """Response model for directory listing"""
-
-    directories: List[DirectoryInfo]
-
-    class Config:
-        from_attributes = True
 
 
 @router.post("/")
@@ -118,28 +102,6 @@ def get_repositories_html(
             {
                 "error_message": f"Error loading repositories: {str(e)}",
             },
-        )
-
-
-@router.get("/directories", response_model=DirectoryListResponse)
-async def list_directories(path: str = "/") -> DirectoryListResponse:
-    """List directories at the given path for autocomplete functionality."""
-
-    try:
-        if not secure_exists(path):
-            return DirectoryListResponse(directories=[])
-
-        if not secure_isdir(path):
-            return DirectoryListResponse(directories=[])
-
-        directories = get_directory_listing(path, include_files=False)
-
-        return DirectoryListResponse(directories=directories)
-
-    except Exception as e:
-        logger.error(f"Error listing directories at {path}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list directories: {str(e)}"
         )
 
 

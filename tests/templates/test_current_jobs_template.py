@@ -6,6 +6,7 @@ and does not include the spinner animation.
 """
 
 import pytest
+import uuid
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 from datetime import datetime
@@ -27,11 +28,11 @@ class TestCurrentJobsTemplate:
         return env
 
     @pytest.fixture
-    def sample_job_data(self) -> list[dict]:
+    def sample_job_data(self) -> list[dict[str, object]]:
         """Sample job data for template testing"""
         return [
             {
-                "id": "test-job-123",
+                "id": str(uuid.uuid4()),
                 "type": "Backup",
                 "status": "running",
                 "started_at": datetime(2025, 9, 29, 10, 30, 45),
@@ -47,7 +48,7 @@ class TestCurrentJobsTemplate:
         ]
 
     def test_current_jobs_template_renders_without_spinner(
-        self, jinja_env: Environment, sample_job_data: list[dict]
+        self, jinja_env: Environment, sample_job_data: list[dict[str, object]]
     ) -> None:
         """Test that current jobs template renders without spinner animation"""
         template = jinja_env.get_template("partials/jobs/current_jobs_list.html")
@@ -68,8 +69,8 @@ class TestCurrentJobsTemplate:
         )
 
         # Verify job data is rendered
-        assert "test-job-123" in rendered, "Should render first job ID"
-        assert "test-job-456" in rendered, "Should render second job ID"
+        assert sample_job_data[0]["id"] in rendered, "Should render first job ID"
+        assert sample_job_data[1]["id"] in rendered, "Should render second job ID"
         assert "Backup" in rendered, "Should render job types"
         assert "Cleanup" in rendered, "Should render job types"
         assert "2025-09-29 10:30:45" in rendered, "Should render formatted start times"
@@ -95,7 +96,7 @@ class TestCurrentJobsTemplate:
         assert "animate-spin" not in rendered, "Empty state should not contain spinner"
 
     def test_current_jobs_template_structure(
-        self, jinja_env: Environment, sample_job_data: list[dict]
+        self, jinja_env: Environment, sample_job_data: list[dict[str, object]]
     ) -> None:
         """Test the overall structure of the rendered template"""
         template = jinja_env.get_template("partials/jobs/current_jobs_list.html")

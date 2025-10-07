@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Callable
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
+import uuid
 
 from borgitory.utils.datetime_utils import now_utc
 
@@ -27,7 +28,7 @@ class JobPriority(Enum):
 class QueuedJob:
     """Represents a job in the queue"""
 
-    job_id: str
+    job_id: uuid.UUID
     job_type: str
     priority: JobPriority = JobPriority.NORMAL
     queued_at: Optional[datetime] = None
@@ -109,16 +110,18 @@ class JobQueueManager:
         self._operation_semaphore: Optional[asyncio.Semaphore] = None
 
         # Running job tracking
-        self._running_jobs: Dict[str, QueuedJob] = {}
-        self._running_backups: Dict[str, QueuedJob] = {}
+        self._running_jobs: Dict[uuid.UUID, QueuedJob] = {}
+        self._running_backups: Dict[uuid.UUID, QueuedJob] = {}
 
         # Queue processor control
         self._queue_processors_started = False
         self._shutdown_requested = False
 
         # Callbacks for job events
-        self._job_start_callback: Optional[Callable[[str, QueuedJob], None]] = None
-        self._job_complete_callback: Optional[Callable[[str, bool], None]] = None
+        self._job_start_callback: Optional[Callable[[uuid.UUID, QueuedJob], None]] = (
+            None
+        )
+        self._job_complete_callback: Optional[Callable[[uuid.UUID, bool], None]] = None
 
     async def initialize(self) -> None:
         """Initialize async resources"""
@@ -135,8 +138,8 @@ class JobQueueManager:
 
     def set_callbacks(
         self,
-        job_start_callback: Optional[Callable[[str, QueuedJob], None]] = None,
-        job_complete_callback: Optional[Callable[[str, bool], None]] = None,
+        job_start_callback: Optional[Callable[[uuid.UUID, QueuedJob], None]] = None,
+        job_complete_callback: Optional[Callable[[uuid.UUID, bool], None]] = None,
     ) -> None:
         """Set callbacks for job lifecycle events"""
         self._job_start_callback = job_start_callback
@@ -144,7 +147,7 @@ class JobQueueManager:
 
     async def enqueue_job(
         self,
-        job_id: str,
+        job_id: uuid.UUID,
         job_type: str,
         priority: JobPriority = JobPriority.NORMAL,
         metadata: Optional[Dict[str, object]] = None,
@@ -319,7 +322,7 @@ class JobQueueManager:
             if self._job_complete_callback:
                 self._job_complete_callback(job_id, success)
 
-    def _cleanup_running_job(self, job_id: str, is_backup: bool) -> None:
+    def _cleanup_running_job(self, job_id: uuid.UUID, is_backup: bool) -> None:
         """Clean up tracking for a running job"""
         if job_id in self._running_jobs:
             del self._running_jobs[job_id]

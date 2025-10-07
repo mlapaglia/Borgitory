@@ -2,13 +2,15 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+import uuid
 from typing import AsyncGenerator, List, Optional
 from sqlalchemy.orm import Session, joinedload
 from fastapi.templating import Jinja2Templates
 
 from borgitory.models.database import Job
+from borgitory.models.job_results import JobStatusEnum
 from borgitory.protocols import JobManagerProtocol
-from borgitory.services.jobs.job_manager import BorgJob
+from borgitory.services.jobs.job_models import BorgJob
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +92,7 @@ class JobProgress:
 class JobDisplayData:
     """Complete display data for a job"""
 
-    id: str
+    id: uuid.UUID
     title: str
     status: JobStatus
     repository_name: str
@@ -133,7 +135,7 @@ class TemplateJobStatus:
 class TemplateJobContext:
     """Job context object for templates - mimics the old dynamic job context"""
 
-    id: str
+    id: uuid.UUID
     status: TemplateJobStatus
     started_at: Optional[datetime]
     finished_at: Optional[datetime]
@@ -372,7 +374,7 @@ class JobRenderService:
         self.converter = converter or JobDataConverter()
 
     def get_job_display_data(
-        self, job_id: str, db: Session
+        self, job_id: uuid.UUID, db: Session
     ) -> Optional[JobDisplayData]:
         """Get job display data using simplified resolution strategy"""
         try:
@@ -386,7 +388,10 @@ class JobRenderService:
                 .first()
             )
 
-            if db_job and db_job.status in ["completed", "failed"]:
+            if db_job and db_job.status in [
+                JobStatusEnum.COMPLETED,
+                JobStatusEnum.FAILED,
+            ]:
                 logger.info(f"Using database data for completed/failed job {job_id}")
                 job_data = self.converter.convert_database_job(db_job)
                 return self.converter.fix_failed_job_tasks(job_data)
@@ -555,7 +560,7 @@ class JobRenderService:
             yield "data: \n\n"
 
     def get_job_for_template(
-        self, job_id: str, db: Session, expand_details: bool = False
+        self, job_id: uuid.UUID, db: Session, expand_details: bool = False
     ) -> Optional[TemplateJobData]:
         """Get job data formatted for template rendering"""
         job_data = self.get_job_display_data(job_id, db)

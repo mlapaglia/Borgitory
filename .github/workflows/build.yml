@@ -81,9 +81,13 @@ jobs:
     - name: Load Docker image
       run: docker load < /tmp/borgitory-test-x86_64.tar
     
-    - name: Run linting
+    - name: Run Python linting
       run: |
         docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test-x86_64 python lint.py check
+    
+    - name: Run HTML linting
+      run: |
+        docker run --rm -v $(pwd):/workspace -w /workspace borgitory-test-x86_64 python lint.py html
 
   code-quality-types:
     runs-on: ubuntu-latest

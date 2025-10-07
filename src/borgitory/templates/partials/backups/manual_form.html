@@ -1,24 +1,26 @@
 <!-- Manual Backup -->
 <div class="border dark:border-gray-600 rounded-lg p-4">
     <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create Backup</h3>
-    <form 
-        hx-post="/api/jobs/backup" 
-        hx-ext="json-enc"
-        hx-target="#backup-status"
-        hx-swap="innerHTML"
-    >
+    <form hx-post="/api/jobs/backup"
+          hx-ext="json-enc"
+          hx-target="#backup-status"
+          hx-swap="innerHTML">
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Repository
+                </label>
                 <select name="repository_id" required class="select-modern w-full">
                     <option value="">Select Repository...</option>
                     {% for repo in repositories %}
-                    <option value="{{ repo.id }}">{{ repo.name }}</option>
+                        <option value="{{ repo.id }}">{{ repo.name }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Source Path</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Source Path
+                </label>
                 {% set input_id = "backup-source-path" %}
                 {% set input_name = "source_path" %}
                 {% set placeholder = "/pictures/" %}
@@ -26,7 +28,9 @@
                 {% include "partials/shared/path_autocomplete.html" %}
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Compression</label>
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Compression
+                </label>
                 <select name="compression" class="select-modern w-full">
                     <option value="zstd">ZSTD (Recommended)</option>
                     <option value="lz4">LZ4 (Fast)</option>
@@ -34,54 +38,83 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Archive Prune (Optional)</label>
-                <select name="prune_config_id" id="backup-cleanup-select" class="select-modern w-full">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Archive Prune (Optional)
+                </label>
+                <select name="prune_config_id"
+                        id="backup-cleanup-select"
+                        class="select-modern w-full">
                     <option value="">No prune</option>
                     {% for config in prune_configs %}
-                    <option value="{{ config.id }}">{{ config.name }}</option>
+                        <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Automatically prune old archives after backup completes</p>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Automatically prune old archives after backup completes
+                </p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Cloud Backup (Optional)</label>
-                <select name="cloud_sync_config_id" id="backup-cloud-select" class="select-modern w-full">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Cloud Backup (Optional)
+                </label>
+                <select name="cloud_sync_config_id"
+                        id="backup-cloud-select"
+                        class="select-modern w-full">
                     <option value="">No cloud backup</option>
                     {% for config in cloud_sync_configs %}
-                    <option value="{{ config.id }}">{{ config.name }}</option>
+                        <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Automatically backup to cloud after Borg backup completes</p>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Automatically backup to cloud after Borg backup completes
+                </p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository Check (Optional)</label>
-                <select name="check_config_id" id="backup-check-select" class="select-modern w-full">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Repository Check (Optional)
+                </label>
+                <select name="check_config_id"
+                        id="backup-check-select"
+                        class="select-modern w-full">
                     <option value="">No check</option>
                     {% for config in check_configs %}
-                    <option value="{{ config.id }}">{{ config.name }}</option>
+                        <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Verify repository integrity after backup completes</p>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Verify repository integrity after backup completes
+                </p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Notifications (Optional)</label>
-                <select name="notification_config_id" id="backup-notification-select" class="select-modern w-full">
+                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Notifications (Optional)
+                </label>
+                <select name="notification_config_id"
+                        id="backup-notification-select"
+                        class="select-modern w-full">
                     <option value="">No notifications</option>
                     {% for config in notification_configs %}
-                    <option value="{{ config.id }}">{{ config.name }}</option>
+                        <option value="{{ config.id }}">{{ config.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Get notified when backup completes or fails</p>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Get notified when backup completes or fails
+                </p>
             </div>
             <div class="flex items-center">
-                <input type="checkbox" name="dry_run" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <input type="checkbox"
+                       name="dry_run"
+                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                 <label class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Dry Run</label>
             </div>
             <div class="flex items-center">
-                <input type="checkbox" name="ignore_lock" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <input type="checkbox"
+                       name="ignore_lock"
+                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                 <label class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Ignore Lock</label>
             </div>
-            <button type="submit" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+            <button type="submit"
+                    class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
                 Start Backup
             </button>
         </div>

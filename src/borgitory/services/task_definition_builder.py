@@ -16,6 +16,7 @@ from borgitory.models.database import (
 from borgitory.models.schemas import PruneRequest, CheckRequest
 from borgitory.constants.retention import RetentionConfigProtocol, RetentionFieldHandler
 from borgitory.services.hooks.hook_config import HookConfigParser
+from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.custom_types import ConfigDict
 
@@ -71,7 +72,7 @@ class TaskDefinitionBuilder:
             parameters["patterns"] = patterns
 
         return TaskDefinition(
-            type="backup",
+            type=TaskTypeEnum.BACKUP,
             name=f"Backup {repository_name}",
             parameters=parameters,
         )
@@ -114,7 +115,9 @@ class TaskDefinitionBuilder:
             parameters.update(retention_dict)
 
         return TaskDefinition(
-            type="prune", name=f"Prune {repository_name}", parameters=parameters
+            type=TaskTypeEnum.PRUNE,
+            name=f"Prune {repository_name}",
+            parameters=parameters,
         )
 
     def build_prune_task_from_request(
@@ -146,7 +149,9 @@ class TaskDefinitionBuilder:
             parameters.update(retention_dict)
 
         return TaskDefinition(
-            type="prune", name=f"Prune {repository_name}", parameters=parameters
+            type=TaskTypeEnum.PRUNE,
+            name=f"Prune {repository_name}",
+            parameters=parameters,
         )
 
     def build_check_task_from_config(
@@ -172,7 +177,7 @@ class TaskDefinitionBuilder:
             return None
 
         return TaskDefinition(
-            type="check",
+            type=TaskTypeEnum.CHECK,
             name=f"Check {repository_name} ({check_config.name})",
             parameters={
                 "check_type": check_config.check_type,
@@ -201,7 +206,7 @@ class TaskDefinitionBuilder:
             Task definition dictionary
         """
         return TaskDefinition(
-            type="check",
+            type=TaskTypeEnum.CHECK,
             name=f"Check {repository_name}",
             parameters={
                 "check_type": check_request.check_type,
@@ -236,7 +241,7 @@ class TaskDefinitionBuilder:
         )
 
         return TaskDefinition(
-            type="cloud_sync",
+            type=TaskTypeEnum.CLOUD_SYNC,
             name=name,
             parameters={
                 "cloud_sync_config_id": cloud_sync_config_id,
@@ -266,7 +271,7 @@ class TaskDefinitionBuilder:
             return None
 
         return TaskDefinition(
-            type="notification",
+            type=TaskTypeEnum.NOTIFICATION,
             name=f"Send notification for {repository_name}",
             parameters={
                 "provider": notification_config.provider,
@@ -298,7 +303,7 @@ class TaskDefinitionBuilder:
             display_name += f" ({repository_name})"
 
         return TaskDefinition(
-            type="hook",
+            type=TaskTypeEnum.HOOK,
             name=display_name,
             parameters={
                 "hook_name": hook_name,
@@ -338,7 +343,7 @@ class TaskDefinitionBuilder:
 
             return [
                 TaskDefinition(
-                    type="hook",
+                    type=TaskTypeEnum.HOOK,
                     name=display_name,
                     parameters={
                         "hook_type": hook_type,

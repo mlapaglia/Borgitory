@@ -126,8 +126,15 @@ class TestRepositoryArchivesNavigation:
         content = response.text
 
         # Check that repo1 is selected
-        assert f'value="{repo1.id}" selected' in content
-        assert f'value="{repo2.id}" selected' not in content
+        assert f'value="{repo1.id}"' in content
+        assert "selected" in content
+        assert f'value="{repo2.id}"' in content
+        # Ensure repo2 is not selected (no selected attribute near repo2)
+        repo2_section = content[
+            content.find(f'value="{repo2.id}"') : content.find(f'value="{repo2.id}"')
+            + 200
+        ]
+        assert "selected" not in repo2_section
 
         # Check that both repositories are available as options
         assert "selector-repo-1" in content

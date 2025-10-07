@@ -27,6 +27,7 @@ from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.protocols.path_protocols import PathServiceInterface
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.protocols.file_protocols import FileServiceProtocol
 from borgitory.utils.datetime_utils import (
     format_datetime_for_display,
     parse_datetime_string,
@@ -36,7 +37,6 @@ from borgitory.utils.secure_path import (
     get_directory_listing,
     secure_exists,
     secure_isdir,
-    secure_remove_file,
     DirectoryInfo,
 )
 from borgitory.utils.security import secure_borg_command
@@ -88,11 +88,13 @@ class RepositoryService:
         scheduler_service: SchedulerService,
         path_service: PathServiceInterface,
         command_executor: CommandExecutorProtocol,
+        file_service: FileServiceProtocol,
     ) -> None:
         self.borg_service = borg_service
         self.scheduler_service = scheduler_service
         self.path_service = path_service
         self.command_executor = command_executor
+        self.file_service = file_service
 
     async def create_repository(
         self, request: CreateRepositoryRequest, db: Session
@@ -153,6 +155,7 @@ class RepositoryService:
         self, request: ImportRepositoryRequest, db: Session
     ) -> RepositoryOperationResult:
         """Import an existing Borg repository."""
+        keyfile_path: str | None = None
         try:
             # Validate repository doesn't already exist
             validation_errors = await self._validate_repository_import(request, db)
@@ -162,11 +165,9 @@ class RepositoryService:
                 )
 
             # Handle keyfile if provided
-            keyfile_path: str | None = None
             if request.keyfile and request.keyfile.filename:
                 keyfile_result = await self._save_keyfile(request.name, request.keyfile)
                 if not keyfile_result["success"]:
-                    # Type narrowing: if success is False, it's a KeyfileErrorResult
                     error_msg = keyfile_result.get("error")
                     return RepositoryOperationResult(
                         success=False,
@@ -174,27 +175,9 @@ class RepositoryService:
                         if error_msg
                         else "Unknown keyfile error",
                     )
-                # Type narrowing: if success is True, it's a KeyfileSuccessResult
+
                 path_value = keyfile_result.get("path")
                 keyfile_path = str(path_value) if path_value else None
-
-            db_repo = Repository()
-            db_repo.name = request.name
-            db_repo.path = request.path
-            db_repo.set_passphrase(request.passphrase)
-            db_repo.cache_dir = request.cache_dir
-
-            # Set encryption type if provided
-            if request.encryption_type:
-                db_repo.encryption_type = request.encryption_type
-
-            # Set keyfile content if provided
-            if request.keyfile_content:
-                db_repo.set_keyfile_content(request.keyfile_content)
-
-            db.add(db_repo)
-            db.commit()
-            db.refresh(db_repo)
 
             verification_successful = await self.borg_service.verify_repository_access(
                 repo_path=request.path,
@@ -205,14 +188,28 @@ class RepositoryService:
 
             if not verification_successful:
                 if keyfile_path:
-                    secure_remove_file(keyfile_path)
-                db.delete(db_repo)
-                db.commit()
+                    await self.file_service.remove_file(keyfile_path)
 
                 return RepositoryOperationResult(
                     success=False,
                     error_message="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
                 )
+
+            db_repo = Repository()
+            db_repo.name = request.name
+            db_repo.path = request.path
+            db_repo.set_passphrase(request.passphrase)
+            db_repo.cache_dir = request.cache_dir
+
+            if request.encryption_type:
+                db_repo.encryption_type = request.encryption_type
+
+            if request.keyfile_content:
+                db_repo.set_keyfile_content(request.keyfile_content)
+
+            db.add(db_repo)
+            db.commit()
+            db.refresh(db_repo)
 
             try:
                 archives_response = await self.borg_service.list_archives(db_repo)
@@ -233,6 +230,11 @@ class RepositoryService:
 
         except Exception as e:
             db.rollback()
+            if keyfile_path is not None:
+                try:
+                    await self.file_service.remove_file(keyfile_path)
+                except Exception:
+                    pass
             error_message = f"Failed to import repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
@@ -328,7 +330,7 @@ class RepositoryService:
                 )
 
             directory_data = get_directory_listing(
-                request.path, include_files=request.include_files
+                request.path, self.file_service, include_files=request.include_files
             )
 
             if request.max_items > 0:
@@ -568,9 +570,8 @@ class RepositoryService:
         )
         keyfile_path = self.path_service.secure_join(keyfiles_dir, safe_filename)
 
-        with open(keyfile_path, "wb") as f:
-            content = await keyfile.read()
-            f.write(content)
+        content = await keyfile.read()
+        await self.file_service.write_file(keyfile_path, content)
 
         logger.info(
             f"Saved keyfile for repository '{repository_name}' at {keyfile_path}"
@@ -961,7 +962,7 @@ class RepositoryService:
                     directories = []
                 else:
                     directories = get_directory_listing(
-                        path, include_files=include_files
+                        path, self.file_service, include_files=include_files
                     )
 
             # Filter directories based on search term

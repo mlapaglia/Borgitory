@@ -185,12 +185,13 @@ class TestManualRunAPScheduler:
         mock_scheduler_service: AsyncMock,
     ) -> None:
         """Test ScheduleService.run_schedule_manually calls scheduler service correctly"""
-        expected_job_id = str(uuid.uuid4())
+        expected_job_id = uuid.uuid4()
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
         result = await schedule_service.run_schedule_manually(test_schedule.id)
 
         assert result.success is True
+        assert result.job_details is not None
         assert result.job_details.get("job_id") == expected_job_id
         assert result.error_message is None
 
@@ -207,6 +208,7 @@ class TestManualRunAPScheduler:
         result = await schedule_service.run_schedule_manually(999)
 
         assert result.success is False
+        assert result.job_details is not None
         assert result.job_details.get("job_id") is None
         assert result.error_message == "Schedule not found"
 
@@ -228,6 +230,7 @@ class TestManualRunAPScheduler:
         result = await schedule_service.run_schedule_manually(test_schedule.id)
 
         assert result.success is False
+        assert result.job_details is not None
         assert result.job_details.get("job_id") is None
         assert result.error_message is not None
         assert (
@@ -246,7 +249,7 @@ class TestManualRunAPScheduler:
         """Test the API endpoint for manual run with APScheduler approach"""
         # Setup dependency override
         mock_scheduler_service = AsyncMock()
-        expected_job_id = str(uuid.uuid4())
+        expected_job_id = uuid.uuid4()
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
         schedule_service = ScheduleService(test_db, mock_scheduler_service)
@@ -370,12 +373,13 @@ class TestManualRunAPScheduler:
         """Test scheduler service with properly mocked dependencies (no patching)"""
         # Create a mock job manager that tracks calls
         mock_job_manager = Mock(spec=JobManagerProtocol)
-        mock_job_manager.create_composite_job = AsyncMock(return_value="test-job-123")
+        test_job_id = uuid.uuid4()
+        mock_job_manager.create_composite_job = AsyncMock(return_value=test_job_id)
 
         # Create a mock job service factory
         mock_job_service = Mock()
         mock_job_service.create_backup_job = AsyncMock(
-            return_value={"job_id": "test-job-123"}
+            return_value={"job_id": test_job_id}
         )
         mock_job_service_factory = Mock(return_value=mock_job_service)
 
