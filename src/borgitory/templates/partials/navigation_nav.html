@@ -1,177 +1,153 @@
 <!-- Navigation buttons only (extracted from navigation.html) -->
 <nav class="mt-4">
     <div class="px-2 sm:px-4 space-y-1 sm:space-y-2">
-        <button
-            hx-get="/api/tabs/repositories"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/repositories"
-            id="nav-repositories"
-            class="nav-item {% if active_tab == 'repositories' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/repositories"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/repositories"
+                id="nav-repositories"
+                class="nav-item {% if active_tab == 'repositories' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2V7z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2V7z">
+                </path>
             </svg>
             <span>Repositories</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/backups"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/backups"
-            id="nav-backups"
-            class="nav-item {% if active_tab == 'backups' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/backups"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/backups"
+                id="nav-backups"
+                class="nav-item {% if active_tab == 'backups' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4">
+                </path>
             </svg>
             <span>Backups</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/schedules"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/schedules"
-            id="nav-schedules"
-            class="nav-item {% if active_tab == 'schedules' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/schedules"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/schedules"
+                id="nav-schedules"
+                class="nav-item {% if active_tab == 'schedules' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z">
+                </path>
             </svg>
             <span>Schedules</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/cloud-sync"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/cloud-sync"
-            id="nav-cloud-sync"
-            class="nav-item {% if active_tab == 'cloud-sync' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/cloud-sync"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/cloud-sync"
+                id="nav-cloud-sync"
+                class="nav-item {% if active_tab == 'cloud-sync' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10">
+                </path>
             </svg>
             <span>Cloud Sync</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/archives"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/archives"
-            id="nav-archives"
-            class="nav-item {% if active_tab == 'archives' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/archives"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/archives"
+                id="nav-archives"
+                class="nav-item {% if active_tab == 'archives' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                </path>
             </svg>
             <span>Archives</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/statistics"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/statistics"
-            id="nav-statistics"
-            class="nav-item {% if active_tab == 'statistics' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/statistics"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/statistics"
+                id="nav-statistics"
+                class="nav-item {% if active_tab == 'statistics' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                </path>
             </svg>
             <span>Statistics</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/prune"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/prune"
-            id="nav-cleanup"
-            class="nav-item {% if active_tab == 'prune' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/prune"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/prune"
+                id="nav-cleanup"
+                class="nav-item {% if active_tab == 'prune' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                </path>
             </svg>
             <span>Archive Pruning</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/notifications"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/notifications"
-            id="nav-notifications"
-            class="nav-item {% if active_tab == 'notifications' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/notifications"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/notifications"
+                id="nav-notifications"
+                class="nav-item {% if active_tab == 'notifications' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9v4l-2 2v1h18v-1l-2-2V9c0-3.87-3.13-7-7-7zm0 18c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9v4l-2 2v1h18v-1l-2-2V9c0-3.87-3.13-7-7-7zm0 18c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2z">
+                </path>
             </svg>
             <span>Notifications</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/packages"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/packages"
-            id="nav-packages"
-            class="nav-item {% if active_tab == 'packages' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/packages"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/packages"
+                id="nav-packages"
+                class="nav-item {% if active_tab == 'packages' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4">
+                </path>
             </svg>
             <span>Package Manager</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/jobs"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/jobs"
-            id="nav-jobs"
-            class="nav-item {% if active_tab == 'jobs' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/jobs"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/jobs"
+                id="nav-jobs"
+                class="nav-item {% if active_tab == 'jobs' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
+                </path>
             </svg>
             <span>Job History</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/repository-check"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/repository-check"
-            id="nav-repository-check"
-            class="nav-item {% if active_tab == 'repository-check' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/repository-check"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/repository-check"
+                id="nav-repository-check"
+                class="nav-item {% if active_tab == 'repository-check' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z">
+                </path>
             </svg>
             <span>Repository Check</span>
         </button>
-
-        <button
-            hx-get="/api/tabs/debug"
-            hx-target="#main-content"
-            hx-swap="innerHTML"
-            hx-push-url="/debug"
-            id="nav-debug"
-            class="nav-item {% if active_tab == 'debug' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3"
-        >
+        <button hx-get="/api/tabs/debug"
+                hx-target="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="/debug"
+                id="nav-debug"
+                class="nav-item {% if active_tab == 'debug' %}active{% endif %} w-full text-left px-2 sm:px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 flex items-center space-x-2 sm:space-x-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <!-- Bug body -->
-                <ellipse cx="12" cy="12" rx="4" ry="6" stroke-width="2"/>
+                <ellipse cx="12" cy="12" rx="4" ry="6" stroke-width="2" />
                 <!-- Bug head -->
-                <circle cx="12" cy="7" r="2" stroke-width="2"/>
+                <circle cx="12" cy="7" r="2" stroke-width="2" />
                 <!-- Bug legs -->
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10l-3-1M16 10l3-1M8 14l-3 1M16 14l3 1M8 18l-2 2M16 18l2 2"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10l-3-1M16 10l3-1M8 14l-3 1M16 14l3 1M8 18l-2 2M16 18l2 2" />
                 <!-- Bug antennae -->
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 5l-1-2M14 5l1-2"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 5l-1-2M14 5l1-2" />
             </svg>
             <span>Debug Info</span>
         </button>

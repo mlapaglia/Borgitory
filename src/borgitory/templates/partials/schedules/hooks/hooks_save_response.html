@@ -1,25 +1,20 @@
 <!-- Hooks Save Response - Updates parent form and closes modal -->
-
 <!-- Close the modal -->
 <div id="modal-container" hx-swap-oob="innerHTML"></div>
-
 <!-- Update parent form fields via OOB swap -->
-<input type="hidden" 
-       name="pre_job_hooks" 
-       id="pre-hooks-data" 
+<input type="hidden"
+       name="pre_job_hooks"
+       id="pre-hooks-data"
        value="{{ pre_hooks_json if pre_hooks_json else '' }}"
        hx-swap-oob="true">
-
 <!-- Update parent form fields via OOB swap -->
-<input type="hidden" 
-       name="post_job_hooks" 
-       id="post-hooks-data" 
+<input type="hidden"
+       name="post_job_hooks"
+       id="post-hooks-data"
        value="{{ post_hooks_json if post_hooks_json else '' }}"
        hx-swap-oob="true">
-
 <!-- Update hooks button text via OOB swap -->
 <span hx-swap-oob="innerHTML:#hooks-button-text">Pre/Post Job Hooks</span>
-
 <!-- Update the entire button to ensure proper layout -->
 <button type="button"
         class="flex items-stretch w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden"
@@ -29,8 +24,10 @@
         hx-swap-oob="outerHTML:[hx-post*='hooks-modal']">
     <span class="flex-1 px-4 py-2 text-left" id="hooks-button-text">Pre/Post Job Hooks</span>
     {% if total_count > 0 %}
-        <span class="flex items-center justify-center px-3 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]" id="hooks-count-badge">{{ total_count }}</span>
+        <span class="flex items-center justify-center px-3 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]"
+              id="hooks-count-badge">{{ total_count }}</span>
     {% else %}
-        <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]" id="hooks-count-badge">{{ total_count }}</span>
+        <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]"
+              id="hooks-count-badge">{{ total_count }}</span>
     {% endif %}
 </button>

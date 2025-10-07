@@ -1,17 +1,16 @@
 <!-- Notifications Tab -->
 <div id="tab-notifications" class="tab-content">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Notification Configuration</h2>
-        
+        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+            Notification Configuration
+        </h2>
         <!-- Status notifications -->
         <div id="notification-status"></div>
-        
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Add Form / Edit Form Container -->
             <div id="notification-form-container">
                 {% include "partials/notifications/add_form.html" %}
             </div>
-            
             <!-- Existing Notifications List -->
             {% include "partials/notifications/list.html" %}
         </div>

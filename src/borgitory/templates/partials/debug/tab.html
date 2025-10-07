@@ -4,36 +4,35 @@
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Debug Information</h1>
-                <p class="text-gray-600 dark:text-gray-300 mt-1">System information for troubleshooting</p>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">
+                    System information for troubleshooting
+                </p>
             </div>
-            <button 
-                hx-get="/api/debug/html"
-                hx-target="#debug-info-container"
-                hx-swap="innerHTML"
-                hx-indicator="#debug-loading"
-                id="refresh-debug-btn"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center space-x-2"
-            >
+            <button hx-get="/api/debug/html"
+                    hx-target="#debug-info-container"
+                    hx-swap="innerHTML"
+                    hx-indicator="#debug-loading"
+                    id="refresh-debug-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center space-x-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                    </path>
                 </svg>
                 <span>Refresh</span>
             </button>
         </div>
-
         <!-- Debug Info Container -->
-        <div 
-            id="debug-info-container" 
-            class="space-y-6"
-            hx-get="/api/debug/html"
-            hx-trigger="revealed"
-            hx-swap="innerHTML"
-            hx-indicator="#debug-loading">
-        </div>
-        
+        <div id="debug-info-container"
+             class="space-y-6"
+             hx-get="/api/debug/html"
+             hx-trigger="revealed"
+             hx-swap="innerHTML"
+             hx-indicator="#debug-loading"></div>
         <!-- Loading Indicator -->
-        <div id="debug-loading" class="[&.htmx-request]:block hidden text-center py-8">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <div id="debug-loading"
+             class="[&.htmx-request]:block hidden text-center py-8">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4">
+            </div>
             <p class="text-gray-500 dark:text-gray-400">Loading debug information...</p>
         </div>
     </div>

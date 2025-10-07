@@ -2,15 +2,12 @@
 <div hx-get="/api/shared/notification?message=Schedule created successfully!&type=success"
      hx-target="body"
      hx-swap="beforeend"
-     hx-trigger="load">
-</div>
-
+     hx-trigger="load"></div>
 <!-- Trigger schedule list refresh -->
 <div hx-trigger="load"
      hx-swap="none"
      hx-on::load="document.body.dispatchEvent(new CustomEvent('scheduleUpdate'))">
 </div>
-
 <script>
 // Reset form fields (keeping this JavaScript for complex form logic)
 (function() {

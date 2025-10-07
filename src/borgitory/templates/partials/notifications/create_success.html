@@ -2,12 +2,9 @@
 <div hx-get="/api/shared/notification?type=success&message=Notification configuration '{{ config_name }}' added successfully!"
      hx-target="#notification-status"
      hx-swap="innerHTML"
-     hx-trigger="load">
-</div>
-
+     hx-trigger="load"></div>
 <!-- Reset form by loading clean form -->
 <div hx-get="/api/notifications/form"
      hx-target="#notification-form-container"
      hx-swap="innerHTML"
-     hx-trigger="load delay:100ms">
-</div>
+     hx-trigger="load delay:100ms"></div>

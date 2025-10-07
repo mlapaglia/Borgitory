@@ -46,6 +46,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff>=0.12.11",
+    "djlint>=1.36.4",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
@@ -234,6 +235,19 @@ module = [
     "sse_starlette.*",
 ]
 ignore_missing_imports = true
+
+[tool.djlint]
+profile = "jinja"
+indent = 4
+max_line_length = 88
+per_file_ignores = [
+    "src/borgitory/templates/partials/archives/directory_contents.html:J018",
+    "src/borgitory/templates/partials/auth/login_form_active.html:J018",
+    "src/borgitory/templates/partials/auth/register_form_active.html:J018",
+    "src/borgitory/templates/partials/repositories/modal/details_modal.html:J018",
+    "src/borgitory/templates/base.html:J004",
+]
+ignore="H021,J004,J018"
 
 [tool.pyright]
 include = ["src", "tests"]

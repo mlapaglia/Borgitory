@@ -2,8 +2,12 @@
 {% if stats.error is defined %}
     <div class="bg-red-50 border border-red-200 rounded-lg p-4">
         <div class="flex items-center">
-            <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            <svg class="w-5 h-5 text-red-400 mr-2"
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                </path>
             </svg>
             <span class="text-red-700 font-semibold">Error loading statistics:</span>
         </div>
@@ -14,8 +18,12 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-blue-50 rounded-lg p-4">
             <div class="flex items-center">
-                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                <svg class="w-8 h-8 text-blue-600"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                    </path>
                 </svg>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-blue-600">Total Archives</p>
@@ -23,11 +31,14 @@
                 </div>
             </div>
         </div>
-
         <div class="bg-green-50 rounded-lg p-4">
             <div class="flex items-center">
-                <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                <svg class="w-8 h-8 text-green-600"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4">
+                    </path>
                 </svg>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-green-600">Space Saved</p>
@@ -35,49 +46,61 @@
                 </div>
             </div>
         </div>
-
         <div class="bg-purple-50 rounded-lg p-4">
             <div class="flex items-center">
-                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                <svg class="w-8 h-8 text-purple-600"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
+                    </path>
                 </svg>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-purple-600">Compression</p>
-                    <p class="text-2xl font-bold text-purple-900">{{ stats.summary.overall_compression_ratio }}%</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-yellow-50 rounded-lg p-4">
-            <div class="flex items-center">
-                <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
-                </svg>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-yellow-600">Deduplication</p>
-                    <p class="text-2xl font-bold text-yellow-900">{{ stats.summary.overall_deduplication_ratio }}%</p>
-                </div>
-            </div>
-        </div>
-
-        {% if stats.execution_time_stats and stats.execution_time_stats|length > 0 %}
-        <div class="bg-indigo-50 rounded-lg p-4">
-            <div class="flex items-center">
-                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-indigo-600">Avg Task Time</p>
-                    <p class="text-2xl font-bold text-indigo-900">
-                        {% set avg_time = (stats.execution_time_stats | sum(attribute='average_duration_minutes') / stats.execution_time_stats|length) | round(1) %}
-                        {{ avg_time }} min
+                    <p class="text-2xl font-bold text-purple-900">
+                        {{ stats.summary.overall_compression_ratio }}%
                     </p>
                 </div>
             </div>
         </div>
+        <div class="bg-yellow-50 rounded-lg p-4">
+            <div class="flex items-center">
+                <svg class="w-8 h-8 text-yellow-600"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z">
+                    </path>
+                </svg>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-yellow-600">Deduplication</p>
+                    <p class="text-2xl font-bold text-yellow-900">
+                        {{ stats.summary.overall_deduplication_ratio }}%
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% if stats.execution_time_stats and stats.execution_time_stats|length > 0 %}
+            <div class="bg-indigo-50 rounded-lg p-4">
+                <div class="flex items-center">
+                    <svg class="w-8 h-8 text-indigo-600"
+                         fill="none"
+                         stroke="currentColor"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z">
+                        </path>
+                    </svg>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-indigo-600">Avg Task Time</p>
+                        <p class="text-2xl font-bold text-indigo-900">
+                            {% set avg_time = (stats.execution_time_stats | sum(attribute='average_duration_minutes') / stats.execution_time_stats|length) | round(1) %}
+                            {{ avg_time }} min
+                        </p>
+                    </div>
+                </div>
+            </div>
         {% endif %}
     </div>
-
     <!-- Charts -->
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <!-- Repository Size Over Time -->
@@ -87,15 +110,15 @@
                 <canvas id="sizeChart"></canvas>
             </div>
         </div>
-
         <!-- Compression & Deduplication Ratios -->
         <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Compression & Deduplication Ratios</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                Compression & Deduplication Ratios
+            </h3>
             <div class="relative h-64">
                 <canvas id="ratioChart"></canvas>
             </div>
         </div>
-
         <!-- File Types by Count Over Time -->
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">File Types by Count Over Time</h3>
@@ -103,7 +126,6 @@
                 <canvas id="fileTypeCountChart"></canvas>
             </div>
         </div>
-
         <!-- File Types by Size Over Time -->
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">File Types by Size Over Time</h3>
@@ -111,38 +133,36 @@
                 <canvas id="fileTypeSizeChart"></canvas>
             </div>
         </div>
-
         <!-- Job Execution Times -->
         {% if stats.execution_time_stats and stats.execution_time_stats|length > 0 %}
-        <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Average Job Execution Times</h3>
-            <div class="relative h-64">
-                <canvas id="executionTimeChart"></canvas>
+            <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Average Job Execution Times</h3>
+                <div class="relative h-64">
+                    <canvas id="executionTimeChart"></canvas>
+                </div>
             </div>
-        </div>
         {% endif %}
-
         <!-- Success/Failure Rates by Task Type -->
         {% if stats.success_failure_stats and stats.success_failure_stats|length > 0 %}
-        <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Task Success & Failure Rates</h3>
-            <div class="relative h-64">
-                <canvas id="successFailureChart"></canvas>
+            <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Task Success & Failure Rates</h3>
+                <div class="relative h-64">
+                    <canvas id="successFailureChart"></canvas>
+                </div>
             </div>
-        </div>
         {% endif %}
-
         <!-- Backup Success/Failure Timeline -->
         {% if stats.timeline_success_failure and stats.timeline_success_failure.labels|length > 0 %}
-        <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Backup Success/Failure Timeline (Last 30 Days)</h3>
-            <div class="relative h-64">
-                <canvas id="timelineSuccessFailureChart"></canvas>
+            <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                    Backup Success/Failure Timeline (Last 30 Days)
+                </h3>
+                <div class="relative h-64">
+                    <canvas id="timelineSuccessFailureChart"></canvas>
+                </div>
             </div>
-        </div>
         {% endif %}
     </div>
-
     <!-- Detailed Statistics Table -->
     <div class="mt-6 bg-white rounded-lg shadow overflow-hidden">
         <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
@@ -167,67 +187,70 @@
                     <span class="font-semibold text-gray-900 ml-2">{{ stats.summary.average_archive_size_gb }} GB</span>
                 </div>
             </div>
-
             <!-- Execution Time Statistics -->
             {% if stats.execution_time_stats and stats.execution_time_stats|length > 0 %}
-            <div class="mt-6 pt-6 border-t border-gray-200">
-                <h4 class="text-md font-semibold text-gray-900 mb-4">Job Execution Statistics</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                    {% for stat in stats.execution_time_stats %}
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="font-semibold text-gray-900 mb-2">{{ stat.task_type.replace('_', ' ').title() }}</div>
-                        <div class="space-y-1">
-                            <div>
-                                <span class="text-gray-600">Avg Duration:</span>
-                                <span class="font-medium text-gray-900 ml-1">{{ stat.average_duration_minutes }} min</span>
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h4 class="text-md font-semibold text-gray-900 mb-4">Job Execution Statistics</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                        {% for stat in stats.execution_time_stats %}
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="font-semibold text-gray-900 mb-2">
+                                    {{ stat.task_type.replace('_', ' ').title() }}
+                                </div>
+                                <div class="space-y-1">
+                                    <div>
+                                        <span class="text-gray-600">Avg Duration:</span>
+                                        <span class="font-medium text-gray-900 ml-1">{{ stat.average_duration_minutes }} min</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600">Total Runs:</span>
+                                        <span class="font-medium text-gray-900 ml-1">{{ stat.total_executions }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600">Range:</span>
+                                        <span class="font-medium text-gray-900 ml-1">{{ stat.min_duration_minutes }}-{{ stat.max_duration_minutes }} min</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <span class="text-gray-600">Total Runs:</span>
-                                <span class="font-medium text-gray-900 ml-1">{{ stat.total_executions }}</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-600">Range:</span>
-                                <span class="font-medium text-gray-900 ml-1">{{ stat.min_duration_minutes }}-{{ stat.max_duration_minutes }} min</span>
-                            </div>
-                        </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
                 </div>
-            </div>
             {% endif %}
-
             <!-- Success/Failure Statistics -->
             {% if stats.success_failure_stats and stats.success_failure_stats|length > 0 %}
-            <div class="mt-6 pt-6 border-t border-gray-200">
-                <h4 class="text-md font-semibold text-gray-900 mb-4">Task Success/Failure Statistics</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                    {% for stat in stats.success_failure_stats %}
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="font-semibold text-gray-900 mb-2">{{ stat.task_type.replace('_', ' ').title() }}</div>
-                        <div class="space-y-1">
-                            <div>
-                                <span class="text-gray-600">Success Rate:</span>
-                                <span class="font-medium text-green-700 ml-1">{{ stat.success_rate }}%</span>
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h4 class="text-md font-semibold text-gray-900 mb-4">
+                        Task Success/Failure Statistics
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                        {% for stat in stats.success_failure_stats %}
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="font-semibold text-gray-900 mb-2">
+                                    {{ stat.task_type.replace('_', ' ').title() }}
+                                </div>
+                                <div class="space-y-1">
+                                    <div>
+                                        <span class="text-gray-600">Success Rate:</span>
+                                        <span class="font-medium text-green-700 ml-1">{{ stat.success_rate }}%</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600">Successful:</span>
+                                        <span class="font-medium text-green-700 ml-1">{{ stat.successful_count }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600">Failed:</span>
+                                        <span class="font-medium text-red-700 ml-1">{{ stat.failed_count }}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <span class="text-gray-600">Successful:</span>
-                                <span class="font-medium text-green-700 ml-1">{{ stat.successful_count }}</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-600">Failed:</span>
-                                <span class="font-medium text-red-700 ml-1">{{ stat.failed_count }}</span>
-                            </div>
-                        </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
                 </div>
-            </div>
             {% endif %}
         </div>
     </div>
-
     <!-- Chart data for HTMX initialization -->
-    <div id="chart-data" 
+    <div id="chart-data"
          data-size-chart='{{ stats.size_over_time | tojson }}'
          data-ratio-chart='{{ stats.dedup_compression_stats | tojson }}'
          data-file-type-count-chart='{{ stats.file_type_stats.count_chart | tojson }}'
@@ -235,9 +258,7 @@
          {% if stats.execution_time_chart %}data-execution-time-chart='{{ stats.execution_time_chart | tojson }}'{% endif %}
          {% if stats.success_failure_chart %}data-success-failure-chart='{{ stats.success_failure_chart | tojson }}'{% endif %}
          {% if stats.timeline_success_failure %}data-timeline-success-failure-chart='{{ stats.timeline_success_failure | tojson }}'{% endif %}
-         style="display: none;">
-    </div>
-
+         style="display: none"></div>
     <!-- Initialize charts when this template loads -->
     <script>
     (function() {
