@@ -8,12 +8,13 @@ import logging
 import re
 import inspect
 from typing import Dict, List, Optional, Callable, TYPE_CHECKING, cast
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from borgitory.constants.retention import RetentionFieldHandler
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.services.rclone_service import RcloneService
@@ -301,7 +302,7 @@ class JobExecutor:
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        db_session_factory: Callable[[], "Session"],
+        session_maker: "async_sessionmaker[AsyncSession]",
         rclone_service: RcloneService,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
@@ -314,7 +315,7 @@ class JobExecutor:
         Args:
             repository_path: Path to the borg repository
             cloud_sync_config_id: ID of the cloud sync configuration
-            db_session_factory: Factory for database sessions (required)
+            session_maker: Async session maker for database sessions (required)
             rclone_service: Rclone service instance for cloud operations (required)
             encryption_service: Service for encrypting/decrypting sensitive fields (required)
             storage_factory: Factory for creating cloud storage instances (required)
@@ -326,20 +327,20 @@ class JobExecutor:
         """
         try:
             from borgitory.models.database import CloudSyncConfig
-
-            session_factory = db_session_factory
+            from sqlalchemy import select
 
             logger.info(f"Starting cloud sync for repository {repository_path}")
 
             if output_callback:
                 output_callback("Starting cloud sync...")
 
-            with session_factory() as db:
-                config = (
-                    db.query(CloudSyncConfig)
-                    .filter(CloudSyncConfig.id == cloud_sync_config_id)
-                    .first()
+            async with session_maker() as db:
+                result = await db.execute(
+                    select(CloudSyncConfig).where(
+                        CloudSyncConfig.id == cloud_sync_config_id
+                    )
                 )
+                config = result.scalar_one_or_none()
 
                 if not config or not config.enabled:
                     logger.info(

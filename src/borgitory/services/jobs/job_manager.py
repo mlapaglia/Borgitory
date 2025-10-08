@@ -14,7 +14,6 @@ from typing import (
     List,
     AsyncGenerator,
     TYPE_CHECKING,
-    Any,
 )
 
 from borgitory.models.job_results import JobStatusEnum, JobStatus, JobTypeEnum
@@ -69,12 +68,7 @@ class JobManager:
         self.queue_manager = dependencies.queue_manager
         self.event_broadcaster = dependencies.event_broadcaster
         self.database_manager = dependencies.database_manager
-        # Use semantic type alias for application-scoped notification service
-        from borgitory.dependencies import ApplicationScopedNotificationService
-
-        self.notification_service: Optional[ApplicationScopedNotificationService] = (
-            dependencies.notification_service
-        )
+        self.notification_service = dependencies.notification_service
 
         self.jobs: Dict[uuid.UUID, BorgJob] = {}
         self._processes: Dict[uuid.UUID, asyncio.subprocess.Process] = {}
@@ -93,56 +87,40 @@ class JobManager:
             self.executor,
             self.output_manager,
             self.event_broadcaster,
+            self.database_manager,
         )
         self.prune_executor = PruneTaskExecutor(
-            self.executor, self.output_manager, self.event_broadcaster
+            self.executor,
+            self.output_manager,
+            self.event_broadcaster,
+            self.database_manager,
         )
         self.check_executor = CheckTaskExecutor(
-            self.executor, self.output_manager, self.event_broadcaster
+            self.executor,
+            self.output_manager,
+            self.event_broadcaster,
+            self.database_manager,
         )
         self.cloud_sync_executor = CloudSyncTaskExecutor(
-            self.executor, self.output_manager, self.event_broadcaster
+            self.executor,
+            self.output_manager,
+            self.event_broadcaster,
+            self.dependencies.async_session_maker,
+            self.dependencies.rclone_service,
+            self.dependencies.encryption_service,
+            self.dependencies.storage_factory,
+            self.dependencies.provider_registry,
+            self.database_manager,
         )
         self.notification_executor = NotificationTaskExecutor(
-            self.executor, self.output_manager, self.event_broadcaster
+            self.executor,
+            self.output_manager,
+            self.event_broadcaster,
+            self.dependencies.async_session_maker,
+            self.dependencies.notification_service,
         )
         self.hook_executor = HookTaskExecutor(
             self.executor, self.output_manager, self.event_broadcaster
-        )
-
-        # Inject repository data getter into executors
-        for executor in [
-            self.backup_executor,
-            self.prune_executor,
-            self.check_executor,
-            self.cloud_sync_executor,
-        ]:
-            setattr(executor, "_get_repository_data", self._get_repository_data)
-
-        # Inject dependencies into cloud sync executor
-        setattr(
-            self.cloud_sync_executor,
-            "_get_dependencies",
-            self._get_cloud_sync_dependencies,
-        )
-
-        # Inject notification service and database session factory into notification executor
-        setattr(
-            self.notification_executor,
-            "_get_notification_service",
-            self._get_notification_service,
-        )
-        setattr(
-            self.notification_executor,
-            "_get_db_session_factory",
-            self._get_db_session_factory,
-        )
-
-        # Inject hook execution service into hook executor
-        setattr(
-            self.hook_executor,
-            "_get_hook_execution_service",
-            self._get_hook_execution_service,
         )
 
     def _setup_callbacks(self) -> None:
@@ -741,43 +719,6 @@ class JobManager:
         finally:
             if job.id in self._processes:
                 del self._processes[job.id]
-
-    # Dependency injection methods for task executors
-    async def _get_repository_data(
-        self, repository_id: int
-    ) -> Optional[Dict[str, Any]]:
-        """Get repository data by ID"""
-        if hasattr(self, "database_manager") and self.database_manager:
-            try:
-                return await self.database_manager.get_repository_data(repository_id)
-            except Exception as e:
-                logger.error(
-                    f"Error getting repository data from database manager: {e}"
-                )
-
-        return None
-
-    async def _get_cloud_sync_dependencies(self) -> Optional[Dict[str, Any]]:
-        """Get cloud sync dependencies"""
-        return {
-            "db_session_factory": self.dependencies.db_session_factory,
-            "rclone_service": self.dependencies.rclone_service,
-            "encryption_service": self.dependencies.encryption_service,
-            "storage_factory": self.dependencies.storage_factory,
-            "provider_registry": self.dependencies.provider_registry,
-        }
-
-    async def _get_notification_service(self) -> Optional[Any]:
-        """Get notification service"""
-        return self.notification_service
-
-    async def _get_db_session_factory(self) -> Optional[Any]:
-        """Get database session factory"""
-        return self.dependencies.db_session_factory
-
-    async def _get_hook_execution_service(self) -> Optional[Any]:
-        """Get hook execution service"""
-        return self.dependencies.hook_execution_service
 
     # Public API methods
     def subscribe_to_events(self) -> Optional[asyncio.Queue[JobEvent]]:

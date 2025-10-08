@@ -4,8 +4,12 @@ Cloud Sync Task Executor - Handles cloud sync task execution
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Dict
+from borgitory.services.cloud_providers.registry import ProviderRegistry
+from borgitory.services.cloud_providers.service import StorageFactory
+from borgitory.services.encryption_service import EncryptionService
 from borgitory.services.jobs.broadcaster.event_type import EventType
+from borgitory.services.rclone_service import RcloneService
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 from borgitory.protocols.job_event_broadcaster_protocol import (
@@ -13,6 +17,8 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 )
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
+from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +31,22 @@ class CloudSyncTaskExecutor:
         job_executor: ProcessExecutorProtocol,
         output_manager: JobOutputManagerProtocol,
         event_broadcaster: JobEventBroadcasterProtocol,
+        session_maker: async_sessionmaker[AsyncSession],
+        rclone_service: RcloneService,
+        encryption_service: EncryptionService,
+        storage_factory: StorageFactory,
+        provider_registry: ProviderRegistry,
+        database_manager: JobDatabaseManagerProtocol,
     ):
+        self.session_maker = session_maker
+        self.rclone_service = rclone_service
+        self.encryption_service = encryption_service
+        self.storage_factory = storage_factory
+        self.provider_registry = provider_registry
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
+        self.database_manager = database_manager
 
     async def execute_cloud_sync_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
@@ -40,7 +58,7 @@ class CloudSyncTaskExecutor:
             task.status = TaskStatusEnum.FAILED
             task.error = "Repository ID is missing"
             return False
-        repo_data = await self._get_repository_data(job.repository_id)
+        repo_data = await self.database_manager.get_repository_data(job.repository_id)
         if not repo_data:
             task.status = TaskStatusEnum.FAILED
             task.return_code = 1
@@ -107,27 +125,14 @@ class CloudSyncTaskExecutor:
             )
             return True
 
-        # Get dependencies from the job manager
-        dependencies = await self._get_dependencies()
-        if not dependencies:
-            task.status = TaskStatusEnum.FAILED
-            task.error = "Missing required cloud sync dependencies"
-            return False
-
-        # Create a wrapper to convert context manager to direct session
-        db_factory = dependencies["db_session_factory"]
-
-        def session_factory() -> Any:
-            return db_factory().__enter__()
-
         result = await self.job_executor.execute_cloud_sync_task(
             repository_path=str(repository_path or ""),
             cloud_sync_config_id=cloud_sync_config_id,
-            db_session_factory=session_factory,
-            rclone_service=dependencies["rclone_service"],
-            encryption_service=dependencies["encryption_service"],
-            storage_factory=dependencies["storage_factory"],
-            provider_registry=dependencies["provider_registry"],
+            session_maker=self.session_maker,
+            rclone_service=self.rclone_service,
+            encryption_service=self.encryption_service,
+            storage_factory=self.storage_factory,
+            provider_registry=self.provider_registry,
             output_callback=task_output_callback,
         )
 
@@ -142,15 +147,3 @@ class CloudSyncTaskExecutor:
             task.error = result.error
 
         return bool(result.return_code == 0)
-
-    async def _get_repository_data(
-        self, repository_id: int
-    ) -> Optional[Dict[str, Any]]:
-        """Get repository data by ID - this will be injected by the job manager"""
-        # This method will be overridden by the job manager
-        return None
-
-    async def _get_dependencies(self) -> Optional[Dict[str, Any]]:
-        """Get dependencies - this will be injected by the job manager"""
-        # This method will be overridden by the job manager
-        return None

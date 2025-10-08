@@ -25,6 +25,7 @@ def get_data_dir() -> str:
 DATA_DIR = get_data_dir()
 DATABASE_PATH = os.path.join(DATA_DIR, "borgitory.db")
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+ASYNC_DATABASE_URL = f"sqlite+aiosqlite:///{DATABASE_PATH}"
 
 
 def get_secret_key() -> str:

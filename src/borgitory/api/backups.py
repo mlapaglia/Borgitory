@@ -1,7 +1,8 @@
 import logging
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from borgitory.models.database import (
     Repository,
@@ -9,9 +10,8 @@ from borgitory.models.database import (
     CloudSyncConfig,
     NotificationConfig,
     RepositoryCheckConfig,
-    get_db,
 )
-from borgitory.dependencies import TemplatesDep
+from borgitory.dependencies import TemplatesDep, get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -21,22 +21,31 @@ router = APIRouter()
 async def get_backup_form(
     request: Request,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get backup form with all dropdowns populated"""
-    repositories = db.query(Repository).all()
-    prune_configs = db.query(PruneConfig).filter(PruneConfig.enabled.is_(True)).all()
-    cloud_sync_configs = (
-        db.query(CloudSyncConfig).filter(CloudSyncConfig.enabled.is_(True)).all()
+    repositories_result = await db.execute(select(Repository))
+    repositories = list(repositories_result.scalars().all())
+
+    prune_configs_result = await db.execute(
+        select(PruneConfig).where(PruneConfig.enabled.is_(True))
     )
-    notification_configs = (
-        db.query(NotificationConfig).filter(NotificationConfig.enabled.is_(True)).all()
+    prune_configs = list(prune_configs_result.scalars().all())
+
+    cloud_sync_configs_result = await db.execute(
+        select(CloudSyncConfig).where(CloudSyncConfig.enabled.is_(True))
     )
-    check_configs = (
-        db.query(RepositoryCheckConfig)
-        .filter(RepositoryCheckConfig.enabled.is_(True))
-        .all()
+    cloud_sync_configs = list(cloud_sync_configs_result.scalars().all())
+
+    notification_configs_result = await db.execute(
+        select(NotificationConfig).where(NotificationConfig.enabled.is_(True))
     )
+    notification_configs = list(notification_configs_result.scalars().all())
+
+    check_configs_result = await db.execute(
+        select(RepositoryCheckConfig).where(RepositoryCheckConfig.enabled.is_(True))
+    )
+    check_configs = list(check_configs_result.scalars().all())
 
     return templates.TemplateResponse(
         request,

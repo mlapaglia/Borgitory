@@ -4,8 +4,10 @@ from datetime import datetime
 from enum import Enum
 import uuid
 from typing import AsyncGenerator, List, Optional
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import joinedload
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from borgitory.models.database import Job
 from borgitory.models.job_results import JobStatusEnum
@@ -373,20 +375,20 @@ class JobRenderService:
         self.templates = templates
         self.converter = converter or JobDataConverter()
 
-    def get_job_display_data(
-        self, job_id: uuid.UUID, db: Session
+    async def get_job_display_data(
+        self, job_id: uuid.UUID, db: AsyncSession
     ) -> Optional[JobDisplayData]:
         """Get job display data using simplified resolution strategy"""
         try:
             logger.info(f"Getting job {job_id} for display")
 
             # 1. Try database first (authoritative for completed jobs)
-            db_job = (
-                db.query(Job)
+            result = await db.execute(
+                select(Job)
                 .options(joinedload(Job.repository), joinedload(Job.tasks))
-                .filter(Job.id == job_id)
-                .first()
+                .where(Job.id == job_id)
             )
+            db_job = result.scalar_one_or_none()
 
             if db_job and db_job.status in [
                 JobStatusEnum.COMPLETED,
@@ -427,19 +429,22 @@ class JobRenderService:
             logger.error(f"Error getting job display data for {job_id}: {e}")
             return None
 
-    def render_jobs_html(
-        self, db: Session, expand: str = "", browser_tz_offset: Optional[int] = None
+    async def render_jobs_html(
+        self,
+        db: AsyncSession,
+        expand: str = "",
+        browser_tz_offset: Optional[int] = None,
     ) -> str:
         """Render job history as HTML"""
         try:
             # Get recent jobs (last 20) with their tasks
-            db_jobs = (
-                db.query(Job)
+            result = await db.execute(
+                select(Job)
                 .options(joinedload(Job.repository), joinedload(Job.tasks))
                 .order_by(Job.started_at.desc())
                 .limit(20)
-                .all()
             )
+            db_jobs = list(result.scalars().all())
 
             if not db_jobs:
                 return self.templates.get_template(
@@ -559,11 +564,11 @@ class JobRenderService:
                 yield f"data: {line}\n"
             yield "data: \n\n"
 
-    def get_job_for_template(
-        self, job_id: uuid.UUID, db: Session, expand_details: bool = False
+    async def get_job_for_template(
+        self, job_id: uuid.UUID, db: AsyncSession, expand_details: bool = False
     ) -> Optional[TemplateJobData]:
         """Get job data formatted for template rendering"""
-        job_data = self.get_job_display_data(job_id, db)
+        job_data = await self.get_job_display_data(job_id, db)
         if not job_data:
             return None
         return convert_to_template_data(job_data, expand_details)

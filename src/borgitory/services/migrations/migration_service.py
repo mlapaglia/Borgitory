@@ -38,10 +38,10 @@ class MigrationService:
         self.database_ops = database_ops
         self.migration_ops = migration_ops
 
-    def get_current_revision(self) -> Optional[str]:
+    async def get_current_revision(self) -> Optional[str]:
         """Get the current database revision."""
         try:
-            return self.database_ops.get_current_revision()
+            return await self.database_ops.get_current_revision()
         except Exception as e:
             logger.error(f"Failed to get current revision: {e}")
             return None

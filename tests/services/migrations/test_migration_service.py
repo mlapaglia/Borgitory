@@ -67,7 +67,7 @@ class MockDatabaseOperations(DatabaseOperationsProtocol):
         self.current_revision = "abc123def456"
         self.should_raise = False
 
-    def get_current_revision(self) -> Optional[str]:
+    async def get_current_revision(self) -> Optional[str]:
         if self.should_raise:
             raise Exception("Database error")
         return self.current_revision

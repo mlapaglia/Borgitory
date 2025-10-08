@@ -3,6 +3,9 @@ Job Manager Factory - Factory pattern for creating job manager instances with pr
 """
 
 from typing import Optional, Callable, Any
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from borgitory.models.database import async_session_maker
 from borgitory.services.jobs.broadcaster.job_event_broadcaster import (
     get_job_event_broadcaster,
 )
@@ -42,7 +45,6 @@ class JobManagerFactory:
             from borgitory.services.jobs.job_output_manager import JobOutputManager
             from borgitory.services.jobs.job_queue_manager import JobQueueManager
             from borgitory.services.jobs.job_database_manager import JobDatabaseManager
-            from borgitory.utils.db_session import get_db_session
 
             # Create all required core services
             event_broadcaster = JobEventBroadcaster(
@@ -64,7 +66,22 @@ class JobManagerFactory:
             )
 
             database_manager = JobDatabaseManager(
-                db_session_factory=get_db_session,
+                async_session_maker=async_session_maker,
+            )
+
+            # For basic dependencies, we need to provide all required services
+            # Import the required services
+            from borgitory.dependencies import (
+                get_rclone_service,
+                get_encryption_service,
+                get_storage_factory,
+                get_registry_factory,
+                get_provider_registry,
+                get_hook_execution_service,
+                get_notification_service_singleton,
+            )
+            from borgitory.services.notifications.providers.discord_provider import (
+                HttpClient,
             )
 
             custom_dependencies = JobManagerDependencies(
@@ -73,6 +90,16 @@ class JobManagerFactory:
                 output_manager=output_manager,
                 queue_manager=queue_manager,
                 database_manager=database_manager,
+                async_session_maker=async_session_maker,
+                rclone_service=get_rclone_service(),
+                http_client_factory=lambda: HttpClient(),  # type: ignore
+                encryption_service=get_encryption_service(),
+                storage_factory=get_storage_factory(get_rclone_service()),
+                provider_registry=get_provider_registry(
+                    registry_factory=get_registry_factory()
+                ),
+                notification_service=get_notification_service_singleton(),
+                hook_execution_service=get_hook_execution_service(),
             )
 
         # Create core services with proper configuration
@@ -82,9 +109,7 @@ class JobManagerFactory:
             output_manager=custom_dependencies.output_manager,
             queue_manager=custom_dependencies.queue_manager,
             database_manager=custom_dependencies.database_manager,
-            # Use provided dependencies or create new ones
-            subprocess_executor=custom_dependencies.subprocess_executor,
-            db_session_factory=custom_dependencies.db_session_factory,
+            async_session_maker=custom_dependencies.async_session_maker,
             rclone_service=custom_dependencies.rclone_service,
             http_client_factory=custom_dependencies.http_client_factory,
             encryption_service=custom_dependencies.encryption_service,
@@ -92,6 +117,8 @@ class JobManagerFactory:
             provider_registry=custom_dependencies.provider_registry,
             notification_service=custom_dependencies.notification_service,
             hook_execution_service=custom_dependencies.hook_execution_service,
+            # Use provided dependencies or create new ones
+            subprocess_executor=custom_dependencies.subprocess_executor,
         )
 
         # All core services are now required and handled above
@@ -130,7 +157,6 @@ class JobManagerFactory:
         from borgitory.services.jobs.job_output_manager import JobOutputManager
         from borgitory.services.jobs.job_queue_manager import JobQueueManager
         from borgitory.services.jobs.job_database_manager import JobDatabaseManager
-        from borgitory.utils.db_session import get_db_session
 
         command_executor = create_command_executor()
         job_executor = JobExecutor(command_executor)
@@ -146,7 +172,11 @@ class JobManagerFactory:
         )
 
         database_manager = JobDatabaseManager(
-            db_session_factory=get_db_session,
+            async_session_maker=async_session_maker,
+        )
+
+        from borgitory.services.notifications.providers.discord_provider import (
+            HttpClient,
         )
 
         complete_deps = JobManagerDependencies(
@@ -155,7 +185,9 @@ class JobManagerFactory:
             output_manager=output_manager,
             queue_manager=queue_manager,
             database_manager=database_manager,
+            async_session_maker=async_session_maker,
             rclone_service=get_rclone_service(),
+            http_client_factory=lambda: HttpClient(),  # type: ignore
             encryption_service=get_encryption_service(),
             storage_factory=get_storage_factory(get_rclone_service()),
             provider_registry=get_provider_registry(
@@ -172,7 +204,7 @@ class JobManagerFactory:
         cls,
         mock_event_broadcaster: Optional[JobEventBroadcasterProtocol] = None,
         mock_subprocess: Optional[Callable[..., Any]] = None,
-        mock_db_session: Optional[Callable[[], Any]] = None,
+        mock_async_session_maker: Optional[Callable[[], Any]] = None,
         mock_rclone_service: Optional[Any] = None,
         mock_http_client: Optional[Callable[[], Any]] = None,
         config: Optional[JobManagerConfig] = None,
@@ -183,6 +215,7 @@ class JobManagerFactory:
         from unittest.mock import Mock
 
         mock_job_executor = Mock(spec=ProcessExecutorProtocol)
+        mock_async_session_maker = Mock(spec=async_sessionmaker[AsyncSession])
         mock_output_manager = Mock(spec=JobOutputManagerProtocol)
         mock_queue_manager = Mock(spec=JobQueueManagerProtocol)
         mock_database_manager = Mock(spec=JobDatabaseManagerProtocol)
@@ -190,16 +223,30 @@ class JobManagerFactory:
             spec=JobEventBroadcasterProtocol
         )
 
+        # Create mock services for all required dependencies
+        mock_rclone_service = mock_rclone_service or Mock()
+        mock_encryption_service = Mock()
+        mock_storage_factory = Mock()
+        mock_provider_registry = Mock()
+        mock_notification_service = Mock()
+        mock_hook_execution_service = Mock()
+        mock_http_client_factory = mock_http_client or Mock()
+
         test_deps = JobManagerDependencies(
             event_broadcaster=mock_event_broadcaster,
             job_executor=mock_job_executor,
             output_manager=mock_output_manager,
             queue_manager=mock_queue_manager,
             database_manager=mock_database_manager,
+            async_session_maker=mock_async_session_maker,
+            rclone_service=mock_rclone_service or Mock(),
+            http_client_factory=mock_http_client_factory,
+            encryption_service=mock_encryption_service,
+            storage_factory=mock_storage_factory,
+            provider_registry=mock_provider_registry,
+            notification_service=mock_notification_service,
+            hook_execution_service=mock_hook_execution_service,
             subprocess_executor=mock_subprocess,
-            db_session_factory=mock_db_session,
-            rclone_service=mock_rclone_service,
-            http_client_factory=mock_http_client,
         )
 
         return cls.create_dependencies(config=config, custom_dependencies=test_deps)
@@ -226,13 +273,13 @@ def get_default_job_manager_dependencies() -> JobManagerDependencies:
 def get_test_job_manager_dependencies(
     mock_event_broadcaster: JobEventBroadcasterProtocol,
     mock_subprocess: Optional[Callable[..., Any]] = None,
-    mock_db_session: Optional[Callable[[], Any]] = None,
+    mock_async_session_maker: Optional[Callable[[], Any]] = None,
     mock_rclone_service: Optional[Any] = None,
 ) -> JobManagerDependencies:
     """Get job manager dependencies for testing"""
     return JobManagerFactory.create_for_testing(
         mock_event_broadcaster=mock_event_broadcaster,
         mock_subprocess=mock_subprocess,
-        mock_db_session=mock_db_session,
+        mock_async_session_maker=mock_async_session_maker,
         mock_rclone_service=mock_rclone_service,
     )

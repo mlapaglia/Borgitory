@@ -15,8 +15,9 @@ from typing import (
     TYPE_CHECKING,
 )
 from dataclasses import dataclass, field
-from contextlib import _GeneratorContextManager
 import uuid
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.protocols.job_event_broadcaster_protocol import (
@@ -61,7 +62,6 @@ class TaskStatusEnum(str, Enum):
 if TYPE_CHECKING:
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
     from borgitory.dependencies import ApplicationScopedNotificationService
-    from sqlalchemy.orm import Session
     from borgitory.services.notifications.providers.discord_provider import HttpClient
     from borgitory.services.cloud_providers import StorageFactory
     from borgitory.services.encryption_service import EncryptionService
@@ -102,33 +102,19 @@ class JobManagerDependencies:
     output_manager: JobOutputManagerProtocol
     queue_manager: JobQueueManagerProtocol
     database_manager: JobDatabaseManagerProtocol
+    async_session_maker: async_sessionmaker[AsyncSession]
+    rclone_service: "RcloneService"
+    http_client_factory: Callable[[], "HttpClient"]
+    encryption_service: "EncryptionService"
+    storage_factory: "StorageFactory"
+    provider_registry: "ProviderRegistry"
+    notification_service: "ApplicationScopedNotificationService"
+    hook_execution_service: "HookExecutionService"
 
     # External dependencies (for testing/customization)
     subprocess_executor: Optional[Callable[..., Coroutine[None, None, "Process"]]] = (
         field(default_factory=lambda: asyncio.create_subprocess_exec)
     )
-    db_session_factory: Optional[Callable[[], _GeneratorContextManager["Session"]]] = (
-        None
-    )
-    rclone_service: Optional["RcloneService"] = None
-    http_client_factory: Optional[Callable[[], "HttpClient"]] = None
-    encryption_service: Optional["EncryptionService"] = None
-    storage_factory: Optional["StorageFactory"] = None
-    provider_registry: Optional["ProviderRegistry"] = None
-    # Use semantic type alias for application-scoped notification service
-    notification_service: Optional["ApplicationScopedNotificationService"] = None
-    hook_execution_service: Optional["HookExecutionService"] = None
-
-    def __post_init__(self) -> None:
-        """Initialize default dependencies if not provided"""
-        if self.db_session_factory is None:
-            self.db_session_factory = self._default_db_session_factory
-
-    def _default_db_session_factory(self) -> _GeneratorContextManager["Session"]:
-        """Default database session factory"""
-        from borgitory.utils.db_session import get_db_session
-
-        return get_db_session()
 
 
 @dataclass

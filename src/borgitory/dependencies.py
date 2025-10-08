@@ -5,15 +5,18 @@ FastAPI dependency providers for the application.
 from typing import (
     Annotated,
     TYPE_CHECKING,
+    AsyncGenerator,
     Optional,
     Callable,
-    ContextManager,
     Any,
     List,
     Coroutine,
 )
 import asyncio
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from borgitory.models.database import async_session_maker
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.models.enums import EncryptionType
 from borgitory.services.jobs.job_models import TaskStatusEnum, TaskTypeEnum
@@ -39,11 +42,8 @@ if TYPE_CHECKING:
     from borgitory.services.command_execution.wsl_command_executor import (
         WSLCommandExecutor,
     )
-    from sqlalchemy.orm import Session
 from functools import lru_cache
 from fastapi import Depends
-from sqlalchemy.orm import Session
-from borgitory.models.database import SessionLocal, get_db
 from borgitory.utils.template_paths import get_template_directory
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
@@ -127,6 +127,16 @@ if TYPE_CHECKING:
     )
     from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
     from borgitory.factories.service_factory import CloudProviderServiceFactory
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 def get_wsl_command_executor() -> "WSLCommandExecutor":
@@ -229,21 +239,15 @@ def get_job_queue_manager() -> JobQueueManager:
     )
 
 
-def get_job_database_manager(
-    db_session_factory: Optional[Callable[[], ContextManager["Session"]]] = None,
-) -> JobDatabaseManager:
+def get_job_database_manager() -> JobDatabaseManager:
     """
     Provide a JobDatabaseManager instance.
 
     Request-scoped for proper database session management.
     Uses default db_session_factory if none provided.
     """
-    if db_session_factory is None:
-        from borgitory.utils.db_session import get_db_session
 
-        db_session_factory = get_db_session
-
-    return JobDatabaseManager(db_session_factory=db_session_factory)
+    return JobDatabaseManager(async_session_maker)
 
 
 def get_command_runner_config() -> "CommandRunnerConfig":
@@ -367,7 +371,6 @@ def get_notification_service(
 
 
 def get_notification_config_service(
-    db: Session = Depends(get_db),
     notification_service: NotificationService = Depends(get_notification_service),
 ) -> NotificationConfigService:
     """
@@ -375,7 +378,7 @@ def get_notification_config_service(
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return NotificationConfigService(db=db, notification_service=notification_service)
+    return NotificationConfigService(notification_service=notification_service)
 
 
 def get_rclone_service(
@@ -466,13 +469,13 @@ def get_hook_execution_service() -> HookExecutionService:
     return HookExecutionService(command_runner=command_runner)
 
 
-def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinitionBuilder:
+def get_task_definition_builder() -> TaskDefinitionBuilder:
     """
     Provide a TaskDefinitionBuilder instance with database session.
 
     Note: This is not cached because it needs a database session per request.
     """
-    return TaskDefinitionBuilder(db)
+    return TaskDefinitionBuilder()
 
 
 def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
@@ -607,37 +610,32 @@ def get_provider_registry(
     return registry_factory.create_production_registry()
 
 
-def get_configuration_service(db: Session = Depends(get_db)) -> ConfigurationService:
+def get_configuration_service() -> ConfigurationService:
     """
-    Provide ConfigurationService with injected database session.
-
-    Args:
-        db: Database session for configuration queries
+    Provide ConfigurationService.
 
     Returns:
         ConfigurationService: Configured service instance
     """
-    return ConfigurationService(db=db)
+    return ConfigurationService()
 
 
-def get_repository_check_config_service(
-    db: Session = Depends(get_db),
-) -> RepositoryCheckConfigService:
+def get_repository_check_config_service() -> RepositoryCheckConfigService:
     """
-    Provide a RepositoryCheckConfigService instance with database session injection.
+    Provide a RepositoryCheckConfigService instance.
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return RepositoryCheckConfigService(db=db)
+    return RepositoryCheckConfigService()
 
 
-def get_prune_service(db: Session = Depends(get_db)) -> PruneService:
+def get_prune_service() -> PruneService:
     """
     Provide a PruneService instance with database session injection.
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return PruneService(db=db)
+    return PruneService()
 
 
 def get_cron_description_service() -> CronDescriptionService:
@@ -758,6 +756,8 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
         storage_factory=storage_factory,
         provider_registry=provider_registry,
         hook_execution_service=hook_execution_service,
+        async_session_maker=async_session_maker,
+        http_client_factory=lambda: HttpClient(),  # type: ignore
     )
 
     # Use the factory to ensure all dependencies are properly initialized
@@ -809,7 +809,11 @@ def get_scheduler_service_singleton() -> SchedulerService:
     """
     # Resolve dependencies directly (not via FastAPI DI)
     job_manager = get_job_manager_singleton()
-    return SchedulerService(job_manager=job_manager, job_service_factory=None)
+    job_service = get_job_service()
+    return SchedulerService(
+        job_manager=job_manager,
+        job_service=job_service,
+    )
 
 
 def get_scheduler_service_dependency() -> SchedulerService:
@@ -836,7 +840,6 @@ def get_scheduler_service_dependency() -> SchedulerService:
 
 
 def get_schedule_service(
-    db: Session = Depends(get_db),
     scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
 ) -> ScheduleService:
     """
@@ -844,11 +847,10 @@ def get_schedule_service(
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return ScheduleService(db=db, scheduler_service=scheduler_service)
+    return ScheduleService(scheduler_service=scheduler_service)
 
 
 def get_job_service(
-    db: Session = Depends(get_db),
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> JobService:
     """
@@ -856,7 +858,7 @@ def get_job_service(
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return JobService(db, job_manager)
+    return JobService(job_manager)
 
 
 def get_job_stream_service(
@@ -922,7 +924,6 @@ def get_cloud_provider_service_factory(
 
 
 def get_cloud_sync_service(
-    db: Session = Depends(get_db),
     factory: "CloudProviderServiceFactory" = Depends(
         get_cloud_provider_service_factory
     ),
@@ -933,8 +934,8 @@ def get_cloud_sync_service(
     Request-scoped since it depends on database session.
     Uses factory for consistent DI pattern across all services.
     """
-    # **DI CHECK**: Using factory pattern with request-scoped db injection
-    return factory.create_cloud_sync_service(db, "default")
+
+    return factory.create_cloud_sync_service("default")
 
 
 # 📋 SEMANTIC TYPE ALIASES FOR DEPENDENCY INJECTION
@@ -1203,7 +1204,9 @@ def get_recovery_service(
     Returns:
         RecoveryService: New RecoveryService instance for each request
     """
-    return RecoveryService(command_executor=command_executor)
+    return RecoveryService(
+        command_executor=command_executor, session_maker=async_session_maker
+    )
 
 
 RequestScopedRecoveryService = Annotated[RecoveryService, Depends(get_recovery_service)]
@@ -1240,11 +1243,10 @@ RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_servi
 
 
 def get_package_manager_service(
-    db: Session = Depends(get_db),
     command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
 ) -> PackageManagerService:
     """Get PackageManagerService instance with database session."""
-    return PackageManagerService(command_runner=command_runner, db_session=db)
+    return PackageManagerService(command_runner=command_runner)
 
 
 PackageManagerServiceDep = Annotated[
@@ -1273,7 +1275,6 @@ def get_package_restoration_service_for_startup() -> PackageRestorationService:
     """
 
     # The service will manage its own database session during restoration
-    db = SessionLocal()
     from borgitory.config.command_runner_config import CommandRunnerConfig
     from borgitory.services.command_execution.command_executor_factory import (
         create_command_executor,
@@ -1282,7 +1283,5 @@ def get_package_restoration_service_for_startup() -> PackageRestorationService:
     config = CommandRunnerConfig()
     executor = create_command_executor()
     command_runner = SimpleCommandRunner(config=config, executor=executor)
-    package_manager = PackageManagerService(
-        command_runner=command_runner, db_session=db
-    )
+    package_manager = PackageManagerService(command_runner=command_runner)
     return PackageRestorationService(package_manager=package_manager)

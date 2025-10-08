@@ -3,6 +3,8 @@ Protocol interfaces for cloud storage and synchronization services.
 """
 
 from typing import Protocol, List, Optional, Callable, TYPE_CHECKING
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.custom_types import ConfigDict
 
 if TYPE_CHECKING:
@@ -104,43 +106,54 @@ class CloudSyncServiceProtocol(Protocol):
 class CloudSyncConfigServiceProtocol(Protocol):
     """Protocol for cloud sync configuration management (CRUD operations)."""
 
-    def create_cloud_sync_config(
-        self, config: "CloudSyncConfigCreate"
+    async def create_cloud_sync_config(
+        self, config: "CloudSyncConfigCreate", db: "AsyncSession"
     ) -> "CloudSyncConfig":
         """Create a new cloud sync configuration."""
         ...
 
-    def get_cloud_sync_configs(self) -> List["CloudSyncConfig"]:
+    async def get_cloud_sync_configs(
+        self, db: "AsyncSession"
+    ) -> List["CloudSyncConfig"]:
         """Get all cloud sync configurations."""
         ...
 
-    def get_cloud_sync_config_by_id(self, config_id: int) -> "CloudSyncConfig":
+    async def get_cloud_sync_config_by_id(
+        self, config_id: int, db: "AsyncSession"
+    ) -> "CloudSyncConfig":
         """Get a cloud sync configuration by ID."""
         ...
 
-    def update_cloud_sync_config(
-        self, config_id: int, config_update: "CloudSyncConfigUpdate"
+    async def update_cloud_sync_config(
+        self, config_id: int, config_update: "CloudSyncConfigUpdate", db: "AsyncSession"
     ) -> "CloudSyncConfig":
         """Update a cloud sync configuration."""
         ...
 
-    def delete_cloud_sync_config(self, config_id: int) -> None:
+    async def delete_cloud_sync_config(
+        self, config_id: int, db: "AsyncSession"
+    ) -> None:
         """Delete a cloud sync configuration."""
         ...
 
-    def enable_cloud_sync_config(self, config_id: int) -> "CloudSyncConfig":
+    async def enable_cloud_sync_config(
+        self, config_id: int, db: "AsyncSession"
+    ) -> "CloudSyncConfig":
         """Enable a cloud sync configuration."""
         ...
 
-    def disable_cloud_sync_config(self, config_id: int) -> "CloudSyncConfig":
+    async def disable_cloud_sync_config(
+        self, config_id: int, db: "AsyncSession"
+    ) -> "CloudSyncConfig":
         """Disable a cloud sync configuration."""
         ...
 
-    def get_decrypted_config_for_editing(
+    async def get_decrypted_config_for_editing(
         self,
         config_id: int,
         encryption_service: "EncryptionService",
         storage_factory: "StorageFactory",
+        db: "AsyncSession",
     ) -> ConfigDict:
         """Get decrypted configuration for editing."""
         ...

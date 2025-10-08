@@ -7,7 +7,9 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from borgitory.models.database import Schedule, Repository
 
@@ -84,8 +86,7 @@ class ScheduleRunResult:
 class ScheduleService:
     """Service for schedule business logic operations."""
 
-    def __init__(self, db: Session, scheduler_service: "SchedulerService") -> None:
-        self.db = db
+    def __init__(self, scheduler_service: "SchedulerService") -> None:
         self.scheduler_service = scheduler_service
 
     def validate_cron_expression(
@@ -105,20 +106,35 @@ class ScheduleService:
                 success=False, error_message=f"Invalid cron expression: {str(e)}"
             )
 
-    def get_schedule_by_id(self, schedule_id: int) -> Optional[Schedule]:
+    async def get_schedule_by_id(
+        self, schedule_id: int, db: AsyncSession
+    ) -> Optional[Schedule]:
         """Get a schedule by ID."""
-        return self.db.query(Schedule).filter(Schedule.id == schedule_id).first()
+        result = await db.execute(select(Schedule).where(Schedule.id == schedule_id))
+        return result.scalar_one_or_none()
 
-    def get_schedules(self, skip: int = 0, limit: int = 100) -> List[Schedule]:
+    async def get_schedules(
+        self, db: AsyncSession, skip: int = 0, limit: int = 100
+    ) -> List[Schedule]:
         """Get a list of schedules with pagination."""
-        return self.db.query(Schedule).offset(skip).limit(limit).all()
+        result = await db.execute(
+            select(Schedule)
+            .options(joinedload(Schedule.repository))
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
-    def get_all_schedules(self) -> List[Schedule]:
+    async def get_all_schedules(self, db: AsyncSession) -> List[Schedule]:
         """Get all schedules."""
-        return self.db.query(Schedule).all()
+        result = await db.execute(
+            select(Schedule).options(joinedload(Schedule.repository))
+        )
+        return list(result.scalars().all())
 
     async def create_schedule(
         self,
+        db: AsyncSession,
         name: str,
         repository_id: int,
         cron_expression: str,
@@ -138,9 +154,10 @@ class ScheduleService:
         """
         try:
             # Validate repository exists
-            repository = (
-                self.db.query(Repository).filter(Repository.id == repository_id).first()
+            result = await db.execute(
+                select(Repository).where(Repository.id == repository_id)
             )
+            repository = result.scalar_one_or_none()
             if not repository:
                 return ScheduleOperationResult(
                     success=False, error_message="Repository not found"
@@ -167,9 +184,9 @@ class ScheduleService:
             db_schedule.post_job_hooks = post_job_hooks
             db_schedule.patterns = patterns
 
-            self.db.add(db_schedule)
-            self.db.commit()
-            self.db.refresh(db_schedule)
+            db.add(db_schedule)
+            await db.commit()
+            await db.refresh(db_schedule)
 
             # Add to scheduler
             try:
@@ -179,14 +196,14 @@ class ScheduleService:
                 return ScheduleOperationResult(success=True, schedule=db_schedule)
             except Exception as e:
                 # Rollback database changes if scheduler fails
-                self.db.delete(db_schedule)
-                self.db.commit()
+                await db.delete(db_schedule)
+                await db.commit()
                 return ScheduleOperationResult(
                     success=False, error_message=f"Failed to schedule job: {str(e)}"
                 )
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return ScheduleOperationResult(
                 success=False, error_message=f"Failed to create schedule: {str(e)}"
             )
@@ -194,6 +211,7 @@ class ScheduleService:
     async def update_schedule(
         self,
         schedule_id: int,
+        db: AsyncSession,
         update_data: Dict[str, Any],
     ) -> ScheduleOperationResult:
         """
@@ -203,7 +221,7 @@ class ScheduleService:
             ScheduleOperationResult with success status, schedule, and optional error message
         """
         try:
-            schedule = self.get_schedule_by_id(schedule_id)
+            schedule = await self.get_schedule_by_id(schedule_id, db)
             if not schedule:
                 return ScheduleOperationResult(
                     success=False, error_message="Schedule not found"
@@ -213,8 +231,8 @@ class ScheduleService:
             for field, value in update_data.items():
                 setattr(schedule, field, value)
 
-            self.db.commit()
-            self.db.refresh(schedule)
+            await db.commit()
+            await db.refresh(schedule)
 
             # Update the scheduler if enabled
             if schedule.enabled:
@@ -232,12 +250,14 @@ class ScheduleService:
             return ScheduleOperationResult(success=True, schedule=schedule)
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return ScheduleOperationResult(
                 success=False, error_message=f"Failed to update schedule: {str(e)}"
             )
 
-    async def toggle_schedule(self, schedule_id: int) -> ScheduleOperationResult:
+    async def toggle_schedule(
+        self, schedule_id: int, db: AsyncSession
+    ) -> ScheduleOperationResult:
         """
         Toggle a schedule's enabled state.
 
@@ -245,14 +265,14 @@ class ScheduleService:
             ScheduleOperationResult with success status, schedule, and optional error message
         """
         try:
-            schedule = self.get_schedule_by_id(schedule_id)
+            schedule = await self.get_schedule_by_id(schedule_id, db)
             if not schedule:
                 return ScheduleOperationResult(
                     success=False, error_message="Schedule not found"
                 )
 
             schedule.enabled = not schedule.enabled
-            self.db.commit()
+            await db.commit()
 
             # Update scheduler
             try:
@@ -269,12 +289,14 @@ class ScheduleService:
                 )
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return ScheduleOperationResult(
                 success=False, error_message=f"Failed to toggle schedule: {str(e)}"
             )
 
-    async def delete_schedule(self, schedule_id: int) -> ScheduleDeleteResult:
+    async def delete_schedule(
+        self, schedule_id: int, db: AsyncSession
+    ) -> ScheduleDeleteResult:
         """
         Delete a schedule.
 
@@ -282,7 +304,7 @@ class ScheduleService:
             ScheduleDeleteResult with success status, schedule name, and optional error message
         """
         try:
-            schedule = self.get_schedule_by_id(schedule_id)
+            schedule = await self.get_schedule_by_id(schedule_id, db)
             if not schedule:
                 return ScheduleDeleteResult(
                     success=False, error_message="Schedule not found"
@@ -300,18 +322,20 @@ class ScheduleService:
                 )
 
             # Delete from database
-            self.db.delete(schedule)
-            self.db.commit()
+            await db.delete(schedule)
+            await db.commit()
 
             return ScheduleDeleteResult(success=True, schedule_name=schedule_name)
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return ScheduleDeleteResult(
                 success=False, error_message=f"Failed to delete schedule: {str(e)}"
             )
 
-    async def run_schedule_manually(self, schedule_id: int) -> ScheduleRunResult:
+    async def run_schedule_manually(
+        self, schedule_id: int, db: AsyncSession
+    ) -> ScheduleRunResult:
         """
         Manually run a schedule immediately by injecting a one-time job into APScheduler.
 
@@ -319,7 +343,7 @@ class ScheduleService:
             ScheduleRunResult with success status, job details, and optional error message
         """
         try:
-            schedule = self.get_schedule_by_id(schedule_id)
+            schedule = await self.get_schedule_by_id(schedule_id, db)
             if not schedule:
                 return ScheduleRunResult(
                     success=False, error_message="Schedule not found"

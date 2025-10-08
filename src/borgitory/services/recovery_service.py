@@ -10,10 +10,11 @@ import logging
 from borgitory.models.database import Repository
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.db_session import get_db_session
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 import asyncio
 from borgitory.utils.security import create_borg_command
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,14 @@ logger = logging.getLogger(__name__)
 class RecoveryService:
     """Service to recover from application crashes during backup operations"""
 
-    def __init__(self, command_executor: CommandExecutorProtocol) -> None:
+    def __init__(
+        self,
+        command_executor: CommandExecutorProtocol,
+        session_maker: async_sessionmaker[AsyncSession],
+    ) -> None:
         """Initialize RecoveryService with command executor for cross-platform compatibility."""
         self.command_executor = command_executor
+        self.session_maker = session_maker
 
     async def recover_stale_jobs(self) -> None:
         """
@@ -51,13 +57,14 @@ class RecoveryService:
         try:
             logger.info("Checking database for interrupted job records...")
 
-            with get_db_session() as db:
+            async with self.session_maker() as db:
                 from borgitory.models.database import Job, JobTask
 
                 # Find all jobs in database marked as running or pending (interrupted before completion)
-                interrupted_jobs = (
-                    db.query(Job).filter(Job.status.in_(["running", "pending"])).all()
+                result = await db.execute(
+                    select(Job).where(Job.status.in_(["running", "pending"]))
                 )
+                interrupted_jobs = result.scalars().all()
 
                 if not interrupted_jobs:
                     logger.info("No interrupted database job records found")
@@ -78,14 +85,13 @@ class RecoveryService:
                     job.error = f"Error: Job cancelled on startup - was running when application shut down (started: {job.started_at})"
 
                     # Mark all running tasks as failed
-                    running_tasks = (
-                        db.query(JobTask)
-                        .filter(
+                    task_result = await db.execute(
+                        select(JobTask).where(
                             JobTask.job_id == job.id,
                             JobTask.status.in_(["pending", "running", "in_progress"]),
                         )
-                        .all()
                     )
+                    running_tasks = task_result.scalars().all()
 
                     for task in running_tasks:
                         task.status = JobStatusEnum.FAILED
@@ -98,11 +104,10 @@ class RecoveryService:
                         job.job_type in ["manual_backup", "scheduled_backup", "backup"]
                         and job.repository_id
                     ):
-                        repository = (
-                            db.query(Repository)
-                            .filter(Repository.id == job.repository_id)
-                            .first()
+                        repo_result = await db.execute(
+                            select(Repository).where(Repository.id == job.repository_id)
                         )
+                        repository = repo_result.scalar_one_or_none()
                         if repository:
                             logger.info(
                                 f"Releasing repository lock for: {repository.name}"
@@ -117,6 +122,8 @@ class RecoveryService:
                             f"Job {job.id} is not a backup job or has no repository_id - skipping lock release"
                         )
 
+                # Commit all the changes
+                await db.commit()
                 logger.info("All interrupted database job records cancelled")
 
         except Exception as e:

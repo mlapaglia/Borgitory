@@ -3,16 +3,19 @@ Job Database Manager - Handles database operations with dependency injection
 """
 
 import logging
-from typing import Dict, List, Optional, Callable, TYPE_CHECKING, ContextManager
+from typing import Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
 import uuid
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy import select, delete
+from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
     from borgitory.services.jobs.job_models import BorgJobTask
 
 logger = logging.getLogger(__name__)
@@ -34,20 +37,14 @@ class DatabaseJobData:
     cloud_sync_config_id: Optional[int] = None
 
 
-class JobDatabaseManager:
+class JobDatabaseManager(JobDatabaseManagerProtocol):
     """Manages database operations for jobs with dependency injection"""
 
     def __init__(
         self,
-        db_session_factory: Optional[Callable[[], ContextManager["Session"]]] = None,
+        async_session_maker: async_sessionmaker[AsyncSession],
     ) -> None:
-        self.db_session_factory = db_session_factory or self._default_db_session_factory
-
-    def _default_db_session_factory(self) -> ContextManager["Session"]:
-        """Default database session factory"""
-        from borgitory.utils.db_session import get_db_session
-
-        return get_db_session()
+        self.async_session_maker = async_session_maker
 
     async def create_database_job(
         self, job_data: DatabaseJobData
@@ -56,7 +53,7 @@ class JobDatabaseManager:
         try:
             from borgitory.models.database import Job, StringUUID
 
-            with self.db_session_factory() as db:
+            async with self.async_session_maker() as db:
                 db_job = Job()
                 db_job.id = StringUUID(job_data.id.hex)
                 db_job.repository_id = job_data.repository_id
@@ -76,8 +73,8 @@ class JobDatabaseManager:
                 db_job.completed_tasks = 0  # Default completed tasks
 
                 db.add(db_job)
-                db.commit()
-                db.refresh(db_job)
+                await db.commit()
+                await db.refresh(db_job)
 
                 logger.info(
                     f"Created database job record {db_job.id} for job {job_data.id}"
@@ -100,8 +97,9 @@ class JobDatabaseManager:
         try:
             from borgitory.models.database import Job
 
-            with self.db_session_factory() as db:
-                db_job = db.query(Job).filter(Job.id == job_id).first()
+            async with self.async_session_maker() as db:
+                result = await db.execute(select(Job).where(Job.id == job_id))
+                db_job = result.scalar_one_or_none()
 
                 if not db_job:
                     logger.warning(f"Database job not found for UUID {job_id}")
@@ -115,7 +113,7 @@ class JobDatabaseManager:
                 if error_message is not None:
                     db_job.error = error_message
 
-                db.commit()
+                await db.commit()
 
                 logger.info(f"Updated database job {db_job.id} status to {status}")
 
@@ -130,8 +128,9 @@ class JobDatabaseManager:
         try:
             from borgitory.models.database import Job
 
-            with self.db_session_factory() as db:
-                db_job = db.query(Job).filter(Job.id == job_id).first()
+            async with self.async_session_maker() as db:
+                result = await db.execute(select(Job).where(Job.id == job_id))
+                db_job = result.scalar_one_or_none()
 
                 if not db_job:
                     return None
@@ -163,13 +162,15 @@ class JobDatabaseManager:
         try:
             from borgitory.models.database import Job
 
-            with self.db_session_factory() as db:
-                query = db.query(Job).filter(Job.repository_id == repository_id)
+            async with self.async_session_maker() as db:
+                query = select(Job).where(Job.repository_id == repository_id)
 
                 if job_type:
-                    query = query.filter(Job.type == job_type)
+                    query = query.where(Job.type == job_type)
 
-                jobs = query.order_by(Job.started_at.desc()).limit(limit).all()
+                query = query.order_by(Job.started_at.desc()).limit(limit)
+                result = await db.execute(query)
+                jobs = result.scalars().all()
 
                 return [
                     {
@@ -198,10 +199,11 @@ class JobDatabaseManager:
         try:
             from borgitory.models.database import Repository
 
-            with self.db_session_factory() as db:
-                repo = (
-                    db.query(Repository).filter(Repository.id == repository_id).first()
+            async with self.async_session_maker() as db:
+                result = await db.execute(
+                    select(Repository).where(Repository.id == repository_id)
                 )
+                repo = result.scalar_one_or_none()
 
                 if not repo:
                     return None
@@ -232,15 +234,16 @@ class JobDatabaseManager:
         try:
             from borgitory.models.database import Job, JobTask
 
-            with self.db_session_factory() as db:
+            async with self.async_session_maker() as db:
                 # Find the job by UUID
-                db_job = db.query(Job).filter(Job.id == job_id).first()
+                result = await db.execute(select(Job).where(Job.id == job_id))
+                db_job = result.scalar_one_or_none()
                 if not db_job:
                     logger.warning(f"Job not found for UUID {job_id}")
                     return False
 
                 # Clear existing tasks for this job
-                db.query(JobTask).filter(JobTask.job_id == db_job.id).delete()
+                await db.execute(delete(JobTask).where(JobTask.job_id == db_job.id))
 
                 # Save each task
                 for i, task in enumerate(tasks):
@@ -275,7 +278,7 @@ class JobDatabaseManager:
                     (1 for task in tasks if task.status == TaskStatusEnum.COMPLETED), 0
                 )
 
-                db.commit()
+                await db.commit()
                 logger.info(f"Saved {len(tasks)} tasks for job {job_id}")
                 return True
 
@@ -289,27 +292,34 @@ class JobDatabaseManager:
             from borgitory.models.database import Job
             from sqlalchemy import func
 
-            with self.db_session_factory() as db:
+            async with self.async_session_maker() as db:
                 # Total jobs by status
-                status_counts = (
-                    db.query(Job.status, func.count(Job.id)).group_by(Job.status).all()
+                result = await db.execute(
+                    select(Job.status, func.count(Job.id)).group_by(Job.status)
                 )
+                status_counts = result.all()
 
                 # Jobs by type
-                type_counts = (
-                    db.query(Job.type, func.count(Job.id)).group_by(Job.type).all()
+                result = await db.execute(
+                    select(Job.type, func.count(Job.id)).group_by(Job.type)
                 )
+                type_counts = result.all()
 
                 # Recent jobs (last 24 hours)
                 from datetime import timedelta
 
                 recent_cutoff = now_utc() - timedelta(hours=24)
-                recent_jobs = (
-                    db.query(Job).filter(Job.started_at >= recent_cutoff).count()
+                result = await db.execute(
+                    select(func.count(Job.id)).where(Job.started_at >= recent_cutoff)
                 )
+                recent_jobs = result.scalar() or 0
+
+                # Total jobs count
+                result = await db.execute(select(func.count(Job.id)))
+                total_jobs = result.scalar() or 0
 
                 return {
-                    "total_jobs": db.query(Job).count(),
+                    "total_jobs": total_jobs,
                     "by_status": {status: count for status, count in status_counts},
                     "by_type": {job_type: count for job_type, count in type_counts},
                     "recent_jobs_24h": recent_jobs,

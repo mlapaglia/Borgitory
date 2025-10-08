@@ -5,7 +5,8 @@ Handles all repository-related business operations independent of HTTP concerns.
 
 import logging
 from typing import Dict, List, Protocol, TypedDict, Union, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from borgitory.models.database import Repository, Job, Schedule
 from borgitory.models.enums import EncryptionType
@@ -99,7 +100,7 @@ class RepositoryService:
         self.file_service = file_service
 
     async def create_repository(
-        self, request: CreateRepositoryRequest, db: Session
+        self, request: CreateRepositoryRequest, db: AsyncSession
     ) -> RepositoryOperationResult:
         """Create a new Borg repository."""
         try:
@@ -139,7 +140,7 @@ class RepositoryService:
                 keyfile_contents = keyfile_result.get("key_data")
                 if keyfile_contents:
                     db_repo.set_keyfile_content(keyfile_contents)
-                    db.commit()
+                    await db.commit()
                     logger.info(
                         f"Saved keyfile contents for repository '{request.name}'"
                     )
@@ -149,8 +150,8 @@ class RepositoryService:
                     )
 
             db.add(db_repo)
-            db.commit()
-            db.refresh(db_repo)
+            await db.commit()
+            await db.refresh(db_repo)
 
             logger.info(
                 f"Successfully created and initialized repository '{request.name}'"
@@ -164,13 +165,13 @@ class RepositoryService:
             )
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             error_message = f"Failed to create repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
 
     async def import_repository(
-        self, request: ImportRepositoryRequest, db: Session
+        self, request: ImportRepositoryRequest, db: AsyncSession
     ) -> RepositoryOperationResult:
         """Import an existing Borg repository."""
         try:
@@ -217,8 +218,8 @@ class RepositoryService:
                 )
 
             db.add(db_repo)
-            db.commit()
-            db.refresh(db_repo)
+            await db.commit()
+            await db.refresh(db_repo)
 
             return RepositoryOperationResult(
                 success=True,
@@ -233,13 +234,14 @@ class RepositoryService:
             return RepositoryOperationResult(success=False, error_message=error_message)
 
     async def update_repository(
-        self, repository_id: int, update_data: RepositoryUpdate, db: Session
+        self, repository_id: int, update_data: RepositoryUpdate, db: AsyncSession
     ) -> RepositoryOperationResult:
         """Update an existing repository."""
         try:
-            repository = (
-                db.query(Repository).filter(Repository.id == repository_id).first()
+            result = await db.execute(
+                select(Repository).where(Repository.id == repository_id)
             )
+            repository = result.scalar_one_or_none()
             if not repository:
                 return RepositoryOperationResult(
                     success=False, error_message="Repository not found"
@@ -266,8 +268,8 @@ class RepositoryService:
             if "passphrase" in update_dict and update_dict["passphrase"]:
                 repository.set_passphrase(update_dict["passphrase"])
 
-            db.commit()
-            db.refresh(repository)
+            await db.commit()
+            await db.refresh(repository)
 
             logger.info(f"Repository '{repository.name}' updated successfully")
             return RepositoryOperationResult(
@@ -275,19 +277,20 @@ class RepositoryService:
             )
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             error_message = f"Failed to update repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
 
     async def list_archives(
-        self, repository_id: int, db: Session
+        self, repository_id: int, db: AsyncSession
     ) -> ArchiveListingResult:
         """List archives in a repository."""
         try:
-            repository = (
-                db.query(Repository).filter(Repository.id == repository_id).first()
+            result = await db.execute(
+                select(Repository).where(Repository.id == repository_id)
             )
+            repository = result.scalar_one_or_none()
             if not repository:
                 return ArchiveListingResult(
                     success=False,
@@ -394,15 +397,14 @@ class RepositoryService:
             )
 
     async def get_archive_contents(
-        self, request: ArchiveContentsRequest, db: Session
+        self, request: ArchiveContentsRequest, db: AsyncSession
     ) -> ArchiveContentsResult:
         """Get contents of an archive at specified path."""
         try:
-            repository = (
-                db.query(Repository)
-                .filter(Repository.id == request.repository_id)
-                .first()
+            result = await db.execute(
+                select(Repository).where(Repository.id == request.repository_id)
             )
+            repository = result.scalar_one_or_none()
             if not repository:
                 return ArchiveContentsResult(
                     success=False,
@@ -455,15 +457,14 @@ class RepositoryService:
             )
 
     async def delete_repository(
-        self, request: DeleteRepositoryRequest, db: Session
+        self, request: DeleteRepositoryRequest, db: AsyncSession
     ) -> DeleteRepositoryResult:
         """Delete a repository and its associated data."""
         try:
-            repository = (
-                db.query(Repository)
-                .filter(Repository.id == request.repository_id)
-                .first()
+            result = await db.execute(
+                select(Repository).where(Repository.id == request.repository_id)
             )
+            repository = result.scalar_one_or_none()
             if not repository:
                 return DeleteRepositoryResult(
                     success=False,
@@ -473,14 +474,13 @@ class RepositoryService:
 
             repo_name = repository.name
 
-            active_jobs = (
-                db.query(Job)
-                .filter(
+            job_result = await db.execute(
+                select(Job).where(
                     Job.repository_id == request.repository_id,
                     Job.status.in_(["running", "pending", "queued"]),
                 )
-                .all()
             )
+            active_jobs = job_result.scalars().all()
 
             if active_jobs:
                 active_job_types = [job.type for job in active_jobs]
@@ -491,11 +491,10 @@ class RepositoryService:
                     error_message=f"Cannot delete repository '{repo_name}' - {len(active_jobs)} active job(s) running: {', '.join(active_job_types)}. Please wait for jobs to complete or cancel them first.",
                 )
 
-            schedules_to_delete = (
-                db.query(Schedule)
-                .filter(Schedule.repository_id == request.repository_id)
-                .all()
+            schedule_result = await db.execute(
+                select(Schedule).where(Schedule.repository_id == request.repository_id)
             )
+            schedules_to_delete = schedule_result.scalars().all()
 
             deleted_schedules = 0
             for schedule in schedules_to_delete:
@@ -508,8 +507,8 @@ class RepositoryService:
                         f"Could not remove scheduled job for schedule ID {schedule.id}: {e}"
                     )
 
-            db.delete(repository)
-            db.commit()
+            await db.delete(repository)
+            await db.commit()
 
             logger.info(f"Successfully deleted repository '{repo_name}'")
 
@@ -521,7 +520,7 @@ class RepositoryService:
             )
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             error_message = f"Failed to delete repository: {str(e)}"
             logger.error(error_message)
             return DeleteRepositoryResult(
@@ -531,14 +530,15 @@ class RepositoryService:
             )
 
     async def _validate_repository_creation(
-        self, request: CreateRepositoryRequest, db: Session
+        self, request: CreateRepositoryRequest, db: AsyncSession
     ) -> List[RepositoryValidationError]:
         """Validate repository creation request."""
         errors = []
 
-        existing_name = (
-            db.query(Repository).filter(Repository.name == request.name).first()
+        result = await db.execute(
+            select(Repository).where(Repository.name == request.name)
         )
+        existing_name = result.scalar_one_or_none()
         if existing_name:
             errors.append(
                 RepositoryValidationError(
@@ -546,9 +546,10 @@ class RepositoryService:
                 )
             )
 
-        existing_path = (
-            db.query(Repository).filter(Repository.path == request.path).first()
+        result = await db.execute(
+            select(Repository).where(Repository.path == request.path)
         )
+        existing_path = result.scalar_one_or_none()
         if existing_path:
             errors.append(
                 RepositoryValidationError(
@@ -560,14 +561,15 @@ class RepositoryService:
         return errors
 
     async def _validate_repository_import(
-        self, request: ImportRepositoryRequest, db: Session
+        self, request: ImportRepositoryRequest, db: AsyncSession
     ) -> List[RepositoryValidationError]:
         """Validate repository import request."""
         errors = []
 
-        existing_name = (
-            db.query(Repository).filter(Repository.name == request.name).first()
+        result = await db.execute(
+            select(Repository).where(Repository.name == request.name)
         )
+        existing_name = result.scalar_one_or_none()
         if existing_name:
             errors.append(
                 RepositoryValidationError(
@@ -575,9 +577,10 @@ class RepositoryService:
                 )
             )
 
-        existing_path = (
-            db.query(Repository).filter(Repository.path == request.path).first()
+        result = await db.execute(
+            select(Repository).where(Repository.path == request.path)
         )
+        existing_path = result.scalar_one_or_none()
         if existing_path:
             errors.append(
                 RepositoryValidationError(
@@ -589,7 +592,7 @@ class RepositoryService:
         return errors
 
     async def _validate_repository_update(
-        self, repository: Repository, update_data: RepositoryUpdate, db: Session
+        self, repository: Repository, update_data: RepositoryUpdate, db: AsyncSession
     ) -> List[RepositoryValidationError]:
         """Validate repository update request."""
         errors = []
@@ -597,12 +600,12 @@ class RepositoryService:
 
         # Check if name is being changed and if it conflicts
         if "name" in update_dict and update_dict["name"] != repository.name:
-            existing_name = (
-                db.query(Repository)
-                .filter(Repository.name == update_dict["name"])
-                .filter(Repository.id != repository.id)
-                .first()
+            result = await db.execute(
+                select(Repository)
+                .where(Repository.name == update_dict["name"])
+                .where(Repository.id != repository.id)
             )
+            existing_name = result.scalar_one_or_none()
             if existing_name:
                 errors.append(
                     RepositoryValidationError(
@@ -983,10 +986,13 @@ class RepositoryService:
         return f"{value:.1f} PB"
 
     async def get_repository_by_id(
-        self, repository_id: int, db: Session
+        self, repository_id: int, db: AsyncSession
     ) -> Repository | None:
         """Get a repository by its ID from the database."""
-        return db.query(Repository).filter(Repository.id == repository_id).first()
+        result = await db.execute(
+            select(Repository).where(Repository.id == repository_id)
+        )
+        return result.scalar_one_or_none()
 
     async def list_directories_for_autocomplete(
         self, path: str, search_term: str = "", include_files: bool = False

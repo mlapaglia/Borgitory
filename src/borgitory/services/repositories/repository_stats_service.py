@@ -5,7 +5,8 @@ from typing import Dict, List, Callable, Optional, TypedDict
 from dataclasses import dataclass
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, and_
 
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_models import TaskStatusEnum
@@ -231,7 +232,7 @@ class RepositoryStatsService:
     async def get_repository_statistics(
         self,
         repository: Repository,
-        db: Session,
+        db: AsyncSession,
         progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> RepositoryStats:
         """Gather comprehensive repository statistics"""
@@ -693,19 +694,18 @@ class RepositoryStatsService:
         return summary
 
     async def _get_execution_time_stats(
-        self, repository: Repository, db: Session
+        self, repository: Repository, db: AsyncSession
     ) -> List[ExecutionTimeStats]:
         """Calculate execution time statistics for different task types"""
         from borgitory.models.database import Job, JobTask
-        from sqlalchemy import and_
         from collections import defaultdict
 
         try:
             # Query completed jobs and tasks for this repository
-            completed_tasks = (
-                db.query(JobTask.task_type, JobTask.started_at, JobTask.completed_at)
+            result = await db.execute(
+                select(JobTask.task_type, JobTask.started_at, JobTask.completed_at)
                 .join(Job, Job.id == JobTask.job_id)
-                .filter(
+                .where(
                     and_(
                         Job.repository_id == repository.id,
                         JobTask.status == TaskStatusEnum.COMPLETED,
@@ -713,8 +713,8 @@ class RepositoryStatsService:
                         JobTask.completed_at.isnot(None),
                     )
                 )
-                .all()
             )
+            completed_tasks = result.all()
 
             # Group by task type and calculate durations in Python
             task_durations = defaultdict(list)
@@ -820,19 +820,18 @@ class RepositoryStatsService:
         return chart_data
 
     async def _get_success_failure_stats(
-        self, repository: Repository, db: Session
+        self, repository: Repository, db: AsyncSession
     ) -> List[SuccessFailureStats]:
         """Calculate success/failure statistics for different task types"""
         from borgitory.models.database import Job, JobTask
-        from sqlalchemy import and_
         from collections import defaultdict
 
         try:
             # Query all completed and failed tasks for this repository
-            task_results = (
-                db.query(JobTask.task_type, JobTask.status)
+            result = await db.execute(
+                select(JobTask.task_type, JobTask.status)
                 .join(Job, Job.id == JobTask.job_id)
-                .filter(
+                .where(
                     and_(
                         Job.repository_id == repository.id,
                         JobTask.status.in_(
@@ -840,8 +839,8 @@ class RepositoryStatsService:
                         ),
                     )
                 )
-                .all()
             )
+            task_results = result.all()
 
             # Group by task type and count successes/failures
             task_counts: defaultdict[str, dict[str, int]] = defaultdict(
@@ -923,11 +922,10 @@ class RepositoryStatsService:
         return chart_data
 
     async def _get_timeline_success_failure_data(
-        self, repository: Repository, db: Session
+        self, repository: Repository, db: AsyncSession
     ) -> TimelineSuccessFailureData:
         """Get timeline data for successful vs failed backups over time"""
         from borgitory.models.database import Job, JobTask
-        from sqlalchemy import and_, func
         from collections import defaultdict
         from datetime import timedelta
 
@@ -935,10 +933,10 @@ class RepositoryStatsService:
             # Get backup tasks from the last 30 days
             thirty_days_ago = now_utc() - timedelta(days=30)
 
-            backup_results = (
-                db.query(func.date(JobTask.completed_at).label("date"), JobTask.status)
+            result = await db.execute(
+                select(func.date(JobTask.completed_at).label("date"), JobTask.status)
                 .join(Job, Job.id == JobTask.job_id)
-                .filter(
+                .where(
                     and_(
                         Job.repository_id == repository.id,
                         JobTask.task_type.in_(["backup", "scheduled_backup"]),
@@ -950,18 +948,20 @@ class RepositoryStatsService:
                     )
                 )
                 .order_by("date")
-                .all()
             )
+            backup_results = result.all()
 
             # Group by date and count successes/failures
             daily_counts: defaultdict[str, dict[str, int]] = defaultdict(
                 lambda: {"successful": 0, "failed": 0}
             )
-            for result in backup_results:
-                date_str = str(result.date) if result.date else "unknown"
-                if result.status == TaskStatusEnum.COMPLETED:
+
+            for row in backup_results:
+                date_value, status = row  # Unpack the tuple
+                date_str = str(date_value) if date_value else "unknown"
+                if status == TaskStatusEnum.COMPLETED:
                     daily_counts[date_str]["successful"] += 1
-                elif result.status == TaskStatusEnum.FAILED:
+                elif status == TaskStatusEnum.FAILED:
                     daily_counts[date_str]["failed"] += 1
 
             # Sort dates and create chart data
