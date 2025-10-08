@@ -4,7 +4,6 @@ Hook execution service for running pre and post job commands.
 
 import asyncio
 import logging
-import os
 from typing import Dict, List, Optional, Protocol, NamedTuple
 import uuid
 
@@ -212,8 +211,7 @@ class HookExecutionService:
 
         try:
             # Prepare environment variables
-            env = os.environ.copy()
-            env.update(hook.environment_vars)
+            env = hook.environment_vars
 
             # Add job context to environment
             if context:

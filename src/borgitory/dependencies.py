@@ -460,7 +460,9 @@ def get_hook_execution_service() -> HookExecutionService:
     Uses SimpleCommandRunner as the command runner for consistent command execution.
     """
     command_runner_config = get_command_runner_config()
-    command_runner = get_simple_command_runner(command_runner_config)
+    wsl_executor = get_wsl_command_executor()
+    command_executor = get_command_executor(wsl_executor)
+    command_runner = get_simple_command_runner(command_runner_config, command_executor)
     return HookExecutionService(command_runner=command_runner)
 
 
