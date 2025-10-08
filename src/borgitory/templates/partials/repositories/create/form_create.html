@@ -1,12 +1,20 @@
-<!-- Create New Repository Form -->
+<!-- Create/Edit Repository Form -->
 <div id="create-form-container" class="repository-form">
     <div id="create-form">
         <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">
-            Create New Repository
+            {% if repository %}
+                Edit Repository
+            {% else %}
+                Create New Repository
+            {% endif %}
         </h3>
         <!-- Status div for trigger templates -->
         <div id="create-form-status"></div>
-        <form hx-post="/api/repositories/"
+        <form {% if repository %}
+                hx-put="/api/repositories/{{ repository.id }}"
+              {% else %}
+                hx-post="/api/repositories/"
+              {% endif %}
               hx-ext="json-enc"
               hx-target="#create-form-status"
               hx-swap="innerHTML"
@@ -14,18 +22,22 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
-                    <input type="text" name="name" required class="input-modern mt-1">
+                    <input type="text" name="name" required class="input-modern mt-1" value="{{ repository.name if repository else '' }}">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Repository Path</label>
                     {% set input_id = "create-path" %}
                     {% set input_name = "path" %}
-                    {% set input_value = "" %}
+                    {% set input_value = repository.path if repository else "" %}
                     {% set placeholder = "/repos/my-repo" %}
                     {% set required = true %}
                     {% include "partials/shared/path_autocomplete.html" %}
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Enter the full path to your new Borg repository
+                        {% if repository %}
+                            Repository path (cannot be changed after creation)
+                        {% else %}
+                            Enter the full path to your new Borg repository
+                        {% endif %}
                     </p>
                 </div>
                 <div>
@@ -33,23 +45,36 @@
                         Encryption Type
                     </label>
                     <select name="encryption_type"
-                            class="input-modern mt-1">
+                            class="input-modern mt-1"
+                            {% if repository %}disabled{% endif %}>
                         <option value="">Select encryption type...</option>
-                        <option value="repokey">Repository Key (repokey)</option>
-                        <option value="repokey-blake2">Repository Key Blake2 (repokey-blake2)</option>
-                        <option value="keyfile">Keyfile (keyfile)</option>
-                        <option value="keyfile-blake2">Keyfile Blake2 (keyfile-blake2)</option>
-                        <option value="authenticated">Authenticated (authenticated)</option>
-                        <option value="authenticated-blake2">Authenticated Blake2 (authenticated-blake2)</option>
-                        <option value="none">No Encryption (none)</option>
+                        <option value="repokey" {{ 'selected' if repository and repository.encryption_type == 'repokey' else '' }}>Repository Key (repokey)</option>
+                        <option value="repokey-blake2" {{ 'selected' if repository and repository.encryption_type == 'repokey-blake2' else '' }}>Repository Key Blake2 (repokey-blake2)</option>
+                        <option value="keyfile" {{ 'selected' if repository and repository.encryption_type == 'keyfile' else '' }}>Keyfile (keyfile)</option>
+                        <option value="keyfile-blake2" {{ 'selected' if repository and repository.encryption_type == 'keyfile-blake2' else '' }}>Keyfile Blake2 (keyfile-blake2)</option>
+                        <option value="authenticated" {{ 'selected' if repository and repository.encryption_type == 'authenticated' else '' }}>Authenticated (authenticated)</option>
+                        <option value="authenticated-blake2" {{ 'selected' if repository and repository.encryption_type == 'authenticated-blake2' else '' }}>Authenticated Blake2 (authenticated-blake2)</option>
+                        <option value="none" {{ 'selected' if repository and repository.encryption_type == 'none' else '' }}>No Encryption (none)</option>
                     </select>
+                    {% if repository %}
+                        <input type="hidden" name="encryption_type" value="{{ repository.encryption_type }}">
+                    {% endif %}
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Choose the <a href="https://borgbackup.readthedocs.io/en/stable/usage/init.html#more-encryption-modes" target="_blank" class="text-blue-600 hover:text-blue-700">encryption method</a> for your new repository
+                        {% if repository %}
+                            Encryption type (cannot be changed after creation)
+                        {% else %}
+                            Choose the <a href="https://borgbackup.readthedocs.io/en/stable/usage/init.html#more-encryption-modes" target="_blank" class="text-blue-600 hover:text-blue-700">encryption method</a> for your new repository
+                        {% endif %}
                     </p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Passphrase</label>
-                    <input type="password" name="passphrase" required class="input-modern mt-1" placeholder="Enter repository passphrase">
+                    <input type="password" name="passphrase" {% if not repository %}required{% endif %} class="input-modern mt-1" placeholder="{% if repository %}Enter new passphrase (leave empty to keep current){% else %}Enter repository passphrase{% endif %}">
+                    {% if repository %}
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                            Leave empty to keep the current passphrase
+                        </p>
+                    {% endif %}
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -57,7 +82,7 @@
                     </label>
                     {% set input_id = "create-cache-dir" %}
                     {% set input_name = "cache_dir" %}
-                    {% set input_value = "" %}
+                    {% set input_value = repository.cache_dir if repository else "" %}
                     {% set placeholder = "Leave empty for default" %}
                     {% set required = false %}
                     {% include "partials/shared/path_autocomplete.html" %}
@@ -65,15 +90,34 @@
                         Custom cache directory for Borg operations. Leave empty to use default.
                     </p>
                 </div>
-                <button type="submit"
-                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
-                    Create Repository
-                </button>
+                <div class="flex space-x-2">
+                    <button type="submit"
+                            class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
+                        {% if repository %}
+                            Update Repository
+                        {% else %}
+                            Create Repository
+                        {% endif %}
+                    </button>
+                    {% if repository %}
+                        <button type="button"
+                                hx-get="/api/repositories/create-form"
+                                hx-target="#create-form-container"
+                                hx-swap="innerHTML"
+                                class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+                            Cancel
+                        </button>
+                    {% endif %}
+                </div>
                 <!-- HTMX Loading Indicator -->
                 <div id="create-loading"
                      class="[&.htmx-request]:flex hidden items-center justify-center text-sm text-gray-600 mt-2">
                     <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                    Creating repository...
+                    {% if repository %}
+                        Updating repository...
+                    {% else %}
+                        Creating repository...
+                    {% endif %}
                 </div>
             </div>
         </form>

@@ -175,10 +175,20 @@ class RepositoryUpdate(BaseModel):
         None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9-_\s]+$"
     )
     path: Optional[str] = Field(None, min_length=1, pattern=ABSOLUTE_PATH_PATTERN)
-    passphrase: Optional[str] = Field(None, min_length=8)
+    passphrase: Optional[str] = Field(None)
     cache_dir: Optional[str] = Field(
         None, description="Custom cache directory path (optional, absolute path)"
     )
+
+    @field_validator("passphrase")
+    @classmethod
+    def validate_passphrase(cls, v: Optional[str]) -> Optional[str]:
+        """Validate passphrase - can be None, empty string (keep current), or at least 8 characters."""
+        if v is None or v == "":
+            return v
+        if len(v) < 8:
+            raise ValueError("Passphrase must be at least 8 characters long")
+        return v
 
     @field_validator("cache_dir")
     @classmethod

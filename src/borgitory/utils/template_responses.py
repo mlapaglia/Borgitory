@@ -100,6 +100,31 @@ class RepositoryResponseHandler:
             )
 
     @staticmethod
+    def handle_update_response(
+        request: Request, result: RepositoryOperationResult
+    ) -> HTMLResponse:
+        """Handle repository update response."""
+        if result.success:
+            response = get_templates_instance().TemplateResponse(
+                request,
+                "partials/repositories/create/form_update_success.html",
+                {"repository_name": result.repository_name},
+            )
+            response.headers["HX-Trigger"] = "repositoryUpdate"
+            return response
+        else:
+            error_message = result.error_message
+            if result.is_validation_error and result.validation_errors:
+                error_message = result.validation_errors[0].message
+
+            return get_templates_instance().TemplateResponse(
+                request,
+                "partials/repositories/create/form_update_error.html",
+                {"error_message": error_message},
+                status_code=200,
+            )
+
+    @staticmethod
     def handle_scan_response(
         request: Request, result: RepositoryScanResult
     ) -> HTMLResponse:

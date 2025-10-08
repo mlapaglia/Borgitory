@@ -225,6 +225,25 @@ async def get_create_form(
     )
 
 
+@router.get("/{repo_id}/edit", response_class=HTMLResponse)
+async def get_edit_form(
+    repo_id: int,
+    request: Request,
+    templates: TemplatesDep,
+    db: Session = Depends(get_db),
+) -> _TemplateResponse:
+    """Get the edit repository form"""
+    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/create/form_create.html",
+        {"repository": repository},
+    )
+
+
 @router.post("/import")
 async def import_repository(
     request: Request,
@@ -260,25 +279,18 @@ def get_repository(repo_id: int, db: Session = Depends(get_db)) -> Repository:
     return repository
 
 
-@router.put("/{repo_id}", response_model=RepositorySchema)
-def update_repository(
-    repo_id: int, repo_update: RepositoryUpdate, db: Session = Depends(get_db)
-) -> Repository:
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
-    if repository is None:
-        raise HTTPException(status_code=404, detail="Repository not found")
-
-    update_data = repo_update.model_dump(exclude_unset=True)
-
-    if "passphrase" in update_data:
-        repository.set_passphrase(update_data.pop("passphrase"))
-
-    for field, value in update_data.items():
-        setattr(repository, field, value)
-
-    db.commit()
-    db.refresh(repository)
-    return repository
+@router.put("/{repo_id}", response_class=HTMLResponse)
+async def update_repository(
+    repo_id: int,
+    request: Request,
+    repo_update: RepositoryUpdate,
+    repo_svc: RepositoryServiceDep,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> HTMLResponse:
+    """Update a repository - thin controller using business logic service."""
+    result = await repo_svc.update_repository(repo_id, repo_update, db)
+    return RepositoryResponseHandler.handle_update_response(request, result)
 
 
 @router.get("/{repo_id}/lock-status", response_class=HTMLResponse)

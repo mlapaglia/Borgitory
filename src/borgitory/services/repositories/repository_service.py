@@ -24,6 +24,7 @@ from borgitory.models.repository_dtos import (
     DeleteRepositoryRequest,
     DeleteRepositoryResult,
 )
+from borgitory.models.schemas import RepositoryUpdate
 from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.protocols.path_protocols import PathServiceInterface
@@ -228,6 +229,54 @@ class RepositoryService:
 
         except Exception as e:
             error_message = f"Failed to import repository: {str(e)}"
+            logger.error(error_message)
+            return RepositoryOperationResult(success=False, error_message=error_message)
+
+    async def update_repository(
+        self, repository_id: int, update_data: RepositoryUpdate, db: Session
+    ) -> RepositoryOperationResult:
+        """Update an existing repository."""
+        try:
+            repository = (
+                db.query(Repository).filter(Repository.id == repository_id).first()
+            )
+            if not repository:
+                return RepositoryOperationResult(
+                    success=False, error_message="Repository not found"
+                )
+
+            # Validate update data
+            validation_errors = await self._validate_repository_update(
+                repository, update_data, db
+            )
+            if validation_errors:
+                return RepositoryOperationResult(
+                    success=False, validation_errors=validation_errors
+                )
+
+            # Update fields
+            update_dict = update_data.model_dump(exclude_unset=True)
+
+            if "name" in update_dict:
+                repository.name = update_dict["name"]
+
+            if "cache_dir" in update_dict:
+                repository.cache_dir = update_dict["cache_dir"]
+
+            if "passphrase" in update_dict and update_dict["passphrase"]:
+                repository.set_passphrase(update_dict["passphrase"])
+
+            db.commit()
+            db.refresh(repository)
+
+            logger.info(f"Repository '{repository.name}' updated successfully")
+            return RepositoryOperationResult(
+                success=True, repository_name=repository.name
+            )
+
+        except Exception as e:
+            db.rollback()
+            error_message = f"Failed to update repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
 
@@ -536,6 +585,30 @@ class RepositoryService:
                     message=f"Repository with path '{request.path}' already exists with name '{existing_path.name}'",
                 )
             )
+
+        return errors
+
+    async def _validate_repository_update(
+        self, repository: Repository, update_data: RepositoryUpdate, db: Session
+    ) -> List[RepositoryValidationError]:
+        """Validate repository update request."""
+        errors = []
+        update_dict = update_data.model_dump(exclude_unset=True)
+
+        # Check if name is being changed and if it conflicts
+        if "name" in update_dict and update_dict["name"] != repository.name:
+            existing_name = (
+                db.query(Repository)
+                .filter(Repository.name == update_dict["name"])
+                .filter(Repository.id != repository.id)
+                .first()
+            )
+            if existing_name:
+                errors.append(
+                    RepositoryValidationError(
+                        field="name", message="Repository with this name already exists"
+                    )
+                )
 
         return errors
 
