@@ -169,6 +169,7 @@ class RepositoryBase(BaseModel):
 class RepositoryCreate(RepositoryBase):
     pass
 
+
 class RepositoryUpdate(BaseModel):
     name: Optional[str] = Field(
         None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9-_\s]+$"

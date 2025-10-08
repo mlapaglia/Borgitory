@@ -88,7 +88,9 @@ class Repository(Base):
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
     encrypted_passphrase: Mapped[str] = mapped_column(String, nullable=False)
-    encryption_type: Mapped[EncryptionType] = mapped_column(String, nullable=False)
+    encryption_type: Mapped[EncryptionType] = mapped_column(
+        String, default=EncryptionType.NONE, nullable=False
+    )
     encrypted_keyfile_content: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # Encrypted keyfile content

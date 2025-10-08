@@ -5,7 +5,6 @@ Clean data structures for business logic layer.
 
 from typing import Optional, List
 from dataclasses import dataclass
-from fastapi import UploadFile
 from borgitory.custom_types import ConfigDict
 from borgitory.models.enums import EncryptionType
 

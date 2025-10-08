@@ -727,7 +727,6 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
 
     # Resolve all dependencies directly (not via FastAPI DI)
     env_config = get_job_manager_env_config()
-    borg_service = get_borg_service()
     config = get_job_manager_config(env_config)
     wsl_executor = get_wsl_command_executor()
     command_executor = get_command_executor(wsl_executor)
@@ -743,17 +742,14 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     registry_factory = get_registry_factory()
     provider_registry = get_provider_registry(registry_factory)
     hook_execution_service = get_hook_execution_service()
-    repository_service = get_repository_service()
-    
+
     # Create dependencies using resolved services
     custom_dependencies = JobManagerDependencies(
-        borg_service=borg_service,
         job_executor=job_executor,
         output_manager=output_manager,
         queue_manager=queue_manager,
         database_manager=database_manager,
         event_broadcaster=event_broadcaster,
-        repository_service=repository_service,
         rclone_service=rclone_service,
         notification_service=notification_service,
         encryption_service=encryption_service,
@@ -1082,13 +1078,11 @@ def get_archive_manager_singleton() -> ArchiveManagerProtocol:
         ArchiveManagerProtocol: Cached singleton instance with persistent cache state
     """
     # Resolve dependencies directly (not via FastAPI DI)
-    borg_service = get_borg_service()
     wsl_executor = get_wsl_command_executor()
     command_executor = get_command_executor(wsl_executor)
     job_executor = get_job_executor(command_executor)
 
     return ArchiveManager(
-        borg_service=borg_service,
         job_executor=job_executor,
         command_executor=command_executor,
         cache_ttl=timedelta(minutes=30),
@@ -1150,7 +1144,6 @@ def get_borg_service(
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
     archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
-    file_service: "FileServiceProtocol" = Depends(get_file_service),
 ) -> BorgService:
     """
     Provide BorgService with all mandatory dependencies injected.
@@ -1172,11 +1165,10 @@ def get_borg_service(
         job_manager=job_manager,
         archive_service=archive_service,
         command_executor=command_executor,
-        file_service=file_service,
     )
 
+
 def get_archive_manager(
-    borg_service: BorgService = Depends(get_borg_service),
     job_executor: JobExecutor = Depends(get_job_executor),
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> ArchiveManagerProtocol:
@@ -1190,15 +1182,14 @@ def get_archive_manager(
     use get_archive_manager_dependency() instead.
     """
     return ArchiveManager(
-        borg_service=borg_service,
         job_executor=job_executor,
         command_executor=command_executor,
         cache_ttl=timedelta(minutes=30),
     )
 
+
 def get_recovery_service(
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
-    borg_service: BorgService = Depends(get_borg_service),
 ) -> RecoveryService:
     """
     Provide a RecoveryService instance with proper FastAPI dependency injection.
@@ -1210,7 +1201,7 @@ def get_recovery_service(
     Returns:
         RecoveryService: New RecoveryService instance for each request
     """
-    return RecoveryService(command_executor=command_executor, borg_service=borg_service)
+    return RecoveryService(command_executor=command_executor)
 
 
 RequestScopedRecoveryService = Annotated[RecoveryService, Depends(get_recovery_service)]

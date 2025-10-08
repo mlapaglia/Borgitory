@@ -12,8 +12,8 @@ from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.utils.db_session import get_db_session
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
-from borgitory.services.borg_service import BorgService
 import asyncio
+from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +21,9 @@ logger = logging.getLogger(__name__)
 class RecoveryService:
     """Service to recover from application crashes during backup operations"""
 
-    def __init__(self, command_executor: CommandExecutorProtocol, borg_service: BorgService) -> None:
+    def __init__(self, command_executor: CommandExecutorProtocol) -> None:
         """Initialize RecoveryService with command executor for cross-platform compatibility."""
         self.command_executor = command_executor
-        self.borg_service = borg_service
 
     async def recover_stale_jobs(self) -> None:
         """
@@ -128,40 +127,41 @@ class RecoveryService:
         try:
             logger.info(f"Attempting to release lock on repository: {repository.name}")
 
-            async with self.borg_service.create_borg_command(
-                repository=repository,
+            borg_command = create_borg_command(
+                repository_path=repository.path,
+                passphrase=repository.get_passphrase(),
                 base_command="borg break-lock",
                 additional_args=[],
-            ) as (command, env, _):
-                # Execute the break-lock command with a timeout using command executor
-                process = await self.command_executor.create_subprocess(
-                    command=command,
-                    env=env,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+            )
+            # Execute the break-lock command with a timeout using command executor
+            process = await self.command_executor.create_subprocess(
+                command=borg_command.command,
+                env=borg_command.environment,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(), timeout=30
                 )
 
-                try:
-                    stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=30
+                if process.returncode == 0:
+                    logger.info(
+                        f"Successfully released lock on repository: {repository.name}"
                     )
-
-                    if process.returncode == 0:
-                        logger.info(
-                            f"Successfully released lock on repository: {repository.name}"
-                        )
-                    else:
-                        # Log the error but don't fail - lock might not exist
-                        stderr_text = stderr.decode() if stderr else "No error details"
-                        logger.warning(
-                            f"Break-lock returned {process.returncode} for {repository.name}: {stderr_text}"
-                        )
-
-                except asyncio.TimeoutError:
+                else:
+                    # Log the error but don't fail - lock might not exist
+                    stderr_text = stderr.decode() if stderr else "No error details"
                     logger.warning(
-                        f"Break-lock timed out for repository: {repository.name}"
+                        f"Break-lock returned {process.returncode} for {repository.name}: {stderr_text}"
                     )
-                    process.kill()
+
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"Break-lock timed out for repository: {repository.name}"
+                )
+                process.kill()
 
         except Exception as e:
             logger.error(f"Error releasing lock for repository {repository.name}: {e}")

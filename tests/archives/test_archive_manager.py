@@ -189,7 +189,7 @@ class TestArchiveManager:
         mock_process.stderr.read.return_value = b""
 
         with patch(
-            "borgitory.services.archives.archive_manager.build_secure_borg_command_with_keyfile"
+            "borgitory.services.archives.archive_manager.build_borg_command"
         ) as mock_secure:
             mock_result = MagicMock()
             mock_result.command = [

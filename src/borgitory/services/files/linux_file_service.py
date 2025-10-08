@@ -17,7 +17,7 @@ class LinuxFileService(FileServiceProtocol):
         """Write content to a file at the given path."""
         # Ensure parent directory exists
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
+
         with open(file_path, "wb") as f:
             f.write(content)
         logger.info(f"Wrote file to {file_path}")

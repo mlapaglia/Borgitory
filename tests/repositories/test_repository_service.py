@@ -8,6 +8,7 @@ from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy.orm import Session
 
 from borgitory.models.borg_info import RepositoryInitializationResult
+from borgitory.models.enums import EncryptionType
 from borgitory.protocols.repository_protocols import BackupServiceProtocol
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.services.repositories.repository_service import RepositoryService
@@ -109,7 +110,7 @@ class TestRepositoryService:
             name="test-repo",
             path="/mnt/backup/test-repo",
             passphrase="secret123",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Mock successful initialization
@@ -157,7 +158,7 @@ class TestRepositoryService:
             name="existing-repo",
             path="/mnt/backup/test-repo",
             passphrase="secret123",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Mock existing repository with same name
@@ -197,7 +198,7 @@ class TestRepositoryService:
             name="test-repo",
             path="/mnt/backup/test-repo",
             passphrase="secret123",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Test different types of Borg failures
@@ -440,7 +441,7 @@ class TestRepositoryService:
             name="imported-repo",
             path="/mnt/backup/existing-repo",
             passphrase="secret123",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Mock successful verification
@@ -491,8 +492,8 @@ class TestRepositoryService:
             name="imported-repo",
             path="/mnt/backup/existing-repo",
             passphrase="secret123",
-            keyfile=mock_keyfile,
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
+            keyfile_content="keyfile content",
         )
 
         # Mock successful keyfile save
@@ -547,8 +548,7 @@ class TestRepositoryService:
             path="/mnt/backup/existing-repo",
             passphrase="secret123",
             keyfile_content="keyfile content as text",
-            encryption_type="keyfile",
-            user_id=1,
+            encryption_type=EncryptionType.KEYFILE,
         )
 
         # Mock successful verification
@@ -577,7 +577,7 @@ class TestRepositoryService:
             test_db.query(Repository).filter(Repository.name == "imported-repo").first()
         )
         assert saved_repo is not None
-        assert saved_repo.encryption_type == "keyfile"
+        assert saved_repo.encryption_type == EncryptionType.KEYFILE
         assert saved_repo.get_keyfile_content() == "keyfile content as text"
 
     @pytest.mark.asyncio
@@ -599,7 +599,7 @@ class TestRepositoryService:
             name="existing-repo",
             path="/mnt/backup/new-repo",
             passphrase="secret123",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Act
@@ -632,7 +632,7 @@ class TestRepositoryService:
             name="new-repo",
             path="/mnt/backup/existing-repo",
             passphrase="secret123",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Act
@@ -665,8 +665,8 @@ class TestRepositoryService:
             name="imported-repo",
             path="/mnt/backup/existing-repo",
             passphrase="secret123",
-            keyfile=mock_keyfile,
-            user_id=1,
+            keyfile_content="keyfile content",
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Mock path service methods to be async
@@ -694,7 +694,7 @@ class TestRepositoryService:
             name="imported-repo",
             path="/mnt/backup/existing-repo",
             passphrase="wrong-passphrase",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Mock failed verification
@@ -728,7 +728,7 @@ class TestRepositoryService:
             path="/mnt/backup/existing-repo",
             passphrase="secret123",
             cache_dir="/custom/cache/dir",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Mock successful verification
@@ -766,7 +766,7 @@ class TestRepositoryService:
             name="imported-repo",
             path="/mnt/backup/existing-repo",
             passphrase="secret123",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Mock verification to raise exception during the verification step
@@ -802,7 +802,7 @@ class TestRepositoryService:
             name="imported-repo",
             path="/mnt/backup/existing-repo",
             passphrase="secret123",
-            user_id=1,
+            encryption_type=EncryptionType.REPOKEY,
         )
 
         # Mock successful verification

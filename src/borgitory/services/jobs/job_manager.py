@@ -64,13 +64,11 @@ class JobManager:
 
         self.dependencies = dependencies
 
-        self.borg_service = dependencies.borg_service
         self.executor = dependencies.job_executor
         self.output_manager = dependencies.output_manager
         self.queue_manager = dependencies.queue_manager
         self.event_broadcaster = dependencies.event_broadcaster
         self.database_manager = dependencies.database_manager
-        self.repository_service = dependencies.repository_service
         # Use semantic type alias for application-scoped notification service
         from borgitory.dependencies import ApplicationScopedNotificationService
 
@@ -92,7 +90,9 @@ class JobManager:
     def _init_task_executors(self) -> None:
         """Initialize task executors with dependencies"""
         self.backup_executor = BackupTaskExecutor(
-            self.executor, self.output_manager, self.event_broadcaster, self.borg_service
+            self.executor,
+            self.output_manager,
+            self.event_broadcaster,
         )
         self.prune_executor = PruneTaskExecutor(
             self.executor, self.output_manager, self.event_broadcaster
@@ -384,7 +384,7 @@ class JobManager:
 
         self.output_manager.create_job_output(job_id)
 
-        asyncio.create_task(self._execute_composite_job(job, repository))
+        asyncio.create_task(self._execute_composite_job(job))
 
         self.event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
@@ -394,7 +394,7 @@ class JobManager:
 
         return job_id
 
-    async def _execute_composite_job(self, job: BorgJob, repository: Repository) -> None:
+    async def _execute_composite_job(self, job: BorgJob) -> None:
         """Execute a composite job with multiple sequential tasks"""
         job.status = JobStatusEnum.RUNNING
 
@@ -430,7 +430,7 @@ class JobManager:
 
                 # Execute the task based on its type using the appropriate executor
                 try:
-                    await self._execute_task_with_executor(job, task, task_index, repository)
+                    await self._execute_task_with_executor(job, task, task_index)
 
                     # Task status, return_code, and completed_at are already set by the individual task methods
                     # Just ensure completed_at is set if not already
@@ -632,7 +632,7 @@ class JobManager:
             )
 
     async def _execute_task_with_executor(
-        self, job: BorgJob, task: BorgJobTask, task_index: int, repository: Repository
+        self, job: BorgJob, task: BorgJobTask, task_index: int
     ) -> bool:
         """Execute a task using the appropriate executor"""
         # For post-hooks, determine if job has failed so far
@@ -656,7 +656,7 @@ class JobManager:
 
         # Route to appropriate executor
         if task.task_type == TaskTypeEnum.BACKUP:
-            return await self.backup_executor.execute_backup_task(job, task, repository)
+            return await self.backup_executor.execute_backup_task(job, task)
         elif task.task_type == TaskTypeEnum.PRUNE:
             return await self.prune_executor.execute_prune_task(job, task, task_index)
         elif task.task_type == TaskTypeEnum.CHECK:

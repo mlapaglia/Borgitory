@@ -5,8 +5,6 @@ from fastapi import (
     Depends,
     HTTPException,
     Form,
-    File,
-    UploadFile,
     Request,
 )
 from fastapi.responses import HTMLResponse, StreamingResponse, Response

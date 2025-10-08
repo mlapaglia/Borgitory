@@ -71,12 +71,16 @@ async def _is_borg_repository(
         return False
 
 
-async def _is_borg_cache(directory_path: str, file_service: "FileServiceProtocol") -> bool:
+async def _is_borg_cache(
+    directory_path: str, file_service: "FileServiceProtocol"
+) -> bool:
     """Check if a directory is a Borg cache by looking for a config file with [cache] section."""
     try:
         config_path = os.path.join(directory_path, "config")
 
-        if not file_service.exists(config_path) or not file_service.isfile(config_path):
+        if not await file_service.exists(config_path) or not await file_service.isfile(
+            config_path
+        ):
             return False
 
         # Try to read the config file and check for [cache] section

@@ -40,7 +40,7 @@ from borgitory.utils.secure_path import (
     secure_isdir,
     DirectoryInfo,
 )
-from borgitory.utils.security import secure_borg_command
+from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
 
@@ -130,15 +130,22 @@ class RepositoryService:
                     borg_error=borg_error,
                 )
 
-            if db_repo.encryption_type in [EncryptionType.KEYFILE, EncryptionType.KEYFILE_BLAKE2]:
+            if db_repo.encryption_type in [
+                EncryptionType.KEYFILE,
+                EncryptionType.KEYFILE_BLAKE2,
+            ]:
                 keyfile_result = await self.export_repository_key(db_repo)
                 keyfile_contents = keyfile_result.get("key_data")
                 if keyfile_contents:
                     db_repo.set_keyfile_content(keyfile_contents)
                     db.commit()
-                    logger.info(f"Saved keyfile contents for repository '{request.name}'")
+                    logger.info(
+                        f"Saved keyfile contents for repository '{request.name}'"
+                    )
                 else:
-                    logger.warning(f"Could not retrieve keyfile contents for repository '{request.name}'")
+                    logger.warning(
+                        f"Could not retrieve keyfile contents for repository '{request.name}'"
+                    )
 
             db.add(db_repo)
             db.commit()
@@ -184,8 +191,9 @@ class RepositoryService:
             if request.keyfile_content:
                 db_repo.set_keyfile_content(request.keyfile_content)
 
-
-            verification_successful = await self.borg_service.verify_repository_access(db_repo)
+            verification_successful = await self.borg_service.verify_repository_access(
+                db_repo
+            )
 
             if not verification_successful:
                 return RepositoryOperationResult(
@@ -568,51 +576,51 @@ class RepositoryService:
     ) -> Dict[str, Any]:
         """Check if a repository is currently locked by attempting a quick borg list operation."""
         try:
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg config",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--list"],
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=10.0,
-                )
+            )
 
-                if result.success:
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=10.0,
+            )
+
+            if result.success:
+                return {
+                    "locked": False,
+                    "accessible": True,
+                    "message": "Repository is accessible",
+                }
+            else:
+                stderr_text = result.stderr
+                if (
+                    "Failed to create/acquire the lock" in stderr_text
+                    or "LockTimeout" in stderr_text
+                ):
                     return {
-                        "locked": False,
-                        "accessible": True,
-                        "message": "Repository is accessible",
+                        "locked": True,
+                        "accessible": False,
+                        "message": "Repository is locked by another process",
+                        "error": stderr_text,
+                    }
+                elif "Command timed out" in stderr_text:
+                    return {
+                        "locked": True,
+                        "accessible": False,
+                        "message": "Repository check timed out (possibly locked)",
                     }
                 else:
-                    stderr_text = result.stderr
-                    if (
-                        "Failed to create/acquire the lock" in stderr_text
-                        or "LockTimeout" in stderr_text
-                    ):
-                        return {
-                            "locked": True,
-                            "accessible": False,
-                            "message": "Repository is locked by another process",
-                            "error": stderr_text,
-                        }
-                    elif "Command timed out" in stderr_text:
-                        return {
-                            "locked": True,
-                            "accessible": False,
-                            "message": "Repository check timed out (possibly locked)",
-                        }
-                    else:
-                        return {
-                            "locked": False,
-                            "accessible": False,
-                            "message": f"Repository access failed: {stderr_text}",
-                            "error": stderr_text,
-                        }
+                    return {
+                        "locked": False,
+                        "accessible": False,
+                        "message": f"Repository access failed: {stderr_text}",
+                        "error": stderr_text,
+                    }
 
         except Exception as e:
             logger.error(f"Error checking repository lock status: {e}")
@@ -628,47 +636,44 @@ class RepositoryService:
         try:
             logger.info(f"Attempting to break lock on repository: {repository.name}")
 
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg break-lock",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=30.0,
-                )
+            )
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=30.0,
+            )
 
-                if result.success:
-                    logger.info(
-                        f"Successfully broke lock on repository: {repository.name}"
+            if result.success:
+                logger.info(f"Successfully broke lock on repository: {repository.name}")
+                return {
+                    "success": True,
+                    "message": "Repository lock successfully removed",
+                }
+            else:
+                stderr_text = result.stderr or "No error details"
+                if "Command timed out" in stderr_text:
+                    logger.warning(
+                        f"Break-lock timed out for repository: {repository.name}"
                     )
                     return {
-                        "success": True,
-                        "message": "Repository lock successfully removed",
+                        "success": False,
+                        "message": "Break-lock operation timed out",
                     }
                 else:
-                    stderr_text = result.stderr or "No error details"
-                    if "Command timed out" in stderr_text:
-                        logger.warning(
-                            f"Break-lock timed out for repository: {repository.name}"
-                        )
-                        return {
-                            "success": False,
-                            "message": "Break-lock operation timed out",
-                        }
-                    else:
-                        logger.warning(
-                            f"Break-lock returned {result.return_code} for {repository.name}: {stderr_text}"
-                        )
-                        return {
-                            "success": False,
-                            "message": f"Failed to break lock: {stderr_text}",
-                            "error": stderr_text,
-                        }
+                    logger.warning(
+                        f"Break-lock returned {result.return_code} for {repository.name}: {stderr_text}"
+                    )
+                    return {
+                        "success": False,
+                        "message": f"Failed to break lock: {stderr_text}",
+                        "error": stderr_text,
+                    }
 
         except Exception as e:
             logger.error(f"Error breaking lock for repository {repository.name}: {e}")
@@ -711,88 +716,85 @@ class RepositoryService:
     async def _get_borg_info(self, repository: Repository) -> Dict[str, Any]:
         """Get repository information using borg info command."""
         try:
-            async with self.borg_service.create_borg_command(
-                repository=repository,
+            borg_command = create_borg_command(
+                repository_path=repository.path,
+                passphrase=repository.get_passphrase(),
                 base_command="borg info",
                 additional_args=["--json"],
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=30.0,
-                )
+            )
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=30.0,
+            )
 
-                if result.success:
-                    import json
+            if result.success:
+                import json
 
-                    info_data = json.loads(result.stdout)
+                info_data = json.loads(result.stdout)
 
-                    # Extract relevant information
-                    info_result = {
-                        "success": True,
-                        "repository_id": info_data.get("repository", {}).get("id"),
-                        "location": info_data.get("repository", {}).get("location"),
-                        "encryption": info_data.get("encryption"),
-                        "keyfile": info_data.get("key file"),
-                        "cache": info_data.get("cache"),
-                        "security_dir": info_data.get("security_dir"),
-                    }
+                # Extract relevant information
+                info_result = {
+                    "success": True,
+                    "repository_id": info_data.get("repository", {}).get("id"),
+                    "location": info_data.get("repository", {}).get("location"),
+                    "encryption": info_data.get("encryption"),
+                    "keyfile": info_data.get("key file"),
+                    "cache": info_data.get("cache"),
+                    "security_dir": info_data.get("security_dir"),
+                }
 
-                    # Add archive statistics if available
-                    archives = info_data.get("archives", [])
+                # Add archive statistics if available
+                archives = info_data.get("archives", [])
+                if archives:
+                    info_result["archives_count"] = len(archives)
+
+                    # Calculate totals
+                    total_original = sum(
+                        archive.get("stats", {}).get("original_size", 0)
+                        for archive in archives
+                    )
+                    total_compressed = sum(
+                        archive.get("stats", {}).get("compressed_size", 0)
+                        for archive in archives
+                    )
+                    total_deduplicated = sum(
+                        archive.get("stats", {}).get("deduplicated_size", 0)
+                        for archive in archives
+                    )
+
+                    # Format sizes
+                    info_result["original_size"] = self._format_bytes(total_original)
+                    info_result["compressed_size"] = self._format_bytes(
+                        total_compressed
+                    )
+                    info_result["deduplicated_size"] = self._format_bytes(
+                        total_deduplicated
+                    )
+
+                    # Get last modified from most recent archive
                     if archives:
-                        info_result["archives_count"] = len(archives)
-
-                        # Calculate totals
-                        total_original = sum(
-                            archive.get("stats", {}).get("original_size", 0)
-                            for archive in archives
-                        )
-                        total_compressed = sum(
-                            archive.get("stats", {}).get("compressed_size", 0)
-                            for archive in archives
-                        )
-                        total_deduplicated = sum(
-                            archive.get("stats", {}).get("deduplicated_size", 0)
-                            for archive in archives
+                        latest_archive = max(archives, key=lambda a: a.get("start", ""))
+                        info_result["last_modified"] = latest_archive.get(
+                            "start", "Unknown"
                         )
 
-                        # Format sizes
-                        info_result["original_size"] = self._format_bytes(
-                            total_original
-                        )
-                        info_result["compressed_size"] = self._format_bytes(
-                            total_compressed
-                        )
-                        info_result["deduplicated_size"] = self._format_bytes(
-                            total_deduplicated
-                        )
-
-                        # Get last modified from most recent archive
-                        if archives:
-                            latest_archive = max(
-                                archives, key=lambda a: a.get("start", "")
-                            )
-                            info_result["last_modified"] = latest_archive.get(
-                                "start", "Unknown"
-                            )
-
-                    return info_result
+                return info_result
+            else:
+                stderr_text = result.stderr or "Unknown error"
+                if "Command timed out" in stderr_text:
+                    return {
+                        "success": False,
+                        "error": True,
+                        "error_message": "Repository info command timed out",
+                    }
                 else:
-                    stderr_text = result.stderr or "Unknown error"
-                    if "Command timed out" in stderr_text:
-                        return {
-                            "success": False,
-                            "error": True,
-                            "error_message": "Repository info command timed out",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error": True,
-                            "error_message": f"Failed to get repository info: {stderr_text}",
-                        }
+                    return {
+                        "success": False,
+                        "error": True,
+                        "error_message": f"Failed to get repository info: {stderr_text}",
+                    }
 
         except Exception as e:
             logger.error(f"Error getting borg info for {repository.name}: {e}")
@@ -805,42 +807,44 @@ class RepositoryService:
     async def _get_borg_config(self, repository: Repository) -> Dict[str, Any]:
         """Get repository configuration using borg config --list command."""
         try:
-            async with self.borg_service.create_borg_command(
-                repository=repository,
+            borg_command = create_borg_command(
+                repository_path=repository.path,
+                passphrase=repository.get_passphrase(),
                 base_command="borg config",
                 additional_args=["--list"],
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=30.0,
-                )
+            )
 
-                if result.success:
-                    config_output = result.stdout.strip()
-                    config_dict = {}
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=30.0,
+            )
 
-                    # Parse the config output (format: key = value)
-                    for line in config_output.split("\n"):
-                        line = line.strip()
-                        if line and "=" in line:
-                            key, value = line.split("=", 1)
-                            config_dict[key.strip()] = value.strip()
+            if result.success:
+                config_output = result.stdout.strip()
+                config_dict = {}
 
-                    return {"success": True, "config": config_dict}
+                # Parse the config output (format: key = value)
+                for line in config_output.split("\n"):
+                    line = line.strip()
+                    if line and "=" in line:
+                        key, value = line.split("=", 1)
+                        config_dict[key.strip()] = value.strip()
+
+                return {"success": True, "config": config_dict}
+            else:
+                stderr_text = result.stderr or "Unknown error"
+                if "Command timed out" in stderr_text:
+                    return {
+                        "success": False,
+                        "error_message": "Repository config command timed out",
+                    }
                 else:
-                    stderr_text = result.stderr or "Unknown error"
-                    if "Command timed out" in stderr_text:
-                        return {
-                            "success": False,
-                            "error_message": "Repository config command timed out",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error_message": f"Failed to get repository config: {stderr_text}",
-                        }
+                    return {
+                        "success": False,
+                        "error_message": f"Failed to get repository config: {stderr_text}",
+                    }
 
         except Exception as e:
             logger.error(f"Error getting borg config for {repository.name}: {e}")
@@ -852,36 +856,38 @@ class RepositoryService:
     async def export_repository_key(self, repository: Repository) -> Dict[str, Any]:
         """Export repository key using borg key export command."""
         try:
-            async with self.borg_service.create_borg_command(
-                repository=repository,
+            borg_command = create_borg_command(
+                repository_path=repository.path,
+                passphrase=repository.get_passphrase(),
                 base_command="borg key export",
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=30.0,
-                )
+            )
 
-                if result.success:
-                    key_data = result.stdout.strip()
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=30.0,
+            )
+
+            if result.success:
+                key_data = result.stdout.strip()
+                return {
+                    "success": True,
+                    "key_data": key_data,
+                    "filename": f"{repository.name}_key.txt",
+                }
+            else:
+                stderr_text = result.stderr or "Unknown error"
+                if "Command timed out" in stderr_text:
                     return {
-                        "success": True,
-                        "key_data": key_data,
-                        "filename": f"{repository.name}_key.txt",
+                        "success": False,
+                        "error_message": "Key export command timed out",
                     }
                 else:
-                    stderr_text = result.stderr or "Unknown error"
-                    if "Command timed out" in stderr_text:
-                        return {
-                            "success": False,
-                            "error_message": "Key export command timed out",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error_message": f"Failed to export repository key: {stderr_text}",
-                        }
+                    return {
+                        "success": False,
+                        "error_message": f"Failed to export repository key: {stderr_text}",
+                    }
 
         except Exception as e:
             logger.error(f"Error exporting key for repository {repository.name}: {e}")
@@ -903,7 +909,9 @@ class RepositoryService:
             value /= 1024.0
         return f"{value:.1f} PB"
 
-    async def get_repository_by_id(self, repository_id: int, db: Session) -> Repository | None:
+    async def get_repository_by_id(
+        self, repository_id: int, db: Session
+    ) -> Repository | None:
         """Get a repository by its ID from the database."""
         return db.query(Repository).filter(Repository.id == repository_id).first()
 

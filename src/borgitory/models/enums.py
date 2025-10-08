@@ -4,7 +4,7 @@ from typing import List
 
 class EncryptionType(StrEnum):
     """Borg encryption type enumeration"""
-    
+
     NONE = "none"
     REPOKEY = "repokey"
     REPOKEY_BLAKE2 = "repokey-blake2"

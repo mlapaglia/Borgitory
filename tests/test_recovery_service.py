@@ -187,7 +187,7 @@ class TestRecoveryServiceLockRelease:
         mock_command_executor.create_subprocess.return_value = mock_process
 
         with patch(
-            "borgitory.services.recovery_service.secure_borg_command"
+            "borgitory.services.recovery_service.create_borg_command"
         ) as mock_secure:
             mock_secure.return_value.__aenter__.return_value = (
                 ["borg", "break-lock", "/test/repo/path"],
@@ -221,7 +221,7 @@ class TestRecoveryServiceLockRelease:
         mock_command_executor.create_subprocess.return_value = mock_process
 
         with patch(
-            "borgitory.services.recovery_service.secure_borg_command"
+            "borgitory.services.recovery_service.create_borg_command"
         ) as mock_secure:
             mock_secure.return_value.__aenter__.return_value = (
                 ["borg", "break-lock", "/test/repo/path"],
@@ -250,7 +250,7 @@ class TestRecoveryServiceLockRelease:
         mock_command_executor.create_subprocess.return_value = mock_process
 
         with patch(
-            "borgitory.services.recovery_service.secure_borg_command"
+            "borgitory.services.recovery_service.create_borg_command"
         ) as mock_secure:
             mock_secure.return_value.__aenter__.return_value = (
                 ["borg", "break-lock", "/test/repo/path"],
@@ -276,7 +276,7 @@ class TestRecoveryServiceLockRelease:
         mock_command_executor.create_subprocess.side_effect = Exception("Process error")
 
         with patch(
-            "borgitory.services.recovery_service.secure_borg_command"
+            "borgitory.services.recovery_service.create_borg_command"
         ) as mock_secure:
             mock_secure.return_value.__aenter__.return_value = (
                 ["borg", "break-lock", "/test/repo/path"],

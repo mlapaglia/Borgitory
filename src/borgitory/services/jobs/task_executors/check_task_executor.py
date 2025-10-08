@@ -11,7 +11,7 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 )
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.security import secure_borg_command
+from borgitory.utils.security import create_borg_command
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
@@ -81,26 +81,27 @@ class CheckTaskExecutor:
             if repository_path:
                 additional_args.append(str(repository_path))
 
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg check",
                 repository_path="",  # Already in additional_args
                 passphrase=passphrase,
-                keyfile_content=keyfile_content,
                 additional_args=additional_args,
-            ) as (command, env, _):
-                process = await self.job_executor.start_process(command, env)
+            )
+            process = await self.job_executor.start_process(
+                borg_command.command, borg_command.environment
+            )
 
-                result = await self.job_executor.monitor_process_output(
-                    process, output_callback=task_output_callback
-                )
+            result = await self.job_executor.monitor_process_output(
+                process, output_callback=task_output_callback
+            )
 
-                task.return_code = result.return_code
-                task.status = (
-                    TaskStatusEnum.COMPLETED
-                    if result.return_code == 0
-                    else TaskStatusEnum.FAILED
-                )
-                task.completed_at = now_utc()
+            task.return_code = result.return_code
+            task.status = (
+                TaskStatusEnum.COMPLETED
+                if result.return_code == 0
+                else TaskStatusEnum.FAILED
+            )
+            task.completed_at = now_utc()
 
             if result.stdout:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()

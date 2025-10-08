@@ -15,9 +15,8 @@ from starlette.responses import StreamingResponse
 from borgitory.models.database import Repository
 from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
-from borgitory.services.borg_service import BorgService
 from borgitory.utils.security import (
-    secure_borg_command,
+    create_borg_command,
     validate_archive_name,
 )
 
@@ -41,12 +40,10 @@ class ArchiveManager:
 
     def __init__(
         self,
-        borg_service: BorgService,
         job_executor: "ProcessExecutorProtocol",
         command_executor: CommandExecutorProtocol,
         cache_ttl: timedelta = timedelta(minutes=30),
     ) -> None:
-        self.borg_service = borg_service
         self.job_executor = job_executor
         self.command_executor = command_executor
         self.cache_ttl = cache_ttl
@@ -194,7 +191,6 @@ class ArchiveManager:
         self, repository: Repository, archive_name: str, file_path: str
     ) -> StreamingResponse:
         """Extract a single file from an archive and stream it to the client"""
-        result = None
         try:
             # Validate inputs
             if not archive_name or not archive_name.strip():
@@ -212,79 +208,80 @@ class ArchiveManager:
             borg_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
 
             # Use manual keyfile management for streaming operations
-            result = self.borg_service.create_borg_command(
-                repository=repository,
+            borg_command = create_borg_command(
+                repository_path=repository.path,
+                passphrase=repository.get_passphrase(),
                 base_command="borg extract",
                 additional_args=borg_args,
             )
-            async with result as (command, env, _):
-                logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
-                # Start the borg process using command executor for cross-platform compatibility
-                process = await self.command_executor.create_subprocess(
-                    command=command,
-                    env=env,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
+            logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
-                async def generate_stream() -> AsyncGenerator[bytes, None]:
-                    """Generator function to stream the file content with automatic backpressure"""
-                    try:
-                        while True:
-                            if process.stdout is None:
-                                break
-                            chunk = await process.stdout.read(
-                                65536
-                            )  # 64KB chunks for efficiency
-                            if not chunk:
-                                break
+            # Start the borg process using command executor for cross-platform compatibility
+            process = await self.command_executor.create_subprocess(
+                command=borg_command.command,
+                env=borg_command.environment,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
-                            yield chunk
+            async def generate_stream() -> AsyncGenerator[bytes, None]:
+                """Generator function to stream the file content with automatic backpressure"""
+                try:
+                    while True:
+                        if process.stdout is None:
+                            break
+                        chunk = await process.stdout.read(
+                            65536
+                        )  # 64KB chunks for efficiency
+                        if not chunk:
+                            break
 
-                        # Wait for process to complete
-                        return_code = await process.wait()
+                        yield chunk
 
-                        # Check for errors after process completes
-                        if return_code != 0:
-                            # Read stderr for error details
-                            stderr_data = b""
-                            if process.stderr:
-                                try:
-                                    stderr_data = await process.stderr.read()
-                                except Exception as e:
-                                    logger.warning(f"Could not read stderr: {e}")
+                    # Wait for process to complete
+                    return_code = await process.wait()
 
-                            error_msg = (
-                                stderr_data.decode("utf-8", errors="replace")
-                                if stderr_data
-                                else "Unknown error"
-                            )
-                            logger.error(
-                                f"Borg extract process failed with code {return_code}: {error_msg}"
-                            )
-                            raise Exception(
-                                f"Borg extract failed with code {return_code}: {error_msg}"
-                            )
-
-                    except Exception:
-                        # Clean up process if still running
-                        if process.returncode is None:
-                            process.terminate()
+                    # Check for errors after process completes
+                    if return_code != 0:
+                        # Read stderr for error details
+                        stderr_data = b""
+                        if process.stderr:
                             try:
-                                await asyncio.wait_for(process.wait(), timeout=5.0)
-                            except asyncio.TimeoutError:
-                                process.kill()
-                                await process.wait()
-                        raise
+                                stderr_data = await process.stderr.read()
+                            except Exception as e:
+                                logger.warning(f"Could not read stderr: {e}")
 
-                filename = os.path.basename(file_path)
+                        error_msg = (
+                            stderr_data.decode("utf-8", errors="replace")
+                            if stderr_data
+                            else "Unknown error"
+                        )
+                        logger.error(
+                            f"Borg extract process failed with code {return_code}: {error_msg}"
+                        )
+                        raise Exception(
+                            f"Borg extract failed with code {return_code}: {error_msg}"
+                        )
 
-                return StreamingResponse(
-                    generate_stream(),
-                    media_type="application/octet-stream",
-                    headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-                )
+                except Exception:
+                    # Clean up process if still running
+                    if process.returncode is None:
+                        process.terminate()
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=5.0)
+                        except asyncio.TimeoutError:
+                            process.kill()
+                            await process.wait()
+                    raise
+
+            filename = os.path.basename(file_path)
+
+            return StreamingResponse(
+                generate_stream(),
+                media_type="application/octet-stream",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
 
         except Exception as e:
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
@@ -305,33 +302,33 @@ class ArchiveManager:
             f"{repository.path}::{archive_name}",
         ]
 
-        async with self.borg_service.create_borg_command(
+        borg_command = create_borg_command(
             base_command=base_command,
-            repository=repository,
+            repository_path=repository.path,
+            passphrase=repository.get_passphrase(),
             additional_args=additional_args,
-        ) as (final_command, env, _):
-            try:
-                cmd_result = await self.command_executor.execute_command(
-                    command=final_command,
-                    env=env,
-                    timeout=60.0,
-                )
+        )
 
-                if not cmd_result.success:
-                    error_text = (
-                        cmd_result.stderr or cmd_result.error or "Unknown error"
-                    )
-                    raise Exception(f"Borg list failed: {error_text}")
+        try:
+            cmd_result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=60.0,
+            )
 
-                # Parse the JSON lines output
-                items = self._parse_borg_list_output(cmd_result.stdout)
+            if not cmd_result.success:
+                error_text = cmd_result.stderr or cmd_result.error or "Unknown error"
+                raise Exception(f"Borg list failed: {error_text}")
 
-                logger.info(f"Retrieved {len(items)} items from archive {archive_name}")
-                return items
+            # Parse the JSON lines output
+            items = self._parse_borg_list_output(cmd_result.stdout)
 
-            except Exception as e:
-                logger.error(f"Error getting archive items: {e}")
-                raise
+            logger.info(f"Retrieved {len(items)} items from archive {archive_name}")
+            return items
+
+        except Exception as e:
+            logger.error(f"Error getting archive items: {e}")
+            raise
 
     def _parse_borg_list_output(self, output_text: str) -> List[ArchiveEntry]:
         """

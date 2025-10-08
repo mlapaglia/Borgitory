@@ -1,11 +1,8 @@
 import re
 import secrets
-import tempfile
-import os
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Optional, AsyncGenerator, Tuple
+from typing import List, Dict, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,18 +14,6 @@ class BorgCommandResult:
 
     command: List[str]
     environment: Dict[str, str]
-    temp_keyfile_path: Optional[str] = None
-
-    def cleanup_temp_files(self) -> None:
-        """Clean up temporary keyfile if it exists."""
-        if self.temp_keyfile_path and os.path.exists(self.temp_keyfile_path):
-            try:
-                os.unlink(self.temp_keyfile_path)
-                logger.debug(f"Cleaned up temporary keyfile: {self.temp_keyfile_path}")
-            except OSError as e:
-                logger.warning(
-                    f"Failed to clean up temporary keyfile {self.temp_keyfile_path}: {e}"
-                )
 
 
 def sanitize_path(path: str) -> str:
@@ -271,35 +256,11 @@ def get_or_generate_secret_key(data_dir: str) -> str:
         raise Exception(f"Failed to save secret key to {secret_file}: {e}")
 
 
-def _create_temp_keyfile(keyfile_content: str) -> str:
-    """Create a temporary keyfile from content and return its path."""
-    # Create a temporary file
-    temp_fd, temp_path = tempfile.mkstemp(suffix=".key", prefix="borg_temp_")
-
-    try:
-        # Write the keyfile content
-        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
-            f.write(keyfile_content)
-
-        # Make sure only owner can read the keyfile
-        os.chmod(temp_path, 0o600)
-
-        logger.debug(f"Created temporary keyfile at {temp_path}")
-        return temp_path
-    except Exception:
-        # Clean up on error
-        try:
-            os.unlink(temp_path)
-        except OSError:
-            pass
-        raise
-
-
 def build_secure_borg_command_with_keyfile(
     base_command: str,
     repository_path: str,
     passphrase: str,
-    keyfile_content: Optional[str] = None,
+    keyfile_path: Optional[str] = None,
     additional_args: Optional[List[str]] = None,
     environment_overrides: Optional[Dict[str, str]] = None,
 ) -> BorgCommandResult:
@@ -310,21 +271,18 @@ def build_secure_borg_command_with_keyfile(
         base_command: The base borg command (e.g., "borg create")
         repository_path: Path to the repository (can be empty if included in additional_args)
         passphrase: Repository passphrase
-        keyfile_content: If provided, creates a temporary keyfile and sets BORG_KEY_FILE
+        keyfile_path: If provided, sets BORG_KEY_FILE
         additional_args: Additional command arguments
         environment_overrides: Additional environment variables
 
     Returns:
         BorgCommandResult containing command, environment, and optional temp keyfile path
     """
-    temp_keyfile_path = None
+    environment_overrides = {}
 
     # Handle keyfile creation
-    if keyfile_content:
-        temp_keyfile_path = _create_temp_keyfile(keyfile_content)
-        if not environment_overrides:
-            environment_overrides = {}
-        environment_overrides["BORG_KEY_FILE"] = temp_keyfile_path
+    if keyfile_path:
+        environment_overrides["BORG_KEY_FILE"] = keyfile_path
 
     # Build the command using existing function
     command, env = build_secure_borg_command(
@@ -335,21 +293,17 @@ def build_secure_borg_command_with_keyfile(
         environment_overrides=environment_overrides,
     )
 
-    return BorgCommandResult(
-        command=command, environment=env, temp_keyfile_path=temp_keyfile_path
-    )
+    return BorgCommandResult(command=command, environment=env)
 
 
-@asynccontextmanager
-async def secure_borg_command(
+def create_borg_command(
     base_command: str,
     repository_path: str,
     passphrase: str,
-    keyfile_content: Optional[str] = None,
+    keyfile_path: Optional[str] = None,
     additional_args: Optional[List[str]] = None,
     environment_overrides: Optional[Dict[str, str]] = None,
-    cleanup_keyfile: bool = True,
-) -> AsyncGenerator[Tuple[List[str], Dict[str, str], Optional[str]], None]:
+) -> BorgCommandResult:
     """
     Context manager that builds a secure Borg command with optional keyfile cleanup.
 
@@ -357,7 +311,7 @@ async def secure_borg_command(
         base_command: The base borg command (e.g., "borg create")
         repository_path: Path to the repository (can be empty if included in additional_args)
         passphrase: Repository passphrase
-        keyfile_content: If provided, creates a temporary keyfile and sets BORG_KEY_FILE
+        keyfile_path: If provided, sets BORG_KEY_FILE
         additional_args: Additional command arguments
         environment_overrides: Additional environment variables
         cleanup_keyfile: If False, keyfile won't be cleaned up automatically (caller must clean up)
@@ -375,30 +329,11 @@ async def secure_borg_command(
             job_id = await job_manager.start_job(command, env)
             # Job manager is responsible for cleanup_temp_keyfile(temp_keyfile_path)
     """
-    result = build_secure_borg_command_with_keyfile(
+    return build_secure_borg_command_with_keyfile(
         base_command=base_command,
         repository_path=repository_path,
         passphrase=passphrase,
-        keyfile_content=keyfile_content,
+        keyfile_path=keyfile_path,
         additional_args=additional_args,
         environment_overrides=environment_overrides,
     )
-
-    try:
-        yield result.command, result.environment, result.temp_keyfile_path
-    finally:
-        # Automatic cleanup (unless disabled)
-        if cleanup_keyfile:
-            result.cleanup_temp_files()
-
-
-def cleanup_temp_keyfile(temp_keyfile_path: Optional[str]) -> None:
-    """Helper function to clean up a temporary keyfile."""
-    if temp_keyfile_path:
-        try:
-            os.unlink(temp_keyfile_path)
-            logger.debug(f"Cleaned up temporary keyfile: {temp_keyfile_path}")
-        except OSError as e:
-            logger.warning(
-                f"Failed to clean up temporary keyfile {temp_keyfile_path}: {e}"
-            )

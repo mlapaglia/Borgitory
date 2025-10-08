@@ -35,7 +35,9 @@ def wsl_available() -> bool:
         return False
 
 
-def create_file_service(command_executor: "CommandExecutorProtocol") -> FileServiceProtocol:
+def create_file_service(
+    command_executor: "CommandExecutorProtocol",
+) -> FileServiceProtocol:
     """
     Create a file service for the current environment.
 
@@ -59,5 +61,7 @@ def create_file_service(command_executor: "CommandExecutorProtocol") -> FileServ
         logger.debug("Creating Linux file service")
         return LinuxFileService()
     else:
-        logger.error(f"Unknown environment {config.get_platform_name()}, using native file service")
+        logger.error(
+            f"Unknown environment {config.get_platform_name()}, using native file service"
+        )
         raise RuntimeError(f"Unknown environment {config.get_platform_name()}")

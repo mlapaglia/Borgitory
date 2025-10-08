@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.security import secure_borg_command
+from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
 
@@ -164,27 +164,27 @@ class RepositoryStatsService:
     async def execute_borg_list(self, repository: Repository) -> List[str]:
         """Execute borg list command to get archive names using the new command executor"""
         try:
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg list",
                 repository_path=str(repository.path),
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--short"],
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                )
-                if result.success:
-                    archives = [
-                        line.strip()
-                        for line in result.stdout.strip().split("\n")
-                        if line.strip()
-                    ]
-                    return archives
-                else:
-                    logger.error(f"Failed to list archives: {result.stderr}")
-                    return []
+            )
+
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+            )
+            if result.success:
+                archives = [
+                    line.strip()
+                    for line in result.stdout.strip().split("\n")
+                    if line.strip()
+                ]
+                return archives
+            else:
+                logger.error(f"Failed to list archives: {result.stderr}")
+                return []
         except Exception as e:
             logger.error(f"Error executing borg list: {e}")
             raise  # Let exceptions bubble up for proper error handling
@@ -194,39 +194,36 @@ class RepositoryStatsService:
     ) -> "ArchiveInfo | None":
         """Execute borg info command to get archive details using the new command executor"""
         try:
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg info",
-                repository_path="",
+                repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json", f"{repository.path}::{archive_name}"],
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                )
-                if result.success:
-                    info_data = json.loads(result.stdout)
-                    if info_data.get("archives"):
-                        archive_data = info_data["archives"][0]
-                        return ArchiveInfo(
-                            name=archive_data["name"],
-                            start=archive_data["start"],
-                            end=archive_data["end"],
-                            duration=archive_data["duration"],
-                            original_size=archive_data["stats"]["original_size"],
-                            compressed_size=archive_data["stats"]["compressed_size"],
-                            deduplicated_size=archive_data["stats"][
-                                "deduplicated_size"
-                            ],
-                            nfiles=archive_data["stats"]["nfiles"],
-                        )
-                    else:
-                        logger.error(f"No archive data found for {archive_name}")
-                        return None
+            )
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+            )
+            if result.success:
+                info_data = json.loads(result.stdout)
+                if info_data.get("archives"):
+                    archive_data = info_data["archives"][0]
+                    return ArchiveInfo(
+                        name=archive_data["name"],
+                        start=archive_data["start"],
+                        end=archive_data["end"],
+                        duration=archive_data["duration"],
+                        original_size=archive_data["stats"]["original_size"],
+                        compressed_size=archive_data["stats"]["compressed_size"],
+                        deduplicated_size=archive_data["stats"]["deduplicated_size"],
+                        nfiles=archive_data["stats"]["nfiles"],
+                    )
                 else:
-                    logger.error(f"Failed to get archive info: {result.stderr}")
+                    logger.error(f"No archive data found for {archive_name}")
                     return None
+            else:
+                logger.error(f"Failed to get archive info: {result.stderr}")
+                return None
         except Exception as e:
             logger.error(f"Error executing borg info: {e}")
             raise  # Let exceptions bubble up for proper error handling
@@ -495,75 +492,74 @@ class RepositoryStatsService:
                 )
             try:
                 # Get file listing with sizes
-                async with secure_borg_command(
+                borg_command = create_borg_command(
                     base_command="borg list",
                     repository_path="",
                     passphrase=repository.get_passphrase(),
-                    keyfile_content=repository.get_keyfile_content(),
                     additional_args=[
                         f"{repository.path}::{archive_name}",
                         "--format={size} {path}{NL}",
                     ],
-                ) as (command, env, _):
-                    process = await self.command_executor.create_subprocess(
-                        command=command,
-                        env=env,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
+                )
+                process = await self.command_executor.create_subprocess(
+                    command=borg_command.command,
+                    env=borg_command.environment,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
 
-                    stdout, stderr = await process.communicate()
+                stdout, stderr = await process.communicate()
 
-                    if process.returncode == 0:
-                        # Parse file types and sizes
-                        ext_count: Dict[str, int] = {}
-                        ext_size: Dict[str, int] = {}
+                if process.returncode == 0:
+                    # Parse file types and sizes
+                    ext_count: Dict[str, int] = {}
+                    ext_size: Dict[str, int] = {}
 
-                        for line in stdout.decode().strip().split("\n"):
-                            if not line.strip():
+                    for line in stdout.decode().strip().split("\n"):
+                        if not line.strip():
+                            continue
+                        parts = line.strip().split(" ", 1)
+                        if len(parts) == 2:
+                            try:
+                                size = int(parts[0])
+                                path = parts[1]
+
+                                # Extract file extension
+                                if "." in path and not path.endswith("/"):
+                                    ext = path.split(".")[-1].lower()
+                                    if (
+                                        ext and len(ext) <= 10
+                                    ):  # Reasonable extension length
+                                        ext_count[ext] = ext_count.get(ext, 0) + 1
+                                        ext_size[ext] = ext_size.get(ext, 0) + size
+                            except (ValueError, IndexError):
                                 continue
-                            parts = line.strip().split(" ", 1)
-                            if len(parts) == 2:
-                                try:
-                                    size = int(parts[0])
-                                    path = parts[1]
 
-                                    # Extract file extension
-                                    if "." in path and not path.endswith("/"):
-                                        ext = path.split(".")[-1].lower()
-                                        if (
-                                            ext and len(ext) <= 10
-                                        ):  # Reasonable extension length
-                                            ext_count[ext] = ext_count.get(ext, 0) + 1
-                                            ext_size[ext] = ext_size.get(ext, 0) + size
-                                except (ValueError, IndexError):
-                                    continue
+                    # Add to timeline
+                    archive_date = (
+                        archive_name.split("backup-")[-1][:10]
+                        if "backup-" in archive_name
+                        else archive_name[:10]
+                    )
+                    file_type_timeline["labels"].append(archive_date)
 
-                        # Add to timeline
-                        archive_date = (
-                            archive_name.split("backup-")[-1][:10]
-                            if "backup-" in archive_name
-                            else archive_name[:10]
-                        )
-                        file_type_timeline["labels"].append(archive_date)
+                    # Store data for each extension
+                    for ext in ext_count:
+                        if ext not in file_type_timeline["count_data"]:
+                            file_type_timeline["count_data"][ext] = []
+                            file_type_timeline["size_data"][ext] = []
+                        file_type_timeline["count_data"][ext].append(ext_count[ext])
+                        file_type_timeline["size_data"][ext].append(
+                            round(ext_size[ext] / (1024 * 1024), 2)
+                        )  # Convert to MB
 
-                        # Store data for each extension
-                        for ext in ext_count:
-                            if ext not in file_type_timeline["count_data"]:
-                                file_type_timeline["count_data"][ext] = []
-                                file_type_timeline["size_data"][ext] = []
-                            file_type_timeline["count_data"][ext].append(ext_count[ext])
-                            file_type_timeline["size_data"][ext].append(
-                                round(ext_size[ext] / (1024 * 1024), 2)
-                            )  # Convert to MB
-
-                        # Fill missing data points for consistency
-                        for ext in file_type_timeline["count_data"]:
-                            while len(file_type_timeline["count_data"][ext]) < len(
-                                file_type_timeline["labels"]
-                            ):
-                                file_type_timeline["count_data"][ext].insert(-1, 0)
-                                file_type_timeline["size_data"][ext].insert(-1, 0)
+                    # Fill missing data points for consistency
+                    for ext in file_type_timeline["count_data"]:
+                        while len(file_type_timeline["count_data"][ext]) < len(
+                            file_type_timeline["labels"]
+                        ):
+                            file_type_timeline["count_data"][ext].insert(-1, 0)
+                            file_type_timeline["size_data"][ext].insert(-1, 0)
 
             except Exception as e:
                 logger.error(
