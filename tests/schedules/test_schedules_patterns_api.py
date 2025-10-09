@@ -8,7 +8,7 @@ import pytest
 import json
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock, Mock
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from fastapi.responses import HTMLResponse
 
 from borgitory.main import app
@@ -19,8 +19,6 @@ from borgitory.dependencies import (
 )
 from borgitory.services.scheduling.schedule_service import ScheduleService
 from borgitory.services.configuration_service import ConfigurationService
-
-client = TestClient(app)
 
 
 class TestSchedulePatternsAPI:
@@ -75,8 +73,8 @@ class TestSchedulePatternsAPI:
         app.dependency_overrides.clear()
 
     # Test add-pattern-field endpoint
-    def test_add_pattern_field_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_add_pattern_field_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test adding a new pattern field."""
         form_data = {
@@ -86,7 +84,7 @@ class TestSchedulePatternsAPI:
             "pattern_style": ["sh"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/add-pattern-field",
             data=form_data,
         )
@@ -94,13 +92,13 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_add_pattern_field_empty_form(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_add_pattern_field_empty_form(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test adding pattern field with empty form data."""
         form_data: Dict[str, str] = {}
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/add-pattern-field",
             data=form_data,
         )
@@ -109,8 +107,8 @@ class TestSchedulePatternsAPI:
         assert "text/html" in response.headers.get("content-type", "")
 
     # Test move-pattern endpoint
-    def test_move_pattern_up_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_move_pattern_up_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test moving a pattern up in the list."""
         form_data = {
@@ -122,7 +120,7 @@ class TestSchedulePatternsAPI:
             "pattern_style": ["sh", "fm"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/move-pattern",
             data=form_data,
         )
@@ -130,8 +128,8 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_move_pattern_down_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_move_pattern_down_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test moving a pattern down in the list."""
         form_data = {
@@ -143,7 +141,7 @@ class TestSchedulePatternsAPI:
             "pattern_style": ["re", "pp"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/move-pattern",
             data=form_data,
         )
@@ -151,20 +149,20 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_move_pattern_invalid_direction(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_move_pattern_invalid_direction(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test moving pattern with invalid direction."""
         form_data = {
             "index": "0",
-            "direction": "sideways",  # Invalid direction
+            "direction": "sideways",
             "pattern_name": ["Pattern 1"],
             "pattern_expression": ["*.txt"],
             "pattern_action": ["include"],
             "pattern_style": ["sh"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/move-pattern",
             data=form_data,
         )
@@ -172,27 +170,26 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_move_pattern_error_handling(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_move_pattern_error_handling(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test move pattern endpoint error handling."""
         form_data = {
-            "index": "invalid",  # Invalid index
+            "index": "invalid",
             "direction": "up",
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/move-pattern",
             data=form_data,
         )
 
         assert response.status_code == 200
-        # Should return empty container on error
         assert '<div class="space-y-4"></div>' in response.text
 
     # Test remove-pattern-field endpoint
-    def test_remove_pattern_field_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_remove_pattern_field_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test removing a pattern field successfully."""
         form_data = {
@@ -203,7 +200,7 @@ class TestSchedulePatternsAPI:
             "pattern_style": ["sh", "fm"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/remove-pattern-field",
             data=form_data,
         )
@@ -211,35 +208,34 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_remove_pattern_field_invalid_index(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_remove_pattern_field_invalid_index(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test removing pattern field with invalid index."""
         form_data = {
-            "index": "invalid",  # Invalid index
+            "index": "invalid",
             "pattern_name": ["Pattern 1"],
             "pattern_expression": ["*.txt"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/remove-pattern-field",
             data=form_data,
         )
 
         assert response.status_code == 200
-        # Should return empty container on error
         assert '<div class="space-y-4"></div>' in response.text
 
     # Test patterns-modal endpoint
-    def test_get_patterns_modal_with_data(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_get_patterns_modal_with_data(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test opening patterns modal with existing pattern data."""
         json_data = {
             "patterns": '[{"name": "Test Pattern", "expression": "*.pdf", "pattern_type": "include", "style": "sh"}]'
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/patterns-modal",
             json=json_data,
         )
@@ -247,13 +243,13 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_patterns_modal_empty_data(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_get_patterns_modal_empty_data(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test opening patterns modal with no existing patterns."""
         json_data: Dict[str, str] = {"patterns": "[]"}
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/patterns-modal",
             json=json_data,
         )
@@ -261,13 +257,13 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_patterns_modal_invalid_json(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_get_patterns_modal_invalid_json(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test patterns modal with invalid JSON data."""
         json_data = {"patterns": "invalid json"}
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/patterns-modal",
             json=json_data,
         )
@@ -275,18 +271,18 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_patterns_modal_no_json(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_get_patterns_modal_no_json(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test patterns modal with no JSON data."""
-        response = client.post("/api/schedules/patterns/patterns-modal")
+        response = await async_client.post("/api/schedules/patterns/patterns-modal")
 
-        assert response.status_code == 200  # Endpoint handles missing JSON gracefully
+        assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
     # Test save-patterns endpoint
-    def test_save_patterns_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_save_patterns_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test saving patterns successfully."""
         form_data = {
@@ -296,7 +292,7 @@ class TestSchedulePatternsAPI:
             "pattern_style": ["sh"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/save-patterns",
             data=form_data,
         )
@@ -304,18 +300,18 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_save_patterns_validation_error(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_save_patterns_validation_error(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test saving patterns with validation errors."""
         form_data = {
             "pattern_name": ["Pattern with no expression"],
-            "pattern_expression": [""],  # Empty expression
+            "pattern_expression": [""],
             "pattern_action": ["include"],
             "pattern_style": ["sh"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/save-patterns",
             data=form_data,
         )
@@ -323,13 +319,13 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 400
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_save_patterns_empty_form(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_save_patterns_empty_form(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test saving with completely empty form."""
         form_data: Dict[str, str] = {}
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/save-patterns",
             data=form_data,
         )
@@ -337,8 +333,8 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_save_patterns_multiple_patterns(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_save_patterns_multiple_patterns(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test saving multiple patterns."""
         form_data = {
@@ -348,7 +344,7 @@ class TestSchedulePatternsAPI:
             "pattern_style": ["sh", "fm"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/save-patterns",
             data=form_data,
         )
@@ -357,8 +353,8 @@ class TestSchedulePatternsAPI:
         assert "text/html" in response.headers.get("content-type", "")
 
     # Test validate-all-patterns endpoint
-    def test_validate_all_patterns_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_validate_all_patterns_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test validating all patterns successfully."""
         form_data = {
@@ -368,7 +364,7 @@ class TestSchedulePatternsAPI:
             "pattern_style": ["sh"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/validate-all-patterns",
             data=form_data,
         )
@@ -376,13 +372,13 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_validate_all_patterns_empty_form(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_validate_all_patterns_empty_form(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test validating with empty form."""
         form_data: Dict[str, str] = {}
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/validate-all-patterns",
             data=form_data,
         )
@@ -390,8 +386,8 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_validate_all_patterns_multiple_patterns(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_validate_all_patterns_multiple_patterns(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test validating multiple patterns."""
         form_data = {
@@ -401,7 +397,7 @@ class TestSchedulePatternsAPI:
             "pattern_style": ["sh", "fm", "re"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/validate-all-patterns",
             data=form_data,
         )
@@ -409,18 +405,18 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_validate_all_patterns_with_invalid_patterns(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_validate_all_patterns_with_invalid_patterns(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test validating patterns with some invalid ones."""
         form_data = {
             "pattern_name": ["Valid Pattern", "Invalid Pattern"],
-            "pattern_expression": ["*.pdf", ""],  # Second has empty expression
+            "pattern_expression": ["*.pdf", ""],
             "pattern_action": ["include", "exclude"],
             "pattern_style": ["sh", "fm"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/validate-all-patterns",
             data=form_data,
         )
@@ -428,21 +424,15 @@ class TestSchedulePatternsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_validate_all_patterns_error_handling(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_validate_all_patterns_error_handling(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test validate patterns endpoint error handling."""
-        # This test simulates an unexpected error during validation
-        # The endpoint should handle it gracefully and return error template
-
-        # We can't easily simulate an internal error without mocking,
-        # but we can test that the endpoint handles malformed data
         form_data = {
             "pattern_name": ["Test"],
-            # Missing other required fields to potentially cause issues
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/patterns/validate-all-patterns",
             data=form_data,
         )
@@ -451,11 +441,11 @@ class TestSchedulePatternsAPI:
         assert "text/html" in response.headers.get("content-type", "")
 
     # Test close-modal endpoint
-    def test_close_patterns_modal(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_close_patterns_modal(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test closing patterns modal without saving."""
-        response = client.get("/api/schedules/patterns/close-modal")
+        response = await async_client.get("/api/schedules/patterns/close-modal")
 
         assert response.status_code == 200
         assert '<div id="modal-container"></div>' in response.text

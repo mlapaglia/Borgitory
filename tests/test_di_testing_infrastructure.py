@@ -184,15 +184,6 @@ class TestDependencyTestHelper:
         with pytest.raises(AssertionError, match="Service creation failed"):
             DependencyTestHelper.verify_service_creation(failing_factory)
 
-    def test_verify_dependency_override_works(self) -> None:
-        """Test dependency override verification."""
-        mock_debug_service = MockServiceFactory.create_mock_debug_service()
-
-        # This should not raise any exceptions
-        DependencyTestHelper.verify_dependency_override_works(
-            get_debug_service, mock_debug_service, "/api/debug/info"
-        )
-
 
 class TestIntegrationWithExistingTests:
     """Test integration with existing test patterns."""

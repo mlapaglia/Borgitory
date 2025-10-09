@@ -8,7 +8,7 @@ import pytest
 import json
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock, Mock
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from fastapi.responses import HTMLResponse
 
 from borgitory.main import app
@@ -19,8 +19,6 @@ from borgitory.dependencies import (
 )
 from borgitory.services.scheduling.schedule_service import ScheduleService
 from borgitory.services.configuration_service import ConfigurationService
-
-client = TestClient(app)
 
 
 class TestScheduleHooksAPI:
@@ -72,8 +70,8 @@ class TestScheduleHooksAPI:
         app.dependency_overrides.clear()
 
     # Test add-hook-field endpoint
-    def test_add_hook_field_pre_hook(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_add_hook_field_pre_hook(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test adding a new pre-hook field."""
         form_data = {
@@ -82,7 +80,7 @@ class TestScheduleHooksAPI:
             "pre_hook_command": ["echo existing"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/add-hook-field",
             data=form_data,
         )
@@ -90,8 +88,8 @@ class TestScheduleHooksAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_add_hook_field_post_hook(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_add_hook_field_post_hook(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test adding a new post-hook field."""
         form_data = {
@@ -100,7 +98,7 @@ class TestScheduleHooksAPI:
             "post_hook_command": ["echo post existing"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/add-hook-field",
             data=form_data,
         )
@@ -108,13 +106,13 @@ class TestScheduleHooksAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_add_hook_field_empty_form(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_add_hook_field_empty_form(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test adding hook field with empty form data."""
         form_data = {"hook_type": "pre"}
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/add-hook-field",
             data=form_data,
         )
@@ -123,8 +121,8 @@ class TestScheduleHooksAPI:
         assert "text/html" in response.headers.get("content-type", "")
 
     # Test move-hook endpoint
-    def test_move_hook_up_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_move_hook_up_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test moving a hook up in the list."""
         form_data = {
@@ -135,7 +133,7 @@ class TestScheduleHooksAPI:
             "pre_hook_command": ["command1", "command2"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/move-hook",
             data=form_data,
         )
@@ -143,8 +141,8 @@ class TestScheduleHooksAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_move_hook_down_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_move_hook_down_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test moving a hook down in the list."""
         form_data = {
@@ -155,7 +153,7 @@ class TestScheduleHooksAPI:
             "post_hook_command": ["commandA", "commandB"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/move-hook",
             data=form_data,
         )
@@ -163,19 +161,19 @@ class TestScheduleHooksAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_move_hook_invalid_direction(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_move_hook_invalid_direction(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test moving hook with invalid direction."""
         form_data = {
             "hook_type": "pre",
             "index": "0",
-            "direction": "sideways",  # Invalid direction
+            "direction": "sideways",
             "pre_hook_name": ["Hook 1"],
             "pre_hook_command": ["command1"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/move-hook",
             data=form_data,
         )
@@ -183,28 +181,27 @@ class TestScheduleHooksAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_move_hook_error_handling(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_move_hook_error_handling(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test move hook endpoint error handling."""
         form_data = {
             "hook_type": "pre",
-            "index": "invalid",  # Invalid index
+            "index": "invalid",
             "direction": "up",
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/move-hook",
             data=form_data,
         )
 
         assert response.status_code == 200
-        # Should return empty container on error
         assert '<div class="space-y-4"></div>' in response.text
 
     # Test remove-hook-field endpoint
-    def test_remove_hook_field_success(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_remove_hook_field_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test removing a hook field successfully."""
         form_data = {
@@ -214,7 +211,7 @@ class TestScheduleHooksAPI:
             "pre_hook_command": ["command1", "command2"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/remove-hook-field",
             data=form_data,
         )
@@ -223,8 +220,8 @@ class TestScheduleHooksAPI:
         assert "text/html" in response.headers.get("content-type", "")
 
     # Test hooks-modal endpoint
-    def test_get_hooks_modal_with_data(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_get_hooks_modal_with_data(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test opening hooks modal with existing hook data."""
         json_data = {
@@ -232,7 +229,7 @@ class TestScheduleHooksAPI:
             "post_hooks": '[{"name": "Post Hook", "command": "echo post"}]',
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/hooks-modal",
             json=json_data,
         )
@@ -240,13 +237,13 @@ class TestScheduleHooksAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_hooks_modal_empty_data(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_get_hooks_modal_empty_data(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test opening hooks modal with no existing hooks."""
         json_data: Dict[str, str] = {"pre_hooks": "[]", "post_hooks": "[]"}
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/hooks-modal",
             json=json_data,
         )
@@ -254,8 +251,8 @@ class TestScheduleHooksAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_hooks_modal_invalid_json(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_get_hooks_modal_invalid_json(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test hooks modal with invalid JSON data."""
         json_data = {
@@ -263,7 +260,7 @@ class TestScheduleHooksAPI:
             "post_hooks": "also invalid",
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/hooks-modal",
             json=json_data,
         )
@@ -272,7 +269,9 @@ class TestScheduleHooksAPI:
         assert "text/html" in response.headers.get("content-type", "")
 
     # Test save-hooks endpoint
-    def test_save_hooks_success(self, setup_test_dependencies: Dict[str, Any]) -> None:
+    async def test_save_hooks_success(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
         """Test saving hooks successfully."""
         form_data = {
             "pre_hook_name": ["Valid Pre Hook"],
@@ -281,7 +280,7 @@ class TestScheduleHooksAPI:
             "post_hook_command": ["echo post"],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/save-hooks",
             data=form_data,
         )
@@ -289,16 +288,16 @@ class TestScheduleHooksAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_save_hooks_validation_error(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_save_hooks_validation_error(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test saving hooks with validation errors."""
         form_data = {
             "pre_hook_name": ["Hook with no command"],
-            "pre_hook_command": [""],  # Empty command
+            "pre_hook_command": [""],
         }
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/save-hooks",
             data=form_data,
         )
@@ -306,13 +305,13 @@ class TestScheduleHooksAPI:
         assert response.status_code == 400
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_save_hooks_empty_form(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_save_hooks_empty_form(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test saving with completely empty form."""
         form_data: Dict[str, str] = {}
 
-        response = client.post(
+        response = await async_client.post(
             "/api/schedules/hooks/save-hooks",
             data=form_data,
         )
@@ -321,9 +320,11 @@ class TestScheduleHooksAPI:
         assert "text/html" in response.headers.get("content-type", "")
 
     # Test close-modal endpoint
-    def test_close_modal(self, setup_test_dependencies: Dict[str, Any]) -> None:
+    async def test_close_modal(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
         """Test closing modal without saving."""
-        response = client.get("/api/schedules/hooks/close-modal")
+        response = await async_client.get("/api/schedules/hooks/close-modal")
 
         assert response.status_code == 200
         assert '<div id="modal-container"></div>' in response.text
