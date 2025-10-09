@@ -95,7 +95,11 @@
                            name="passphrase"
                            {% if not repository %}required{% endif %}
                            class="input-modern mt-1"
-                           placeholder="{% if repository %}Enter new passphrase (leave empty to keep current){% else %}Enter repository passphrase{% endif %}">
+                           {% if repository -%}
+                           placeholder="Enter new passphrase (leave empty to keep current)"
+                           {%- else -%}
+                           placeholder="Enter repository passphrase"
+                           {%- endif %}>
                     {% if repository %}
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                             Leave empty to keep the current passphrase
