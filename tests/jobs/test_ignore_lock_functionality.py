@@ -140,8 +140,8 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager.backup_executor,
-                "_get_repository_data",
+                job_manager.backup_executor.database_manager,
+                "get_repository_data",
                 return_value=mock_repository_data,
             ),
             patch.object(
@@ -191,8 +191,8 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager.backup_executor,
-                "_get_repository_data",
+                job_manager.backup_executor.database_manager,
+                "get_repository_data",
                 return_value=mock_repository_data,
             ),
             patch.object(
@@ -288,8 +288,8 @@ class TestIgnoreLockFunctionality:
         # Execute the backup task with mocked methods
         with (
             patch.object(
-                job_manager.backup_executor,
-                "_get_repository_data",
+                job_manager.backup_executor.database_manager,
+                "get_repository_data",
                 return_value=mock_repository_data,
             ),
             patch.object(

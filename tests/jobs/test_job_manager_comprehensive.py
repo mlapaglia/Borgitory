@@ -7,6 +7,7 @@ import uuid
 import asyncio
 from typing import Generator, AsyncGenerator
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.protocols.job_event_broadcaster_protocol import (
@@ -134,7 +135,7 @@ class TestJobManagerFactory:
         assert deps.database_manager is not None
 
         # Test that it uses default session factory
-        assert deps.db_session_factory is not None
+        assert deps.async_session_maker is not None
 
     def test_create_dependencies_with_config(self) -> None:
         """Test creating dependencies with custom config"""
@@ -158,12 +159,12 @@ class TestJobManagerFactory:
 
         deps = JobManagerFactory.create_for_testing(
             mock_subprocess=mock_subprocess,
-            mock_db_session=mock_db_session,
+            mock_async_session_maker=mock_db_session,
             mock_rclone_service=mock_rclone,
         )
 
         assert deps.subprocess_executor is mock_subprocess
-        assert deps.db_session_factory is mock_db_session
+        assert deps.async_session_maker is mock_db_session
         assert deps.rclone_service is mock_rclone
 
     def test_create_minimal(self) -> None:
@@ -203,12 +204,12 @@ class TestJobManagerTaskExecution:
         )
 
         # Override with real database session
-        deps.db_session_factory = db_session_factory
+        deps.async_session_maker = db_session_factory
 
         # Create a real database manager that uses the real database session
         from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
-        real_db_manager = JobDatabaseManager(db_session_factory=db_session_factory)
+        real_db_manager = JobDatabaseManager(async_session_maker=db_session_factory)
         deps.database_manager = real_db_manager
 
         manager = JobManager(dependencies=deps)
@@ -257,7 +258,7 @@ class TestJobManagerTaskExecution:
         )
 
         # Override with real database session and specific mocks
-        deps.db_session_factory = mock_db_session_factory
+        deps.async_session_maker = mock_db_session_factory
         deps.job_executor = mock_job_executor
         deps.database_manager = mock_database_manager
         deps.output_manager = mock_output_manager
@@ -480,17 +481,20 @@ class TestJobManagerTaskExecution:
         assert db_session_factory is not None
 
         with db_session_factory() as db:
-            # Query the database for the job and its tasks
-            db_job = db.query(DatabaseJob).filter(DatabaseJob.id == job_id).first()
+            # Query the database for the job and its tasks using SQLAlchemy 2.0 syntax
+            result = await db.execute(
+                select(DatabaseJob).where(DatabaseJob.id == job_id)
+            )
+            db_job = result.scalar_one_or_none()
             assert db_job is not None, f"Job {job_id} should be persisted in database"
 
             # Query for the tasks
-            db_tasks = (
-                db.query(DatabaseTask)
-                .filter(DatabaseTask.job_id == job_id)
+            tasks_result = await db.execute(
+                select(DatabaseTask)
+                .where(DatabaseTask.job_id == job_id)
                 .order_by(DatabaseTask.task_order)
-                .all()
             )
+            db_tasks = list(tasks_result.scalars().all())
             assert len(db_tasks) == 2, (
                 f"Expected 2 tasks in database, got {len(db_tasks)}"
             )
@@ -927,8 +931,8 @@ class TestJobManagerTaskExecution:
             + '"}'
         )
         test_db.add(notification_config)
-        test_db.commit()
-        test_db.refresh(notification_config)
+        await test_db.commit()
+        await test_db.refresh(notification_config)
 
         job_id = uuid.uuid4()
         task = BorgJobTask(
@@ -1071,7 +1075,7 @@ class TestJobManagerDatabaseIntegration:
                 pass
 
         deps = JobManagerFactory.create_for_testing()
-        deps.db_session_factory = db_session_factory
+        deps.async_session_maker = db_session_factory
 
         # Create a real database manager instead of using the mock
         from borgitory.services.jobs.job_database_manager import JobDatabaseManager
@@ -1094,7 +1098,9 @@ class TestJobManagerDatabaseIntegration:
         # Mock the get_passphrase method to avoid encryption issues
         sample_repository.get_passphrase = Mock(return_value="test-passphrase")  # type: ignore[method-assign]
 
-        result = await job_manager_with_db._get_repository_data(sample_repository.id)
+        result = await job_manager_with_db.database_manager.get_repository_data(
+            sample_repository.id
+        )
 
         assert result is not None
         assert result["id"] == sample_repository.id
@@ -1106,7 +1112,7 @@ class TestJobManagerDatabaseIntegration:
         self, job_manager_with_db: JobManager
     ) -> None:
         """Test getting repository data for non-existent repository"""
-        result = await job_manager_with_db._get_repository_data(99999)
+        result = await job_manager_with_db.database_manager.get_repository_data(99999)
         assert result is None
 
 
@@ -1162,7 +1168,7 @@ class TestJobManagerStreamingAndUtility:
         from unittest.mock import Mock
         from typing import AsyncGenerator
 
-        async def empty_stream() -> AsyncGenerator[dict, None]:
+        async def empty_stream() -> AsyncGenerator[dict[str, object], None]:
             return
             yield  # This line will never be reached, but makes it a proper async generator
 
@@ -1307,11 +1313,11 @@ class TestJobManagerFactoryFunctions:
         deps = get_test_job_manager_dependencies(
             mock_event_broadcaster=mock_event_broadcaster,
             mock_subprocess=mock_subprocess,
-            mock_db_session=mock_db_session,
+            mock_async_session_maker=mock_db_session,
             mock_rclone_service=mock_rclone,
         )
 
         assert deps.event_broadcaster is mock_event_broadcaster
         assert deps.subprocess_executor is mock_subprocess
-        assert deps.db_session_factory is mock_db_session
+        assert deps.async_session_maker is mock_db_session
         assert deps.rclone_service is mock_rclone

@@ -249,8 +249,8 @@ class TestJobRenderServiceUUIDIntegration:
             error=mock_job_with_uuid.error,
         )
 
-        service.converter.convert_database_job.return_value = expected_job_data
-        service.converter.fix_failed_job_tasks.return_value = expected_job_data
+        service.converter.convert_database_job.return_value = expected_job_data  # type: ignore[attr-defined]
+        service.converter.fix_failed_job_tasks.return_value = expected_job_data  # type: ignore[attr-defined]
 
         # Test the new architecture method
         result = await service.get_job_display_data(mock_job_with_uuid.id, mock_db)
@@ -262,10 +262,10 @@ class TestJobRenderServiceUUIDIntegration:
         assert result.status.type.value == "completed"
 
         # Verify the converter was called with the database job
-        service.converter.convert_database_job.assert_called_once_with(
+        service.converter.convert_database_job.assert_called_once_with(  # type: ignore[attr-defined]
             mock_job_with_uuid
         )
-        service.converter.fix_failed_job_tasks.assert_called_once_with(
+        service.converter.fix_failed_job_tasks.assert_called_once_with(  # type: ignore[attr-defined]
             expected_job_data
         )
 

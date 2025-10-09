@@ -6,6 +6,7 @@ import uuid
 from unittest.mock import Mock, AsyncMock
 from borgitory.services.jobs.job_service import JobService
 from borgitory.models.job_results import JobStopResult, JobStopError
+from borgitory.services.jobs.job_manager import JobManager
 
 
 class TestJobStopFunctionality:
@@ -13,9 +14,8 @@ class TestJobStopFunctionality:
 
     def setup_method(self) -> None:
         """Set up test fixtures"""
-        self.mock_db = Mock()
-        self.mock_job_manager = Mock()
-        self.job_service = JobService(self.mock_db, self.mock_job_manager)
+        self.mock_job_manager = Mock(spec=JobManager)
+        self.job_service = JobService(self.mock_job_manager)
 
     async def test_stop_job_success(self) -> None:
         """Test successful job stopping"""

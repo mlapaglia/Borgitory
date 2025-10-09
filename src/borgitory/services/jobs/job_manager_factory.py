@@ -215,7 +215,9 @@ class JobManagerFactory:
         from unittest.mock import Mock
 
         mock_job_executor = Mock(spec=ProcessExecutorProtocol)
-        mock_async_session_maker = Mock(spec=async_sessionmaker[AsyncSession])
+        mock_async_session_maker = mock_async_session_maker or Mock(
+            spec=async_sessionmaker[AsyncSession]
+        )
         mock_output_manager = Mock(spec=JobOutputManagerProtocol)
         mock_queue_manager = Mock(spec=JobQueueManagerProtocol)
         mock_database_manager = Mock(spec=JobDatabaseManagerProtocol)
@@ -239,7 +241,7 @@ class JobManagerFactory:
             queue_manager=mock_queue_manager,
             database_manager=mock_database_manager,
             async_session_maker=mock_async_session_maker,
-            rclone_service=mock_rclone_service or Mock(),
+            rclone_service=mock_rclone_service,
             http_client_factory=mock_http_client_factory,
             encryption_service=mock_encryption_service,
             storage_factory=mock_storage_factory,

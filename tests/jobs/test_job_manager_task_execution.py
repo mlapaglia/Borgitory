@@ -70,7 +70,7 @@ class TestJobManagerTaskExecution:
 
         # Create dependencies using the factory and then override specific fields
         deps = JobManagerFactory.create_for_testing()
-        deps.db_session_factory = db_session_factory
+        deps.async_session_maker = db_session_factory
         deps.notification_service = notification_service
         # Add cloud sync dependencies for comprehensive testing
         deps.rclone_service = get_rclone_service()
@@ -132,7 +132,7 @@ class TestJobManagerTaskExecution:
         deps.queue_manager = mock_queue_manager
         deps.event_broadcaster = mock_event_broadcaster
         deps.notification_service = mock_notification_service
-        deps.db_session_factory = mock_db_session_factory
+        deps.async_session_maker = mock_db_session_factory
 
         # Create job manager with mock dependencies
         job_manager = JobManager(dependencies=deps)

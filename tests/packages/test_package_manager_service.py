@@ -4,7 +4,9 @@ Tests for PackageManagerService
 
 import pytest
 from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.protocols.command_protocols import CommandResult
 
@@ -39,6 +41,12 @@ def package_service(mock_command_runner: MockCommandRunner) -> PackageManagerSer
 
 
 class TestPackageManagerService:
+    @pytest.fixture
+    def mock_db(self) -> MagicMock:
+        """Mock database"""
+        db = MagicMock(spec=AsyncSession)
+        return db
+
     async def test_search_packages_empty_cache(
         self,
         package_service: PackageManagerService,
@@ -126,6 +134,7 @@ Section: web
         self,
         package_service: PackageManagerService,
         mock_command_runner: MockCommandRunner,
+        mock_db: AsyncSession,
     ) -> None:
         """Test successful package installation"""
         mock_command_runner._run_command_mock.side_effect = [
@@ -159,7 +168,9 @@ Section: web
             ),
         ]
 
-        success, message = await package_service.install_packages(["curl"])
+        success, message = await package_service.install_packages(
+            session=mock_db, packages=["curl"]
+        )
 
         assert success is True
         assert "Successfully installed: curl" in message
@@ -170,6 +181,7 @@ Section: web
         self,
         package_service: PackageManagerService,
         mock_command_runner: MockCommandRunner,
+        mock_db: AsyncSession,
     ) -> None:
         """Test failed package installation"""
         mock_command_runner._run_command_mock.side_effect = [
@@ -190,7 +202,7 @@ Section: web
         ]
 
         success, message = await package_service.install_packages(
-            ["nonexistent-package"]
+            session=mock_db, packages=["nonexistent-package"]
         )
 
         assert success is False
@@ -201,6 +213,7 @@ Section: web
         self,
         package_service: PackageManagerService,
         mock_command_runner: MockCommandRunner,
+        mock_db: AsyncSession,
     ) -> None:
         """Test successful package removal"""
         mock_command_runner._run_command_mock.return_value = CommandResult(
@@ -211,7 +224,9 @@ Section: web
             duration=3.0,
         )
 
-        success, message = await package_service.remove_packages(["curl"])
+        success, message = await package_service.remove_packages(
+            session=mock_db, packages=["curl"]
+        )
 
         assert success is True
         assert "Successfully removed: curl" in message

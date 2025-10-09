@@ -172,9 +172,9 @@ class TestPruneAPI:
         )
 
         # Verify service was called with correct parameters
-        mock_service.create_prune_config.assert_called_once_with(
+        mock_service.create_prune_config.assert_called_once_with(  # type: ignore[attr-defined]
             mock_db, sample_config_create
-        )  # type: ignore[attr-defined]
+        )
 
         # Verify HTMX success template response
         mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
@@ -421,9 +421,9 @@ class TestPruneAPI:
         )
 
         # Verify service was called with correct parameters
-        mock_service.update_prune_config.assert_called_once_with(
+        mock_service.update_prune_config.assert_called_once_with(  # type: ignore[attr-defined]
             mock_db, 1, sample_config_update
-        )  # type: ignore[attr-defined]
+        )
 
         # Verify HTMX success template response
         mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
